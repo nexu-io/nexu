@@ -1,0 +1,3 @@
+[submodule "docs/cowork"]
+	path = docs/cowork
+	url = git@github.com:refly-ai/agent-digital-cowork.git
