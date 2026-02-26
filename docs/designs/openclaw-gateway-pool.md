@@ -87,7 +87,7 @@ apps/gateway-pool (N 个)
 - `OPENCLAW_CONFIG_PATH`（sidecar 落盘配置路径）
 - `OPENCLAW_STATE_DIR`（运行时状态目录）
 - `RUNTIME_POOL_ID`（该 sidecar 所属 pool 节点标识）
-- `INTERNAL_TRPC_TOKEN`（sidecar 调用 internal tRPC）
+- `INTERNAL_TRPC_TOKEN`（sidecar 调用 internal HTTP API）
 - `RUNTIME_API_BASE_URL`（默认 `http://localhost:3000`，指向 `apps/api`）
 
 可选调优参数：
@@ -105,16 +105,16 @@ apps/gateway-pool (N 个)
 ### apps/api
 
 - `routes/*`：Public API 的 HTTP 协议、OpenAPI、鉴权。
-- `trpc/internal/*`（新增）：Pool Node 内部交互（register/heartbeat/config）。
+- `routes/pool-routes.ts`（新增 internal HTTP）：Pool Node 内部交互（register/heartbeat/config）。
 - `lib/config-generator.ts`：纯函数，输入 bot/channel/credential，输出 OpenClaw config。
 - `services/runtime/*`（新增）：
   - 配置快照发布
-  - internal tRPC config 查询
+  - internal HTTP config 查询
   - runtime 实例状态记录（可选）
 
 ### runtime-sidecar（Pool Node 内）
 
-- 周期拉取控制面配置（当前为 HTTP，目标迁移到 tRPC query）
+- 周期拉取控制面配置（HTTP query）
 - 校验 schema
 - 原子写入 `OPENCLAW_CONFIG_PATH`
 - 触发/依赖 OpenClaw `reload.mode=hybrid` 热更新
@@ -124,18 +124,19 @@ apps/gateway-pool (N 个)
 
 - `apps/api/src/routes/bot-routes.ts`：创建 bot 时会 `findOrCreateDefaultPool()`，必要时写入 `gateway_pools` 默认记录，并把 `bots.pool_id` 绑定到该 pool。
 - `apps/api/src/routes/channel-routes.ts`：Slack 连接成功后写入 `webhook_routes(pool_id, external_id, bot_channel_id)`。
-- `apps/api/src/routes/pool-routes.ts`：当前仍通过内部 HTTP 端点 `GET /api/internal/pools/{poolId}/config` 调用 `generatePoolConfig()` 返回配置（待迁移到 tRPC）。
-- `apps/api/src/lib/config-generator.ts`：按 `bots.pool_id` 聚合 bot/channel/credential 生成配置，并在成功返回前执行 `gateway_pools.config_version = config_version + 1`。
+- `apps/api/src/routes/pool-routes.ts`：通过内部 HTTP 端点提供 register/heartbeat/config 查询，sidecar 通过 `/api/internal/pools/*` 调用。
+- `apps/api/src/lib/config-generator.ts`：按 `bots.pool_id` 聚合 bot/channel/credential 生成配置（纯函数，无写入副作用）。
+- `apps/api/src/services/runtime/pool-config-service.ts`：在发布路径进行 hash 去重、写入 `pool_config_snapshots`，并更新 `gateway_pools.config_version`。
 
-> 说明：当前实现中，`config_version` 的写入发生在“拉取配置时”（读路径带写入副作用），后续建议迁移到“配置发布时”写入快照，轮询只读。
+> 说明：`config_version` 的写入已迁移到“配置发布路径”，sidecar 轮询走只读查询。
 
 ### Sidecar 进程形态（关键约束）
 
 - `runtime-sidecar` 默认是后台 worker/daemon，**不提供 Hono HTTP 服务**。
-- sidecar 仅作为 internal tRPC 的调用方（client），不作为被调用方（server）。
+- sidecar 仅作为 internal HTTP API 的调用方（client），不作为被调用方（server）。
 - sidecar 对外职责限定为：拉取配置、校验、原子写入、热更新协调、心跳上报。
 - 如需健康检查/指标端点（`/healthz`、`/metrics`），应作为可选最小 HTTP 暴露能力，而不是引入完整路由服务层。
-- **sidecar 不直连数据库、不查询任何业务表**（如 `gateway_pools`、`bots`、`webhook_routes`、`pool_config_snapshots`）；所有读写都必须经控制面 internal tRPC 完成。
+- **sidecar 不直连数据库、不查询任何业务表**（如 `gateway_pools`、`bots`、`webhook_routes`、`pool_config_snapshots`）；所有读写都必须经控制面 internal HTTP API 完成。
 
 ---
 
@@ -201,20 +202,20 @@ apps/gateway-pool (N 个)
    - Phase B：接入 pool config snapshot 发布器。
    - Phase C：前端在创建 bot 场景按需透传 `poolId`（仅高级入口暴露）。
 
-## Internal（tRPC）
+## Internal（HTTP）
 
-1. `internal.pool.register`（mutation）
+1. `POST /api/internal/pools/register`
    - sidecar 在 gateway 就绪后注册节点；由控制面写入/更新 `gateway_pools`：`status=active`、`podIp`、`lastHeartbeat`。
-2. `internal.pool.heartbeat`（mutation，推荐）
+2. `POST /api/internal/pools/heartbeat`（推荐）
    - sidecar 周期上报 `status/podIp/lastSeenVersion`；由控制面更新 `gateway_pools.status/last_heartbeat/pod_ip`。
-3. `internal.pool.getConfig`（query，当前目标）
+3. `GET /api/internal/pools/{poolId}/config`（兼容）
    - sidecar 拉取 pool 聚合配置；由 `generatePoolConfig()` 生成并返回。
-4. `internal.pool.getConfigLatest` / `internal.pool.getConfigByVersion`（query，演进目标）
-   - 迁移到 snapshot 后提供版本化只读查询，替代读路径写入副作用。
+4. `GET /api/internal/pools/{poolId}/config/latest` / `GET /api/internal/pools/{poolId}/config/versions/{version}`
+   - 提供版本化只读查询，替代读路径写入副作用。
 
 鉴权：
 
-- internal tRPC 统一使用 `X-Internal-Token`（或 `Authorization: Bearer <token>`）做机器鉴权。
+- internal HTTP API 统一使用 `X-Internal-Token`（或 `Authorization: Bearer <token>`）做机器鉴权。
 
 ---
 
@@ -223,7 +224,7 @@ apps/gateway-pool (N 个)
 ### 1) Gateway 启动注册（gateway -> sidecar -> 控制面）
 
 1. gateway 进程启动并通过本地健康检查（sidecar 等待 gateway ready）。
-2. sidecar 调用 `internal.pool.register`，携带 `poolId/podIp/status=active`。
+2. sidecar 调用 `POST /api/internal/pools/register`，携带 `poolId/podIp/status=active`。
 3. 控制面 upsert `gateway_pools` 对应记录：
    - 首次出现：创建记录（含 `id/pool_name/status/created_at` 等基础字段）
    - 已存在：更新 `status/pod_ip/last_heartbeat`
@@ -231,14 +232,14 @@ apps/gateway-pool (N 个)
 
 ### 2) 状态持续上报（sidecar -> 控制面）
 
-1. sidecar 定时调用 `internal.pool.heartbeat`。
+1. sidecar 定时调用 `POST /api/internal/pools/heartbeat`。
 2. 上报内容建议包含：`status`（`active|degraded|unhealthy`）、`podIp`、`lastSeenVersion`、`timestamp`。
 3. 控制面更新 `gateway_pools.last_heartbeat` 与 `gateway_pools.status`；必要时更新 `pod_ip`。
 4. 若心跳超时未更新，控制面将节点标记为 `unhealthy`（用于路由告警与运维可见性）。
 
 ### 3) 配置拉取与热更新（sidecar -> 控制面 -> gateway）
 
-1. sidecar 轮询 `internal.pool.getConfig`（当前目标）或 `internal.pool.getConfigLatest`（演进后）。
+1. sidecar 轮询 `GET /api/internal/pools/{poolId}/config/latest`（可按需回退到 `/config` 兼容端点）。
 2. 控制面按 pool 聚合配置：
    - 从 `bots.pool_id` 找到该 pool 下 bot
    - 过滤 active bot 与 connected channel
@@ -290,24 +291,24 @@ sequenceDiagram
   API-->>Web: 200 bot
 
   SC->>GW: 等待 gateway ready
-  SC->>API: internal.pool.register(poolId, podIp, status)
+  SC->>API: POST /api/internal/pools/register
   API->>DB: upsert gateway_pools(status, pod_ip, last_heartbeat)
   API-->>SC: ok
 
   loop 每 N 秒
-    SC->>API: internal.pool.heartbeat(poolId, status, podIp, lastSeenVersion)
+    SC->>API: POST /api/internal/pools/heartbeat
     API->>DB: update gateway_pools(last_heartbeat, status, pod_ip)
     API-->>SC: ok
   end
 
   loop 轮询配置
-    SC->>API: internal.pool.getConfig(poolId)
+    SC->>API: GET /api/internal/pools/{poolId}/config/latest
     API->>DB: 读取 bots/channels/credentials + pool_config_snapshots
     API-->>SC: OpenClawConfig (+ version/hash)
     alt 配置有变化
       SC->>SC: schema 校验 + tmp+rename 原子写 OPENCLAW_CONFIG_PATH
       GW->>GW: reload.mode=hybrid 热更新 (PID 不变)
-      SC->>API: internal.pool.heartbeat(..., lastSeenVersion)
+      SC->>API: POST /api/internal/pools/heartbeat
       API->>DB: 更新 last_heartbeat/status
     else 配置无变化
       SC->>SC: 跳过写盘
@@ -368,7 +369,7 @@ sequenceDiagram
 ### Phase 2: Pool Config Snapshot + Sidecar 协议
 
 1. 新增 pool 维度 snapshot 表与发布器。
-2. 提供 `getConfigLatest|getConfigByVersion` internal tRPC query（pool 维度）。
+2. 提供 `getConfigLatest|getConfigByVersion` internal HTTP query（pool 维度）。
 3. sidecar 完成轮询、校验、原子写入。
 
 验收：
@@ -406,7 +407,7 @@ sequenceDiagram
 1. 启动 `apps/api`。
 2. 启动一个 pool node（本地可用 mock sidecar + openclaw 进程模拟）。
 3. 创建 bot、连接 Slack。
-4. sidecar 轮询 `internal.pool.getConfig`（或 `getConfigLatest`）并落盘（整文件原子替换）。
+4. sidecar 轮询 `/api/internal/pools/{poolId}/config/latest` 并落盘（整文件原子替换）。
 5. 向 `/api/slack/events` 发事件，确认转发链路。
 6. 修改配置后观察 Gateway 日志 `reload` 关键字，并确认进程 PID 不变。
 
@@ -422,8 +423,8 @@ sequenceDiagram
    - 缓解：sidecar 心跳上报 `podIp`，并及时更新 `gateway_pools.pod_ip`。
 4. **敏感信息泄漏**：日志打出 token/secret。
    - 缓解：统一脱敏日志，不记录 credential 明文。
-5. **版本号膨胀与无效写入**：当前 `GET /config` 会递增 `gateway_pools.config_version`。
-   - 缓解：引入 snapshot/hash 去重，把版本写入从“拉取路径”迁移到“发布路径”。
+5. **版本号膨胀与无效写入**：若在拉取路径写版本，可能导致无效递增。
+   - 缓解：使用 snapshot/hash 去重，版本写入仅在“发布路径”执行。
 
 ---
 
@@ -431,6 +432,6 @@ sequenceDiagram
 
 1. 无独立中心化管理服务依赖，系统可运行。
 2. 每个 pool node 可通过 sidecar 独立完成配置拉取与热更新。
-3. `apps/api` 提供 pool 维度 config snapshot internal tRPC。
+3. `apps/api` 提供 pool 维度 config snapshot internal HTTP API。
 4. Slack webhook 可稳定路由到对应 pool node。
 5. 文档、测试、联调步骤完整。

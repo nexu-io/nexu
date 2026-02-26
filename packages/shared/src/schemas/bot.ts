@@ -11,6 +11,7 @@ export const createBotSchema = z.object({
     .max(100),
   systemPrompt: z.string().optional(),
   modelId: z.string().default("gpt-4o"),
+  poolId: z.string().optional(),
 });
 
 export const updateBotSchema = z.object({
@@ -23,6 +24,7 @@ export const botResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
+  poolId: z.string().nullable(),
   status: botStatusSchema,
   modelId: z.string(),
   systemPrompt: z.string().nullable(),

@@ -2,6 +2,10 @@
 
 How to receive Slack event callbacks on your local machine and run a Gateway for end-to-end AI responses.
 
+Related guide:
+
+- `docs/guides/local-runtime-sidecar.md` — 中文版，本地 sidecar + 本地 OpenClaw 联调说明（推荐和本篇配合使用）
+
 ## Architecture
 
 ```

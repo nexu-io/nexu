@@ -10,6 +10,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bots, gatewayAssignments, gatewayPools } from "../db/schema/index.js";
+import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -32,6 +33,14 @@ const createBotRoute = createRoute({
     200: {
       content: { "application/json": { schema: botResponseSchema } },
       description: "Bot created",
+    },
+    400: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Invalid pool state",
+    },
+    404: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Pool not found",
     },
     409: {
       content: { "application/json": { schema: errorResponseSchema } },
@@ -157,6 +166,7 @@ function formatBot(
     id: bot.id,
     name: bot.name,
     slug: bot.slug,
+    poolId: bot.poolId ?? null,
     status: (bot.status ?? "active") as "active" | "paused" | "deleted",
     modelId: bot.modelId ?? "anthropic/claude-sonnet-4-6",
     systemPrompt: bot.systemPrompt,
@@ -191,6 +201,31 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
     const input = c.req.valid("json");
     const userId = c.get("userId");
 
+    let poolId = input.poolId;
+    if (poolId) {
+      const [requestedPool] = await db
+        .select()
+        .from(gatewayPools)
+        .where(eq(gatewayPools.id, poolId));
+
+      if (!requestedPool) {
+        return c.json({ message: `Pool ${poolId} not found` }, 404);
+      }
+
+      if (requestedPool.status !== "active") {
+        return c.json({ message: `Pool ${poolId} is not active` }, 400);
+      }
+    } else {
+      poolId = await findOrCreateDefaultPool();
+    }
+
+    if (!poolId) {
+      throw new Error("Pool selection failed");
+    }
+
+    const botId = createId();
+    const now = new Date().toISOString();
+
     const [existingBot] = await db
       .select()
       .from(bots)
@@ -200,28 +235,36 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
       return c.json({ message: "Bot slug already exists" }, 409);
     }
 
-    const poolId = await findOrCreateDefaultPool();
-    const botId = createId();
-    const now = new Date().toISOString();
+    await db.transaction(async (tx) => {
+      await tx.insert(bots).values({
+        id: botId,
+        userId,
+        name: input.name,
+        slug: input.slug,
+        systemPrompt: input.systemPrompt,
+        modelId: input.modelId,
+        poolId,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    await db.insert(bots).values({
-      id: botId,
-      userId,
-      name: input.name,
-      slug: input.slug,
-      systemPrompt: input.systemPrompt,
-      modelId: input.modelId,
-      poolId,
-      createdAt: now,
-      updatedAt: now,
+      await tx.insert(gatewayAssignments).values({
+        id: createId(),
+        botId,
+        poolId,
+        assignedAt: now,
+      });
     });
 
-    await db.insert(gatewayAssignments).values({
-      id: createId(),
-      botId,
-      poolId,
-      assignedAt: now,
-    });
+    try {
+      await publishPoolConfigSnapshot(db, poolId);
+    } catch (error) {
+      console.error("[bots] failed to publish pool config snapshot", {
+        poolId,
+        botId,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
 
     const [bot] = await db.select().from(bots).where(eq(bots.id, botId));
     if (!bot) {
@@ -294,6 +337,18 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
       throw new Error("Failed to update bot");
     }
 
+    if (updated.poolId) {
+      try {
+        await publishPoolConfigSnapshot(db, updated.poolId);
+      } catch (error) {
+        console.error("[bots] failed to publish pool config snapshot", {
+          poolId: updated.poolId,
+          botId,
+          error: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    }
+
     return c.json(formatBot(updated), 200);
   });
 
@@ -318,6 +373,18 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
       .update(bots)
       .set({ status: "deleted", updatedAt: new Date().toISOString() })
       .where(eq(bots.id, botId));
+
+    if (bot.poolId) {
+      try {
+        await publishPoolConfigSnapshot(db, bot.poolId);
+      } catch (error) {
+        console.error("[bots] failed to publish pool config snapshot", {
+          poolId: bot.poolId,
+          botId,
+          error: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    }
 
     return c.json({ success: true }, 200);
   });
@@ -345,6 +412,18 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
       throw new Error("Failed to pause bot");
     }
 
+    if (updated.poolId) {
+      try {
+        await publishPoolConfigSnapshot(db, updated.poolId);
+      } catch (error) {
+        console.error("[bots] failed to publish pool config snapshot", {
+          poolId: updated.poolId,
+          botId,
+          error: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    }
+
     return c.json(formatBot(updated), 200);
   });
 
@@ -369,6 +448,18 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
     const [updated] = await db.select().from(bots).where(eq(bots.id, botId));
     if (!updated) {
       throw new Error("Failed to resume bot");
+    }
+
+    if (updated.poolId) {
+      try {
+        await publishPoolConfigSnapshot(db, updated.poolId);
+      } catch (error) {
+        console.error("[bots] failed to publish pool config snapshot", {
+          poolId: updated.poolId,
+          botId,
+          error: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
     }
 
     return c.json(formatBot(updated), 200);

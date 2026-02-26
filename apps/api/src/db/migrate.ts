@@ -111,6 +111,7 @@ export async function migrate(dbUrl?: string) {
       config_version INTEGER DEFAULT 0,
       pod_ip TEXT,
       last_heartbeat TEXT,
+      last_seen_version INTEGER DEFAULT 0,
       created_at TEXT NOT NULL
     );
 
@@ -149,9 +150,25 @@ export async function migrate(dbUrl?: string) {
       external_id TEXT NOT NULL,
       pool_id TEXT NOT NULL,
       bot_channel_id TEXT NOT NULL,
+      bot_id TEXT,
+      account_id TEXT,
+      runtime_url TEXT,
+      updated_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
     CREATE UNIQUE INDEX IF NOT EXISTS webhook_routes_uniq_idx ON webhook_routes(channel_type, external_id);
+
+    CREATE TABLE IF NOT EXISTS pool_config_snapshots (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      pool_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      config_hash TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS pool_config_snapshots_pool_version_idx ON pool_config_snapshots(pool_id, version);
+    CREATE UNIQUE INDEX IF NOT EXISTS pool_config_snapshots_pool_hash_idx ON pool_config_snapshots(pool_id, config_hash);
 
     CREATE TABLE IF NOT EXISTS oauth_states (
       pk SERIAL PRIMARY KEY,
@@ -174,6 +191,14 @@ export async function migrate(dbUrl?: string) {
       expires_at TEXT,
       created_at TEXT NOT NULL
     );
+  `);
+
+  await client.query(`
+    ALTER TABLE gateway_pools ADD COLUMN IF NOT EXISTS last_seen_version INTEGER DEFAULT 0;
+    ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS bot_id TEXT;
+    ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS account_id TEXT;
+    ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS runtime_url TEXT;
+    ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NOW()::TEXT;
   `);
 
   console.log("Database migrated successfully");

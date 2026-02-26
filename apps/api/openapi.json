@@ -37,6 +37,9 @@
                   "modelId": {
                     "type": "string",
                     "default": "gpt-4o"
+                  },
+                  "poolId": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -64,6 +67,10 @@
                     "slug": {
                       "type": "string"
                     },
+                    "poolId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -90,11 +97,48 @@
                     "id",
                     "name",
                     "slug",
+                    "poolId",
                     "status",
                     "modelId",
                     "systemPrompt",
                     "createdAt",
                     "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid pool state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pool not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
                   ]
                 }
               }
@@ -146,6 +190,10 @@
                           "slug": {
                             "type": "string"
                           },
+                          "poolId": {
+                            "type": "string",
+                            "nullable": true
+                          },
                           "status": {
                             "type": "string",
                             "enum": [
@@ -172,6 +220,7 @@
                           "id",
                           "name",
                           "slug",
+                          "poolId",
                           "status",
                           "modelId",
                           "systemPrompt",
@@ -223,6 +272,10 @@
                     "slug": {
                       "type": "string"
                     },
+                    "poolId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -249,6 +302,7 @@
                     "id",
                     "name",
                     "slug",
+                    "poolId",
                     "status",
                     "modelId",
                     "systemPrompt",
@@ -332,6 +386,10 @@
                     "slug": {
                       "type": "string"
                     },
+                    "poolId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -358,6 +416,7 @@
                     "id",
                     "name",
                     "slug",
+                    "poolId",
                     "status",
                     "modelId",
                     "systemPrompt",
@@ -474,6 +533,10 @@
                     "slug": {
                       "type": "string"
                     },
+                    "poolId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -500,6 +563,7 @@
                     "id",
                     "name",
                     "slug",
+                    "poolId",
                     "status",
                     "modelId",
                     "systemPrompt",
@@ -563,6 +627,10 @@
                     "slug": {
                       "type": "string"
                     },
+                    "poolId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -589,6 +657,7 @@
                     "id",
                     "name",
                     "slug",
+                    "poolId",
                     "status",
                     "modelId",
                     "systemPrompt",
@@ -1291,6 +1360,105 @@
                         "auth"
                       ]
                     },
+                    "models": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "merge",
+                            "replace"
+                          ]
+                        },
+                        "providers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "baseUrl": {
+                                "type": "string"
+                              },
+                              "apiKey": {
+                                "type": "string"
+                              },
+                              "api": {
+                                "type": "string"
+                              },
+                              "models": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "reasoning": {
+                                      "type": "boolean"
+                                    },
+                                    "input": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "cost": {
+                                      "type": "object",
+                                      "properties": {
+                                        "input": {
+                                          "type": "number"
+                                        },
+                                        "output": {
+                                          "type": "number"
+                                        },
+                                        "cacheRead": {
+                                          "type": "number"
+                                        },
+                                        "cacheWrite": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "input",
+                                        "output"
+                                      ]
+                                    },
+                                    "contextWindow": {
+                                      "type": "number"
+                                    },
+                                    "maxTokens": {
+                                      "type": "number"
+                                    },
+                                    "compat": {
+                                      "type": "object",
+                                      "properties": {
+                                        "supportsStore": {
+                                          "type": "boolean"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "baseUrl",
+                              "apiKey",
+                              "api",
+                              "models"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "providers"
+                      ]
+                    },
                     "agents": {
                       "type": "object",
                       "properties": {
@@ -1298,7 +1466,22 @@
                           "type": "object",
                           "properties": {
                             "model": {
-                              "type": "string"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "primary": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "primary"
+                                  ]
+                                }
+                              ]
                             }
                           }
                         },
@@ -1360,6 +1543,44 @@
                         "slack": {
                           "type": "object",
                           "properties": {
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "socket",
+                                "http"
+                              ]
+                            },
+                            "signingSecret": {
+                              "type": "string"
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "groupPolicy": {
+                              "type": "string",
+                              "enum": [
+                                "open",
+                                "allowlist",
+                                "disabled"
+                              ]
+                            },
+                            "requireMention": {
+                              "type": "boolean"
+                            },
+                            "dmPolicy": {
+                              "type": "string",
+                              "enum": [
+                                "pairing",
+                                "allowlist",
+                                "open"
+                              ]
+                            },
+                            "allowFrom": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
                             "accounts": {
                               "type": "object",
                               "additionalProperties": {
@@ -1446,6 +1667,35 @@
                           "match"
                         ]
                       }
+                    },
+                    "commands": {
+                      "type": "object",
+                      "properties": {
+                        "native": {
+                          "type": "string",
+                          "enum": [
+                            "auto",
+                            "off"
+                          ]
+                        },
+                        "nativeSkills": {
+                          "type": "string",
+                          "enum": [
+                            "auto",
+                            "off"
+                          ]
+                        },
+                        "restart": {
+                          "type": "boolean"
+                        },
+                        "ownerDisplay": {
+                          "type": "string",
+                          "enum": [
+                            "raw",
+                            "friendly"
+                          ]
+                        }
+                      }
                     }
                   },
                   "required": [
@@ -1460,6 +1710,1130 @@
           },
           "404": {
             "description": "Pool not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/pools/register": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "poolId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "podIp": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "active",
+                      "degraded",
+                      "unhealthy",
+                      "draining",
+                      "terminated"
+                    ],
+                    "default": "active"
+                  }
+                },
+                "required": [
+                  "poolId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pool node registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "poolId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "poolId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/pools/heartbeat": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "poolId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "podIp": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "active",
+                      "degraded",
+                      "unhealthy",
+                      "draining",
+                      "terminated"
+                    ],
+                    "default": "active"
+                  },
+                  "lastSeenVersion": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "poolId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pool node heartbeat accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "poolId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "active",
+                        "degraded",
+                        "unhealthy",
+                        "draining",
+                        "terminated"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "poolId",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/pools/{poolId}/config/latest": {
+      "get": {
+        "tags": [
+          "Internal"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "poolId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest pool config snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "poolId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "configHash": {
+                      "type": "string"
+                    },
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "gateway": {
+                          "type": "object",
+                          "properties": {
+                            "port": {
+                              "type": "number",
+                              "default": 18789
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "local"
+                              ],
+                              "default": "local"
+                            },
+                            "bind": {
+                              "type": "string",
+                              "enum": [
+                                "loopback",
+                                "lan",
+                                "auto"
+                              ],
+                              "default": "lan"
+                            },
+                            "auth": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "none",
+                                    "token"
+                                  ]
+                                },
+                                "token": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "mode"
+                              ]
+                            },
+                            "reload": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "off",
+                                    "hot",
+                                    "hybrid"
+                                  ]
+                                }
+                              },
+                              "default": {
+                                "mode": "hybrid"
+                              },
+                              "required": [
+                                "mode"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "auth"
+                          ]
+                        },
+                        "models": {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "merge",
+                                "replace"
+                              ]
+                            },
+                            "providers": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "baseUrl": {
+                                    "type": "string"
+                                  },
+                                  "apiKey": {
+                                    "type": "string"
+                                  },
+                                  "api": {
+                                    "type": "string"
+                                  },
+                                  "models": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "reasoning": {
+                                          "type": "boolean"
+                                        },
+                                        "input": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "cost": {
+                                          "type": "object",
+                                          "properties": {
+                                            "input": {
+                                              "type": "number"
+                                            },
+                                            "output": {
+                                              "type": "number"
+                                            },
+                                            "cacheRead": {
+                                              "type": "number"
+                                            },
+                                            "cacheWrite": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "input",
+                                            "output"
+                                          ]
+                                        },
+                                        "contextWindow": {
+                                          "type": "number"
+                                        },
+                                        "maxTokens": {
+                                          "type": "number"
+                                        },
+                                        "compat": {
+                                          "type": "object",
+                                          "properties": {
+                                            "supportsStore": {
+                                              "type": "boolean"
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "id"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "baseUrl",
+                                  "apiKey",
+                                  "api",
+                                  "models"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "providers"
+                          ]
+                        },
+                        "agents": {
+                          "type": "object",
+                          "properties": {
+                            "defaults": {
+                              "type": "object",
+                              "properties": {
+                                "model": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "primary": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "primary"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "list": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "default": {
+                                    "type": "boolean"
+                                  },
+                                  "workspace": {
+                                    "type": "string"
+                                  },
+                                  "model": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "primary": {
+                                            "type": "string"
+                                          },
+                                          "fallbacks": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "primary"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "list"
+                          ]
+                        },
+                        "channels": {
+                          "type": "object",
+                          "properties": {
+                            "slack": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "socket",
+                                    "http"
+                                  ]
+                                },
+                                "signingSecret": {
+                                  "type": "string"
+                                },
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "groupPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "open",
+                                    "allowlist",
+                                    "disabled"
+                                  ]
+                                },
+                                "requireMention": {
+                                  "type": "boolean"
+                                },
+                                "dmPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pairing",
+                                    "allowlist",
+                                    "open"
+                                  ]
+                                },
+                                "allowFrom": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "accounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "type": "boolean",
+                                        "default": true
+                                      },
+                                      "botToken": {
+                                        "type": "string"
+                                      },
+                                      "signingSecret": {
+                                        "type": "string"
+                                      },
+                                      "appToken": {
+                                        "type": "string"
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "socket",
+                                          "http"
+                                        ],
+                                        "default": "http"
+                                      },
+                                      "webhookPath": {
+                                        "type": "string"
+                                      },
+                                      "dmPolicy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "pairing",
+                                          "allowlist",
+                                          "open"
+                                        ]
+                                      },
+                                      "groupPolicy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open",
+                                          "allowlist",
+                                          "disabled"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "botToken"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "accounts"
+                              ]
+                            }
+                          }
+                        },
+                        "bindings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "agentId": {
+                                "type": "string"
+                              },
+                              "match": {
+                                "type": "object",
+                                "properties": {
+                                  "channel": {
+                                    "type": "string"
+                                  },
+                                  "accountId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "channel"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "agentId",
+                              "match"
+                            ]
+                          }
+                        },
+                        "commands": {
+                          "type": "object",
+                          "properties": {
+                            "native": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "off"
+                              ]
+                            },
+                            "nativeSkills": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "off"
+                              ]
+                            },
+                            "restart": {
+                              "type": "boolean"
+                            },
+                            "ownerDisplay": {
+                              "type": "string",
+                              "enum": [
+                                "raw",
+                                "friendly"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "gateway",
+                        "agents",
+                        "channels",
+                        "bindings"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "poolId",
+                    "version",
+                    "configHash",
+                    "config",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pool not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/pools/{poolId}/config/versions/{version}": {
+      "get": {
+        "tags": [
+          "Internal"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "poolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0
+            },
+            "required": false,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pool config snapshot by version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "poolId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "configHash": {
+                      "type": "string"
+                    },
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "gateway": {
+                          "type": "object",
+                          "properties": {
+                            "port": {
+                              "type": "number",
+                              "default": 18789
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "local"
+                              ],
+                              "default": "local"
+                            },
+                            "bind": {
+                              "type": "string",
+                              "enum": [
+                                "loopback",
+                                "lan",
+                                "auto"
+                              ],
+                              "default": "lan"
+                            },
+                            "auth": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "none",
+                                    "token"
+                                  ]
+                                },
+                                "token": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "mode"
+                              ]
+                            },
+                            "reload": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "off",
+                                    "hot",
+                                    "hybrid"
+                                  ]
+                                }
+                              },
+                              "default": {
+                                "mode": "hybrid"
+                              },
+                              "required": [
+                                "mode"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "auth"
+                          ]
+                        },
+                        "models": {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "merge",
+                                "replace"
+                              ]
+                            },
+                            "providers": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "baseUrl": {
+                                    "type": "string"
+                                  },
+                                  "apiKey": {
+                                    "type": "string"
+                                  },
+                                  "api": {
+                                    "type": "string"
+                                  },
+                                  "models": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "reasoning": {
+                                          "type": "boolean"
+                                        },
+                                        "input": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "cost": {
+                                          "type": "object",
+                                          "properties": {
+                                            "input": {
+                                              "type": "number"
+                                            },
+                                            "output": {
+                                              "type": "number"
+                                            },
+                                            "cacheRead": {
+                                              "type": "number"
+                                            },
+                                            "cacheWrite": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          "required": [
+                                            "input",
+                                            "output"
+                                          ]
+                                        },
+                                        "contextWindow": {
+                                          "type": "number"
+                                        },
+                                        "maxTokens": {
+                                          "type": "number"
+                                        },
+                                        "compat": {
+                                          "type": "object",
+                                          "properties": {
+                                            "supportsStore": {
+                                              "type": "boolean"
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "id"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "baseUrl",
+                                  "apiKey",
+                                  "api",
+                                  "models"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "providers"
+                          ]
+                        },
+                        "agents": {
+                          "type": "object",
+                          "properties": {
+                            "defaults": {
+                              "type": "object",
+                              "properties": {
+                                "model": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "primary": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "primary"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "list": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "default": {
+                                    "type": "boolean"
+                                  },
+                                  "workspace": {
+                                    "type": "string"
+                                  },
+                                  "model": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "primary": {
+                                            "type": "string"
+                                          },
+                                          "fallbacks": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "primary"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "list"
+                          ]
+                        },
+                        "channels": {
+                          "type": "object",
+                          "properties": {
+                            "slack": {
+                              "type": "object",
+                              "properties": {
+                                "mode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "socket",
+                                    "http"
+                                  ]
+                                },
+                                "signingSecret": {
+                                  "type": "string"
+                                },
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "groupPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "open",
+                                    "allowlist",
+                                    "disabled"
+                                  ]
+                                },
+                                "requireMention": {
+                                  "type": "boolean"
+                                },
+                                "dmPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pairing",
+                                    "allowlist",
+                                    "open"
+                                  ]
+                                },
+                                "allowFrom": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "accounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "type": "boolean",
+                                        "default": true
+                                      },
+                                      "botToken": {
+                                        "type": "string"
+                                      },
+                                      "signingSecret": {
+                                        "type": "string"
+                                      },
+                                      "appToken": {
+                                        "type": "string"
+                                      },
+                                      "mode": {
+                                        "type": "string",
+                                        "enum": [
+                                          "socket",
+                                          "http"
+                                        ],
+                                        "default": "http"
+                                      },
+                                      "webhookPath": {
+                                        "type": "string"
+                                      },
+                                      "dmPolicy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "pairing",
+                                          "allowlist",
+                                          "open"
+                                        ]
+                                      },
+                                      "groupPolicy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open",
+                                          "allowlist",
+                                          "disabled"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "botToken"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "accounts"
+                              ]
+                            }
+                          }
+                        },
+                        "bindings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "agentId": {
+                                "type": "string"
+                              },
+                              "match": {
+                                "type": "object",
+                                "properties": {
+                                  "channel": {
+                                    "type": "string"
+                                  },
+                                  "accountId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "channel"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "agentId",
+                              "match"
+                            ]
+                          }
+                        },
+                        "commands": {
+                          "type": "object",
+                          "properties": {
+                            "native": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "off"
+                              ]
+                            },
+                            "nativeSkills": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "off"
+                              ]
+                            },
+                            "restart": {
+                              "type": "boolean"
+                            },
+                            "ownerDisplay": {
+                              "type": "string",
+                              "enum": [
+                                "raw",
+                                "friendly"
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "gateway",
+                        "agents",
+                        "channels",
+                        "bindings"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "poolId",
+                    "version",
+                    "configHash",
+                    "config",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Config version not found",
             "content": {
               "application/json": {
                 "schema": {

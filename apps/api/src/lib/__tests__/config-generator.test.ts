@@ -22,6 +22,7 @@ async function createTables(client: pg.Pool) {
   await client.query(`
     DROP TABLE IF EXISTS webhook_routes CASCADE;
     DROP TABLE IF EXISTS gateway_assignments CASCADE;
+    DROP TABLE IF EXISTS pool_config_snapshots CASCADE;
     DROP TABLE IF EXISTS usage_metrics CASCADE;
     DROP TABLE IF EXISTS users CASCADE;
     DROP TABLE IF EXISTS channel_credentials CASCADE;
@@ -81,6 +82,7 @@ async function createTables(client: pg.Pool) {
       config_version INTEGER DEFAULT 0,
       pod_ip TEXT,
       last_heartbeat TEXT,
+      last_seen_version INTEGER DEFAULT 0,
       created_at TEXT NOT NULL
     );
 
@@ -99,15 +101,31 @@ async function createTables(client: pg.Pool) {
       external_id TEXT NOT NULL,
       pool_id TEXT NOT NULL,
       bot_channel_id TEXT NOT NULL,
+      bot_id TEXT,
+      account_id TEXT,
+      runtime_url TEXT,
+      updated_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
     CREATE UNIQUE INDEX webhook_routes_uniq_idx ON webhook_routes(channel_type, external_id);
+
+    CREATE TABLE pool_config_snapshots (
+      pk SERIAL PRIMARY KEY,
+      id TEXT NOT NULL UNIQUE,
+      pool_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      config_hash TEXT NOT NULL,
+      config_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX pool_config_snapshots_pool_version_idx ON pool_config_snapshots(pool_id, version);
+    CREATE UNIQUE INDEX pool_config_snapshots_pool_hash_idx ON pool_config_snapshots(pool_id, config_hash);
   `);
 }
 
 async function truncateAll(client: pg.Pool) {
   await client.query(
-    "TRUNCATE bots, bot_channels, channel_credentials, gateway_pools, gateway_assignments, webhook_routes CASCADE",
+    "TRUNCATE bots, bot_channels, channel_credentials, gateway_pools, gateway_assignments, webhook_routes, pool_config_snapshots CASCADE",
   );
 }
 

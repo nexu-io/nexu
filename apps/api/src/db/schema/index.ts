@@ -84,6 +84,7 @@ export const gatewayPools = pgTable("gateway_pools", {
   configVersion: integer("config_version").default(0),
   podIp: text("pod_ip"),
   lastHeartbeat: text("last_heartbeat"),
+  lastSeenVersion: integer("last_seen_version").default(0),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -134,6 +135,12 @@ export const webhookRoutes = pgTable(
     externalId: text("external_id").notNull(),
     poolId: text("pool_id").notNull(),
     botChannelId: text("bot_channel_id").notNull(),
+    botId: text("bot_id"),
+    accountId: text("account_id"),
+    runtimeUrl: text("runtime_url"),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -142,6 +149,31 @@ export const webhookRoutes = pgTable(
     uniqueIndex("webhook_routes_uniq_idx").on(
       table.channelType,
       table.externalId,
+    ),
+  ],
+);
+
+export const poolConfigSnapshots = pgTable(
+  "pool_config_snapshots",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    poolId: text("pool_id").notNull(),
+    version: integer("version").notNull(),
+    configHash: text("config_hash").notNull(),
+    configJson: text("config_json").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("pool_config_snapshots_pool_version_idx").on(
+      table.poolId,
+      table.version,
+    ),
+    uniqueIndex("pool_config_snapshots_pool_hash_idx").on(
+      table.poolId,
+      table.configHash,
     ),
   ],
 );
