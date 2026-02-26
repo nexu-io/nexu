@@ -42,6 +42,7 @@ ENV NODE_ENV=production
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/gateway/node_modules ./apps/gateway/node_modules
+COPY --from=build /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=build /app/apps/gateway/dist ./apps/gateway/dist
 COPY --from=build /app/apps/gateway/package.json ./apps/gateway/package.json
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
