@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nexu.api.fullname" . }}
+  namespace: {{ include "nexu.namespace" . }}
+  labels:
+    {{- include "nexu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.api.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.api.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "nexu.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nexu.gateway.fullname" . }}
+  namespace: {{ include "nexu.namespace" . }}
+  labels:
+    {{- include "nexu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  {{- if not .Values.gateway.hpa.enabled }}
+  replicas: {{ .Values.gateway.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "nexu.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "nexu.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+    spec:
+      initContainers:
+        - name: fetch-config
+          image: "{{ .Values.gateway.initContainer.image.repository }}:{{ .Values.gateway.initContainer.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.initContainer.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              MAX_RETRIES=30
+              attempt=0
+              while [ "$attempt" -lt "$MAX_RETRIES" ]; do
+                status=$(curl -s -o /etc/openclaw/config.json -w "%{http_code}" \
+                  -H "Authorization: Bearer $GATEWAY_TOKEN" \
+                  "${NEXU_API_URL}/api/internal/pools/${POOL_ID}/config")
+                if [ "$status" = "200" ]; then
+                  echo "Config fetched."
+                  exit 0
+                fi
+                attempt=$((attempt + 1))
+                echo "Attempt ${attempt}/${MAX_RETRIES} (HTTP ${status}), retrying..."
+                sleep 2
+              done
+              echo "Failed to fetch config."
+              exit 1
+          envFrom:
+            - configMapRef:
+                name: {{ include "nexu.configMapName" . }}
+            - secretRef:
+                name: {{ include "nexu.secretName" . }}
+          env:
+            - name: POOL_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "nexu.configMapName" . }}
+                  key: POOL_ID
+                  optional: true
+          volumeMounts:
+            - name: openclaw-config
+              mountPath: /etc/openclaw
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - name: gateway
+              containerPort: {{ .Values.gateway.service.port }}
+              protocol: TCP
+          env:
+            - name: NEXU_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "nexu.configMapName" . }}
+                  key: NEXU_API_URL
+            - name: GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexu.secretName" . }}
+                  key: GATEWAY_TOKEN
+            - name: POOL_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "nexu.configMapName" . }}
+                  key: POOL_ID
+                  optional: true
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: OPENCLAW_CONFIG_PATH
+              value: /etc/openclaw/config.json
+          volumeMounts:
+            - name: openclaw-config
+              mountPath: /etc/openclaw
+          readinessProbe:
+            tcpSocket:
+              port: gateway
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: gateway
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+      volumes:
+        - name: openclaw-config
+          emptyDir: {}

@@ -1,0 +1,8 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "nexu.namespace" . }}
+  labels:
+    {{- include "nexu.labels" . | nindent 4 }}
+{{- end }}

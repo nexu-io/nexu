@@ -1,0 +1,114 @@
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  create: false
+  name: nexu
+
+global:
+  labels: {}
+
+config:
+  PORT: "3000"
+  NODE_ENV: "production"
+  WEB_URL: "https://nexu.example.com"
+  BETTER_AUTH_URL: "https://api.nexu.example.com"
+  POOL_ID: "pool_local_01"
+
+secret:
+  DATABASE_URL: "postgresql://nexu:CHANGEME@postgres:5432/nexu"
+  BETTER_AUTH_SECRET: "CHANGEME-random-secret"
+  ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  GATEWAY_TOKEN: "CHANGEME-gateway-token"
+  SLACK_CLIENT_ID: ""
+  SLACK_CLIENT_SECRET: ""
+  SLACK_SIGNING_SECRET: ""
+  LITELLM_BASE_URL: ""
+  LITELLM_API_KEY: ""
+
+api:
+  replicas: 2
+  image:
+    repository: nexu-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+web:
+  replicas: 2
+  image:
+    repository: nexu-web
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 64Mi
+
+gateway:
+  replicas: 1
+  image:
+    repository: nexu-gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  initContainer:
+    image:
+      repository: curlimages/curl
+      tag: latest
+      pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 18789
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    - host: nexu.example.com
+      paths:
+        - path: /v1
+          pathType: Prefix
+          service: api
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /health
+          pathType: Exact
+          service: api
+        - path: /openapi.json
+          pathType: Exact
+          service: api
+        - path: /
+          pathType: Prefix
+          service: web
+  tls: []

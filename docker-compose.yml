@@ -19,7 +19,7 @@ services:
     profiles: ["full"]
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: apps/api/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
     profiles: ["full"]
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: http://localhost:3000
     depends_on:
@@ -52,7 +52,7 @@ services:
   gateway:
     build:
       context: .
-      dockerfile: Dockerfile.gateway
+      dockerfile: apps/gateway/Dockerfile
     environment:
       NEXU_API_URL: ${NEXU_API_URL:-http://api:3000}
       POOL_ID: pool_local_01

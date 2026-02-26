@@ -26,9 +26,9 @@ kubectl kustomize overlays/prod/ | kubectl apply -f -
 
 ```bash
 # 从项目根目录构建
-docker build -f Dockerfile.api -t nexu-api .
-docker build -f Dockerfile.web -t nexu-web .
-docker build -f Dockerfile.gateway -t nexu-gateway .
+docker build -f apps/api/Dockerfile -t nexu-api .
+docker build -f apps/web/Dockerfile -t nexu-web .
+docker build -f apps/gateway/Dockerfile -t nexu-gateway .
 ```
 
 ## 注意事项
