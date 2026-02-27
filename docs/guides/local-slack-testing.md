@@ -193,7 +193,7 @@ NEXU_API_URL=http://host.docker.internal:3000 docker compose up gateway -d
 
 说明：
 - `NEXU_API_URL` 覆盖默认值，让 Docker 容器内的 Gateway 通过 `host.docker.internal` 访问宿主机上的 API
-- `docker-compose.yml` 默认设置 `POD_IP=127.0.0.1`，API 会通过 `127.0.0.1:18789`（端口映射）将事件转发到 Gateway
+- `docker-compose.yml` 默认设置 `RUNTIME_POD_IP=127.0.0.1`，API 会通过 `127.0.0.1:18789`（端口映射）将事件转发到 Gateway
 - 首次启动需要 build 镜像，加 `--build` 参数：`NEXU_API_URL=http://host.docker.internal:3000 docker compose up gateway -d --build`
 
 > macOS/Windows 上 `host.docker.internal` 自动可用。Linux 需加 `--add-host=host.docker.internal:host-gateway` 或使用宿主机实际 IP。
@@ -294,12 +294,12 @@ LITELLM_API_KEY=sk-your-key
 ### 6b. Start All Services
 
 ```bash
-POD_IP=gateway docker compose --profile full up --build
+RUNTIME_POD_IP=gateway docker compose --profile full up --build
 ```
 
 说明：
 - `--profile full` 启动 api 和 web 服务（它们配置了 `profiles: ["full"]`）
-- `POD_IP=gateway` 让 Gateway 注册 Docker DNS 名而非容器内部 IP，使得 Docker 内的 API 可通过 `gateway:18789` 转发事件
+- `RUNTIME_POD_IP=gateway` 让 Gateway 注册 Docker DNS 名而非容器内部 IP，使得 Docker 内的 API 可通过 `gateway:18789` 转发事件
 
 This starts:
 
@@ -323,7 +323,7 @@ open http://localhost:8080
 
 # Gateway
 docker compose logs gateway
-# Should show: "Config fetched successfully" + "Starting OpenClaw gateway"
+# Should show: "starting gateway" + "initial pool config synced"
 ```
 
 ### 8b. Register and Test
@@ -332,7 +332,7 @@ docker compose logs gateway
 2. Register with invite code **NEXU2026**
 3. Create a bot → Connect Slack → Test in Slack
 
-> **代码变更需重新构建：** `POD_IP=gateway docker compose --profile full up --build` 重新打镜像。日常开发建议用 [Path A](#path-a-pnpm-dev-recommended-for-development)。
+> **代码变更需重新构建：** `RUNTIME_POD_IP=gateway docker compose --profile full up --build` 重新打镜像。日常开发建议用 [Path A](#path-a-pnpm-dev-recommended-for-development)。
 
 ---
 
@@ -426,7 +426,7 @@ API 日志显示 `Failed to forward to gateway` 或 `ECONNREFUSED`：
 
 **原因：`pod_ip` 是 Docker 容器内部 IP，macOS 宿主机无法访问。**
 
-`gateway-entrypoint.sh` 启动时用 `hostname -i` 注册了容器 IP（如 `172.21.0.3`），macOS 上这个 IP 不可路由。
+根因通常是 `gateway_pools.pod_ip` 被写成了容器内部 IP（如 `172.21.0.3`），macOS 上这个 IP 不可路由。
 
 **修复：**
 ```sql
@@ -434,7 +434,7 @@ API 日志显示 `Failed to forward to gateway` 或 `ECONNREFUSED`：
 UPDATE gateway_pools SET pod_ip = '127.0.0.1' WHERE id = 'pool_local_01';
 ```
 
-防止 Gateway 重启后覆盖：确保 `docker-compose.yml` 中 `POD_IP` 设置正确（默认 `127.0.0.1`）。
+防止 Gateway 重启后覆盖：确保 `docker-compose.yml` 中 `RUNTIME_POD_IP` 设置正确（默认 `127.0.0.1`）。
 
 ### API 转发时 "Invalid JSON"
 - Hono 框架可能在 middleware 中已消费了 request body

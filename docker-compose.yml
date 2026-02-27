@@ -28,6 +28,7 @@ services:
       DATABASE_URL: postgresql://nexu:nexu@postgres:5432/nexu_dev
       AUTO_SEED: "true"
       WEB_URL: http://localhost:8080
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-internal-token}
     ports:
       - "3000:3000"
     healthcheck:
@@ -54,10 +55,11 @@ services:
       context: .
       dockerfile: apps/gateway/Dockerfile
     environment:
-      NEXU_API_URL: ${NEXU_API_URL:-http://api:3000}
-      POOL_ID: pool_local_01
-      GATEWAY_TOKEN: ${GATEWAY_TOKEN:-gw-secret-token}
-      POD_IP: ${POD_IP:-127.0.0.1}
+      RUNTIME_API_BASE_URL: ${RUNTIME_API_BASE_URL:-http://api:3000}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-change-me-internal-token}
+      RUNTIME_POOL_ID: ${RUNTIME_POOL_ID:-pool_local_01}
+      RUNTIME_POD_IP: ${RUNTIME_POD_IP:-127.0.0.1}
+      RUNTIME_MANAGE_OPENCLAW_PROCESS: ${RUNTIME_MANAGE_OPENCLAW_PROCESS:-true}
     ports:
       - "18789:18789"
 

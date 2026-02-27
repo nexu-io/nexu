@@ -30,10 +30,10 @@ At minimum set `ENCRYPTION_KEY`, `BETTER_AUTH_SECRET`, and Slack credentials. Se
 ### 2. Start
 
 ```bash
-POD_IP=gateway docker compose --profile full up --build
+RUNTIME_POD_IP=gateway docker compose --profile full up --build
 ```
 
-> `--profile full` 启动 api/web 服务。`POD_IP=gateway` 使 Gateway 注册 Docker DNS 名，确保服务间通信正确。
+> `--profile full` 启动 api/web 服务。`RUNTIME_POD_IP=gateway` 使 Gateway 注册 Docker DNS 名，确保服务间通信正确。
 
 | Service  | Host Port | Description |
 |----------|-----------|-------------|
@@ -74,8 +74,9 @@ docker build -f Dockerfile.gateway -t nexu-gateway .
 
 ### Gateway (`Dockerfile.gateway`)
 - Installs pinned `openclaw@{VERSION}` from npm (build arg `OPENCLAW_VERSION`, default `2026.2.25`)
-- `gateway-entrypoint.sh`: fetches config from API with retry, registers pod IP, starts gateway
-- Env vars: `NEXU_API_URL`, `POOL_ID`, `GATEWAY_TOKEN`, `POD_IP`
+- Gateway runtime service (`apps/gateway/src/index.ts`) fetches config with retry, waits for gateway readiness, registers pool, and keeps heartbeat/config-sync loops running
+- Optional process management switch: `RUNTIME_MANAGE_OPENCLAW_PROCESS=true` lets the runtime spawn `openclaw gateway` via `child_process`
+- Key env vars: `RUNTIME_API_BASE_URL`, `INTERNAL_API_TOKEN`, `RUNTIME_POOL_ID`, `RUNTIME_POD_IP`, `OPENCLAW_CONFIG_PATH`
 
 ### PostgreSQL
 - `postgres:16-alpine`, credentials `nexu:nexu`, database `nexu_dev`
