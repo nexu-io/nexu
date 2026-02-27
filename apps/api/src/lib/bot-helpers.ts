@@ -52,7 +52,7 @@ export async function findOrCreateDefaultBot(
     userId,
     name: "My Bot",
     slug: "my-bot",
-    modelId: "anthropic/claude-sonnet-4-6",
+    modelId: process.env.DEFAULT_MODEL_ID ?? "anthropic/claude-sonnet-4",
     poolId,
     createdAt: now,
     updatedAt: now,

@@ -1473,7 +1473,8 @@
                     "channelType": {
                       "type": "string",
                       "enum": [
-                        "slack"
+                        "slack",
+                        "discord"
                       ]
                     },
                     "accountId": {
@@ -1489,6 +1490,10 @@
                       ]
                     },
                     "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
                       "type": "string",
                       "nullable": true
                     },
@@ -1515,6 +1520,123 @@
           },
           "409": {
             "description": "Slack already connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/channels/discord/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botToken": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "appId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "guildName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "botToken",
+                  "appId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Discord channel connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Discord already connected",
             "content": {
               "application/json": {
                 "schema": {
@@ -1561,7 +1683,8 @@
                           "channelType": {
                             "type": "string",
                             "enum": [
-                              "slack"
+                              "slack",
+                              "discord"
                             ]
                           },
                           "accountId": {
@@ -1577,6 +1700,10 @@
                             ]
                           },
                           "teamName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "appId": {
                             "type": "string",
                             "nullable": true
                           },
@@ -1697,7 +1824,8 @@
                     "channelType": {
                       "type": "string",
                       "enum": [
-                        "slack"
+                        "slack",
+                        "discord"
                       ]
                     },
                     "accountId": {
@@ -1713,6 +1841,10 @@
                       ]
                     },
                     "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
                       "type": "string",
                       "nullable": true
                     },
@@ -2229,6 +2361,52 @@
                                 },
                                 "required": [
                                   "botToken"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "accounts"
+                          ]
+                        },
+                        "discord": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "groupPolicy": {
+                              "type": "string",
+                              "enum": [
+                                "open",
+                                "allowlist",
+                                "disabled"
+                              ]
+                            },
+                            "accounts": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "enabled": {
+                                    "type": "boolean",
+                                    "default": true
+                                  },
+                                  "token": {
+                                    "type": "string"
+                                  },
+                                  "groupPolicy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "open",
+                                      "allowlist",
+                                      "disabled"
+                                    ],
+                                    "default": "open"
+                                  }
+                                },
+                                "required": [
+                                  "token"
                                 ]
                               }
                             }
@@ -2870,6 +3048,52 @@
                               "required": [
                                 "accounts"
                               ]
+                            },
+                            "discord": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "groupPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "open",
+                                    "allowlist",
+                                    "disabled"
+                                  ]
+                                },
+                                "accounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "type": "boolean",
+                                        "default": true
+                                      },
+                                      "token": {
+                                        "type": "string"
+                                      },
+                                      "groupPolicy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open",
+                                          "allowlist",
+                                          "disabled"
+                                        ],
+                                        "default": "open"
+                                      }
+                                    },
+                                    "required": [
+                                      "token"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "accounts"
+                              ]
                             }
                           }
                         },
@@ -3369,6 +3593,52 @@
                                     },
                                     "required": [
                                       "botToken"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "accounts"
+                              ]
+                            },
+                            "discord": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "groupPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "open",
+                                    "allowlist",
+                                    "disabled"
+                                  ]
+                                },
+                                "accounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "properties": {
+                                      "enabled": {
+                                        "type": "boolean",
+                                        "default": true
+                                      },
+                                      "token": {
+                                        "type": "string"
+                                      },
+                                      "groupPolicy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open",
+                                          "allowlist",
+                                          "disabled"
+                                        ],
+                                        "default": "open"
+                                      }
+                                    },
+                                    "required": [
+                                      "token"
                                     ]
                                   }
                                 }

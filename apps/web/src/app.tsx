@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthLayout } from "./layouts/auth-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
-import { BotConfigPage } from "./pages/bot-config";
 import { ChannelsPage } from "./pages/channels";
 import { InvitePage } from "./pages/invite";
 import { LandingPage } from "./pages/landing";
@@ -21,7 +20,6 @@ export function App() {
           <Route path="/workspace/sessions" element={<SessionsPage />} />
           <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
           <Route path="/workspace/channels" element={<ChannelsPage />} />
-          <Route path="/workspace/bot" element={<BotConfigPage />} />
           <Route
             path="/workspace/channels/slack/callback"
             element={<SlackOAuthCallbackPage />}

@@ -4,7 +4,6 @@ import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bot,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -236,16 +235,6 @@ export function WorkspaceLayout() {
           >
             <Settings className="h-4 w-4" />
             {!collapsed && "Channel Config"}
-          </Link>
-          <Link
-            to="/workspace/bot"
-            className={cn(
-              "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent",
-              location.pathname.includes("/bot") && "bg-accent",
-            )}
-          >
-            <Bot className="h-4 w-4" />
-            {!collapsed && "Bot Config"}
           </Link>
         </nav>
 

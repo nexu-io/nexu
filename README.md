@@ -47,15 +47,36 @@ nexu/
 | **Package Manager** | pnpm workspaces |
 | **Infrastructure** | AWS EKS / RDS / ElastiCache / S3 |
 
-## 开发
+## 本地开发
+
+### 首次设置
 
 ```bash
 pnpm install
-pnpm dev          # 启动所有 apps
-pnpm typecheck    # 类型检查
-pnpm lint         # Lint
-pnpm generate-types  # API schema → 前端 SDK
+pnpm build                                # 构建 shared 包
+docker compose up postgres -d             # 启动 PostgreSQL (:5433)
+cp apps/api/.env.example apps/api/.env    # 复制环境变量模板，按需填写
+pnpm db:push                              # 推送数据库 schema
+pnpm seed                                 # 创建 gateway pool + 邀请码
 ```
+
+### 日常启动
+
+```bash
+# Terminal 1: API (:3000) + Web (:5173)
+pnpm dev
+
+# Terminal 2: Sidecar（轮询 API 拉配置，写到 .openclaw/）
+pnpm dev:sidecar
+
+# Terminal 3: OpenClaw Gateway（读 .openclaw/ 配置，后台运行）
+pnpm dev:gateway
+```
+
+> Sidecar 每 2 秒从 API 拉最新配置写入 `.openclaw/openclaw.json`，OpenClaw 监听文件变更自动热重载。Web 上改了 channel/bot 后无需重启。
+
+只做前端/API 开发时，只跑 `pnpm dev` 即可。需要端到端测试 Slack/Discord 时再启动 Sidecar + Gateway。
+
 
 ## 相关仓库
 

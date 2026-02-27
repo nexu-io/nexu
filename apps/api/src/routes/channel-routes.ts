@@ -3,6 +3,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import {
   channelListResponseSchema,
   channelResponseSchema,
+  connectDiscordSchema,
   connectSlackSchema,
   slackOAuthUrlResponseSchema,
 } from "@nexu/shared";
@@ -64,7 +65,7 @@ function formatChannel(
   return {
     id: ch.id,
     botId: ch.botId,
-    channelType: ch.channelType as "slack",
+    channelType: ch.channelType as "slack" | "discord",
     accountId: ch.accountId,
     status: (ch.status ?? "pending") as
       | "pending"
@@ -72,6 +73,7 @@ function formatChannel(
       | "disconnected"
       | "error",
     teamName: (config.teamName as string) ?? null,
+    appId: (config.appId as string) ?? null,
     createdAt: ch.createdAt,
     updatedAt: ch.updatedAt,
   };
@@ -187,6 +189,27 @@ const disconnectChannelRoute = createRoute({
     404: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Not found",
+    },
+  },
+});
+
+const connectDiscordRoute = createRoute({
+  method: "post",
+  path: "/v1/channels/discord/connect",
+  tags: ["Channels"],
+  request: {
+    body: {
+      content: { "application/json": { schema: connectDiscordSchema } },
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: channelResponseSchema } },
+      description: "Discord channel connected",
+    },
+    409: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Discord already connected",
     },
   },
 });
@@ -337,6 +360,73 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
         createdAt: now,
       });
     }
+
+    await publishSnapshotSafely(bot.poolId, bot.id);
+
+    const [channel] = await db
+      .select()
+      .from(botChannels)
+      .where(eq(botChannels.id, channelId));
+
+    if (!channel) {
+      throw new Error("Failed to create channel");
+    }
+
+    return c.json(formatChannel(channel), 200);
+  });
+
+  // -- Discord connect --
+  app.openapi(connectDiscordRoute, async (c) => {
+    const userId = c.get("userId");
+    const input = c.req.valid("json");
+
+    const bot = await findOrCreateDefaultBot(userId);
+    const botId = bot.id;
+
+    const accountId = input.guildId
+      ? `discord-${input.guildId}`
+      : "discord-default";
+
+    const [existing] = await db
+      .select()
+      .from(botChannels)
+      .where(
+        and(
+          eq(botChannels.botId, botId),
+          eq(botChannels.channelType, "discord"),
+          eq(botChannels.accountId, accountId),
+        ),
+      );
+
+    if (existing) {
+      return c.json({ message: "Discord channel already connected" }, 409);
+    }
+
+    const channelId = createId();
+    const now = new Date().toISOString();
+
+    await db.insert(botChannels).values({
+      id: channelId,
+      botId,
+      channelType: "discord",
+      accountId,
+      status: "connected",
+      channelConfig: JSON.stringify({
+        appId: input.appId,
+        guildId: input.guildId ?? null,
+        guildName: input.guildName ?? null,
+      }),
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(channelCredentials).values({
+      id: createId(),
+      botChannelId: channelId,
+      credentialType: "botToken",
+      encryptedValue: encrypt(input.botToken),
+      createdAt: now,
+    });
 
     await publishSnapshotSafely(bot.poolId, bot.id);
 

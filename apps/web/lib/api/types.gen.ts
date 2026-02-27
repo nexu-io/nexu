@@ -566,16 +566,59 @@ export type PostV1ChannelsSlackConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack';
+        channelType: 'slack' | 'discord';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
+        appId?: string;
         createdAt: string;
         updatedAt: string;
     };
 };
 
 export type PostV1ChannelsSlackConnectResponse = PostV1ChannelsSlackConnectResponses[keyof PostV1ChannelsSlackConnectResponses];
+
+export type PostV1ChannelsDiscordConnectData = {
+    body?: {
+        botToken: string;
+        appId: string;
+        guildId?: string;
+        guildName?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/channels/discord/connect';
+};
+
+export type PostV1ChannelsDiscordConnectErrors = {
+    /**
+     * Discord already connected
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostV1ChannelsDiscordConnectError = PostV1ChannelsDiscordConnectErrors[keyof PostV1ChannelsDiscordConnectErrors];
+
+export type PostV1ChannelsDiscordConnectResponses = {
+    /**
+     * Discord channel connected
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostV1ChannelsDiscordConnectResponse = PostV1ChannelsDiscordConnectResponses[keyof PostV1ChannelsDiscordConnectResponses];
 
 export type GetV1ChannelsData = {
     body?: never;
@@ -592,10 +635,11 @@ export type GetV1ChannelsResponses = {
         channels: Array<{
             id: string;
             botId: string;
-            channelType: 'slack';
+            channelType: 'slack' | 'discord';
             accountId: string;
             status: 'pending' | 'connected' | 'disconnected' | 'error';
             teamName: string;
+            appId?: string;
             createdAt: string;
             updatedAt: string;
         }>;
@@ -662,10 +706,11 @@ export type GetV1ChannelsByChannelIdStatusResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack';
+        channelType: 'slack' | 'discord';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
+        appId?: string;
         createdAt: string;
         updatedAt: string;
     };
@@ -821,6 +866,17 @@ export type GetApiInternalPoolsByPoolIdConfigResponses = {
                         mode?: 'socket' | 'http';
                         webhookPath?: string;
                         dmPolicy?: 'pairing' | 'allowlist' | 'open';
+                        groupPolicy?: 'open' | 'allowlist' | 'disabled';
+                    };
+                };
+            };
+            discord?: {
+                enabled?: boolean;
+                groupPolicy?: 'open' | 'allowlist' | 'disabled';
+                accounts: {
+                    [key: string]: {
+                        enabled?: boolean;
+                        token: string;
                         groupPolicy?: 'open' | 'allowlist' | 'disabled';
                     };
                 };
@@ -1004,6 +1060,17 @@ export type GetApiInternalPoolsByPoolIdConfigLatestResponses = {
                         };
                     };
                 };
+                discord?: {
+                    enabled?: boolean;
+                    groupPolicy?: 'open' | 'allowlist' | 'disabled';
+                    accounts: {
+                        [key: string]: {
+                            enabled?: boolean;
+                            token: string;
+                            groupPolicy?: 'open' | 'allowlist' | 'disabled';
+                        };
+                    };
+                };
             };
             bindings: Array<{
                 agentId: string;
@@ -1133,6 +1200,17 @@ export type GetApiInternalPoolsByPoolIdConfigVersionsByVersionResponses = {
                             mode?: 'socket' | 'http';
                             webhookPath?: string;
                             dmPolicy?: 'pairing' | 'allowlist' | 'open';
+                            groupPolicy?: 'open' | 'allowlist' | 'disabled';
+                        };
+                    };
+                };
+                discord?: {
+                    enabled?: boolean;
+                    groupPolicy?: 'open' | 'allowlist' | 'disabled';
+                    accounts: {
+                        [key: string]: {
+                            enabled?: boolean;
+                            token: string;
                             groupPolicy?: 'open' | 'allowlist' | 'disabled';
                         };
                     };

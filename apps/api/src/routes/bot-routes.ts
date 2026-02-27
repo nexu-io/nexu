@@ -168,7 +168,10 @@ function formatBot(
     slug: bot.slug,
     poolId: bot.poolId ?? null,
     status: (bot.status ?? "active") as "active" | "paused" | "deleted",
-    modelId: bot.modelId ?? "anthropic/claude-sonnet-4-6",
+    modelId:
+      bot.modelId ??
+      process.env.DEFAULT_MODEL_ID ??
+      "anthropic/claude-sonnet-4",
     systemPrompt: bot.systemPrompt,
     createdAt: bot.createdAt,
     updatedAt: bot.updatedAt,

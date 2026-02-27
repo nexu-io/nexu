@@ -74,8 +74,22 @@ const slackChannelSchema = z.object({
   accounts: z.record(z.string(), slackAccountSchema),
 });
 
+const discordAccountSchema = z.object({
+  enabled: z.boolean().default(true),
+  token: z.string(),
+  groupPolicy: z.enum(["open", "allowlist", "disabled"]).default("open"),
+});
+
+const discordChannelSchema = z.object({
+  enabled: z.boolean().optional(),
+  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+  accounts: z.record(z.string(), discordAccountSchema),
+});
+
 const channelsConfigSchema = z.object({
   slack: slackChannelSchema.optional(),
+  discord: discordChannelSchema.optional(),
 });
 
 const bindingMatchSchema = z.object({
@@ -148,4 +162,5 @@ export const openclawConfigSchema = z.object({
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;
 export type AgentConfig = z.infer<typeof agentSchema>;
 export type SlackAccountConfig = z.infer<typeof slackAccountSchema>;
+export type DiscordAccountConfig = z.infer<typeof discordAccountSchema>;
 export type BindingConfig = z.infer<typeof bindingSchema>;

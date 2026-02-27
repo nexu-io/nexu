@@ -20,13 +20,14 @@ import {
   deleteV1ChannelsByChannelId,
   getV1Channels,
   getV1ChannelsSlackOauthUrl,
+  postV1ChannelsDiscordConnect,
   postV1ChannelsSlackConnect,
 } from "../../lib/api/sdk.gen";
 
 export function ChannelsPage() {
   const queryClient = useQueryClient();
 
-  const { data: channelsData, isLoading: channelsLoading } = useQuery({
+  const { data: channelsData } = useQuery({
     queryKey: ["channels"],
     queryFn: async () => {
       const { data } = await getV1Channels();
@@ -36,6 +37,7 @@ export function ChannelsPage() {
 
   const channels = channelsData?.channels ?? [];
   const slackChannel = channels.find((ch) => ch.channelType === "slack");
+  const discordChannel = channels.find((ch) => ch.channelType === "discord");
 
   return (
     <div className="max-w-2xl">
@@ -62,10 +64,14 @@ export function ChannelsPage() {
         </TabsContent>
 
         <TabsContent value="discord" className="mt-4">
-          <DiscordSetupView
-            channelsLoading={channelsLoading}
-            queryClient={queryClient}
-          />
+          {discordChannel ? (
+            <DiscordConnectedView
+              channel={discordChannel}
+              queryClient={queryClient}
+            />
+          ) : (
+            <DiscordSetupView queryClient={queryClient} />
+          )}
         </TabsContent>
       </Tabs>
     </div>
@@ -309,15 +315,106 @@ function SlackConnectedView({
   );
 }
 
-function DiscordSetupView({
-  channelsLoading: _channelsLoading,
-  queryClient: _queryClient,
+function DiscordConnectedView({
+  channel,
+  queryClient,
 }: {
-  channelsLoading: boolean;
+  channel: {
+    id: string;
+    accountId: string;
+    teamName: string | null;
+    appId?: string | null;
+    status: string;
+  };
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await deleteV1ChannelsByChannelId({
+        path: { channelId: channel.id },
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["channels"] });
+      toast.success("Discord disconnected");
+    },
+  });
+
+  const inviteUrl = channel.appId
+    ? `https://discord.com/oauth2/authorize?client_id=${channel.appId}&scope=bot&permissions=68608`
+    : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Hash className="h-5 w-5" />
+            <div>
+              <CardTitle>{channel.teamName ?? channel.accountId}</CardTitle>
+              <CardDescription>{channel.accountId}</CardDescription>
+            </div>
+          </div>
+          <Badge variant="success">
+            <CheckCircle className="mr-1 h-3 w-3" />
+            Connected
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Separator className="mb-4" />
+        <div className="flex gap-2">
+          {inviteUrl && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={inviteUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Add Bot to Server
+              </a>
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Disconnect
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DiscordSetupView({
+  queryClient,
+}: {
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
   const [step, setStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 2;
+
+  const [appId, setAppId] = useState("");
+  const [botToken, setBotToken] = useState("");
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await postV1ChannelsDiscordConnect({
+        body: { botToken, appId },
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["channels"] });
+      toast.success("Discord connected successfully!");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
 
   return (
     <Card>
@@ -331,9 +428,14 @@ function DiscordSetupView({
       <CardContent className="space-y-4">
         {step === 1 && (
           <div className="space-y-3">
-            <h3 className="font-medium">1. Create a Discord Application</h3>
+            <h3 className="font-medium">
+              1. Create a Discord Application &amp; Enable Intents
+            </h3>
             <p className="text-sm text-muted-foreground">
-              Go to the Discord Developer Portal and create a new application.
+              Go to the Discord Developer Portal, create a new application, then
+              navigate to <strong>Bot</strong> and enable{" "}
+              <strong>Message Content Intent</strong> under Privileged Gateway
+              Intents.
             </p>
             <Button variant="outline" size="sm" asChild>
               <a
@@ -349,48 +451,50 @@ function DiscordSetupView({
         )}
         {step === 2 && (
           <div className="space-y-3">
-            <h3 className="font-medium">2. Configure Bot Permissions</h3>
+            <h3 className="font-medium">2. Enter Credentials &amp; Connect</h3>
             <p className="text-sm text-muted-foreground">
-              In your application settings, go to Bot &rarr; enable
-              &ldquo;Message Content Intent&rdquo; under Privileged Gateway
-              Intents.
+              Copy your Application ID (from General Information) and Bot Token
+              (from Bot &rarr; Reset Token).
             </p>
-          </div>
-        )}
-        {step === 3 && (
-          <div className="space-y-3">
-            <h3 className="font-medium">3. Set Interactions Endpoint</h3>
-            <p className="text-sm text-muted-foreground">
-              In General Information, set the Interactions Endpoint URL to:
-            </p>
-            <code className="block rounded bg-muted p-2 text-sm">
-              https://api.nexu.dev/discord/interactions
-            </code>
-          </div>
-        )}
-        {step === 4 && (
-          <div className="space-y-3">
-            <h3 className="font-medium">4. Enter Credentials</h3>
-            <p className="text-sm text-muted-foreground">
-              Copy your Bot Token and Public Key from the Developer Portal.
-            </p>
-            <div className="space-y-2">
-              <Label>Bot Token</Label>
-              <Input type="password" placeholder="MTxx..." />
-              <Label>Public Key</Label>
-              <Input placeholder="Public Key" />
-              <Label>Guild ID</Label>
-              <Input placeholder="Server ID" />
-            </div>
-          </div>
-        )}
-        {step === 5 && (
-          <div className="space-y-3">
-            <h3 className="font-medium">5. Invite & Test</h3>
-            <p className="text-sm text-muted-foreground">
-              Invite the bot to your server using the OAuth2 URL generator in
-              the Developer Portal. Then test by mentioning the bot.
-            </p>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                connectMutation.mutate();
+              }}
+            >
+              <div className="space-y-2">
+                <Label htmlFor="discord-app-id">Application ID</Label>
+                <Input
+                  id="discord-app-id"
+                  placeholder="123456789012345678"
+                  value={appId}
+                  onChange={(e) => setAppId(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="discord-bot-token">Bot Token</Label>
+                <Input
+                  id="discord-bot-token"
+                  type="password"
+                  placeholder="MTxx..."
+                  value={botToken}
+                  onChange={(e) => setBotToken(e.target.value)}
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={connectMutation.isPending}
+              >
+                {connectMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Connect
+              </Button>
+            </form>
           </div>
         )}
 
@@ -403,12 +507,8 @@ function DiscordSetupView({
           >
             Previous
           </Button>
-          {step < totalSteps ? (
+          {step < totalSteps && (
             <Button onClick={() => setStep((s) => s + 1)}>Next</Button>
-          ) : (
-            <Button onClick={() => toast.info("Discord setup coming soon")}>
-              Complete Setup
-            </Button>
           )}
         </div>
       </CardContent>

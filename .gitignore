@@ -12,3 +12,4 @@ tmp/
 *.db-shm
 *.db-wal
 openapi-ts-error-*.log
+.openclaw/

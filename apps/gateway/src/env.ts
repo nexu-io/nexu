@@ -9,8 +9,9 @@ const nodeEnv = z
   .parse(process.env.NODE_ENV);
 
 const requiredEnvKeys = [
-  "INTERNAL_API_TOKEN",
-  ...(nodeEnv === "production" ? ["RUNTIME_POOL_ID"] : []),
+  ...(nodeEnv === "production"
+    ? ["INTERNAL_API_TOKEN", "RUNTIME_POOL_ID"]
+    : []),
 ] as const;
 
 const missingRequiredEnvKeys = requiredEnvKeys.filter((key) => {
@@ -33,7 +34,7 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   RUNTIME_POOL_ID: z.string().min(1).optional(),
-  INTERNAL_API_TOKEN: z.string().min(1),
+  INTERNAL_API_TOKEN: z.string().min(1).default("gw-secret-token"),
   OPENCLAW_CONFIG_PATH: z.string().min(1).optional(),
   OPENCLAW_STATE_DIR: z.string().min(1).optional(),
   RUNTIME_API_BASE_URL: z.string().url().default("http://localhost:3000"),
@@ -102,7 +103,16 @@ function normalizeConfigPath(path: string): string {
   return trimmed;
 }
 
-function resolveDefaultStateDir(profile: string | undefined): string {
+function resolveDefaultStateDir(
+  profile: string | undefined,
+  nodeEnv: string,
+): string {
+  // In development, write config to project-local .openclaw/ directory
+  if (nodeEnv !== "production") {
+    const suffix = profile ? `-${profile}` : "";
+    return `${process.cwd()}/.openclaw${suffix}`;
+  }
+
   if (!profile) {
     return `${homedir()}/.openclaw`;
   }
@@ -115,7 +125,7 @@ const isProduction = parsedEnv.NODE_ENV === "production";
 
 const openclawStateDir = normalizeConfigPath(
   parsedEnv.OPENCLAW_STATE_DIR ??
-    resolveDefaultStateDir(parsedEnv.OPENCLAW_PROFILE),
+    resolveDefaultStateDir(parsedEnv.OPENCLAW_PROFILE, parsedEnv.NODE_ENV),
 );
 
 const openclawConfigPath = normalizeConfigPath(

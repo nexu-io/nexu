@@ -19,11 +19,15 @@ export async function seedDev(dbUrl?: string) {
   const podIp = process.env.AUTO_SEED === "true" ? "gateway" : "127.0.0.1";
 
   try {
-    // await client.query(`
-    //   INSERT INTO gateway_pools (id, pool_name, pool_type, max_bots, status, pod_ip, created_at)
-    //   VALUES ('pool_local_01', 'local-dev', 'shared', 50, 'active', $1, NOW()::text)
-    //   ON CONFLICT (pool_name) DO UPDATE SET pod_ip = $1, status = 'active'
-    // `, [podIp]);
+    // Gateway pool for local dev
+    await client.query(
+      `
+      INSERT INTO gateway_pools (id, pool_name, pool_type, max_bots, status, pod_ip, created_at)
+      VALUES ('pool_local_01', 'local-dev', 'shared', 50, 'active', $1, NOW()::text)
+      ON CONFLICT (id) DO UPDATE SET pod_ip = $1, status = 'active'
+    `,
+      [podIp],
+    );
 
     // Invite code for registration
     await client.query(`

@@ -16,7 +16,7 @@ export const bots = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     systemPrompt: text("system_prompt"),
-    modelId: text("model_id").default("anthropic/claude-sonnet-4-6"),
+    modelId: text("model_id").default("anthropic/claude-sonnet-4"),
     agentConfig: text("agent_config").default("{}"),
     toolsConfig: text("tools_config").default("{}"),
     status: text("status").default("active"),
