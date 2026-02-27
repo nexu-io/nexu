@@ -86,13 +86,14 @@ function SlackConnectView({
   const [manualMode, setManualMode] = useState(false);
   const [teamId, setTeamId] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [appId, setAppId] = useState("");
   const [botToken, setBotToken] = useState("");
   const [signingSecret, setSigningSecret] = useState("");
 
   const connectMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await postV1ChannelsSlackConnect({
-        body: { teamId, teamName, botToken, signingSecret },
+        body: { teamId, teamName, botToken, signingSecret, appId },
       });
       if (error) throw new Error(error.message);
       return data;
@@ -209,6 +210,19 @@ function SlackConnectView({
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="appId">App ID</Label>
+            <Input
+              id="appId"
+              placeholder="A0123456789"
+              value={appId}
+              onChange={(e) => setAppId(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Found in your Slack App settings under Basic Information.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="botToken">Bot Token</Label>

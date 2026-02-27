@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=--conditions=development pnpm --parallel --filter @nexu/api --filter @nexu/web dev",
+    "dev": "NODE_OPTIONS=--conditions=development pnpm --parallel --filter @nexu/api --filter @nexu/web --filter @nexu/landing dev",
+    "dev:landing": "pnpm --filter @nexu/landing dev",
     "dev:gateway": "OPENCLAW_STATE_DIR=.openclaw openclaw gateway run --allow-unconfigured --bind loopback --port 18789 --force --verbose",
     "dev:sidecar": "pnpm --filter @nexu/gateway dev",
     "build": "pnpm -r build",

@@ -695,6 +695,53 @@
         }
       }
     },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "plan": {
+                      "type": "string"
+                    },
+                    "inviteAccepted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "name",
+                    "plan",
+                    "inviteAccepted"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/bots": {
       "post": {
         "tags": [
@@ -1445,12 +1492,17 @@
                   },
                   "teamName": {
                     "type": "string"
+                  },
+                  "appId": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
                   "botToken",
                   "signingSecret",
-                  "teamId"
+                  "teamId",
+                  "appId"
                 ]
               }
             }
@@ -2357,6 +2409,15 @@
                                       "allowlist",
                                       "disabled"
                                     ]
+                                  },
+                                  "streaming": {
+                                    "type": "string",
+                                    "enum": [
+                                      "off",
+                                      "partial",
+                                      "block",
+                                      "progress"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -2381,6 +2442,14 @@
                                 "open",
                                 "allowlist",
                                 "disabled"
+                              ]
+                            },
+                            "dmPolicy": {
+                              "type": "string",
+                              "enum": [
+                                "pairing",
+                                "allowlist",
+                                "open"
                               ]
                             },
                             "accounts": {
@@ -3037,6 +3106,15 @@
                                           "allowlist",
                                           "disabled"
                                         ]
+                                      },
+                                      "streaming": {
+                                        "type": "string",
+                                        "enum": [
+                                          "off",
+                                          "partial",
+                                          "block",
+                                          "progress"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -3061,6 +3139,14 @@
                                     "open",
                                     "allowlist",
                                     "disabled"
+                                  ]
+                                },
+                                "dmPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pairing",
+                                    "allowlist",
+                                    "open"
                                   ]
                                 },
                                 "accounts": {
@@ -3589,6 +3675,15 @@
                                           "allowlist",
                                           "disabled"
                                         ]
+                                      },
+                                      "streaming": {
+                                        "type": "string",
+                                        "enum": [
+                                          "off",
+                                          "partial",
+                                          "block",
+                                          "progress"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -3613,6 +3708,14 @@
                                     "open",
                                     "allowlist",
                                     "disabled"
+                                  ]
+                                },
+                                "dmPolicy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pairing",
+                                    "allowlist",
+                                    "open"
                                   ]
                                 },
                                 "accounts": {

@@ -8,17 +8,25 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, Ticket } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
-import { postV1InviteValidate } from "../../lib/api/sdk.gen";
+import { getV1Me, postV1InviteValidate } from "../../lib/api/sdk.gen";
 
 export function InvitePage() {
   const navigate = useNavigate();
   const [code, setCode] = useState("");
+
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const { data } = await getV1Me();
+      return data;
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async (inviteCode: string) => {
@@ -40,6 +48,18 @@ export function InvitePage() {
       toast.error("Failed to validate invite code");
     },
   });
+
+  if (profileLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (profile?.inviteAccepted) {
+    return <Navigate to="/workspace" replace />;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

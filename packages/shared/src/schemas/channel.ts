@@ -14,6 +14,7 @@ export const connectSlackSchema = z.object({
   signingSecret: z.string().min(1),
   teamId: z.string().min(1),
   teamName: z.string().optional(),
+  appId: z.string().min(1),
 });
 
 export const connectDiscordSchema = z.object({

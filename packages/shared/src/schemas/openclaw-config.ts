@@ -61,6 +61,7 @@ const slackAccountSchema = z.object({
   webhookPath: z.string().optional(),
   dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
   groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+  streaming: z.enum(["off", "partial", "block", "progress"]).optional(),
 });
 
 const slackChannelSchema = z.object({

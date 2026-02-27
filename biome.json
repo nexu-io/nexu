@@ -35,7 +35,9 @@
       "apps/web/lib/api",
       "*.gen.ts",
       "*.d.ts",
-      "openapi.json"
+      "openapi.json",
+      ".astro",
+      "*.astro"
     ]
   }
 }

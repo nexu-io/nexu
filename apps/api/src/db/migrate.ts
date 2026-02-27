@@ -250,6 +250,13 @@ export async function migrate(dbUrl?: string) {
     ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS account_id TEXT;
     ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS runtime_url TEXT;
     ALTER TABLE webhook_routes ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT NOW()::TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_accepted_at TEXT;
+  `);
+
+  // Recreate webhook_routes unique index to handle composite external_id (teamId:appId)
+  await client.query(`
+    DROP INDEX IF EXISTS webhook_routes_uniq_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS webhook_routes_uniq_idx ON webhook_routes(channel_type, external_id);
   `);
 
   console.log("Database migrated successfully");

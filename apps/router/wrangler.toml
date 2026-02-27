@@ -1,0 +1,13 @@
+name = "nexu-router"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[services]]
+binding = "LANDING"
+service = "nexu-landing"
+
+[[services]]
+binding = "APP"
+service = "nexu-app"
+
+# API_ORIGIN is configured via Cloudflare Dashboard → Worker → Settings → Variables

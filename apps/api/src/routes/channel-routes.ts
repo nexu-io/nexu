@@ -278,7 +278,8 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const bot = await findOrCreateDefaultBot(userId);
     const botId = bot.id;
 
-    const accountId = `slack-${input.teamId}`;
+    const accountId = `slack-${input.appId}`;
+    const slackExternalId = `${input.teamId}:${input.appId}`;
 
     const [globalExisting] = await db
       .select()
@@ -286,14 +287,14 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       .where(
         and(
           eq(webhookRoutes.channelType, "slack"),
-          eq(webhookRoutes.externalId, input.teamId),
+          eq(webhookRoutes.externalId, slackExternalId),
         ),
       );
 
     if (globalExisting) {
       return c.json(
         {
-          message: "This Slack workspace is already connected to another bot",
+          message: "This Slack app is already connected to another bot",
         },
         409,
       );
@@ -326,6 +327,7 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       channelConfig: JSON.stringify({
         teamId: input.teamId,
         teamName: input.teamName ?? null,
+        appId: input.appId,
       }),
       createdAt: now,
       updatedAt: now,
@@ -351,7 +353,7 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       await db.insert(webhookRoutes).values({
         id: createId(),
         channelType: "slack",
-        externalId: input.teamId,
+        externalId: slackExternalId,
         poolId: bot.poolId,
         botChannelId: channelId,
         botId,
@@ -383,9 +385,7 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const bot = await findOrCreateDefaultBot(userId);
     const botId = bot.id;
 
-    const accountId = input.guildId
-      ? `discord-${input.guildId}`
-      : "discord-default";
+    const accountId = `discord-${input.appId}`;
 
     const [existing] = await db
       .select()
@@ -650,7 +650,9 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
       );
     }
 
-    const accountId = `slack-${teamId}`;
+    const appId = tokenResponse.app_id;
+    const accountId = `slack-${appId}`;
+    const slackExternalId = `${teamId}:${appId}`;
 
     // --- 5. Find or create the user's default bot ---
     const bot = await findOrCreateDefaultBot(userId);
@@ -679,7 +681,7 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
         .update(botChannels)
         .set({
           status: "connected",
-          channelConfig: JSON.stringify({ teamId, teamName }),
+          channelConfig: JSON.stringify({ teamId, teamName, appId }),
           updatedAt: now,
         })
         .where(eq(botChannels.id, channelId));
@@ -725,13 +727,13 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
         .where(
           and(
             eq(webhookRoutes.channelType, "slack"),
-            eq(webhookRoutes.externalId, teamId),
+            eq(webhookRoutes.externalId, slackExternalId),
           ),
         );
 
       if (globalExisting) {
         return redirectWithError(
-          "This Slack workspace is already connected to another bot",
+          "This Slack app is already connected to another bot",
         );
       }
 
@@ -743,7 +745,7 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
         channelType: "slack",
         accountId,
         status: "connected",
-        channelConfig: JSON.stringify({ teamId, teamName }),
+        channelConfig: JSON.stringify({ teamId, teamName, appId }),
         createdAt: now,
         updatedAt: now,
       });
@@ -769,7 +771,7 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
         await db.insert(webhookRoutes).values({
           id: createId(),
           channelType: "slack",
-          externalId: teamId,
+          externalId: slackExternalId,
           poolId: bot.poolId,
           botChannelId: channelId,
           botId,

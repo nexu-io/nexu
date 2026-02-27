@@ -6,7 +6,7 @@ import {
 } from "@nexu/shared";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inviteCodes } from "../db/schema/index.js";
+import { inviteCodes, users } from "../db/schema/index.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -63,6 +63,27 @@ export function registerInviteRoutes(app: OpenAPIHono<AppBindings>) {
       .update(inviteCodes)
       .set({ usedCount: sql`${inviteCodes.usedCount} + 1` })
       .where(eq(inviteCodes.id, invite.id));
+
+    // Record invite acceptance for the current user
+    const authUserId = c.get("userId");
+    const now = new Date().toISOString();
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(eq(users.authUserId, authUserId));
+
+    if (existing) {
+      await db
+        .update(users)
+        .set({ inviteAcceptedAt: now, updatedAt: now })
+        .where(eq(users.authUserId, authUserId));
+    } else {
+      await db.insert(users).values({
+        id: crypto.randomUUID(),
+        authUserId,
+        inviteAcceptedAt: now,
+      });
+    }
 
     return c.json({ valid: true }, 200);
   });

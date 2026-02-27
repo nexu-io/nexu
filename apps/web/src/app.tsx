@@ -4,14 +4,13 @@ import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
 import { InvitePage } from "./pages/invite";
-import { LandingPage } from "./pages/landing";
 import { SessionsPage } from "./pages/sessions";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
 
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Navigate to="/workspace" replace />} />
       <Route path="/auth" element={<AuthPage />} />
       <Route element={<AuthLayout />}>
         <Route path="/invite" element={<InvitePage />} />

@@ -12,17 +12,30 @@ import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/lib/auth-client";
 import { Github, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 export function AuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { data: session, isPending } = authClient.useSession();
   const isLogin = searchParams.get("mode") === "login";
   const [loading, setLoading] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+
+  if (isPending) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (session?.user) {
+    return <Navigate to="/invite" replace />;
+  }
 
   const handleOAuth = async (provider: "github" | "google") => {
     setLoading(provider);

@@ -106,6 +106,7 @@ export const users = pgTable("users", {
   id: text("id").notNull().unique(),
   authUserId: text("auth_user_id").notNull().unique(),
   plan: text("plan").default("free"),
+  inviteAcceptedAt: text("invite_accepted_at"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

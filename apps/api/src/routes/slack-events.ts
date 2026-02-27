@@ -79,8 +79,9 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       let payload: Record<string, unknown>;
       try {
         payload = JSON.parse(rawBody) as Record<string, unknown>;
+        const event = payload.event as Record<string, unknown> | undefined;
         console.log(
-          `[slack-events] type=${payload.type} team=${payload.team_id}`,
+          `[slack-events] type=${payload.type} team=${payload.team_id} event.type=${event?.type ?? "none"} event.subtype=${event?.subtype ?? "none"} event.channel=${event?.channel ?? "none"} event.user=${event?.user ?? "none"} event.text=${typeof event?.text === "string" ? event.text.slice(0, 80) : "none"}`,
         );
       } catch {
         console.error("[slack-events] Invalid JSON body");
@@ -92,25 +93,31 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ challenge: payload.challenge });
       }
 
-      // Extract team_id from event payload
+      // Extract team_id and api_app_id from event payload
       const teamId = payload.team_id as string | undefined;
       if (!teamId) {
         return c.json({ error: "Missing team_id" }, 400);
       }
 
-      // Look up webhook route
+      const apiAppId = payload.api_app_id as string | undefined;
+      if (!apiAppId) {
+        return c.json({ error: "Missing api_app_id" }, 400);
+      }
+
+      // Look up webhook route using composite key (teamId:appId)
+      const compositeKey = `${teamId}:${apiAppId}`;
       const [route] = await db
         .select()
         .from(webhookRoutes)
         .where(
           and(
             eq(webhookRoutes.channelType, "slack"),
-            eq(webhookRoutes.externalId, teamId),
+            eq(webhookRoutes.externalId, compositeKey),
           ),
         );
 
       if (!route) {
-        console.warn(`[slack-events] No webhook route for team_id=${teamId}`);
+        console.warn(`[slack-events] No webhook route for ${compositeKey}`);
         return c.json({ error: "Unknown workspace" }, 404);
       }
 
@@ -276,9 +283,10 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       }
 
       // Forward to gateway pod
+      const fwdEvent = payload.event as Record<string, unknown> | undefined;
       const gatewayUrl = `http://${podIp}:18789/slack/events/${accountId}`;
       console.log(
-        `[slack-events] forwarding to ${gatewayUrl} ts=${timestamp} sig=${signature.slice(0, 20)}...`,
+        `[slack-events] forwarding to ${gatewayUrl} event.type=${fwdEvent?.type ?? "none"} ts=${timestamp} sig=${signature.slice(0, 20)}...`,
       );
 
       try {
@@ -294,7 +302,7 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
 
         const respBody = await gatewayResp.text();
         console.log(
-          `[slack-events] gateway responded: status=${gatewayResp.status} body=${respBody.slice(0, 200)}`,
+          `[slack-events] gateway responded: event.type=${fwdEvent?.type ?? "none"} status=${gatewayResp.status} body=${respBody.slice(0, 200)}`,
         );
         return new Response(respBody, {
           status: gatewayResp.status,
