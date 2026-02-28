@@ -5,8 +5,8 @@
 | Doc | Purpose |
 |-----|---------|
 | `core-beliefs.md` | Engineering principles and constraints |
-| `openclaw-multi-tenant.md` | Full system architecture, data model, phased plan |
-| `openclaw-architecture-internals.md` | Upstream OpenClaw runtime analysis |
+| `../designs/openclaw-multi-tenant.md` | Full system architecture, data model, phased plan |
+| `../designs/openclaw-architecture-internals.md` | Upstream OpenClaw runtime analysis |
 
 ## Adding design docs
 

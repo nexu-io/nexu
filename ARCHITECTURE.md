@@ -79,6 +79,6 @@ See `docs/references/openclaw-config-schema.md` for full schema and common pitfa
 
 ## Deeper docs
 
-- `docs/design-docs/openclaw-multi-tenant.md` — Full system design, data model, phased plan
-- `docs/design-docs/openclaw-architecture-internals.md` — OpenClaw runtime analysis
+- `docs/designs/openclaw-multi-tenant.md` — Full system design, data model, phased plan
+- `docs/designs/openclaw-architecture-internals.md` — OpenClaw runtime analysis
 - `docs/design-docs/core-beliefs.md` — Engineering principles

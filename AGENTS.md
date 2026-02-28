@@ -64,8 +64,8 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 | Topic | Location |
 |-------|----------|
 | Architecture & data flows | `ARCHITECTURE.md` |
-| System design | `docs/design-docs/openclaw-multi-tenant.md` |
-| OpenClaw internals | `docs/design-docs/openclaw-architecture-internals.md` |
+| System design | `docs/designs/openclaw-multi-tenant.md` |
+| OpenClaw internals | `docs/designs/openclaw-architecture-internals.md` |
 | Engineering principles | `docs/design-docs/core-beliefs.md` |
 | Config schema & pitfalls | `docs/references/openclaw-config-schema.md` |
 | API coding patterns | `docs/references/api-patterns.md` |
@@ -79,6 +79,44 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 | Product specs | `docs/product-specs/` |
 | Execution plans | `docs/exec-plans/` |
 | DB schema reference | `docs/generated/db-schema.md` |
+| Documentation sync | `.claude/commands/sync-docs.md` |
+
+## Documentation maintenance
+
+After significant code changes, verify documentation is current.
+
+### Diff baseline
+
+```bash
+git diff --name-only $(git merge-base HEAD origin/main)...HEAD
+```
+
+### Impact mapping (changed area -> affected docs)
+
+| Changed area | Affected docs |
+|---|---|
+| `apps/api/src/db/schema/` | `docs/generated/db-schema.md`, `ARCHITECTURE.md` |
+| `apps/api/src/routes/` | `docs/references/api-patterns.md`, `docs/product-specs/*.md` |
+| `apps/web/src/pages/` or routing | `docs/FRONTEND.md` |
+| `apps/gateway/src/` | `ARCHITECTURE.md`, `docs/RELIABILITY.md` |
+| `package.json` scripts | `CLAUDE.md` + `AGENTS.md` Commands sections |
+| New/moved doc files | `CLAUDE.md` Doc Map, `AGENTS.md` Where to look |
+
+### Cross-reference checklist
+
+1. `CLAUDE.md` Commands <-> `AGENTS.md` Commands (same entries)
+2. `CLAUDE.md` Doc Map <-> `AGENTS.md` Where to look (valid paths)
+3. `docs/DESIGN.md` <-> `docs/design-docs/` + `docs/designs/` (indexed)
+4. `docs/product-specs/index.md` <-> actual spec files
+5. `docs/FRONTEND.md` Pages <-> `apps/web/src/app.tsx` routes
+
+### Rules
+
+- Regenerate `docs/generated/db-schema.md` fully from schema source
+- Preserve original language (English/Chinese)
+- Do not auto-commit; present changes for review
+
+Full command reference: `.claude/commands/sync-docs.md`
 
 ## Cross-project sync rules
 
