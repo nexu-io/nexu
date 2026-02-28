@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./datadog.js";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { migrate } from "./db/migrate.js";

@@ -16,14 +16,15 @@
   "dependencies": {
     "@hono/node-server": "^1.13.8",
     "@hono/zod-openapi": "^0.18.4",
+    "@nexu/shared": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",
     "better-auth": "^1.2.7",
+    "dd-trace": "^5.87.0",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.41.0",
     "hono": "^4.7.5",
     "pg": "^8.13.1",
-    "zod": "^3.24.2",
-    "@nexu/shared": "workspace:*"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
