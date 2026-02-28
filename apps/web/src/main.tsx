@@ -1,3 +1,4 @@
+import * as amplitude from "@amplitude/unified";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -5,6 +6,14 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import { App } from "./app";
 import "./index.css";
+
+const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
+if (amplitudeApiKey) {
+  amplitude.initAll(amplitudeApiKey, {
+    analytics: { autocapture: true },
+    sessionReplay: { sampleRate: 1 },
+  });
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {

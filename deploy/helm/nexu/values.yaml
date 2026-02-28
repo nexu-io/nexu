@@ -15,6 +15,7 @@ config:
   BETTER_AUTH_URL: "https://api.nexu.example.com"
   DEFAULT_MODEL_ID: "anthropic/claude-sonnet-4"
   RUNTIME_MANAGE_OPENCLAW_PROCESS: "true"
+  EMAIL_SENDER: "Nexu <noreply@nexu.io>"
 
 secret:
   create: true
@@ -31,6 +32,7 @@ secret:
   GOOGLE_CLIENT_SECRET: ""
   LITELLM_BASE_URL: ""
   LITELLM_API_KEY: ""
+  RESEND_API_KEY: ""
 
 api:
   replicas: 2

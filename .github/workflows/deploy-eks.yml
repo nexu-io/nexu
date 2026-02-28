@@ -84,6 +84,7 @@ jobs:
           build-args: |
             COMMIT_HASH=${{ github.sha }}
             VITE_COMMIT_HASH=${{ github.sha }}
+            VITE_AMPLITUDE_API_KEY=${{ secrets.VITE_AMPLITUDE_API_KEY }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.app }}

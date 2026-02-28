@@ -1,16 +1,86 @@
 import { authClient } from "@/lib/auth-client";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 const CAPABILITY_PILLS = [
-  { emoji: "💻", label: "Code & Deploy" },
-  { emoji: "📊", label: "Data Analysis" },
-  { emoji: "✍️", label: "Content" },
-  { emoji: "🔍", label: "Research" },
-  { emoji: "⚙️", label: "Automation" },
+  { emoji: "\u{1F4BB}", label: "Code & Deploy" },
+  { emoji: "\u{1F4CA}", label: "Data Analysis" },
+  { emoji: "\u270D\uFE0F", label: "Content" },
+  { emoji: "\u{1F50D}", label: "Research" },
+  { emoji: "\u2699\uFE0F", label: "Automation" },
 ];
+
+const OTP_LENGTH = 6;
+const OTP_SLOTS = Array.from({ length: OTP_LENGTH }, (_, i) => ({
+  key: `otp-${i}`,
+  i,
+}));
+const RESEND_COOLDOWN = 30;
+
+function OtpInput({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const handleChange = (index: number, char: string) => {
+    if (!/^\d?$/.test(char)) return;
+    const next = value.split("");
+    next[index] = char;
+    const joined = next.join("");
+    onChange(joined);
+    if (char && index < OTP_LENGTH - 1) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !value[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, OTP_LENGTH);
+    if (pasted) {
+      onChange(pasted.padEnd(OTP_LENGTH, " ").slice(0, OTP_LENGTH));
+      inputRefs.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus();
+    }
+  };
+
+  return (
+    <div className="flex gap-2 justify-center">
+      {OTP_SLOTS.map((slot) => (
+        <input
+          key={slot.key}
+          ref={(el) => {
+            inputRefs.current[slot.i] = el;
+          }}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={value[slot.i] && value[slot.i] !== " " ? value[slot.i] : ""}
+          onChange={(e) => handleChange(slot.i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(slot.i, e)}
+          onPaste={slot.i === 0 ? handlePaste : undefined}
+          disabled={disabled}
+          className="w-11 h-12 text-center text-lg font-semibold rounded-lg border border-border bg-surface-1 text-text-primary focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/10 transition-all disabled:opacity-60"
+        />
+      ))}
+    </div>
+  );
+}
 
 export function AuthPage() {
   const [searchParams] = useSearchParams();
@@ -21,6 +91,70 @@ export function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+
+  // OTP verification state
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [otp, setOtp] = useState("      ");
+  const [verifying, setVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const handleResendOtp = useCallback(async () => {
+    if (resendCooldown > 0) return;
+    setResendCooldown(RESEND_COOLDOWN);
+    try {
+      await authClient.emailOtp.sendVerificationOtp({
+        email,
+        type: "email-verification",
+      });
+      toast.success("Verification code sent");
+    } catch {
+      toast.error("Failed to resend code");
+    }
+  }, [email, resendCooldown]);
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = otp.replace(/\s/g, "");
+    if (code.length !== OTP_LENGTH) {
+      toast.error("Please enter the 6-digit code");
+      return;
+    }
+    setVerifying(true);
+    try {
+      const { error } = await authClient.emailOtp.verifyEmail({
+        email,
+        otp: code,
+      });
+      if (error) {
+        toast.error(error.message ?? "Invalid verification code");
+        setVerifying(false);
+        return;
+      }
+      // Auto sign in after verification
+      if (password) {
+        const { error: signInError } = await authClient.signIn.email({
+          email,
+          password,
+        });
+        if (signInError) {
+          toast.error(signInError.message ?? "Sign in failed");
+          setVerifying(false);
+          return;
+        }
+      }
+      navigate("/invite");
+    } catch {
+      toast.error("Verification failed");
+      setVerifying(false);
+    }
+  };
 
   if (isPending) {
     return (
@@ -56,10 +190,27 @@ export function AuthPage() {
           password,
         });
         if (error) {
+          // If email not verified, resend OTP and show verification screen
+          const msg = (error.message ?? "").toLowerCase();
+          if (
+            msg.includes("email is not verified") ||
+            error.code === "EMAIL_NOT_VERIFIED"
+          ) {
+            await authClient.emailOtp.sendVerificationOtp({
+              email,
+              type: "email-verification",
+            });
+            setPendingVerification(true);
+            setResendCooldown(RESEND_COOLDOWN);
+            setLoading(null);
+            toast.info("Please verify your email first");
+            return;
+          }
           toast.error(error.message ?? "Login failed");
           setLoading(null);
           return;
         }
+        navigate("/invite");
       } else {
         const { error } = await authClient.signUp.email({
           email,
@@ -67,17 +218,179 @@ export function AuthPage() {
           name: name || email.split("@")[0] || "User",
         });
         if (error) {
+          // If user already exists (unverified), resend OTP and show verification screen
+          const msg = (error.message ?? "").toLowerCase();
+          if (msg.includes("already") || msg.includes("exist")) {
+            await authClient.emailOtp.sendVerificationOtp({
+              email,
+              type: "email-verification",
+            });
+            setPendingVerification(true);
+            setResendCooldown(RESEND_COOLDOWN);
+            setLoading(null);
+            toast.info("Verification code sent to your email");
+            return;
+          }
           toast.error(error.message ?? "Sign up failed");
           setLoading(null);
           return;
         }
+        // Sign up succeeded — switch to OTP verification
+        setPendingVerification(true);
+        setResendCooldown(RESEND_COOLDOWN);
+        setLoading(null);
       }
-      navigate("/invite");
     } catch {
       toast.error("Something went wrong");
       setLoading(null);
     }
   };
+
+  // OTP verification screen
+  if (pendingVerification) {
+    return (
+      <div className="flex min-h-screen">
+        {/* Left panel — dark */}
+        <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
+          <div className="flex items-center gap-2.5">
+            <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-white/15">
+              <span className="text-xs font-bold text-white">N</span>
+            </div>
+            <span className="text-[14px] font-semibold text-white/90">
+              Nexu
+            </span>
+          </div>
+          <div>
+            <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
+              Your digital
+              <br />
+              coworker,
+              <br />
+              always on.
+            </h2>
+            <p className="text-[13px] text-white/45 leading-relaxed mb-6 max-w-[280px]">
+              AI avatars that live in Slack — not just chatting, but delivering
+              real results. Build apps, analyze data, write content, run
+              automations.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {CAPABILITY_PILLS.map((p) => (
+                <span
+                  key={p.label}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-white/[0.07] text-white/60 border border-white/[0.06]"
+                >
+                  <span className="text-[11px]">{p.emoji}</span>
+                  {p.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="text-[11px] text-white/20">
+            &copy; 2026 Nexu by Refly
+          </div>
+        </div>
+
+        {/* Right panel — OTP form */}
+        <div className="flex-1 flex flex-col bg-surface-0">
+          <nav className="border-b border-border lg:hidden">
+            <div className="flex items-center px-6 h-14">
+              <Link to="/" className="flex items-center gap-2.5">
+                <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-accent">
+                  <span className="text-xs font-bold text-accent-fg">N</span>
+                </div>
+                <span className="text-sm font-semibold tracking-tight text-text-primary">
+                  Nexu
+                </span>
+              </Link>
+            </div>
+          </nav>
+
+          <div className="flex-1 flex items-center justify-center px-6 py-16">
+            <div className="w-full max-w-[360px]">
+              <div className="mb-8 text-center">
+                <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
+                  Check your email
+                </h1>
+                <p className="text-[14px] text-text-muted">
+                  We sent a 6-digit code to{" "}
+                  <span className="font-medium text-text-secondary">
+                    {email}
+                  </span>
+                </p>
+              </div>
+
+              <form onSubmit={handleVerifyOtp} className="space-y-6">
+                <OtpInput value={otp} onChange={setOtp} disabled={verifying} />
+
+                <button
+                  type="submit"
+                  disabled={verifying}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {verifying && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Verify
+                </button>
+              </form>
+
+              <div className="text-center mt-6">
+                <span className="text-[13px] text-text-muted">
+                  Didn't receive a code?{" "}
+                </span>
+                {resendCooldown > 0 ? (
+                  <span className="text-[13px] text-text-muted">
+                    Resend in {resendCooldown}s
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    className="text-[13px] text-accent font-medium hover:underline underline-offset-2"
+                  >
+                    Resend code
+                  </button>
+                )}
+              </div>
+
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingVerification(false);
+                    setOtp("      ");
+                  }}
+                  className="text-[13px] text-text-muted hover:text-text-secondary transition-colors"
+                >
+                  &larr; Back to sign up
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 px-6 py-4 text-[11px] text-text-muted">
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-text-secondary transition-colors"
+            >
+              Terms of Service
+            </a>
+            <span className="text-border">&middot;</span>
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-text-secondary transition-colors"
+            >
+              Privacy Policy
+            </a>
+            <span className="text-border">&middot;</span>
+            <span>&copy; 2026 Nexu by Refly</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -121,7 +434,9 @@ export function AuthPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-[11px] text-white/20">© 2026 Nexu by Refly</div>
+        <div className="text-[11px] text-white/20">
+          &copy; 2026 Nexu by Refly
+        </div>
       </div>
 
       {/* Right panel — form */}
@@ -299,7 +614,7 @@ export function AuthPage() {
           >
             Terms of Service
           </a>
-          <span className="text-border">·</span>
+          <span className="text-border">&middot;</span>
           <a
             href="/privacy"
             target="_blank"
@@ -308,7 +623,7 @@ export function AuthPage() {
           >
             Privacy Policy
           </a>
-          <span className="text-border">·</span>
+          <span className="text-border">&middot;</span>
           <span>&copy; 2026 Nexu by Refly</span>
         </div>
       </div>
