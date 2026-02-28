@@ -40,6 +40,8 @@ jobs:
     env:
       VITE_COMMIT_HASH: ${{ github.sha }}
       VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
+      VITE_AUTH_BASE_URL: ${{ vars.VITE_AUTH_BASE_URL }}
+      VITE_WHATSAPP_WA_ME_URL: ${{ vars.VITE_WHATSAPP_WA_ME_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

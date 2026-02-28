@@ -85,6 +85,8 @@ jobs:
             COMMIT_HASH=${{ github.sha }}
             VITE_COMMIT_HASH=${{ github.sha }}
             VITE_AMPLITUDE_API_KEY=${{ secrets.AMPLITUDE_API_KEY }}
+            VITE_AUTH_BASE_URL=${{ vars.VITE_AUTH_BASE_URL }}
+            VITE_WHATSAPP_WA_ME_URL=${{ vars.VITE_WHATSAPP_WA_ME_URL }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.app }}

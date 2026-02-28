@@ -45,6 +45,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: http://localhost:3000
+        VITE_WHATSAPP_WA_ME_URL: https://wa.me/15551846745?text=Hello%20Nexu
     depends_on:
       - api
     ports:

@@ -25,6 +25,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import "@/lib/api";
+import { whatsappQrImageUrl, whatsappWaMeUrl } from "@/lib/whatsapp";
 import {
   deleteV1ChannelsByChannelId,
   getV1Channels,
@@ -1039,7 +1040,7 @@ function ConfiguredView({
   );
 }
 
-// ─── WhatsApp QR placeholder ─────────────────────────────────
+// ─── WhatsApp QR setup ───────────────────────────────────────
 
 function WhatsAppQRView() {
   return (
@@ -1049,10 +1050,36 @@ function WhatsAppQRView() {
           <Smartphone size={22} className="text-emerald-500" />
         </div>
         <h3 className="text-[15px] font-semibold text-text-primary mb-1">
-          WhatsApp Coming Soon
+          Scan to connect WhatsApp
         </h3>
         <p className="text-[12px] text-text-muted mb-6 leading-relaxed">
-          WhatsApp Business API integration is under development. Stay tuned.
+          Open WhatsApp and scan the QR code below to start chatting with Nexu.
+        </p>
+        <div className="mx-auto mb-4 w-full max-w-[240px] rounded-xl border border-border bg-white p-2">
+          <img
+            src={whatsappQrImageUrl}
+            alt="WhatsApp QR code"
+            className="w-full h-auto rounded-lg"
+          />
+        </div>
+        <a
+          href={whatsappWaMeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+        >
+          Open WhatsApp
+          <ExternalLink size={12} />
+        </a>
+        <p className="mt-3 text-[11px] text-text-muted break-all">
+          <a
+            href={whatsappWaMeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-secondary underline underline-offset-2"
+          >
+            {whatsappWaMeUrl}
+          </a>
         </p>
       </div>
 
