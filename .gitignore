@@ -13,3 +13,4 @@ tmp/
 *.db-wal
 openapi-ts-error-*.log
 .openclaw/
+.vscode
