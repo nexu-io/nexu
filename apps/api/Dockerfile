@@ -24,6 +24,8 @@ FROM node:22-slim
 
 RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
 
+ARG COMMIT_HASH
+
 WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -38,6 +40,7 @@ COPY --from=builder /app/apps/api/dist/ apps/api/dist/
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV COMMIT_HASH=${COMMIT_HASH}
 
 EXPOSE 3000
 

@@ -35,6 +35,8 @@ jobs:
 
   deploy-app:
     runs-on: ubuntu-latest
+    env:
+      VITE_COMMIT_HASH: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

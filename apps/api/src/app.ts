@@ -26,6 +26,7 @@ import type { AppBindings } from "./types.js";
 
 export function createApp() {
   const app = new OpenAPIHono<AppBindings>();
+  const commitHash = process.env.COMMIT_HASH;
 
   app.use("*", logger());
   app.use(
@@ -58,7 +59,14 @@ export function createApp() {
     info: { title: "Nexu API", version: "1.0.0" },
   });
 
-  app.get("/health", (c) => c.json({ status: "ok" }));
+  app.get("/health", (c) =>
+    c.json({
+      status: "ok",
+      metadata: {
+        commitHash: commitHash ?? null,
+      },
+    }),
+  );
 
   return app;
 }

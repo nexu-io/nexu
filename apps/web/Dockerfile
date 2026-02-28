@@ -17,7 +17,9 @@ COPY packages/shared/ packages/shared/
 COPY apps/web/ apps/web/
 
 ARG VITE_API_URL=""
+ARG VITE_COMMIT_HASH=""
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_COMMIT_HASH=${VITE_COMMIT_HASH}
 
 RUN pnpm --filter @nexu/web build
 
