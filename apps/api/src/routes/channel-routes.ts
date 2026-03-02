@@ -300,7 +300,10 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     url.searchParams.set("redirect_uri", getSlackRedirectUri());
     url.searchParams.set("state", nonce);
 
-    return c.json({ url: url.toString(), redirectUri: getSlackRedirectUri() }, 200);
+    return c.json(
+      { url: url.toString(), redirectUri: getSlackRedirectUri() },
+      200,
+    );
   });
 
   // -- Manual Slack connect (authenticated) --
