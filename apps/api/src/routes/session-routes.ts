@@ -16,6 +16,8 @@ import {
   sessions,
 } from "../db/schema/index.js";
 import { decrypt } from "../lib/crypto.js";
+import { BaseError, ServiceError } from "../lib/error.js";
+import { logger } from "../lib/logger.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -167,7 +169,11 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
       .where(eq(sessions.sessionKey, input.sessionKey));
 
     if (!created) {
-      throw new Error("Session upsert failed");
+      throw ServiceError.from("session-routes", {
+        code: "session_upsert_failed",
+        session_key: input.sessionKey,
+        bot_id: input.botId,
+      });
     }
 
     return c.json(formatSession(created), 201);
@@ -213,7 +219,10 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
       .where(eq(sessions.id, id));
 
     if (!updated) {
-      throw new Error("Session update failed");
+      throw ServiceError.from("session-routes", {
+        code: "session_update_failed",
+        session_id: id,
+      });
     }
 
     return c.json(formatSession(updated), 200);
@@ -281,9 +290,11 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
         );
 
         if (!guildsResp.ok) {
-          console.warn(
-            `[discord-sync] Failed to fetch guilds: ${guildsResp.status}`,
-          );
+          logger.warn({
+            message: "discord_sync_fetch_guilds_failed",
+            status: guildsResp.status,
+            bot_channel_id: ch.id,
+          });
           continue;
         }
 
@@ -325,7 +336,13 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
           totalSynced++;
         }
       } catch (err) {
-        console.error("[discord-sync] Error fetching guilds:", err);
+        const unknownError = BaseError.from(err);
+        logger.error({
+          message: "discord_sync_fetch_guilds_error",
+          scope: "discord_sync_fetch_guilds",
+          bot_channel_id: ch.id,
+          ...unknownError.toJSON(),
+        });
       }
     }
 

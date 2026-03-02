@@ -1,7 +1,12 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { authMiddleware } from "./middleware/auth.js";
+import {
+  errorMiddleware,
+  logHandledError,
+  resolveErrorHandling,
+} from "./middleware/error-middleware.js";
+import { requestLoggerMiddleware } from "./middleware/request-logger.js";
 import {
   registerArtifactInternalRoutes,
   registerArtifactRoutes,
@@ -30,7 +35,8 @@ export function createApp() {
   const app = new OpenAPIHono<AppBindings>();
   const commitHash = process.env.COMMIT_HASH;
 
-  app.use("*", logger());
+  app.use("*", requestLoggerMiddleware);
+  app.use("*", errorMiddleware);
   app.use(
     "*",
     cors({
@@ -71,6 +77,12 @@ export function createApp() {
       },
     }),
   );
+
+  app.onError((error, c) => {
+    const handled = resolveErrorHandling(c, error);
+    logHandledError(c, handled.level, handled.logBody);
+    return c.json(handled.responseBody, handled.status);
+  });
 
   return app;
 }

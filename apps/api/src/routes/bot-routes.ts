@@ -10,6 +10,8 @@ import { createId } from "@paralleldrive/cuid2";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bots, gatewayAssignments, gatewayPools } from "../db/schema/index.js";
+import { BaseError, ServiceError } from "../lib/error.js";
+import { logger } from "../lib/logger.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 
 import type { AppBindings } from "../types.js";
@@ -223,7 +225,9 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     if (!poolId) {
-      throw new Error("Pool selection failed");
+      throw ServiceError.from("bot-routes", {
+        code: "pool_selection_failed",
+      });
     }
 
     const botId = createId();
@@ -262,16 +266,22 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
     try {
       await publishPoolConfigSnapshot(db, poolId);
     } catch (error) {
-      console.error("[bots] failed to publish pool config snapshot", {
-        poolId,
-        botId,
-        error: error instanceof Error ? error.message : "unknown_error",
+      const unknownError = BaseError.from(error);
+      logger.error({
+        message: "bots_publish_snapshot_failed",
+        scope: "bots_publish_snapshot",
+        pool_id: poolId,
+        bot_id: botId,
+        ...unknownError.toJSON(),
       });
     }
 
     const [bot] = await db.select().from(bots).where(eq(bots.id, botId));
     if (!bot) {
-      throw new Error("Failed to create bot");
+      throw ServiceError.from("bot-routes", {
+        code: "bot_create_failed",
+        bot_id: botId,
+      });
     }
 
     return c.json(formatBot(bot), 200);
@@ -337,17 +347,23 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
 
     const [updated] = await db.select().from(bots).where(eq(bots.id, botId));
     if (!updated) {
-      throw new Error("Failed to update bot");
+      throw ServiceError.from("bot-routes", {
+        code: "bot_update_failed",
+        bot_id: botId,
+      });
     }
 
     if (updated.poolId) {
       try {
         await publishPoolConfigSnapshot(db, updated.poolId);
       } catch (error) {
-        console.error("[bots] failed to publish pool config snapshot", {
-          poolId: updated.poolId,
-          botId,
-          error: error instanceof Error ? error.message : "unknown_error",
+        const unknownError = BaseError.from(error);
+        logger.error({
+          message: "bots_publish_snapshot_failed",
+          scope: "bots_publish_snapshot",
+          pool_id: updated.poolId,
+          bot_id: botId,
+          ...unknownError.toJSON(),
         });
       }
     }
@@ -381,10 +397,13 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
       try {
         await publishPoolConfigSnapshot(db, bot.poolId);
       } catch (error) {
-        console.error("[bots] failed to publish pool config snapshot", {
-          poolId: bot.poolId,
-          botId,
-          error: error instanceof Error ? error.message : "unknown_error",
+        const unknownError = BaseError.from(error);
+        logger.error({
+          message: "bots_publish_snapshot_failed",
+          scope: "bots_publish_snapshot",
+          pool_id: bot.poolId,
+          bot_id: botId,
+          ...unknownError.toJSON(),
         });
       }
     }
@@ -412,17 +431,23 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
 
     const [updated] = await db.select().from(bots).where(eq(bots.id, botId));
     if (!updated) {
-      throw new Error("Failed to pause bot");
+      throw ServiceError.from("bot-routes", {
+        code: "bot_pause_failed",
+        bot_id: botId,
+      });
     }
 
     if (updated.poolId) {
       try {
         await publishPoolConfigSnapshot(db, updated.poolId);
       } catch (error) {
-        console.error("[bots] failed to publish pool config snapshot", {
-          poolId: updated.poolId,
-          botId,
-          error: error instanceof Error ? error.message : "unknown_error",
+        const unknownError = BaseError.from(error);
+        logger.error({
+          message: "bots_publish_snapshot_failed",
+          scope: "bots_publish_snapshot",
+          pool_id: updated.poolId,
+          bot_id: botId,
+          ...unknownError.toJSON(),
         });
       }
     }
@@ -450,17 +475,23 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
 
     const [updated] = await db.select().from(bots).where(eq(bots.id, botId));
     if (!updated) {
-      throw new Error("Failed to resume bot");
+      throw ServiceError.from("bot-routes", {
+        code: "bot_resume_failed",
+        bot_id: botId,
+      });
     }
 
     if (updated.poolId) {
       try {
         await publishPoolConfigSnapshot(db, updated.poolId);
       } catch (error) {
-        console.error("[bots] failed to publish pool config snapshot", {
-          poolId: updated.poolId,
-          botId,
-          error: error instanceof Error ? error.message : "unknown_error",
+        const unknownError = BaseError.from(error);
+        logger.error({
+          message: "bots_publish_snapshot_failed",
+          scope: "bots_publish_snapshot",
+          pool_id: updated.poolId,
+          bot_id: botId,
+          ...unknownError.toJSON(),
         });
       }
     }

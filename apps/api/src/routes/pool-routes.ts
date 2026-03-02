@@ -15,6 +15,7 @@ import { db } from "../db/index.js";
 import { bots, gatewayPools, poolSecrets } from "../db/schema/index.js";
 import { generatePoolConfig } from "../lib/config-generator.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
+import { BaseError, ServiceError } from "../lib/error.js";
 import { requireInternalToken } from "../middleware/internal-auth.js";
 import {
   getPoolConfigSnapshotByVersion,
@@ -218,11 +219,23 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
       const config = await generatePoolConfig(db, poolId);
       return c.json(config, 200);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      if (message.includes("not found")) {
-        return c.json({ message }, 404);
+      if (
+        error instanceof ServiceError &&
+        error.context.code === "pool_not_found"
+      ) {
+        return c.json({ message: `Pool ${poolId} not found` }, 404);
       }
-      throw error;
+
+      const baseError = BaseError.from(error);
+      throw ServiceError.from(
+        "pool-routes",
+        {
+          code: "pool_get_config_failed",
+          pool_id: poolId,
+          message: baseError.message,
+        },
+        { cause: baseError },
+      );
     }
   });
 

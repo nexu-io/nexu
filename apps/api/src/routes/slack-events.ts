@@ -12,6 +12,8 @@ import {
   webhookRoutes,
 } from "../db/schema/index.js";
 import { decrypt } from "../lib/crypto.js";
+import { BaseError } from "../lib/error.js";
+import { logger } from "../lib/logger.js";
 import type { AppBindings } from "../types.js";
 
 // ── Read body from Node.js IncomingMessage (bypasses Hono body reading) ──
@@ -52,9 +54,12 @@ function verifySlackSignature(
 export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
   app.on("POST", "/api/slack/events", async (c) => {
     try {
-      console.log(
-        `[slack-events] incoming: method=${c.req.method} content-type=${c.req.header("content-type")} retry=${c.req.header("x-slack-retry-num") ?? "none"}`,
-      );
+      logger.info({
+        message: "slack_events_incoming",
+        method: c.req.method,
+        content_type: c.req.header("content-type") ?? "unknown",
+        is_retry: Boolean(c.req.header("x-slack-retry-num")),
+      });
 
       // Skip Slack retries — we already processed the original
       if (c.req.header("x-slack-retry-num")) {
@@ -70,9 +75,17 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
           const incoming = (c.env as { incoming: IncomingMessage }).incoming;
           rawBody = await readIncomingBody(incoming);
         }
-        console.log(`[slack-events] body length=${rawBody.length}`);
+        logger.info({
+          message: "slack_events_body_read",
+          body_length: rawBody.length,
+        });
       } catch (err) {
-        console.error("[slack-events] Failed to read body:", err);
+        const unknownError = BaseError.from(err);
+        logger.warn({
+          message: "slack_events_body_read_failed",
+          scope: "slack_events_body_read",
+          ...unknownError.toJSON(),
+        });
         return c.json({ ok: true });
       }
 
@@ -80,12 +93,18 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       try {
         payload = JSON.parse(rawBody) as Record<string, unknown>;
         const event = payload.event as Record<string, unknown> | undefined;
-        console.log(
-          `[slack-events] type=${payload.type} team=${payload.team_id} event.type=${event?.type ?? "none"} event.subtype=${event?.subtype ?? "none"} event.channel=${event?.channel ?? "none"} event.user=${event?.user ?? "none"} event.text=${typeof event?.text === "string" ? event.text.slice(0, 80) : "none"}`,
-        );
+        logger.info({
+          message: "slack_events_payload_parsed",
+          payload_type: payload.type,
+          team_id: payload.team_id,
+          event_type: event?.type ?? "none",
+          event_subtype: event?.subtype ?? "none",
+          event_channel: event?.channel ?? "none",
+          event_user: event?.user ?? "none",
+        });
       } catch {
-        console.error("[slack-events] Invalid JSON body");
-        return c.json({ error: "Invalid JSON" }, 400);
+        logger.warn({ message: "slack_events_invalid_json_body" });
+        return c.json({ message: "Invalid JSON" }, 400);
       }
 
       // Handle url_verification challenge (Slack endpoint validation)
@@ -96,12 +115,12 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       // Extract team_id and api_app_id from event payload
       const teamId = payload.team_id as string | undefined;
       if (!teamId) {
-        return c.json({ error: "Missing team_id" }, 400);
+        return c.json({ message: "Missing team_id" }, 400);
       }
 
       const apiAppId = payload.api_app_id as string | undefined;
       if (!apiAppId) {
-        return c.json({ error: "Missing api_app_id" }, 400);
+        return c.json({ message: "Missing api_app_id" }, 400);
       }
 
       // Look up webhook route using composite key (teamId:appId)
@@ -117,8 +136,11 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         );
 
       if (!route) {
-        console.warn(`[slack-events] No webhook route for ${compositeKey}`);
-        return c.json({ error: "Unknown workspace" }, 404);
+        logger.warn({
+          message: "slack_events_webhook_route_missing",
+          composite_key: compositeKey,
+        });
+        return c.json({ message: "Unknown workspace" }, 404);
       }
 
       // Retrieve signing secret from credentials
@@ -133,10 +155,11 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         );
 
       if (!signingSecretRow) {
-        console.error(
-          `[slack-events] No signing secret for botChannelId=${route.botChannelId}`,
-        );
-        return c.json({ error: "Channel misconfigured" }, 500);
+        logger.error({
+          message: "slack_events_signing_secret_missing",
+          bot_channel_id: route.botChannelId,
+        });
+        return c.json({ message: "Channel misconfigured" }, 500);
       }
 
       const signingSecret = decrypt(signingSecretRow.encryptedValue);
@@ -146,15 +169,16 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       const signature = c.req.header("x-slack-signature") ?? "";
 
       if (!timestamp || !signature) {
-        console.warn("[slack-events] Missing signature headers");
-        return c.json({ error: "Missing Slack signature headers" }, 401);
+        logger.warn({ message: "slack_events_signature_headers_missing" });
+        return c.json({ message: "Missing Slack signature headers" }, 401);
       }
 
       if (!verifySlackSignature(signingSecret, timestamp, rawBody, signature)) {
-        console.warn(
-          `[slack-events] Signature mismatch: ts=${timestamp} sig=${signature.slice(0, 20)}...`,
-        );
-        return c.json({ error: "Invalid signature" }, 401);
+        logger.warn({
+          message: "slack_events_signature_mismatch",
+          timestamp,
+        });
+        return c.json({ message: "Invalid signature" }, 401);
       }
 
       // Find the gateway pod + botId
@@ -227,7 +251,13 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
               }
             }
           } catch (err) {
-            console.warn("[slack-events] Failed to resolve channel name:", err);
+            const unknownError = BaseError.from(err);
+            logger.warn({
+              message: "slack_events_channel_name_resolve_failed",
+              scope: "slack_events_channel_name_resolve",
+              bot_channel_id: route.botChannelId,
+              ...unknownError.toJSON(),
+            });
           }
         }
 
@@ -258,14 +288,22 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
               updatedAt: now,
             },
           })
-          .then(() =>
-            console.log(
-              `[slack-events] session upserted: ${sessionKey} title="${title}"`,
-            ),
-          )
-          .catch((err) =>
-            console.error("[slack-events] session upsert failed:", err),
-          );
+          .then(() => {
+            logger.info({
+              message: "slack_events_session_upserted",
+              session_key: sessionKey,
+              title,
+            });
+          })
+          .catch((err) => {
+            const unknownError = BaseError.from(err);
+            logger.warn({
+              message: "slack_events_session_upsert_failed",
+              scope: "slack_events_session_upsert",
+              session_key: sessionKey,
+              ...unknownError.toJSON(),
+            });
+          });
       }
 
       const [pool] = await db
@@ -277,18 +315,23 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
 
       // Forward to gateway or log locally
       if (!podIp) {
-        console.warn(
-          `[slack-events] no active gateway pod for team_id=${teamId} pool_id=${route.poolId}`,
-        );
+        logger.warn({
+          message: "slack_events_gateway_pod_missing",
+          team_id: teamId,
+          pool_id: route.poolId,
+        });
         return c.json({ accepted: true }, 202);
       }
 
       // Forward to gateway pod
       const fwdEvent = payload.event as Record<string, unknown> | undefined;
       const gatewayUrl = `http://${podIp}:18789/slack/events/${accountId}`;
-      console.log(
-        `[slack-events] forwarding to ${gatewayUrl} event.type=${fwdEvent?.type ?? "none"} ts=${timestamp} sig=${signature.slice(0, 20)}...`,
-      );
+      logger.info({
+        message: "slack_events_forwarding",
+        gateway_url: gatewayUrl,
+        event_type: fwdEvent?.type ?? "none",
+        timestamp,
+      });
 
       try {
         const gatewayResp = await fetch(gatewayUrl, {
@@ -302,23 +345,34 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         });
 
         const respBody = await gatewayResp.text();
-        console.log(
-          `[slack-events] gateway responded: event.type=${fwdEvent?.type ?? "none"} status=${gatewayResp.status} body=${respBody.slice(0, 200)}`,
-        );
+        logger.info({
+          message: "slack_events_gateway_response",
+          event_type: fwdEvent?.type ?? "none",
+          status: gatewayResp.status,
+          body_length: respBody.length,
+        });
         return new Response(respBody, {
           status: gatewayResp.status,
           headers: { "Content-Type": "application/json" },
         });
       } catch (err) {
-        console.error("[slack-events] Failed to forward to gateway", {
-          poolId: route.poolId,
-          accountId,
-          error: err instanceof Error ? err.message : "unknown_error",
+        const unknownError = BaseError.from(err);
+        logger.warn({
+          message: "slack_events_gateway_forward_failed",
+          scope: "slack_events_gateway_forward",
+          pool_id: route.poolId,
+          account_id: accountId,
+          ...unknownError.toJSON(),
         });
         return c.json({ accepted: true }, 202);
       }
     } catch (err) {
-      console.error("[slack-events] Unhandled error:", err);
+      const unknownError = BaseError.from(err);
+      logger.warn({
+        message: "slack_events_unhandled_error",
+        scope: "slack_events_handler",
+        ...unknownError.toJSON(),
+      });
       return c.json({ ok: true });
     }
   });

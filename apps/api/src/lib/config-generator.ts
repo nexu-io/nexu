@@ -15,6 +15,7 @@ import {
   gatewayPools,
 } from "../db/schema/index.js";
 import { decrypt } from "./crypto.js";
+import { ServiceError } from "./error.js";
 
 interface ChannelCredentialRow {
   credentialType: string;
@@ -53,7 +54,11 @@ export async function generatePoolConfig(
     )[0];
 
   if (!pool) {
-    throw new Error(`Pool ${poolIdOrName} not found`);
+    throw ServiceError.from("config-generator", {
+      code: "pool_not_found",
+      message: `Pool ${poolIdOrName} not found`,
+      pool_id_or_name: poolIdOrName,
+    });
   }
 
   const poolId = pool.id;

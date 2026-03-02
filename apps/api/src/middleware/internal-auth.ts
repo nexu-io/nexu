@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
+import { MiddlewareError } from "../lib/error.js";
 
 function readToken(c: Context): string | null {
   const headerToken = c.req.header("x-internal-token");
@@ -23,13 +23,17 @@ function readToken(c: Context): string | null {
 export function requireInternalToken(c: Context): void {
   const expectedToken = process.env.INTERNAL_API_TOKEN;
   if (!expectedToken) {
-    throw new HTTPException(500, {
+    throw MiddlewareError.from("internal-auth", {
+      code: "internal_token_not_configured",
       message: "INTERNAL_API_TOKEN is not configured",
     });
   }
 
   const actualToken = readToken(c);
   if (!actualToken || actualToken !== expectedToken) {
-    throw new HTTPException(401, { message: "Unauthorized internal request" });
+    throw MiddlewareError.from("internal-auth", {
+      code: "internal_token_invalid",
+      message: "Unauthorized internal request",
+    });
   }
 }

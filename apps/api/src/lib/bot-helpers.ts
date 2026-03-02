@@ -2,6 +2,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bots, gatewayAssignments, gatewayPools } from "../db/schema/index.js";
+import { ServiceError } from "./error.js";
 
 export async function findDefaultPool(): Promise<string> {
   // Find an active pool — prefer one with a registered gateway (pod_ip set)
@@ -19,9 +20,7 @@ export async function findDefaultPool(): Promise<string> {
     return firstPool.id;
   }
 
-  throw new Error(
-    "No gateway pool available. Ensure a gateway is deployed and registered.",
-  );
+  throw ServiceError.from("bot-helpers", { code: "default_pool_not_found" });
 }
 
 export async function findOrCreateDefaultBot(
@@ -67,7 +66,11 @@ export async function findOrCreateDefaultBot(
 
   const [bot] = await db.select().from(bots).where(eq(bots.id, botId));
   if (!bot) {
-    throw new Error("Failed to create default bot");
+    throw ServiceError.from("bot-helpers", {
+      code: "default_bot_create_failed",
+      bot_id: botId,
+      user_id: userId,
+    });
   }
 
   return bot;

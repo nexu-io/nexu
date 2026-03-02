@@ -19,6 +19,8 @@ import {
 } from "../db/schema/index.js";
 import { findOrCreateDefaultBot } from "../lib/bot-helpers.js";
 import { encrypt } from "../lib/crypto.js";
+import { BaseError, ServiceError } from "../lib/error.js";
+import { logger } from "../lib/logger.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 
 import type { AppBindings } from "../types.js";
@@ -90,10 +92,13 @@ async function publishSnapshotSafely(
   try {
     await publishPoolConfigSnapshot(db, poolId);
   } catch (error) {
-    console.error("[channels] failed to publish pool config snapshot", {
-      poolId,
-      botId,
-      error: error instanceof Error ? error.message : "unknown_error",
+    const unknownError = BaseError.from(error);
+    logger.error({
+      message: "channels_publish_snapshot_failed",
+      scope: "channels_publish_snapshot",
+      pool_id: poolId,
+      bot_id: botId,
+      ...unknownError.toJSON(),
     });
   }
 }
@@ -532,7 +537,11 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       .where(eq(botChannels.id, channelId));
 
     if (!channel) {
-      throw new Error("Failed to create channel");
+      throw ServiceError.from("channel-routes", {
+        code: "channel_create_failed",
+        channel_id: channelId,
+        bot_id: bot.id,
+      });
     }
 
     return c.json(formatChannel(channel), 200);
@@ -642,7 +651,11 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       .where(eq(botChannels.id, channelId));
 
     if (!channel) {
-      throw new Error("Failed to create channel");
+      throw ServiceError.from("channel-routes", {
+        code: "channel_create_failed",
+        channel_id: channelId,
+        bot_id: bot.id,
+      });
     }
 
     return c.json(formatChannel(channel), 200);

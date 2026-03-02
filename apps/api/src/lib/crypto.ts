@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { ServiceError } from "./error.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -7,11 +8,14 @@ const AUTH_TAG_LENGTH = 16;
 function getEncryptionKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
-    throw new Error("ENCRYPTION_KEY environment variable is not set");
+    throw ServiceError.from("crypto", { code: "encryption_key_missing" });
   }
   const buf = Buffer.from(key, "hex");
   if (buf.length !== 32) {
-    throw new Error("ENCRYPTION_KEY must be 32 bytes (64 hex characters)");
+    throw ServiceError.from("crypto", {
+      code: "encryption_key_invalid_length",
+      actual_length: buf.length,
+    });
   }
   return buf;
 }
