@@ -1164,7 +1164,7 @@ function AvatarStep({
     ),
   );
   const [selected, setSelected] = useState<string | null>(
-    data.selectedAvatar || null,
+    data.selectedAvatar || AVATAR_OPTIONS[0]?.id || null,
   );
   const [votes, setVotes] = useState<string[]>(data.avatarVotes || []);
   const [customRequest, setCustomRequest] = useState("");
@@ -1275,7 +1275,11 @@ function AvatarStep({
               <div className="w-full space-y-3 flex-1 min-h-0 flex flex-col">
                 <button
                   type="button"
-                  onClick={() => setSelected(avatar.id)}
+                  onClick={() =>
+                    setSelected((prev) =>
+                      prev === avatar.id ? null : avatar.id,
+                    )
+                  }
                   className={`w-full py-2 rounded-md text-[13px] font-medium transition-colors cursor-pointer shrink-0 ${isSelected ? "bg-accent text-accent-foreground" : "border border-border text-text-primary hover:border-border-hover"}`}
                 >
                   {isSelected ? "\u2713 Selected" : "Select this avatar"}
@@ -1408,7 +1412,7 @@ function AvatarStep({
           type="button"
           onClick={() =>
             onComplete({
-              selectedAvatar: selected || "nexu-alpha",
+              selectedAvatar: selected ?? undefined,
               avatarVotes: votes,
               customAvatarRequest: customRequest.trim(),
             })
