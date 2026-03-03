@@ -6,7 +6,7 @@ import {
 } from "@nexu/shared";
 import { fetchJson } from "./api.js";
 import { env } from "./env.js";
-import { log } from "./log.js";
+import { logger } from "./log.js";
 import type { RuntimeState } from "./state.js";
 import { setConfigSyncStatus } from "./state.js";
 
@@ -69,12 +69,15 @@ export async function pollLatestConfig(state: RuntimeState): Promise<boolean> {
 
   setConfigSyncStatus(state, "active");
 
-  log("applied new pool config", {
-    poolId: payload.poolId,
-    version: payload.version,
-    hash: payload.configHash,
-    secretsChanged,
-  });
+  logger.info(
+    {
+      poolId: payload.poolId,
+      version: payload.version,
+      hash: payload.configHash,
+      secretsChanged,
+    },
+    "applied new pool config",
+  );
 
   return true;
 }
@@ -95,9 +98,12 @@ export async function fetchInitialConfig(): Promise<void> {
   // so write with empty agents/secrets (will be populated on first poll cycle)
   await writeNexuContext(undefined, undefined);
 
-  log("initial pool config synced", {
-    event: "startup_config_sync",
-    status: "success",
-    poolId: env.RUNTIME_POOL_ID,
-  });
+  logger.info(
+    {
+      event: "startup_config_sync",
+      status: "success",
+      poolId: env.RUNTIME_POOL_ID,
+    },
+    "initial pool config synced",
+  );
 }

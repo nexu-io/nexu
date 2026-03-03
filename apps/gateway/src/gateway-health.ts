@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import type { ExecFileException } from "node:child_process";
 import { env } from "./env.js";
-import { log } from "./log.js";
+import { GatewayError, logger } from "./log.js";
 import type { GatewayProbeErrorCode } from "./state.js";
 import { sleep } from "./utils.js";
 
@@ -162,23 +162,35 @@ export async function waitGatewayReady(): Promise<void> {
   for (;;) {
     const result = await probeGatewayLiveness();
     if (result.ok) {
-      log("gateway is ready", {
-        event: "gateway_probe",
-        probeType: result.probeType,
-        latencyMs: result.latencyMs,
-      });
+      logger.info(
+        {
+          event: "gateway_probe",
+          probeType: result.probeType,
+          latencyMs: result.latencyMs,
+        },
+        "gateway is ready",
+      );
       return;
     }
 
-    log("gateway readiness probe failed; retrying", {
-      event: "gateway_probe",
-      probeType: result.probeType,
-      attempt,
-      errorCode: result.errorCode,
-      latencyMs: result.latencyMs,
-      exitCode: result.exitCode,
-      retryInMs: 1000,
-    });
+    logger.warn(
+      GatewayError.from(
+        {
+          source: "gateway-health/wait-ready",
+          message: "gateway readiness probe failed; retrying",
+          code: result.errorCode,
+        },
+        {
+          event: "gateway_probe",
+          probeType: result.probeType,
+          attempt,
+          latencyMs: result.latencyMs,
+          exitCode: result.exitCode,
+          retryInMs: 1000,
+        },
+      ).toJSON(),
+      "gateway readiness probe failed; retrying",
+    );
 
     attempt += 1;
     await sleep(1000);

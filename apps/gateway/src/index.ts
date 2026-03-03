@@ -1,4 +1,5 @@
 import { bootstrapGateway } from "./bootstrap.js";
+import { BaseError, logger } from "./log.js";
 import {
   runDiscordSessionSyncLoop,
   runGatewayHealthLoops,
@@ -23,8 +24,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   stopManagedOpenclawGateway();
-  console.error("[gateway] fatal error", {
-    error: error instanceof Error ? error.message : "unknown_error",
-  });
+  logger.error(BaseError.from(error).toJSON(), "fatal error");
   process.exitCode = 1;
 });

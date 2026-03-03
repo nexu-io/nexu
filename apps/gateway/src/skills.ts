@@ -3,7 +3,7 @@ import { dirname, join, relative } from "node:path";
 import { runtimeSkillsResponseSchema } from "@nexu/shared";
 import { fetchJson } from "./api.js";
 import { env } from "./env.js";
-import { log } from "./log.js";
+import { GatewayError, logger } from "./log.js";
 import type { RuntimeState } from "./state.js";
 import { setSkillsSyncStatus } from "./state.js";
 
@@ -67,7 +67,20 @@ async function writeSkillFiles(
 
     for (const [filePath, content] of Object.entries(files)) {
       if (!isValidSkillFilePath(filePath)) {
-        log("skipping invalid skill file path", { name, filePath });
+        logger.warn(
+          GatewayError.from(
+            {
+              source: "skills/write-files",
+              message: "skipping invalid skill file path",
+              code: "invalid_skill_file_path",
+            },
+            {
+              name,
+              filePath,
+            },
+          ).toJSON(),
+          "skipping invalid skill file path",
+        );
         continue;
       }
       const target = join(skillDir, filePath);
@@ -101,10 +114,13 @@ export async function pollLatestSkills(state: RuntimeState): Promise<boolean> {
   state.lastSkillsHash = payload.skillsHash;
   setSkillsSyncStatus(state, "active");
 
-  log("applied new skills snapshot", {
-    version: payload.version,
-    hash: payload.skillsHash,
-  });
+  logger.info(
+    {
+      version: payload.version,
+      hash: payload.skillsHash,
+    },
+    "applied new skills snapshot",
+  );
 
   return true;
 }

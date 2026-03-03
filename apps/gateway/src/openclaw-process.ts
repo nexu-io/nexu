@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { env } from "./env.js";
-import { log } from "./log.js";
+import { BaseError, GatewayError, logger } from "./log.js";
 
 let openclawGatewayProcess: ChildProcess | null = null;
 
@@ -28,26 +28,43 @@ export function startManagedOpenclawGateway(): void {
   openclawGatewayProcess = child;
 
   child.once("error", (error: Error) => {
-    log("failed to spawn openclaw gateway", {
-      bin: env.OPENCLAW_BIN,
-      args,
-      error: error.message,
-    });
+    const baseError = BaseError.from(error);
+    logger.error(
+      GatewayError.from(
+        {
+          source: "openclaw-process/spawn",
+          message: "failed to spawn openclaw gateway",
+          code: baseError.code,
+        },
+        {
+          bin: env.OPENCLAW_BIN,
+          args,
+          reason: baseError.message,
+        },
+      ).toJSON(),
+      "failed to spawn openclaw gateway",
+    );
     openclawGatewayProcess = null;
   });
 
   child.once("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-    log("openclaw gateway process exited", {
-      code,
-      signal,
-    });
+    logger.warn(
+      {
+        code,
+        signal,
+      },
+      "openclaw gateway process exited",
+    );
     openclawGatewayProcess = null;
   });
 
-  log("spawned openclaw gateway process", {
-    bin: env.OPENCLAW_BIN,
-    args,
-  });
+  logger.info(
+    {
+      bin: env.OPENCLAW_BIN,
+      args,
+    },
+    "spawned openclaw gateway process",
+  );
 }
 
 export function stopManagedOpenclawGateway(): void {
