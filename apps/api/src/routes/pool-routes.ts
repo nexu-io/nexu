@@ -145,7 +145,7 @@ async function buildAgentMeta(
 
   const agentMeta: Record<string, { botId: string }> = {};
   for (const bot of poolBots) {
-    agentMeta[bot.slug] = { botId: bot.id };
+    agentMeta[bot.id] = { botId: bot.id };
   }
   return agentMeta;
 }

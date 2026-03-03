@@ -15,7 +15,7 @@ import {
   onLivenessFailure,
   onLivenessSuccess,
 } from "./health-state.js";
-import { log } from "./log.js";
+import { BaseError, GatewayError, logger } from "./log.js";
 import { pollLatestSkills } from "./skills.js";
 import {
   type RuntimeState,
@@ -40,9 +40,20 @@ export async function runHeartbeatLoop(state: RuntimeState): Promise<never> {
     try {
       await sendHeartbeat(state);
     } catch (error) {
-      log("heartbeat failed", {
-        error: error instanceof Error ? error.message : "unknown_error",
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/heartbeat",
+            message: "heartbeat failed",
+            code: baseError.code,
+          },
+          {
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "heartbeat failed",
+      );
     }
 
     await sleep(env.RUNTIME_HEARTBEAT_INTERVAL_MS);
@@ -57,9 +68,20 @@ export async function runDiscordSessionSyncLoop(): Promise<never> {
     try {
       await syncDiscordSessions();
     } catch (error) {
-      log("discord session sync failed", {
-        error: error instanceof Error ? error.message : "unknown_error",
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/discord-session-sync",
+            message: "discord session sync failed",
+            code: baseError.code,
+          },
+          {
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "discord session sync failed",
+      );
     }
 
     // Sync every 30 seconds
@@ -85,10 +107,21 @@ export async function runPollLoop(state: RuntimeState): Promise<never> {
       }
     } catch (error) {
       setConfigSyncStatus(state, "degraded");
-      log("config poll failed", {
-        error: error instanceof Error ? error.message : "unknown_error",
-        retryInMs: backoffMs,
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/config-poll",
+            message: "config poll failed",
+            code: baseError.code,
+          },
+          {
+            retryInMs: backoffMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "config poll failed",
+      );
       await sleep(backoffMs);
       backoffMs = Math.min(backoffMs * 2, env.RUNTIME_MAX_BACKOFF_MS);
     }
@@ -109,10 +142,21 @@ export async function runSkillsPollLoop(state: RuntimeState): Promise<never> {
       await sleep(env.RUNTIME_POLL_INTERVAL_MS + jitter);
     } catch (error) {
       setSkillsSyncStatus(state, "degraded");
-      log("skills poll failed", {
-        error: error instanceof Error ? error.message : "unknown_error",
-        retryInMs: backoffMs,
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/skills-poll",
+            message: "skills poll failed",
+            code: baseError.code,
+          },
+          {
+            retryInMs: backoffMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "skills poll failed",
+      );
       await sleep(backoffMs);
       backoffMs = Math.min(backoffMs * 2, env.RUNTIME_MAX_BACKOFF_MS);
     }
@@ -126,22 +170,31 @@ function logProbeFailure(
   latencyMs: number,
   exitCode?: number,
 ): void {
-  log("gateway probe failed", {
-    event: "gateway_probe",
-    probeType,
-    status: evaluator.status,
-    latencyMs,
-    errorCode,
-    exitCode,
-    consecutiveFailures:
-      probeType === "liveness"
-        ? evaluator.counters.consecutiveLivenessFailures
-        : evaluator.counters.consecutiveDeepFailures,
-    consecutiveSuccesses:
-      probeType === "liveness"
-        ? evaluator.counters.consecutiveLivenessSuccesses
-        : evaluator.counters.consecutiveDeepSuccesses,
-  });
+  logger.warn(
+    GatewayError.from(
+      {
+        source: "loop/gateway-probe",
+        message: "gateway probe failed",
+        code: errorCode,
+      },
+      {
+        event: "gateway_probe",
+        probeType,
+        status: evaluator.status,
+        latencyMs,
+        exitCode,
+        consecutiveFailures:
+          probeType === "liveness"
+            ? evaluator.counters.consecutiveLivenessFailures
+            : evaluator.counters.consecutiveDeepFailures,
+        consecutiveSuccesses:
+          probeType === "liveness"
+            ? evaluator.counters.consecutiveLivenessSuccesses
+            : evaluator.counters.consecutiveDeepSuccesses,
+      },
+    ).toJSON(),
+    "gateway probe failed",
+  );
 }
 
 function applyGatewayTransition(
@@ -153,12 +206,15 @@ function applyGatewayTransition(
   }
 
   setGatewayStatus(state, transition.to);
-  log("gateway health state changed", {
-    event: "gateway_state_changed",
-    from: transition.from,
-    status: transition.to,
-    reason: transition.reason,
-  });
+  logger.info(
+    {
+      event: "gateway_state_changed",
+      from: transition.from,
+      status: transition.to,
+      reason: transition.reason,
+    },
+    "gateway health state changed",
+  );
 }
 
 async function runGatewayLivenessLoop(
@@ -237,9 +293,12 @@ async function runGatewayDeepHealthLoop(
 
 export function runGatewayHealthLoops(state: RuntimeState): void {
   if (!env.RUNTIME_GATEWAY_PROBE_ENABLED) {
-    log("gateway runtime probes disabled", {
-      enabled: env.RUNTIME_GATEWAY_PROBE_ENABLED,
-    });
+    logger.warn(
+      {
+        enabled: env.RUNTIME_GATEWAY_PROBE_ENABLED,
+      },
+      "gateway runtime probes disabled",
+    );
     return;
   }
 

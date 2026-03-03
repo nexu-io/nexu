@@ -83,6 +83,7 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 | Execution plans | `docs/exec-plans/` |
 | DB schema reference | `docs/generated/db-schema.md` |
 | Documentation sync | `.nexu-dev/skills/sync-docs/SKILL.md` |
+| E2E gateway testing | `.nexu-dev/skills/nexu-e2e-test/SKILL.md` |
 
 ## Documentation maintenance
 

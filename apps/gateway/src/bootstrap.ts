@@ -5,7 +5,7 @@ import { registerPool } from "./api.js";
 import { fetchInitialConfig } from "./config.js";
 import { env, envWarnings } from "./env.js";
 import { waitGatewayReady } from "./gateway-health.js";
-import { log } from "./log.js";
+import { BaseError, GatewayError, logger } from "./log.js";
 import { startManagedOpenclawGateway } from "./openclaw-process.js";
 import { pollLatestSkills } from "./skills.js";
 import type { RuntimeState } from "./state.js";
@@ -15,12 +15,23 @@ async function registerPoolWithRetry(): Promise<void> {
   return runWithRetry(
     registerPool,
     ({ attempt, retryDelayMs, error }) => {
-      log("pool registration failed; retrying", {
-        attempt,
-        poolId: env.RUNTIME_POOL_ID,
-        retryDelayMs,
-        error: error instanceof Error ? error.message : "unknown_error",
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "bootstrap/register-pool",
+            message: "pool registration failed; retrying",
+            code: baseError.code,
+          },
+          {
+            attempt,
+            poolId: env.RUNTIME_POOL_ID,
+            retryDelayMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "pool registration failed; retrying",
+      );
     },
     env.RUNTIME_MAX_BACKOFF_MS,
   );
@@ -30,12 +41,23 @@ async function fetchInitialConfigWithRetry(): Promise<void> {
   return runWithRetry(
     fetchInitialConfig,
     ({ attempt, retryDelayMs, error }) => {
-      log("initial config sync failed; retrying", {
-        attempt,
-        poolId: env.RUNTIME_POOL_ID,
-        retryDelayMs,
-        error: error instanceof Error ? error.message : "unknown_error",
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "bootstrap/fetch-initial-config",
+            message: "initial config sync failed; retrying",
+            code: baseError.code,
+          },
+          {
+            attempt,
+            poolId: env.RUNTIME_POOL_ID,
+            retryDelayMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "initial config sync failed; retrying",
+      );
     },
     env.RUNTIME_MAX_BACKOFF_MS,
   );
@@ -45,12 +67,23 @@ async function syncInitialSkillsWithRetry(state: RuntimeState): Promise<void> {
   return runWithRetry(
     () => pollLatestSkills(state).then(() => undefined),
     ({ attempt, retryDelayMs, error }) => {
-      log("initial skills sync failed; retrying", {
-        attempt,
-        poolId: env.RUNTIME_POOL_ID,
-        retryDelayMs,
-        error: error instanceof Error ? error.message : "unknown_error",
-      });
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "bootstrap/sync-initial-skills",
+            message: "initial skills sync failed; retrying",
+            code: baseError.code,
+          },
+          {
+            attempt,
+            poolId: env.RUNTIME_POOL_ID,
+            retryDelayMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "initial skills sync failed; retrying",
+      );
     },
     env.RUNTIME_MAX_BACKOFF_MS,
   );
@@ -88,7 +121,7 @@ async function clearStaleSessionLocks(): Promise<void> {
   }
 
   if (removed > 0) {
-    log("cleared stale session locks", { count: removed });
+    logger.info({ count: removed }, "cleared stale session locks");
   }
 }
 
@@ -115,57 +148,75 @@ async function rewriteSkillFiles(): Promise<void> {
   }
 
   if (rewritten > 0) {
-    log("rewrote skill files to trigger watcher", { count: rewritten });
+    logger.info({ count: rewritten }, "rewrote skill files to trigger watcher");
   }
 }
 
 export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   if (envWarnings.usedHostnameAsRuntimePoolId) {
-    log("warning: RUNTIME_POOL_ID is unset; using hostname fallback", {
-      nodeEnv: env.NODE_ENV,
-      poolId: env.RUNTIME_POOL_ID,
-    });
+    logger.warn(
+      {
+        nodeEnv: env.NODE_ENV,
+        poolId: env.RUNTIME_POOL_ID,
+      },
+      "RUNTIME_POOL_ID is unset; using hostname fallback",
+    );
   }
 
   if (envWarnings.deprecatedGatewayHttpEnvKeys.length > 0) {
-    log("deprecated gateway HTTP env vars detected and ignored", {
-      keys: envWarnings.deprecatedGatewayHttpEnvKeys,
-    });
+    logger.warn(
+      {
+        keys: envWarnings.deprecatedGatewayHttpEnvKeys,
+      },
+      "deprecated gateway HTTP env vars detected and ignored",
+    );
   }
 
   if (envWarnings.openclawConfigPathSource === "state_dir_env") {
-    log("OPENCLAW_CONFIG_PATH is unset; derived from OPENCLAW_STATE_DIR", {
-      stateDir: envWarnings.openclawStateDir,
-      configPath: envWarnings.openclawConfigPath,
-    });
+    logger.warn(
+      {
+        stateDir: envWarnings.openclawStateDir,
+        configPath: envWarnings.openclawConfigPath,
+      },
+      "OPENCLAW_CONFIG_PATH is unset; derived from OPENCLAW_STATE_DIR",
+    );
   }
 
   if (envWarnings.openclawConfigPathSource === "profile_default") {
-    log("OPENCLAW_CONFIG_PATH is unset; derived from profile default", {
-      profile: env.OPENCLAW_PROFILE,
-      stateDir: envWarnings.openclawStateDir,
-      configPath: envWarnings.openclawConfigPath,
-    });
+    logger.warn(
+      {
+        profile: env.OPENCLAW_PROFILE,
+        stateDir: envWarnings.openclawStateDir,
+        configPath: envWarnings.openclawConfigPath,
+      },
+      "OPENCLAW_CONFIG_PATH is unset; derived from profile default",
+    );
   }
 
   if (envWarnings.openclawConfigPathSource === "default") {
-    log("OPENCLAW_CONFIG_PATH is unset; using ~/.openclaw/openclaw.json", {
-      stateDir: envWarnings.openclawStateDir,
-      configPath: envWarnings.openclawConfigPath,
-    });
+    logger.warn(
+      {
+        stateDir: envWarnings.openclawStateDir,
+        configPath: envWarnings.openclawConfigPath,
+      },
+      "OPENCLAW_CONFIG_PATH is unset; using ~/.openclaw/openclaw.json",
+    );
   }
 
-  log("starting gateway", {
-    poolId: env.RUNTIME_POOL_ID,
-    configPath: env.OPENCLAW_CONFIG_PATH,
-    manageOpenclawProcess: env.RUNTIME_MANAGE_OPENCLAW_PROCESS,
-  });
+  logger.info(
+    {
+      poolId: env.RUNTIME_POOL_ID,
+      configPath: env.OPENCLAW_CONFIG_PATH,
+      manageOpenclawProcess: env.RUNTIME_MANAGE_OPENCLAW_PROCESS,
+    },
+    "starting gateway",
+  );
   await registerPoolWithRetry();
-  log("pool registered", { poolId: env.RUNTIME_POOL_ID });
+  logger.info({ poolId: env.RUNTIME_POOL_ID }, "pool registered");
 
   await fetchInitialConfigWithRetry();
   await syncInitialSkillsWithRetry(state);
-  log("initial skills synced", { poolId: env.RUNTIME_POOL_ID });
+  logger.info({ poolId: env.RUNTIME_POOL_ID }, "initial skills synced");
 
   await clearStaleSessionLocks();
 

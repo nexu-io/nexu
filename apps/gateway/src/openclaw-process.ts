@@ -1,6 +1,9 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 import { env } from "./env.js";
-import { log } from "./log.js";
+import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
+
+const logger = gatewayLogger.child({ log_source: "openclaw" });
 
 let openclawGatewayProcess: ChildProcess | null = null;
 
@@ -12,6 +15,34 @@ function buildOpenclawGatewayArgs(): string[] {
   }
 
   return args;
+}
+
+function pipeChildStream(
+  stream: NodeJS.ReadableStream | null,
+  streamName: "stdout" | "stderr",
+): void {
+  if (!stream) {
+    return;
+  }
+
+  const reader = createInterface({
+    input: stream,
+    crlfDelay: Number.POSITIVE_INFINITY,
+  });
+
+  reader.on("line", (line) => {
+    if (line.length === 0) {
+      return;
+    }
+
+    logger.info(
+      {
+        stream: streamName,
+        raw_line: line,
+      },
+      "openclaw output",
+    );
+  });
 }
 
 export function startManagedOpenclawGateway(): void {
@@ -26,33 +57,57 @@ export function startManagedOpenclawGateway(): void {
     ...safeEnv
   } = process.env;
   const child = spawn(env.OPENCLAW_BIN, args, {
-    stdio: "inherit",
-    env: { ...safeEnv, SKILL_API_TOKEN: env.SKILL_API_TOKEN },
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...safeEnv,
+      SKILL_API_TOKEN: env.SKILL_API_TOKEN,
+      OPENCLAW_LOG_LEVEL: "error",
+    },
   });
+
+  pipeChildStream(child.stdout, "stdout");
+  pipeChildStream(child.stderr, "stderr");
 
   openclawGatewayProcess = child;
 
   child.once("error", (error: Error) => {
-    log("failed to spawn openclaw gateway", {
-      bin: env.OPENCLAW_BIN,
-      args,
-      error: error.message,
-    });
+    const baseError = BaseError.from(error);
+    logger.error(
+      GatewayError.from(
+        {
+          source: "openclaw-process/spawn",
+          message: "failed to spawn openclaw gateway",
+          code: baseError.code,
+        },
+        {
+          bin: env.OPENCLAW_BIN,
+          args,
+          reason: baseError.message,
+        },
+      ).toJSON(),
+      "failed to spawn openclaw gateway",
+    );
     openclawGatewayProcess = null;
   });
 
   child.once("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-    log("openclaw gateway process exited", {
-      code,
-      signal,
-    });
+    logger.warn(
+      {
+        code,
+        signal,
+      },
+      "openclaw gateway process exited",
+    );
     openclawGatewayProcess = null;
   });
 
-  log("spawned openclaw gateway process", {
-    bin: env.OPENCLAW_BIN,
-    args,
-  });
+  logger.info(
+    {
+      bin: env.OPENCLAW_BIN,
+      args,
+    },
+    "spawned openclaw gateway process",
+  );
 }
 
 export function stopManagedOpenclawGateway(): void {

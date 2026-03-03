@@ -390,4 +390,16 @@ describe("Config Generator", () => {
     const result = openclawConfigSchema.safeParse(config);
     expect(result.success).toBe(true);
   });
+
+  it("should include stateDir/skills in extraDirs for skill discovery", async () => {
+    await seedData();
+    const config = await generatePoolConfig(db, "pool-1");
+
+    const extraDirs = config.skills?.load?.extraDirs;
+    expect(extraDirs).toBeDefined();
+    expect(extraDirs).toHaveLength(1);
+    // stateDir defaults to OPENCLAW_STATE_DIR env or "/data/openclaw"
+    const stateDir = process.env.OPENCLAW_STATE_DIR ?? "/data/openclaw";
+    expect(extraDirs?.[0]).toBe(`${stateDir}/skills`);
+  });
 });
