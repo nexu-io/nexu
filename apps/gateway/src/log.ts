@@ -1,14 +1,20 @@
 import pino from "pino";
 
 const env = process.env.DD_ENV ?? process.env.NODE_ENV ?? "development";
-const version = process.env.DD_VERSION ?? process.env.COMMIT_HASH ?? "unknown";
+const version =
+  process.env.DD_VERSION ??
+  process.env.COMMIT_HASH ??
+  process.env.GIT_COMMIT_SHA ??
+  process.env.IMAGE_TAG ??
+  process.env.npm_package_version;
 
 export const logger = pino({
   level: process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
   base: {
     service: "nexu-gateway",
     env,
-    version,
+    log_source: "gateway",
+    ...(version ? { version } : {}),
   },
   timestamp: pino.stdTimeFunctions.isoTime,
 });

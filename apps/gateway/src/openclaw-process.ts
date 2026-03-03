@@ -1,6 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { env } from "./env.js";
-import { BaseError, GatewayError, logger } from "./log.js";
+import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
+
+const logger = gatewayLogger.child({ log_source: "openclaw" });
 
 let openclawGatewayProcess: ChildProcess | null = null;
 
@@ -22,7 +24,10 @@ export function startManagedOpenclawGateway(): void {
   const args = buildOpenclawGatewayArgs();
   const child = spawn(env.OPENCLAW_BIN, args, {
     stdio: "inherit",
-    env: process.env,
+    env: {
+      ...process.env,
+      OPENCLAW_LOG_LEVEL: "error",
+    },
   });
 
   openclawGatewayProcess = child;
