@@ -17,6 +17,7 @@ import {
 } from "../db/schema/index.js";
 import { decrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
+import { requireInternalToken } from "../middleware/internal-auth.js";
 import { logger } from "../lib/logger.js";
 
 import type { AppBindings } from "../types.js";
@@ -106,6 +107,7 @@ const updateSessionInternalRoute = createRoute({
 export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
   // POST /api/internal/sessions — Gateway sidecar upserts a session
   app.openapi(createSessionRoute, async (c) => {
+    requireInternalToken(c);
     const input = c.req.valid("json");
 
     // Verify botId exists
@@ -181,6 +183,7 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // PATCH /api/internal/sessions/:id — update session
   app.openapi(updateSessionInternalRoute, async (c) => {
+    requireInternalToken(c);
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
 
@@ -230,6 +233,7 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // POST /api/internal/sessions/sync-discord — Sync Discord sessions via Discord REST API
   app.post("/api/internal/sessions/sync-discord", async (c) => {
+    requireInternalToken(c);
     const body = (await c.req.json()) as { poolId?: string };
     const poolId = body.poolId;
     if (!poolId) {
