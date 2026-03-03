@@ -124,9 +124,9 @@ export async function generatePoolConfig(
 
   const agentList: AgentConfig[] = activeBots.map((bot, index) => {
     const agent: AgentConfig = {
-      id: bot.slug,
+      id: bot.id,
       name: bot.name,
-      workspace: `${stateDir}/workspaces/${bot.slug}`,
+      workspace: `${stateDir}/workspaces/${bot.id}`,
     };
 
     if (index === 0) {
@@ -176,7 +176,7 @@ export async function generatePoolConfig(
       };
 
       bindingsList.push({
-        agentId: ch.botSlug,
+        agentId: ch.botId,
         match: {
           channel: "slack",
           accountId: ch.accountId,
@@ -201,7 +201,7 @@ export async function generatePoolConfig(
       };
 
       bindingsList.push({
-        agentId: ch.botSlug,
+        agentId: ch.botId,
         match: {
           channel: "discord",
           accountId: ch.accountId,
@@ -227,7 +227,7 @@ export async function generatePoolConfig(
       };
 
       bindingsList.push({
-        agentId: ch.botSlug,
+        agentId: ch.botId,
         match: {
           channel: "feishu",
           accountId: ch.accountId,
@@ -346,11 +346,14 @@ export async function generatePoolConfig(
   }
 
   // Enable skill hot-reload watcher so OpenClaw picks up managed skills
-  // written to ~/.openclaw/skills/ by the sidecar without requiring a restart.
+  // written by the sidecar without requiring a restart.
+  // extraDirs ensures OpenClaw scans the sidecar's write directory
+  // (${stateDir}/skills) which may differ from OpenClaw's CONFIG_DIR/skills.
   config.skills = {
     load: {
       watch: true,
       watchDebounceMs: 250,
+      extraDirs: [`${stateDir}/skills`],
     },
   };
 
