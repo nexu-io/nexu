@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "generate-openapi": "tsx scripts/generate-openapi.ts",
     "db:generate": "drizzle-kit generate",
-    "db:check-sync": "pnpm db:generate && git diff --exit-code -- migrations && test -z \"$(git ls-files --others --exclude-standard migrations)\"",
+    "db:check-sync": "tsx scripts/check-migration-sync.ts",
     "db:check-dangerous": "tsx scripts/check-migration-dangerous.ts",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed-dev.ts"

@@ -1,5 +1,5 @@
-import { readFile, readdir } from "node:fs/promises";
-import { extname, join, relative } from "node:path";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 type Violation = {
@@ -34,6 +34,16 @@ const migrationsDirPath = fileURLToPath(
   new URL("../migrations", import.meta.url),
 );
 const cwd = process.cwd();
+const reportPath = process.env.DB_MIGRATION_DANGEROUS_REPORT_PATH;
+
+async function writeReport(content: string) {
+  if (!reportPath) {
+    return;
+  }
+
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(reportPath, content, "utf8");
+}
 
 async function collectSqlFiles(dirPath: string): Promise<string[]> {
   const entries = await readdir(dirPath, { withFileTypes: true });
@@ -139,6 +149,9 @@ async function main() {
   const sqlFiles = await collectSqlFiles(migrationsDirPath);
 
   if (sqlFiles.length === 0) {
+    await writeReport(
+      "### Dangerous SQL Check Passed\n\nNo migration SQL files found.",
+    );
     console.log("No migration SQL files found.");
     return;
   }
@@ -153,17 +166,36 @@ async function main() {
   }
 
   if (violations.length === 0) {
+    await writeReport(
+      "### Dangerous SQL Check Passed\n\nNo dangerous SQL statements were detected.",
+    );
     console.log("Migration dangerous-operation check passed.");
     return;
   }
 
+  const reportLines: string[] = [
+    "### Dangerous SQL Check Failed",
+    "",
+    "The following migration statements are blocked by CI:",
+    "",
+  ];
+
   console.error("Dangerous migration statements detected:");
   for (const violation of violations) {
     const relativePath = relative(cwd, violation.filePath);
+    reportLines.push(
+      `- ${relativePath}:${violation.line} ${violation.message} -> ${violation.snippet}`,
+    );
     console.error(
       `- ${relativePath}:${violation.line} ${violation.message} -> ${violation.snippet}`,
     );
   }
+
+  reportLines.push(
+    "",
+    "Please rewrite the migration to avoid destructive/unbounded DML operations in PR stage.",
+  );
+  await writeReport(reportLines.join("\n"));
 
   process.exitCode = 1;
 }
