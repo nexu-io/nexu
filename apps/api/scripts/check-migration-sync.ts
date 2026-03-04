@@ -228,6 +228,9 @@ function formatFailureReport(
   const diffPreview = getDiffPreview(entries);
   const checkDisplayName = getCheckDisplayName(mode);
   const hasMigrationChangesInPr = pullRequestChangedMigrations.length > 0;
+  const generatedUntrackedMigrations = entries
+    .filter((entry) => entry.code === "??")
+    .map((entry) => entry.filePath);
 
   const lines: string[] = [
     `### ❌ ${checkDisplayName}`,
@@ -271,6 +274,25 @@ function formatFailureReport(
     "- All migration SQL and snapshot/journal artifacts needed by current schema are included in the PR.",
   );
 
+  if (reason === "missing_migration") {
+    lines.push("", "**Schemas Missing Corresponding Migration Files**");
+
+    if (pullRequestChangedSchemas.length > 0) {
+      for (const filePath of pullRequestChangedSchemas) {
+        lines.push(`- ${filePath}`);
+      }
+    } else {
+      lines.push("- Unable to infer schema files from PR diff.");
+    }
+
+    if (generatedUntrackedMigrations.length > 0) {
+      lines.push("", "**Generated Migration Artifacts Not Included In PR**");
+      for (const filePath of generatedUntrackedMigrations) {
+        lines.push(`- ${filePath}`);
+      }
+    }
+  }
+
   if (hasMigrationChangesInPr) {
     lines.push("", "**Migration Files Changed In This PR**");
     for (const filePath of pullRequestChangedMigrations) {
@@ -278,7 +300,7 @@ function formatFailureReport(
     }
   }
 
-  if (pullRequestChangedSchemas.length > 0) {
+  if (reason !== "missing_migration" && pullRequestChangedSchemas.length > 0) {
     lines.push("", "**Schema Files Changed In This PR**");
     for (const filePath of pullRequestChangedSchemas) {
       lines.push(`- ${filePath}`);
@@ -297,7 +319,7 @@ function formatFailureReport(
 
   lines.push("```");
 
-  if (diffPreview.text.length > 0) {
+  if (reason !== "missing_migration" && diffPreview.text.length > 0) {
     lines.push(
       "",
       "**Generated Diff Preview**",
