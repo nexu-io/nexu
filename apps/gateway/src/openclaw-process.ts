@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from "node:child_process";
+import path from "node:path";
 import { env } from "./env.js";
 import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
 
@@ -27,8 +28,18 @@ export function startManagedOpenclawGateway(): void {
     ENCRYPTION_KEY: _encryptionKey,
     ...safeEnv
   } = process.env;
+  // Resolve CWD to match OPENCLAW_STATE_DIR so that relative workspace paths
+  // (e.g. ".openclaw/workspaces/{id}") resolve consistently for both the exec
+  // tool and the memory indexer.  Without this, exec resolves relative to the
+  // sidecar's CWD (apps/gateway/) while the indexer resolves relative to
+  // CONFIG_DIR, causing memory files to be written to the wrong location.
+  const openclawCwd = env.OPENCLAW_STATE_DIR
+    ? path.resolve(env.OPENCLAW_STATE_DIR)
+    : undefined;
+
   const child = spawn(env.OPENCLAW_BIN, args, {
     stdio: ["ignore", "ignore", "ignore"],
+    cwd: openclawCwd,
     env: {
       ...safeEnv,
       SKILL_API_TOKEN: env.SKILL_API_TOKEN,

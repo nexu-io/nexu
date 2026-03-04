@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="x-commit-hash" content="%VITE_COMMIT_HASH%" />
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="/favicon/favicon-light.svg" />
+    <script>
+      (() => {
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
+        const updateFavicon = () => {
+          const link = document.getElementById("app-favicon");
+          if (!(link instanceof HTMLLinkElement)) return;
+          link.href = media.matches ? "/favicon/favicon-dark.svg" : "/favicon/favicon-light.svg";
+        };
+        updateFavicon();
+        media.addEventListener("change", updateFavicon);
+      })();
+    </script>
     <title>Nexu - OpenClaw Dashboard</title>
   </head>
   <body>

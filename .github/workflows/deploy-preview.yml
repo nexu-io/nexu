@@ -29,25 +29,11 @@ jobs:
     outputs:
       api_url: ${{ steps.deploy.outputs.url }}
     steps:
-      - name: Check Fly token
-        id: check-token
-        env:
-          FLY_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          if [ -n "$FLY_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::FLY_API_TOKEN not set — skipping API preview deploy"
-          fi
-
       - uses: actions/checkout@v4
-        if: steps.check-token.outputs.available == 'true'
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
-        if: steps.check-token.outputs.available == 'true'
 
       - name: Generate app name
-        if: steps.check-token.outputs.available == 'true'
         id: slug
         run: |
           BRANCH="${{ github.head_ref }}"
@@ -56,21 +42,20 @@ jobs:
           echo "app_name=nexu-api-preview-${SLUG}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy API to Fly.io
-        if: steps.check-token.outputs.available == 'true'
         id: deploy
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           APP="${{ steps.slug.outputs.app_name }}"
-          flyctl apps create "$APP" --org personal 2>/dev/null || true
-          flyctl secrets set \
+          fly apps create "$APP" --org personal 2>/dev/null || true
+          fly secrets set \
             DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
             BETTER_AUTH_URL="https://${APP}.fly.dev" \
             WEB_URL="https://${{ steps.slug.outputs.app_name }}.preview.nexu.io" \
             RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
             --app "$APP"
-          flyctl deploy --app "$APP" --config apps/api/fly.toml --wait-timeout 120
+          fly deploy --app "$APP" --config apps/api/fly.toml --wait-timeout 120
           echo "url=https://${APP}.fly.dev" >> "$GITHUB_OUTPUT"
 
   deploy-preview:
@@ -177,6 +162,21 @@ jobs:
             | jq -r '.result[0].id')
           echo "Zone ID: $ZONE_ID"
 
+          # Ensure wildcard DNS record *.preview.nexu.io exists (required for Workers Custom Domains)
+          WILDCARD_EXISTS=$(curl -sf -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records?name=*.preview.nexu.io&type=AAAA" \
+            | jq -r '.result | length')
+          if [ "$WILDCARD_EXISTS" = "0" ]; then
+            echo "Creating wildcard DNS record *.preview.nexu.io"
+            curl -sf -X POST \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+              -d '{"type":"AAAA","name":"*.preview","content":"100::","proxied":true}' | jq .
+          else
+            echo "Wildcard DNS record *.preview.nexu.io already exists"
+          fi
+
           # Attach custom domain to the worker
           curl -sf -X PUT \
             -H "Authorization: Bearer $CF_API_TOKEN" \
@@ -253,7 +253,6 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          if [ -z "$FLY_API_TOKEN" ]; then exit 0; fi
           APP="nexu-api-preview-${{ steps.slug.outputs.branch_slug }}"
           flyctl apps destroy "$APP" --yes 2>/dev/null || true
         continue-on-error: true

@@ -1,6 +1,6 @@
 FROM node:22-slim AS base
 
-ARG OPENCLAW_VERSION=2026.2.25
+ARG OPENCLAW_VERSION=2026.3.2
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl git ca-certificates && \
