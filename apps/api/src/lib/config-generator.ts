@@ -300,7 +300,7 @@ export async function generatePoolConfig(
     },
     messages: {
       ackReaction: "eyes",
-      ackReactionScope: "all",
+      ackReactionScope: "group-mentions",
       removeAckAfterReply: true,
     },
     channels: {},
@@ -339,7 +339,7 @@ export async function generatePoolConfig(
       signingSecret: firstAccount?.signingSecret ?? "",
       enabled: true,
       groupPolicy: "open",
-      requireMention: false,
+      requireMention: true,
       dmPolicy: "open",
       allowFrom: ["*"],
       ackReaction: "eyes",
