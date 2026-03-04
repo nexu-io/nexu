@@ -7,6 +7,7 @@ on:
       - "apps/web/**"
       - "apps/landing/**"
       - "packages/shared/**"
+      - "apps/api/**"
 
   # Cleanup preview worker when PR is closed
   pull_request_target:
@@ -22,8 +23,59 @@ env:
   PREVIEW_DOMAIN_SUFFIX: "preview.nexu.io"
 
 jobs:
-  deploy-preview:
+  deploy-api-preview:
     if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Check Fly token
+        id: check-token
+        env:
+          FLY_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -n "$FLY_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::FLY_API_TOKEN not set — skipping API preview deploy"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check-token.outputs.available == 'true'
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.check-token.outputs.available == 'true'
+
+      - name: Generate app name
+        if: steps.check-token.outputs.available == 'true'
+        id: slug
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[\/\_]/-/g' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+          SLUG="${SLUG:0:36}"
+          echo "app_name=nexu-api-preview-${SLUG}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy API to Fly.io
+        if: steps.check-token.outputs.available == 'true'
+        id: deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          APP="${{ steps.slug.outputs.app_name }}"
+          flyctl apps create "$APP" --org personal 2>/dev/null || true
+          flyctl secrets set \
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
+            BETTER_AUTH_URL="https://${APP}.fly.dev" \
+            WEB_URL="https://${{ steps.slug.outputs.app_name }}.preview.nexu.io" \
+            RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
+            --app "$APP"
+          flyctl deploy --app "$APP" --config apps/api/fly.toml --wait-timeout 120
+          echo "url=https://${APP}.fly.dev" >> "$GITHUB_OUTPUT"
+
+  deploy-preview:
+    if: always() && github.event.action != 'closed'
+    needs: [deploy-api-preview]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,9 +115,46 @@ jobs:
         env:
           VITE_PREVIEW: "true"
           VITE_COMMIT_HASH: ${{ github.sha }}
-          VITE_AUTH_BASE_URL: ${{ vars.VITE_AUTH_BASE_URL }}
+          VITE_AUTH_BASE_URL: ""
           VITE_WHATSAPP_WA_ME_URL: ${{ vars.VITE_WHATSAPP_WA_ME_URL }}
           VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
+
+      - name: Inject API proxy worker
+        env:
+          API_ORIGIN: ${{ needs.deploy-api-preview.outputs.api_url || 'https://api.nexu.io' }}
+        run: |
+          cat > apps/web/src/_worker.ts << 'EOF'
+          interface Env { ASSETS: Fetcher; API_ORIGIN: string; }
+          export default {
+            async fetch(request: Request, env: Env): Promise<Response> {
+              const url = new URL(request.url);
+              if (url.pathname.startsWith("/api/")) {
+                const origin = new URL(env.API_ORIGIN);
+                const target = new URL(url.pathname + url.search, origin);
+                const headers = new Headers(request.headers);
+                headers.set("Host", origin.host);
+                headers.set("Origin", origin.origin);
+                headers.set("Referer", origin.origin + "/");
+                return fetch(target, { method: request.method, headers, body: request.body });
+              }
+              return env.ASSETS.fetch(request);
+            },
+          } satisfies ExportedHandler<Env>;
+          EOF
+
+          cat > apps/web/wrangler.preview.jsonc << EOF
+          {
+            "name": "nexu-app-preview",
+            "compatibility_date": "2025-01-01",
+            "main": "src/_worker.ts",
+            "assets": {
+              "directory": "./dist",
+              "not_found_handling": "single-page-application",
+              "binding": "ASSETS"
+            },
+            "vars": { "API_ORIGIN": "${API_ORIGIN}" }
+          }
+          EOF
 
       - name: Deploy preview worker
         uses: cloudflare/wrangler-action@v3
@@ -74,7 +163,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4"
-          command: deploy --name ${{ steps.slug.outputs.worker_name }}
+          command: deploy --config wrangler.preview.jsonc --name ${{ steps.slug.outputs.worker_name }}
           workingDirectory: apps/web
 
       - name: Attach custom domain
@@ -107,11 +196,13 @@ jobs:
           script: |
             const hostname = '${{ steps.slug.outputs.preview_hostname }}';
             const previewUrl = `https://${hostname}`;
+            const apiUrl = '${{ needs.deploy-api-preview.outputs.api_url }}' || 'https://api.nexu.io';
             const body = `## Preview Deployment
 
             | App | URL |
             |-----|-----|
             | Web | [${previewUrl}](${previewUrl}) |
+            | API | [${apiUrl}](${apiUrl}) |
 
             Deployed from commit: \`${context.sha.substring(0, 7)}\``;
 
@@ -150,9 +241,22 @@ jobs:
         run: |
           BRANCH="${{ github.head_ref }}"
           SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[\/\_]/-/g' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
-          SLUG="${SLUG:0:50}"
+          SLUG="${SLUG:0:36}"
+          echo "branch_slug=$SLUG" >> "$GITHUB_OUTPUT"
           echo "worker_name=nexu-app-preview-${SLUG}" >> "$GITHUB_OUTPUT"
           echo "preview_hostname=${SLUG}.${{ env.PREVIEW_DOMAIN_SUFFIX }}" >> "$GITHUB_OUTPUT"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        continue-on-error: true
+
+      - name: Delete API preview
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then exit 0; fi
+          APP="nexu-api-preview-${{ steps.slug.outputs.branch_slug }}"
+          flyctl apps destroy "$APP" --yes 2>/dev/null || true
+        continue-on-error: true
 
       - name: Remove custom domain
         env:

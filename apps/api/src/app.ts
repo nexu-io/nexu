@@ -1,5 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import type { Context } from "hono";
 import { cors } from "hono/cors";
+import { Span, Trace } from "./lib/trace-decorator.js";
 import { authMiddleware } from "./middleware/auth.js";
 import {
   errorMiddleware,
@@ -17,10 +19,12 @@ import {
   registerChannelRoutes,
   registerSlackOAuthCallback,
 } from "./routes/channel-routes.js";
+import { registerFeedbackRoutes } from "./routes/feedback-routes.js";
 import { registerInviteRoutes } from "./routes/invite-routes.js";
 import { registerModelRoutes } from "./routes/model-routes.js";
 import { registerOnboardingRoutes } from "./routes/onboarding-routes.js";
 import { registerPoolRoutes } from "./routes/pool-routes.js";
+import { registerSecretRoutes } from "./routes/secret-routes.js";
 import {
   registerSessionInternalRoutes,
   registerSessionRoutes,
@@ -31,9 +35,33 @@ import { registerUserRoutes } from "./routes/user-routes.js";
 
 import type { AppBindings } from "./types.js";
 
+class HealthHandler {
+  constructor(private readonly commitHash?: string) {}
+
+  @Trace("api.health")
+  async handle(c: Context<AppBindings>): Promise<Response> {
+    const payload = await this.buildPayload();
+    return c.json(payload);
+  }
+
+  @Span("api.health.payload")
+  async buildPayload(): Promise<{
+    status: "ok";
+    metadata: { commitHash: string | null };
+  }> {
+    return {
+      status: "ok",
+      metadata: {
+        commitHash: this.commitHash ?? null,
+      },
+    };
+  }
+}
+
 export function createApp() {
   const app = new OpenAPIHono<AppBindings>();
   const commitHash = process.env.COMMIT_HASH;
+  const healthHandler = new HealthHandler(commitHash);
 
   app.use("*", requestLoggerMiddleware);
   app.use("*", errorMiddleware);
@@ -50,7 +78,9 @@ export function createApp() {
   registerSlackEvents(app);
   registerArtifactInternalRoutes(app);
   registerSessionInternalRoutes(app);
+  registerSecretRoutes(app);
   registerSkillRoutes(app);
+  registerFeedbackRoutes(app);
 
   app.use("/api/v1/*", authMiddleware);
 
@@ -69,14 +99,7 @@ export function createApp() {
     info: { title: "Nexu API", version: "1.0.0" },
   });
 
-  app.get("/health", (c) =>
-    c.json({
-      status: "ok",
-      metadata: {
-        commitHash: commitHash ?? null,
-      },
-    }),
-  );
+  app.get("/health", (c) => healthHandler.handle(c));
 
   app.onError((error, c) => {
     const handled = resolveErrorHandling(c, error);

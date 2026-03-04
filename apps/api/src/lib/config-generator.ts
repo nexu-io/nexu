@@ -124,9 +124,9 @@ export async function generatePoolConfig(
 
   const agentList: AgentConfig[] = activeBots.map((bot, index) => {
     const agent: AgentConfig = {
-      id: bot.slug,
+      id: bot.id,
       name: bot.name,
-      workspace: `${stateDir}/workspaces/${bot.slug}`,
+      workspace: `${stateDir}/workspaces/${bot.id}`,
     };
 
     if (index === 0) {
@@ -176,7 +176,7 @@ export async function generatePoolConfig(
       };
 
       bindingsList.push({
-        agentId: ch.botSlug,
+        agentId: ch.botId,
         match: {
           channel: "slack",
           accountId: ch.accountId,
@@ -201,7 +201,7 @@ export async function generatePoolConfig(
       };
 
       bindingsList.push({
-        agentId: ch.botSlug,
+        agentId: ch.botId,
         match: {
           channel: "discord",
           accountId: ch.accountId,
@@ -227,7 +227,7 @@ export async function generatePoolConfig(
       };
 
       bindingsList.push({
-        agentId: ch.botSlug,
+        agentId: ch.botId,
         match: {
           channel: "feishu",
           accountId: ch.accountId,

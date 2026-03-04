@@ -15,7 +15,6 @@ export interface RuntimeState {
   gatewayStatus: RuntimeStatus;
   lastSeenVersion: number;
   lastConfigHash: string;
-  lastSecretsHash: string;
   lastSkillsHash: string;
   gatewayLastOkAt: string | null;
   gatewayLastErrorCode: GatewayProbeErrorCode | null;
@@ -30,7 +29,6 @@ export function createRuntimeState(): RuntimeState {
     gatewayStatus: "active",
     lastSeenVersion: 0,
     lastConfigHash: "",
-    lastSecretsHash: "",
     lastSkillsHash: "",
     gatewayLastOkAt: null,
     gatewayLastErrorCode: null,

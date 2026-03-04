@@ -10,7 +10,7 @@ const nodeEnv = z
 
 const requiredEnvKeys = [
   ...(nodeEnv === "production"
-    ? ["INTERNAL_API_TOKEN", "RUNTIME_POOL_ID"]
+    ? ["INTERNAL_API_TOKEN", "SKILL_API_TOKEN", "RUNTIME_POOL_ID"]
     : []),
 ] as const;
 
@@ -35,6 +35,7 @@ const envSchema = z.object({
     .default("development"),
   RUNTIME_POOL_ID: z.string().min(1).optional(),
   INTERNAL_API_TOKEN: z.string().min(1).default("gw-secret-token"),
+  SKILL_API_TOKEN: z.string().min(1).default("skill-secret-token"),
   OPENCLAW_CONFIG_PATH: z.string().min(1).optional(),
   OPENCLAW_STATE_DIR: z.string().min(1).optional(),
   OPENCLAW_SKILLS_DIR: z.string().min(1).optional(),

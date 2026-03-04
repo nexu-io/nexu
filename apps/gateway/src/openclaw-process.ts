@@ -1,5 +1,4 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import { env } from "./env.js";
 import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
 
@@ -17,50 +16,25 @@ function buildOpenclawGatewayArgs(): string[] {
   return args;
 }
 
-function pipeChildStream(
-  stream: NodeJS.ReadableStream | null,
-  streamName: "stdout" | "stderr",
-): void {
-  if (!stream) {
-    return;
-  }
-
-  const reader = createInterface({
-    input: stream,
-    crlfDelay: Number.POSITIVE_INFINITY,
-  });
-
-  reader.on("line", (line) => {
-    if (line.length === 0) {
-      return;
-    }
-
-    logger.info(
-      {
-        stream: streamName,
-        raw_line: line,
-      },
-      "openclaw output",
-    );
-  });
-}
-
 export function startManagedOpenclawGateway(): void {
   if (openclawGatewayProcess !== null) {
     return;
   }
 
   const args = buildOpenclawGatewayArgs();
+  const {
+    INTERNAL_API_TOKEN: _internalToken,
+    ENCRYPTION_KEY: _encryptionKey,
+    ...safeEnv
+  } = process.env;
   const child = spawn(env.OPENCLAW_BIN, args, {
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "ignore", "ignore"],
     env: {
-      ...process.env,
+      ...safeEnv,
+      SKILL_API_TOKEN: env.SKILL_API_TOKEN,
       OPENCLAW_LOG_LEVEL: "error",
     },
   });
-
-  pipeChildStream(child.stdout, "stdout");
-  pipeChildStream(child.stderr, "stderr");
 
   openclawGatewayProcess = child;
 

@@ -60,7 +60,7 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 PostgreSQL with Drizzle ORM. No foreign keys — application-level joins only. All tables in `apps/api/src/db/schema/index.ts`.
 
-Key tables: `bots`, `bot_channels`, `channel_credentials`, `gateway_pools`, `gateway_assignments`, `webhook_routes`, `oauth_states`, `invite_codes`, `users`, `usage_metrics`.
+Key tables: `bots`, `bot_channels`, `channel_credentials`, `gateway_pools`, `gateway_assignments`, `webhook_routes`, `oauth_states`, `invite_codes`, `users`, `usage_metrics`, `pool_config_snapshots`, `skills`, `skills_snapshots`, `artifacts`, `pool_secrets`, `sessions`.
 
 Public IDs via cuid2. Internal `pk` (serial auto-increment) never exposed to API.
 

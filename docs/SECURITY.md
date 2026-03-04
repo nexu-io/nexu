@@ -21,14 +21,56 @@
 - better-auth with email/password registration
 - HTTP-only session cookies
 - `authMiddleware` validates session for all `/v1/*` routes
-- Internal endpoints (`/api/internal/*`) require `GATEWAY_TOKEN` header
 - Configured in `apps/api/src/auth.ts`
+
+### Internal API — Two-token model
+
+Internal endpoints (`/api/internal/*`) use a two-tier token system:
+
+| Token | Env var | Purpose | Who holds it |
+|-------|---------|---------|-------------|
+| Internal token | `INTERNAL_API_TOKEN` | Privileged operations (config, secrets mgmt, skill sync) | Gateway sidecar only |
+| Skill token | `SKILL_API_TOKEN` | Skill-facing operations (fetch scoped secrets, record artifacts) | OpenClaw child process (via env) |
+
+**Middleware:**
+- `requireInternalToken(c)` — accepts only `INTERNAL_API_TOKEN`
+- `requireSkillToken(c)` — accepts `SKILL_API_TOKEN` or `INTERNAL_API_TOKEN` (superset)
+- Both use `crypto.timingSafeEqual` for constant-time comparison
+- Implementation: `apps/api/src/middleware/internal-auth.ts`
+
+**Endpoint mapping:**
+
+| Endpoint | Auth |
+|----------|------|
+| `GET /config`, `GET /config/latest`, `GET /config/versions/:v` | `requireInternalToken` |
+| `POST /register`, `POST /heartbeat` | `requireInternalToken` |
+| `PUT /secrets` | `requireInternalToken` |
+| `PUT /skills/:name`, `GET /skills/latest` | `requireInternalToken` |
+| `POST /sessions`, `PATCH /sessions/:id`, `POST /sessions/sync-discord` | `requireInternalToken` |
+| `GET /secrets/:skillName` | `requireSkillToken` |
+| `POST /artifacts`, `PATCH /artifacts/:id` | `requireSkillToken` |
+
+### OpenClaw process isolation
+
+The gateway strips privileged env vars before spawning the OpenClaw child process:
+- `INTERNAL_API_TOKEN` — **not inherited** by OpenClaw
+- `ENCRYPTION_KEY` — **not inherited** by OpenClaw
+- `SKILL_API_TOKEN` — inherited, used by skills to fetch scoped secrets
+
+`nexu-context.json` (written by gateway sidecar) contains only `apiUrl`, `poolId`, and `agents` — no tokens or secrets on disk.
+
+## Pool secrets scoping
+
+- Secrets stored in `pool_secrets` table, encrypted with AES-256-GCM
+- Each secret has a `scope` field: `pool` (available to all skills) or `skill:<name>` (specific skill only)
+- Skills fetch their secrets at runtime via `GET /api/internal/secrets/:skillName` using `SKILL_API_TOKEN`
+- API returns only secrets where `scope = 'pool'` OR `scope = 'skill:<skillName>'`
 
 ## Secret management
 
 - Production: AWS Secrets Manager → External Secrets Operator → K8s Secrets
 - Local dev: `.env` file (never committed)
-- Required: `DATABASE_URL`, `ENCRYPTION_KEY`, `GATEWAY_TOKEN`, `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, `BETTER_AUTH_SECRET`
+- Required: `DATABASE_URL`, `ENCRYPTION_KEY`, `INTERNAL_API_TOKEN`, `SKILL_API_TOKEN`, `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, `BETTER_AUTH_SECRET`
 - Optional: `LITELLM_BASE_URL`, `LITELLM_API_KEY`
 
 ## OAuth state
@@ -40,7 +82,8 @@
 ## Review checklist
 
 - [ ] No credentials in log output or error messages
-- [ ] New API endpoints behind `authMiddleware` or `GATEWAY_TOKEN`
+- [ ] New API endpoints behind `authMiddleware`, `requireInternalToken`, or `requireSkillToken`
 - [ ] Encrypted storage for any new secret material
 - [ ] Slack signature verification for any new webhook endpoint
 - [ ] No `ENCRYPTION_KEY` or tokens in committed code
+- [ ] New env vars added to `deploy/helm/nexu/values.yaml`

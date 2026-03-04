@@ -12,7 +12,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { artifacts, bots } from "../db/schema/index.js";
 import { ServiceError } from "../lib/error.js";
-import { requireInternalToken } from "../middleware/internal-auth.js";
+import { requireSkillToken } from "../middleware/internal-auth.js";
 import type { AppBindings } from "../types.js";
 
 const errorResponseSchema = z.object({
@@ -106,7 +106,7 @@ const updateArtifactInternalRoute = createRoute({
 export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
   // POST /api/internal/artifacts — Skill creates an artifact
   app.openapi(createArtifactRoute, async (c) => {
-    requireInternalToken(c);
+    requireSkillToken(c);
     const input = c.req.valid("json");
 
     // Verify botId exists
@@ -161,7 +161,7 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // PATCH /api/internal/artifacts/:id — update artifact
   app.openapi(updateArtifactInternalRoute, async (c) => {
-    requireInternalToken(c);
+    requireSkillToken(c);
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
 

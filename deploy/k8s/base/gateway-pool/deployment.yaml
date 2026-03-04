@@ -29,7 +29,7 @@ spec:
               attempt=0
               while [ "$attempt" -lt "$MAX_RETRIES" ]; do
                 status=$(curl -s -o /etc/openclaw/config.json -w "%{http_code}" \
-                  -H "Authorization: Bearer $(GATEWAY_TOKEN)" \
+                  -H "x-internal-token: $(INTERNAL_API_TOKEN)" \
                   "${NEXU_API_URL}/api/internal/pools/${POOL_ID}/config")
                 if [ "$status" = "200" ]; then
                   echo "Config fetched."
@@ -73,6 +73,16 @@ spec:
                 secretKeyRef:
                   name: nexu-secrets
                   key: GATEWAY_TOKEN
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nexu-secrets
+                  key: INTERNAL_API_TOKEN
+            - name: SKILL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nexu-secrets
+                  key: SKILL_API_TOKEN
             - name: POOL_ID
               valueFrom:
                 configMapKeyRef:

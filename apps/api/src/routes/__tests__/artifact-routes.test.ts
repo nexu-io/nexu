@@ -97,6 +97,7 @@ describe("Artifact Internal Routes", () => {
 
   beforeAll(async () => {
     process.env.INTERNAL_API_TOKEN = TOKEN;
+    process.env.SKILL_API_TOKEN = TOKEN;
     setupPool = new pg.Pool({ connectionString: TEST_DB_URL });
     await createTables(setupPool);
   });

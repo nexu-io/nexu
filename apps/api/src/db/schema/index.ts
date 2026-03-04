@@ -276,6 +276,7 @@ export const poolSecrets = pgTable(
     poolId: text("pool_id").notNull(),
     secretName: text("secret_name").notNull(),
     encryptedValue: text("encrypted_value").notNull(),
+    scope: text("scope").notNull().default("pool"),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),

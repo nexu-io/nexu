@@ -233,6 +233,120 @@ export type PatchApiInternalSessionsByIdResponses = {
 
 export type PatchApiInternalSessionsByIdResponse = PatchApiInternalSessionsByIdResponses[keyof PatchApiInternalSessionsByIdResponses];
 
+export type GetApiInternalSecretsBySkillNameData = {
+    body?: never;
+    path: {
+        skillName: string;
+    };
+    query: {
+        poolId: string;
+    };
+    url: '/api/internal/secrets/{skillName}';
+};
+
+export type GetApiInternalSecretsBySkillNameErrors = {
+    /**
+     * Unauthorized
+     */
+    401: {
+        message: string;
+    };
+};
+
+export type GetApiInternalSecretsBySkillNameError = GetApiInternalSecretsBySkillNameErrors[keyof GetApiInternalSecretsBySkillNameErrors];
+
+export type GetApiInternalSecretsBySkillNameResponses = {
+    /**
+     * Scoped secrets for skill
+     */
+    200: {
+        [key: string]: string;
+    };
+};
+
+export type GetApiInternalSecretsBySkillNameResponse = GetApiInternalSecretsBySkillNameResponses[keyof GetApiInternalSecretsBySkillNameResponses];
+
+export type GetApiInternalSkillsLatestData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/skills/latest';
+};
+
+export type GetApiInternalSkillsLatestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: {
+        message: string;
+    };
+};
+
+export type GetApiInternalSkillsLatestError = GetApiInternalSkillsLatestErrors[keyof GetApiInternalSkillsLatestErrors];
+
+export type GetApiInternalSkillsLatestResponses = {
+    /**
+     * Latest skills snapshot
+     */
+    200: {
+        version: number;
+        skillsHash: string;
+        skills: {
+            [key: string]: {
+                [key: string]: string;
+            };
+        };
+        createdAt: string;
+    };
+};
+
+export type GetApiInternalSkillsLatestResponse = GetApiInternalSkillsLatestResponses[keyof GetApiInternalSkillsLatestResponses];
+
+export type PutApiInternalSkillsByNameData = {
+    body?: {
+        content: string;
+        files?: {
+            [key: string]: string;
+        };
+        status?: 'active' | 'inactive';
+    };
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/internal/skills/{name}';
+};
+
+export type PutApiInternalSkillsByNameErrors = {
+    /**
+     * Invalid name or body
+     */
+    400: {
+        message: string;
+    };
+    /**
+     * Unauthorized
+     */
+    401: {
+        message: string;
+    };
+};
+
+export type PutApiInternalSkillsByNameError = PutApiInternalSkillsByNameErrors[keyof PutApiInternalSkillsByNameErrors];
+
+export type PutApiInternalSkillsByNameResponses = {
+    /**
+     * Skill upserted
+     */
+    200: {
+        ok: boolean;
+        name: string;
+        version: number;
+    };
+};
+
+export type PutApiInternalSkillsByNameResponse = PutApiInternalSkillsByNameResponses[keyof PutApiInternalSkillsByNameResponses];
+
 export type GetApiV1MeData = {
     body?: never;
     path?: never;
@@ -918,6 +1032,13 @@ export type GetApiInternalPoolsByPoolIdConfigResponses = {
                 };
             };
         };
+        skills?: {
+            load?: {
+                watch?: boolean;
+                watchDebounceMs?: number;
+                extraDirs?: Array<string>;
+            };
+        };
         agents: {
             defaults?: {
                 model?: string | {
@@ -1042,6 +1163,45 @@ export type PostApiInternalPoolsHeartbeatResponses = {
 
 export type PostApiInternalPoolsHeartbeatResponse = PostApiInternalPoolsHeartbeatResponses[keyof PostApiInternalPoolsHeartbeatResponses];
 
+export type PutApiInternalPoolsByPoolIdSecretsData = {
+    body?: {
+        secrets: {
+            [key: string]: string | {
+                value: string;
+                scope?: string;
+            };
+        };
+    };
+    path: {
+        poolId: string;
+    };
+    query?: never;
+    url: '/api/internal/pools/{poolId}/secrets';
+};
+
+export type PutApiInternalPoolsByPoolIdSecretsErrors = {
+    /**
+     * Pool not found
+     */
+    404: {
+        message: string;
+    };
+};
+
+export type PutApiInternalPoolsByPoolIdSecretsError = PutApiInternalPoolsByPoolIdSecretsErrors[keyof PutApiInternalPoolsByPoolIdSecretsErrors];
+
+export type PutApiInternalPoolsByPoolIdSecretsResponses = {
+    /**
+     * Secrets stored
+     */
+    200: {
+        ok: boolean;
+        count: number;
+    };
+};
+
+export type PutApiInternalPoolsByPoolIdSecretsResponse = PutApiInternalPoolsByPoolIdSecretsResponses[keyof PutApiInternalPoolsByPoolIdSecretsResponses];
+
 export type GetApiInternalPoolsByPoolIdConfigLatestData = {
     body?: never;
     path: {
@@ -1129,6 +1289,13 @@ export type GetApiInternalPoolsByPoolIdConfigLatestResponses = {
                     };
                 };
             };
+            skills?: {
+                load?: {
+                    watch?: boolean;
+                    watchDebounceMs?: number;
+                    extraDirs?: Array<string>;
+                };
+            };
             agents: {
                 defaults?: {
                     model?: string | {
@@ -1200,6 +1367,15 @@ export type GetApiInternalPoolsByPoolIdConfigLatestResponses = {
                 enabled?: boolean;
             };
         };
+        agentMeta?: {
+            [key: string]: {
+                botId: string;
+            };
+        };
+        poolSecrets?: {
+            [key: string]: string;
+        };
+        secretsHash?: string;
         createdAt: string;
     };
 };
@@ -1294,6 +1470,13 @@ export type GetApiInternalPoolsByPoolIdConfigVersionsByVersionResponses = {
                     };
                 };
             };
+            skills?: {
+                load?: {
+                    watch?: boolean;
+                    watchDebounceMs?: number;
+                    extraDirs?: Array<string>;
+                };
+            };
             agents: {
                 defaults?: {
                     model?: string | {
@@ -1365,6 +1548,15 @@ export type GetApiInternalPoolsByPoolIdConfigVersionsByVersionResponses = {
                 enabled?: boolean;
             };
         };
+        agentMeta?: {
+            [key: string]: {
+                botId: string;
+            };
+        };
+        poolSecrets?: {
+            [key: string]: string;
+        };
+        secretsHash?: string;
         createdAt: string;
     };
 };

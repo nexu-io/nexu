@@ -1,4 +1,8 @@
-import { sendHeartbeat, syncDiscordSessions } from "./api.js";
+import {
+  sendHeartbeat,
+  syncDiscordSessions,
+  syncFeishuSessions,
+} from "./api.js";
 import { pollLatestConfig } from "./config.js";
 import { env } from "./env.js";
 import {
@@ -81,6 +85,35 @@ export async function runDiscordSessionSyncLoop(): Promise<never> {
           },
         ).toJSON(),
         "discord session sync failed",
+      );
+    }
+
+    // Sync every 30 seconds
+    await sleep(30000);
+  }
+}
+
+export async function runFeishuSessionSyncLoop(): Promise<never> {
+  // Initial delay to let the gateway stabilize
+  await sleep(5000);
+
+  for (;;) {
+    try {
+      await syncFeishuSessions();
+    } catch (error) {
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/feishu-session-sync",
+            message: "feishu session sync failed",
+            code: baseError.code,
+          },
+          {
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "feishu session sync failed",
       );
     }
 

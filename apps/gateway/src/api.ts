@@ -64,3 +64,10 @@ export async function syncDiscordSessions(): Promise<void> {
     body: JSON.stringify({ poolId: env.RUNTIME_POOL_ID }),
   });
 }
+
+export async function syncFeishuSessions(): Promise<void> {
+  await fetchJson("/api/internal/sessions/sync-feishu", {
+    method: "POST",
+    body: JSON.stringify({ poolId: env.RUNTIME_POOL_ID }),
+  });
+}

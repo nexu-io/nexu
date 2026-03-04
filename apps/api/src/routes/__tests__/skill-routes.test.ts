@@ -24,6 +24,7 @@ vi.mock("../../db/index.js", async () => {
   };
 });
 
+import { MiddlewareError } from "../../lib/error.js";
 import { registerSkillRoutes } from "../skill-routes.js";
 
 const TEST_DB_URL =
@@ -67,6 +68,14 @@ async function truncateAll(pool: pg.Pool) {
 
 function buildApp() {
   const app = new OpenAPIHono();
+  app.onError((err, c) => {
+    if (err instanceof MiddlewareError) {
+      const code = err.context.code;
+      const status = code === "internal_token_invalid" ? 401 : 500;
+      return c.json({ message: err.message }, status);
+    }
+    return c.json({ message: "Internal Server Error" }, 500);
+  });
   registerSkillRoutes(app as Parameters<typeof registerSkillRoutes>[0]);
   return app;
 }

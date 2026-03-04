@@ -307,6 +307,11 @@ export async function migrate(dbUrl?: string) {
     CREATE UNIQUE INDEX IF NOT EXISTS pool_secrets_uniq_idx ON pool_secrets(pool_id, secret_name);
   `);
 
+  // Scope column for per-skill secret filtering
+  await client.query(`
+    ALTER TABLE pool_secrets ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'pool';
+  `);
+
   // Multi-file skills support
   await client.query(`
     ALTER TABLE skills ADD COLUMN IF NOT EXISTS files TEXT NOT NULL DEFAULT '{}';

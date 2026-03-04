@@ -2,6 +2,7 @@ import { bootstrapGateway } from "./bootstrap.js";
 import { BaseError, logger } from "./log.js";
 import {
   runDiscordSessionSyncLoop,
+  runFeishuSessionSyncLoop,
   runGatewayHealthLoops,
   runHeartbeatLoop,
   runPollLoop,
@@ -18,6 +19,7 @@ async function main(): Promise<void> {
   runGatewayHealthLoops(state);
   void runHeartbeatLoop(state);
   void runDiscordSessionSyncLoop();
+  void runFeishuSessionSyncLoop();
   void runSkillsPollLoop(state);
   await runPollLoop(state);
 }

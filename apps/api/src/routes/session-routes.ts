@@ -18,6 +18,7 @@ import {
 import { decrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
+import { requireInternalToken } from "../middleware/internal-auth.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -106,6 +107,7 @@ const updateSessionInternalRoute = createRoute({
 export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
   // POST /api/internal/sessions — Gateway sidecar upserts a session
   app.openapi(createSessionRoute, async (c) => {
+    requireInternalToken(c);
     const input = c.req.valid("json");
 
     // Verify botId exists
@@ -181,6 +183,7 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // PATCH /api/internal/sessions/:id — update session
   app.openapi(updateSessionInternalRoute, async (c) => {
+    requireInternalToken(c);
     const { id } = c.req.valid("param");
     const input = c.req.valid("json");
 
@@ -230,6 +233,7 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // POST /api/internal/sessions/sync-discord — Sync Discord sessions via Discord REST API
   app.post("/api/internal/sessions/sync-discord", async (c) => {
+    requireInternalToken(c);
     const body = (await c.req.json()) as { poolId?: string };
     const poolId = body.poolId;
     if (!poolId) {
@@ -340,6 +344,199 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
         logger.error({
           message: "discord_sync_fetch_guilds_error",
           scope: "discord_sync_fetch_guilds",
+          bot_channel_id: ch.id,
+          ...unknownError.toJSON(),
+        });
+      }
+    }
+
+    return c.json({ synced: totalSynced });
+  });
+
+  // POST /api/internal/sessions/sync-feishu — Sync Feishu sessions via Feishu REST API
+  app.post("/api/internal/sessions/sync-feishu", async (c) => {
+    const body = (await c.req.json()) as { poolId?: string };
+    const poolId = body.poolId;
+    if (!poolId) {
+      return c.json({ message: "poolId required" }, 400);
+    }
+
+    // Find all bots in this pool
+    const poolBots = await db
+      .select({ id: bots.id })
+      .from(bots)
+      .where(and(eq(bots.poolId, poolId), eq(bots.status, "active")));
+
+    if (poolBots.length === 0) {
+      return c.json({ synced: 0 });
+    }
+
+    const botIds = poolBots.map((b) => b.id);
+    let totalSynced = 0;
+
+    // Find all connected Feishu channels for these bots
+    const feishuChannels = await db
+      .select()
+      .from(botChannels)
+      .where(
+        and(
+          inArray(botChannels.botId, botIds),
+          eq(botChannels.channelType, "feishu"),
+          eq(botChannels.status, "connected"),
+        ),
+      );
+
+    for (const ch of feishuChannels) {
+      // Get appId and appSecret credentials
+      const creds = await db
+        .select({
+          credentialType: channelCredentials.credentialType,
+          encryptedValue: channelCredentials.encryptedValue,
+        })
+        .from(channelCredentials)
+        .where(eq(channelCredentials.botChannelId, ch.id));
+
+      const credMap = new Map<string, string>();
+      for (const cred of creds) {
+        try {
+          credMap.set(cred.credentialType, decrypt(cred.encryptedValue));
+        } catch {
+          // skip unreadable credentials
+        }
+      }
+
+      const appId = credMap.get("appId");
+      const appSecret = credMap.get("appSecret");
+      if (!appId || !appSecret) continue;
+
+      try {
+        // Get tenant_access_token from Feishu auth API
+        const tokenResp = await fetch(
+          "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+          },
+        );
+
+        if (!tokenResp.ok) {
+          logger.warn({
+            message: "feishu_sync_token_fetch_failed",
+            scope: "feishu_sync",
+            status: tokenResp.status,
+            bot_channel_id: ch.id,
+          });
+          continue;
+        }
+
+        const tokenData = (await tokenResp.json()) as {
+          code: number;
+          tenant_access_token?: string;
+        };
+
+        if (tokenData.code !== 0 || !tokenData.tenant_access_token) {
+          logger.warn({
+            message: "feishu_sync_token_error",
+            scope: "feishu_sync",
+            feishu_code: tokenData.code,
+            bot_channel_id: ch.id,
+          });
+          continue;
+        }
+
+        const tenantToken = tokenData.tenant_access_token;
+
+        // Fetch chats from Feishu API (paginated)
+        let pageToken: string | undefined;
+        const allChats: Array<{ chat_id: string; name: string }> = [];
+
+        do {
+          const url = new URL("https://open.feishu.cn/open-apis/im/v1/chats");
+          if (pageToken) {
+            url.searchParams.set("page_token", pageToken);
+          }
+
+          const chatsResp = await fetch(url.toString(), {
+            headers: { Authorization: `Bearer ${tenantToken}` },
+          });
+
+          if (!chatsResp.ok) {
+            logger.warn({
+              message: "feishu_sync_fetch_chats_failed",
+              scope: "feishu_sync",
+              status: chatsResp.status,
+              bot_channel_id: ch.id,
+            });
+            break;
+          }
+
+          const chatsData = (await chatsResp.json()) as {
+            code: number;
+            data?: {
+              items?: Array<{ chat_id: string; name: string }>;
+              page_token?: string;
+              has_more?: boolean;
+            };
+          };
+
+          if (chatsData.code !== 0) {
+            logger.warn({
+              message: "feishu_sync_chats_api_error",
+              scope: "feishu_sync",
+              feishu_code: chatsData.code,
+              bot_channel_id: ch.id,
+            });
+            break;
+          }
+
+          if (chatsData.data?.items) {
+            allChats.push(...chatsData.data.items);
+          }
+
+          pageToken = chatsData.data?.has_more
+            ? chatsData.data.page_token
+            : undefined;
+        } while (pageToken);
+
+        // Upsert sessions for each chat
+        const now = new Date().toISOString();
+
+        for (const chat of allChats) {
+          const sessionKey = `feishu_${ch.accountId}_${chat.chat_id}`;
+          const title = chat.name || chat.chat_id;
+
+          await db
+            .insert(sessions)
+            .values({
+              id: createId(),
+              botId: ch.botId,
+              sessionKey,
+              channelType: "feishu",
+              channelId: chat.chat_id,
+              title,
+              status: "active",
+              messageCount: 0,
+              lastMessageAt: now,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoUpdate({
+              target: sessions.sessionKey,
+              set: {
+                botId: ch.botId,
+                title,
+                updatedAt: now,
+              },
+            });
+
+          totalSynced++;
+        }
+      } catch (err) {
+        const unknownError = BaseError.from(err);
+        logger.error({
+          message: "feishu_sync_fetch_chats_error",
+          scope: "feishu_sync",
           bot_channel_id: ch.id,
           ...unknownError.toJSON(),
         });

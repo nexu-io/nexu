@@ -39,6 +39,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "nexu.secretName" . }}
                   key: INTERNAL_API_TOKEN
+            - name: SKILL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nexu.secretName" . }}
+                  key: SKILL_API_TOKEN
             - name: ORDINAL
               valueFrom:
                 fieldRef:
@@ -64,6 +69,12 @@ spec:
               mountPath: /etc/openclaw
             - name: openclaw-data
               mountPath: /data/openclaw
+            # Mount PVC logs/ subdir at OpenClaw's default log path so
+            # daily-rolling logs (openclaw-YYYY-MM-DD.log) persist on the
+            # PVC with automatic 24h pruning.
+            - name: openclaw-data
+              mountPath: /tmp/openclaw
+              subPath: logs
           readinessProbe:
             tcpSocket:
               port: gateway
