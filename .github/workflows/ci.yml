@@ -65,6 +65,8 @@ jobs:
             const sections = [];
             const syncFailed = "${{ steps.migration-sync.outcome }}" === "failure";
             const dangerousFailed = "${{ steps.migration-dangerous.outcome }}" === "failure";
+            const syncStatus = syncFailed ? "❌ Failed" : "✅ Passed";
+            const dangerousStatus = dangerousFailed ? "❌ Failed" : "✅ Passed";
 
             if (syncFailed) {
               if (fs.existsSync(process.env.SYNC_REPORT_PATH)) {
@@ -83,9 +85,19 @@ jobs:
             }
 
             const body = `${marker}
-            ## DB Migration CI Failed
+            ## 🚨 DB Migration Checks Failed
+
+            > [!CAUTION]
+            > One or more required DB migration checks failed. This PR is blocked until all required DB migration checks pass.
+
+            | Check | Result |
+            | --- | --- |
+            | Verify DB migration sync | ${syncStatus} |
+            | Check dangerous migration SQL | ${dangerousStatus} |
 
             ${sections.join("\n\n---\n\n")}
+
+            **Pass Gate**: both checks in the table above must be `✅ Passed`.
 
             Workflow run: ${runUrl}`;
 

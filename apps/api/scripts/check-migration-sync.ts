@@ -11,6 +11,8 @@ type StatusEntry = {
 const reportPath = process.env.DB_MIGRATION_SYNC_REPORT_PATH;
 const baseRef = process.env.DB_MIGRATION_BASE_REF;
 const eventName = process.env.DB_MIGRATION_EVENT_NAME;
+const maxDiffLines = 220;
+const maxDiffChars = 16000;
 
 async function writeReport(content: string) {
   if (!reportPath) {
@@ -76,6 +78,74 @@ function getPullRequestChangedFiles(pathSpec: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+function truncateForCodeBlock(content: string): {
+  text: string;
+  truncated: boolean;
+} {
+  const rawLines = content.split("\n");
+  const byLine = rawLines.slice(0, maxDiffLines).join("\n");
+  const byChar = byLine.slice(0, maxDiffChars);
+  const truncated =
+    byLine.length < content.length || byChar.length < byLine.length;
+
+  return {
+    text: byChar,
+    truncated,
+  };
+}
+
+function getTrackedMigrationDiff(): string {
+  const diffResult = runCommand("git", [
+    "--no-pager",
+    "diff",
+    "--",
+    "migrations",
+  ]);
+  return diffResult.stdout.trim();
+}
+
+function getUntrackedMigrationDiff(filePath: string): string {
+  const diffResult = runCommand("git", [
+    "--no-pager",
+    "diff",
+    "--no-index",
+    "--",
+    "/dev/null",
+    filePath,
+  ]);
+
+  return diffResult.stdout.trim();
+}
+
+function getDiffPreview(entries: StatusEntry[]): {
+  text: string;
+  truncated: boolean;
+} {
+  const chunks: string[] = [];
+
+  const trackedDiff = getTrackedMigrationDiff();
+  if (trackedDiff.length > 0) {
+    chunks.push(trackedDiff);
+  }
+
+  const untrackedEntries = entries.filter((entry) => entry.code === "??");
+  for (const entry of untrackedEntries) {
+    const diff = getUntrackedMigrationDiff(entry.filePath);
+    if (diff.length > 0) {
+      chunks.push(diff);
+    }
+  }
+
+  if (chunks.length === 0) {
+    return {
+      text: "",
+      truncated: false,
+    };
+  }
+
+  return truncateForCodeBlock(chunks.join("\n\n"));
+}
+
 function formatFailureReport(
   entries: StatusEntry[],
   pullRequestChangedMigrations: string[],
@@ -84,60 +154,82 @@ function formatFailureReport(
   const untracked = entries.filter((entry) => entry.code === "??");
   const tracked = entries.filter((entry) => entry.code !== "??");
   const hasMigrationChangesInPr = pullRequestChangedMigrations.length > 0;
+  const diffPreview = getDiffPreview(entries);
 
   const lines: string[] = [
-    "### Migration Sync Check Failed",
+    "### ❌ Verify DB migration sync",
     "",
-    "`drizzle-kit generate` produced changes under `apps/api/migrations` that are not fully reflected in this PR.",
+    "> [!CAUTION]",
+    "> Required check failed. `drizzle-kit generate` produced migration drift not reflected in this PR.",
     "",
-    "**Detected reasons**",
+    "**Failure Classification**",
   ];
 
   if (untracked.length > 0 && !hasMigrationChangesInPr) {
     lines.push(
-      "- Missing migration files in PR: schema changed but no generated migration updates were committed.",
+      "- Missing migration files in PR: schema changed but generated migration artifacts were not committed.",
     );
   }
 
   if (untracked.length > 0 && hasMigrationChangesInPr) {
     lines.push(
-      "- Migration files and schema are inconsistent: this PR includes migration edits, but `drizzle-kit generate` still creates additional artifacts.",
+      "- Migration/schema mismatch: this PR edits migration files, but regeneration still produces additional files.",
     );
   }
 
   if (tracked.length > 0 && untracked.length === 0) {
     lines.push(
-      "- Generated migration output differs from committed files (metadata or SQL drift).",
+      "- Migration drift: generated migration output differs from committed migration files.",
     );
   }
 
+  lines.push(
+    "",
+    "**Pass Criteria**",
+    "- Re-running `drizzle-kit generate` introduces zero changes under `apps/api/migrations`.",
+    "- All migration SQL and snapshot/journal artifacts needed by current schema are included in the PR.",
+  );
+
   if (hasMigrationChangesInPr) {
-    lines.push("", "**Migration files changed in this PR**");
+    lines.push("", "**Migration Files Changed In This PR**");
     for (const filePath of pullRequestChangedMigrations) {
       lines.push(`- ${filePath}`);
     }
   }
 
   if (pullRequestChangedSchemas.length > 0) {
-    lines.push("", "**Schema files changed in this PR**");
+    lines.push("", "**Schema Files Changed In This PR**");
     for (const filePath of pullRequestChangedSchemas) {
       lines.push(`- ${filePath}`);
     }
   }
 
-  lines.push("", "**Locations**");
-
-  for (const entry of entries) {
-    lines.push(`- ${entry.raw}`);
-  }
-
   lines.push(
     "",
-    "**How to fix**",
-    "1. Run `pnpm --filter @nexu/api db:generate`.",
-    "2. Stage generated files: `git add apps/api/migrations`.",
-    "3. Commit and push.",
+    "**Detected Drift (git status --porcelain -- migrations)**",
+    "```text",
   );
+
+  for (const entry of entries) {
+    lines.push(entry.raw);
+  }
+
+  lines.push("```");
+
+  if (diffPreview.text.length > 0) {
+    lines.push(
+      "",
+      "**Generated Diff Preview**",
+      "```diff",
+      diffPreview.text,
+      "```",
+    );
+    if (diffPreview.truncated) {
+      lines.push(
+        "_Diff truncated for readability. See workflow logs for the full generated diff._",
+      );
+    }
+  }
 
   return lines.join("\n");
 }
@@ -155,9 +247,14 @@ async function main() {
     }
 
     const message = [
-      "### Migration Sync Check Failed",
+      "### ❌ Verify DB migration sync",
       "",
-      "`pnpm db:generate` failed before sync validation could run.",
+      "> [!CAUTION]",
+      "> Required check failed before sync validation could run.",
+      "",
+      "**Pass Criteria**",
+      "- `pnpm --filter @nexu/api db:generate` exits successfully.",
+      "- Re-running generation introduces zero changes under `apps/api/migrations`.",
       "",
       "```text",
       generateResult.stderr.trim() || "Unknown drizzle generation error",
@@ -182,9 +279,10 @@ async function main() {
     }
 
     const message = [
-      "### Migration Sync Check Failed",
+      "### ❌ Verify DB migration sync",
       "",
-      "Unable to inspect git status for migration files.",
+      "> [!CAUTION]",
+      "> Required check failed because CI could not inspect migration file status.",
       "",
       "```text",
       statusResult.stderr.trim() || "Unknown git status error",
@@ -208,7 +306,7 @@ async function main() {
 
   if (entries.length === 0) {
     const success =
-      "### Migration Sync Check Passed\n\nSchema and migration files are in sync.";
+      "### ✅ Verify DB migration sync\n\nSchema and migration files are in sync.";
     await writeReport(success);
     console.log("Migration sync check passed.");
     return;

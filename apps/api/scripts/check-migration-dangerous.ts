@@ -150,7 +150,7 @@ async function main() {
 
   if (sqlFiles.length === 0) {
     await writeReport(
-      "### Dangerous SQL Check Passed\n\nNo migration SQL files found.",
+      "### ✅ Check dangerous migration SQL\n\nNo migration SQL files found.",
     );
     console.log("No migration SQL files found.");
     return;
@@ -167,16 +167,24 @@ async function main() {
 
   if (violations.length === 0) {
     await writeReport(
-      "### Dangerous SQL Check Passed\n\nNo dangerous SQL statements were detected.",
+      "### ✅ Check dangerous migration SQL\n\nNo dangerous SQL statements were detected.",
     );
     console.log("Migration dangerous-operation check passed.");
     return;
   }
 
   const reportLines: string[] = [
-    "### Dangerous SQL Check Failed",
+    "### ❌ Check dangerous migration SQL",
     "",
-    "The following migration statements are blocked by CI:",
+    "> [!CAUTION]",
+    "> Required check failed. CI detected blocked SQL patterns in migration files.",
+    "",
+    "**Pass Criteria**",
+    "- Migration SQL contains no blocked DDL (`DROP TABLE`, `TRUNCATE TABLE`, `ALTER TABLE ... DROP COLUMN`).",
+    "- `UPDATE`/`DELETE` statements in migrations are bounded with `WHERE`.",
+    "",
+    "**Blocked Statements**",
+    "```text",
     "",
   ];
 
@@ -184,7 +192,7 @@ async function main() {
   for (const violation of violations) {
     const relativePath = relative(cwd, violation.filePath);
     reportLines.push(
-      `- ${relativePath}:${violation.line} ${violation.message} -> ${violation.snippet}`,
+      `${relativePath}:${violation.line} ${violation.message} -> ${violation.snippet}`,
     );
     console.error(
       `- ${relativePath}:${violation.line} ${violation.message} -> ${violation.snippet}`,
@@ -192,8 +200,9 @@ async function main() {
   }
 
   reportLines.push(
+    "```",
     "",
-    "Please rewrite the migration to avoid destructive/unbounded DML operations in PR stage.",
+    "Review and adjust the listed SQL lines before re-running CI.",
   );
   await writeReport(reportLines.join("\n"));
 
