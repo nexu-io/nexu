@@ -97,7 +97,7 @@ jobs:
 
             ${sections.join("\n\n---\n\n")}
 
-            **Pass Gate**: both checks in the table above must be `✅ Passed`.
+            **Pass Gate**: both checks in the table above must be ✅ Passed.
 
             Workflow run: ${runUrl}`;
 
