@@ -25,11 +25,12 @@ The user sends `/feedback <message>` to share feedback, report issues, or make s
      🤖 assistant reply
      ```
      Use 👤 for user messages and 🤖 for your (assistant) replies. This must be real messages, NOT a summary.
+   - **imageUrls**: Scan the recent conversation for image URLs. Include any `https://` URL that ends with `.png`, `.jpg`, `.jpeg`, `.gif`, or `.webp`, as well as Feishu image CDN URLs (containing `open.feishu.cn` or `lf-flow-web-cdn.doubao.com`). Collect up to 5 image URLs. If none found, omit this field.
 
 3. **Submit feedback**: Use the exec tool to run a curl command. Build the JSON payload as a variable first, then POST it:
 
 ```bash
-PAYLOAD='{"content":"<ESCAPED_FEEDBACK>","channel":"<CHANNEL_TYPE>","sender":"<SENDER>","agentId":"<AGENT_ID>","conversationContext":"<ESCAPED_CONTEXT>"}'
+PAYLOAD='{"content":"<ESCAPED_FEEDBACK>","channel":"<CHANNEL_TYPE>","sender":"<SENDER>","agentId":"<AGENT_ID>","conversationContext":"<ESCAPED_CONTEXT>","imageUrls":["<URL1>","<URL2>"]}'
 curl -s -X POST "${RUNTIME_API_BASE_URL:-http://localhost:3000}/api/internal/feedback" \
   -H "x-internal-token: ${SKILL_API_TOKEN:-gw-secret-token}" \
   -H "Content-Type: application/json" \
@@ -40,6 +41,7 @@ Important:
 - Replace ALL `<...>` placeholders with actual values BEFORE running the command
 - Properly escape JSON special characters in strings (double quotes → `\"`, newlines → `\n`, backslashes → `\\`)
 - Keep conversationContext under 8000 characters
+- For `imageUrls`: include only valid URLs found in conversation; omit the field entirely (or use `[]`) if no images found
 - The `${VAR:-default}` syntax provides fallback values; do NOT replace these — they are shell expressions
 
 4. **Confirm to user**:
