@@ -66,16 +66,13 @@ pnpm seed                                 # 创建 gateway pool + 邀请码
 # Terminal 1: API (:3000) + Web (:5173)
 pnpm dev
 
-# Terminal 2: Sidecar（轮询 API 拉配置，写到 .openclaw/）
+# Terminal 2: Sidecar + OpenClaw Gateway（轮询 API 拉配置，自动管理 OpenClaw 进程）
 pnpm dev:sidecar
-
-# Terminal 3: OpenClaw Gateway（读 .openclaw/ 配置，后台运行）
-pnpm dev:gateway
 ```
 
-> Sidecar 每 2 秒从 API 拉最新配置写入 `.openclaw/openclaw.json`，OpenClaw 监听文件变更自动热重载。Web 上改了 channel/bot 后无需重启。
+> Sidecar 每 2 秒从 API 拉最新配置写入 `.openclaw/openclaw.json`，并自动启动和管理 OpenClaw Gateway 进程（:18789）。Web 上改了 channel/bot 后无需重启，OpenClaw 监听文件变更自动热重载。
 
-只做前端/API 开发时，只跑 `pnpm dev` 即可。需要端到端测试 Slack/Discord 时再启动 Sidecar + Gateway。
+只做前端/API 开发时，只跑 `pnpm dev` 即可。需要端到端测试 Slack/Discord/飞书时再启动 Sidecar。
 
 
 ## 相关仓库

@@ -265,10 +265,20 @@ export async function generatePoolConfig(
         model: { primary: defaultModelId },
         compaction: {
           mode: "safeguard",
-          maxHistoryShare: 0.7,
-          keepRecentTokens: 16000,
+          maxHistoryShare: 0.5,
+          keepRecentTokens: 20000,
           memoryFlush: {
             enabled: true,
+          },
+        },
+        memorySearch: {
+          enabled: true,
+          sources: ["memory"],
+          provider: "openai",
+          model: "google/gemini-embedding-001",
+          remote: {
+            baseUrl: "https://openrouter.ai/api/v1/",
+            apiKey: process.env.OPENROUTER_API_KEY ?? "",
           },
         },
       },

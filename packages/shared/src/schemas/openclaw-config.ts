@@ -60,6 +60,13 @@ const compactionSchema = z
   })
   .passthrough();
 
+const memorySearchRemoteSchema = z
+  .object({
+    baseUrl: z.string().optional(),
+    apiKey: z.string().optional(),
+  })
+  .passthrough();
+
 const memorySearchSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -68,6 +75,7 @@ const memorySearchSchema = z
       .enum(["openai", "gemini", "local", "voyage", "mistral"])
       .optional(),
     model: z.string().optional(),
+    remote: memorySearchRemoteSchema.optional(),
   })
   .passthrough();
 
