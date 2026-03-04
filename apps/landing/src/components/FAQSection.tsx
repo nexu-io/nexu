@@ -54,7 +54,10 @@ const FAQ_ITEMS = [
 
 export default function FAQSection() {
   return (
-    <section id="faq" className="px-6 py-24 mx-auto max-w-2xl">
+    <section
+      id="faq"
+      className="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-2xl"
+    >
       <div className="mb-14 text-center">
         <div className="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">
           FAQ

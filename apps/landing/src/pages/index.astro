@@ -181,19 +181,21 @@ const stats = [
 
       {/* Nav */}
       <nav class="sticky top-0 z-50 border-b backdrop-blur-md border-border bg-surface-0/85">
-        <div class="flex justify-between items-center px-6 mx-auto max-w-5xl h-14">
+        <div class="flex justify-between items-center px-4 sm:px-6 mx-auto max-w-5xl h-14">
           <div class="flex items-center gap-2.5">
             <div class="flex justify-center items-center w-7 h-7 rounded-lg bg-accent">
               <span class="text-xs font-bold text-accent-fg">N</span>
             </div>
             <span class="text-sm font-semibold tracking-tight text-text-primary">Nexu</span>
           </div>
-          <div class="flex items-center gap-6 text-[13px] text-text-tertiary">
+          <div class="hidden md:flex items-center gap-6 text-[13px] text-text-tertiary">
             <a href="#scenarios" class="transition-colors hover:text-text-primary">Scenarios</a>
             <a href="#features" class="transition-colors hover:text-text-primary">Features</a>
             <a href="#how" class="transition-colors hover:text-text-primary">How it works</a>
             <a href="#faq" class="transition-colors hover:text-text-primary">FAQ</a>
-            <a href="/auth" class="px-4 py-1.5 bg-accent hover:bg-accent-hover text-accent-fg rounded-md text-[13px] font-medium transition-colors inline-flex items-center gap-1.5">
+          </div>
+          <div class="flex items-center">
+            <a href="/auth" class="px-3 sm:px-4 py-1.5 bg-accent hover:bg-accent-hover text-accent-fg rounded-md text-[12px] sm:text-[13px] font-medium transition-colors inline-flex items-center gap-1.5">
               Get started free <ArrowRight size={14} />
             </a>
           </div>
@@ -204,16 +206,16 @@ const stats = [
       <section class="overflow-hidden relative">
         <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(var(--color-accent-rgb,99,102,241),0.06)_0%,transparent_50%)]"></div>
         <div class="absolute inset-0 opacity-15" style="background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 56px 56px;"></div>
-        <div class="relative px-6 pt-24 pb-20 mx-auto max-w-4xl text-center">
+        <div class="relative px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-14 sm:pb-16 md:pb-20 mx-auto max-w-4xl text-center">
           <div class="inline-flex gap-2 items-center px-3 py-1 mb-8 text-xs font-medium rounded-full border border-accent/20 text-accent bg-accent/5">
             <Zap size={12} /> Nexu · Digital clone powered by OpenClaw
           </div>
-          <h1 class="text-[42px] font-bold text-text-primary mb-6 leading-[1.15] tracking-tight">
+          <h1 class="text-[32px] sm:text-[40px] md:text-[42px] font-bold text-text-primary mb-5 sm:mb-6 leading-[1.15] tracking-tight">
             For your lobster 🦞<br />
             <span class="text-accent">A cyber office where humans and clones coexist</span>
           </h1>
-          <p class="mx-auto mb-8 max-w-2xl text-lg leading-relaxed text-text-tertiary">
-            Your lobster lives in Slack / Discord / Telegram / WhatsApp, etc. —<br />
+          <p class="mx-auto mb-7 sm:mb-8 max-w-2xl text-base sm:text-lg leading-relaxed text-text-tertiary">
+            Your lobster lives in Slack / Discord / Telegram / WhatsApp, etc. —<br class="hidden sm:block" />
             not just chatting, but delivering results. Build apps, analyze data, write content, run automations.
           </p>
           <div class="flex flex-wrap gap-2 justify-center mb-10">
@@ -225,7 +227,7 @@ const stats = [
             ))}
           </div>
           <div class="flex gap-3 justify-center items-center mx-auto mb-6 max-w-md">
-            <a href="/auth" class="flex gap-2 items-center px-8 py-3 text-sm font-semibold rounded-lg transition-all bg-accent hover:bg-accent-hover text-accent-fg hover:shadow-lg hover:shadow-accent/20">
+            <a href="/auth" class="flex gap-2 items-center px-6 sm:px-8 py-3 text-sm font-semibold rounded-lg transition-all bg-accent hover:bg-accent-hover text-accent-fg hover:shadow-lg hover:shadow-accent/20">
               Get started free <ArrowRight size={14} />
             </a>
           </div>
@@ -239,13 +241,13 @@ const stats = [
       <DemoSection client:visible />
 
       {/* Features */}
-      <section id="features" class="px-6 py-24 mx-auto max-w-4xl">
+      <section id="features" class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
         <div class="mb-14 text-center">
           <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">Capabilities</div>
           <h2 class="text-2xl font-bold tracking-tight text-text-primary">You share the idea. 🦞 delivers the result.</h2>
           <p class="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-text-tertiary">No tools to learn. No prompts to craft. Open your IM, say what you need, and your lobster builds it.</p>
         </div>
-        <div class="grid grid-cols-3 gap-5 mb-10">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5 lg:mb-10">
           {features.slice(0, 3).map((f) => (
             <div class="p-6 rounded-xl border transition-colors bg-surface-1 border-border hover:border-border-hover group">
               <div class="flex justify-center items-center w-10 h-10 rounded-xl bg-accent/10 mb-4">
@@ -256,7 +258,7 @@ const stats = [
             </div>
           ))}
         </div>
-        <div class="grid grid-cols-3 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.slice(3).map((f) => (
             <div class="p-6 rounded-xl border transition-colors bg-surface-1 border-border hover:border-border-hover group">
               <div class="flex justify-center items-center w-10 h-10 rounded-xl bg-accent/10 mb-4">
@@ -269,18 +271,18 @@ const stats = [
         </div>
       </section>
 
-      <div class="px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
+      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
 
       {/* How it works */}
-      <section id="how" class="px-6 py-24 mx-auto max-w-4xl">
+      <section id="how" class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
         <div class="mb-14 text-center">
           <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">How it works</div>
           <h2 class="text-2xl font-bold tracking-tight text-text-primary">3 steps to get 🦞 working</h2>
         </div>
-        <div class="grid grid-cols-3 gap-10">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
           {steps.map((s, i) => (
             <div class="relative text-center">
-              {i < 2 && <div class="absolute -right-5 top-7 w-10 border-t border-dashed border-border"></div>}
+              {i < 2 && <div class="hidden md:block absolute -right-5 top-7 w-10 border-t border-dashed border-border"></div>}
               <div class="flex justify-center items-center mx-auto mb-5 w-14 h-14 rounded-2xl bg-accent/10">
                 <s.Icon size={24} className="text-accent" />
               </div>
@@ -292,15 +294,15 @@ const stats = [
         </div>
       </section>
 
-      <div class="px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
+      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
 
       {/* Use Cases */}
-      <section class="px-6 py-24 mx-auto max-w-5xl">
+      <section class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-5xl">
         <div class="mb-14 text-center">
           <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">Use cases</div>
           <h2 class="text-2xl font-bold tracking-tight text-text-primary">You describe it. Your 🦞 delivers it.</h2>
         </div>
-        <div class="grid grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {useCases.map((c) => (
             <div class="flex gap-5 items-start p-5 rounded-xl border bg-surface-1 border-border">
               <div class="flex justify-center items-center w-10 h-10 rounded-xl shrink-0 bg-accent/10">
@@ -321,11 +323,11 @@ const stats = [
         </div>
       </section>
 
-      <div class="px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
+      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
 
       {/* Numbers */}
-      <section class="px-6 py-24 mx-auto max-w-4xl">
-        <div class="grid grid-cols-4 gap-8 text-center">
+      <section class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {stats.map((n) => (
             <div>
               <div class="font-mono text-3xl font-bold tracking-tight text-accent">{n.num}</div>
@@ -336,7 +338,7 @@ const stats = [
         </div>
       </section>
 
-      <div class="px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
+      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
 
       {/* FAQ (React island — interactive accordion) */}
       <FAQSection client:visible />
@@ -344,11 +346,11 @@ const stats = [
       {/* Final CTA */}
       <section class="overflow-hidden relative">
         <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(var(--color-accent-rgb,99,102,241),0.05)_0%,transparent_60%)]"></div>
-        <div class="relative px-6 py-24 mx-auto max-w-3xl text-center">
+        <div class="relative px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-3xl text-center">
           <h2 class="mb-4 text-3xl font-bold tracking-tight text-text-primary">Stop doing it yourself. Let 🦞 handle it.</h2>
           <p class="mb-8 text-base text-text-tertiary">Get started for free — say what you need, your lobster builds it.</p>
           <div class="flex gap-3 justify-center">
-            <a href="/auth" class="flex gap-2 items-center px-8 py-3 text-sm font-semibold rounded-lg transition-all bg-accent hover:bg-accent-hover text-accent-fg hover:shadow-lg hover:shadow-accent/20">
+            <a href="/auth" class="flex gap-2 items-center px-6 sm:px-8 py-3 text-sm font-semibold rounded-lg transition-all bg-accent hover:bg-accent-hover text-accent-fg hover:shadow-lg hover:shadow-accent/20">
               Get started free <ArrowRight size={14} />
             </a>
           </div>
@@ -357,14 +359,14 @@ const stats = [
 
       {/* Footer */}
       <footer class="border-t border-border">
-        <div class="flex justify-between items-center px-6 py-8 mx-auto max-w-5xl">
+        <div class="flex flex-col gap-4 md:flex-row md:justify-between md:items-center px-4 sm:px-6 py-8 mx-auto max-w-5xl">
           <div class="flex items-center gap-2.5">
             <div class="flex justify-center items-center w-5 h-5 rounded bg-accent">
               <span class="text-[9px] font-bold text-accent-fg">N</span>
             </div>
             <span class="text-xs text-text-muted">&copy; 2026 Powerformer, Inc.</span>
           </div>
-          <div class="flex gap-6 text-xs text-text-muted">
+          <div class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-text-muted">
             <a href="#" class="transition-colors hover:text-text-secondary">X / Twitter</a>
             <a href="#" class="transition-colors hover:text-text-secondary">Docs</a>
             <a href="/privacy" class="transition-colors hover:text-text-secondary">Privacy Policy</a>
