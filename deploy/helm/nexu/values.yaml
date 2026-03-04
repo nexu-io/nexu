@@ -38,6 +38,7 @@ secret:
   LITELLM_API_KEY: ""
   RESEND_API_KEY: ""
   FEISHU_FEEDBACK_WEBHOOK_URL: ""
+  FEISHU_FEEDBACK_CHAT_ID: ""
 
 api:
   replicas: 2
