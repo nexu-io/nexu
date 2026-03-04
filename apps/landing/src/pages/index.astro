@@ -153,6 +153,23 @@ const stats = [
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link id="app-favicon" rel="icon" type="image/svg+xml" href="/favicon/favicon-light.svg" />
+    <script>
+      (() => {
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
+        const updateFavicon = () => {
+          const link = document.getElementById("app-favicon");
+          if (!link) return;
+          link.setAttribute("href", media.matches ? "/favicon/favicon-dark.svg" : "/favicon/favicon-light.svg");
+        };
+        updateFavicon();
+        if (typeof media.addEventListener === "function") {
+          media.addEventListener("change", updateFavicon);
+          return;
+        }
+        media.addListener(updateFavicon);
+      })();
+    </script>
     <title>Nexu - Your Digital Clone, Powered by OpenClaw</title>
     <meta name="description" content="Your lobster lives in Slack, Discord, Telegram, WhatsApp — not just chatting, but delivering results. Build apps, analyze data, write content, run automations." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
