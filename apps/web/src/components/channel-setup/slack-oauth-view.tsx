@@ -446,9 +446,9 @@ export function SlackOAuthView({
                 Still on{" "}
                 <span className="font-medium text-text-secondary">
                   OAuth & Permissions
-                </span>
-                {" "}— click &quot;Install to Workspace&quot; at the top,
-                authorize, then find the token under{" "}
+                </span>{" "}
+                — click &quot;Install to Workspace&quot; at the top, authorize,
+                then find the token under{" "}
                 <span className="font-medium text-text-secondary">
                   OAuth Tokens
                 </span>
@@ -526,12 +526,23 @@ export function SlackOAuthView({
               {[
                 <span key="1">Go to your Slack App → Event Subscriptions</span>,
                 <span key="2">Toggle Enable Events to On</span>,
-                <span key="3">Paste the URL above into the Request URL field</span>,
-                <span key="4">Subscribe to bot events: <strong className="text-text-primary">app_mention</strong>, <strong className="text-text-primary">message.channels</strong>, <strong className="text-text-primary">message.groups</strong>, <strong className="text-text-primary">message.im</strong></span>,
-              ].map((item, i) => (
-                <div key={i} className="flex gap-2.5 items-start">
+                <span key="3">
+                  Paste the URL above into the Request URL field
+                </span>,
+                <span key="4">
+                  Subscribe to bot events:{" "}
+                  <strong className="text-text-primary">app_mention</strong>,{" "}
+                  <strong className="text-text-primary">
+                    message.channels
+                  </strong>
+                  ,{" "}
+                  <strong className="text-text-primary">message.groups</strong>,{" "}
+                  <strong className="text-text-primary">message.im</strong>
+                </span>,
+              ].map((item, idx) => (
+                <div key={item.key} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
-                    {i + 1}
+                    {idx + 1}
                   </div>
                   <span className="text-[12px] text-text-secondary leading-relaxed">
                     {item}
