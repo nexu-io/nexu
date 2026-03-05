@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect migration SQL and run migrate apply (debug)
+      - name: Detect migration SQL and print manifest (debug)
         shell: bash
         env:
           DB_MIGRATION_BASE_REF: main
@@ -46,7 +46,7 @@ jobs:
           done
 
           if [[ ${#sql_files[@]} -eq 0 ]]; then
-            echo "No changed migration SQL files found against origin/${BASE_REF}. Skip migrate apply."
+            echo "No changed migration SQL files found against origin/${BASE_REF}. Skip."
             exit 0
           fi
 
@@ -100,12 +100,4 @@ jobs:
           cat "${manifest_path}"
           echo "----- manifest.json end -----"
 
-          echo "Running: nexu-db migrate apply --manifest ${manifest_path}"
-          set +e
-          nexu-db migrate apply --manifest "${manifest_path}"
-          apply_exit_code=$?
-          set -e
-
-          if [[ ${apply_exit_code} -ne 0 ]]; then
-            echo "nexu-db migrate apply exited with code ${apply_exit_code} (expected before CLI is implemented)."
-          fi
+          echo "Debug mode: manifest generated only; CLI call skipped."
