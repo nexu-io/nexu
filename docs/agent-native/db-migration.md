@@ -62,6 +62,39 @@
 - 禁止 push：停止用 drizzle-kit push（本地开发环境除外）
 - 禁止启动时迁移：从 apps/api/src/index.ts 移除 await migrate()，迁移改成独立 CI 步骤（测试环境、生产环境）
 
+### 回归验证流程（建议每次 Schema/Migration 调整后执行）
+
+目标：确保 `apps/api/src/db/schema/index.ts` 仍可作为 SSoT，并同时兼容新库初始化与已有库对齐。
+
+1. **Schema -> Migration 无漂移**
+   - 执行 `pnpm --filter @nexu/api db:generate`
+   - 期望：输出 `No schema changes, nothing to migrate`。
+
+2. **已有库对齐验证（push 应为 no-op）**
+   - 从当前本地开发库克隆一个仅 schema 的测试库（示例）：
+     - `createdb nexu_schema_check`
+     - `pg_dump --schema-only --no-owner --no-privileges "$DATABASE_URL" | psql "$DATABASE_URL_SCHEMA_CHECK"`
+   - 执行：
+     - `DATABASE_URL="$DATABASE_URL_SCHEMA_CHECK" pnpm --filter @nexu/api db:push --verbose`
+   - 期望：`No changes detected`。
+
+3. **新库初始化验证（migrate + push）**
+   - 创建空测试库（示例：`createdb nexu_mig_check`）
+   - 执行：
+     - `DATABASE_URL="$DATABASE_URL_MIG_CHECK" pnpm --filter @nexu/api db:migrate`
+     - `DATABASE_URL="$DATABASE_URL_MIG_CHECK" pnpm --filter @nexu/api db:push --verbose`
+   - 期望：`db:migrate` 成功，且随后 `db:push` 显示 `No changes detected`。
+
+4. **危险 SQL 检查**
+   - 执行 `pnpm --filter @nexu/api db:check-dangerous`
+   - 期望：检查通过。
+
+### 常见回归信号
+
+- `db:push` 提示要 `DROP INDEX`：通常是 schema 未声明该索引（应补到 Drizzle schema）。
+- `db:push` 提示要先 `DROP CONSTRAINT` 再 `ADD CONSTRAINT`：常见于约束名不一致（语义相同但命名不同）。
+- `db:migrate` 在已有库失败（如 `relation already exists`）：说明缺少 baseline 或 migration 未考虑兼容性。
+
 ## 整体流程（阶段二：Atlas 方案）
 
 ### 本地开发阶段

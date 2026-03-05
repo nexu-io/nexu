@@ -1,6 +1,6 @@
 {
-  "id": "55df9825-7b5b-4af7-b845-7dd8195b3337",
-  "prevId": "bfe0d71f-ee9e-4281-a506-cb6551893cbb",
+  "id": "319f81cb-9ea6-49d9-ae7d-cde82f9c6b94",
+  "prevId": "55df9825-7b5b-4af7-b845-7dd8195b3337",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -124,7 +124,68 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "artifacts_bot_id_idx": {
+          "name": "artifacts_bot_id_idx",
+          "columns": [
+            {
+              "expression": "bot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_session_key_idx": {
+          "name": "artifacts_session_key_idx",
+          "columns": [
+            {
+              "expression": "session_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_status_idx": {
+          "name": "artifacts_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_created_at_idx": {
+          "name": "artifacts_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -224,7 +285,17 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "account_userId_fkey": {
+          "name": "account_userId_fkey",
+          "tableFrom": "account",
+          "tableTo": "user",
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -287,7 +358,17 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "session_userId_fkey": {
+          "name": "session_userId_fkey",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "session_token_key": {

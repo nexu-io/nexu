@@ -95,10 +95,7 @@ export function reportProbeFailure(context: {
 }): void {
   emitMetric(
     "gateway.probe.failure",
-    [
-      `probe_type:${context.probeType}`,
-      `error_code:${context.errorCode}`,
-    ],
+    [`probe_type:${context.probeType}`, `error_code:${context.errorCode}`],
     {
       event: "gateway_probe_failure",
       probeType: context.probeType,
@@ -113,15 +110,11 @@ export function reportProbeSuccess(context: {
   probeType: string;
   latencyMs: number;
 }): void {
-  emitMetric(
-    "gateway.probe.success",
-    [`probe_type:${context.probeType}`],
-    {
-      event: "gateway_probe_success",
-      probeType: context.probeType,
-      latencyMs: context.latencyMs,
-    },
-  );
+  emitMetric("gateway.probe.success", [`probe_type:${context.probeType}`], {
+    event: "gateway_probe_success",
+    probeType: context.probeType,
+    latencyMs: context.latencyMs,
+  });
 }
 
 export function reportStateTransition(context: {
@@ -131,11 +124,7 @@ export function reportStateTransition(context: {
 }): void {
   emitMetric(
     "gateway.state.transition",
-    [
-      `from:${context.from}`,
-      `to:${context.to}`,
-      `reason:${context.reason}`,
-    ],
+    [`from:${context.from}`, `to:${context.to}`, `reason:${context.reason}`],
     {
       event: "gateway_state_transition",
       from: context.from,
@@ -148,12 +137,8 @@ export function reportStateTransition(context: {
 export function reportHeartbeatFailure(context: {
   errorCode: string;
 }): void {
-  emitMetric(
-    "gateway.heartbeat.failure",
-    [`error_code:${context.errorCode}`],
-    {
-      event: "gateway_heartbeat_failure",
-      errorCode: context.errorCode,
-    },
-  );
+  emitMetric("gateway.heartbeat.failure", [`error_code:${context.errorCode}`], {
+    event: "gateway_heartbeat_failure",
+    errorCode: context.errorCode,
+  });
 }

@@ -1,6 +1,6 @@
 {
-  "id": "55df9825-7b5b-4af7-b845-7dd8195b3337",
-  "prevId": "bfe0d71f-ee9e-4281-a506-cb6551893cbb",
+  "id": "cfd0f01f-f193-4e7a-9a85-ddf0bb18bcaa",
+  "prevId": "319f81cb-9ea6-49d9-ae7d-cde82f9c6b94",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -124,7 +124,68 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "artifacts_bot_id_idx": {
+          "name": "artifacts_bot_id_idx",
+          "columns": [
+            {
+              "expression": "bot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_session_key_idx": {
+          "name": "artifacts_session_key_idx",
+          "columns": [
+            {
+              "expression": "session_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_status_idx": {
+          "name": "artifacts_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_created_at_idx": {
+          "name": "artifacts_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -224,7 +285,17 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "account_userId_fkey": {
+          "name": "account_userId_fkey",
+          "tableFrom": "account",
+          "tableTo": "user",
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -287,7 +358,17 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "session_userId_fkey": {
+          "name": "session_userId_fkey",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "session_token_key": {
@@ -1810,6 +1891,140 @@
           "name": "webhook_routes_id_unique",
           "nullsNotDistinct": false,
           "columns": ["id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.workspace_template_snapshots": {
+      "name": "workspace_template_snapshots",
+      "schema": "",
+      "columns": {
+        "pk": {
+          "name": "pk",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "templates_hash": {
+          "name": "templates_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "templates_json": {
+          "name": "templates_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workspace_template_snapshots_id_unique": {
+          "name": "workspace_template_snapshots_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id"]
+        },
+        "workspace_template_snapshots_version_unique": {
+          "name": "workspace_template_snapshots_version_unique",
+          "nullsNotDistinct": false,
+          "columns": ["version"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.workspace_templates": {
+      "name": "workspace_templates",
+      "schema": "",
+      "columns": {
+        "pk": {
+          "name": "pk",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "write_mode": {
+          "name": "write_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'seed'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'active'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "workspace_templates_id_unique": {
+          "name": "workspace_templates_id_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id"]
+        },
+        "workspace_templates_name_unique": {
+          "name": "workspace_templates_name_unique",
+          "nullsNotDistinct": false,
+          "columns": ["name"]
         }
       },
       "policies": {},

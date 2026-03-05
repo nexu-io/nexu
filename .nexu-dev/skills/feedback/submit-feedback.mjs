@@ -86,7 +86,8 @@ const MAX_ASSISTANT_MSG_LEN = 300;
  * Clean assistant text: strip code blocks, long paths, JSON blobs, etc.
  * Keep only the conversational substance.
  */
-function cleanAssistantText(text) {
+function cleanAssistantText(input) {
+  let text = input;
   // Replace fenced code blocks with a short placeholder
   text = text.replace(/```[\s\S]*?```/g, "[代码片段]");
 
@@ -112,7 +113,7 @@ function cleanAssistantText(text) {
 
   // Truncate if still too long
   if (text.length > MAX_ASSISTANT_MSG_LEN) {
-    text = text.slice(0, MAX_ASSISTANT_MSG_LEN) + "…";
+    text = `${text.slice(0, MAX_ASSISTANT_MSG_LEN)}…`;
   }
 
   return text;
@@ -311,7 +312,7 @@ function readFiles(paths) {
 let conversationContext = "";
 let imageData = [];
 let fileData = [];
-let imageUrls = [];
+const imageUrls = [];
 
 const sessionFile = findSessionFile();
 if (sessionFile && existsSync(sessionFile)) {
