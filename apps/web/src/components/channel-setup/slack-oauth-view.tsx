@@ -497,7 +497,7 @@ export function SlackOAuthView({
                 Configure Event Subscriptions
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Set the Request URL in your Slack App →{" "}
+                In Slack app dashboard, set the Request URL at Features →{" "}
                 <span className="font-medium text-text-secondary">
                   Event Subscriptions
                 </span>
@@ -524,23 +524,12 @@ export function SlackOAuthView({
             </div>
             <div className="space-y-2">
               {[
-                <span key="1">Go to your Slack App → Event Subscriptions</span>,
-                <span key="2">Toggle Enable Events to On</span>,
-                <span key="3">
-                  Paste the URL above into the Request URL field
-                </span>,
-                <span key="4">
-                  Subscribe to bot events:{" "}
-                  <strong className="text-text-primary">app_mention</strong>,{" "}
-                  <strong className="text-text-primary">
-                    message.channels
-                  </strong>
-                  ,{" "}
-                  <strong className="text-text-primary">message.groups</strong>,{" "}
-                  <strong className="text-text-primary">message.im</strong>
-                </span>,
+                "Open api.slack.com/apps, select your app, then go to Features → Event Subscriptions.",
+                "Turn Enable Events on.",
+                "Paste the URL above into the Request URL field.",
+                "Subscribe to bot events: app_mention, message.channels.",
               ].map((item, idx) => (
-                <div key={item.key} className="flex gap-2.5 items-start">
+                <div key={item} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
                     {idx + 1}
                   </div>
