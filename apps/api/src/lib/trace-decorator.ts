@@ -12,6 +12,13 @@ type DatadogTracer = {
   ) => T;
 };
 
+type SpanTags = Record<string, unknown>;
+type SpanTagResolver = (args: unknown[]) => SpanTags | undefined;
+
+type SpanDecoratorOptions = {
+  tags?: SpanTags | SpanTagResolver;
+};
+
 let tracerPromise: Promise<DatadogTracer | null> | null = null;
 
 async function getTracer(): Promise<DatadogTracer | null> {
@@ -44,7 +51,68 @@ async function getTracer(): Promise<DatadogTracer | null> {
 
 type AsyncMethod = (...args: unknown[]) => Promise<unknown>;
 
-function decorateWithSpan(spanName: string, spanType: "trace" | "span") {
+async function executeSpan<T>(
+  spanName: string,
+  spanType: "trace" | "span",
+  run: () => Promise<T>,
+  tags?: SpanTags,
+): Promise<T> {
+  const tracer = await getTracer();
+
+  if (!tracer) {
+    logger.info({
+      message: "trace_local_event",
+      span_name: spanName,
+      span_type: spanType,
+      ...(tags ?? {}),
+    });
+    return run();
+  }
+
+  return tracer.trace(
+    spanName,
+    {
+      resource: spanName,
+      tags: {
+        span_type: spanType,
+        ...(tags ?? {}),
+      },
+    },
+    async (span) => {
+      try {
+        return await run();
+      } catch (error) {
+        span.setTag("error", true);
+        if (error instanceof Error) {
+          span.setTag("error.type", error.name || "Error");
+          span.setTag("error.msg", error.message || "unknown_error");
+        }
+        throw error;
+      }
+    },
+  );
+}
+
+function resolveDecoratorTags(
+  options: SpanDecoratorOptions | undefined,
+  args: unknown[],
+): SpanTags | undefined {
+  if (!options?.tags) {
+    return undefined;
+  }
+
+  if (typeof options.tags === "function") {
+    return options.tags(args);
+  }
+
+  return options.tags;
+}
+
+function decorateWithSpan(
+  spanName: string,
+  spanType: "trace" | "span",
+  options?: SpanDecoratorOptions,
+) {
   return (
     _target: object,
     _propertyKey: string,
@@ -57,46 +125,21 @@ function decorateWithSpan(spanName: string, spanType: "trace" | "span") {
     }
 
     descriptor.value = async function (...args: unknown[]) {
-      const tracer = await getTracer();
-
-      if (!tracer) {
-        logger.info({
-          message: "trace_local_event",
-          span_name: spanName,
-          span_type: spanType,
-        });
-        return (original as AsyncMethod).apply(this, args);
-      }
-
-      return tracer.trace(
+      const tags = resolveDecoratorTags(options, args);
+      return executeSpan(
         spanName,
-        {
-          resource: spanName,
-          tags: {
-            span_type: spanType,
-          },
-        },
-        async (span) => {
-          try {
-            return await (original as AsyncMethod).apply(this, args);
-          } catch (error) {
-            span.setTag("error", true);
-            if (error instanceof Error) {
-              span.setTag("error.type", error.name || "Error");
-              span.setTag("error.msg", error.message || "unknown_error");
-            }
-            throw error;
-          }
-        },
+        spanType,
+        () => (original as AsyncMethod).apply(this, args),
+        tags,
       );
     };
   };
 }
 
-export function Trace(spanName: string) {
-  return decorateWithSpan(spanName, "trace");
+export function Trace(spanName: string, options?: SpanDecoratorOptions) {
+  return decorateWithSpan(spanName, "trace", options);
 }
 
-export function Span(spanName: string) {
-  return decorateWithSpan(spanName, "span");
+export function Span(spanName: string, options?: SpanDecoratorOptions) {
+  return decorateWithSpan(spanName, "span", options);
 }

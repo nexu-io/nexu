@@ -21,6 +21,7 @@ import { findOrCreateDefaultBot } from "../lib/bot-helpers.js";
 import { encrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
+import { Span } from "../lib/trace-decorator.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 
 import type { AppBindings } from "../types.js";
@@ -49,6 +50,64 @@ interface SlackOAuthV2Response {
   enterprise?: { id: string; name: string } | null;
   authed_user: { id: string };
 }
+
+class ChannelSpanHandler {
+  @Span("api.channels.snapshot.publish", {
+    tags: ([poolId]) => ({ channel_type: "multi", pool_id: poolId }),
+  })
+  async publishSnapshot(poolId: string): Promise<void> {
+    await publishPoolConfigSnapshot(db, poolId);
+  }
+
+  @Span("api.channels.slack.oauth_state.create", {
+    tags: () => ({ channel_type: "slack" }),
+  })
+  async createSlackOauthState(
+    userId: string,
+    nonce: string,
+    expiresAt: string,
+    returnTo: string | undefined,
+  ): Promise<void> {
+    await db.insert(oauthStates).values({
+      id: createId(),
+      state: nonce,
+      userId,
+      expiresAt,
+      returnTo,
+    });
+  }
+
+  @Span("api.channels.slack.auth_test", {
+    tags: () => ({ channel_type: "slack" }),
+  })
+  async slackAuthTest(botToken: string): Promise<Response> {
+    return fetch("https://slack.com/api/auth.test", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+  }
+
+  @Span("api.channels.slack.bots_info", {
+    tags: () => ({ channel_type: "slack" }),
+  })
+  async slackBotsInfo(botId: string, botToken: string): Promise<Response> {
+    return fetch(`https://slack.com/api/bots.info?bot=${botId}`, {
+      headers: { Authorization: `Bearer ${botToken}` },
+    });
+  }
+
+  @Span("api.channels.bot.resolve_default", {
+    tags: () => ({ channel_type: "slack" }),
+  })
+  async resolveDefaultBot(userId: string) {
+    return findOrCreateDefaultBot(userId);
+  }
+}
+
+const channelSpanHandler = new ChannelSpanHandler();
 
 function formatChannel(
   ch: typeof botChannels.$inferSelect,
@@ -90,7 +149,7 @@ async function publishSnapshotSafely(
   }
 
   try {
-    await publishPoolConfigSnapshot(db, poolId);
+    await channelSpanHandler.publishSnapshot(poolId);
   } catch (error) {
     const unknownError = BaseError.from(error);
     logger.error({
@@ -286,13 +345,12 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const returnTo = c.req.query("returnTo");
 
-    await db.insert(oauthStates).values({
-      id: createId(),
-      state: nonce,
+    await channelSpanHandler.createSlackOauthState(
       userId,
+      nonce,
       expiresAt,
       returnTo,
-    });
+    );
 
     const url = new URL("https://slack.com/oauth/v2/authorize");
     url.searchParams.set("client_id", clientId);
@@ -317,13 +375,7 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     let teamName = input.teamName;
 
     if (!teamId || !appId) {
-      const authResp = await fetch("https://slack.com/api/auth.test", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${input.botToken}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      });
+      const authResp = await channelSpanHandler.slackAuthTest(input.botToken);
       const authData = (await authResp.json()) as {
         ok: boolean;
         team_id?: string;
@@ -352,11 +404,9 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       // auth.test returns bot_id but not app_id; use bots.info to resolve the real app_id
       // (app_id must match api_app_id in Slack event payloads for webhook route lookup)
       if (!appId && authData.bot_id) {
-        const botsResp = await fetch(
-          `https://slack.com/api/bots.info?bot=${authData.bot_id}`,
-          {
-            headers: { Authorization: `Bearer ${input.botToken}` },
-          },
+        const botsResp = await channelSpanHandler.slackBotsInfo(
+          authData.bot_id,
+          input.botToken,
         );
         const botsData = (await botsResp.json()) as {
           ok: boolean;
@@ -378,7 +428,7 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       }
     }
 
-    const bot = await findOrCreateDefaultBot(userId);
+    const bot = await channelSpanHandler.resolveDefaultBot(userId);
     const botId = bot.id;
 
     const accountId = `slack-${appId}`;
@@ -604,7 +654,9 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     try {
       const appResp = await fetch(
         "https://discord.com/api/v10/applications/@me",
-        { headers: { Authorization: `Bot ${input.botToken}` } },
+        {
+          headers: { Authorization: `Bot ${input.botToken}` },
+        },
       );
       if (appResp.ok) {
         const appData = (await appResp.json()) as { id: string };

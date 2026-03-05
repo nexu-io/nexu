@@ -44,6 +44,14 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 - Whenever you add a new environment variable, update `deploy/helm/nexu/values.yaml` in the same change.
 - Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `docs/guides/gateway-environment-guide.md`.
 
+## Observability conventions
+
+- Request-level tracing must be created uniformly by middleware as the root trace.
+- Logic with monitoring value must be split into named functions and annotated with `@Trace` / `@Span`.
+- Do not introduce function-wrapper transitional APIs such as `runTrace` / `runSpan`.
+- Iterate incrementally: add Trace/Span within established code patterns first, then refine based on metrics.
+- Logger usage source of truth: `apps/api/src/lib/logger.ts`; follow its exported API and nearby call-site patterns when adding logs.
+
 ## Required checks
 
 - `pnpm typecheck` — after any TypeScript changes

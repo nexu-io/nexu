@@ -3,6 +3,7 @@ import type { IncomingMessage } from "node:http";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { createId } from "@paralleldrive/cuid2";
 import { and, eq, sql } from "drizzle-orm";
+import type { Context } from "hono";
 import { db } from "../db/index.js";
 import {
   botChannels,
@@ -14,6 +15,7 @@ import {
 import { decrypt } from "../lib/crypto.js";
 import { BaseError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
+import { Span } from "../lib/trace-decorator.js";
 import type { AppBindings } from "../types.js";
 
 // ── Read body from Node.js IncomingMessage (bypasses Hono body reading) ──
@@ -51,8 +53,58 @@ function verifySlackSignature(
 
 // ── Route registration ────────────────────────────────────────────────────
 
-export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
-  app.on("POST", "/api/slack/events", async (c) => {
+class SlackEventsTraceHandler {
+  @Span("api.slack.events.webhook_route.lookup", {
+    tags: ([compositeKey]) => ({
+      channel_type: "slack",
+      composite_key: compositeKey,
+    }),
+  })
+  async lookupWebhookRoute(compositeKey: string) {
+    return db
+      .select()
+      .from(webhookRoutes)
+      .where(
+        and(
+          eq(webhookRoutes.channelType, "slack"),
+          eq(webhookRoutes.externalId, compositeKey),
+        ),
+      );
+  }
+
+  @Span("api.slack.events.gateway.forward", {
+    tags: ([, accountId, poolId]) => ({
+      channel_type: "slack",
+      account_id: accountId,
+      pool_id: poolId,
+    }),
+  })
+  async forwardToGateway(
+    gatewayUrl: string,
+    _accountId: string,
+    _poolId: string,
+    rawBody: string,
+    timestamp: string,
+    signature: string,
+  ): Promise<Response> {
+    return fetch(gatewayUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-slack-request-timestamp": timestamp,
+        "x-slack-signature": signature,
+      },
+      body: rawBody,
+    });
+  }
+
+  @Span("api.slack.events.ingress", {
+    tags: () => ({
+      route: "/api/slack/events",
+      channel_type: "slack",
+    }),
+  })
+  async handle(c: Context<AppBindings>): Promise<Response> {
     try {
       logger.info({
         message: "slack_events_incoming",
@@ -61,17 +113,14 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         is_retry: Boolean(c.req.header("x-slack-retry-num")),
       });
 
-      // Skip Slack retries — we already processed the original
       if (c.req.header("x-slack-retry-num")) {
         return c.json({ ok: true });
       }
 
-      // Read body — try Hono first, fall back to raw IncomingMessage
       let rawBody: string;
       try {
         rawBody = await c.req.text();
         if (!rawBody) {
-          // Hono might have already consumed the body; try raw IncomingMessage
           const incoming = (c.env as { incoming: IncomingMessage }).incoming;
           rawBody = await readIncomingBody(incoming);
         }
@@ -107,12 +156,10 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ message: "Invalid JSON" }, 400);
       }
 
-      // Handle url_verification challenge (Slack endpoint validation)
       if (payload.type === "url_verification") {
         return c.json({ challenge: payload.challenge });
       }
 
-      // Extract team_id and api_app_id from event payload
       const teamId = payload.team_id as string | undefined;
       if (!teamId) {
         return c.json({ message: "Missing team_id" }, 400);
@@ -123,17 +170,8 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ message: "Missing api_app_id" }, 400);
       }
 
-      // Look up webhook route using composite key (teamId:appId)
       const compositeKey = `${teamId}:${apiAppId}`;
-      const [route] = await db
-        .select()
-        .from(webhookRoutes)
-        .where(
-          and(
-            eq(webhookRoutes.channelType, "slack"),
-            eq(webhookRoutes.externalId, compositeKey),
-          ),
-        );
+      const [route] = await this.lookupWebhookRoute(compositeKey);
 
       if (!route) {
         logger.warn({
@@ -143,7 +181,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ message: "Unknown workspace" }, 404);
       }
 
-      // Retrieve signing secret from credentials
       const [signingSecretRow] = await db
         .select({ encryptedValue: channelCredentials.encryptedValue })
         .from(channelCredentials)
@@ -163,8 +200,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       }
 
       const signingSecret = decrypt(signingSecretRow.encryptedValue);
-
-      // Verify Slack request signature
       const timestamp = c.req.header("x-slack-request-timestamp") ?? "";
       const signature = c.req.header("x-slack-signature") ?? "";
 
@@ -181,7 +216,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ message: "Invalid signature" }, 401);
       }
 
-      // Find the gateway pod + botId
       const [channel] = await db
         .select({
           accountId: botChannels.accountId,
@@ -191,8 +225,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         .where(eq(botChannels.id, route.botChannelId));
 
       const accountId = channel?.accountId ?? `slack-${teamId}`;
-
-      // Upsert session for message events (fire-and-forget)
       const event = payload.event as Record<string, unknown> | undefined;
       const isMessageEvent =
         event?.type === "message" || event?.type === "app_mention";
@@ -201,7 +233,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         const sessionKey = `slack_${teamId}_${channelId}`;
         const now = new Date().toISOString();
 
-        // Resolve Slack channel name via bot token (best-effort)
         let channelName = channelId;
         const [botTokenRow] = await db
           .select({ encryptedValue: channelCredentials.encryptedValue })
@@ -225,7 +256,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
             };
             if (infoData.ok && infoData.channel) {
               if (infoData.channel.is_im) {
-                // DM — try to get user display name
                 const userId = infoData.channel.user;
                 if (userId) {
                   const userResp = await fetch(
@@ -312,8 +342,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         .where(eq(gatewayPools.id, route.poolId));
 
       const podIp = pool?.podIp;
-
-      // Forward to gateway or log locally
       if (!podIp) {
         logger.warn({
           message: "slack_events_gateway_pod_missing",
@@ -323,7 +351,6 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
         return c.json({ accepted: true }, 202);
       }
 
-      // Forward to gateway pod
       const fwdEvent = payload.event as Record<string, unknown> | undefined;
       const gatewayUrl = `http://${podIp}:18789/slack/events/${accountId}`;
       logger.info({
@@ -334,15 +361,14 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       });
 
       try {
-        const gatewayResp = await fetch(gatewayUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-slack-request-timestamp": timestamp,
-            "x-slack-signature": signature,
-          },
-          body: rawBody,
-        });
+        const gatewayResp = await this.forwardToGateway(
+          gatewayUrl,
+          accountId,
+          route.poolId,
+          rawBody,
+          timestamp,
+          signature,
+        );
 
         const respBody = await gatewayResp.text();
         logger.info({
@@ -375,5 +401,13 @@ export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
       });
       return c.json({ ok: true });
     }
+  }
+}
+
+export function registerSlackEvents(app: OpenAPIHono<AppBindings>) {
+  const traceHandler = new SlackEventsTraceHandler();
+
+  app.on("POST", "/api/slack/events", async (c) => {
+    return traceHandler.handle(c);
   });
 }

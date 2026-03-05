@@ -3,6 +3,8 @@ import type { MiddlewareHandler } from "hono";
 import { LogSampleRules } from "../lib/log-sample-rules.js";
 import { logger } from "../lib/logger.js";
 
+import type { AppBindings } from "../types.js";
+
 const slowRequestThresholdMs = Number.parseInt(
   process.env.REQUEST_LOG_SLOW_MS ?? "300",
   10,
@@ -51,31 +53,39 @@ const logSampleRules = new LogSampleRules(
   },
 );
 
-export const requestLoggerMiddleware: MiddlewareHandler = async (c, next) => {
+export const requestLoggerMiddleware: MiddlewareHandler<AppBindings> = async (
+  c,
+  next,
+) => {
   const startedAt = Date.now();
-  const requestId = c.req.header("x-request-id") ?? randomUUID();
+  const requestId =
+    c.get("requestId") ?? c.req.header("x-request-id") ?? randomUUID();
+  let threw = false;
 
   c.set("requestId", requestId);
   c.header("x-request-id", requestId);
 
-  await next();
+  try {
+    await next();
+  } catch (error) {
+    threw = true;
+    throw error;
+  } finally {
+    const latencyMs = Date.now() - startedAt;
+    const method = c.req.method;
+    const path = c.req.path;
+    const status = threw ? 500 : c.res.status;
+    const decision = logSampleRules.get(path, status, latencyMs);
 
-  const latencyMs = Date.now() - startedAt;
-  const method = c.req.method;
-  const path = c.req.path;
-  const status = c.res.status;
-  const decision = logSampleRules.get(path, status, latencyMs);
-
-  if (!decision.shouldLog) {
-    return;
+    if (decision.shouldLog) {
+      logger.info({
+        message: "http_request",
+        request_id: requestId,
+        method,
+        path,
+        status,
+        latency_ms: latencyMs,
+      });
+    }
   }
-
-  logger.info({
-    message: "http_request",
-    request_id: requestId,
-    method,
-    path,
-    status,
-    latency_ms: latencyMs,
-  });
 };

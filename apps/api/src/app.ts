@@ -9,6 +9,7 @@ import {
   resolveErrorHandling,
 } from "./middleware/error-middleware.js";
 import { requestLoggerMiddleware } from "./middleware/request-logger.js";
+import { requestTraceMiddleware } from "./middleware/request-trace.js";
 import {
   registerArtifactInternalRoutes,
   registerArtifactRoutes,
@@ -63,6 +64,7 @@ export function createApp() {
   const commitHash = process.env.COMMIT_HASH;
   const healthHandler = new HealthHandler(commitHash);
 
+  app.use("*", requestTraceMiddleware);
   app.use("*", requestLoggerMiddleware);
   app.use("*", errorMiddleware);
   app.use(
@@ -99,6 +101,7 @@ export function createApp() {
     info: { title: "Nexu API", version: "1.0.0" },
   });
 
+  // Infrastructure health endpoint (k8s/lb/docker probes).
   app.get("/health", (c) => healthHandler.handle(c));
 
   app.onError((error, c) => {
