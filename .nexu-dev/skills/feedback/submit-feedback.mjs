@@ -79,6 +79,45 @@ function findSessionFile() {
 // ---------------------------------------------------------------------------
 // Parse JSONL → messages + image paths
 // ---------------------------------------------------------------------------
+
+const MAX_ASSISTANT_MSG_LEN = 300;
+
+/**
+ * Clean assistant text: strip code blocks, long paths, JSON blobs, etc.
+ * Keep only the conversational substance.
+ */
+function cleanAssistantText(text) {
+  // Replace fenced code blocks with a short placeholder
+  text = text.replace(/```[\s\S]*?```/g, "[代码片段]");
+
+  // Replace inline code that looks like long paths (>40 chars)
+  text = text.replace(/`[^`]{40,}`/g, "[...]");
+
+  // Strip lines that are mostly a file path (e.g. /data/openclaw/..., /Users/..., ./src/...)
+  text = text.replace(/^.*(?:\/[\w._-]+){4,}.*$/gm, "");
+
+  // Strip lines that look like JSON objects/arrays (starts with { or [, >60 chars)
+  text = text.replace(/^\s*[{[][\s\S]{60,}$/gm, "");
+
+  // Strip tool-use markers that OpenClaw sometimes injects
+  text = text.replace(
+    /\[(?:tool_use|tool_result|function_call|exec)[^\]]*\]\n?/gi,
+    "",
+  );
+
+  // Collapse multiple blank lines into one
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  text = text.trim();
+
+  // Truncate if still too long
+  if (text.length > MAX_ASSISTANT_MSG_LEN) {
+    text = text.slice(0, MAX_ASSISTANT_MSG_LEN) + "…";
+  }
+
+  return text;
+}
+
 function parseSession(filePath) {
   const messages = [];
   const imagePaths = [];
@@ -103,14 +142,15 @@ function parseSession(filePath) {
 
         let text = block.text;
 
-        // Strip system envelope: "System: [timestamp] Feishu[...] DM from ...: actual message"
+        // Strip system envelope: "System: [timestamp] Feishu/Slack[...] DM/Channel from ...: actual message"
         text = text.replace(
-          /^System:\s*\[.*?\]\s*Feishu\[.*?\]\s*(?:DM|Channel)\s+from\s+\S+:\s*/,
+          /^System:\s*\[.*?\]\s*(?:Feishu|Slack|Discord)\[.*?\]\s*(?:DM|Channel)\s+from\s+\S+:\s*/,
           "",
         );
 
         // Extract media paths from user messages — classify as image or file
         if (msg.role === "user") {
+          // Format: [media attached: /path (mime)]
           text = text.replace(
             /\[media attached: ([^\s]+) \(([^)]+)\)[^\]]*\]\n?/g,
             (_match, path, mime) => {
@@ -123,11 +163,65 @@ function parseSession(filePath) {
               return "";
             },
           );
+          // Format: [media attached N/M: /path (mime) | /path]
+          text = text.replace(
+            /\[media attached \d+\/\d+: ([^\s]+) \(([^)]+)\)[^\]]*\]\n?/g,
+            (_match, path, mime) => {
+              const ext = path.split(".").pop()?.toLowerCase() || "";
+              if (IMAGE_EXTENSIONS.has(ext) || mime.startsWith("image/")) {
+                if (imagePaths.length < MAX_IMAGES) imagePaths.push(path);
+              } else {
+                if (filePaths.length < MAX_FILES) filePaths.push(path);
+              }
+              return "";
+            },
+          );
+          // Strip "[media attached: N files]" header
+          text = text.replace(/\[media attached: \d+ files?\]\n?/g, "");
+
+          // Extract Slack/Discord image URLs: [image: https://...]
+          text = text.replace(
+            /\[image: (https?:\/\/[^\s\]]+)\]\n?/g,
+            (_match, url) => {
+              if (imagePaths.length < MAX_IMAGES) imagePaths.push(url);
+              return "";
+            },
+          );
+
+          // Strip system-injected metadata blocks
+          text = text.replace(
+            /,?\s*prefer the message tool[^\n]*(?:\n(?!Conversation info|Sender \(|<@|\[message_id)[^\n]*)*/i,
+            "",
+          );
+          text = text.replace(
+            /Conversation info \(untrusted metadata\):\s*```json\s*\{[\s\S]*?\}\s*```\n?/g,
+            "",
+          );
+          text = text.replace(
+            /Sender \(untrusted metadata\):\s*```json\s*\{[\s\S]*?\}\s*```\n?/g,
+            "",
+          );
+          text = text.replace(/\[message_id: [^\]]+\]\n?/g, "");
+
+          // Strip Slack-specific noise
+          text = text.replace(/\[Slack file: [^\]]*\]\n?/g, "");
+          text = text.replace(
+            /Untrusted context \(metadata[^)]*\):[\s\S]*?<<<END_EXTERNAL_UNTRUSTED_CONTENT[^>]*>>>\n?/g,
+            "",
+          );
+          // Strip Slack user mentions: <@U0AJB581Q2D> → ""
+          text = text.replace(/<@[A-Z0-9]+>/g, "");
         }
 
         text = text.replace(/To send an image back.*?\n?/g, "");
 
-        text = text.trim();
+        // Clean assistant messages to remove technical noise
+        if (msg.role === "assistant") {
+          text = cleanAssistantText(text);
+        } else {
+          text = text.trim();
+        }
+
         if (!text) continue;
 
         const prefix = msg.role === "user" ? "👤" : "🤖";
@@ -217,12 +311,24 @@ function readFiles(paths) {
 let conversationContext = "";
 let imageData = [];
 let fileData = [];
+let imageUrls = [];
 
 const sessionFile = findSessionFile();
 if (sessionFile && existsSync(sessionFile)) {
   const parsed = parseSession(sessionFile);
   conversationContext = parsed.conversationContext;
-  imageData = readImages(parsed.imagePaths);
+
+  // Split image paths into local files and remote URLs
+  const localPaths = [];
+  for (const p of parsed.imagePaths) {
+    if (p.startsWith("http://") || p.startsWith("https://")) {
+      imageUrls.push(p);
+    } else {
+      localPaths.push(p);
+    }
+  }
+
+  imageData = readImages(localPaths);
   fileData = readFiles(parsed.filePaths);
 }
 
@@ -236,6 +342,10 @@ const payload = {
 
 if (imageData.length > 0) {
   payload.imageData = imageData;
+}
+
+if (imageUrls.length > 0) {
+  payload.imageUrls = imageUrls;
 }
 
 if (fileData.length > 0) {

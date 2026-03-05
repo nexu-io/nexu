@@ -5,10 +5,14 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import dotenv from "dotenv";
 import { createApp } from "./app.js";
-import { pool } from "./db/index.js";
+import { db, pool } from "./db/index.js";
 import { migrate } from "./db/migrate.js";
 import { BaseError } from "./lib/error.js";
 import { logger } from "./lib/logger.js";
+import {
+  startPoolHealthMonitor,
+  stopPoolHealthMonitor,
+} from "./services/runtime/pool-health-monitor.js";
 
 function loadEnv() {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -61,7 +65,10 @@ async function main() {
     }
   });
 
+  startPoolHealthMonitor(db);
+
   const shutdown = () => {
+    stopPoolHealthMonitor();
     server.close();
     pool.end().finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 1000);

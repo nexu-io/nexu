@@ -242,6 +242,35 @@ export const inviteCodes = pgTable("invite_codes", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const workspaceTemplates = pgTable("workspace_templates", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  name: text("name").notNull().unique(),
+  content: text("content").notNull(),
+  writeMode: text("write_mode").notNull().default("seed"),
+  status: text("status").default("active"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const workspaceTemplateSnapshots = pgTable(
+  "workspace_template_snapshots",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    version: integer("version").notNull().unique(),
+    templatesHash: text("templates_hash").notNull(),
+    templatesJson: text("templates_json").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+);
+
 export const artifacts = pgTable("artifacts", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),

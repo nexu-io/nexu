@@ -65,3 +65,19 @@ export const runtimeSkillsResponseSchema = z.object({
 });
 
 export type RuntimeSkillsResponse = z.infer<typeof runtimeSkillsResponseSchema>;
+
+export const runtimeWorkspaceTemplatesResponseSchema = z.object({
+  version: z.number().int().nonnegative(),
+  templatesHash: z.string(),
+  templates: z.record(
+    z.object({
+      content: z.string(),
+      writeMode: z.enum(["seed", "inject"]),
+    }),
+  ),
+  createdAt: z.string().datetime(),
+});
+
+export type RuntimeWorkspaceTemplatesResponse = z.infer<
+  typeof runtimeWorkspaceTemplatesResponseSchema
+>;

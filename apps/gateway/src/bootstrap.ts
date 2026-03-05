@@ -6,10 +6,14 @@ import { fetchInitialConfig } from "./config.js";
 import { env, envWarnings } from "./env.js";
 import { waitGatewayReady } from "./gateway-health.js";
 import { BaseError, GatewayError, logger } from "./log.js";
-import { startManagedOpenclawGateway } from "./openclaw-process.js";
+import {
+  enableAutoRestart,
+  startManagedOpenclawGateway,
+} from "./openclaw-process.js";
 import { pollLatestSkills } from "./skills.js";
 import type { RuntimeState } from "./state.js";
 import { runWithRetry, sleep } from "./utils.js";
+import { pollLatestWorkspaceTemplates } from "./workspace-templates.js";
 
 async function registerPoolWithRetry(): Promise<void> {
   return runWithRetry(
@@ -83,6 +87,34 @@ async function syncInitialSkillsWithRetry(state: RuntimeState): Promise<void> {
           },
         ).toJSON(),
         "initial skills sync failed; retrying",
+      );
+    },
+    env.RUNTIME_MAX_BACKOFF_MS,
+  );
+}
+
+async function syncInitialWorkspaceTemplatesWithRetry(
+  state: RuntimeState,
+): Promise<void> {
+  return runWithRetry(
+    () => pollLatestWorkspaceTemplates(state).then(() => undefined),
+    ({ attempt, retryDelayMs, error }) => {
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "bootstrap/sync-initial-workspace-templates",
+            message: "initial workspace templates sync failed; retrying",
+            code: baseError.code,
+          },
+          {
+            attempt,
+            poolId: env.RUNTIME_POOL_ID,
+            retryDelayMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "initial workspace templates sync failed; retrying",
       );
     },
     env.RUNTIME_MAX_BACKOFF_MS,
@@ -230,10 +262,17 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   await syncInitialSkillsWithRetry(state);
   logger.info({ poolId: env.RUNTIME_POOL_ID }, "initial skills synced");
 
+  await syncInitialWorkspaceTemplatesWithRetry(state);
+  logger.info(
+    { poolId: env.RUNTIME_POOL_ID },
+    "initial workspace templates synced",
+  );
+
   await clearStaleSessionLocks();
 
   if (env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
     startManagedOpenclawGateway();
+    enableAutoRestart();
   }
 
   await waitGatewayReady();

@@ -33,13 +33,15 @@ const agentModelSchema = z.union([
   }),
 ]);
 
-const agentSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  default: z.boolean().optional(),
-  workspace: z.string().optional(),
-  model: agentModelSchema.optional(),
-});
+const agentSchema = z
+  .object({
+    id: z.string(),
+    name: z.string().optional(),
+    default: z.boolean().optional(),
+    workspace: z.string().optional(),
+    model: agentModelSchema.optional(),
+  })
+  .passthrough();
 
 const compactionMemoryFlushSchema = z
   .object({
@@ -67,6 +69,12 @@ const memorySearchRemoteSchema = z
   })
   .passthrough();
 
+const memorySearchSyncSchema = z
+  .object({
+    intervalMinutes: z.number().optional(),
+  })
+  .passthrough();
+
 const memorySearchSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -76,6 +84,7 @@ const memorySearchSchema = z
       .optional(),
     model: z.string().optional(),
     remote: memorySearchRemoteSchema.optional(),
+    sync: memorySearchSyncSchema.optional(),
   })
   .passthrough();
 
@@ -271,6 +280,25 @@ const cronConfigSchema = z
   })
   .passthrough();
 
+const diagnosticsOtelSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    endpoint: z.string().optional(),
+    serviceName: z.string().optional(),
+    traces: z.boolean().optional(),
+    metrics: z.boolean().optional(),
+    logs: z.boolean().optional(),
+    flushIntervalMs: z.number().optional(),
+  })
+  .passthrough();
+
+const diagnosticsConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    otel: diagnosticsOtelSchema.optional(),
+  })
+  .passthrough();
+
 const messagesConfigSchema = z
   .object({
     ackReaction: z.string().optional(),
@@ -292,6 +320,7 @@ export const openclawConfigSchema = z.object({
   commands: commandsConfigSchema.optional(),
   cron: cronConfigSchema.optional(),
   messages: messagesConfigSchema.optional(),
+  diagnostics: diagnosticsConfigSchema.optional(),
 });
 
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;

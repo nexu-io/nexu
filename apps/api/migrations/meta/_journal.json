@@ -8,6 +8,13 @@
       "when": 1772621591056,
       "tag": "0000_unique_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772688393630,
+      "tag": "0001_bouncy_gargoyle",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,13 @@ import {
   onLivenessSuccess,
 } from "./health-state.js";
 import { BaseError, GatewayError, logger } from "./log.js";
+import {
+  reportHeartbeatFailure,
+  reportProbeFailure,
+  reportProbeSuccess,
+  reportStateTransition,
+} from "./metrics.js";
+import { killForRestart } from "./openclaw-process.js";
 import { pollLatestSkills } from "./skills.js";
 import {
   type RuntimeState,
@@ -28,8 +35,10 @@ import {
   setConfigSyncStatus,
   setGatewayStatus,
   setSkillsSyncStatus,
+  setWorkspaceTemplatesSyncStatus,
 } from "./state.js";
 import { sleep } from "./utils.js";
+import { pollLatestWorkspaceTemplates } from "./workspace-templates.js";
 
 const gatewayHealthConfig: GatewayHealthEvaluatorConfig = {
   failDegradedThreshold: env.RUNTIME_GATEWAY_FAIL_DEGRADED_THRESHOLD,
@@ -58,6 +67,7 @@ export async function runHeartbeatLoop(state: RuntimeState): Promise<never> {
         ).toJSON(),
         "heartbeat failed",
       );
+      reportHeartbeatFailure({ errorCode: baseError.code ?? "unknown" });
     }
 
     await sleep(env.RUNTIME_HEARTBEAT_INTERVAL_MS);
@@ -196,6 +206,43 @@ export async function runSkillsPollLoop(state: RuntimeState): Promise<never> {
   }
 }
 
+export async function runWorkspaceTemplatesPollLoop(
+  state: RuntimeState,
+): Promise<never> {
+  let backoffMs = env.RUNTIME_POLL_INTERVAL_MS;
+
+  for (;;) {
+    try {
+      await pollLatestWorkspaceTemplates(state);
+      backoffMs = env.RUNTIME_POLL_INTERVAL_MS;
+
+      const jitter = Math.floor(
+        Math.random() * (env.RUNTIME_POLL_JITTER_MS + 1),
+      );
+      await sleep(env.RUNTIME_POLL_INTERVAL_MS + jitter);
+    } catch (error) {
+      setWorkspaceTemplatesSyncStatus(state, "degraded");
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/workspace-templates-poll",
+            message: "workspace templates poll failed",
+            code: baseError.code,
+          },
+          {
+            retryInMs: backoffMs,
+            reason: baseError.message,
+          },
+        ).toJSON(),
+        "workspace templates poll failed",
+      );
+      await sleep(backoffMs);
+      backoffMs = Math.min(backoffMs * 2, env.RUNTIME_MAX_BACKOFF_MS);
+    }
+  }
+}
+
 function logProbeFailure(
   evaluator: GatewayHealthEvaluator,
   probeType: "liveness" | "deep",
@@ -248,6 +295,16 @@ function applyGatewayTransition(
     },
     "gateway health state changed",
   );
+  reportStateTransition({
+    from: transition.from,
+    to: transition.to,
+    reason: transition.reason,
+  });
+
+  // Kill the hung process so scheduleRestart can take over
+  if (transition.to === "unhealthy") {
+    killForRestart();
+  }
 }
 
 async function runGatewayLivenessLoop(
@@ -260,6 +317,10 @@ async function runGatewayLivenessLoop(
 
     if (result.ok) {
       markGatewayProbeSuccess(state, result.checkedAt);
+      reportProbeSuccess({
+        probeType: result.probeType,
+        latencyMs: result.latencyMs,
+      });
       const transition = onLivenessSuccess(
         evaluator,
         gatewayHealthConfig,
@@ -268,6 +329,12 @@ async function runGatewayLivenessLoop(
       applyGatewayTransition(state, transition);
     } else {
       markGatewayProbeFailure(state, result.errorCode, result.checkedAt);
+      reportProbeFailure({
+        probeType: result.probeType,
+        errorCode: result.errorCode,
+        latencyMs: result.latencyMs,
+        exitCode: result.exitCode,
+      });
       const transition = onLivenessFailure(
         evaluator,
         gatewayHealthConfig,
@@ -297,6 +364,10 @@ async function runGatewayDeepHealthLoop(
 
     if (result.ok) {
       markGatewayProbeSuccess(state, result.checkedAt);
+      reportProbeSuccess({
+        probeType: result.probeType,
+        latencyMs: result.latencyMs,
+      });
       const transition = onDeepHealthSuccess(
         evaluator,
         gatewayHealthConfig,
@@ -305,6 +376,12 @@ async function runGatewayDeepHealthLoop(
       applyGatewayTransition(state, transition);
     } else {
       markGatewayProbeFailure(state, result.errorCode, result.checkedAt);
+      reportProbeFailure({
+        probeType: result.probeType,
+        errorCode: result.errorCode,
+        latencyMs: result.latencyMs,
+        exitCode: result.exitCode,
+      });
       const transition = onDeepHealthFailure(
         evaluator,
         gatewayHealthConfig,

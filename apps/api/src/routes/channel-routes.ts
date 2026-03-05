@@ -123,6 +123,8 @@ const SLACK_BOT_SCOPES = [
   "im:write",
   "mpim:history",
   "mpim:read",
+  "files:read",
+  "files:write",
   "reactions:write",
   "users:read",
   "users.profile:read",

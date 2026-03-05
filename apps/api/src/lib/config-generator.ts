@@ -278,6 +278,9 @@ export async function generatePoolConfig(
                   baseUrl: "https://openrouter.ai/api/v1/",
                   apiKey: process.env.OPENROUTER_API_KEY,
                 },
+                sync: {
+                  intervalMinutes: 5,
+                },
               },
             }
           : {}),
@@ -291,7 +294,12 @@ export async function generatePoolConfig(
         host: "gateway",
       },
       web: {
-        search: { enabled: true },
+        search: {
+          enabled: true,
+          ...(process.env.BRAVE_API_KEY
+            ? { provider: "brave", apiKey: process.env.BRAVE_API_KEY }
+            : {}),
+        },
         fetch: { enabled: true },
       },
     },
@@ -388,6 +396,29 @@ export async function generatePoolConfig(
     restart: true,
     ownerDisplay: "raw",
   };
+
+  // Enable OpenTelemetry diagnostics via Datadog direct OTLP intake or
+  // a local Agent/Collector.  DD_API_KEY triggers agentless mode (sends
+  // directly to https://otlp.datadoghq.com); OTEL_EXPORTER_OTLP_ENDPOINT
+  // overrides the endpoint for Agent-based setups.
+  const ddApiKey = process.env.DD_API_KEY;
+  const otelEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  if (ddApiKey || otelEndpoint) {
+    const otelConfig: Record<string, unknown> = {
+      enabled: true,
+      endpoint:
+        otelEndpoint ??
+        `https://otlp.${process.env.DD_SITE ?? "datadoghq.com"}`,
+      serviceName: process.env.OTEL_SERVICE_NAME ?? "nexu-openclaw",
+      traces: true,
+      metrics: true,
+      logs: true,
+    };
+    if (ddApiKey) {
+      otelConfig.headers = { "dd-api-key": ddApiKey };
+    }
+    config.diagnostics = { enabled: true, otel: otelConfig };
+  }
 
   const validated = openclawConfigSchema.parse(config);
 

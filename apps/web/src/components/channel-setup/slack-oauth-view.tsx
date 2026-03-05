@@ -34,6 +34,8 @@ const SLACK_SCOPES = [
   { scope: "mpim:history", desc: "Read group DM messages" },
   { scope: "mpim:read", desc: "Read group DM info" },
   { scope: "reactions:write", desc: "Add processing indicator reactions" },
+  { scope: "files:read", desc: "Access files shared in channels" },
+  { scope: "files:write", desc: "Upload files and images" },
   { scope: "users:read", desc: "Resolve user info" },
   { scope: "users.profile:read", desc: "Read user profile details" },
 ];
