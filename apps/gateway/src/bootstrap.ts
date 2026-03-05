@@ -125,6 +125,18 @@ async function clearStaleSessionLocks(): Promise<void> {
   }
 }
 
+async function touchConfigFile(): Promise<void> {
+  try {
+    const content = await readFile(env.OPENCLAW_CONFIG_PATH, "utf8");
+    const temp = `${env.OPENCLAW_CONFIG_PATH}.tmp`;
+    await writeFile(temp, content, "utf8");
+    await rename(temp, env.OPENCLAW_CONFIG_PATH);
+    logger.info("rewrote config file to trigger watcher");
+  } catch {
+    // config file may not exist yet
+  }
+}
+
 async function rewriteSkillFiles(): Promise<void> {
   let entries: string[];
   try {
@@ -227,4 +239,8 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   await waitGatewayReady();
   await sleep(2000);
   await rewriteSkillFiles();
+
+  // Re-touch the config file so OpenClaw's file watcher picks up the
+  // initial config that was written before the watcher was ready.
+  await touchConfigFile();
 }

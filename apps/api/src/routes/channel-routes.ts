@@ -170,6 +170,8 @@ function getSlackRedirectUri(): string {
 
 /** Scopes required for a messaging bot. */
 const SLACK_BOT_SCOPES = [
+  "app_mentions:read",
+  "assistant:write",
   "channels:history",
   "channels:read",
   "chat:write",
@@ -180,7 +182,9 @@ const SLACK_BOT_SCOPES = [
   "im:write",
   "mpim:history",
   "mpim:read",
+  "reactions:write",
   "users:read",
+  "users.profile:read",
 ].join(",");
 
 // ---------------------------------------------------------------------------

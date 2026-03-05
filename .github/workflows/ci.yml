@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   checks:
@@ -16,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -30,6 +33,135 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify DB migration sync (missing migration files)
+        id: migration-sync-missing
+        continue-on-error: true
+        env:
+          DB_MIGRATION_EVENT_NAME: ${{ github.event_name }}
+          DB_MIGRATION_BASE_REF: ${{ github.base_ref }}
+          DB_MIGRATION_SYNC_MODE: missing
+          DB_MIGRATION_SYNC_REPORT_PATH: ${{ runner.temp }}/db-migration-sync-missing-report.md
+        run: pnpm --filter @nexu/api db:check-sync:missing
+
+      - name: Verify DB migration sync (schema/migration mismatch)
+        id: migration-sync-mismatch
+        if: steps.migration-sync-missing.outcome == 'success'
+        continue-on-error: true
+        env:
+          DB_MIGRATION_EVENT_NAME: ${{ github.event_name }}
+          DB_MIGRATION_BASE_REF: ${{ github.base_ref }}
+          DB_MIGRATION_SYNC_MODE: mismatch
+          DB_MIGRATION_SYNC_REPORT_PATH: ${{ runner.temp }}/db-migration-sync-mismatch-report.md
+        run: pnpm --filter @nexu/api db:check-sync:mismatch
+
+      - name: Check dangerous migration SQL
+        id: migration-dangerous
+        continue-on-error: true
+        env:
+          DB_MIGRATION_DANGEROUS_REPORT_PATH: ${{ runner.temp }}/db-migration-dangerous-report.md
+        run: pnpm --filter @nexu/api db:check-dangerous
+
+      - name: Comment migration check failures on PR
+        if: github.event_name == 'pull_request' && (steps.migration-sync-missing.outcome == 'failure' || steps.migration-sync-mismatch.outcome == 'failure' || steps.migration-dangerous.outcome == 'failure')
+        uses: actions/github-script@v7
+        env:
+          SYNC_MISSING_REPORT_PATH: ${{ runner.temp }}/db-migration-sync-missing-report.md
+          SYNC_MISMATCH_REPORT_PATH: ${{ runner.temp }}/db-migration-sync-mismatch-report.md
+          DANGEROUS_REPORT_PATH: ${{ runner.temp }}/db-migration-dangerous-report.md
+        with:
+          script: |
+            const fs = require("node:fs");
+            const marker = "<!-- db-migration-ci-report -->";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            const toStatus = (outcome) => {
+              if (outcome === "failure") return "❌ Failed";
+              if (outcome === "success") return "✅ Passed";
+              if (outcome === "skipped") return "⏭️ Skipped";
+              return "⌛ Pending";
+            };
+
+            const sections = [];
+            const missingSyncOutcome = "${{ steps.migration-sync-missing.outcome }}";
+            const mismatchSyncOutcome = "${{ steps.migration-sync-mismatch.outcome }}";
+            const dangerousOutcome = "${{ steps.migration-dangerous.outcome }}";
+
+            const missingSyncFailed = missingSyncOutcome === "failure";
+            const mismatchSyncFailed = mismatchSyncOutcome === "failure";
+            const dangerousFailed = dangerousOutcome === "failure";
+
+            if (missingSyncFailed) {
+              if (fs.existsSync(process.env.SYNC_MISSING_REPORT_PATH)) {
+                sections.push(fs.readFileSync(process.env.SYNC_MISSING_REPORT_PATH, "utf8").trim());
+              } else {
+                sections.push("### ❌ Verify DB migration sync (missing migration files)\n\nSee workflow logs for details.");
+              }
+            }
+
+            if (mismatchSyncFailed) {
+              if (fs.existsSync(process.env.SYNC_MISMATCH_REPORT_PATH)) {
+                sections.push(fs.readFileSync(process.env.SYNC_MISMATCH_REPORT_PATH, "utf8").trim());
+              } else {
+                sections.push("### ❌ Verify DB migration sync (schema/migration mismatch)\n\nSee workflow logs for details.");
+              }
+            }
+
+            if (dangerousFailed) {
+              if (fs.existsSync(process.env.DANGEROUS_REPORT_PATH)) {
+                sections.push(fs.readFileSync(process.env.DANGEROUS_REPORT_PATH, "utf8").trim());
+              } else {
+                sections.push("### Dangerous SQL Check Failed\n\nSee workflow logs for details.");
+              }
+            }
+
+            const body = `${marker}
+            ## 🚨 DB Migration Checks Failed
+
+            > [!CAUTION]
+            > One or more required DB migration checks failed. This PR is blocked until all required DB migration checks pass.
+
+            | Check | Result |
+            | --- | --- |
+            | Verify DB migration sync (missing migration files) | ${toStatus(missingSyncOutcome)} |
+            | Verify DB migration sync (schema/migration mismatch) | ${toStatus(mismatchSyncOutcome)} |
+            | Check dangerous migration SQL | ${toStatus(dangerousOutcome)} |
+
+            ${sections.join("\n\n---\n\n")}
+
+            **Pass Gate**: all required checks in the table above must be ✅ Passed.
+
+            Workflow run: ${runUrl}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user.type === "Bot" && comment.body.includes(marker),
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail on migration check errors
+        if: steps.migration-sync-missing.outcome == 'failure' || steps.migration-sync-mismatch.outcome == 'failure' || steps.migration-dangerous.outcome == 'failure'
+        run: exit 1
 
       - name: Typecheck
         run: pnpm typecheck

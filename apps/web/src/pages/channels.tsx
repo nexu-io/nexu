@@ -229,7 +229,7 @@ function ConfiguredView({
 
   const webhookUrl = `${window.location.origin}/api/${platform}/events`;
   const discordInviteUrl = channel.appId
-    ? `https://discord.com/oauth2/authorize?client_id=${channel.appId}&scope=bot&permissions=68608`
+    ? `https://discord.com/oauth2/authorize?client_id=${channel.appId}&scope=bot&permissions=8`
     : null;
 
   return (

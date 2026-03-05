@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "NODE_OPTIONS=--conditions=development pnpm --parallel --filter @nexu/api --filter @nexu/web --filter @nexu/landing dev",
     "dev:landing": "pnpm --filter @nexu/landing dev",
-    "dev:gateway": "mkdir -p .openclaw/skills && OPENCLAW_STATE_DIR=.openclaw RUNTIME_API_BASE_URL=http://localhost:3000 INTERNAL_API_TOKEN=gw-secret-token openclaw gateway run --allow-unconfigured --bind loopback --port 18789 --force --verbose",
     "dev:sidecar": "pnpm --filter @nexu/gateway dev",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
@@ -15,6 +14,13 @@
     "test": "pnpm -r test",
     "generate-types": "pnpm --filter @nexu/api generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "seed": "pnpm --filter @nexu/api db:seed",
+    "db:generate": "pnpm --filter @nexu/api db:generate",
+    "db:migrate": "pnpm --filter @nexu/api db:migrate",
+    "db:check-sync": "pnpm --filter @nexu/api db:check-sync",
+    "db:check-sync:missing": "pnpm --filter @nexu/api db:check-sync:missing",
+    "db:check-sync:mismatch": "pnpm --filter @nexu/api db:check-sync:mismatch",
+    "db:check-dangerous": "pnpm --filter @nexu/api db:check-dangerous",
+    "db:check-dangerous-sql": "pnpm --filter @nexu/api db:check-dangerous-sql",
     "db:push": "pnpm --filter @nexu/api db:push"
   },
   "devDependencies": {

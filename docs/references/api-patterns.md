@@ -293,7 +293,7 @@ export const usageMetrics = pgTable("usage_metrics", {
 - `pk` (bigint, auto-increment) 为内部主键，`id` (cuid2 text) 为公开 ID
 - 列名: `snake_case`，Drizzle 字段: `camelCase`
 - Schema 集中在 `db/schema/index.ts`
-- 用 `drizzle-kit push` 推 schema，不用手写 migration
+- 用 `drizzle-kit generate` 生成 migration SQL 并提交 `apps/api/migrations/`（复杂场景可在生成后受控编辑）
 
 ---
 

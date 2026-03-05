@@ -26,9 +26,23 @@ pnpm lint                             # Biome lint
 pnpm format                           # Biome format
 pnpm test                             # Vitest
 pnpm --filter @nexu/api test          # API tests only
+pnpm db:generate                      # Generate Drizzle migration files (recommended)
 pnpm --filter @nexu/api db:push       # Drizzle schema push
 pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
+
+## DB schema change workflow
+
+When changing DB structure, follow this workflow.
+
+### Development stage
+
+1. Use TS schema (`apps/api/src/db/schema/index.ts`) as the SSoT for target DB structure.
+2. Generate migration SQL with Drizzle (`pnpm db:generate`) and commit files under `apps/api/migrations/`.
+
+### PR stage
+
+- CI automatically checks migration SQL; failures block the PR.
 
 ## Hard rules
 

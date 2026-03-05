@@ -21,11 +21,25 @@ pnpm lint                             # Biome lint (run after any code changes)
 pnpm format                           # Biome auto-fix + format
 pnpm test                             # Run all tests (Vitest)
 pnpm --filter @nexu/api test          # API tests only
+pnpm db:generate                      # Generate Drizzle migration files (recommended)
 pnpm --filter @nexu/api db:push       # Push Drizzle schema to database
 pnpm generate-types                   # Export OpenAPI spec → regenerate frontend SDK
 ```
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
+
+## DB Schema Change Workflow
+
+When changing DB structure, follow this workflow.
+
+### Development stage
+
+1. Use TS schema (`apps/api/src/db/schema/index.ts`) as the SSoT for target DB structure.
+2. Generate migration SQL with Drizzle (`pnpm db:generate`) and commit files under `apps/api/migrations/`.
+
+### PR stage
+
+- CI automatically checks migration SQL; failures block the PR.
 
 ## Architecture
 
@@ -76,3 +90,4 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Doc sync | `.nexu-dev/skills/sync-docs/SKILL.md` |
 | E2E gateway testing | `.nexu-dev/skills/nexu-e2e-test/SKILL.md` |
 | Production operations | `.nexu-dev/skills/prod-ops/SKILL.md` |
+| Nano Banana (image gen) | `.nexu-dev/skills/nano-banana/SKILL.md` |
