@@ -88,7 +88,8 @@ jobs:
             WEB_URL="https://${{ steps.slug.outputs.app_name }}.preview.nexu.io" \
             RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
             --app "$APP"
-          flyctl deploy --app "$APP" --config apps/api/fly.toml --wait-timeout 120
+          cd apps/api
+          flyctl deploy --app "$APP" --wait-timeout 120
           echo "url=https://${APP}.fly.dev" >> "$GITHUB_OUTPUT"
 
   deploy-preview:
