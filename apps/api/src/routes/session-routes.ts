@@ -236,7 +236,7 @@ class SessionSyncTraceHandler {
         const now = new Date().toISOString();
 
         for (const guild of guilds) {
-          const sessionKey = `discord_${guild.id}`;
+          const sessionKey = `agent:${ch.botId}:discord:channel:${guild.id}`;
           const title = guild.name;
 
           await db
@@ -258,7 +258,10 @@ class SessionSyncTraceHandler {
               target: sessions.sessionKey,
               set: {
                 botId: ch.botId,
+                channelType: "discord",
+                channelId: guild.id,
                 title,
+                status: "active",
                 updatedAt: now,
               },
             });

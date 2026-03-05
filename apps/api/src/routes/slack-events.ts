@@ -232,7 +232,13 @@ class SlackEventsTraceHandler {
         event?.type === "message" || event?.type === "app_mention";
       if (isMessageEvent && channel?.botId && event?.channel) {
         const channelId = event.channel as string;
-        const sessionKey = `slack_${teamId}_${channelId}`;
+        const threadTs =
+          typeof event.thread_ts === "string" && event.thread_ts.length > 0
+            ? event.thread_ts
+            : null;
+        const scope = threadTs ? "thread" : "channel";
+        const scopeId = threadTs ?? channelId;
+        const sessionKey = `agent:${channel.botId}:slack:${scope}:${scopeId}`;
         const now = new Date().toISOString();
 
         let channelName = channelId;
