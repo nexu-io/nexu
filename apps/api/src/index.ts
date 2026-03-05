@@ -6,7 +6,6 @@ import { serve } from "@hono/node-server";
 import dotenv from "dotenv";
 import { createApp } from "./app.js";
 import { pool } from "./db/index.js";
-import { migrate } from "./db/migrate.js";
 import { BaseError } from "./lib/error.js";
 import { logger } from "./lib/logger.js";
 
@@ -29,7 +28,6 @@ function loadEnv() {
 
 async function main() {
   loadEnv();
-  await migrate();
 
   if (process.env.AUTO_SEED === "true") {
     const { seedDev } = await import("./db/seed-dev.js");

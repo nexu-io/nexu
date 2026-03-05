@@ -95,7 +95,7 @@ After establishing the SSM tunnel:
 ```bash
 export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 DB_PASS=$(kubectl get secret -n nexu nexu-secrets -o jsonpath='{.data.DATABASE_PASSWORD}' | base64 -d)
-node -e "import('./apps/api/src/db/migrate.ts').then(m => m.migrate('postgresql://nexu_app:${DB_PASS}@localhost:5434/nexu')).catch(e => { console.error(e); process.exit(1); })"
+DATABASE_URL="postgresql://nexu_app:${DB_PASS}@localhost:5434/nexu" pnpm --filter @nexu/api db:migrate
 ```
 
 Or run specific DDL directly via psql. Always use `IF NOT EXISTS` for idempotency.

@@ -24,7 +24,7 @@ env:
 
 jobs:
   deploy-api-preview:
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && startsWith(github.head_ref, 'cursor/')
     runs-on: ubuntu-latest
     outputs:
       api_url: ${{ steps.deploy.outputs.url }}
@@ -59,7 +59,7 @@ jobs:
           echo "url=https://${APP}.fly.dev" >> "$GITHUB_OUTPUT"
 
   deploy-preview:
-    if: always() && github.event.action != 'closed'
+    if: always() && github.event.action != 'closed' && startsWith(github.head_ref, 'cursor/')
     needs: [deploy-api-preview]
     runs-on: ubuntu-latest
     permissions:
