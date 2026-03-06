@@ -3,7 +3,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import { userStatsResponseSchema } from "@nexu/shared";
 import { sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { users } from "../db/schema/index.js";
+import { botChannels, users } from "../db/schema/index.js";
 import type { AppBindings } from "../types.js";
 
 const getUserStatsRoute = createRoute({
@@ -41,12 +41,19 @@ export function registerStatsRoutes(app: OpenAPIHono<AppBindings>) {
       })
       .from(users);
 
+    const [channelStats] = await db
+      .select({
+        totalChannels: sql<number>`count(*)::int`,
+      })
+      .from(botChannels);
+
     return c.json(
       {
         totalUsers: stats?.totalUsers ?? 0,
         todayNewUsers: stats?.todayNewUsers ?? 0,
         last7DaysNewUsers: stats?.last7DaysNewUsers ?? 0,
         last30DaysNewUsers: stats?.last30DaysNewUsers ?? 0,
+        totalChannels: channelStats?.totalChannels ?? 0,
       },
       200,
     );
