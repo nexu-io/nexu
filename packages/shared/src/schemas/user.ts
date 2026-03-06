@@ -17,6 +17,7 @@ export const userStatsResponseSchema = z.object({
   todayNewUsers: z.number(),
   last7DaysNewUsers: z.number(),
   last30DaysNewUsers: z.number(),
+  totalChannels: z.number(),
 });
 
 export type UserStatsResponse = z.infer<typeof userStatsResponseSchema>;
