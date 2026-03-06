@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Loader2,
   Lock,
+  MessageSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -22,6 +23,7 @@ const SLACK_MANUAL_STEPS = [
   { title: "Create Slack App" },
   { title: "Signing Secret" },
   { title: "Bot Token" },
+  { title: "Enable DMs" },
 ];
 
 const SLACK_LOGO_PATH =
@@ -335,7 +337,7 @@ export function SlackOAuthView({
       </div>
 
       {/* Step indicator */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
         {SLACK_MANUAL_STEPS.map((s, i) => (
           <button
             type="button"
@@ -550,6 +552,66 @@ export function SlackOAuthView({
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted/40"
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Enable DMs */}
+      {activeStep === 3 && (
+        <div className="p-5 rounded-xl border bg-surface-1 border-border">
+          <div className="flex gap-3 items-start mb-4">
+            <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-[#4A154B]/10 text-[12px] font-bold text-[#4A154B] shrink-0">
+              4
+            </div>
+            <div>
+              <h3 className="text-[14px] font-semibold text-text-primary">
+                Enable Direct Messages
+              </h3>
+              <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
+                Allow users to chat with your bot via DM in Slack.
+              </p>
+            </div>
+          </div>
+          <div className="ml-11 space-y-4">
+            <div className="space-y-2.5 mb-2">
+              {[
+                <span key="1">
+                  In the sidebar, go to{" "}
+                  <strong className="text-text-primary">App Home</strong>
+                </span>,
+                <span key="2">
+                  Scroll down to{" "}
+                  <strong className="text-text-primary">Show Tabs</strong>
+                </span>,
+                <span key="3">
+                  Check{" "}
+                  <strong className="text-text-primary">
+                    Allow users to send Slash commands and messages from the
+                    messages tab
+                  </strong>
+                </span>,
+              ].map((item, idx) => (
+                <div key={item.key} className="flex gap-2.5 items-start">
+                  <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
+                    {idx + 1}
+                  </div>
+                  <span className="text-[12px] text-text-secondary leading-relaxed">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2.5 items-start p-3 rounded-lg bg-[#4A154B]/5 border border-[#4A154B]/10">
+              <MessageSquare
+                size={14}
+                className="text-[#4A154B] shrink-0 mt-0.5"
+              />
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Without this setting, users won't be able to send messages to
+                your bot in the{" "}
+                <strong className="text-text-primary">Messages</strong> tab.
+              </p>
             </div>
             <button
               type="button"

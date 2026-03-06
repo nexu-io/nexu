@@ -4,7 +4,6 @@ import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle,
   ArrowLeft,
   BookOpen,
   Check,
@@ -18,31 +17,27 @@ import {
   Loader2,
   RotateCcw,
   Shield,
-  Smartphone,
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
-import { whatsappQrImageUrl, whatsappWaMeUrl } from "@/lib/whatsapp";
 import {
   deleteApiV1ChannelsByChannelId,
   getApiV1Channels,
 } from "../../lib/api/sdk.gen";
 
-type Platform = "slack" | "discord" | "whatsapp";
+type Platform = "slack" | "discord";
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
-  { id: "whatsapp", emoji: "\u{1F4AC}", desc: "Business API" },
 ];
 
 const PLATFORM_LABELS: Record<Platform, string> = {
   slack: "Slack",
   discord: "Discord",
-  whatsapp: "WhatsApp",
 };
 
 // ─── Main page ───────────────────────────────────────────────
@@ -175,8 +170,6 @@ export function ChannelsPage() {
             oauthError={slackError}
             disabled={quotaLimited}
           />
-        ) : platform === "whatsapp" ? (
-          <WhatsAppQRView />
         ) : (
           <DiscordSetupView
             onConnected={handleConnected}
@@ -457,78 +450,6 @@ function ConfiguredView({
         </div>
       )}
     </>
-  );
-}
-
-// ─── WhatsApp QR setup ───────────────────────────────────────
-
-function WhatsAppQRView() {
-  return (
-    <div className="max-w-md mx-auto">
-      <div className="p-6 sm:p-8 rounded-xl border bg-surface-1 border-border text-center">
-        <div className="flex justify-center items-center w-12 h-12 rounded-xl bg-emerald-500/10 mx-auto mb-5">
-          <Smartphone size={22} className="text-emerald-500" />
-        </div>
-        <h3 className="text-[15px] font-semibold text-text-primary mb-1">
-          Scan to connect WhatsApp
-        </h3>
-        <p className="text-[12px] text-text-muted mb-6 leading-relaxed">
-          Open WhatsApp and scan the QR code below to start chatting with Nexu.
-        </p>
-        <div className="mx-auto mb-4 w-full max-w-[240px] rounded-xl border border-border bg-white p-2">
-          <img
-            src={whatsappQrImageUrl}
-            alt="WhatsApp QR code"
-            className="w-full h-auto rounded-lg"
-          />
-        </div>
-        <a
-          href={whatsappWaMeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
-        >
-          Open WhatsApp
-          <ExternalLink size={12} />
-        </a>
-        <p className="mt-3 text-[11px] text-text-muted break-all">
-          <a
-            href={whatsappWaMeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-text-secondary underline underline-offset-2"
-          >
-            {whatsappWaMeUrl}
-          </a>
-        </p>
-      </div>
-
-      <div className="flex gap-3 items-center p-4 mt-4 rounded-xl border bg-surface-1 border-border">
-        <AlertCircle size={15} className="text-accent shrink-0" />
-        <div className="text-[12px] text-text-muted leading-relaxed">
-          <span className="font-medium text-text-secondary">Need help?</span>{" "}
-          Check out the{" "}
-          <a
-            href="https://docs.nexu.dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:underline underline-offset-2"
-          >
-            full documentation
-          </a>{" "}
-          or reach us on{" "}
-          <a
-            href="https://discord.gg/nexu"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:underline underline-offset-2"
-          >
-            Discord
-          </a>
-          .
-        </div>
-      </div>
-    </div>
   );
 }
 

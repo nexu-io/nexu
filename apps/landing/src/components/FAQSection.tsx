@@ -27,12 +27,12 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 const FAQ_ITEMS = [
   {
-    q: "What is nexu?",
-    a: "nexu is the simplest OpenClaw for teams - deploy in under a minute, with persistent memory and 1,000+ built-in tools. Always on in Slack, Discord and Telegram. Zero data loss, always learning.",
+    q: "What is Nexu?",
+    a: "Nexu is the simplest OpenClaw for teams - deploy in under a minute, with persistent memory and 1,000+ built-in tools. Always on in Slack, Discord and Telegram. Zero data loss, always learning.",
   },
   {
-    q: "How is nexu different from self-hosting OpenClaw?",
-    a: "nexu is hosted and ready in under a minute - no YAML, no server. You get persistent memory (OpenClaw sessions are stateless), 1,000+ tools out of the box, automatic updates, and team-level context across channels.",
+    q: "How is Nexu different from self-hosting OpenClaw?",
+    a: "Nexu is hosted and ready in under a minute - no YAML, no server. You get persistent memory (OpenClaw sessions are stateless), 1,000+ tools out of the box, automatic updates, and team-level context across channels.",
   },
   {
     q: "Do I need to know how to code?",
@@ -43,8 +43,8 @@ const FAQ_ITEMS = [
     a: "Slack, Discord, and Telegram. Add the bot to your workspace or group - your AI joins in under a minute and is 24/7 next to your team.",
   },
   {
-    q: "How does nexu understand my team?",
-    a: "nexu has persistent memory and learns from everyday work chat. It understands you and your team over time - no repeating yourself. The more you use it, the sharper it gets.",
+    q: "How does Nexu understand my team?",
+    a: "Nexu has persistent memory and learns from everyday work chat. It understands you and your team over time - no repeating yourself. The more you use it, the sharper it gets.",
   },
   {
     q: "Is my data safe?",
@@ -63,7 +63,7 @@ export default function FAQSection() {
           FAQ
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-text-primary">
-          You might be wondering
+          Frequently Asked Questions
         </h2>
       </div>
       <div>
