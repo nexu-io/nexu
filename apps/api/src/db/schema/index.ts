@@ -431,3 +431,11 @@ export const sessions = pgTable(
     index("sessions_channel_type_idx").on(table.channelType),
   ],
 );
+
+// Test-only table used to validate post-merge DB migration workflow.
+export const e2eTestMigration = pgTable("e2e_test_migration", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

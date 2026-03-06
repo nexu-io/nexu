@@ -29,6 +29,13 @@
       "when": 1772701141453,
       "tag": "0003_curly_tomorrow_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772783973210,
+      "tag": "0004_curved_bishop",
+      "breakpoints": true
     }
   ]
 }
