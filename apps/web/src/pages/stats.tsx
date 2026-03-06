@@ -1,6 +1,6 @@
 import "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, CalendarDays, RefreshCw, Users } from "lucide-react";
+import { Calendar, CalendarDays, Radio, RefreshCw, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { getApiStatsUsers } from "../../lib/api/sdk.gen";
 
@@ -67,8 +67,8 @@ export function StatsPage() {
     return (
       <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6 md:p-8">
         <h1 className="mb-6 text-lg font-bold text-text-primary">Statistics</h1>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, index) => (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: static loading placeholders
               key={index}
@@ -120,7 +120,7 @@ export function StatsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatsCard
           title="Total users"
           value={stats.totalUsers}
@@ -140,6 +140,11 @@ export function StatsPage() {
           title="New in 30 days"
           value={stats.last30DaysNewUsers}
           icon={<CalendarDays size={14} />}
+        />
+        <StatsCard
+          title="Total channels"
+          value={stats.totalChannels}
+          icon={<Radio size={14} />}
         />
       </div>
     </div>
