@@ -2156,6 +2156,7 @@ export type GetApiStatsUsersResponses = {
         todayNewUsers: number;
         last7DaysNewUsers: number;
         last30DaysNewUsers: number;
+        totalChannels: number;
     };
 };
 
