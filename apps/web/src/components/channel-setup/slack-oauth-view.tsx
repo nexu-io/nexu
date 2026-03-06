@@ -5,9 +5,7 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
-  CheckCircle2,
   ChevronRight,
-  Copy,
   ExternalLink,
   Loader2,
   Lock,
@@ -20,35 +18,83 @@ import {
   postApiV1ChannelsSlackConnect,
 } from "../../../lib/api/sdk.gen";
 
-const SLACK_SCOPES = [
-  { scope: "app_mentions:read", desc: "Receive @mention events" },
-  { scope: "assistant:write", desc: "Enable streaming & typing indicators" },
-  { scope: "channels:history", desc: "Read channel messages" },
-  { scope: "channels:read", desc: "List channels" },
-  { scope: "chat:write", desc: "Send messages" },
-  { scope: "groups:history", desc: "Read private channel messages" },
-  { scope: "groups:read", desc: "List private channels" },
-  { scope: "im:history", desc: "Read DM messages" },
-  { scope: "im:read", desc: "Read DM info" },
-  { scope: "im:write", desc: "Open direct messages" },
-  { scope: "mpim:history", desc: "Read group DM messages" },
-  { scope: "mpim:read", desc: "Read group DM info" },
-  { scope: "reactions:write", desc: "Add processing indicator reactions" },
-  { scope: "files:read", desc: "Access files shared in channels" },
-  { scope: "files:write", desc: "Upload files and images" },
-  { scope: "users:read", desc: "Resolve user info" },
-  { scope: "users.profile:read", desc: "Read user profile details" },
-];
-
 const SLACK_MANUAL_STEPS = [
+  { title: "Create Slack App" },
   { title: "Signing Secret" },
-  { title: "Add Scopes" },
   { title: "Bot Token" },
-  { title: "Configure Events" },
 ];
 
 const SLACK_LOGO_PATH =
   "M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.124 2.521a2.528 2.528 0 0 1 2.52-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.52V8.834zm-1.271 0a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.166 0a2.528 2.528 0 0 1 2.521 2.522v6.312zm-2.521 10.124a2.528 2.528 0 0 1 2.521 2.52A2.528 2.528 0 0 1 15.166 24a2.528 2.528 0 0 1-2.521-2.522v-2.52h2.521zm0-1.271a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.312A2.528 2.528 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522 2.521h-6.312z";
+
+const SLACK_MANIFEST_SCOPES = [
+  "app_mentions:read",
+  "assistant:write",
+  "channels:history",
+  "channels:read",
+  "chat:write",
+  "chat:write.customize",
+  "chat:write.public",
+  "files:read",
+  "files:write",
+  "groups:history",
+  "groups:read",
+  "im:history",
+  "im:read",
+  "im:write",
+  "im:write.topic",
+  "links:write",
+  "metadata.message:read",
+  "mpim:history",
+  "mpim:read",
+  "mpim:write",
+  "mpim:write.topic",
+  "reactions:write",
+  "remote_files:read",
+  "team:read",
+  "usergroups:read",
+  "users:read",
+  "users.profile:read",
+];
+
+const SLACK_MANIFEST_BOT_EVENTS = [
+  "app_mention",
+  "file_created",
+  "message.channels",
+  "message.groups",
+  "message.im",
+  "message.mpim",
+  "subteam_created",
+  "team_join",
+  "team_rename",
+];
+
+function buildSlackManifestUrl(baseUrl: string): string {
+  const manifest = {
+    display_information: {
+      name: "Nexu",
+      description: "Nexu — AI-powered workspace for your team",
+      background_color: "#29292b",
+    },
+    features: {
+      bot_user: { display_name: "Nexu", always_online: true },
+    },
+    oauth_config: {
+      redirect_urls: [`${baseUrl}/api/oauth/slack/callback`],
+      scopes: { bot: SLACK_MANIFEST_SCOPES },
+    },
+    settings: {
+      event_subscriptions: {
+        request_url: `${baseUrl}/api/slack/events`,
+        bot_events: SLACK_MANIFEST_BOT_EVENTS,
+      },
+      org_deploy_enabled: false,
+      socket_mode_enabled: false,
+      token_rotation_enabled: false,
+    },
+  };
+  return `https://api.slack.com/apps?new_app=1&manifest_json=${encodeURIComponent(JSON.stringify(manifest))}`;
+}
 
 export interface SlackOAuthViewProps {
   /** Called when Slack is successfully connected */
@@ -74,7 +120,6 @@ export function SlackOAuthView({
     initialManual ? "manual" : "install",
   );
   const [activeStep, setActiveStep] = useState(0);
-  const [copied, setCopied] = useState(false);
   const [botToken, setBotToken] = useState("");
   const [signingSecret, setSigningSecret] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -122,12 +167,6 @@ export function SlackOAuthView({
     window.addEventListener("pageshow", handlePageShow);
     return () => window.removeEventListener("pageshow", handlePageShow);
   }, []);
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleAddToSlack = async () => {
     setPhase("authorizing");
@@ -290,7 +329,7 @@ export function SlackOAuthView({
       </div>
 
       {/* Step indicator */}
-      <div className="grid grid-cols-4 gap-2 mb-6">
+      <div className="grid grid-cols-3 gap-2 mb-6">
         {SLACK_MANUAL_STEPS.map((s, i) => (
           <button
             type="button"
@@ -325,7 +364,7 @@ export function SlackOAuthView({
         ))}
       </div>
 
-      {/* Step 1: Signing Secret */}
+      {/* Step 1: Create Slack App */}
       {activeStep === 0 && (
         <div className="p-5 rounded-xl border bg-surface-1 border-border">
           <div className="flex gap-3 items-start mb-4">
@@ -334,27 +373,96 @@ export function SlackOAuthView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
+                Create a Slack App
+              </h3>
+              <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
+                Click the button below to create a pre-configured Slack App with
+                all required scopes, events, and bot settings. After creating,
+                click{" "}
+                <span className="font-medium text-text-primary">Next</span> to
+                enter your credentials.
+              </p>
+            </div>
+          </div>
+          <div className="ml-11">
+            <a
+              href={buildSlackManifestUrl(
+                eventsUrl.replace(/\/api\/slack\/events$/, ""),
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all"
+            >
+              <ExternalLink size={12} />
+              Create Slack App
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Signing Secret */}
+      {activeStep === 1 && (
+        <div className="p-5 rounded-xl border bg-surface-1 border-border">
+          <div className="flex gap-3 items-start mb-4">
+            <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-[#4A154B]/10 text-[12px] font-bold text-[#4A154B] shrink-0">
+              2
+            </div>
+            <div>
+              <h3 className="text-[14px] font-semibold text-text-primary">
                 Copy your Signing Secret
               </h3>
-              <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Open your Slack App Dashboard → go to{" "}
-                <span className="font-medium text-text-secondary">
-                  Basic Information → App Credentials
-                </span>{" "}
-                → copy the Signing Secret and paste it below.
+              <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
+                Copy the Signing Secret from your Slack App.
               </p>
             </div>
           </div>
           <div className="ml-11 space-y-4">
-            <a
-              href="https://api.slack.com/apps"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex gap-1.5 items-center px-3.5 py-2 text-[12px] font-medium rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover hover:bg-surface-3 transition-all"
-            >
-              <ExternalLink size={12} />
-              Open Slack App Dashboard
-            </a>
+            <div className="space-y-2.5 mb-2">
+              <div className="flex gap-2.5 items-start">
+                <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
+                  1
+                </div>
+                <a
+                  href="https://api.slack.com/apps"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex gap-1.5 items-center px-3 py-1.5 text-[12px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all"
+                >
+                  <ExternalLink size={11} />
+                  Open Slack App Dashboard
+                </a>
+              </div>
+              {[
+                <span key="2">
+                  Click on the app you just created (e.g.{" "}
+                  <strong className="text-text-primary">"Nexu"</strong>)
+                </span>,
+                <span key="3">
+                  Go to{" "}
+                  <strong className="text-text-primary">
+                    Basic Information
+                  </strong>
+                </span>,
+                <span key="4">
+                  Scroll to{" "}
+                  <strong className="text-text-primary">App Credentials</strong>
+                </span>,
+                <span key="5">
+                  Copy the{" "}
+                  <strong className="text-text-primary">Signing Secret</strong>{" "}
+                  and paste it below
+                </span>,
+              ].map((item, idx) => (
+                <div key={item.key} className="flex gap-2.5 items-start">
+                  <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
+                    {idx + 2}
+                  </div>
+                  <span className="text-[12px] text-text-secondary leading-relaxed">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
             <div>
               <div className="flex items-baseline gap-1.5 mb-1.5">
                 <label
@@ -383,56 +491,6 @@ export function SlackOAuthView({
         </div>
       )}
 
-      {/* Step 2: Add Scopes */}
-      {activeStep === 1 && (
-        <div className="p-5 rounded-xl border bg-surface-1 border-border">
-          <div className="flex gap-3 items-start mb-4">
-            <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-[#4A154B]/10 text-[12px] font-bold text-[#4A154B] shrink-0">
-              2
-            </div>
-            <div>
-              <h3 className="text-[14px] font-semibold text-text-primary">
-                Add Bot Token Scopes
-              </h3>
-              <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Go to{" "}
-                <span className="font-medium text-text-secondary">
-                  OAuth & Permissions
-                </span>{" "}
-                → scroll to Bot Token Scopes → add all the scopes below. This
-                must be done before installing the app.
-              </p>
-            </div>
-          </div>
-          <div className="ml-11">
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="px-3.5 py-2.5 bg-surface-3 border-b border-border">
-                <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">
-                  Required Scopes
-                </span>
-              </div>
-              {SLACK_SCOPES.map((s, i) => (
-                <div
-                  key={s.scope}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 ${
-                    i < SLACK_SCOPES.length - 1 ? "border-b border-border" : ""
-                  }`}
-                >
-                  <CheckCircle2
-                    size={12}
-                    className="text-emerald-500 shrink-0"
-                  />
-                  <code className="text-[11px] font-mono text-[#4A154B] bg-[#4A154B]/8 px-1.5 py-0.5 rounded font-medium">
-                    {s.scope}
-                  </code>
-                  <span className="text-[11px] text-text-muted">{s.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Step 3: Install & Get Bot Token */}
       {activeStep === 2 && (
         <div className="p-5 rounded-xl border bg-surface-1 border-border">
@@ -444,21 +502,43 @@ export function SlackOAuthView({
               <h3 className="text-[14px] font-semibold text-text-primary">
                 Install app & copy Bot Token
               </h3>
-              <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Still on{" "}
-                <span className="font-medium text-text-secondary">
-                  OAuth & Permissions
-                </span>{" "}
-                — click &quot;Install to Workspace&quot; at the top, authorize,
-                then find the token under{" "}
-                <span className="font-medium text-text-secondary">
-                  OAuth Tokens
-                </span>
-                .
+              <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
+                Install your Slack App and copy the Bot Token.
               </p>
             </div>
           </div>
-          <div className="ml-11">
+          <div className="ml-11 space-y-4">
+            <div className="space-y-2.5 mb-2">
+              {[
+                <span key="1">
+                  In the sidebar, go to{" "}
+                  <strong className="text-text-primary">Install App</strong>
+                </span>,
+                <span key="2">
+                  Click{" "}
+                  <strong className="text-text-primary">
+                    Install to Workspace
+                  </strong>{" "}
+                  and authorize
+                </span>,
+                <span key="3">
+                  Copy the{" "}
+                  <strong className="text-text-primary">
+                    Bot User OAuth Token
+                  </strong>{" "}
+                  that appears and paste it below
+                </span>,
+              ].map((item, idx) => (
+                <div key={item.key} className="flex gap-2.5 items-start">
+                  <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
+                    {idx + 1}
+                  </div>
+                  <span className="text-[12px] text-text-secondary leading-relaxed">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
             <div>
               <div className="flex items-baseline gap-1.5 mb-1.5">
                 <label
@@ -483,80 +563,11 @@ export function SlackOAuthView({
                 />
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Configure Events */}
-      {activeStep === 3 && (
-        <div className="p-5 rounded-xl border bg-surface-1 border-border">
-          <div className="flex gap-3 items-start mb-4">
-            <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-[#4A154B]/10 text-[12px] font-bold text-[#4A154B] shrink-0">
-              4
-            </div>
-            <div>
-              <h3 className="text-[14px] font-semibold text-text-primary">
-                Configure Event Subscriptions
-              </h3>
-              <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Set the Request URL in your Slack App →{" "}
-                <span className="font-medium text-text-secondary">
-                  Event Subscriptions
-                </span>
-              </p>
-            </div>
-          </div>
-          <div className="ml-11 space-y-3">
-            <div className="flex gap-2 items-center p-3 rounded-lg border bg-surface-0 border-border font-mono text-[12px]">
-              <code className="flex-1 break-all text-text-secondary">
-                {eventsUrl}
-              </code>
-              <button
-                type="button"
-                onClick={() => handleCopy(eventsUrl)}
-                className="p-1.5 rounded-lg transition-all text-text-muted hover:text-text-primary hover:bg-surface-3 shrink-0 cursor-pointer"
-                title="Copy"
-              >
-                {copied ? (
-                  <Check size={13} className="text-emerald-500" />
-                ) : (
-                  <Copy size={13} />
-                )}
-              </button>
-            </div>
-            <div className="space-y-2">
-              {[
-                <span key="1">Go to your Slack App → Event Subscriptions</span>,
-                <span key="2">Toggle Enable Events to On</span>,
-                <span key="3">
-                  Paste the URL above into the Request URL field
-                </span>,
-                <span key="4">
-                  Subscribe to bot events:{" "}
-                  <strong className="text-text-primary">app_mention</strong>,{" "}
-                  <strong className="text-text-primary">
-                    message.channels
-                  </strong>
-                  ,{" "}
-                  <strong className="text-text-primary">message.groups</strong>,{" "}
-                  <strong className="text-text-primary">message.im</strong>
-                </span>,
-              ].map((item, idx) => (
-                <div key={item.key} className="flex gap-2.5 items-start">
-                  <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
-                    {idx + 1}
-                  </div>
-                  <span className="text-[12px] text-text-secondary leading-relaxed">
-                    {item}
-                  </span>
-                </div>
-              ))}
-            </div>
             <button
               type="button"
               onClick={handleManualConnect}
               disabled={connecting || !botToken.trim() || !signingSecret.trim()}
-              className="flex gap-1.5 items-center px-5 py-2.5 text-[13px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all disabled:opacity-60 cursor-pointer mt-4"
+              className="flex gap-1.5 items-center px-5 py-2.5 text-[13px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all disabled:opacity-60 cursor-pointer"
             >
               {connecting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -73,6 +73,7 @@ jobs:
           SLUG=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[\/\_]/-/g' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
           SLUG="${SLUG:0:36}"
           echo "app_name=nexu-api-preview-${SLUG}" >> "$GITHUB_OUTPUT"
+          echo "branch_slug=${SLUG}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy API to Fly.io
         id: deploy
@@ -80,15 +81,17 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           APP="${{ steps.slug.outputs.app_name }}"
-          fly apps create "$APP" --org personal 2>/dev/null || true
-          fly secrets set \
+          flyctl apps create "$APP" --org personal 2>/dev/null || true
+          flyctl secrets set \
             DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
-            BETTER_AUTH_URL="https://${APP}.fly.dev" \
-            WEB_URL="https://${{ steps.slug.outputs.app_name }}.preview.nexu.io" \
+            BETTER_AUTH_URL="https://${{ steps.slug.outputs.branch_slug }}.${{ env.PREVIEW_DOMAIN_SUFFIX }}" \
+            WEB_URL="https://${{ steps.slug.outputs.branch_slug }}.${{ env.PREVIEW_DOMAIN_SUFFIX }}" \
             RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
             --app "$APP"
-          fly deploy --app "$APP" --config apps/api/fly.toml --wait-timeout 120
+          # flyctl resolves dockerfile relative to fly.toml dir; normalize for old branches
+          sed -i 's|dockerfile = "apps/api/Dockerfile.fly"|dockerfile = "Dockerfile.fly"|' apps/api/fly.toml
+          flyctl deploy --app "$APP" --config apps/api/fly.toml --wait-timeout 120
           echo "url=https://${APP}.fly.dev" >> "$GITHUB_OUTPUT"
 
   deploy-preview:
@@ -150,8 +153,6 @@ jobs:
                 const target = new URL(url.pathname + url.search, origin);
                 const headers = new Headers(request.headers);
                 headers.set("Host", origin.host);
-                headers.set("Origin", origin.origin);
-                headers.set("Referer", origin.origin + "/");
                 return fetch(target, { method: request.method, headers, body: request.body });
               }
               return env.ASSETS.fetch(request);

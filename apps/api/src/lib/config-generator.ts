@@ -126,7 +126,7 @@ export async function generatePoolConfig(
     const agent: AgentConfig = {
       id: bot.id,
       name: bot.name,
-      workspace: `${stateDir}/workspaces/${bot.id}`,
+      workspace: `${stateDir}/agents/${bot.id}`,
     };
 
     if (index === 0) {
@@ -169,6 +169,13 @@ export async function generatePoolConfig(
         // Provide a placeholder so the account passes the configured check.
         appToken: "xapp-placeholder-not-used-in-http-mode",
         streaming: "partial",
+        // Explicit per-account policies so `openclaw doctor --fix` cannot
+        // break routing by moving top-level defaults into accounts.default.
+        groupPolicy: "open",
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        requireMention: true,
+        ackReaction: "eyes",
       };
 
       bindingsList.push({
@@ -271,7 +278,7 @@ export async function generatePoolConfig(
           ? {
               memorySearch: {
                 enabled: true,
-                sources: ["memory"],
+                sources: ["memory", "sessions"],
                 provider: "openai",
                 model: "google/gemini-embedding-001",
                 remote: {

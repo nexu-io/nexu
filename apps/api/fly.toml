@@ -2,7 +2,7 @@ app = "nexu-api"
 primary_region = "sin"
 
 [build]
-  dockerfile = "apps/api/Dockerfile.fly"
+  dockerfile = "Dockerfile.fly"
   [build.args]
     COMMIT_HASH = ""
 

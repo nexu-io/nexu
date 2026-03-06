@@ -26,12 +26,31 @@ Any static files: HTML, CSS, JS, images, fonts, etc. Common use cases:
    - Lowercase alphanumeric + hyphens only, max 63 characters
    - Reuse the same slug for redeployments
    - Ask user to confirm if ambiguous
-3. Run the deploy script:
+3. Resolve session-related parameters from session files first, then run deploy.
+
+Resolve (example):
 
 ```bash
-"$SKILL_DIR/scripts/deploy.sh" <project-slug> <directory>
+"$SKILL_DIR/scripts/session-search.sh" --message-ref <message-ref> --agent-id <agent-id>
 ```
 
+Then run deploy:
+
+```bash
+"$SKILL_DIR/scripts/deploy.sh" <project-slug> <directory> <agent-id> <session-key>
+```
+
+Optional: pass source context so deploy will also persist/update binding files:
+
+```bash
+"$SKILL_DIR/scripts/deploy.sh" <project-slug> <directory> <agent-id> <session-key> <message-ref> <thread-ref> <account-id> <channel-id> <channel-type> <sender-ref>
+```
+
+`agent-id` is required. The script uses it to resolve the corresponding `botId`
+from `nexu-context.json` when recording deployment artifacts.
+`session-key` is required if you want the record to appear in `/workspace/sessions/:id`.
+Prefer runtime `OPENCLAW_SESSION_KEY` (authoritative). Never use `agent-id` as
+`session-key`.
 4. Parse the JSON output and report to user:
    - Brief summary of what was deployed
    - Live URL from the `url` field
@@ -49,6 +68,11 @@ Any static files: HTML, CSS, JS, images, fonts, etc. Common use cases:
 - Never pass credentials as command arguments
 - Always use the bundled `deploy.sh` — do not call Cloudflare API directly
 - Do not set `DEPLOY_BACKEND` or any other env overrides — the script handles everything
+- Always pass the caller `<agent-id>` as arg #3 to `deploy.sh`
+- Always pass the current `<session-key>` as arg #4 to ensure deployment appears in the session Deployments list
+- Never pass `<agent-id>` as `<session-key>`; they are different values
+- Prefer resolving `<session-key>` from `session-search.sh` output instead of guessing from prompt text
+- If source refs are available, pass them to `deploy.sh` so it can write/update `sessions.json` + rolling `binding-*.jsonl` records
 - Do not hand-edit source files just to add cache-busting query params; the deploy script handles cache revalidation via a staged `_headers` file
 - If the script fails, show the `message` field from the JSON error to the user
 - Cloudflare credentials are fetched at runtime via the scoped secrets API using `SKILL_API_TOKEN` from env — do not attempt to read or inject them manually

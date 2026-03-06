@@ -16,7 +16,10 @@ import { bots, gatewayPools, poolSecrets } from "../db/schema/index.js";
 import { generatePoolConfig } from "../lib/config-generator.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
-import { requireInternalToken } from "../middleware/internal-auth.js";
+import {
+  requireInternalToken,
+  requireSkillToken,
+} from "../middleware/internal-auth.js";
 import {
   getPoolConfigSnapshotByVersion,
   publishPoolConfigSnapshot,
@@ -34,6 +37,15 @@ const poolIdParam = z.object({
 const poolConfigVersionParam = z.object({
   poolId: z.string(),
   version: z.coerce.number().int().nonnegative(),
+});
+
+const staticDeploySecretsQuery = z.object({
+  poolId: z.string(),
+});
+
+const staticDeploySecretsResponseSchema = z.object({
+  CLOUDFLARE_API_TOKEN: z.string(),
+  CLOUDFLARE_ACCOUNT_ID: z.string(),
 });
 
 const getPoolConfigRoute = createRoute({
@@ -131,6 +143,27 @@ const getPoolConfigByVersionRoute = createRoute({
     404: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Config version not found",
+    },
+  },
+});
+
+const getStaticDeploySecretsRoute = createRoute({
+  method: "get",
+  path: "/api/internal/secrets/static-deploy",
+  tags: ["Internal"],
+  request: {
+    query: staticDeploySecretsQuery,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: staticDeploySecretsResponseSchema },
+      },
+      description: "Static deploy secrets for a pool",
+    },
+    404: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Pool not found",
     },
   },
 });
@@ -396,6 +429,40 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
         poolSecrets: secrets,
         secretsHash,
         createdAt: snapshot.createdAt,
+      },
+      200,
+    );
+  });
+
+  app.openapi(getStaticDeploySecretsRoute, async (c) => {
+    requireSkillToken(c);
+    const { poolId } = c.req.valid("query");
+
+    const [pool] = await db
+      .select({ id: gatewayPools.id })
+      .from(gatewayPools)
+      .where(eq(gatewayPools.id, poolId))
+      .limit(1);
+
+    if (!pool) {
+      return c.json({ message: `Pool ${poolId} not found` }, 404);
+    }
+
+    const { secrets } = await buildPoolSecrets(poolId);
+    const cloudflareApiToken = secrets.CLOUDFLARE_API_TOKEN;
+    const cloudflareAccountId = secrets.CLOUDFLARE_ACCOUNT_ID;
+
+    if (!cloudflareApiToken || !cloudflareAccountId) {
+      return c.json(
+        { message: `Missing Cloudflare secrets for pool ${poolId}` },
+        404,
+      );
+    }
+
+    return c.json(
+      {
+        CLOUDFLARE_API_TOKEN: cloudflareApiToken,
+        CLOUDFLARE_ACCOUNT_ID: cloudflareAccountId,
       },
       200,
     );

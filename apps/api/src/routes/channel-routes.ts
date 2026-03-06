@@ -437,7 +437,8 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const bot = await channelSpanHandler.resolveDefaultBot(userId);
     const botId = bot.id;
 
-    const accountId = `slack-${appId}`;
+    const accountId = `slack-${appId}-${teamId}`;
+    const oldAccountId = `slack-${appId}`;
     const slackExternalId = `${teamId}:${appId}`;
 
     // Check if this Slack app is already connected (by externalId)
@@ -470,7 +471,7 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       );
 
     const existingChannel = existingChannels.find(
-      (ch) => ch.accountId === accountId,
+      (ch) => ch.accountId === accountId || ch.accountId === oldAccountId,
     );
 
     if (existingChannel || globalExisting) {
@@ -544,19 +545,6 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
           updatedAt: now,
           createdAt: now,
         });
-      }
-
-      // Clean up other stale Slack channels for the same bot (wrong accountId from bot_id era)
-      for (const stale of existingChannels) {
-        if (stale.id !== channelId) {
-          await db
-            .delete(webhookRoutes)
-            .where(eq(webhookRoutes.botChannelId, stale.id));
-          await db
-            .delete(channelCredentials)
-            .where(eq(channelCredentials.botChannelId, stale.id));
-          await db.delete(botChannels).where(eq(botChannels.id, stale.id));
-        }
       }
     } else {
       // New connection
@@ -952,7 +940,8 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
     }
 
     const appId = tokenResponse.app_id;
-    const accountId = `slack-${appId}`;
+    const accountId = `slack-${appId}-${teamId}`;
+    const oldAccountId = `slack-${appId}`;
     const slackExternalId = `${teamId}:${appId}`;
 
     // --- 5. Find or create the user's default bot ---
@@ -960,16 +949,15 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
     const botId = bot.id;
 
     // --- 6. Create or update the channel connection ---
-    const [existing] = await db
+    const existingSlackChannels = await db
       .select()
       .from(botChannels)
       .where(
-        and(
-          eq(botChannels.botId, botId),
-          eq(botChannels.channelType, "slack"),
-          eq(botChannels.accountId, accountId),
-        ),
+        and(eq(botChannels.botId, botId), eq(botChannels.channelType, "slack")),
       );
+    const existing = existingSlackChannels.find(
+      (ch) => ch.accountId === accountId || ch.accountId === oldAccountId,
+    );
 
     const now = new Date().toISOString();
     let channelId: string;
@@ -982,6 +970,7 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
         .update(botChannels)
         .set({
           status: "connected",
+          accountId,
           channelConfig: JSON.stringify({ teamId, teamName, appId }),
           updatedAt: now,
         })
@@ -1018,7 +1007,12 @@ export function registerSlackOAuthCallback(app: OpenAPIHono<AppBindings>) {
             botId,
             updatedAt: now,
           })
-          .where(eq(webhookRoutes.botChannelId, channelId));
+          .where(
+            and(
+              eq(webhookRoutes.channelType, "slack"),
+              eq(webhookRoutes.externalId, slackExternalId),
+            ),
+          );
       }
     } else {
       // New connection — check global uniqueness first
