@@ -86,7 +86,7 @@ jobs:
             DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             BETTER_AUTH_SECRET="${{ secrets.BETTER_AUTH_SECRET }}" \
             BETTER_AUTH_URL="https://${{ steps.slug.outputs.branch_slug }}.${{ env.PREVIEW_DOMAIN_SUFFIX }}" \
-            WEB_URL="https://${{ steps.slug.outputs.app_name }}.preview.nexu.io" \
+            WEB_URL="https://${{ steps.slug.outputs.branch_slug }}.${{ env.PREVIEW_DOMAIN_SUFFIX }}" \
             RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
             --app "$APP"
           # flyctl resolves dockerfile relative to fly.toml dir; normalize for old branches
