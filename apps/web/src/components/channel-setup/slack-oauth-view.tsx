@@ -59,6 +59,7 @@ const SLACK_MANIFEST_SCOPES = [
 
 const SLACK_MANIFEST_BOT_EVENTS = [
   "app_mention",
+  "app_uninstalled",
   "file_created",
   "message.channels",
   "message.groups",
@@ -67,6 +68,7 @@ const SLACK_MANIFEST_BOT_EVENTS = [
   "subteam_created",
   "team_join",
   "team_rename",
+  "tokens_revoked",
 ];
 
 function buildSlackManifestUrl(baseUrl: string): string {

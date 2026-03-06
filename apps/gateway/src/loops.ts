@@ -1,4 +1,5 @@
 import {
+  checkSlackTokens,
   sendHeartbeat,
   syncDiscordSessions,
   syncFeishuSessions,
@@ -240,6 +241,33 @@ export async function runWorkspaceTemplatesPollLoop(
       await sleep(backoffMs);
       backoffMs = Math.min(backoffMs * 2, env.RUNTIME_MAX_BACKOFF_MS);
     }
+  }
+}
+
+export async function runSlackTokenHealthLoop(): Promise<never> {
+  // Wait one full interval before the first check — bootstrap already
+  // ran an initial check so there's no need to re-check immediately.
+  await sleep(env.RUNTIME_TOKEN_HEALTH_INTERVAL_MS);
+
+  for (;;) {
+    try {
+      await checkSlackTokens();
+    } catch (error) {
+      const baseError = BaseError.from(error);
+      logger.warn(
+        GatewayError.from(
+          {
+            source: "loop/slack-token-health",
+            message: "slack token health check failed",
+            code: baseError.code,
+          },
+          { reason: baseError.message },
+        ).toJSON(),
+        "slack token health check failed",
+      );
+    }
+
+    await sleep(env.RUNTIME_TOKEN_HEALTH_INTERVAL_MS);
   }
 }
 

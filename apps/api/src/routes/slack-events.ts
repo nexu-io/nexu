@@ -16,6 +16,7 @@ import { decrypt } from "../lib/crypto.js";
 import { BaseError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
+import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 import type { AppBindings } from "../types.js";
 
 // ── Read body from Node.js IncomingMessage (bypasses Hono body reading) ──
@@ -226,8 +227,46 @@ class SlackEventsTraceHandler {
 
       const accountId = channel?.accountId ?? `slack-${apiAppId}-${teamId}`;
 
-      // Upsert session for message events (fire-and-forget)
+      // Handle token lifecycle events — prevent invalid tokens from crashing the gateway
       const event = payload.event as Record<string, unknown> | undefined;
+      const eventType = event?.type as string | undefined;
+
+      if (eventType === "tokens_revoked" || eventType === "app_uninstalled") {
+        const newStatus =
+          eventType === "app_uninstalled" ? "disconnected" : "error";
+        logger.info({
+          message: "slack_events_token_lifecycle",
+          event_type: eventType,
+          team_id: teamId,
+          api_app_id: apiAppId,
+          bot_channel_id: route.botChannelId,
+          new_status: newStatus,
+        });
+
+        await db
+          .update(botChannels)
+          .set({ status: newStatus, updatedAt: new Date().toISOString() })
+          .where(eq(botChannels.id, route.botChannelId));
+
+        if (eventType === "app_uninstalled") {
+          await db
+            .delete(webhookRoutes)
+            .where(eq(webhookRoutes.botChannelId, route.botChannelId));
+        }
+
+        // Trigger config reload so the gateway drops the dead account
+        publishPoolConfigSnapshot(db, route.poolId).catch((err) => {
+          logger.warn({
+            message: "slack_events_config_republish_failed",
+            pool_id: route.poolId,
+            error: String(err),
+          });
+        });
+
+        return c.json({ ok: true });
+      }
+
+      // Upsert session for message events (fire-and-forget)
       const isMessageEvent =
         event?.type === "message" || event?.type === "app_mention";
       if (isMessageEvent && channel?.botId && event?.channel) {

@@ -71,3 +71,10 @@ export async function syncFeishuSessions(): Promise<void> {
     body: JSON.stringify({ poolId: env.RUNTIME_POOL_ID }),
   });
 }
+
+export async function checkSlackTokens(): Promise<void> {
+  await fetchJson(
+    `/api/internal/pools/${env.RUNTIME_POOL_ID}/check-slack-tokens`,
+    { method: "POST" },
+  );
+}

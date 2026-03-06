@@ -8,6 +8,7 @@ import {
   runHeartbeatLoop,
   runPollLoop,
   runSkillsPollLoop,
+  runSlackTokenHealthLoop,
   runWorkspaceTemplatesPollLoop,
 } from "./loops.js";
 import { stopManagedOpenclawGateway } from "./openclaw-process.js";
@@ -23,6 +24,7 @@ async function main(): Promise<void> {
   void runDiscordSessionSyncLoop();
   void runFeishuSessionSyncLoop();
   void runSkillsPollLoop(state);
+  void runSlackTokenHealthLoop();
   void runWorkspaceTemplatesPollLoop(state);
   await runPollLoop(state);
 }

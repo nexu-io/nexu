@@ -81,3 +81,20 @@ export const runtimeWorkspaceTemplatesResponseSchema = z.object({
 export type RuntimeWorkspaceTemplatesResponse = z.infer<
   typeof runtimeWorkspaceTemplatesResponseSchema
 >;
+
+export const slackTokenHealthCheckResponseSchema = z.object({
+  checked: z.number().int(),
+  invalidated: z.number().int(),
+  results: z.array(
+    z.object({
+      botChannelId: z.string(),
+      accountId: z.string(),
+      ok: z.boolean(),
+      error: z.string().optional(),
+    }),
+  ),
+});
+
+export type SlackTokenHealthCheckResponse = z.infer<
+  typeof slackTokenHealthCheckResponseSchema
+>;

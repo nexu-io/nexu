@@ -8,14 +8,22 @@ import {
   runtimePoolHeartbeatSchema,
   runtimePoolRegisterResponseSchema,
   runtimePoolRegisterSchema,
+  slackTokenHealthCheckResponseSchema,
 } from "@nexu/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bots, gatewayPools, poolSecrets } from "../db/schema/index.js";
+import {
+  botChannels,
+  bots,
+  channelCredentials,
+  gatewayPools,
+  poolSecrets,
+} from "../db/schema/index.js";
 import { generatePoolConfig } from "../lib/config-generator.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
+import { logger } from "../lib/logger.js";
 import {
   requireInternalToken,
   requireSkillToken,
@@ -167,6 +175,188 @@ const getStaticDeploySecretsRoute = createRoute({
     },
   },
 });
+
+const checkSlackTokensRoute = createRoute({
+  method: "post",
+  path: "/api/internal/pools/{poolId}/check-slack-tokens",
+  tags: ["Internal"],
+  request: {
+    params: poolIdParam,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: slackTokenHealthCheckResponseSchema },
+      },
+      description: "Slack token health check results",
+    },
+    404: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Pool not found",
+    },
+  },
+});
+
+async function checkSlackTokenHealth(poolId: string): Promise<{
+  checked: number;
+  invalidated: number;
+  results: {
+    botChannelId: string;
+    accountId: string;
+    ok: boolean;
+    error?: string;
+  }[];
+}> {
+  const poolBots = await db
+    .select({ id: bots.id })
+    .from(bots)
+    .where(and(eq(bots.poolId, poolId), eq(bots.status, "active")));
+
+  const botIds = poolBots.map((b) => b.id);
+  if (botIds.length === 0) {
+    return { checked: 0, invalidated: 0, results: [] };
+  }
+
+  // Collect all connected Slack channels across all bots in this pool
+  const slackChannels: {
+    channelId: string;
+    accountId: string;
+    botId: string;
+  }[] = [];
+  for (const botId of botIds) {
+    const channels = await db
+      .select({ id: botChannels.id, accountId: botChannels.accountId })
+      .from(botChannels)
+      .where(
+        and(
+          eq(botChannels.botId, botId),
+          eq(botChannels.channelType, "slack"),
+          eq(botChannels.status, "connected"),
+        ),
+      );
+    for (const ch of channels) {
+      slackChannels.push({
+        channelId: ch.id,
+        accountId: ch.accountId,
+        botId,
+      });
+    }
+  }
+
+  if (slackChannels.length === 0) {
+    return { checked: 0, invalidated: 0, results: [] };
+  }
+
+  // Fetch bot tokens for all channels
+  const channelTokens: {
+    channelId: string;
+    accountId: string;
+    token: string;
+  }[] = [];
+  for (const ch of slackChannels) {
+    const [tokenRow] = await db
+      .select({ encryptedValue: channelCredentials.encryptedValue })
+      .from(channelCredentials)
+      .where(
+        and(
+          eq(channelCredentials.botChannelId, ch.channelId),
+          eq(channelCredentials.credentialType, "botToken"),
+        ),
+      );
+    if (tokenRow) {
+      try {
+        channelTokens.push({
+          channelId: ch.channelId,
+          accountId: ch.accountId,
+          token: decrypt(tokenRow.encryptedValue),
+        });
+      } catch {
+        // Decryption failed — treat as invalid
+        channelTokens.push({
+          channelId: ch.channelId,
+          accountId: ch.accountId,
+          token: "",
+        });
+      }
+    }
+  }
+
+  // Validate all tokens concurrently
+  const checkResults = await Promise.allSettled(
+    channelTokens.map(async (ct) => {
+      if (!ct.token) {
+        return { ...ct, ok: false, error: "decrypt_failed" };
+      }
+      const resp = await fetch("https://slack.com/api/auth.test", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ct.token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = (await resp.json()) as { ok: boolean; error?: string };
+      return { ...ct, ok: data.ok, error: data.error };
+    }),
+  );
+
+  const results: {
+    botChannelId: string;
+    accountId: string;
+    ok: boolean;
+    error?: string;
+  }[] = [];
+  const invalidChannelIds: string[] = [];
+
+  for (const result of checkResults) {
+    if (result.status === "fulfilled") {
+      const r = result.value;
+      results.push({
+        botChannelId: r.channelId,
+        accountId: r.accountId,
+        ok: r.ok,
+        error: r.error,
+      });
+      if (!r.ok) {
+        invalidChannelIds.push(r.channelId);
+      }
+    } else {
+      // Promise rejected (timeout, network error)
+      // Don't mark as invalid on transient errors — skip
+      logger.warn({
+        message: "slack_token_check_request_failed",
+        error: String(result.reason),
+      });
+    }
+  }
+
+  // Mark invalid channels
+  if (invalidChannelIds.length > 0) {
+    const now = new Date().toISOString();
+    for (const channelId of invalidChannelIds) {
+      await db
+        .update(botChannels)
+        .set({ status: "error", updatedAt: now })
+        .where(eq(botChannels.id, channelId));
+    }
+
+    logger.info({
+      message: "slack_token_health_check_invalidated",
+      pool_id: poolId,
+      invalidated_count: invalidChannelIds.length,
+      invalidated_ids: invalidChannelIds,
+    });
+
+    // Trigger config regeneration to exclude dead accounts
+    await publishPoolConfigSnapshot(db, poolId);
+  }
+
+  return {
+    checked: results.length,
+    invalidated: invalidChannelIds.length,
+    results,
+  };
+}
 
 async function buildAgentMeta(
   poolId: string,
@@ -466,5 +656,23 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
       },
       200,
     );
+  });
+
+  app.openapi(checkSlackTokensRoute, async (c) => {
+    requireInternalToken(c);
+    const { poolId } = c.req.valid("param");
+
+    const [pool] = await db
+      .select({ id: gatewayPools.id })
+      .from(gatewayPools)
+      .where(eq(gatewayPools.id, poolId))
+      .limit(1);
+
+    if (!pool) {
+      return c.json({ message: `Pool ${poolId} not found` }, 404);
+    }
+
+    const result = await checkSlackTokenHealth(poolId);
+    return c.json(result, 200);
   });
 }

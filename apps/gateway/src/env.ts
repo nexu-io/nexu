@@ -94,6 +94,11 @@ const envSchema = z.object({
     .int()
     .nonnegative()
     .default(15000),
+  RUNTIME_TOKEN_HEALTH_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(300_000),
 });
 
 function normalizeConfigPath(path: string): string {

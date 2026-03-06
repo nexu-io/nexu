@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs";
 import { readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { registerPool } from "./api.js";
+import { checkSlackTokens, registerPool } from "./api.js";
 import { fetchInitialConfig } from "./config.js";
 import { env, envWarnings } from "./env.js";
 import { waitGatewayReady } from "./gateway-health.js";
@@ -257,6 +257,19 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   );
   await registerPoolWithRetry();
   logger.info({ poolId: env.RUNTIME_POOL_ID }, "pool registered");
+
+  // Validate Slack bot tokens before fetching config so OpenClaw starts
+  // with a clean config that excludes any channels with revoked tokens.
+  try {
+    await checkSlackTokens();
+    logger.info("slack token health check passed");
+  } catch (error) {
+    const baseError = BaseError.from(error);
+    logger.warn(
+      { reason: baseError.message },
+      "slack token health check failed; continuing with startup",
+    );
+  }
 
   await fetchInitialConfigWithRetry();
   await syncInitialSkillsWithRetry(state);
