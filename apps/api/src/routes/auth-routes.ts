@@ -4,10 +4,6 @@ import { pool } from "../db/index.js";
 import type { AppBindings } from "../types.js";
 
 export function registerAuthRoutes(app: OpenAPIHono<AppBindings>) {
-  app.on(["POST", "GET"], "/api/auth/*", (c) => {
-    return auth.handler(c.req.raw);
-  });
-
   // Public endpoint: check if an email is already registered and verified.
   // Used by the signup form to distinguish "verified user" from "unverified user".
   app.post("/api/auth/check-email", async (c) => {
@@ -27,5 +23,9 @@ export function registerAuthRoutes(app: OpenAPIHono<AppBindings>) {
       exists: true,
       verified: result.rows[0].emailVerified === true,
     });
+  });
+
+  app.on(["POST", "GET"], "/api/auth/*", (c) => {
+    return auth.handler(c.req.raw);
   });
 }
