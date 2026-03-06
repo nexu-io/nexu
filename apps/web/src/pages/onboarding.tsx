@@ -242,9 +242,9 @@ interface AvatarOption {
   tagline: string;
   description: string;
   skills: AvatarSkill[];
-  available: boolean;
   color: string;
   bgGradient: string;
+  videoSrc: string;
 }
 
 const AVATAR_OPTIONS: AvatarOption[] = [
@@ -286,9 +286,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
         description: "One-click publish so everyone can access what you built",
       },
     ],
-    available: true,
-    color: "#6366f1",
+    color: "#6A7DF1",
     bgGradient: "from-indigo-50 to-violet-50",
+    videoSrc: "https://static.refly.ai/video/nexu-alpha.mp4",
   },
   {
     id: "ai-sales",
@@ -325,9 +325,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
         description: "Proposals, decks, ROI analyses \u2014 generated fast",
       },
     ],
-    available: false,
-    color: "#10b981",
+    color: "#D999F7",
     bgGradient: "from-emerald-50 to-green-50",
+    videoSrc: "https://static.refly.ai/video/ai-sales.mp4",
   },
   {
     id: "ai-support",
@@ -360,9 +360,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
         description: "Turn repeated questions into docs to reduce busywork",
       },
     ],
-    available: false,
-    color: "#3b82f6",
+    color: "#346E58",
     bgGradient: "from-blue-50 to-cyan-50",
+    videoSrc: "https://static.refly.ai/video/ai-support.mp4",
   },
   {
     id: "ai-pm",
@@ -398,9 +398,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
         description: "How are key numbers looking? Let data tell the story",
       },
     ],
-    available: false,
-    color: "#ec4899",
+    color: "#FFD032",
     bgGradient: "from-pink-50 to-rose-50",
+    videoSrc: "https://static.refly.ai/video/ai-pm.mp4",
   },
   {
     id: "ai-marketing",
@@ -433,9 +433,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
           "Which channels bring the most customers? Is the spend worth it?",
       },
     ],
-    available: false,
-    color: "#f59e0b",
+    color: "#F8672F",
     bgGradient: "from-amber-50 to-orange-50",
+    videoSrc: "https://static.refly.ai/video/ai-marketing.mp4",
   },
   {
     id: "ai-designer",
@@ -471,9 +471,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
         description: "Make sure everyone can use your product comfortably",
       },
     ],
-    available: false,
-    color: "#8b5cf6",
+    color: "#06EEFF",
     bgGradient: "from-purple-50 to-fuchsia-50",
+    videoSrc: "https://static.refly.ai/video/ai-designer.mp4",
   },
   {
     id: "custom",
@@ -482,9 +482,9 @@ const AVATAR_OPTIONS: AvatarOption[] = [
     tagline: "Can't find what you need? Tell us",
     description: "Describe what you want your AI to do \u2014 we'll build it",
     skills: [],
-    available: false,
-    color: "#a3a3a3",
+    color: "#2C2A2B",
     bgGradient: "from-gray-50 to-slate-50",
+    videoSrc: "https://static.refly.ai/video/custom.mp4",
   },
 ];
 
@@ -1195,12 +1195,10 @@ function AvatarStep({
   const [selected, setSelected] = useState<string | null>(
     data.selectedAvatar || AVATAR_OPTIONS[0]?.id || null,
   );
-  const [votes, setVotes] = useState<string[]>(data.avatarVotes || []);
-  const [customRequest, setCustomRequest] = useState("");
+  const votes = data.avatarVotes || [];
 
   const avatar = AVATAR_OPTIONS[currentIndex] ?? AVATAR_OPTIONS[0];
   if (!avatar) return null;
-  const isCustom = avatar.id === "custom";
   const isSelected = selected === avatar.id;
 
   const goPrev = useCallback(() => {
@@ -1211,12 +1209,6 @@ function AvatarStep({
   const goNext = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % AVATAR_OPTIONS.length);
   }, []);
-  const toggleVote = (id: string) => {
-    setVotes((prev) =>
-      prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id],
-    );
-  };
-
   return (
     <div>
       <div className="mb-5 text-center">
@@ -1250,21 +1242,22 @@ function AvatarStep({
         <div className="flex-1 h-[420px] flex flex-col items-center overflow-hidden">
           <div className="flex flex-col items-center w-full h-full">
             <div
-              className={`relative w-40 h-44 rounded-2xl mb-3 overflow-hidden bg-gradient-to-b ${avatar.bgGradient} border-2 transition-all shrink-0 ${isSelected ? "border-accent shadow-lg shadow-accent/10" : "border-border"}`}
+              className={`relative aspect-square w-40 rounded-2xl mb-3 overflow-hidden bg-gradient-to-b ${avatar.bgGradient} border-2 transition-all shrink-0 ${isSelected ? "border-accent shadow-lg shadow-accent/10" : "border-border"}`}
             >
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-5xl opacity-60">
-                  {avatar.available ? "\u{1F99E}" : "\u{1F512}"}
-                </span>
-              </div>
+              <video
+                key={avatar.videoSrc}
+                className="h-full w-full object-cover"
+                src={avatar.videoSrc}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="metadata"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
               {isSelected && (
                 <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-accent-foreground text-[10px] bg-accent shadow-md">
                   {"\u2713"}
-                </div>
-              )}
-              {!avatar.available && !isCustom && (
-                <div className="absolute inset-x-0 bottom-0 py-1.5 text-center text-[10px] font-medium text-white bg-gradient-to-t from-black/60 via-black/40 to-transparent">
-                  Coming soon
                 </div>
               )}
             </div>
@@ -1278,41 +1271,17 @@ function AvatarStep({
               </p>
             </div>
 
-            {isCustom ? (
-              <div className="w-full space-y-3 flex-1 min-h-0">
-                <textarea
-                  value={customRequest}
-                  onChange={(e) => setCustomRequest(e.target.value)}
-                  placeholder="Describe the AI role you'd like..."
-                  rows={3}
-                  className="w-full px-3.5 py-2.5 bg-surface-1 border border-border rounded-lg text-text-primary placeholder:text-text-muted text-[13px] focus:outline-none focus:border-border-hover transition-colors resize-none"
-                />
-                <p className="text-[11px] text-text-muted text-center">
-                  Your input shapes what we build next
-                </p>
-                <button
-                  type="button"
-                  onClick={() => toggleVote(avatar.id)}
-                  className={`w-full py-2 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${votes.includes(avatar.id) ? "bg-accent text-accent-foreground border-accent" : "text-text-secondary border-border hover:border-border-hover"}`}
-                >
-                  {votes.includes(avatar.id)
-                    ? "\u2713 Voted"
-                    : "Vote for custom roles"}
-                </button>
-              </div>
-            ) : avatar.available ? (
-              <div className="w-full space-y-3 flex-1 min-h-0 flex flex-col">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelected((prev) =>
-                      prev === avatar.id ? null : avatar.id,
-                    )
-                  }
-                  className={`w-full py-2 rounded-md text-[13px] font-medium transition-colors cursor-pointer shrink-0 ${isSelected ? "bg-accent text-accent-foreground" : "border border-border text-text-primary hover:border-border-hover"}`}
-                >
-                  {isSelected ? "\u2713 Selected" : "Select this avatar"}
-                </button>
+            <div className="w-full space-y-3 flex-1 min-h-0 flex flex-col">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelected((prev) => (prev === avatar.id ? null : avatar.id))
+                }
+                className={`w-full py-2 rounded-md text-[13px] font-medium transition-colors cursor-pointer shrink-0 ${isSelected ? "bg-accent text-accent-foreground" : "border border-border text-text-primary hover:border-border-hover"}`}
+              >
+                {isSelected ? "\u2713 Selected" : "Select this avatar"}
+              </button>
+              {avatar.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5 justify-center">
                   {avatar.skills.map((skill) => (
                     <span
@@ -1328,46 +1297,17 @@ function AvatarStep({
                     </span>
                   ))}
                 </div>
-                <p className="text-[11px] text-text-muted text-center mt-auto shrink-0">
-                  {avatar.description}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 flex-1 min-h-0">
-                <div className="flex flex-wrap gap-1.5 justify-center">
-                  {avatar.skills.map((skill) => (
-                    <span
-                      key={skill.name}
-                      title={skill.description}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-surface-1 border border-border-subtle text-text-muted cursor-default"
-                    >
-                      <span
-                        className="w-1 h-1 rounded-full shrink-0"
-                        style={{ backgroundColor: avatar.color, opacity: 0.4 }}
-                      />
-                      {skill.name}
-                    </span>
-                  ))}
+              ) : (
+                <div className="flex items-center justify-center">
+                  <span className="inline-flex items-center rounded-full border border-border bg-surface-1 px-3 py-1 text-[11px] font-medium text-text-secondary">
+                    Tailored to your workflow
+                  </span>
                 </div>
-                <span className="text-[10px] text-text-muted bg-surface-1 px-2 py-0.5 rounded-full border border-border">
-                  Coming soon
-                </span>
-                <button
-                  type="button"
-                  onClick={() => toggleVote(avatar.id)}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors cursor-pointer ${votes.includes(avatar.id) ? "bg-accent text-accent-foreground border-accent" : "text-text-secondary border-border hover:border-border-hover"}`}
-                >
-                  {votes.includes(avatar.id)
-                    ? "\u2713 Voted"
-                    : "Vote for this role"}
-                </button>
-                {votes.includes(avatar.id) && (
-                  <p className="text-[11px] text-success text-center">
-                    Thanks! We'll prioritize this based on votes.
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+              <p className="text-[11px] text-text-muted text-center mt-auto shrink-0">
+                {avatar.description}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -1409,7 +1349,7 @@ function AvatarStep({
                   backgroundColor: isCurrent
                     ? avatar.color
                     : isSelected
-                      ? "var(--color-success)"
+                      ? a.color
                       : "var(--color-border-hover)",
                 }}
               />
@@ -1443,7 +1383,7 @@ function AvatarStep({
             onComplete({
               selectedAvatar: selected ?? undefined,
               avatarVotes: votes,
-              customAvatarRequest: customRequest.trim(),
+              customAvatarRequest: "",
             })
           }
           disabled={!selected}
