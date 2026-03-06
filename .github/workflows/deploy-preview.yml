@@ -153,8 +153,6 @@ jobs:
                 const target = new URL(url.pathname + url.search, origin);
                 const headers = new Headers(request.headers);
                 headers.set("Host", origin.host);
-                headers.set("Origin", origin.origin);
-                headers.set("Referer", origin.origin + "/");
                 return fetch(target, { method: request.method, headers, body: request.body });
               }
               return env.ASSETS.fetch(request);
