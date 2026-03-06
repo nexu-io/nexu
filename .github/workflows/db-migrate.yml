@@ -20,7 +20,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect migration SQL and print manifest (debug)
+      - name: Detect migration SQL and generate manifest
+        id: detect-migrations
         shell: bash
         env:
           DB_MIGRATION_BASE_REF: main
@@ -47,6 +48,7 @@ jobs:
 
           if [[ ${#sql_files[@]} -eq 0 ]]; then
             echo "No changed migration SQL files found against origin/${BASE_REF}. Skip."
+            echo "has_migrations=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -100,4 +102,34 @@ jobs:
           cat "${manifest_path}"
           echo "----- manifest.json end -----"
 
-          echo "Debug mode: manifest generated only; CLI call skipped."
+          echo "has_migrations=true" >> "$GITHUB_OUTPUT"
+          echo "manifest_path=${manifest_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply DB migrations
+        if: steps.detect-migrations.outputs.has_migrations == 'true'
+        shell: bash
+        env:
+          MIGRATE_APPLY_URL: https://5jhbys8c46.execute-api.us-east-1.amazonaws.com/migrate/apply
+          MIGRATE_API_KEY: ${{ secrets.NEXU_DB_MIGRATE_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          manifest_path="${{ steps.detect-migrations.outputs.manifest_path }}"
+          response_path="$RUNNER_TEMP/migrate-apply-response.json"
+
+          http_status="$(curl --silent --show-error --location \
+            --output "${response_path}" \
+            --write-out "%{http_code}" \
+            -X POST "${MIGRATE_APPLY_URL}" \
+            -H "content-type: application/json" \
+            -H "x-api-key: ${MIGRATE_API_KEY}" \
+            --data "@${manifest_path}")"
+
+          echo "Migrate apply HTTP status: ${http_status}"
+          echo "Migrate apply response body:"
+          cat "${response_path}"
+
+          if [[ ! "${http_status}" =~ ^2 ]]; then
+            echo "Migrate apply failed with HTTP status ${http_status}."
+            exit 1
+          fi
