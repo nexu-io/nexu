@@ -117,13 +117,13 @@ const CHANNEL_OPTIONS: ChannelOption[] = [
     color: "#5865F2",
     connectable: true,
   },
-  {
-    id: "whatsapp",
-    name: "WhatsApp",
-    protocol: "QR link",
-    color: "#25D366",
-    connectable: true,
-  },
+  // {
+  //   id: "whatsapp",
+  //   name: "WhatsApp",
+  //   protocol: "QR link",
+  //   color: "#25D366",
+  //   connectable: true,
+  // },
   {
     id: "telegram",
     name: "Telegram",
