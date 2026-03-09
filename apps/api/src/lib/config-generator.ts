@@ -344,6 +344,9 @@ export async function generatePoolConfig(
         fetch: { enabled: true },
       },
     },
+    session: {
+      dmScope: "per-channel-peer",
+    },
     cron: {
       enabled: true,
     },

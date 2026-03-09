@@ -309,6 +309,19 @@ const messagesConfigSchema = z
   })
   .passthrough();
 
+const sessionConfigSchema = z
+  .object({
+    dmScope: z
+      .enum([
+        "main",
+        "per-peer",
+        "per-channel-peer",
+        "per-account-channel-peer",
+      ])
+      .optional(),
+  })
+  .passthrough();
+
 export const openclawConfigSchema = z.object({
   gateway: gatewayConfigSchema,
   models: modelsConfigSchema.optional(),
@@ -318,6 +331,7 @@ export const openclawConfigSchema = z.object({
   channels: channelsConfigSchema,
   bindings: z.array(bindingSchema),
   commands: commandsConfigSchema.optional(),
+  session: sessionConfigSchema.optional(),
   cron: cronConfigSchema.optional(),
   messages: messagesConfigSchema.optional(),
   diagnostics: diagnosticsConfigSchema.optional(),
