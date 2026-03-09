@@ -789,7 +789,8 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
           const config =
             typeof ch.channelConfig === "string"
               ? JSON.parse(ch.channelConfig)
-              : (ch.channelConfig as Record<string, unknown>);
+              : ((ch.channelConfig as unknown as Record<string, unknown>) ??
+                {});
           return !config?.botUserId;
         } catch {
           return false;
@@ -819,7 +820,8 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
           const config =
             typeof ch.channelConfig === "string"
               ? JSON.parse(ch.channelConfig)
-              : ((ch.channelConfig as Record<string, unknown>) ?? {});
+              : ((ch.channelConfig as unknown as Record<string, unknown>) ??
+                {});
           const updatedConfig = { ...config, botUserId: authData.user_id };
 
           await db
