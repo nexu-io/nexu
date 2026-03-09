@@ -43,6 +43,9 @@ jobs:
           - app: gateway
             dockerfile: apps/gateway/Dockerfile
             ecr_repository: nexu-gateway
+          - app: sandbox
+            dockerfile: apps/gateway/Dockerfile.sandbox
+            ecr_repository: nexu-sandbox
 
     steps:
       - name: Checkout

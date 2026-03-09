@@ -94,6 +94,18 @@ gateway:
       memory: 4Gi
   persistence:
     size: 20Gi
+  sandbox:
+    enabled: false
+    dindImage: "docker:27-dind"
+    sandboxImage: "nexu-sandbox:latest"
+    dindResources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    dindStorageSize: 10Gi
   hpa:
     enabled: true
     minReplicas: 1

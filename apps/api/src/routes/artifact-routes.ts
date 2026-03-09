@@ -62,6 +62,39 @@ async function resolveArtifactSessionKey(input: {
 
   const normalizedBotId = input.botId.trim().toLowerCase();
   if (rawChatId.startsWith("user:")) {
+    const userId = rawChatId.slice("user:".length).trim().toLowerCase();
+    const stripThread = (key: string) => key.replace(/:thread:.*$/, "");
+
+    // With dmScope: "per-channel-peer", DM session keys are
+    //   agent:{botId}:{channel}:direct:{userId}
+    // Try DB lookup first, then fall back to legacy agent:{botId}:main.
+    if (userId) {
+      const dmConditions = [
+        eq(sessions.botId, input.botId),
+        sql`lower(${sessions.sessionKey}) LIKE ${`%:direct:${userId}`}`,
+      ];
+      const normalizedChannelType = input.channelType?.trim().toLowerCase();
+      if (normalizedChannelType) {
+        dmConditions.push(eq(sessions.channelType, normalizedChannelType));
+      }
+      const dmRows = await db
+        .select({ sessionKey: sessions.sessionKey })
+        .from(sessions)
+        .where(and(...dmConditions))
+        .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt))
+        .limit(1);
+
+      if (dmRows[0]) {
+        const baseKey = stripThread(normalizeSessionKey(dmRows[0].sessionKey));
+        return {
+          sessionKey: normalizedThreadId
+            ? `${baseKey}:thread:${normalizedThreadId}`
+            : baseKey,
+        };
+      }
+    }
+
+    // Fallback: legacy dmScope "main"
     const base = `agent:${normalizedBotId}:main`;
     return {
       sessionKey: normalizedThreadId
@@ -101,16 +134,36 @@ async function resolveArtifactSessionKey(input: {
     return { error: "No matching session found for chatId" };
   }
 
+  // Filter to only valid agent:*:channel:* session keys.
+  // Prod data may contain legacy formats (e.g. "slack_T09CNAG_C09CNAG")
+  // or truncated keys (e.g. "agent:bot:slack" without :channel:).
+  const normalizedChannelId = channelId.toLowerCase();
+  const validRows = rows.filter((row) => {
+    const key = normalizeSessionKey(row.sessionKey);
+    return (
+      key.startsWith("agent:") &&
+      key.includes(`:channel:${normalizedChannelId}`)
+    );
+  });
+
+  if (validRows.length === 0) {
+    return { error: "No matching session found for chatId" };
+  }
+
+  // Strip thread suffixes to get base channel keys, then deduplicate
+  const stripThread = (key: string) => key.replace(/:thread:.*$/, "");
   const uniqueBaseKeys = new Set(
-    rows.map((row) => normalizeSessionKey(row.sessionKey)),
+    validRows.map((row) => stripThread(normalizeSessionKey(row.sessionKey))),
   );
   if (uniqueBaseKeys.size !== 1) {
     return { error: "Ambiguous session resolution for chatId" };
   }
 
-  const baseKey = rows[0]?.sessionKey
-    ? normalizeSessionKey(rows[0].sessionKey)
-    : undefined;
+  const firstValid = validRows[0];
+  if (!firstValid) {
+    return { error: "No matching session found for chatId" };
+  }
+  const baseKey = stripThread(normalizeSessionKey(firstValid.sessionKey));
   if (!baseKey) {
     return { error: "No matching session found for chatId" };
   }

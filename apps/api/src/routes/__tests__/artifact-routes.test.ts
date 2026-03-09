@@ -590,6 +590,42 @@ describe("Artifact Internal Routes", () => {
       expect(body.message).toBe("Ambiguous session resolution for chatId");
     });
 
+    it("resolves correctly when legacy and truncated session keys exist", async () => {
+      const now = new Date().toISOString();
+      // Seed 3 sessions for the same bot+channel with different key formats:
+      // 1. Legacy pre-agent format
+      // 2. Truncated (missing :channel:xxx)
+      // 3. Valid agent:*:channel:* format
+      await setupPool.query(
+        `INSERT INTO sessions (id, bot_id, session_key, channel_type, channel_id, title, status, created_at, updated_at)
+         VALUES
+         ('sess-legacy', 'bot-test-1', 'slack_T09CNAG1BP0_C0AJKG60H6D', 'slack', 'c0ajkg60h6d', 'Legacy Session', 'active', $1, $2),
+         ('sess-truncated', 'bot-test-1', 'agent:bot-test-1:slack', 'slack', 'c0ajkg60h6d', 'Truncated Session', 'active', $1, $2),
+         ('sess-valid', 'bot-test-1', 'agent:bot-test-1:slack:channel:c0ajkg60h6d', 'slack', 'c0ajkg60h6d', 'Valid Session', 'active', $1, $2)`,
+        [now, now],
+      );
+
+      const res = await app.request("/api/internal/artifacts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-token": TOKEN,
+        },
+        body: JSON.stringify({
+          botId: "bot-test-1",
+          title: "Deploy with Legacy Data",
+          chatId: "channel:C0AJKG60H6D",
+          channelType: "slack",
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.sessionKey).toBe(
+        "agent:bot-test-1:slack:channel:c0ajkg60h6d",
+      );
+    });
+
     it("returns 400 when channel chatId has no exact session", async () => {
       const res = await app.request("/api/internal/artifacts", {
         method: "POST",

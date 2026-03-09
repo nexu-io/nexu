@@ -148,11 +148,16 @@ function mimeType(filePath) {
 // Image compression via sharp
 // ---------------------------------------------------------------------------
 
+// Use createRequire so NODE_PATH resolves globally-installed sharp
+// (works in sandbox without a /node_modules symlink).
+import { createRequire } from "node:module";
+const _require = createRequire(import.meta.url);
+
 let sharp;
 try {
-  sharp = (await import("sharp")).default;
+  sharp = _require("sharp");
 } catch {
-  // Auto-install sharp at runtime (same pattern as static-deploy uses for wrangler)
+  // Not pre-installed — try auto-install (works outside sandbox where fs is writable).
   const { execSync } = await import("node:child_process");
   const scriptDir = path.dirname(new URL(import.meta.url).pathname);
   console.log("Installing sharp (first run only)...");
@@ -162,11 +167,9 @@ try {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 60_000,
     });
-    sharp = (await import("sharp")).default;
-  } catch (_installErr) {
-    console.error(
-      `Error: Failed to auto-install sharp.\nManual fix: cd ${scriptDir} && npm install sharp`,
-    );
+    sharp = _require("sharp");
+  } catch {
+    console.error("ERROR: sharp is required but could not be installed.");
     process.exit(1);
   }
 }

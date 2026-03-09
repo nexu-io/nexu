@@ -1,16 +1,17 @@
 FROM node:22-slim AS base
 
-ARG OPENCLAW_VERSION=2026.3.2
+ARG OPENCLAW_VERSION=2026.3.7
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl git ca-certificates && \
+    apt-get install -y --no-install-recommends curl git ca-certificates docker.io && \
     rm -rf /var/lib/apt/lists/*
 
 # Rewrite git SSH -> HTTPS for public GitHub repos
 RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/" && \
     git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
-RUN npm install -g openclaw@${OPENCLAW_VERSION}
+RUN npm install -g openclaw@${OPENCLAW_VERSION} && \
+    npm install --prefix /usr/local/lib/node_modules/openclaw/extensions/feishu @larksuiteoapi/node-sdk
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"

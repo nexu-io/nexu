@@ -32,7 +32,7 @@ const token =
   process.env.INTERNAL_API_TOKEN ||
   "gw-secret-token";
 
-const MAX_MESSAGES = 30;
+const MAX_MESSAGES = 10;
 const MAX_IMAGES = 5;
 const MAX_FILES = 5;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -204,6 +204,47 @@ function parseSession(filePath) {
           );
           text = text.replace(/\[message_id: [^\]]+\]\n?/g, "");
 
+          // Extract useful content from "Replied message" JSON blocks
+          text = text.replace(
+            /Replied message \(untrusted, for context\):\s*```json\s*([\s\S]*?)```\n?/g,
+            (_match, json) => {
+              try {
+                const obj = JSON.parse(json);
+                const body = obj.body?.trim();
+                return body ? `↩️ ${body}\n` : "";
+              } catch {
+                return "";
+              }
+            },
+          );
+
+          // Extract useful content from "Chat history" JSON blocks
+          text = text.replace(
+            /Chat history since last reply \(untrusted, for context\):\s*```json\s*([\s\S]*?)```\n?/g,
+            (_match, json) => {
+              try {
+                const arr = JSON.parse(json);
+                if (!Array.isArray(arr) || arr.length === 0) return "";
+                const lines = arr
+                  .slice(-3) // keep last 3 messages max
+                  .map((m) => m.body?.trim())
+                  .filter(Boolean);
+                return lines.length > 0 ? `💬 ${lines.join(" → ")}\n` : "";
+              } catch {
+                return "";
+              }
+            },
+          );
+
+          // Strip [System: ...] lines (Feishu mention hints etc.)
+          text = text.replace(/\[System: [^\]]*\]\n?/g, "");
+
+          // Strip MEDIA instruction block injected by OpenClaw
+          text = text.replace(
+            /MEDIA:https?:\/\/\S+[\s\S]*?Keep caption in the text body\.\n?/g,
+            "",
+          );
+
           // Strip Slack-specific noise
           text = text.replace(/\[Slack file: [^\]]*\]\n?/g, "");
           text = text.replace(
@@ -212,6 +253,9 @@ function parseSession(filePath) {
           );
           // Strip Slack user mentions: <@U0AJB581Q2D> → ""
           text = text.replace(/<@[A-Z0-9]+>/g, "");
+
+          // Strip Feishu at-mention tags: <at user_id="...">name</at> → name
+          text = text.replace(/<at user_id="[^"]*">([^<]*)<\/at>/g, "$1");
         }
 
         text = text.replace(/To send an image back.*?\n?/g, "");

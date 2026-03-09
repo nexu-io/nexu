@@ -64,6 +64,14 @@ spec:
               value: /etc/openclaw/config.json
             - name: OPENCLAW_STATE_DIR
               value: /data/openclaw
+            {{- if .Values.gateway.sandbox.enabled }}
+            - name: SANDBOX_ENABLED
+              value: "true"
+            - name: SANDBOX_IMAGE
+              value: {{ .Values.gateway.sandbox.sandboxImage | quote }}
+            - name: DOCKER_HOST
+              value: "tcp://localhost:2375"
+            {{- end }}
           volumeMounts:
             - name: openclaw-config
               mountPath: /etc/openclaw
@@ -89,6 +97,45 @@ spec:
             timeoutSeconds: 5
           resources:
             {{- toYaml .Values.gateway.resources | nindent 12 }}
+        {{- if .Values.gateway.sandbox.enabled }}
+        - name: dind
+          image: {{ .Values.gateway.sandbox.dindImage | quote }}
+          securityContext:
+            privileged: true
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              DNS_IP=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
+              DNS_IP="${DNS_IP:-8.8.8.8}"
+              mkdir -p /etc/docker
+              printf '{"dns":["%s"]}\n' "$DNS_IP" > /etc/docker/daemon.json
+              exec dockerd-entrypoint.sh dockerd \
+                --host=tcp://0.0.0.0:2375 \
+                --host=unix:///var/run/docker.sock \
+                --tls=false
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          startupProbe:
+            exec:
+              command: ["docker", "info"]
+            initialDelaySeconds: 2
+            periodSeconds: 2
+            failureThreshold: 15
+          livenessProbe:
+            exec:
+              command: ["docker", "info"]
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: docker-data
+              mountPath: /var/lib/docker
+            - name: openclaw-data
+              mountPath: /data/openclaw
+          resources:
+            {{- toYaml .Values.gateway.sandbox.dindResources | nindent 12 }}
+        {{- end }}
       volumes:
         - name: openclaw-config
           emptyDir: {}
@@ -101,3 +148,11 @@ spec:
         resources:
           requests:
             storage: {{ .Values.gateway.persistence.size | default "20Gi" }}
+    - metadata:
+        name: docker-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: {{ .Values.gateway.sandbox.dindStorageSize | default "10Gi" }}
