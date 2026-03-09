@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { fetchInitialConfig } from "./config.js";
 import { env } from "./env.js";
 import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
@@ -189,7 +190,7 @@ export function startManagedOpenclawGateway(): void {
     : undefined;
 
   const child = spawn(env.OPENCLAW_BIN, args, {
-    stdio: ["ignore", "ignore", "ignore"],
+    stdio: ["ignore", "pipe", "pipe"],
     cwd: openclawCwd,
     env: {
       ...safeEnv,
@@ -200,6 +201,17 @@ export function startManagedOpenclawGateway(): void {
 
   openclawGatewayProcess = child;
   lastStartTime = Date.now();
+
+  if (child.stdout) {
+    createInterface({ input: child.stdout }).on("line", (line) => {
+      logger.info({ stream: "stdout" }, line);
+    });
+  }
+  if (child.stderr) {
+    createInterface({ input: child.stderr }).on("line", (line) => {
+      logger.error({ stream: "stderr" }, line);
+    });
+  }
 
   child.once("error", (error: Error) => {
     const baseError = BaseError.from(error);
