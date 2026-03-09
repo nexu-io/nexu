@@ -296,6 +296,7 @@ export async function generatePoolConfig(
               sandbox: {
                 mode: "all" as const,
                 scope: "agent" as const,
+                workspaceAccess: "rw" as const,
                 docker: {
                   image: process.env.SANDBOX_IMAGE ?? "nexu-sandbox:latest",
                   memory: "256m",
