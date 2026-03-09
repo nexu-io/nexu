@@ -62,6 +62,39 @@ async function resolveArtifactSessionKey(input: {
 
   const normalizedBotId = input.botId.trim().toLowerCase();
   if (rawChatId.startsWith("user:")) {
+    const userId = rawChatId.slice("user:".length).trim().toLowerCase();
+    const stripThread = (key: string) => key.replace(/:thread:.*$/, "");
+
+    // With dmScope: "per-channel-peer", DM session keys are
+    //   agent:{botId}:{channel}:direct:{userId}
+    // Try DB lookup first, then fall back to legacy agent:{botId}:main.
+    if (userId) {
+      const dmConditions = [
+        eq(sessions.botId, input.botId),
+        sql`lower(${sessions.sessionKey}) LIKE ${`%:direct:${userId}`}`,
+      ];
+      const normalizedChannelType = input.channelType?.trim().toLowerCase();
+      if (normalizedChannelType) {
+        dmConditions.push(eq(sessions.channelType, normalizedChannelType));
+      }
+      const dmRows = await db
+        .select({ sessionKey: sessions.sessionKey })
+        .from(sessions)
+        .where(and(...dmConditions))
+        .orderBy(desc(sessions.lastMessageAt), desc(sessions.createdAt))
+        .limit(1);
+
+      if (dmRows[0]) {
+        const baseKey = stripThread(normalizeSessionKey(dmRows[0].sessionKey));
+        return {
+          sessionKey: normalizedThreadId
+            ? `${baseKey}:thread:${normalizedThreadId}`
+            : baseKey,
+        };
+      }
+    }
+
+    // Fallback: legacy dmScope "main"
     const base = `agent:${normalizedBotId}:main`;
     return {
       sessionKey: normalizedThreadId
