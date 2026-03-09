@@ -292,6 +292,19 @@ const diagnosticsOtelSchema = z
   })
   .passthrough();
 
+const pluginEntrySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .passthrough();
+
+const pluginsConfigSchema = z
+  .object({
+    entries: z.record(z.string(), pluginEntrySchema).optional(),
+    allow: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
 const diagnosticsConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -335,6 +348,7 @@ export const openclawConfigSchema = z.object({
   cron: cronConfigSchema.optional(),
   messages: messagesConfigSchema.optional(),
   diagnostics: diagnosticsConfigSchema.optional(),
+  plugins: pluginsConfigSchema.optional(),
 });
 
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;

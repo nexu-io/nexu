@@ -420,6 +420,16 @@ export async function generatePoolConfig(
       allowFrom: ["*"],
       accounts: feishuAccounts,
     };
+
+    // Feishu is a plugin-based channel; explicitly enable it so OpenClaw
+    // loads the plugin without needing `openclaw doctor --fix`.
+    config.plugins = {
+      ...config.plugins,
+      entries: {
+        ...config.plugins?.entries,
+        feishu: { enabled: true },
+      },
+    };
   }
 
   // Enable skill hot-reload watcher so OpenClaw picks up managed skills
