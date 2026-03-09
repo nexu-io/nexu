@@ -344,6 +344,12 @@ export async function generatePoolConfig(
         },
         fetch: { enabled: true },
       },
+      // Disable the sandbox tool allowlist so plugin tools (feishu_doc,
+      // feishu_chat, etc.) are not blocked.  An empty allow list means
+      // "allow everything not in the deny list".
+      ...(process.env.SANDBOX_ENABLED === "true"
+        ? { sandbox: { tools: { allow: [] } } }
+        : {}),
     },
     session: {
       dmScope: "per-channel-peer",
