@@ -308,6 +308,11 @@ class SlackEventsTraceHandler {
       }
 
       // ====== Unclaimed user hard interception ======
+      // Skip bot messages to prevent infinite loops (bot sends claim card → triggers message event → sends again)
+      if (event?.bot_id || event?.subtype === "bot_message") {
+        return c.json({ ok: true });
+      }
+
       const senderSlackUserId = event?.user as string | undefined;
       const isUserMessageEvent =
         senderSlackUserId &&
