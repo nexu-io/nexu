@@ -355,6 +355,7 @@ export const artifacts = pgTable(
     id: text("id").notNull().unique(),
     botId: text("bot_id").notNull(),
     sessionKey: text("session_key"),
+    nexuUserId: text("nexu_user_id"),
     channelType: text("channel_type"),
     channelId: text("channel_id"),
     title: text("title").notNull(),
@@ -377,6 +378,7 @@ export const artifacts = pgTable(
   },
   (table) => [
     index("artifacts_bot_id_idx").on(table.botId),
+    index("artifacts_nexu_user_id_idx").on(table.nexuUserId),
     index("artifacts_session_key_idx").on(table.sessionKey),
     index("artifacts_status_idx").on(table.status),
     index("artifacts_created_at_idx").on(table.createdAt),

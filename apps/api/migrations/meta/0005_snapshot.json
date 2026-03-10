@@ -1,5 +1,5 @@
 {
-  "id": "f8df73c0-c52d-4ae2-8b4a-a53602df95f2",
+  "id": "eadb0a77-15d2-48ec-98a7-c216664edfc4",
   "prevId": "8708a8bf-eb6a-476e-a295-0bd9d1e817b4",
   "version": "7",
   "dialect": "postgresql",
@@ -28,6 +28,12 @@
         },
         "session_key": {
           "name": "session_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nexu_user_id": {
+          "name": "nexu_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -130,6 +136,21 @@
           "columns": [
             {
               "expression": "bot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "artifacts_nexu_user_id_idx": {
+          "name": "artifacts_nexu_user_id_idx",
+          "columns": [
+            {
+              "expression": "nexu_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
