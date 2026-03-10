@@ -117,10 +117,7 @@ function cleanAssistantText(input) {
   text = text.replace(/^\d+\.\s+.{0,20}(联系|通过|直接|建议|或者).*$/gm, "");
 
   // Strip lines that look like internal skill/path references (require path-like patterns)
-  text = text.replace(
-    /^.*(?:\/[\w._-]+){2,}.*(?:skill|snapshot).*$/gim,
-    "",
-  );
+  text = text.replace(/^.*(?:\/[\w._-]+){2,}.*(?:skill|snapshot).*$/gim, "");
 
   // Collapse multiple blank lines into one
   text = text.replace(/\n{3,}/g, "\n\n");
