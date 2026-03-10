@@ -296,5 +296,5 @@ You run inside a Docker sandbox. Understanding your environment prevents errors.
 - If `read` fails with "Sandbox FS error (ENOENT)", the file doesn't exist yet — create it first
 - Network access works (bridge mode) — you can `curl` external APIs
 - `npm install` works in `/workspace` but NOT in read-only paths
-- **Creating skills:** `/data/openclaw/skills/` is read-only (platform-managed). To create your own skills, write them to `/workspace/skills/` — OpenClaw auto-discovers skills in your workspace.
+- **Creating skills:** `/data/openclaw/skills/` is read-only (platform-managed). To create your own skills, write them to `/workspace/skills/<skill-name>/SKILL.md` — OpenClaw auto-discovers skills in your workspace directory.
 <!-- NEXU-PLATFORM-END -->
