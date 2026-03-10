@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import type { Dirent } from "node:fs";
 import { readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -332,6 +333,29 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
 
   await clearStaleSessionLocks();
   await clearStaleGatewayLocks();
+
+  // When sandbox mode is enabled, wait for the DinD sidecar's Docker daemon
+  // to become reachable before starting OpenClaw.  Without this, early
+  // messages fail with "Cannot connect to the Docker daemon".
+  if (process.env.SANDBOX_ENABLED === "true") {
+    const maxAttempts = 30;
+    for (let i = 1; i <= maxAttempts; i++) {
+      try {
+        execFileSync("docker", ["info"], { timeout: 5000, stdio: "ignore" });
+        logger.info("docker daemon reachable");
+        break;
+      } catch {
+        if (i === maxAttempts) {
+          logger.warn(
+            { attempts: maxAttempts },
+            "docker daemon not reachable; starting OpenClaw anyway",
+          );
+        } else {
+          await sleep(2000);
+        }
+      }
+    }
+  }
 
   if (env.RUNTIME_MANAGE_OPENCLAW_PROCESS) {
     startManagedOpenclawGateway();
