@@ -4,6 +4,7 @@ import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { checkSlackTokens } from "./api.js";
 import { fetchInitialConfig } from "./config.js";
 import { env } from "./env.js";
 import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
@@ -82,6 +83,14 @@ function scheduleRestart(
 
   setTimeout(() => {
     void (async () => {
+      // Validate Slack tokens before refreshing config so the new config
+      // excludes any channels with revoked tokens — prevents crash loops.
+      try {
+        await checkSlackTokens();
+      } catch {
+        // best-effort; continue with restart
+      }
+
       try {
         await fetchInitialConfig();
         logger.info(
