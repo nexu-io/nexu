@@ -6,6 +6,7 @@ import { sendEmail } from "./lib/email.js";
 
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgresql://nexu:nexu@localhost:5433/nexu_dev";
+const googleAuthEnabled = process.env.BETTER_AUTH_GOOGLE_ENABLE === "true";
 
 // Enable cross-subdomain cookies in production so session cookies set on
 // api.nexu.io are readable from nexu.io (the frontend).
@@ -32,12 +33,14 @@ const options: BetterAuthOptions = {
       },
     }),
   ],
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  ...(googleAuthEnabled && {
+    socialProviders: {
+      google: {
+        clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      },
     },
-  },
+  }),
   ...(cookieDomain && {
     advanced: {
       crossSubDomainCookies: {
@@ -50,7 +53,7 @@ const options: BetterAuthOptions = {
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["google"],
+      trustedProviders: googleAuthEnabled ? ["google"] : [],
     },
   },
 };
