@@ -237,9 +237,12 @@ export async function generatePoolConfig(
       if (ch.connectionMode === "webhook") {
         feishuAccount.connectionMode = "webhook";
         feishuAccount.webhookPath = `/feishu/events/${ch.accountId}`;
+        feishuAccount.webhookPort = 18789;
         if (verificationToken) {
           feishuAccount.verificationToken = verificationToken;
         }
+      } else {
+        feishuAccount.connectionMode = "websocket";
       }
 
       feishuAccounts[ch.accountId] = feishuAccount;
@@ -443,7 +446,6 @@ export async function generatePoolConfig(
   if (Object.keys(feishuAccounts).length > 0) {
     config.channels.feishu = {
       enabled: true,
-      connectionMode: "websocket",
       dmPolicy: "open",
       groupPolicy: "open",
       requireMention: true,
