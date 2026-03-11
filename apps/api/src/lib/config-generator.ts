@@ -137,6 +137,17 @@ export async function generatePoolConfig(
       agent.model = { primary: resolveModelId(bot.modelId) };
     }
 
+    // Per-agent /tmp bind so the sandbox fs-bridge recognises /tmp as
+    // a writable mount.  Without this, the Write tool rejects /tmp paths
+    // because tmpfs mounts are invisible to the path-safety guard.
+    if (process.env.SANDBOX_ENABLED === "true") {
+      (agent as Record<string, unknown>).sandbox = {
+        docker: {
+          binds: [`${stateDir}/agents/${bot.id}/.tmp:/tmp:rw`],
+        },
+      };
+    }
+
     return agent;
   });
 
@@ -435,12 +446,24 @@ export async function generatePoolConfig(
     config.channels.feishu = {
       enabled: true,
       connectionMode: "websocket",
-      streaming: true,
+      // Streaming disabled: long responses cause duplicate delivery (streaming
+      // card + chunked final cards) because deliveredFinalTexts dedup fails
+      // when mergeStreamingText diverges from the final text payload.
+      // TODO: re-enable after OpenClaw fixes feishu streaming dedup for long text.
+      streaming: false,
       renderMode: "card",
       dmPolicy: "open",
       groupPolicy: "open",
       requireMention: true,
       allowFrom: ["*"],
+      tools: {
+        doc: true,
+        chat: true,
+        wiki: true,
+        drive: true,
+        perm: true,
+        scopes: true,
+      },
       accounts: feishuAccounts,
     };
 
