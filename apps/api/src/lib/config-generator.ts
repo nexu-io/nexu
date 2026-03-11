@@ -280,6 +280,9 @@ export async function generatePoolConfig(
       controlUi: {
         dangerouslyAllowHostHeaderOriginFallback: true,
       },
+      tools: {
+        allow: ["cron"],
+      },
     },
     agents: {
       defaults: {
@@ -342,6 +345,10 @@ export async function generatePoolConfig(
                     // npm packages (e.g. sharp in nano-banana).
                     NODE_PATH: "/usr/local/lib/node_modules",
                   },
+                },
+                browser: {
+                  enabled: true,
+                  allowHostControl: true,
                 },
                 prune: {
                   idleHours: 4,
@@ -484,6 +491,7 @@ export async function generatePoolConfig(
     nativeSkills: "auto",
     restart: true,
     ownerDisplay: "raw",
+    ownerAllowFrom: ["*"],
   };
 
   // Enable OpenTelemetry diagnostics via Datadog direct OTLP intake or

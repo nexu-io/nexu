@@ -16,14 +16,25 @@ const controlUiSchema = z
   })
   .optional();
 
-const gatewayConfigSchema = z.object({
-  port: z.number().default(18789),
-  mode: z.literal("local").default("local"),
-  bind: z.enum(["loopback", "lan", "auto"]).default("lan"),
-  auth: gatewayAuthSchema,
-  reload: gatewayReloadSchema.default({ mode: "hybrid" }),
-  controlUi: controlUiSchema,
-});
+const gatewayToolsSchema = z
+  .object({
+    allow: z.array(z.string()).optional(),
+    deny: z.array(z.string()).optional(),
+  })
+  .passthrough()
+  .optional();
+
+const gatewayConfigSchema = z
+  .object({
+    port: z.number().default(18789),
+    mode: z.literal("local").default("local"),
+    bind: z.enum(["loopback", "lan", "auto"]).default("lan"),
+    auth: gatewayAuthSchema,
+    reload: gatewayReloadSchema.default({ mode: "hybrid" }),
+    controlUi: controlUiSchema,
+    tools: gatewayToolsSchema,
+  })
+  .passthrough();
 
 const agentModelSchema = z.union([
   z.string(),
