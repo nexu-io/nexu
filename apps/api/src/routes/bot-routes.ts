@@ -9,7 +9,14 @@ import {
 import { createId } from "@paralleldrive/cuid2";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bots, gatewayAssignments, gatewayPools } from "../db/schema/index.js";
+import {
+  botChannels,
+  bots,
+  channelCredentials,
+  gatewayAssignments,
+  gatewayPools,
+  webhookRoutes,
+} from "../db/schema/index.js";
 import { BaseError, ServiceError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
@@ -383,6 +390,23 @@ export function registerBotRoutes(app: OpenAPIHono<AppBindings>) {
     if (!bot) {
       return c.json({ message: `Bot ${botId} not found` }, 404);
     }
+
+    // Clean up associated channels before deleting the bot
+    const channels = await db
+      .select({ id: botChannels.id })
+      .from(botChannels)
+      .where(eq(botChannels.botId, botId));
+
+    for (const ch of channels) {
+      await db
+        .delete(webhookRoutes)
+        .where(eq(webhookRoutes.botChannelId, ch.id));
+      await db
+        .delete(channelCredentials)
+        .where(eq(channelCredentials.botChannelId, ch.id));
+    }
+
+    await db.delete(botChannels).where(eq(botChannels.botId, botId));
 
     await db
       .delete(gatewayAssignments)
