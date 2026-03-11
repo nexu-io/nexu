@@ -57,6 +57,13 @@
       "when": 1773228930428,
       "tag": "0007_robust_robin_chapel",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773235783065,
+      "tag": "0008_little_marvel_zombies",
+      "breakpoints": true
     }
   ]
 }

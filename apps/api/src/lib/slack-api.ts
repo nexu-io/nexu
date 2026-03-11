@@ -30,18 +30,22 @@ export async function sendSlackMessage(params: {
   channel: string;
   text: string;
   blocks?: unknown[];
+  threadTs?: string;
 }): Promise<{ ok: boolean; error?: string; ts?: string }> {
+  const body: Record<string, unknown> = {
+    channel: params.channel,
+    text: params.text,
+    blocks: params.blocks,
+  };
+  if (params.threadTs) body.thread_ts = params.threadTs;
+
   const resp = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${params.botToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      channel: params.channel,
-      text: params.text,
-      blocks: params.blocks,
-    }),
+    body: JSON.stringify(body),
   });
   return (await resp.json()) as { ok: boolean; error?: string; ts?: string };
 }
@@ -55,19 +59,23 @@ export async function sendSlackEphemeral(params: {
   user: string;
   text: string;
   blocks?: unknown[];
+  threadTs?: string;
 }): Promise<{ ok: boolean; error?: string }> {
+  const body: Record<string, unknown> = {
+    channel: params.channel,
+    user: params.user,
+    text: params.text,
+    blocks: params.blocks,
+  };
+  if (params.threadTs) body.thread_ts = params.threadTs;
+
   const resp = await fetch("https://slack.com/api/chat.postEphemeral", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${params.botToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      channel: params.channel,
-      user: params.user,
-      text: params.text,
-      blocks: params.blocks,
-    }),
+    body: JSON.stringify(body),
   });
   return (await resp.json()) as { ok: boolean; error?: string };
 }

@@ -6,6 +6,7 @@ import type { Context } from "hono";
 import { db } from "../db/index.js";
 import {
   channelCredentials,
+  claimCardDedup,
   gatewayPools,
   sessionParticipants,
   sessions,
@@ -60,32 +61,20 @@ function setCachedUserId(cacheKey: string, userId: string): void {
   });
 }
 
-// ── Dedup: track recently sent claim cards to avoid spamming ──────────────
+// ── Dedup: DB-level idempotency for claim card sending ───────────────────
+// Uses claim_card_dedup table with feishu event_id as primary key.
+// INSERT ON CONFLICT DO NOTHING — if insert succeeds, this pod sends the card;
+// if conflict, another pod already handled it.
 
-const CLAIM_CARD_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-const recentClaimCards = new Map<string, number>();
-
-function shouldSendClaimCard(openId: string, appId: string): boolean {
-  const key = `${appId}:${openId}`;
-  const lastSent = recentClaimCards.get(key);
-  if (lastSent && Date.now() - lastSent < CLAIM_CARD_COOLDOWN_MS) {
+async function tryAcquireClaimLock(eventId: string): Promise<boolean> {
+  try {
+    const result = await db
+      .insert(claimCardDedup)
+      .values({ eventId })
+      .onConflictDoNothing();
+    return (result.rowCount ?? 0) > 0;
+  } catch {
     return false;
-  }
-  return true;
-}
-
-function markClaimCardSent(openId: string, appId: string): void {
-  const key = `${appId}:${openId}`;
-  recentClaimCards.set(key, Date.now());
-
-  // Periodic cleanup of expired entries
-  if (recentClaimCards.size > 5000) {
-    const now = Date.now();
-    for (const [k, v] of recentClaimCards) {
-      if (now - v > CLAIM_CARD_COOLDOWN_MS) {
-        recentClaimCards.delete(k);
-      }
-    }
   }
 }
 
@@ -240,6 +229,7 @@ class FeishuEventsTraceHandler {
 
       const appId = header.app_id as string | undefined;
       const eventType = header.event_type as string | undefined;
+      const eventId = header.event_id as string | undefined;
 
       if (!appId) {
         return c.json({ message: "Missing app_id in header" }, 400);
@@ -318,8 +308,9 @@ class FeishuEventsTraceHandler {
             event_type: eventType,
           });
 
-          // Deduplicate claim card sending
-          if (shouldSendClaimCard(senderOpenId, appId)) {
+          // Deduplicate claim card sending (DB-level, works across API pods)
+          const dedupKey = eventId ?? `${appId}:${senderOpenId}:${Date.now()}`;
+          if (await tryAcquireClaimLock(dedupKey)) {
             const claimResult = await generateClaimToken({
               workspaceKey,
               imUserId: senderOpenId,
@@ -361,8 +352,6 @@ class FeishuEventsTraceHandler {
                   tenantToken,
                   "open_id",
                 );
-                markClaimCardSent(senderOpenId, appId);
-
                 logger.info({
                   message: "feishu_claim_card_sent",
                   scope: "feishu-events",

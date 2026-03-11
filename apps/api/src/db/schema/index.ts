@@ -506,6 +506,15 @@ export const claimTokens = pgTable("claim_tokens", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+// Idempotency lock for claim card sending — prevents duplicate cards
+// when multiple API pods process the same feishu event concurrently.
+export const claimCardDedup = pgTable("claim_card_dedup", {
+  eventId: text("event_id").primaryKey(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 // Test-only table used to validate post-merge DB migration workflow.
 export const e2eTestMigration = pgTable("e2e_test_migration", {
   id: text("id").primaryKey(),
