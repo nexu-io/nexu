@@ -1,26 +1,25 @@
 name: API Tests (nexu)
 
-# ── 触发规则 ──────────────────────────────────────────────────────────────────
 on:
   push:
-    branches:
-      - main     # push main → 自动跑 prod
-      - develop  # push develop → 自动跑 staging
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]   # PR → 跑 prod smoke
-
+    branches: [ main ]
   schedule:
-    - cron: '0 0 * * *'  # 每天 UTC 00:00（北京时间 08:00）定时跑
-
-  # 手动触发：可选环境 + 测试级别
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
-      environments:
-        description: '要测试的环境（多选用逗号分隔，如 dev,staging,prod）'
+      environment:
+        description: 'Target environment'
         required: true
         default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
       test_tag:
-        description: '测试级别'
+        description: 'Test level'
         required: true
         default: '@smoke'
         type: choice
@@ -31,114 +30,54 @@ on:
           - '@P2'
           - '@P3'
 
-# ── 环境开关（在仓库 Settings → Variables 配置，true/false）──────────────────
-# CI_ENABLE_DEV     = true/false
-# CI_ENABLE_STAGING = true/false
-# CI_ENABLE_PROD    = true/false（默认始终开启）
+# ── 环境开关说明 ───────────────────────────────────────────────────────────────
+# 在仓库 Settings → Variables → Actions 中配置以下变量控制定时任务开关：
+#   CI_ENABLE_DEV     = true / false
+#   CI_ENABLE_STAGING = true / false
+#   CI_ENABLE_PROD    = true / false  （不配置时默认开启）
 
 jobs:
-  # ── 第一步：根据触发方式动态生成 matrix ──────────────────────────────────────
-  setup:
-    name: Resolve environments
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.resolve.outputs.matrix }}
-      test_tag: ${{ steps.resolve.outputs.test_tag }}
-    steps:
-      - name: Resolve environments and test tag
-        id: resolve
-        run: |
-          # 确定本次要运行的环境列表
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # 手动触发：使用输入参数
-            INPUT="${{ github.event.inputs.environments }}"
-            TAG="${{ github.event.inputs.test_tag }}"
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            INPUT="prod"
-            TAG="@smoke"
-          elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
-            INPUT="staging"
-            TAG="@smoke"
-          elif [ "${{ github.event_name }}" == "schedule" ]; then
-            # 定时任务：根据仓库变量决定哪些环境开启
-            INPUT=""
-            [ "${{ vars.CI_ENABLE_DEV }}"     == "true" ] && INPUT="${INPUT:+$INPUT,}dev"
-            [ "${{ vars.CI_ENABLE_STAGING }}" == "true" ] && INPUT="${INPUT:+$INPUT,}staging"
-            [ "${{ vars.CI_ENABLE_PROD }}"    != "false" ] && INPUT="${INPUT:+$INPUT,}prod"
-            [ -z "$INPUT" ] && INPUT="prod"   # 兜底：至少跑 prod
-            TAG="@smoke"
-          else
-            INPUT="prod"
-            TAG="@smoke"
-          fi
+  # ── prod ─────────────────────────────────────────────────────────────────────
+  test-prod:
+    name: "[prod] API Tests"
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'schedule' && vars.CI_ENABLE_PROD != 'false') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    uses: ./.github/workflows/_run-api-tests.yml
+    with:
+      environment: prod
+      test_tag: ${{ github.event.inputs.test_tag || '@smoke' }}
+    secrets:
+      ENV_FILE: ${{ secrets.ENV_FILE_PROD }}
+      NEXU_AUTOMATION_PAT: ${{ secrets.NEXU_AUTOMATION_PAT }}
 
-          # 转换为 JSON array，支持 matrix
-          ENVS_JSON=$(echo "$INPUT" | tr ',' '\n' | jq -Rcs '[split("\n") | .[] | select(. != "")]')
-          echo "matrix={\"environment\":$ENVS_JSON}" >> $GITHUB_OUTPUT
-          echo "test_tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Resolved → envs: $ENVS_JSON  tag: $TAG"
+  # ── staging ──────────────────────────────────────────────────────────────────
+  test-staging:
+    name: "[staging] API Tests"
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'schedule' && vars.CI_ENABLE_STAGING == 'true') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    uses: ./.github/workflows/_run-api-tests.yml
+    with:
+      environment: staging
+      test_tag: ${{ github.event.inputs.test_tag || '@smoke' }}
+    secrets:
+      ENV_FILE: ${{ secrets.ENV_FILE_STAGING }}
+      NEXU_AUTOMATION_PAT: ${{ secrets.NEXU_AUTOMATION_PAT }}
 
-  # ── 第二步：并行跑各环境 ──────────────────────────────────────────────────────
-  api-test:
-    name: [${{ matrix.environment }}] API ${{ needs.setup.outputs.test_tag }}
-    needs: setup
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    # 绑定 GitHub Environment，可在 Settings → Environments 配置审批/保护规则
-    environment: ${{ matrix.environment }}
-
-    strategy:
-      fail-fast: false          # 一个环境失败不影响其他环境继续跑
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
-
-    steps:
-      - name: Checkout Nexu_Automation
-        uses: actions/checkout@v4
-        with:
-          repository: refly-ai/Nexu_Automation
-          # 私有仓库需要 PAT，公开仓库可删除下面这行
-          # token: ${{ secrets.NEXU_AUTOMATION_PAT }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Write .env from secret
-        env:
-          # 每个 GitHub Environment 单独配置对应的 ENV_FILE secret
-          # dev 环境配 ENV_FILE，staging 环境配 ENV_FILE，prod 环境配 ENV_FILE
-          # （在各自 Environment 的 Secrets 里设置，名称统一叫 ENV_FILE）
-          ENV_FILE: ${{ secrets.ENV_FILE }}
-        run: |
-          printf '%s' "$ENV_FILE" > .env.${{ matrix.environment }}
-          LINE_COUNT=$(wc -l < .env.${{ matrix.environment }})
-          echo ".env.${{ matrix.environment }} written (${LINE_COUNT} lines)"
-
-      - name: Install Playwright (chromium only)
-        run: npx playwright install --with-deps chromium
-
-      - name: Run API tests [${{ needs.setup.outputs.test_tag }}]
-        run: |
-          ENV=${{ matrix.environment }} npx playwright test tests/api-generated/ \
-            --project=api \
-            --grep "${{ needs.setup.outputs.test_tag }}"
-
-      - name: Generate Allure Report
-        if: always()
-        run: |
-          npm install -g allure-commandline --quiet
-          allure generate allure-results -o allure-report --clean
-
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: report-${{ matrix.environment }}-${{ github.run_number }}
-          path: |
-            reports/
-            allure-report/
-          retention-days: 14
+  # ── dev ──────────────────────────────────────────────────────────────────────
+  test-dev:
+    name: "[dev] API Tests"
+    if: |
+      (github.event_name == 'schedule' && vars.CI_ENABLE_DEV == 'true') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    uses: ./.github/workflows/_run-api-tests.yml
+    with:
+      environment: dev
+      test_tag: ${{ github.event.inputs.test_tag || '@smoke' }}
+    secrets:
+      ENV_FILE: ${{ secrets.ENV_FILE_DEV }}
+      NEXU_AUTOMATION_PAT: ${{ secrets.NEXU_AUTOMATION_PAT }}
