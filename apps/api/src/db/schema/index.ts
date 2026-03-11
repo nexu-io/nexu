@@ -200,6 +200,34 @@ export const users = pgTable("users", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    keyPrefix: text("key_prefix").notNull(),
+    keyHash: text("key_hash").notNull(),
+    status: text("status").notNull().default("active"),
+    lastUsedAt: text("last_used_at"),
+    expiresAt: text("expires_at"),
+    revokedAt: text("revoked_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("api_keys_key_hash_idx").on(table.keyHash),
+    index("api_keys_user_id_idx").on(table.userId),
+    index("api_keys_key_prefix_idx").on(table.keyPrefix),
+    index("api_keys_status_idx").on(table.status),
+  ],
+);
+
 export const usageMetrics = pgTable("usage_metrics", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
