@@ -338,8 +338,8 @@ export async function generatePoolConfig(
                 workspaceAccess: "rw" as const,
                 docker: {
                   image: process.env.SANDBOX_IMAGE ?? "nexu-sandbox:latest",
-                  memory: "256m",
-                  cpus: 0.5,
+                  memory: "128m",
+                  cpus: 0.25,
                   pidsLimit: 128,
                   network: "bridge",
                   capDrop: ["ALL"],
@@ -368,8 +368,8 @@ export async function generatePoolConfig(
                   enabled: false,
                 },
                 prune: {
-                  idleHours: 4,
-                  maxAgeDays: 3,
+                  idleHours: 0.1,
+                  maxAgeDays: 1,
                 },
               },
             }
