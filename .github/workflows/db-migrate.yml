@@ -3,9 +3,6 @@ name: DB Migrate (MVP)
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
-    types: [opened, synchronize, reopened] # Temporary: enable PR-time testing before merge.
 
 permissions:
   contents: read
@@ -29,18 +26,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            DIFF_FROM="${{ github.event.pull_request.base.sha }}"
-            DIFF_TO="${{ github.event.pull_request.head.sha }}"
-          else
-            BEFORE_SHA="${{ github.event.before }}"
-            HEAD_SHA="${{ github.sha }}"
-            DIFF_FROM="${BEFORE_SHA}"
-            DIFF_TO="${HEAD_SHA}"
+          BEFORE_SHA="${{ github.event.before }}"
+          HEAD_SHA="${{ github.sha }}"
+          DIFF_FROM="${BEFORE_SHA}"
+          DIFF_TO="${HEAD_SHA}"
 
-            if [[ "${BEFORE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
-              DIFF_FROM="${HEAD_SHA}^"
-            fi
+          if [[ "${BEFORE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            DIFF_FROM="${HEAD_SHA}^"
           fi
 
           echo "Diff range: ${DIFF_FROM}...${DIFF_TO}"
@@ -197,7 +189,7 @@ jobs:
           fi
 
       - name: Apply DB migrations to nexu-prod
-        if: steps.detect-migrations.outputs.has_migrations == 'true' && github.event_name == 'push'
+        if: steps.detect-migrations.outputs.has_migrations == 'true'
         shell: bash
         env:
           TARGET_ENV: nexu-prod
