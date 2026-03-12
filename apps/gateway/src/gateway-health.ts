@@ -25,23 +25,74 @@ export interface GatewayProbeFailure {
 
 export type GatewayProbeResult = GatewayProbeSuccess | GatewayProbeFailure;
 
-function buildProbeArgs(probeType: GatewayProbeType): string[] {
-  const args: string[] = [];
+// ---------------------------------------------------------------------------
+// HTTP-based liveness probe — hits /health on the gateway HTTP port.
+// This avoids spawning a full Node.js CLI process (~240 MB) per check.
+// ---------------------------------------------------------------------------
 
+async function runHttpLivenessProbe(): Promise<GatewayProbeResult> {
+  const startedAt = Date.now();
+  const checkedAt = new Date().toISOString();
+  const url = `http://127.0.0.1:${env.RUNTIME_GATEWAY_HTTP_PROBE_PORT}/health`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      env.RUNTIME_GATEWAY_CLI_TIMEOUT_MS,
+    );
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    const latencyMs = Date.now() - startedAt;
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        probeType: "liveness",
+        checkedAt,
+        latencyMs,
+        errorCode: "cli_exit_nonzero",
+        exitCode: response.status,
+      };
+    }
+
+    const body = (await response.json()) as Record<string, unknown>;
+    if (body.ok !== true) {
+      return {
+        ok: false,
+        probeType: "liveness",
+        checkedAt,
+        latencyMs,
+        errorCode: "cli_exit_nonzero",
+      };
+    }
+
+    return { ok: true, probeType: "liveness", checkedAt, latencyMs };
+  } catch (err) {
+    const latencyMs = Date.now() - startedAt;
+    const isAbort = err instanceof DOMException && err.name === "AbortError";
+    return {
+      ok: false,
+      probeType: "liveness",
+      checkedAt,
+      latencyMs,
+      errorCode: isAbort ? "cli_timeout" : "cli_spawn_error",
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CLI-based deep probe — still uses `openclaw status --deep` because the
+// deep status data is only available via the WebSocket protocol, not HTTP.
+// ---------------------------------------------------------------------------
+
+function buildDeepProbeArgs(): string[] {
+  const args: string[] = [];
   if (env.OPENCLAW_PROFILE) {
     args.push("--profile", env.OPENCLAW_PROFILE);
   }
-
-  if (probeType === "liveness") {
-    args.push(
-      "health",
-      "--json",
-      "--timeout",
-      String(env.RUNTIME_GATEWAY_CLI_TIMEOUT_MS),
-    );
-    return args;
-  }
-
   args.push(
     "status",
     "--deep",
@@ -70,12 +121,10 @@ function classifyExecError(error: ExecFileException): {
   return { errorCode: "cli_spawn_error" };
 }
 
-async function runCliProbe(
-  probeType: GatewayProbeType,
-): Promise<GatewayProbeResult> {
+async function runCliDeepProbe(): Promise<GatewayProbeResult> {
   const startedAt = Date.now();
   const checkedAt = new Date().toISOString();
-  const args = buildProbeArgs(probeType);
+  const args = buildDeepProbeArgs();
 
   const executionResult = await new Promise<
     | { ok: true; stdout: string }
@@ -112,7 +161,7 @@ async function runCliProbe(
   if (!executionResult.ok) {
     return {
       ok: false,
-      probeType,
+      probeType: "deep",
       checkedAt,
       latencyMs,
       errorCode: executionResult.errorCode,
@@ -125,7 +174,7 @@ async function runCliProbe(
     if (typeof parsed !== "object" || parsed === null) {
       return {
         ok: false,
-        probeType,
+        probeType: "deep",
         checkedAt,
         latencyMs,
         errorCode: "parse_error",
@@ -134,27 +183,22 @@ async function runCliProbe(
   } catch {
     return {
       ok: false,
-      probeType,
+      probeType: "deep",
       checkedAt,
       latencyMs,
       errorCode: "parse_error",
     };
   }
 
-  return {
-    ok: true,
-    probeType,
-    checkedAt,
-    latencyMs,
-  };
+  return { ok: true, probeType: "deep", checkedAt, latencyMs };
 }
 
 export async function probeGatewayLiveness(): Promise<GatewayProbeResult> {
-  return runCliProbe("liveness");
+  return runHttpLivenessProbe();
 }
 
 export async function probeGatewayDeepHealth(): Promise<GatewayProbeResult> {
-  return runCliProbe("deep");
+  return runCliDeepProbe();
 }
 
 const MAX_READY_ATTEMPTS = 120; // give up after ~2 minutes
