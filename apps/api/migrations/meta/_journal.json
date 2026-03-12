@@ -40,8 +40,29 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1773235539180,
-      "tag": "0005_marvelous_dust",
+      "when": 1772874487868,
+      "tag": "0005_sharp_the_twelve",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772898840432,
+      "tag": "0006_pale_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773062523493,
+      "tag": "0007_ambiguous_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773299719847,
+      "tag": "0008_colorful_rocket_racer",
       "breakpoints": true
     }
   ]

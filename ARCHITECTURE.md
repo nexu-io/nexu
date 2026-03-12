@@ -60,7 +60,7 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 PostgreSQL with Drizzle ORM. No foreign keys — application-level joins only. All tables in `apps/api/src/db/schema/index.ts`.
 
-Key tables: `bots`, `bot_channels`, `channel_credentials`, `gateway_pools`, `gateway_assignments`, `webhook_routes`, `oauth_states`, `invite_codes`, `users`, `usage_metrics`, `pool_config_snapshots`, `skills`, `skills_snapshots`, `artifacts`, `pool_secrets`, `sessions`.
+Key tables: `bots`, `bot_channels`, `channel_credentials`, `gateway_pools`, `gateway_assignments`, `webhook_routes`, `oauth_states`, `invite_codes`, `users`, `usage_metrics`, `pool_config_snapshots`, `skills`, `skills_snapshots`, `artifacts`, `pool_secrets`, `sessions`, `supported_toolkits`, `user_integrations`, `integration_credentials`, `supported_skills`.
 
 Public IDs via cuid2. Internal `pk` (serial auto-increment) never exposed to API.
 
@@ -79,6 +79,6 @@ See `docs/references/openclaw-config-schema.md` for full schema and common pitfa
 
 ## Deeper docs
 
-- `docs/design-docs/openclaw-multi-tenant.md` — Full system design, data model, phased plan
-- `docs/design-docs/openclaw-architecture-internals.md` — OpenClaw runtime analysis
+- `docs/designs/openclaw-multi-tenant.md` — Full system design, data model, phased plan
+- `docs/designs/openclaw-architecture-internals.md` — OpenClaw runtime analysis
 - `docs/design-docs/core-beliefs.md` — Engineering principles

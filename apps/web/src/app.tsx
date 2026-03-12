@@ -5,8 +5,12 @@ import { InviteGuardLayout } from "./layouts/invite-guard-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
+import { IntegrationsPage } from "./pages/integrations";
+import { OAuthCallbackPage } from "./pages/oauth-callback";
 import { OnboardingPage } from "./pages/onboarding";
 import { SessionsPage } from "./pages/sessions";
+import { SkillDetailPage } from "./pages/skill-detail";
+import { SkillsPage } from "./pages/skills";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
 
 function DocumentTitleSync() {
@@ -17,7 +21,14 @@ function DocumentTitleSync() {
       "/auth": "Sign In · Nexu",
       "/onboarding": "Get Started · Nexu",
       "/workspace": "Workspace · Nexu",
+      "/workspace/integrations": "Integrations · Nexu",
+      "/workspace/skills": "Skills · Nexu",
     };
+
+    if (location.pathname.startsWith("/workspace/oauth-callback")) {
+      document.title = "Connecting · Nexu";
+      return;
+    }
 
     document.title = titleByPathname[location.pathname] ?? "Nexu";
   }, [location.pathname]);
@@ -35,6 +46,11 @@ export function App() {
         <Route element={<AuthLayout />}>
           <Route element={<InviteGuardLayout />}>
             <Route path="/onboarding" element={<OnboardingPage />} />
+            {/* OAuth callback — outside WorkspaceLayout for clean full-page card */}
+            <Route
+              path="/workspace/oauth-callback/:integrationId"
+              element={<OAuthCallbackPage />}
+            />
             <Route element={<WorkspaceLayout />}>
               <Route path="/workspace" element={<SessionsPage />} />
               <Route path="/workspace/sessions" element={<SessionsPage />} />
@@ -43,6 +59,15 @@ export function App() {
                 element={<SessionsPage />}
               />
               <Route path="/workspace/channels" element={<ChannelsPage />} />
+              <Route
+                path="/workspace/integrations"
+                element={<IntegrationsPage />}
+              />
+              <Route path="/workspace/skills" element={<SkillsPage />} />
+              <Route
+                path="/workspace/skills/:slug"
+                element={<SkillDetailPage />}
+              />
               <Route
                 path="/workspace/channels/slack/callback"
                 element={<SlackOAuthCallbackPage />}

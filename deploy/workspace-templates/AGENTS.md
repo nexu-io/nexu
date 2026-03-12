@@ -279,7 +279,7 @@ You run inside a Docker sandbox. Understanding your environment prevents errors.
 | `/data/openclaw/skills/` | read-only | Skill scripts (feedback, deploy, etc.). You can read and execute them, not modify. |
 | `/data/openclaw/media/` | read/write | Inbound media (user uploads) and outbound media (images you generate). |
 | `/data/openclaw/nexu-context.json` | read-only | Platform context (API URL, pool ID). |
-| `/tmp`, `/var/tmp` | read/write | Temporary files (cleared on restart). |
+| `/tmp`, `/var/tmp` | read/write | Temporary files. **Shared across all sessions — prefer `/workspace` instead.** |
 
 **What you CANNOT access:**
 - Other agents' workspaces — you only see your own `/workspace`
@@ -292,7 +292,11 @@ You run inside a Docker sandbox. Understanding your environment prevents errors.
 - `browser`, `canvas`, `cron` — managed by the gateway, use the appropriate tool/command
 
 **Tips:**
-- Write files to `/workspace` (your home), not `/tmp` (temporary)
+- **Avoid `/tmp` for session-specific files** — `/tmp` is shared across ALL sessions for this agent, so files from one conversation bleed into another. If you need temporary/scratch files, use a session-specific directory:
+  ```
+  /workspace/tmp/<sessionKey>/   ← isolated per conversation
+  ```
+  Clean up when done. `/tmp` works for throwaway files that don't need session isolation.
 - If `read` fails with "Sandbox FS error (ENOENT)", the file doesn't exist yet — create it first
 - Network access works (bridge mode) — you can `curl` external APIs
 - `npm install` works in `/workspace` but NOT in read-only paths

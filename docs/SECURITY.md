@@ -49,6 +49,7 @@ Internal endpoints (`/api/internal/*`) use a two-tier token system:
 | `POST /sessions`, `PATCH /sessions/:id`, `POST /sessions/sync-discord` | `requireInternalToken` |
 | `GET /secrets/:skillName` | `requireSkillToken` |
 | `POST /artifacts`, `PATCH /artifacts/:id` | `requireSkillToken` |
+| `POST /composio/execute`, `POST /composio/disconnect` | `requireSkillToken` |
 
 ### OpenClaw process isolation
 
@@ -78,6 +79,17 @@ The gateway strips privileged env vars before spawning the OpenClaw child proces
 - Slack OAuth state tokens stored in `oauth_states` table with expiry
 - State verified on callback to prevent CSRF
 - Tokens marked as used after consumption (single-use)
+
+## Composio integration OAuth
+
+- Third-party OAuth flows (Gmail, Google Calendar, etc.) managed via Composio SDK
+- `user_integrations` table tracks per-user OAuth connection state
+- `integration_credentials` stores encrypted credential material (AES-256-GCM)
+- OAuth state parameter stored in `user_integrations.oauth_state` for CSRF prevention
+- Connection URLs generated server-side (`composio-routes.ts`) — never crafted client-side
+- `composio-exec.js` runs in OpenClaw child process with `SKILL_API_TOKEN` only (no `INTERNAL_API_TOKEN`)
+- Auth endpoint: `POST /api/internal/composio/execute` requires `requireSkillToken`
+- Disconnect endpoint: `POST /api/internal/composio/disconnect` requires `requireSkillToken`
 
 ## Review checklist
 

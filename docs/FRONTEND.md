@@ -20,12 +20,18 @@ After any API route/schema change: `pnpm generate-types` then `pnpm typecheck`.
 
 | Route | Page | Purpose |
 |-------|------|---------|
-| `/` | Landing | Public info page |
+| `/` | Redirect | Redirects to `/workspace` |
 | `/auth` | Auth | Register / login |
-| `/invite` | Invite | Invite code registration |
-| `/workspace/bot` | Bot Config | Bot creation and settings |
+| `/onboarding` | Onboarding | New user setup |
+| `/workspace` | Sessions | Bot conversation sessions |
+| `/workspace/sessions` | Sessions | Bot conversation sessions |
+| `/workspace/sessions/:id` | Sessions | Session detail |
 | `/workspace/channels` | Channels | Connected Slack workspaces, "Add to Slack" |
-| `/workspace/channels/slack/callback` | OAuth Callback | Handles Slack redirect |
+| `/workspace/channels/slack/callback` | Slack OAuth Callback | Handles Slack redirect |
+| `/workspace/integrations` | Integrations | Composio toolkit connections (OAuth) |
+| `/workspace/oauth-callback/:integrationId` | OAuth Callback | Handles Composio OAuth redirect |
+| `/workspace/skills` | Skills | Skill catalog |
+| `/workspace/skills/:slug` | Skill Detail | Individual skill info and actions |
 
 ## Layouts
 

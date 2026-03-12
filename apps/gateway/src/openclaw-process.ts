@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -149,6 +149,7 @@ function scheduleRestart(
  * - Pod PID namespace isolates us from other pods
  */
 function killOrphanedOpenclawProcesses(): void {
+  // Try Linux /proc first
   try {
     const procEntries = readdirSync("/proc");
     for (const entry of procEntries) {
@@ -171,8 +172,32 @@ function killOrphanedOpenclawProcesses(): void {
         // process may have exited between readdir and readFile
       }
     }
+    return;
   } catch {
-    // /proc may not exist (non-Linux); skip
+    // /proc not available (macOS); fall through to pgrep
+  }
+
+  // macOS / BSD fallback using pgrep
+  try {
+    const output = execSync("pgrep -f 'openclaw.*gateway'", {
+      encoding: "utf-8",
+      timeout: 3000,
+    }).trim();
+    for (const line of output.split("\n")) {
+      const pid = Number.parseInt(line, 10);
+      if (Number.isNaN(pid) || pid === process.pid) continue;
+      try {
+        process.kill(pid, "SIGKILL");
+        logger.info(
+          { event: "openclaw_orphan_killed", pid },
+          "killed orphaned openclaw gateway process",
+        );
+      } catch {
+        // already exited
+      }
+    }
+  } catch {
+    // pgrep returns exit 1 when no matches; ignore
   }
 }
 
@@ -289,12 +314,29 @@ export function killForRestart(): void {
   openclawGatewayProcess.kill("SIGKILL");
 }
 
-export function stopManagedOpenclawGateway(): void {
+export function stopManagedOpenclawGateway(): Promise<void> {
   autoRestartEnabled = false;
 
   if (openclawGatewayProcess === null || openclawGatewayProcess.killed) {
-    return;
+    return Promise.resolve();
   }
 
-  openclawGatewayProcess.kill("SIGTERM");
+  const child = openclawGatewayProcess;
+
+  return new Promise<void>((resolve) => {
+    const forceKillTimer = setTimeout(() => {
+      if (!child.killed) {
+        logger.warn("openclaw gateway did not exit in time, sending SIGKILL");
+        child.kill("SIGKILL");
+      }
+      resolve();
+    }, 5000);
+
+    child.once("exit", () => {
+      clearTimeout(forceKillTimer);
+      resolve();
+    });
+
+    child.kill("SIGTERM");
+  });
 }

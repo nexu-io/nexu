@@ -137,6 +137,20 @@ export async function generatePoolConfig(
       agent.model = { primary: resolveModelId(bot.modelId) };
     }
 
+    // Per-agent /tmp bind so the sandbox fs-bridge recognises /tmp as
+    // a writable mount.  Without this, the Write tool rejects /tmp paths
+    // because tmpfs mounts are invisible to the path-safety guard.
+    if (process.env.SANDBOX_ENABLED === "true") {
+      (agent as Record<string, unknown>).sandbox = {
+        docker: {
+          binds: [`${stateDir}/agents/${bot.id}/.tmp:/tmp:rw`],
+          // Override default tmpfs to exclude /tmp — Docker rejects duplicate
+          // mount points when both a bind mount and tmpfs target the same path.
+          tmpfs: ["/var/tmp", "/run"],
+        },
+      };
+    }
+
     return agent;
   });
 
@@ -159,15 +173,19 @@ export async function generatePoolConfig(
       const botToken = credMap.get("botToken") ?? "";
       const signingSecret = credMap.get("signingSecret") ?? "";
 
+      // Socket mode for local dev: set SLACK_SOCKET_MODE_APP_TOKEN in .env
+      const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
+      const useSocket = !!socketAppToken;
+
       slackAccounts[ch.accountId] = {
         enabled: true,
         botToken,
         signingSecret,
-        mode: "http",
-        webhookPath: `/slack/events/${ch.accountId}`,
-        // OpenClaw Slack plugin's isConfigured requires appToken even in HTTP mode.
-        // Provide a placeholder so the account passes the configured check.
-        appToken: "xapp-placeholder-not-used-in-http-mode",
+        mode: useSocket ? "socket" : "http",
+        webhookPath: useSocket ? undefined : `/slack/events/${ch.accountId}`,
+        appToken: useSocket
+          ? socketAppToken
+          : "xapp-placeholder-not-used-in-http-mode",
         streaming: "partial",
         // Explicit per-account policies so `openclaw doctor --fix` cannot
         // break routing by moving top-level defaults into accounts.default.
@@ -409,7 +427,7 @@ export async function generatePoolConfig(
     // Top-level signingSecret + mode required by OpenClaw gateway validation
     const firstAccount = Object.values(slackAccounts)[0];
     config.channels.slack = {
-      mode: "http",
+      mode: process.env.SLACK_SOCKET_MODE_APP_TOKEN ? "socket" : "http",
       signingSecret: firstAccount?.signingSecret ?? "",
       enabled: true,
       groupPolicy: "open",
@@ -435,12 +453,24 @@ export async function generatePoolConfig(
     config.channels.feishu = {
       enabled: true,
       connectionMode: "websocket",
-      streaming: true,
+      // Streaming disabled: long responses cause duplicate delivery (streaming
+      // card + chunked final cards) because deliveredFinalTexts dedup fails
+      // when mergeStreamingText diverges from the final text payload.
+      // TODO: re-enable after OpenClaw fixes feishu streaming dedup for long text.
+      streaming: false,
       renderMode: "card",
       dmPolicy: "open",
       groupPolicy: "open",
       requireMention: true,
       allowFrom: ["*"],
+      tools: {
+        doc: true,
+        chat: true,
+        wiki: true,
+        drive: true,
+        perm: true,
+        scopes: true,
+      },
       accounts: feishuAccounts,
     };
 

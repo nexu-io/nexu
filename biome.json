@@ -38,7 +38,8 @@
       "openapi.json",
       ".astro",
       "*.astro",
-      ".openclaw"
+      ".openclaw",
+      ".vscode"
     ]
   }
 }

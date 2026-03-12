@@ -892,6 +892,298 @@
         }
       }
     },
+    "/api/internal/composio/execute": {
+      "post": {
+        "tags": [
+          "Composio (Internal)"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "action": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[A-Z][A-Z0-9_]+$"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "default": {}
+                  }
+                },
+                "required": [
+                  "botId",
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action execution result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "successful": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "successful"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Integration not connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "connectUrl": {
+                      "type": "string"
+                    },
+                    "authCard": {
+                      "type": "object",
+                      "properties": {
+                        "slack": {
+                          "type": "string"
+                        },
+                        "discord": {
+                          "type": "string"
+                        },
+                        "feishu": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slack",
+                        "discord",
+                        "feishu"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bot not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream service error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/composio/disconnect": {
+      "post": {
+        "tags": [
+          "Composio (Internal)"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "toolkitSlug": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "botId",
+                  "toolkitSlug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Integration disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "successful": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "successful"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bot or integration not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/skills/latest": {
       "get": {
         "tags": [
@@ -3023,6 +3315,23 @@
                               "type": "boolean"
                             }
                           }
+                        },
+                        "tools": {
+                          "type": "object",
+                          "properties": {
+                            "allow": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "deny": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -3556,6 +3865,17 @@
                                 "webhook"
                               ]
                             },
+                            "streaming": {
+                              "type": "boolean"
+                            },
+                            "renderMode": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "raw",
+                                "card"
+                              ]
+                            },
                             "dmPolicy": {
                               "type": "string",
                               "enum": [
@@ -3668,6 +3988,20 @@
                         }
                       }
                     },
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "dmScope": {
+                          "type": "string",
+                          "enum": [
+                            "main",
+                            "per-peer",
+                            "per-channel-peer",
+                            "per-account-channel-peer"
+                          ]
+                        }
+                      }
+                    },
                     "cron": {
                       "type": "object",
                       "properties": {
@@ -3728,6 +4062,28 @@
                             "flushIntervalMs": {
                               "type": "number"
                             }
+                          }
+                        }
+                      }
+                    },
+                    "plugins": {
+                      "type": "object",
+                      "properties": {
+                        "entries": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              }
+                            }
+                          }
+                        },
+                        "allow": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
                           }
                         }
                       }
@@ -4121,6 +4477,23 @@
                                   "type": "boolean"
                                 }
                               }
+                            },
+                            "tools": {
+                              "type": "object",
+                              "properties": {
+                                "allow": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "deny": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             }
                           },
                           "required": [
@@ -4654,6 +5027,17 @@
                                     "webhook"
                                   ]
                                 },
+                                "streaming": {
+                                  "type": "boolean"
+                                },
+                                "renderMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "auto",
+                                    "raw",
+                                    "card"
+                                  ]
+                                },
                                 "dmPolicy": {
                                   "type": "string",
                                   "enum": [
@@ -4766,6 +5150,20 @@
                             }
                           }
                         },
+                        "session": {
+                          "type": "object",
+                          "properties": {
+                            "dmScope": {
+                              "type": "string",
+                              "enum": [
+                                "main",
+                                "per-peer",
+                                "per-channel-peer",
+                                "per-account-channel-peer"
+                              ]
+                            }
+                          }
+                        },
                         "cron": {
                           "type": "object",
                           "properties": {
@@ -4826,6 +5224,28 @@
                                 "flushIntervalMs": {
                                   "type": "number"
                                 }
+                              }
+                            }
+                          }
+                        },
+                        "plugins": {
+                          "type": "object",
+                          "properties": {
+                            "entries": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "enabled": {
+                                    "type": "boolean"
+                                  }
+                                }
+                              }
+                            },
+                            "allow": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
                               }
                             }
                           }
@@ -5016,6 +5436,23 @@
                                   "type": "boolean"
                                 }
                               }
+                            },
+                            "tools": {
+                              "type": "object",
+                              "properties": {
+                                "allow": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "deny": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
                             }
                           },
                           "required": [
@@ -5549,6 +5986,17 @@
                                     "webhook"
                                   ]
                                 },
+                                "streaming": {
+                                  "type": "boolean"
+                                },
+                                "renderMode": {
+                                  "type": "string",
+                                  "enum": [
+                                    "auto",
+                                    "raw",
+                                    "card"
+                                  ]
+                                },
                                 "dmPolicy": {
                                   "type": "string",
                                   "enum": [
@@ -5661,6 +6109,20 @@
                             }
                           }
                         },
+                        "session": {
+                          "type": "object",
+                          "properties": {
+                            "dmScope": {
+                              "type": "string",
+                              "enum": [
+                                "main",
+                                "per-peer",
+                                "per-channel-peer",
+                                "per-account-channel-peer"
+                              ]
+                            }
+                          }
+                        },
                         "cron": {
                           "type": "object",
                           "properties": {
@@ -5721,6 +6183,28 @@
                                 "flushIntervalMs": {
                                   "type": "number"
                                 }
+                              }
+                            }
+                          }
+                        },
+                        "plugins": {
+                          "type": "object",
+                          "properties": {
+                            "entries": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                  "enabled": {
+                                    "type": "boolean"
+                                  }
+                                }
+                              }
+                            },
+                            "allow": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
                               }
                             }
                           }
@@ -6603,6 +7087,1191 @@
           },
           "404": {
             "description": "Session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations": {
+      "get": {
+        "tags": [
+          "Integrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of integrations with user status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "integrations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "toolkit": {
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "iconUrl": {
+                                "type": "string"
+                              },
+                              "fallbackIconUrl": {
+                                "type": "string"
+                              },
+                              "category": {
+                                "type": "string"
+                              },
+                              "authScheme": {
+                                "type": "string",
+                                "enum": [
+                                  "oauth2",
+                                  "api_key_global",
+                                  "api_key_user"
+                                ]
+                              },
+                              "authFields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "key": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "text",
+                                        "secret"
+                                      ]
+                                    },
+                                    "placeholder": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "label",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "displayName",
+                              "description",
+                              "iconUrl",
+                              "fallbackIconUrl",
+                              "category",
+                              "authScheme"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "initiated",
+                              "active",
+                              "failed",
+                              "expired",
+                              "disconnected"
+                            ]
+                          },
+                          "connectUrl": {
+                            "type": "string"
+                          },
+                          "connectedAt": {
+                            "type": "string"
+                          },
+                          "credentialHints": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "returnTo": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "page",
+                              "chat"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "toolkit",
+                          "status"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "integrations"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/connect": {
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "toolkitSlug": {
+                    "type": "string"
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "page",
+                      "chat"
+                    ]
+                  },
+                  "returnTo": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "toolkitSlug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connection initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "integration": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "toolkit": {
+                          "type": "object",
+                          "properties": {
+                            "slug": {
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "iconUrl": {
+                              "type": "string"
+                            },
+                            "fallbackIconUrl": {
+                              "type": "string"
+                            },
+                            "category": {
+                              "type": "string"
+                            },
+                            "authScheme": {
+                              "type": "string",
+                              "enum": [
+                                "oauth2",
+                                "api_key_global",
+                                "api_key_user"
+                              ]
+                            },
+                            "authFields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "text",
+                                      "secret"
+                                    ]
+                                  },
+                                  "placeholder": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "label",
+                                  "type"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "slug",
+                            "displayName",
+                            "description",
+                            "iconUrl",
+                            "fallbackIconUrl",
+                            "category",
+                            "authScheme"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "initiated",
+                            "active",
+                            "failed",
+                            "expired",
+                            "disconnected"
+                          ]
+                        },
+                        "connectUrl": {
+                          "type": "string"
+                        },
+                        "connectedAt": {
+                          "type": "string"
+                        },
+                        "credentialHints": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "returnTo": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "page",
+                            "chat"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "toolkit",
+                        "status"
+                      ]
+                    },
+                    "connectUrl": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "integration"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Toolkit not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Integration service not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/{integrationId}/refresh": {
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "integrationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Integration status refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "toolkit": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "iconUrl": {
+                          "type": "string"
+                        },
+                        "fallbackIconUrl": {
+                          "type": "string"
+                        },
+                        "category": {
+                          "type": "string"
+                        },
+                        "authScheme": {
+                          "type": "string",
+                          "enum": [
+                            "oauth2",
+                            "api_key_global",
+                            "api_key_user"
+                          ]
+                        },
+                        "authFields": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "secret"
+                                ]
+                              },
+                              "placeholder": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "type"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "displayName",
+                        "description",
+                        "iconUrl",
+                        "fallbackIconUrl",
+                        "category",
+                        "authScheme"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "initiated",
+                        "active",
+                        "failed",
+                        "expired",
+                        "disconnected"
+                      ]
+                    },
+                    "connectUrl": {
+                      "type": "string"
+                    },
+                    "connectedAt": {
+                      "type": "string"
+                    },
+                    "credentialHints": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "returnTo": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "page",
+                        "chat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "toolkit",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "State verification failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Integration service not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/{integrationId}": {
+      "delete": {
+        "tags": [
+          "Integrations"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "integrationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Integration disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "toolkit": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "iconUrl": {
+                          "type": "string"
+                        },
+                        "fallbackIconUrl": {
+                          "type": "string"
+                        },
+                        "category": {
+                          "type": "string"
+                        },
+                        "authScheme": {
+                          "type": "string",
+                          "enum": [
+                            "oauth2",
+                            "api_key_global",
+                            "api_key_user"
+                          ]
+                        },
+                        "authFields": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "secret"
+                                ]
+                              },
+                              "placeholder": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "type"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "displayName",
+                        "description",
+                        "iconUrl",
+                        "fallbackIconUrl",
+                        "category",
+                        "authScheme"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "initiated",
+                        "active",
+                        "failed",
+                        "expired",
+                        "disconnected"
+                      ]
+                    },
+                    "connectUrl": {
+                      "type": "string"
+                    },
+                    "connectedAt": {
+                      "type": "string"
+                    },
+                    "credentialHints": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "returnTo": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "page",
+                        "chat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "toolkit",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cannot disconnect global toolkit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of available skills",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "skills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "longDescription": {
+                            "type": "string"
+                          },
+                          "iconName": {
+                            "type": "string"
+                          },
+                          "iconUrl": {
+                            "type": "string"
+                          },
+                          "fallbackIconUrl": {
+                            "type": "string"
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "examples": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "tag": {
+                            "type": "string",
+                            "enum": [
+                              "office-collab",
+                              "file-knowledge",
+                              "creative-design",
+                              "biz-analysis",
+                              "av-generation",
+                              "info-content",
+                              "dev-tools"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "official",
+                              "custom"
+                            ]
+                          },
+                          "tools": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "slug": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "provider": {
+                                  "type": "string"
+                                },
+                                "iconUrl": {
+                                  "type": "string"
+                                },
+                                "fallbackIconUrl": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "slug",
+                                "name",
+                                "provider",
+                                "iconUrl",
+                                "fallbackIconUrl"
+                              ]
+                            }
+                          },
+                          "githubUrl": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "description",
+                          "iconName",
+                          "prompt",
+                          "tag",
+                          "source"
+                        ]
+                      }
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "office-collab",
+                              "file-knowledge",
+                              "creative-design",
+                              "biz-analysis",
+                              "av-generation",
+                              "info-content",
+                              "dev-tools"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "skills",
+                    "tags"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills/{slug}": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Skill detail with tool auth status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "longDescription": {
+                      "type": "string"
+                    },
+                    "iconName": {
+                      "type": "string"
+                    },
+                    "iconUrl": {
+                      "type": "string"
+                    },
+                    "fallbackIconUrl": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "examples": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "tag": {
+                      "type": "string",
+                      "enum": [
+                        "office-collab",
+                        "file-knowledge",
+                        "creative-design",
+                        "biz-analysis",
+                        "av-generation",
+                        "info-content",
+                        "dev-tools"
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "official",
+                        "custom"
+                      ]
+                    },
+                    "tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          },
+                          "iconUrl": {
+                            "type": "string"
+                          },
+                          "fallbackIconUrl": {
+                            "type": "string"
+                          },
+                          "authScheme": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "not_connected",
+                              "initiated",
+                              "expired"
+                            ]
+                          },
+                          "integrationId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "provider",
+                          "iconUrl",
+                          "fallbackIconUrl",
+                          "authScheme",
+                          "status"
+                        ]
+                      }
+                    },
+                    "githubUrl": {
+                      "type": "string"
+                    },
+                    "relatedSkills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "longDescription": {
+                            "type": "string"
+                          },
+                          "iconName": {
+                            "type": "string"
+                          },
+                          "iconUrl": {
+                            "type": "string"
+                          },
+                          "fallbackIconUrl": {
+                            "type": "string"
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "examples": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "tag": {
+                            "type": "string",
+                            "enum": [
+                              "office-collab",
+                              "file-knowledge",
+                              "creative-design",
+                              "biz-analysis",
+                              "av-generation",
+                              "info-content",
+                              "dev-tools"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "official",
+                              "custom"
+                            ]
+                          },
+                          "tools": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "slug": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "provider": {
+                                  "type": "string"
+                                },
+                                "iconUrl": {
+                                  "type": "string"
+                                },
+                                "fallbackIconUrl": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "slug",
+                                "name",
+                                "provider",
+                                "iconUrl",
+                                "fallbackIconUrl"
+                              ]
+                            }
+                          },
+                          "githubUrl": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "description",
+                          "iconName",
+                          "prompt",
+                          "tag",
+                          "source"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "slug",
+                    "name",
+                    "description",
+                    "iconName",
+                    "prompt",
+                    "tag",
+                    "source"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Skill not found",
             "content": {
               "application/json": {
                 "schema": {

@@ -1,4 +1,4 @@
-name: Deploy EKS
+name: Deploy EKS Test
 
 on:
   push:
@@ -13,7 +13,7 @@ on:
       - "pnpm-workspace.yaml"
       - "package.json"
       - "tsconfig.base.json"
-      - ".github/workflows/deploy-eks.yml"
+      - ".github/workflows/deploy-eks-test.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ env:
   AWS_REGION: us-east-1
 
 concurrency:
-  group: deploy-eks
+  group: deploy-eks-test
   cancel-in-progress: true
 
 jobs:
@@ -157,13 +157,13 @@ jobs:
             --arg webTag "$WEB_TAG" \
             --arg gatewayTag "$GATEWAY_TAG" \
             '{
-              repository: "refly-ai/nexu-apps",
-              environment: "prod",
+              repository: "powerformer/apps",
+              environment: "test",
               syncMode: "directCommit",
               changes: [
                 {
                   application: "nexu",
-                  valuesFilePath: "envs/prod/nexu/values.yaml",
+                  valuesFilePath: "kubernetes/envs/test/nexu/values.yaml",
                   valuesContent: ({
                     api: {image: {tag: $apiTag}},
                     web: {image: {tag: $webTag}},

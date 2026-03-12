@@ -1,0 +1,21 @@
+CREATE TABLE "supported_skills" (
+	"pk" serial PRIMARY KEY NOT NULL,
+	"id" text NOT NULL,
+	"slug" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text NOT NULL,
+	"long_description" text,
+	"icon_name" text DEFAULT 'Sparkles' NOT NULL,
+	"prompt" text NOT NULL,
+	"examples" text,
+	"tag" text DEFAULT 'office-collab' NOT NULL,
+	"source" text DEFAULT 'official' NOT NULL,
+	"toolkit_slugs" text,
+	"github_url" text,
+	"enabled" boolean DEFAULT true,
+	"sort_order" integer DEFAULT 0,
+	"created_at" text NOT NULL,
+	"updated_at" text NOT NULL,
+	CONSTRAINT "supported_skills_id_unique" UNIQUE("id"),
+	CONSTRAINT "supported_skills_slug_unique" UNIQUE("slug")
+);

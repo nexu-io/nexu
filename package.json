@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=--conditions=development pnpm --parallel --filter @nexu/api --filter @nexu/web --filter @nexu/landing dev",
+    "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names api,web,landing --prefix-colors blue,green,yellow \"pnpm --filter @nexu/api dev\" \"pnpm --filter @nexu/web dev\" \"pnpm --filter @nexu/landing dev\"",
     "dev:landing": "pnpm --filter @nexu/landing dev",
-    "dev:sidecar": "pnpm --filter @nexu/gateway dev",
+    "dev:sidecar": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
@@ -25,7 +25,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/node": "^25.3.1"
+    "@types/node": "^25.3.1",
+    "concurrently": "^9.2.1"
   },
   "engines": {
     "node": ">=20",

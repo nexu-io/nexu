@@ -20,7 +20,9 @@ import {
   registerChannelRoutes,
   registerSlackOAuthCallback,
 } from "./routes/channel-routes.js";
+import { registerComposioRoutes } from "./routes/composio-routes.js";
 import { registerFeedbackRoutes } from "./routes/feedback-routes.js";
+import { registerIntegrationRoutes } from "./routes/integration-routes.js";
 import { registerInviteRoutes } from "./routes/invite-routes.js";
 import { registerModelRoutes } from "./routes/model-routes.js";
 import { registerOnboardingRoutes } from "./routes/onboarding-routes.js";
@@ -30,7 +32,10 @@ import {
   registerSessionInternalRoutes,
   registerSessionRoutes,
 } from "./routes/session-routes.js";
-import { registerSkillRoutes } from "./routes/skill-routes.js";
+import {
+  registerSkillCatalogRoutes,
+  registerSkillRoutes,
+} from "./routes/skill-routes.js";
 import { registerSlackEvents } from "./routes/slack-events.js";
 import { registerUserRoutes } from "./routes/user-routes.js";
 import { registerWorkspaceTemplateRoutes } from "./routes/workspace-template-routes.js";
@@ -82,6 +87,7 @@ export function createApp() {
   registerArtifactInternalRoutes(app);
   registerSessionInternalRoutes(app);
   registerSecretRoutes(app);
+  registerComposioRoutes(app);
   registerSkillRoutes(app);
   registerWorkspaceTemplateRoutes(app);
   registerFeedbackRoutes(app);
@@ -97,6 +103,8 @@ export function createApp() {
   registerPoolRoutes(app);
   registerArtifactRoutes(app);
   registerSessionRoutes(app);
+  registerIntegrationRoutes(app);
+  registerSkillCatalogRoutes(app);
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",
