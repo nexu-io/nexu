@@ -145,9 +145,7 @@ export function OAuthCallbackPage() {
               const channels = channelsData?.channels ?? [];
               chatChannels = [
                 ...new Set(
-                  channels
-                    .map((ch) => ch.channelType)
-                    .filter((t) => !!t),
+                  channels.map((ch) => ch.channelType).filter((t) => !!t),
                 ),
               ];
 
