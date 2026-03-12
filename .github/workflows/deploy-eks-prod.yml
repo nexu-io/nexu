@@ -144,13 +144,13 @@ jobs:
             --arg webTag "$WEB_TAG" \
             --arg gatewayTag "$GATEWAY_TAG" \
             '{
-              repository: "refly-ai/nexu-apps",
+              repository: "powerformer/apps",
               environment: "prod",
               syncMode: "directCommit",
               changes: [
                 {
                   application: "nexu",
-                  valuesFilePath: "envs/prod/nexu/values.yaml",
+                  valuesFilePath: "kubernetes/envs/prod/nexu/values.yaml",
                   valuesContent: ({
                     api: {image: {tag: $apiTag}},
                     web: {image: {tag: $webTag}},
