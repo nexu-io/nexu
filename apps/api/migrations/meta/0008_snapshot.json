@@ -150,9 +150,7 @@
         "api_keys_id_unique": {
           "name": "api_keys_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -347,9 +345,7 @@
         "artifacts_id_unique": {
           "name": "artifacts_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -447,12 +443,8 @@
           "name": "account_userId_fkey",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -524,12 +516,8 @@
           "name": "session_userId_fkey",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -539,9 +527,7 @@
         "session_token_key": {
           "name": "session_token_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -605,9 +591,7 @@
         "user_email_key": {
           "name": "user_email_key",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -761,9 +745,7 @@
         "bot_channels_id_unique": {
           "name": "bot_channels_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -886,9 +868,7 @@
         "bots_id_unique": {
           "name": "bots_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -965,9 +945,7 @@
         "channel_credentials_id_unique": {
           "name": "channel_credentials_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -1042,16 +1020,12 @@
         "gateway_assignments_id_unique": {
           "name": "gateway_assignments_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "gateway_assignments_bot_id_unique": {
           "name": "gateway_assignments_bot_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "bot_id"
-          ]
+          "columns": ["bot_id"]
         }
       },
       "policies": {},
@@ -1148,16 +1122,12 @@
         "gateway_pools_id_unique": {
           "name": "gateway_pools_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "gateway_pools_pool_name_unique": {
           "name": "gateway_pools_pool_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "pool_name"
-          ]
+          "columns": ["pool_name"]
         }
       },
       "policies": {},
@@ -1234,9 +1204,7 @@
         "integration_credentials_id_unique": {
           "name": "integration_credentials_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -1305,16 +1273,12 @@
         "invite_codes_id_unique": {
           "name": "invite_codes_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "invite_codes_code_unique": {
           "name": "invite_codes_code_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "code"
-          ]
+          "columns": ["code"]
         }
       },
       "policies": {},
@@ -1387,16 +1351,12 @@
         "oauth_states_id_unique": {
           "name": "oauth_states_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "oauth_states_state_unique": {
           "name": "oauth_states_state_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "state"
-          ]
+          "columns": ["state"]
         }
       },
       "policies": {},
@@ -1500,9 +1460,7 @@
         "pool_config_snapshots_id_unique": {
           "name": "pool_config_snapshots_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -1592,9 +1550,7 @@
         "pool_secrets_id_unique": {
           "name": "pool_secrets_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -1754,16 +1710,12 @@
         "sessions_id_unique": {
           "name": "sessions_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "sessions_session_key_unique": {
           "name": "sessions_session_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "session_key"
-          ]
+          "columns": ["session_key"]
         }
       },
       "policies": {},
@@ -1832,16 +1784,12 @@
         "skills_id_unique": {
           "name": "skills_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "skills_name_unique": {
           "name": "skills_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
@@ -1896,16 +1844,12 @@
         "skills_snapshots_id_unique": {
           "name": "skills_snapshots_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "skills_snapshots_version_unique": {
           "name": "skills_snapshots_version_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "version"
-          ]
+          "columns": ["version"]
         }
       },
       "policies": {},
@@ -2031,16 +1975,12 @@
         "supported_skills_id_unique": {
           "name": "supported_skills_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "supported_skills_slug_unique": {
           "name": "supported_skills_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -2141,16 +2081,12 @@
         "supported_toolkits_id_unique": {
           "name": "supported_toolkits_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "supported_toolkits_slug_unique": {
           "name": "supported_toolkits_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -2219,9 +2155,7 @@
         "usage_metrics_id_unique": {
           "name": "usage_metrics_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -2356,9 +2290,7 @@
         "user_integrations_id_unique": {
           "name": "user_integrations_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -2474,16 +2406,12 @@
         "users_id_unique": {
           "name": "users_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "users_auth_user_id_unique": {
           "name": "users_auth_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "auth_user_id"
-          ]
+          "columns": ["auth_user_id"]
         }
       },
       "policies": {},
@@ -2590,9 +2518,7 @@
         "webhook_routes_id_unique": {
           "name": "webhook_routes_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "policies": {},
@@ -2647,16 +2573,12 @@
         "workspace_template_snapshots_id_unique": {
           "name": "workspace_template_snapshots_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "workspace_template_snapshots_version_unique": {
           "name": "workspace_template_snapshots_version_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "version"
-          ]
+          "columns": ["version"]
         }
       },
       "policies": {},
@@ -2725,16 +2647,12 @@
         "workspace_templates_id_unique": {
           "name": "workspace_templates_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "workspace_templates_name_unique": {
           "name": "workspace_templates_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
