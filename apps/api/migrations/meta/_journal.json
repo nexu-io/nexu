@@ -57,6 +57,13 @@
       "when": 1773062523493,
       "tag": "0007_ambiguous_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773299719847,
+      "tag": "0008_colorful_rocket_racer",
+      "breakpoints": true
     }
   ]
 }

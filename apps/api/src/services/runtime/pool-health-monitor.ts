@@ -1,4 +1,4 @@
-import { and, lt, ne } from "drizzle-orm";
+import { and, gte, lt, ne } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import type { Database } from "../../db/index.js";
 import { gatewayPools } from "../../db/schema/index.js";
@@ -12,11 +12,12 @@ const STALE_HEARTBEAT_MS = 60_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
-async function scanStalePools(db: Database): Promise<void> {
+async function scanPools(db: Database): Promise<void> {
   const staleThreshold = new Date(
     Date.now() - STALE_HEARTBEAT_MS,
   ).toISOString();
 
+  // Mark pools with stale heartbeats as unhealthy
   const stalePools = await db
     .select({
       id: gatewayPools.id,
@@ -44,6 +45,33 @@ async function scanStalePools(db: Database): Promise<void> {
       previousStatus: pool.status,
     });
   }
+
+  // Recover pools whose heartbeats are fresh but still marked unhealthy
+  const recoveredPools = await db
+    .select({
+      id: gatewayPools.id,
+      lastHeartbeat: gatewayPools.lastHeartbeat,
+    })
+    .from(gatewayPools)
+    .where(
+      and(
+        gte(gatewayPools.lastHeartbeat, staleThreshold),
+        eq(gatewayPools.status, "unhealthy"),
+      ),
+    );
+
+  for (const pool of recoveredPools) {
+    await db
+      .update(gatewayPools)
+      .set({ status: "active" })
+      .where(eq(gatewayPools.id, pool.id));
+
+    logger.info({
+      message: "pool_recovered_active",
+      poolId: pool.id,
+      lastHeartbeat: pool.lastHeartbeat,
+    });
+  }
 }
 
 export function startPoolHealthMonitor(db: Database): void {
@@ -52,7 +80,7 @@ export function startPoolHealthMonitor(db: Database): void {
   }
 
   timer = setInterval(() => {
-    scanStalePools(db).catch((err) => {
+    scanPools(db).catch((err) => {
       logger.error({
         message: "pool_health_scan_failed",
         error: String(err),
