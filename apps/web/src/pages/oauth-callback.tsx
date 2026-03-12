@@ -12,7 +12,10 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "@/lib/api";
-import { postApiV1IntegrationsByIntegrationIdRefresh } from "../../lib/api/sdk.gen";
+import {
+  getApiV1Channels,
+  postApiV1IntegrationsByIntegrationIdRefresh,
+} from "../../lib/api/sdk.gen";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -21,6 +24,11 @@ interface ToolkitInfo {
   toolkitDisplayName: string;
   toolkitIconUrl: string;
   toolkitFallbackIconUrl?: string;
+}
+
+interface SlackDeeplink {
+  nativeUrl: string;
+  webUrl: string;
 }
 
 type CallbackState =
@@ -33,6 +41,7 @@ type CallbackState =
       toolkitSlug: string;
       toolkitIconUrl: string;
       toolkitFallbackIconUrl?: string;
+      slackDeeplink?: SlackDeeplink;
     }
   | { phase: "error"; message: string };
 
@@ -127,6 +136,33 @@ export function OAuthCallbackPage() {
 
           const source = refreshed.source;
           if (source === "chat") {
+            // Fetch Slack channel info to build a deeplink back to the DM
+            let slackDeeplink: SlackDeeplink | undefined;
+            try {
+              const { data: channelsData } = await getApiV1Channels();
+              const slackChannel = channelsData?.channels?.find(
+                (ch) => ch.channelType === "slack",
+              );
+              if (slackChannel) {
+                const accountId = slackChannel.accountId ?? "";
+                const botUserId = slackChannel.botUserId;
+                const teamId = accountId.replace(/^slack-[^-]+-/, "");
+                if (teamId && botUserId) {
+                  slackDeeplink = {
+                    nativeUrl: `slack://user?team=${teamId}&id=${botUserId}`,
+                    webUrl: `https://app.slack.com/client/${teamId}/messages/${botUserId}`,
+                  };
+                } else if (teamId) {
+                  slackDeeplink = {
+                    nativeUrl: `slack://open?team=${teamId}`,
+                    webUrl: `https://app.slack.com/client/${teamId}`,
+                  };
+                }
+              }
+            } catch {
+              // Best effort — fall back to generic links
+            }
+
             setCallbackState({
               phase: "success",
               source: "chat",
@@ -135,6 +171,7 @@ export function OAuthCallbackPage() {
               toolkitSlug: refreshed.toolkit.slug,
               toolkitIconUrl: refreshed.toolkit.iconUrl,
               toolkitFallbackIconUrl: refreshed.toolkit.fallbackIconUrl,
+              slackDeeplink,
             });
           } else {
             // page source or undefined — redirect
@@ -310,18 +347,34 @@ function SuccessCard({
         {/* Return buttons for chat source */}
         {state.source === "chat" && (
           <div className="space-y-2.5 mb-4">
-            <a
-              href="https://slack.com/open"
+            <button
+              type="button"
+              onClick={() => {
+                const deeplink = state.slackDeeplink;
+                const nativeUrl = deeplink?.nativeUrl ?? "slack://open";
+                const webUrl = deeplink?.webUrl ?? "https://slack.com/open";
+
+                // Try native Slack app first; fall back to web after 3s
+                const fallbackTimer = setTimeout(() => {
+                  window.open(webUrl, "_blank", "noopener,noreferrer");
+                }, 3000);
+                const cancelFallback = () => {
+                  clearTimeout(fallbackTimer);
+                  window.removeEventListener("blur", cancelFallback);
+                };
+                window.addEventListener("blur", cancelFallback);
+                window.location.href = nativeUrl;
+              }}
               className={cn(
                 "flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl",
                 "bg-[#4A154B] text-white text-[13px] font-medium",
-                "hover:bg-[#3e1240] transition-colors",
+                "hover:bg-[#3e1240] transition-colors cursor-pointer",
               )}
             >
               <SlackIcon size={16} />
               Return to Slack
               <ExternalLink size={12} className="opacity-60" />
-            </a>
+            </button>
             <a
               href="https://discord.com/channels/@me"
               className={cn(

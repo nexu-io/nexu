@@ -237,39 +237,14 @@ async function resolveComposioUserContext(
       ),
     );
 
-  if (userBots.length === 0) {
+  // Find any bot with a pool to look up COMPOSIO_API_KEY
+  const bot = userBots.find((b) => b.poolId);
+  if (!bot?.poolId) {
     return {
       ok: false,
       status: 400,
       message:
-        "Composio integrations require exactly one active or paused bot for this user",
-    };
-  }
-
-  if (userBots.length > 1) {
-    return {
-      ok: false,
-      status: 409,
-      message:
-        "Composio integrations are only supported for users with a single bot",
-    };
-  }
-
-  const bot = userBots[0];
-  if (!bot) {
-    return {
-      ok: false,
-      status: 400,
-      message:
-        "Composio integrations require exactly one active or paused bot for this user",
-    };
-  }
-  if (!bot.poolId) {
-    return {
-      ok: false,
-      status: 400,
-      message:
-        "Composio integrations require the user's bot to be assigned to a pool",
+        "Composio integrations require at least one bot assigned to a pool",
     };
   }
 

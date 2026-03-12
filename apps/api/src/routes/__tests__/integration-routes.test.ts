@@ -598,10 +598,10 @@ describe("Integration Routes", () => {
 
       expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.message).toContain("exactly one active or paused bot");
+      expect(body.message).toContain("at least one bot assigned to a pool");
     });
 
-    it("oauth2 connect rejects users with multiple active or paused bots", async () => {
+    it("oauth2 connect succeeds for users with multiple bots (uses first pooled bot)", async () => {
       await seedToolkit(setupPool, { slug: "notion" });
       await seedBot(setupPool, {
         id: "bot-1",
@@ -620,9 +620,8 @@ describe("Integration Routes", () => {
         body: JSON.stringify({ toolkitSlug: "notion" }),
       });
 
-      expect(res.status).toBe(409);
-      const body = await res.json();
-      expect(body.message).toContain("single bot");
+      // Should not be rejected — multi-bot users are allowed
+      expect(res.status).not.toBe(409);
     });
 
     it("oauth2 connect rejects users whose only bot has no pool assignment", async () => {
@@ -796,7 +795,7 @@ describe("Integration Routes", () => {
       expect(rows[0].oauth_state).toBe("pending-state");
     });
 
-    it("refresh rejects users with multiple active or paused bots", async () => {
+    it("refresh succeeds for users with multiple bots (uses first pooled bot)", async () => {
       await seedToolkit(setupPool, { slug: "notion" });
       await seedBot(setupPool, {
         id: "bot-1",
@@ -824,9 +823,8 @@ describe("Integration Routes", () => {
         },
       );
 
-      expect(res.status).toBe(409);
-      const body = await res.json();
-      expect(body.message).toContain("single bot");
+      // Should not be rejected — multi-bot users are allowed
+      expect(res.status).not.toBe(409);
     });
 
     it("refresh on active api_key_user integration returns 200 idempotently", async () => {
