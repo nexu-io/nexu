@@ -1,6 +1,7 @@
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
+  type OpenClawConfig,
   openclawConfigSchema,
   runtimePoolConfigResponseSchema,
 } from "@nexu/shared";
@@ -71,6 +72,36 @@ export async function pollLatestConfig(state: RuntimeState): Promise<boolean> {
   return true;
 }
 
+/**
+ * Strip Feishu channels and bindings from the config so OpenClaw starts
+ * without them.  Feishu bot-info probes time out when the event loop is
+ * saturated by concurrent Slack/Discord initialization.  By deferring
+ * Feishu to a hot-reload cycle (after other channels are ready) the
+ * probes complete on an idle event loop.
+ */
+function stripFeishuFromConfig(config: OpenClawConfig): {
+  stripped: OpenClawConfig;
+  hadFeishu: boolean;
+} {
+  if (!config.channels.feishu) {
+    return { stripped: config, hadFeishu: false };
+  }
+
+  const { feishu: _, ...channelsWithoutFeishu } = config.channels;
+  const bindingsWithoutFeishu = config.bindings.filter(
+    (b) => b.match.channel !== "feishu",
+  );
+
+  return {
+    stripped: {
+      ...config,
+      channels: channelsWithoutFeishu,
+      bindings: bindingsWithoutFeishu,
+    },
+    hadFeishu: true,
+  };
+}
+
 export async function fetchInitialConfig(): Promise<void> {
   const response = await fetchJson(
     `/api/internal/pools/${env.RUNTIME_POOL_ID}/config`,
@@ -80,7 +111,19 @@ export async function fetchInitialConfig(): Promise<void> {
   );
 
   const payload = openclawConfigSchema.parse(response);
-  const configJson = JSON.stringify(payload, null, 2);
+
+  let configToWrite = payload;
+  if (env.RUNTIME_DEFER_FEISHU_INIT) {
+    const { stripped, hadFeishu } = stripFeishuFromConfig(payload);
+    if (hadFeishu) {
+      logger.info(
+        "deferred feishu channels from initial config; will inject via hot-reload",
+      );
+    }
+    configToWrite = stripped;
+  }
+
+  const configJson = JSON.stringify(configToWrite, null, 2);
   await atomicWriteConfig(configJson);
 
   // Write initial context — agentMeta not available from raw config endpoint,
