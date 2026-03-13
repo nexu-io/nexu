@@ -12,8 +12,10 @@ import type {
   RuntimeUnitState,
 } from "../shared/host";
 import {
+  getApiBaseUrl,
   getRuntimeConfig,
   getRuntimeState,
+  openExternal,
   startAllUnits,
   startUnit,
   stopAllUnits,
@@ -58,6 +60,138 @@ function phaseTone(phase: RuntimeUnitPhase): string {
 
 function kindLabel(unit: RuntimeUnitState): string {
   return `${unit.kind} / ${unit.launchStrategy}`;
+}
+
+interface CloudStatus {
+  connected: boolean;
+  polling: boolean;
+  userName: string | null;
+  userEmail: string | null;
+  connectedAt: string | null;
+}
+
+function CloudConnectionCard() {
+  const [apiBase, setApiBase] = useState<string | null>(null);
+  const [status, setStatus] = useState<CloudStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getApiBaseUrl().then(setApiBase).catch(() => null);
+  }, []);
+
+  const fetchStatus = useCallback(async () => {
+    if (!apiBase) return;
+    try {
+      const res = await fetch(`${apiBase}/api/internal/desktop/cloud-status`);
+      const data = (await res.json()) as CloudStatus;
+      setStatus(data);
+      setError(null);
+    } catch {
+      // API not ready yet
+    }
+  }, [apiBase]);
+
+  useEffect(() => {
+    void fetchStatus();
+    const timer = window.setInterval(() => void fetchStatus(), 3000);
+    return () => window.clearInterval(timer);
+  }, [fetchStatus]);
+
+  const handleConnect = async () => {
+    if (!apiBase) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${apiBase}/api/internal/desktop/cloud-connect`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { error?: string };
+        setError(body.error ?? "Failed to initiate connection");
+        setBusy(false);
+        return;
+      }
+      const data = (await res.json()) as { browserUrl: string };
+      await openExternal(data.browserUrl);
+      setBusy(false);
+      // Polling state will be picked up by fetchStatus
+    } catch {
+      setError("Failed to connect");
+      setBusy(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!apiBase) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await fetch(`${apiBase}/api/internal/desktop/cloud-disconnect`, {
+        method: "POST",
+      });
+      await fetchStatus();
+    } catch {
+      setError("Failed to disconnect");
+    }
+    setBusy(false);
+  };
+
+  const isConnected = status?.connected ?? false;
+  const isPolling = status?.polling ?? false;
+
+  return (
+    <article className="cloud-card">
+      <div className="cloud-card-head">
+        <div>
+          <div className="runtime-label-row">
+            <strong>Cloud Connection</strong>
+            <span
+              className={`runtime-badge ${isConnected ? "is-running" : isPolling ? "is-busy" : "is-idle"}`}
+            >
+              {isConnected
+                ? "connected"
+                : isPolling
+                  ? "waiting..."
+                  : "disconnected"}
+            </span>
+          </div>
+          {isConnected && status?.userEmail && (
+            <p className="cloud-user-info">
+              {status.userName ? `${status.userName} · ` : ""}
+              {status.userEmail}
+            </p>
+          )}
+          {isPolling && (
+            <p className="cloud-user-info">
+              Waiting for browser login... Check your browser.
+            </p>
+          )}
+        </div>
+        <div className="runtime-actions">
+          {isConnected ? (
+            <button
+              disabled={busy}
+              onClick={() => void handleDisconnect()}
+              type="button"
+              className="cloud-disconnect-btn"
+            >
+              Disconnect
+            </button>
+          ) : (
+            <button
+              disabled={busy || isPolling}
+              onClick={() => void handleConnect()}
+              type="button"
+            >
+              {isPolling ? "Waiting..." : "Connect"}
+            </button>
+          )}
+        </div>
+      </div>
+      {error && <p className="runtime-error">{error}</p>}
+    </article>
+  );
 }
 
 function RuntimeUnitCard({
@@ -266,6 +400,10 @@ function RuntimePage() {
           <dt>Failed</dt>
           <dd>{summary.failed}</dd>
         </div>
+      </section>
+
+      <section className="cloud-section">
+        <CloudConnectionCard />
       </section>
 
       <p className="runtime-note">

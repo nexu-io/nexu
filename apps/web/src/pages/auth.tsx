@@ -89,10 +89,38 @@ export function AuthPage() {
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
   const isLogin = searchParams.get("mode") !== "signup";
+  const isDesktopAuth = searchParams.get("desktop") === "1";
+  const deviceId = searchParams.get("device_id");
   const [loading, setLoading] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [desktopConnected, setDesktopConnected] = useState(false);
+  const [desktopAuthorizing, setDesktopAuthorizing] = useState(false);
+
+  /** After login, authorize the desktop device and show success screen. */
+  const handleDesktopAuthorize = useCallback(async () => {
+    if (!deviceId) return;
+    setDesktopAuthorizing(true);
+    try {
+      const res = await fetch("/api/v1/auth/desktop-authorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ deviceId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast.error((body as { error?: string }).error ?? "Failed to connect desktop");
+        setDesktopAuthorizing(false);
+        return;
+      }
+      setDesktopConnected(true);
+    } catch {
+      toast.error("Failed to connect desktop app");
+      setDesktopAuthorizing(false);
+    }
+  }, [deviceId]);
 
   // OTP verification state
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -157,6 +185,11 @@ export function AuthPage() {
         user_email: email,
         ...(isLogin ? {} : { signup_date: new Date().toISOString() }),
       });
+      if (isDesktopAuth && deviceId) {
+        await handleDesktopAuthorize();
+        setVerifying(false);
+        return;
+      }
       navigate("/workspace");
     } catch {
       toast.error("Verification failed");
@@ -182,7 +215,12 @@ export function AuthPage() {
         user_email: session.user.email,
       });
     }
-  }, [session?.user]);
+
+    // Desktop auth: authorize the device after OAuth callback
+    if (isDesktopAuth && deviceId && !desktopConnected) {
+      handleDesktopAuthorize();
+    }
+  }, [session?.user, isDesktopAuth, deviceId, desktopConnected, handleDesktopAuthorize]);
 
   if (isPending) {
     return (
@@ -192,7 +230,7 @@ export function AuthPage() {
     );
   }
 
-  if (session?.user) {
+  if (session?.user && !isDesktopAuth) {
     return <Navigate to="/workspace" replace />;
   }
 
@@ -201,9 +239,12 @@ export function AuthPage() {
     sessionStorage.setItem("nexu_auth_mode", isLogin ? "login" : "signup");
     sessionStorage.setItem("nexu_auth_provider", provider);
     try {
+      const callbackURL = isDesktopAuth && deviceId
+        ? `${window.location.origin}/auth?desktop=1&device_id=${encodeURIComponent(deviceId)}`
+        : `${window.location.origin}/workspace`;
       await authClient.signIn.social({
         provider,
-        callbackURL: `${window.location.origin}/workspace`,
+        callbackURL,
       });
     } catch {
       setLoading(null);
@@ -242,6 +283,11 @@ export function AuthPage() {
         }
         track("login_email_success");
         identify({ auth_method: "email", user_email: email });
+        if (isDesktopAuth && deviceId) {
+          await handleDesktopAuthorize();
+          setLoading(null);
+          return;
+        }
         navigate("/workspace");
       } else {
         const { error } = await authClient.signUp.email({
@@ -292,6 +338,39 @@ export function AuthPage() {
       setLoading(null);
     }
   };
+
+  // Desktop connection success screen
+  if (desktopConnected) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-0">
+        <div className="text-center max-w-[400px] px-6">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <h1 className="text-[22px] font-bold text-text-primary mb-2">
+            Connected!
+          </h1>
+          <p className="text-[14px] text-text-muted leading-relaxed">
+            Your Nexu Desktop app is now connected to your cloud account. You can close this tab and return to the desktop app.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop authorizing screen (waiting for API call)
+  if (desktopAuthorizing) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-0">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-accent mx-auto mb-4" />
+          <p className="text-[14px] text-text-muted">Connecting your desktop app...</p>
+        </div>
+      </div>
+    );
+  }
 
   // OTP verification screen
   if (pendingVerification) {
@@ -501,6 +580,13 @@ export function AuthPage() {
           <div className="w-full max-w-[360px]">
             {/* Header */}
             <div className="mb-8">
+              {isDesktopAuth && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20">
+                  <p className="text-[13px] text-accent font-medium">
+                    Log in to connect your Nexu Desktop app
+                  </p>
+                </div>
+              )}
               <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
                 {isLogin ? "Welcome back" : "Create your account"}
               </h1>

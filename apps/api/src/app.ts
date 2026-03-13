@@ -39,8 +39,18 @@ import {
 import { registerSlackEvents } from "./routes/slack-events.js";
 import { registerUserRoutes } from "./routes/user-routes.js";
 import { registerWorkspaceTemplateRoutes } from "./routes/workspace-template-routes.js";
+import {
+  registerDesktopDeviceRoutes,
+  registerDesktopAuthorizeRoute,
+} from "./routes/desktop-auth-routes.js";
+import { registerDesktopLocalRoutes } from "./routes/desktop-local-routes.js";
 
 import type { AppBindings } from "./types.js";
+
+/** Whether this API instance is running in Nexu Desktop (local) mode. */
+export function isDesktopMode(): boolean {
+  return process.env.NEXU_DESKTOP_MODE === "true";
+}
 
 class HealthHandler {
   constructor(private readonly commitHash?: string) {}
@@ -81,7 +91,14 @@ export function createApp() {
     }),
   );
 
+  // Desktop mode: permissive CORS for internal endpoints (localhost-only, safe)
+  if (isDesktopMode()) {
+    app.use("/api/internal/desktop/*", cors({ origin: "*" }));
+    registerDesktopLocalRoutes(app);
+  }
+
   registerAuthRoutes(app);
+  registerDesktopDeviceRoutes(app);
   registerSlackOAuthCallback(app);
   registerSlackEvents(app);
   registerArtifactInternalRoutes(app);
@@ -94,6 +111,7 @@ export function createApp() {
 
   app.use("/api/v1/*", authMiddleware);
 
+  registerDesktopAuthorizeRoute(app);
   registerUserRoutes(app);
   registerOnboardingRoutes(app);
   registerBotRoutes(app);

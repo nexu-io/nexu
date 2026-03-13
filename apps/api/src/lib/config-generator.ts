@@ -15,8 +15,39 @@ import {
   channelCredentials,
   gatewayPools,
 } from "../db/schema/index.js";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { decrypt } from "./crypto.js";
 import { ServiceError } from "./error.js";
+
+/**
+ * Load cloud connection credentials (Link gateway) in desktop mode.
+ * Returns null if not in desktop mode or no credentials exist.
+ */
+function loadCloudConfig(): {
+  linkUrl: string;
+  apiKey: string;
+  models: Array<{ id: string; name: string; provider?: string }>;
+} | null {
+  if (process.env.NEXU_DESKTOP_MODE !== "true") return null;
+
+  const stateDir =
+    process.env.OPENCLAW_STATE_DIR ?? path.join(process.cwd(), ".nexu-state");
+  const credPath = path.join(stateDir, "cloud-credentials.json");
+  if (!fs.existsSync(credPath)) return null;
+
+  try {
+    const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
+    if (!creds.encryptedApiKey || !creds.linkGatewayUrl) return null;
+    return {
+      linkUrl: creds.linkGatewayUrl,
+      apiKey: decrypt(creds.encryptedApiKey),
+      models: creds.cloudModels ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
 
 interface ChannelCredentialRow {
   credentialType: string;
@@ -110,12 +141,17 @@ export async function generatePoolConfig(
   const litellmApiKey = process.env.LITELLM_API_KEY;
   const hasLitellm = Boolean(litellmBaseUrl && litellmApiKey);
 
-  // Prefix model ID with "litellm/" when LiteLLM is configured
+  // Link gateway provider (desktop cloud connection)
+  const cloudCfg = loadCloudConfig();
+  const hasLink = Boolean(cloudCfg && cloudCfg.models.length > 0);
+
+  // Prefix model ID with provider namespace for routing
   function resolveModelId(rawModelId: string): string {
-    if (!hasLitellm) return rawModelId;
-    // Already prefixed — skip
-    if (rawModelId.startsWith("litellm/")) return rawModelId;
-    return `litellm/${rawModelId}`;
+    if (rawModelId.startsWith("litellm/") || rawModelId.startsWith("link/"))
+      return rawModelId;
+    if (hasLitellm) return `litellm/${rawModelId}`;
+    if (hasLink) return `link/${rawModelId}`;
+    return rawModelId;
   }
 
   // Workspace path must be under the PVC mount so agent files survive pod restarts.
@@ -421,6 +457,34 @@ export async function generatePoolConfig(
         },
       },
     };
+  }
+
+  // Add Link gateway provider when cloud-connected in desktop mode
+  if (cloudCfg && cloudCfg.models.length > 0) {
+    const linkProvider = {
+      baseUrl: `${cloudCfg.linkUrl}/v1`,
+      apiKey: cloudCfg.apiKey,
+      api: "openai-completions",
+      models: cloudCfg.models.map((m) => ({
+        id: m.id,
+        name: m.name || m.id,
+        reasoning: false,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200000,
+        maxTokens: 8192,
+        compat: { supportsStore: false },
+      })),
+    };
+
+    if (config.models) {
+      config.models.providers.link = linkProvider;
+    } else {
+      config.models = {
+        mode: "merge",
+        providers: { link: linkProvider },
+      };
+    }
   }
 
   if (Object.keys(slackAccounts).length > 0) {

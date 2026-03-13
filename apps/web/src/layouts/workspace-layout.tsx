@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronUp,
+  Cpu,
   LogOut,
   Menu,
   MessageSquare,
@@ -154,6 +155,7 @@ export function WorkspaceLayout() {
   const sessionMatch = location.pathname.match(/\/workspace\/sessions\/(.+)/);
   const selectedSessionId = sessionMatch?.[1] ?? null;
   const isChannelsPage = location.pathname.includes("/channels");
+  const isModelsPage = location.pathname.includes("/models");
   const isSkillsPage = location.pathname.includes("/skills");
 
   const handleLogout = async () => {
@@ -168,6 +170,7 @@ export function WorkspaceLayout() {
   const showEmptyState =
     sessions.length === 0 &&
     !isChannelsPage &&
+    !isModelsPage &&
     !isSkillsPage &&
     !selectedSessionId;
 
@@ -176,14 +179,18 @@ export function WorkspaceLayout() {
     : null;
   const mobileTitle = isChannelsPage
     ? "Channels"
-    : isSkillsPage
-      ? "Skills"
-      : selectedSession?.title || "Conversations";
+    : isModelsPage
+      ? "Models"
+      : isSkillsPage
+        ? "Skills"
+        : selectedSession?.title || "Conversations";
   const mobileSubtitle = isChannelsPage
     ? "Configure your channels"
-    : isSkillsPage
-      ? "Browse AI capabilities"
-      : selectedSession
+    : isModelsPage
+      ? "Manage AI models"
+      : isSkillsPage
+        ? "Browse AI capabilities"
+        : selectedSession
         ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
         : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
@@ -355,6 +362,21 @@ export function WorkspaceLayout() {
             >
               <Zap size={14} />
               {!collapsed && "Skills"}
+            </Link>
+            <Link
+              to="/workspace/models"
+              title={collapsed ? "Models" : undefined}
+              onClick={() => track("workspace_models_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isModelsPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <Cpu size={14} />
+              {!collapsed && "Models"}
             </Link>
           </div>
         </div>
@@ -579,6 +601,22 @@ export function WorkspaceLayout() {
                   >
                     <Zap size={14} />
                     Skills
+                  </Link>
+                  <Link
+                    to="/workspace/models"
+                    onClick={() => {
+                      track("workspace_models_click");
+                      setMobileDrawerOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1 px-3 py-2",
+                      isModelsPage
+                        ? "bg-accent/10 text-accent"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                    )}
+                  >
+                    <Cpu size={14} />
+                    Models
                   </Link>
                 </div>
               </div>

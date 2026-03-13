@@ -348,6 +348,41 @@
   border: 1px solid #f1c3bb;
 }
 
+/* Cloud Connection Card */
+.cloud-section {
+  max-width: 1080px;
+  margin: 0 auto 16px;
+}
+
+.cloud-card {
+  border: 1px solid #ddd5c5;
+  border-radius: 20px;
+  background: rgba(255, 252, 245, 0.92);
+  padding: 18px;
+}
+
+.cloud-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.cloud-user-info {
+  margin: 6px 0 0;
+  color: #5e636d;
+  font-size: 0.85rem;
+}
+
+.cloud-disconnect-btn {
+  border-color: #e8b4b0 !important;
+  color: #a33a33 !important;
+}
+
+.cloud-disconnect-btn:hover {
+  background: #ffe7e2 !important;
+}
+
 @media (max-width: 860px) {
   .runtime-page {
     padding: 18px;

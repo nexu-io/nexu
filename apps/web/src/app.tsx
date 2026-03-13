@@ -10,6 +10,7 @@ import { OAuthCallbackPage } from "./pages/oauth-callback";
 import { OnboardingPage } from "./pages/onboarding";
 import { SessionsPage } from "./pages/sessions";
 import { SkillDetailPage } from "./pages/skill-detail";
+import { ModelsPage } from "./pages/models";
 import { SkillsPage } from "./pages/skills";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
 
@@ -22,6 +23,7 @@ function DocumentTitleSync() {
       "/onboarding": "Get Started · Nexu",
       "/workspace": "Workspace · Nexu",
       "/workspace/integrations": "Integrations · Nexu",
+      "/workspace/models": "Models · Nexu",
       "/workspace/skills": "Skills · Nexu",
     };
 
@@ -63,6 +65,7 @@ export function App() {
                 path="/workspace/integrations"
                 element={<IntegrationsPage />}
               />
+              <Route path="/workspace/models" element={<ModelsPage />} />
               <Route path="/workspace/skills" element={<SkillsPage />} />
               <Route
                 path="/workspace/skills/:slug"

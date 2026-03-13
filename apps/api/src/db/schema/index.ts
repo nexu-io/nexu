@@ -554,6 +554,30 @@ export const supportedSkills = pgTable("supported_skills", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+// Desktop cloud connection: stores pending device authorizations for the
+// "Connect to Cloud" flow. Rows are short-lived (5 min expiry) and deleted
+// after the desktop client polls the completed API key.
+export const desktopDeviceAuthorizations = pgTable(
+  "desktop_device_authorizations",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    deviceId: text("device_id").notNull().unique(),
+    deviceSecretHash: text("device_secret_hash").notNull(),
+    userId: text("user_id"),
+    encryptedApiKey: text("encrypted_api_key"),
+    status: text("status").notNull().default("pending"),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index("desktop_device_auth_device_id_idx").on(table.deviceId),
+    index("desktop_device_auth_status_idx").on(table.status),
+  ],
+);
+
 // Test-only table used to validate post-merge DB migration workflow.
 export const e2eTestMigration = pgTable("e2e_test_migration", {
   id: text("id").primaryKey(),
