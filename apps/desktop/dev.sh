@@ -91,7 +91,7 @@ build_runtime() {
 start_session() {
   log "starting tmux session '$SESSION_NAME'"
   tmux new-session -d -s "$SESSION_NAME" \
-    "cd \"$ELECTRON_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\"; pnpm exec electron .; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
+    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\"; pnpm --dir \"$ROOT_DIR\" --filter @nexu/desktop run start:electron; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
 }
 
 start() {
