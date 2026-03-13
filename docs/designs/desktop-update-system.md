@@ -351,16 +351,30 @@ export default {
 
 ## 5. CI/CD 自动化发布流水线
 
-### 5.1 触发方式
+### 5.1 两套发布流程
+
+| | 测试发布 (Beta) | 线上发布 (Stable) |
+|---|---|---|
+| **触发方式** | 手动 (workflow_dispatch) 或推 `v*-beta.*` tag | 推 `v*` 正式 tag (不含 `-beta`) |
+| **签名** | 可选（未签名需手动绕过 Gatekeeper） | 必须签名 + 公证 |
+| **R2 路径** | `desktop/beta/` | `desktop/stable/` |
+| **元信息文件** | `beta-mac.yml` / `beta.yml` | `latest-mac.yml` / `latest.yml` |
+| **客户端检测** | 仅 beta 通道用户收到 | 所有用户收到 |
+| **用途** | 内部团队测试、验证功能 | 正式推送给用户 |
+| **GitHub Release** | Draft (不公开) | Published |
 
 ```
-开发者推送 git tag → GitHub Actions 自动构建发布
+测试流程:
+  git tag v1.2.0-beta.1 → CI 构建 → 跳过签名(或签名) → 上传 R2 beta/ → 团队手动下载测试
+  或: 手动触发 workflow_dispatch → 选择分支 → 构建 → 上传
 
-git tag v1.0.0        → stable 通道
-git tag v1.1.0-beta.1 → beta 通道
+线上流程:
+  团队验证 beta OK → git tag v1.2.0 → CI 构建 → 签名+公证 → 上传 R2 stable/ → 全量用户自动收到更新
 ```
 
-### 5.2 GitHub Actions Workflow
+### 5.2 共享构建 Job (复用)
+
+两套流程共享同一个 build job，通过参数区分：
 
 ```yaml
 # .github/workflows/desktop-release.yml
@@ -370,22 +384,71 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Release channel'
+        required: true
+        default: 'beta'
+        type: choice
+        options: [beta, stable]
+      skip_signing:
+        description: 'Skip code signing (for testing without Apple cert)'
+        required: false
+        default: true
+        type: boolean
 
-# 确保同一时间只有一个发布在运行
 concurrency:
   group: desktop-release
   cancel-in-progress: false
 
 jobs:
+  # ---- 确定发布参数 ----
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.params.outputs.channel }}
+      version: ${{ steps.params.outputs.version }}
+      skip_signing: ${{ steps.params.outputs.skip_signing }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine release params
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # 手动触发：从 package.json 读版本
+            VERSION=$(node -p "require('./apps/desktop/package.json').version")
+            CHANNEL="${{ inputs.channel }}"
+            SKIP_SIGNING="${{ inputs.skip_signing }}"
+          else
+            # Tag 触发
+            TAG=${GITHUB_REF#refs/tags/v}
+            VERSION="$TAG"
+            if [[ "$TAG" == *"-beta"* ]]; then
+              CHANNEL="beta"
+              SKIP_SIGNING="true"  # beta 默认跳过签名
+            else
+              CHANNEL="stable"
+              SKIP_SIGNING="false" # stable 必须签名
+            fi
+          fi
+
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "skip_signing=$SKIP_SIGNING" >> $GITHUB_OUTPUT
+          echo "📦 Release: v$VERSION ($CHANNEL) skip_signing=$SKIP_SIGNING"
+
+  # ---- 多平台构建 ----
   build:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14        # Apple Silicon runner
+          - os: macos-14
             arch: arm64
             platform: darwin
-          - os: macos-13        # Intel runner
+          - os: macos-13
             arch: x64
             platform: darwin
           - os: windows-latest
@@ -396,9 +459,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -407,7 +468,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build monorepo (API, Gateway, Web, etc.)
+      - name: Build monorepo
         run: pnpm build
 
       - name: Prepare sidecars
@@ -423,14 +484,14 @@ jobs:
       - name: Build & Package Desktop
         working-directory: apps/desktop
         env:
-          # macOS 签名
-          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+          # macOS 签名 (skip_signing=true 时 CSC_LINK 为空，electron-builder 自动跳过)
+          CSC_LINK: ${{ needs.prepare.outputs.skip_signing == 'false' && secrets.MAC_CERTIFICATE_P12_BASE64 || '' }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Windows 签名
-          WIN_CSC_LINK: ${{ secrets.WIN_CERTIFICATE_P12_BASE64 }}
+          WIN_CSC_LINK: ${{ needs.prepare.outputs.skip_signing == 'false' && secrets.WIN_CERTIFICATE_P12_BASE64 || '' }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
         run: pnpm build:dist  # → electron-builder --publish never
 
@@ -439,10 +500,11 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
           path: apps/desktop/release/*
-          retention-days: 7
+          retention-days: 30
 
+  # ---- 上传到 R2 ----
   publish:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -453,30 +515,17 @@ jobs:
           path: release-artifacts
           merge-multiple: true
 
-      - name: Determine channel
-        id: channel
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          if [[ "$TAG" == *"-beta"* ]]; then
-            echo "channel=beta" >> $GITHUB_OUTPUT
-          elif [[ "$TAG" == *"-canary"* ]]; then
-            echo "channel=canary" >> $GITHUB_OUTPUT
-          else
-            echo "channel=stable" >> $GITHUB_OUTPUT
-          fi
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-
       - name: Upload to R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          # 安装 rclone
           curl -O https://downloads.rclone.org/rclone-current-linux-amd64.deb
           sudo dpkg -i rclone-current-linux-amd64.deb
 
-          # 配置 R2 remote
           rclone config create r2 s3 \
             provider=Cloudflare \
             access_key_id=$AWS_ACCESS_KEY_ID \
@@ -484,43 +533,93 @@ jobs:
             endpoint=$R2_ENDPOINT \
             no_check_bucket=true
 
-          # 上传安装包和 blockmap
-          rclone copy release-artifacts/ r2:nexu-releases/desktop/ \
+          # 根据通道决定上传路径
+          if [ "$CHANNEL" = "stable" ]; then
+            R2_DIR="desktop/stable"
+          else
+            R2_DIR="desktop/beta"
+          fi
+
+          # 上传安装包、blockmap、元信息文件
+          rclone copy release-artifacts/ r2:nexu-releases/$R2_DIR/ \
             --include "*.{exe,dmg,zip,blockmap,yml}" \
             --transfers 4
 
-          # 归档到版本目录
+          # 归档到版本目录 (用于历史回溯和手动下载)
           rclone copy release-artifacts/ \
-            r2:nexu-releases/desktop/archive/${{ steps.channel.outputs.version }}/ \
+            r2:nexu-releases/desktop/archive/$VERSION/ \
             --include "*.{exe,dmg,zip}" \
             --transfers 4
 
-      - name: Update release metadata
+      - name: Create GitHub Release
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          # 更新 _meta/releases.json
-          echo '{
-            "version": "${{ steps.channel.outputs.version }}",
-            "channel": "${{ steps.channel.outputs.channel }}",
-            "date": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
-            "tag": "'${GITHUB_REF#refs/tags/}'"
-          }' > release-entry.json
+          if [ "$CHANNEL" = "stable" ]; then
+            # 正式版：Published Release
+            gh release create "v$VERSION" \
+              --title "Nexu Desktop v$VERSION" \
+              --generate-notes \
+              release-artifacts/*.{dmg,exe}
+          else
+            # 测试版：Draft Release (不公开)
+            gh release create "v$VERSION" \
+              --title "Nexu Desktop v$VERSION (Beta)" \
+              --prerelease \
+              --generate-notes \
+              release-artifacts/*.{dmg,exe}
+          fi
 
-          # TODO: 合并到已有的 releases.json
-
-      - name: Notify API (optional - push notification)
-        if: steps.channel.outputs.channel == 'stable'
+      - name: Notify (stable only)
+        if: needs.prepare.outputs.channel == 'stable'
         run: |
-          curl -X POST https://api.nexu.io/api/internal/desktop-release \
+          curl -sf -X POST https://api.nexu.io/api/internal/desktop-release \
             -H "Authorization: Bearer ${{ secrets.INTERNAL_API_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "version": "${{ steps.channel.outputs.version }}",
-              "channel": "${{ steps.channel.outputs.channel }}"
-            }'
+            -d "{\"version\": \"${{ needs.prepare.outputs.version }}\", \"channel\": \"stable\"}" \
+            || echo "API notify failed (non-fatal)"
+```
+
+### 5.3 发布操作手册
+
+**测试发布 (内部团队验证)**:
+
+```bash
+# 方式一：打 beta tag
+git tag v1.2.0-beta.1
+git push origin v1.2.0-beta.1
+# → CI 自动构建，跳过签名，上传到 R2 beta/
+# → 团队从 GitHub Release (prerelease) 或 R2 beta/ 下载测试
+# → macOS 用户需手动: 右键→打开 或 xattr -cr Nexu.app
+
+# 方式二：手动触发 (可选择任意分支)
+# GitHub → Actions → Desktop Release → Run workflow
+# 选择 channel=beta, skip_signing=true, 选择分支
+```
+
+**线上发布 (推送给所有用户)**:
+
+```bash
+# 1. 确认 beta 测试通过
+
+# 2. 更新版本号 (去掉 -beta 后缀)
+cd apps/desktop && npm version 1.2.0
+
+# 3. 提交
+git add -A && git commit -m "release: desktop v1.2.0"
+
+# 4. 打正式 tag
+git tag v1.2.0
+git push && git push origin v1.2.0
+# → CI 自动构建，签名+公证，上传到 R2 stable/
+# → 所有 stable 通道用户 4h 内自动收到更新通知
+
+# 5. 验证
+# - 检查 GitHub Release 是否 Published
+# - 检查 releases.nexu.space/desktop/stable/latest-mac.yml 是否更新
+# - 本地客户端手动检查更新
 ```
 
 ### 5.3 electron-builder 配置
