@@ -258,6 +258,16 @@ export async function generatePoolConfig(
         mode: "token",
         token: gatewayToken ?? process.env.GATEWAY_TOKEN ?? "gw-secret-token",
       },
+      http: {
+        endpoints: {
+          chatCompletions: {
+            enabled: true,
+          },
+          responses: {
+            enabled: true,
+          },
+        },
+      },
       reload: { mode: "hybrid" },
       controlUi: {
         dangerouslyAllowHostHeaderOriginFallback: true,

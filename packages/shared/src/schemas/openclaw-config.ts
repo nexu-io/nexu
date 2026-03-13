@@ -16,11 +16,33 @@ const controlUiSchema = z
   })
   .optional();
 
+const gatewayHttpEndpointsSchema = z
+  .object({
+    chatCompletions: z
+      .object({
+        enabled: z.boolean().optional(),
+      })
+      .optional(),
+    responses: z
+      .object({
+        enabled: z.boolean().optional(),
+      })
+      .optional(),
+  })
+  .optional();
+
+const gatewayHttpSchema = z
+  .object({
+    endpoints: gatewayHttpEndpointsSchema,
+  })
+  .optional();
+
 const gatewayConfigSchema = z.object({
   port: z.number().default(18789),
   mode: z.literal("local").default("local"),
   bind: z.enum(["loopback", "lan", "auto"]).default("lan"),
   auth: gatewayAuthSchema,
+  http: gatewayHttpSchema,
   reload: gatewayReloadSchema.default({ mode: "hybrid" }),
   controlUi: controlUiSchema,
 });
