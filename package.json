@@ -6,6 +6,8 @@
     "dev": "NODE_OPTIONS=--conditions=development pnpm --parallel --filter @nexu/api --filter @nexu/web --filter @nexu/landing dev",
     "dev:landing": "pnpm --filter @nexu/landing dev",
     "dev:sidecar": "pnpm --filter @nexu/gateway dev",
+    "dev:desktop": "pnpm --filter @nexu/desktop dev",
+    "dev:chat": "pnpm --filter @nexu/chat dev",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
@@ -21,7 +23,12 @@
     "db:check-sync:mismatch": "pnpm --filter @nexu/api db:check-sync:mismatch",
     "db:check-dangerous": "pnpm --filter @nexu/api db:check-dangerous",
     "db:check-dangerous-sql": "pnpm --filter @nexu/api db:check-dangerous-sql",
-    "db:push": "pnpm --filter @nexu/api db:push"
+    "db:push": "pnpm --filter @nexu/api db:push",
+    "desktop:start": "./apps/desktop/dev.sh start",
+    "desktop:stop": "./apps/desktop/dev.sh stop",
+    "desktop:restart": "./apps/desktop/dev.sh restart",
+    "desktop:status": "./apps/desktop/dev.sh status",
+    "desktop:logs": "./apps/desktop/dev.sh logs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -33,6 +40,6 @@
   },
   "packageManager": "pnpm@10.26.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["@biomejs/biome", "esbuild"]
+    "onlyBuiltDependencies": ["@biomejs/biome", "electron", "esbuild"]
   }
 }

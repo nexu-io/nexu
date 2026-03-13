@@ -1,5 +1,8 @@
 node_modules/
 dist/
+.next/
+dist-electron/
+.tmp/
 .env
 .env.*
 !.env.example
