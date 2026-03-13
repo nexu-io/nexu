@@ -15,27 +15,42 @@ export type DesktopRuntimeConfig = {
   pglitePort: number;
 };
 
-export function getDesktopRuntimeConfig(env: Record<string, string | undefined>): DesktopRuntimeConfig {
-  const apiPort = Number.parseInt(env.NEXU_API_PORT ?? String(DEFAULT_API_PORT), 10);
-  const webPort = Number.parseInt(env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT), 10);
+export function getDesktopRuntimeConfig(
+  env: Record<string, string | undefined>,
+): DesktopRuntimeConfig {
+  const apiPort = Number.parseInt(
+    env.NEXU_API_PORT ?? String(DEFAULT_API_PORT),
+    10,
+  );
+  const webPort = Number.parseInt(
+    env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT),
+    10,
+  );
   const sessionChatPort = Number.parseInt(
     env.NEXU_SESSION_CHAT_PORT ?? String(DEFAULT_SESSION_CHAT_PORT),
-    10
+    10,
   );
   const sessionChatDbPort = Number.parseInt(
     env.NEXU_SESSION_CHAT_DB_PORT ?? String(DEFAULT_SESSION_CHAT_DB_PORT),
-    10
+    10,
   );
-  const pglitePort = Number.parseInt(env.NEXU_PGLITE_PORT ?? String(DEFAULT_PGLITE_PORT), 10);
+  const pglitePort = Number.parseInt(
+    env.NEXU_PGLITE_PORT ?? String(DEFAULT_PGLITE_PORT),
+    10,
+  );
 
   return {
     apiPort,
-    apiBaseUrl: env.NEXU_API_URL ?? env.NEXU_API_BASE_URL ?? `http://127.0.0.1:${apiPort}`,
+    apiBaseUrl:
+      env.NEXU_API_URL ??
+      env.NEXU_API_BASE_URL ??
+      `http://127.0.0.1:${apiPort}`,
     webPort,
     webUrl: env.NEXU_WEB_URL ?? `http://127.0.0.1:${webPort}`,
     sessionChatPort,
-    sessionChatUrl: env.NEXU_SESSION_CHAT_URL ?? `http://127.0.0.1:${sessionChatPort}`,
+    sessionChatUrl:
+      env.NEXU_SESSION_CHAT_URL ?? `http://127.0.0.1:${sessionChatPort}`,
     sessionChatDbPort,
-    pglitePort
+    pglitePort,
   };
 }

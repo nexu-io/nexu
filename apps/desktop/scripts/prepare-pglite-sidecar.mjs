@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const sidecarRoot = resolve(repoRoot, ".tmp/sidecars/pglite");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const electronNodeModules = resolve(electronRoot, "node_modules");
@@ -20,7 +21,9 @@ async function pathExists(path) {
 
 async function preparePgliteSidecar() {
   if (!(await pathExists(electronNodeModules))) {
-    throw new Error("Missing electron/node_modules. Install electron dependencies first.");
+    throw new Error(
+      "Missing electron/node_modules. Install electron dependencies first.",
+    );
   }
 
   await rm(sidecarRoot, { recursive: true, force: true });
@@ -28,7 +31,7 @@ async function preparePgliteSidecar() {
 
   await writeFile(
     resolve(sidecarRoot, "package.json"),
-    `${JSON.stringify({ name: "pglite-sidecar", private: true, type: "module" }, null, 2)}\n`
+    `${JSON.stringify({ name: "pglite-sidecar", private: true, type: "module" }, null, 2)}\n`,
   );
 
   await writeFile(
@@ -53,7 +56,7 @@ console.log(
     dataDir,
     migrationsDir,
     host,
-    port
+    port,
   })
 );
 
@@ -90,10 +93,10 @@ async function runMigrations() {
       await db.exec(statement);
     }
 
-    await db.query("insert into desktop_sidecar_migrations (name, applied_at) values ($1, $2)", [
-      file,
-      new Date().toISOString()
-    ]);
+      await db.query("insert into desktop_sidecar_migrations (name, applied_at) values ($1, $2)", [
+        file,
+        new Date().toISOString(),
+      ]);
     console.log(\`Applied migration \${file}\`);
   }
 }
@@ -104,7 +107,7 @@ const server = new PGLiteSocketServer({
   db,
   host,
   port,
-  maxConnections: 10
+  maxConnections: 10,
 });
 
 server.addEventListener("listening", (event) => {
@@ -127,13 +130,13 @@ process.on("SIGTERM", () => {
 process.on("SIGINT", () => {
   void shutdown();
 });
-`
+`,
   );
 
   await symlink(
     electronNodeModules,
     sidecarNodeModules,
-    process.platform === "win32" ? "junction" : "dir"
+    process.platform === "win32" ? "junction" : "dir",
   );
 }
 

@@ -2,7 +2,7 @@ import { getApiBaseUrl } from "./host-api";
 
 export async function apiFetch(
   path: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Response> {
   const apiBaseUrl = await getApiBaseUrl();
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -12,7 +12,7 @@ export async function apiFetch(
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers ?? {})
-    }
+      ...(init?.headers ?? {}),
+    },
   });
 }

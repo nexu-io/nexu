@@ -10,7 +10,7 @@ export const hostInvokeChannels = [
   "runtime:stop-unit",
   "runtime:start-all",
   "runtime:stop-all",
-  "shell:open-external"
+  "shell:open-external",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -103,6 +103,6 @@ export type RuntimeState = {
 export type HostBridge = {
   invoke<TChannel extends HostInvokeChannel>(
     channel: TChannel,
-    payload: HostInvokePayloadMap[TChannel]
+    payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
 };

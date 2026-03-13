@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const nexuRoot = repoRoot;
 const webRoot = resolve(nexuRoot, "apps/web");
 const webDistRoot = resolve(webRoot, "dist");
@@ -22,7 +23,9 @@ async function pathExists(path) {
 
 async function ensureBuildArtifacts() {
   if (!(await pathExists(webDistRoot))) {
-    throw new Error("Missing web build artifact: apps/web/dist. Build web first.");
+    throw new Error(
+      "Missing web build artifact: apps/web/dist. Build web first.",
+    );
   }
 }
 
@@ -34,7 +37,7 @@ async function prepareWebSidecar() {
 
   await writeFile(
     resolve(sidecarRoot, "package.json"),
-    `${JSON.stringify({ name: "web-sidecar", private: true, type: "module" }, null, 2)}\n`
+    `${JSON.stringify({ name: "web-sidecar", private: true, type: "module" }, null, 2)}\n`,
   );
 
   await writeFile(
@@ -135,7 +138,7 @@ process.on("SIGTERM", () => {
 process.on("SIGINT", () => {
   void shutdown();
 });
-`
+`,
   );
 }
 

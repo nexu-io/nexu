@@ -9,7 +9,7 @@ import type {
   RuntimeState,
   RuntimeUnitId,
   RuntimeUnitPhase,
-  RuntimeUnitState
+  RuntimeUnitState,
 } from "../shared/host";
 import {
   getRuntimeConfig,
@@ -17,7 +17,7 @@ import {
   startAllUnits,
   startUnit,
   stopAllUnits,
-  stopUnit
+  stopUnit,
 } from "./lib/host-api";
 import "./runtime-page.css";
 
@@ -26,7 +26,7 @@ const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
 if (amplitudeApiKey) {
   amplitude.initAll(amplitudeApiKey, {
     analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 }
+    sessionReplay: { sampleRate: 1 },
   });
   const env = new Identify();
   env.set("environment", import.meta.env.MODE);
@@ -37,9 +37,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      refetchOnWindowFocus: false
-    }
-  }
+      refetchOnWindowFocus: false,
+    },
+  },
 });
 
 function phaseTone(phase: RuntimeUnitPhase): string {
@@ -64,7 +64,7 @@ function RuntimeUnitCard({
   unit,
   onStart,
   onStop,
-  busy
+  busy,
 }: {
   unit: RuntimeUnitState;
   onStart: (id: RuntimeUnitId) => Promise<void>;
@@ -73,8 +73,12 @@ function RuntimeUnitCard({
 }) {
   const isManaged = unit.launchStrategy === "managed";
   const canStart =
-    isManaged && (unit.phase === "idle" || unit.phase === "stopped" || unit.phase === "failed");
-  const canStop = isManaged && (unit.phase === "running" || unit.phase === "starting");
+    isManaged &&
+    (unit.phase === "idle" ||
+      unit.phase === "stopped" ||
+      unit.phase === "failed");
+  const canStop =
+    isManaged && (unit.phase === "running" || unit.phase === "starting");
 
   return (
     <article className="runtime-card">
@@ -82,16 +86,28 @@ function RuntimeUnitCard({
         <div>
           <div className="runtime-label-row">
             <strong>{unit.label}</strong>
-            <span className={`runtime-badge ${phaseTone(unit.phase)}`}>{unit.phase}</span>
+            <span className={`runtime-badge ${phaseTone(unit.phase)}`}>
+              {unit.phase}
+            </span>
           </div>
           <p className="runtime-kind">{kindLabel(unit)}</p>
-          <p className="runtime-command">{unit.commandSummary ?? "embedded runtime unit"}</p>
+          <p className="runtime-command">
+            {unit.commandSummary ?? "embedded runtime unit"}
+          </p>
         </div>
         <div className="runtime-actions">
-          <button disabled={!canStart || busy} onClick={() => void onStart(unit.id)} type="button">
+          <button
+            disabled={!canStart || busy}
+            onClick={() => void onStart(unit.id)}
+            type="button"
+          >
             Start
           </button>
-          <button disabled={!canStop || busy} onClick={() => void onStop(unit.id)} type="button">
+          <button
+            disabled={!canStop || busy}
+            onClick={() => void onStop(unit.id)}
+            type="button"
+          >
             Stop
           </button>
         </div>
@@ -116,7 +132,9 @@ function RuntimeUnitCard({
         </div>
       </dl>
 
-      {unit.lastError ? <p className="runtime-error">{unit.lastError}</p> : null}
+      {unit.lastError ? (
+        <p className="runtime-error">{unit.lastError}</p>
+      ) : null}
 
       <div className="runtime-logs">
         <div className="runtime-logs-head">
@@ -143,7 +161,11 @@ function RuntimePage() {
       setRuntimeState(nextState);
       setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load runtime state.");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load runtime state.",
+      );
     }
   }, []);
 
@@ -163,7 +185,7 @@ function RuntimePage() {
     return {
       running: units.filter((unit) => unit.phase === "running").length,
       failed: units.filter((unit) => unit.phase === "failed").length,
-      managed: units.filter((unit) => unit.launchStrategy === "managed").length
+      managed: units.filter((unit) => unit.launchStrategy === "managed").length,
     };
   }, [runtimeState]);
 
@@ -180,7 +202,8 @@ function RuntimePage() {
     }
   }, [activeUnitId, units]);
 
-  const activeUnit = units.find((unit) => unit.id === activeUnitId) ?? units[0] ?? null;
+  const activeUnit =
+    units.find((unit) => unit.id === activeUnitId) ?? units[0] ?? null;
 
   async function runAction(id: string, action: () => Promise<RuntimeState>) {
     setBusyId(id);
@@ -189,7 +212,9 @@ function RuntimePage() {
       setRuntimeState(nextState);
       setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Runtime action failed.");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Runtime action failed.",
+      );
     } finally {
       setBusyId(null);
     }
@@ -202,14 +227,23 @@ function RuntimePage() {
           <span className="runtime-eyebrow">Desktop Runtime</span>
           <h1>Nexu local cold-start control room</h1>
           <p>
-            Renderer keeps the browser mental model. Electron main orchestrates local runtime units.
+            Renderer keeps the browser mental model. Electron main orchestrates
+            local runtime units.
           </p>
         </div>
         <div className="runtime-header-actions">
-          <button disabled={busyId !== null} onClick={() => void runAction("all:start", startAllUnits)} type="button">
+          <button
+            disabled={busyId !== null}
+            onClick={() => void runAction("all:start", startAllUnits)}
+            type="button"
+          >
             Start all
           </button>
-          <button disabled={busyId !== null} onClick={() => void runAction("all:stop", stopAllUnits)} type="button">
+          <button
+            disabled={busyId !== null}
+            onClick={() => void runAction("all:stop", stopAllUnits)}
+            type="button"
+          >
             Stop all
           </button>
         </div>
@@ -235,24 +269,33 @@ function RuntimePage() {
       </section>
 
       <p className="runtime-note">
-        Control plane currently renders unit metadata plus in-memory tail 200 logs from the local orchestrator.
+        Control plane currently renders unit metadata plus in-memory tail 200
+        logs from the local orchestrator.
       </p>
 
-      {errorMessage ? <p className="runtime-error-banner">{errorMessage}</p> : null}
+      {errorMessage ? (
+        <p className="runtime-error-banner">{errorMessage}</p>
+      ) : null}
 
       <section className="runtime-pane-layout">
         <aside className="runtime-sidebar" aria-label="Runtime units">
           {units.map((unit) => (
             <button
               aria-selected={activeUnit?.id === unit.id}
-              className={activeUnit?.id === unit.id ? "runtime-side-tab is-active" : "runtime-side-tab"}
+              className={
+                activeUnit?.id === unit.id
+                  ? "runtime-side-tab is-active"
+                  : "runtime-side-tab"
+              }
               key={unit.id}
               onClick={() => setActiveUnitId(unit.id)}
               role="tab"
               type="button"
             >
               <span className="runtime-side-tab-label">{unit.label}</span>
-              <span className={`runtime-badge ${phaseTone(unit.phase)}`}>{unit.phase}</span>
+              <span className={`runtime-badge ${phaseTone(unit.phase)}`}>
+                {unit.phase}
+              </span>
             </button>
           ))}
         </aside>
@@ -266,7 +309,9 @@ function RuntimePage() {
               unit={activeUnit}
             />
           ) : (
-            <section className="runtime-empty-state">No runtime units available.</section>
+            <section className="runtime-empty-state">
+              No runtime units available.
+            </section>
           )}
         </div>
       </section>
@@ -284,14 +329,21 @@ function EmbeddedControlPlane() {
 }
 
 function DesktopShell() {
-  const [activeSurface, setActiveSurface] = useState<"web" | "session-chat" | "control">("control");
-  const [runtimeConfig, setRuntimeConfig] = useState<DesktopRuntimeConfig | null>(null);
+  const [activeSurface, setActiveSurface] = useState<
+    "web" | "session-chat" | "control"
+  >("control");
+  const [runtimeConfig, setRuntimeConfig] =
+    useState<DesktopRuntimeConfig | null>(null);
 
   useEffect(() => {
-    void getRuntimeConfig().then(setRuntimeConfig).catch(() => null);
+    void getRuntimeConfig()
+      .then(setRuntimeConfig)
+      .catch(() => null);
   }, []);
 
-  const desktopWebUrl = runtimeConfig ? new URL("/workspace", runtimeConfig.webUrl).toString() : null;
+  const desktopWebUrl = runtimeConfig
+    ? new URL("/workspace", runtimeConfig.webUrl).toString()
+    : null;
   const desktopSessionChatUrl = runtimeConfig?.sessionChatUrl ?? null;
 
   return (
@@ -304,7 +356,11 @@ function DesktopShell() {
 
         <nav className="desktop-nav" aria-label="Desktop surfaces">
           <button
-            className={activeSurface === "web" ? "desktop-nav-item is-active" : "desktop-nav-item"}
+            className={
+              activeSurface === "web"
+                ? "desktop-nav-item is-active"
+                : "desktop-nav-item"
+            }
             onClick={() => setActiveSurface("web")}
             type="button"
           >
@@ -312,7 +368,11 @@ function DesktopShell() {
             <small>HTTP sidecar</small>
           </button>
           <button
-            className={activeSurface === "session-chat" ? "desktop-nav-item is-active" : "desktop-nav-item"}
+            className={
+              activeSurface === "session-chat"
+                ? "desktop-nav-item is-active"
+                : "desktop-nav-item"
+            }
             onClick={() => setActiveSurface("session-chat")}
             type="button"
           >
@@ -320,7 +380,11 @@ function DesktopShell() {
             <small>Next.js sidecar</small>
           </button>
           <button
-            className={activeSurface === "control" ? "desktop-nav-item is-active" : "desktop-nav-item"}
+            className={
+              activeSurface === "control"
+                ? "desktop-nav-item is-active"
+                : "desktop-nav-item"
+            }
             onClick={() => setActiveSurface("control")}
             type="button"
           >
@@ -358,5 +422,5 @@ ReactDOM.createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <RootApp />
     </QueryClientProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

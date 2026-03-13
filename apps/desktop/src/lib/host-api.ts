@@ -2,7 +2,7 @@ import type {
   AppInfo,
   DesktopRuntimeConfig,
   RuntimeState,
-  RuntimeUnitId
+  RuntimeUnitId,
 } from "@shared/host";
 
 function getHostBridge() {
@@ -18,7 +18,10 @@ export async function getAppInfo(): Promise<AppInfo> {
 }
 
 export async function getApiBaseUrl(): Promise<string> {
-  const result = await getHostBridge().invoke("env:get-api-base-url", undefined);
+  const result = await getHostBridge().invoke(
+    "env:get-api-base-url",
+    undefined,
+  );
   return result.apiBaseUrl;
 }
 
