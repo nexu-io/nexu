@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# Push a skill from .nexu-dev/skills/<name>/ to the Nexu API.
+# Push a managed skill from skills/nexubot/<name>/ to the Nexu API.
 #
 # Usage:
-#   bash .nexu-dev/scripts/push-skill.sh <skill-name> [API_URL] [INTERNAL_TOKEN]
+#   bash skills/scripts/push-skill.sh <skill-name> [API_URL] [INTERNAL_TOKEN]
 #
 # Defaults:
 #   API_URL        → http://localhost:3000  (or $NEXU_API_URL)
 #   INTERNAL_TOKEN → from $INTERNAL_API_TOKEN env
 #
-# The script reads all files under .nexu-dev/skills/<name>/, constructs JSON
+# The script reads all files under skills/nexubot/<name>/, constructs JSON
 # via node -e (jq-free), and PUTs to /api/internal/skills/<name>.
 
 set -euo pipefail
@@ -26,7 +26,7 @@ fi
 # Resolve skill directory relative to repo root
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SKILL_DIR="$REPO_ROOT/.nexu-dev/skills/$SKILL_NAME"
+SKILL_DIR="$REPO_ROOT/skills/nexubot/$SKILL_NAME"
 
 if [ ! -d "$SKILL_DIR" ]; then
   echo "Error: Skill directory not found: $SKILL_DIR" >&2

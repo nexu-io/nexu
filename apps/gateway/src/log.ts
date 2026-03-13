@@ -17,6 +17,18 @@ export const logger = pino({
     ...(version ? { version } : {}),
   },
   timestamp: pino.stdTimeFunctions.isoTime,
+  ...(env !== "production"
+    ? {
+        transport: {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            ignore: "pid,hostname,service,env,log_source,version",
+            translateTime: "HH:MM:ss.l",
+          },
+        },
+      }
+    : {}),
 });
 
 type ErrorContext = Record<string, unknown>;

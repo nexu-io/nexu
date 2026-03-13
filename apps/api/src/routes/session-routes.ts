@@ -20,6 +20,7 @@ import { decrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
+import { track } from "../lib/tracking.js";
 import { requireInternalToken } from "../middleware/internal-auth.js";
 
 import type { AppBindings } from "../types.js";
@@ -432,7 +433,7 @@ class SessionSyncTraceHandler {
 
         for (const chat of allChats) {
           const sessionKey = normalizeStoredSessionKey(
-            `feishu_${ch.accountId}_${chat.chat_id}`,
+            `agent:${ch.botId}:feishu:channel:${chat.chat_id}`,
           );
           const title = chat.name || chat.chat_id;
 
@@ -485,9 +486,9 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
     requireInternalToken(c);
     const input = c.req.valid("json");
 
-    // Verify botId exists
+    // Verify botId exists and get owner userId for tracking
     const [bot] = await db
-      .select({ id: bots.id })
+      .select({ id: bots.id, userId: bots.userId })
       .from(bots)
       .where(eq(bots.id, input.botId));
 
@@ -498,6 +499,12 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
     const now = new Date().toISOString();
     const id = createId();
     const normalizedSessionKey = normalizeStoredSessionKey(input.sessionKey);
+
+    // Check if session already exists (to distinguish insert vs update)
+    const [existing] = await db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(eq(sessions.sessionKey, normalizedSessionKey));
 
     // Upsert on sessionKey
     await db
@@ -553,6 +560,13 @@ export function registerSessionInternalRoutes(app: OpenAPIHono<AppBindings>) {
         bot_id: input.botId,
       });
     }
+
+    // Track: new session = session_start, every upsert = task_number
+    const channelType = created.channelType ?? "unknown";
+    if (!existing) {
+      track("session_start", bot.userId, { channel_type: channelType });
+    }
+    track("task_number", bot.userId, { channel_type: channelType });
 
     return c.json(formatSession(created), 201);
   });

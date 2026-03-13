@@ -259,11 +259,17 @@ function ConfiguredView({
 
     if (!nativeUrl || !webUrl) return;
 
-    // Try native app first, fall back to web after timeout
-    window.location.href = nativeUrl;
-    setTimeout(() => {
+    // Try native app first. If the app opens, the browser loses focus
+    // and we cancel the fallback. Otherwise open the web URL after 5s.
+    const fallbackTimer = setTimeout(() => {
       window.open(webUrl, "_blank", "noopener,noreferrer");
-    }, 1500);
+    }, 5000);
+    const cancelFallback = () => {
+      clearTimeout(fallbackTimer);
+      window.removeEventListener("blur", cancelFallback);
+    };
+    window.addEventListener("blur", cancelFallback);
+    window.location.href = nativeUrl;
   }, [slackTeamId, channel.botUserId]);
 
   const webhookUrl = `${window.location.origin}/api/${platform}/events`;

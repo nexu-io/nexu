@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "generate-sdk": "openapi-ts"
+    "generate-sdk": "openapi-ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@amplitude/unified": "1.0.0-beta.38",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.66.1",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",

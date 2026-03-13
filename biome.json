@@ -31,14 +31,17 @@
     "ignore": [
       "node_modules",
       "dist",
+      "coverage",
       "docs/cowork",
       "apps/web/lib/api",
+      "apps/api/migrations/meta/*.json",
       "*.gen.ts",
       "*.d.ts",
       "openapi.json",
       ".astro",
       "*.astro",
-      ".openclaw"
+      ".openclaw",
+      ".vscode"
     ]
   }
 }

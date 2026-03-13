@@ -210,7 +210,7 @@ export function SlackOAuthView({
         return;
       }
       toast.success(`Slack workspace "${data?.teamName ?? ""}" connected!`);
-      track("channel_ready", { channel: "slack" });
+      track("channel_ready", { channel: "slack", channel_type: "slack_token" });
       identify({ channels_connected: 1 });
       onConnected();
     } catch {

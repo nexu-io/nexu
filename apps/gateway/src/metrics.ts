@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import { logger } from "./log.js";
 
 type DogStatsDClient = {
@@ -6,6 +8,7 @@ type DogStatsDClient = {
 };
 
 let client: DogStatsDClient | null | undefined;
+const require = createRequire(import.meta.url);
 
 async function getClient(): Promise<DogStatsDClient | null> {
   if (client !== undefined) return client;
@@ -14,9 +17,11 @@ async function getClient(): Promise<DogStatsDClient | null> {
     return null;
   }
   try {
-    const mod = await import("dd-trace");
-    const tracer = mod.default as unknown as { dogstatsd?: DogStatsDClient };
-    client = tracer.dogstatsd ?? null;
+    const mod = require("dd-trace") as unknown;
+    const tracer = mod as { default?: { dogstatsd?: DogStatsDClient } } & {
+      dogstatsd?: DogStatsDClient;
+    };
+    client = tracer.default?.dogstatsd ?? tracer.dogstatsd ?? null;
     return client;
   } catch {
     client = null;

@@ -58,7 +58,12 @@ const envSchema = z.object({
     .number()
     .int()
     .positive()
-    .default(10000),
+    .default(15000),
+  RUNTIME_GATEWAY_HTTP_PROBE_PORT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(18789),
   RUNTIME_GATEWAY_LIVENESS_INTERVAL_MS: z.coerce
     .number()
     .int()
@@ -68,7 +73,7 @@ const envSchema = z.object({
     .number()
     .int()
     .positive()
-    .default(30000),
+    .default(120000),
   RUNTIME_GATEWAY_FAIL_DEGRADED_THRESHOLD: z.coerce
     .number()
     .int()
@@ -99,6 +104,7 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(300_000),
+  RUNTIME_DEFER_FEISHU_INIT: booleanFromEnvSchema.default("true"),
 });
 
 function normalizeConfigPath(path: string): string {

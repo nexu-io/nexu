@@ -5,6 +5,7 @@ import {
   channelListResponseSchema,
   channelResponseSchema,
   connectDiscordSchema,
+  connectFeishuSchema,
   connectSlackSchema,
   slackOAuthUrlResponseSchema,
 } from "@nexu/shared";
@@ -22,6 +23,7 @@ import { findOrCreateDefaultBot } from "../lib/bot-helpers.js";
 import { checkBotQuota } from "../lib/bot-quota.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
 import { BaseError, ServiceError } from "../lib/error.js";
+import { getFeishuTenantToken } from "../lib/feishu-webhook.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
@@ -128,7 +130,7 @@ function formatChannel(
   return {
     id: ch.id,
     botId: ch.botId,
-    channelType: ch.channelType as "slack" | "discord",
+    channelType: ch.channelType as "slack" | "discord" | "feishu",
     accountId: ch.accountId,
     status: (ch.status ?? "pending") as
       | "pending"
@@ -304,6 +306,27 @@ const connectDiscordRoute = createRoute({
     409: {
       content: { "application/json": { schema: errorResponseSchema } },
       description: "Discord already connected",
+    },
+  },
+});
+
+const connectFeishuRoute = createRoute({
+  method: "post",
+  path: "/api/v1/channels/feishu/connect",
+  tags: ["Channels"],
+  request: {
+    body: {
+      content: { "application/json": { schema: connectFeishuSchema } },
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: channelResponseSchema } },
+      description: "Feishu channel connected",
+    },
+    409: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Invalid credentials or already connected",
     },
   },
 });
@@ -757,6 +780,96 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     return c.json(formatChannel(channel), 200);
   });
 
+  // -- Feishu connect --
+  app.openapi(connectFeishuRoute, async (c) => {
+    const userId = c.get("userId");
+    const input = c.req.valid("json");
+
+    // Validate credentials by attempting to get a tenant token
+    const tenantToken = await getFeishuTenantToken(
+      input.appId,
+      input.appSecret,
+    );
+    if (!tenantToken) {
+      return c.json(
+        {
+          message: "Invalid Feishu credentials: could not obtain tenant token",
+        },
+        409,
+      );
+    }
+
+    const bot = await findOrCreateDefaultBot(userId);
+    const botId = bot.id;
+
+    const accountId = `feishu-${input.appId}`;
+
+    const [existing] = await db
+      .select()
+      .from(botChannels)
+      .where(
+        and(
+          eq(botChannels.botId, botId),
+          eq(botChannels.channelType, "feishu"),
+          eq(botChannels.accountId, accountId),
+        ),
+      );
+
+    if (existing) {
+      return c.json({ message: "Feishu channel already connected" }, 409);
+    }
+
+    const channelId = createId();
+    const now = new Date().toISOString();
+
+    await db.insert(botChannels).values({
+      id: channelId,
+      botId,
+      channelType: "feishu",
+      accountId,
+      status: "connected",
+      channelConfig: JSON.stringify({
+        appId: input.appId,
+      }),
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(channelCredentials).values([
+      {
+        id: createId(),
+        botChannelId: channelId,
+        credentialType: "appId",
+        encryptedValue: encrypt(input.appId),
+        createdAt: now,
+      },
+      {
+        id: createId(),
+        botChannelId: channelId,
+        credentialType: "appSecret",
+        encryptedValue: encrypt(input.appSecret),
+        createdAt: now,
+      },
+    ]);
+
+    await publishSnapshotSafely(bot.poolId, bot.id);
+
+    const [channel] = await db
+      .select()
+      .from(botChannels)
+      .where(eq(botChannels.id, channelId));
+
+    if (!channel) {
+      throw ServiceError.from("channel-routes", {
+        code: "channel_create_failed",
+        channel_id: channelId,
+        bot_id: bot.id,
+      });
+    }
+
+    return c.json(formatChannel(channel), 200);
+  });
+
   // -- List channels --
   app.openapi(listChannelsRoute, async (c) => {
     const userId = c.get("userId");
@@ -848,27 +961,24 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const { channelId } = c.req.valid("param");
     const userId = c.get("userId");
 
-    // Find user's bot
-    const [bot] = await db
+    // Find any bot owned by this user (including deleted for orphan cleanup)
+    const userBots = await db
       .select()
       .from(bots)
-      .where(
-        and(
-          eq(bots.userId, userId),
-          or(eq(bots.status, "active"), eq(bots.status, "paused")),
-        ),
-      );
+      .where(eq(bots.userId, userId));
 
-    if (!bot) {
+    if (userBots.length === 0) {
       return c.json({ message: "Channel not found" }, 404);
     }
+
+    const userBotIds = new Set(userBots.map((b) => b.id));
 
     const [channel] = await db
       .select()
       .from(botChannels)
-      .where(and(eq(botChannels.id, channelId), eq(botChannels.botId, bot.id)));
+      .where(eq(botChannels.id, channelId));
 
-    if (!channel) {
+    if (!channel || !userBotIds.has(channel.botId)) {
       return c.json({ message: `Channel ${channelId} not found` }, 404);
     }
 
@@ -882,7 +992,10 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
 
     await db.delete(botChannels).where(eq(botChannels.id, channelId));
 
-    await publishSnapshotSafely(bot.poolId, bot.id);
+    const ownerBot = userBots.find((b) => b.id === channel.botId);
+    if (ownerBot?.poolId) {
+      await publishSnapshotSafely(ownerBot.poolId, ownerBot.id);
+    }
 
     return c.json({ success: true }, 200);
   });

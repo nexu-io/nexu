@@ -154,6 +154,7 @@ export function WorkspaceLayout() {
   const sessionMatch = location.pathname.match(/\/workspace\/sessions\/(.+)/);
   const selectedSessionId = sessionMatch?.[1] ?? null;
   const isChannelsPage = location.pathname.includes("/channels");
+  const isSkillsPage = location.pathname.includes("/skills");
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
@@ -165,19 +166,26 @@ export function WorkspaceLayout() {
   const userInitial = (userEmail[0] ?? "U").toUpperCase();
 
   const showEmptyState =
-    sessions.length === 0 && !isChannelsPage && !selectedSessionId;
+    sessions.length === 0 &&
+    !isChannelsPage &&
+    !isSkillsPage &&
+    !selectedSessionId;
 
   const selectedSession = selectedSessionId
     ? sessions.find((s) => s.id === selectedSessionId)
     : null;
   const mobileTitle = isChannelsPage
     ? "Channels"
-    : selectedSession?.title || "Conversations";
+    : isSkillsPage
+      ? "Skills"
+      : selectedSession?.title || "Conversations";
   const mobileSubtitle = isChannelsPage
     ? "Configure your channels"
-    : selectedSession
-      ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
-      : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
+    : isSkillsPage
+      ? "Browse AI capabilities"
+      : selectedSession
+        ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
+        : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
     <div className="flex h-screen">
@@ -332,6 +340,21 @@ export function WorkspaceLayout() {
             >
               <Settings size={14} />
               {!collapsed && "Channels"}
+            </Link>
+            <Link
+              to="/workspace/skills"
+              title={collapsed ? "Skills" : undefined}
+              onClick={() => track("workspace_skills_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isSkillsPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <Zap size={14} />
+              {!collapsed && "Skills"}
             </Link>
           </div>
         </div>
@@ -540,6 +563,22 @@ export function WorkspaceLayout() {
                   >
                     <Settings size={14} />
                     Channels
+                  </Link>
+                  <Link
+                    to="/workspace/skills"
+                    onClick={() => {
+                      track("workspace_skills_click");
+                      setMobileDrawerOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1 px-3 py-2",
+                      isSkillsPage
+                        ? "bg-accent/10 text-accent"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                    )}
+                  >
+                    <Zap size={14} />
+                    Skills
                   </Link>
                 </div>
               </div>

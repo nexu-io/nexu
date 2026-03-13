@@ -47,6 +47,16 @@ if (!dataDir) {
   throw new Error("PGLITE_DATA_DIR is required.");
 }
 
+console.log(
+  JSON.stringify({
+    event: "pglite_boot",
+    dataDir,
+    migrationsDir,
+    host,
+    port
+  })
+);
+
 const db = await PGlite.create({ dataDir });
 
 async function runMigrations() {

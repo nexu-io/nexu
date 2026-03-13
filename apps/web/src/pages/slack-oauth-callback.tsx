@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { identify, track } from "@/lib/tracking";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { useEffect } from "react";
@@ -31,6 +32,8 @@ export function SlackOAuthCallbackPage() {
       // Success path: show brief confirmation, then redirect
       queryClient.invalidateQueries({ queryKey: ["channels"] });
       toast.success(`Slack workspace "${teamName}" connected!`);
+      track("channel_ready", { channel: "slack", channel_type: "slack_auth" });
+      identify({ channels_connected: 1 });
 
       const timer = setTimeout(() => {
         if (returnTo === "/onboarding") {

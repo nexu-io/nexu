@@ -200,6 +200,34 @@ export const users = pgTable("users", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    keyPrefix: text("key_prefix").notNull(),
+    keyHash: text("key_hash").notNull(),
+    status: text("status").notNull().default("active"),
+    lastUsedAt: text("last_used_at"),
+    expiresAt: text("expires_at"),
+    revokedAt: text("revoked_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("api_keys_key_hash_idx").on(table.keyHash),
+    index("api_keys_user_id_idx").on(table.userId),
+    index("api_keys_key_prefix_idx").on(table.keyPrefix),
+    index("api_keys_status_idx").on(table.status),
+  ],
+);
+
 export const usageMetrics = pgTable("usage_metrics", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
@@ -432,9 +460,106 @@ export const sessions = pgTable(
   ],
 );
 
+export const supportedToolkits = pgTable("supported_toolkits", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  slug: text("slug").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description").notNull(),
+  domain: text("domain").notNull(),
+  category: text("category").default("office"),
+  authScheme: text("auth_scheme").notNull().default("oauth2"),
+  authFields: text("auth_fields"),
+  enabled: boolean("enabled").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const userIntegrations = pgTable(
+  "user_integrations",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    userId: text("user_id").notNull(),
+    toolkitSlug: text("toolkit_slug").notNull(),
+    composioAccountId: text("composio_account_id"),
+    status: text("status").default("pending"),
+    oauthState: text("oauth_state"),
+    returnTo: text("return_to"),
+    source: text("source"),
+    connectedAt: text("connected_at"),
+    disconnectedAt: text("disconnected_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("user_integrations_user_toolkit_idx").on(
+      table.userId,
+      table.toolkitSlug,
+    ),
+    index("user_integrations_user_id_idx").on(table.userId),
+  ],
+);
+
+export const integrationCredentials = pgTable(
+  "integration_credentials",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    integrationId: text("integration_id").notNull(),
+    credentialKey: text("credential_key").notNull(),
+    encryptedValue: text("encrypted_value").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("int_cred_uniq_idx").on(
+      table.integrationId,
+      table.credentialKey,
+    ),
+  ],
+);
+
+export const supportedSkills = pgTable("supported_skills", {
+  pk: serial("pk").primaryKey(),
+  id: text("id").notNull().unique(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  longDescription: text("long_description"),
+  iconName: text("icon_name").notNull().default("Sparkles"),
+  prompt: text("prompt").notNull(),
+  examples: text("examples"),
+  tag: text("tag").notNull().default("office-collab"),
+  source: text("source").notNull().default("official"),
+  toolkitSlugs: text("toolkit_slugs"),
+  githubUrl: text("github_url"),
+  enabled: boolean("enabled").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 // Test-only table used to validate post-merge DB migration workflow.
 export const e2eTestMigration = pgTable("e2e_test_migration", {
   id: text("id").primaryKey(),
+  probe: text("probe"),
+  test1: text("test1"),
+  test2: text("test2"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

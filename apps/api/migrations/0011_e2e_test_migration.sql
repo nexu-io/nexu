@@ -1,0 +1,1 @@
+ALTER TABLE "e2e_test_migration" ADD COLUMN "test2" text;

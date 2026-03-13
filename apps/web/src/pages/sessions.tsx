@@ -99,7 +99,7 @@ export function SessionsPage() {
   const { id } = useParams<{ id: string }>();
 
   useEffect(() => {
-    if (id) track("session_start");
+    if (id) track("session_detail_view");
   }, [id]);
 
   const { data: session } = useQuery({
@@ -240,6 +240,7 @@ export function SessionsPage() {
                           target="_blank"
                           rel="noreferrer"
                           className="text-[11px] text-emerald-600 shrink-0 hover:underline"
+                          onClick={() => track("channel_detail_deploy_preview")}
                         >
                           Preview <ExternalLink size={9} className="inline" />
                         </a>

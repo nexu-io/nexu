@@ -287,3 +287,78 @@ Bot conversation sessions.
 | updated_at | text | ISO timestamp |
 
 Indexes: `bot_id`, `status`, `created_at`, `channel_type`.
+
+### supported_toolkits
+
+Composio toolkit definitions (OAuth-based integrations).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| pk | serial | Internal PK |
+| id | text | Public ID (cuid2), unique |
+| slug | text | Toolkit identifier (e.g. `gmail`), unique |
+| display_name | text | Human-readable name |
+| description | text | Toolkit description |
+| domain | text | Domain for favicon (e.g. `google.com`) |
+| category | text | Default: `office` |
+| auth_scheme | text | Default: `oauth2` |
+| auth_fields | text | Optional auth field definitions |
+| enabled | boolean | Default: true |
+| sort_order | integer | Display order |
+| created_at | text | ISO timestamp |
+| updated_at | text | ISO timestamp |
+
+### user_integrations
+
+Per-user OAuth connection state for Composio toolkits.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| pk | serial | Internal PK |
+| id | text | Public ID (cuid2), unique |
+| user_id | text | Owner user ID |
+| toolkit_slug | text | References supported_toolkits.slug |
+| composio_account_id | text | Composio-side account ID |
+| status | text | `pending` / `initiated` / `active` / `disconnected` |
+| oauth_state | text | CSRF state token |
+| return_to | text | Redirect URL after OAuth |
+| source | text | `dashboard` / `chat` |
+| connected_at | text | ISO timestamp |
+| disconnected_at | text | ISO timestamp |
+| created_at | text | ISO timestamp |
+| updated_at | text | ISO timestamp |
+
+Unique: `(user_id, toolkit_slug)`. Index: `user_id`.
+
+### integration_credentials
+
+Encrypted credentials for user integrations.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| pk | serial | Internal PK |
+| id | text | Public ID (cuid2), unique |
+| integration_id | text | References user_integrations.id |
+| credential_key | text | Key name |
+| encrypted_value | text | AES-256-GCM encrypted |
+| created_at | text | ISO timestamp |
+
+Unique: `(integration_id, credential_key)`.
+
+### supported_skills
+
+Skill catalog metadata for the dashboard.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| pk | serial | Internal PK |
+| id | text | Public ID (cuid2), unique |
+| slug | text | Skill identifier, unique |
+| name | text | Display name |
+| description | text | Short description |
+| long_description | text | Extended description |
+| icon_name | text | Lucide icon name, default: `Sparkles` |
+| prompt | text | Skill prompt template |
+| examples | text | JSON string of example queries |
+| created_at | text | ISO timestamp |
+| updated_at | text | ISO timestamp |

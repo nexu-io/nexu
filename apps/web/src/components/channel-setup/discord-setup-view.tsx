@@ -70,7 +70,10 @@ export function DiscordSetupView({
         return;
       }
       toast.success(`Discord server "${data?.teamName ?? ""}" connected!`);
-      track("channel_ready", { channel: "discord" });
+      track("channel_ready", {
+        channel: "discord",
+        channel_type: "discord_token",
+      });
       identify({ channels_connected: 1 });
       onConnected();
     } catch {

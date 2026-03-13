@@ -36,6 +36,55 @@
       "when": 1772783973210,
       "tag": "0004_curved_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772874487868,
+      "tag": "0005_sharp_the_twelve",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772898840432,
+      "tag": "0006_pale_firestar",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773062523493,
+      "tag": "0007_ambiguous_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773299719847,
+      "tag": "0008_colorful_rocket_racer",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773307599187,
+      "tag": "0009_e2e_test_migration_probe",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773370278266,
+      "tag": "0010_e2e_test_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773381860660,
+      "tag": "0011_e2e_test_migration",
+      "breakpoints": true
     }
   ]
 }

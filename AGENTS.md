@@ -14,7 +14,13 @@ Nexu is an OpenClaw multi-tenant platform. Users create AI bots, connect them to
 - `packages/shared` — Shared Zod schemas
 - `deploy/k8s` — Kubernetes manifests
 
+## Project overview
+
+Nexu is an OpenClaw multi-tenant SaaS platform. Users create AI bots via a dashboard and connect them to Slack. The system dynamically generates OpenClaw configuration and hot-loads it into shared Gateway processes. One Gateway process serves 50+ bots across multiple users through OpenClaw's native multi-agent + multi-account + bindings routing.
+
 ## Commands
+
+All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 
 ```bash
 pnpm install                          # Install
@@ -30,10 +36,13 @@ pnpm lint                             # Biome lint
 pnpm format                           # Biome format
 pnpm test                             # Vitest
 pnpm --filter @nexu/api test          # API tests only
-pnpm db:generate                      # Generate Drizzle migration files (recommended)
+pnpm db:generate                      # Generate Drizzle migration files
+pnpm db:generate --name <change-name> # Generate Drizzle migration files with a semantic name
 pnpm --filter @nexu/api db:push       # Drizzle schema push
 pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
+
+After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 
 ## DB schema change workflow
 
@@ -42,11 +51,15 @@ When changing DB structure, follow this workflow.
 ### Development stage
 
 1. Use TS schema (`apps/api/src/db/schema/index.ts`) as the SSoT for target DB structure.
-2. Generate migration SQL with Drizzle (`pnpm db:generate`) and commit files under `apps/api/migrations/`.
+2. Generate migration SQL with Drizzle and commit files under `apps/api/migrations/`.
+   - Default: `pnpm db:generate`
+   - Recommended: `pnpm db:generate --name <change-name>` to create a migration with a semantic name
+3. Optional: for complex requirements, manually adjust the generated migration file, but only when necessary. In most cases, the auto-generated migration is the correct default.
 
 ### PR stage
 
 - CI automatically checks migration SQL; failures block the PR.
+- After the PR is merged, migrations are automatically applied by the deployment pipeline.
 
 ## Hard rules
 
@@ -77,6 +90,15 @@ When changing DB structure, follow this workflow.
 - `pnpm generate-types` — after API route/schema changes
 - `pnpm test` — after logic changes
 
+## Architecture
+
+See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
+
+- Monorepo: `apps/api` (Hono), `apps/web` (React), `packages/shared` (Zod schemas)
+- Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
+- Config generator: `apps/api/src/lib/config-generator.ts` builds OpenClaw config from DB
+- Key data flows: Slack OAuth, Slack event routing, config hot-reload
+
 ## Code style (quick reference)
 
 - Biome: 2-space indent, double quotes, semicolons always
@@ -92,13 +114,14 @@ When changing DB structure, follow this workflow.
 | Topic | Location |
 |-------|----------|
 | Architecture & data flows | `ARCHITECTURE.md` |
-| System design | `docs/design-docs/openclaw-multi-tenant.md` |
-| OpenClaw internals | `docs/design-docs/openclaw-architecture-internals.md` |
+| System design | `docs/designs/openclaw-multi-tenant.md` |
+| OpenClaw internals | `docs/designs/openclaw-architecture-internals.md` |
 | Engineering principles | `docs/design-docs/core-beliefs.md` |
 | Config schema & pitfalls | `docs/references/openclaw-config-schema.md` |
 | API coding patterns | `docs/references/api-patterns.md` |
 | Infrastructure | `docs/references/infrastructure.md` |
 | Gateway environment (dev vs prod) | `docs/guides/gateway-environment-guide.md` |
+| Workspace templates | `docs/guides/workspace-templates.md` |
 | Local Slack testing | `docs/references/local-slack-testing.md` |
 | Frontend conventions | `docs/FRONTEND.md` |
 | Security posture | `docs/SECURITY.md` |
@@ -108,8 +131,10 @@ When changing DB structure, follow this workflow.
 | Product specs | `docs/product-specs/` |
 | Execution plans | `docs/exec-plans/` |
 | DB schema reference | `docs/generated/db-schema.md` |
-| Documentation sync | `.nexu-dev/skills/sync-docs/SKILL.md` |
-| E2E gateway testing | `.nexu-dev/skills/nexu-e2e-test/SKILL.md` |
+| Documentation sync | `skills/localdev/sync-docs/SKILL.md` |
+| E2E gateway testing | `skills/localdev/nexu-e2e-test/SKILL.md` |
+| Production operations | `skills/localdev/prod-ops/SKILL.md` |
+| Nano Banana (image gen) | `skills/nexubot/nano-banana/SKILL.md` |
 
 ## Documentation maintenance
 
@@ -129,16 +154,15 @@ git diff --name-only $(git merge-base HEAD origin/main)...HEAD
 | `apps/api/src/routes/` | `docs/references/api-patterns.md`, `docs/product-specs/*.md` |
 | `apps/web/src/pages/` or routing | `docs/FRONTEND.md` |
 | `apps/gateway/src/` | `ARCHITECTURE.md`, `docs/RELIABILITY.md` |
-| `package.json` scripts | `CLAUDE.md` + `AGENTS.md` Commands sections |
-| New/moved doc files | `CLAUDE.md` Doc Map, `AGENTS.md` Where to look |
+| `package.json` scripts | `AGENTS.md` Commands section |
+| New/moved doc files | `AGENTS.md` Where to look |
 
 ### Cross-reference checklist
 
-1. `CLAUDE.md` Commands <-> `AGENTS.md` Commands (same entries)
-2. `CLAUDE.md` Doc Map <-> `AGENTS.md` Where to look (valid paths)
-3. `docs/DESIGN.md` <-> `docs/design-docs/` + `docs/designs/` (indexed)
-4. `docs/product-specs/index.md` <-> actual spec files
-5. `docs/FRONTEND.md` Pages <-> `apps/web/src/app.tsx` routes
+1. `AGENTS.md` Where to look table — all paths valid
+2. `docs/DESIGN.md` <-> `docs/design-docs/` + `docs/designs/` (indexed)
+3. `docs/product-specs/index.md` <-> actual spec files
+4. `docs/FRONTEND.md` Pages <-> `apps/web/src/app.tsx` routes
 
 ### Rules
 
@@ -146,7 +170,7 @@ git diff --name-only $(git merge-base HEAD origin/main)...HEAD
 - Preserve original language (English/Chinese)
 - Do not auto-commit; present changes for review
 
-Full reference: `.nexu-dev/skills/sync-docs/SKILL.md`
+Full reference: `skills/localdev/sync-docs/SKILL.md`
 
 ## Cross-project sync rules
 

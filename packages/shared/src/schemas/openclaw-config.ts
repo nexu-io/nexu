@@ -16,14 +16,25 @@ const controlUiSchema = z
   })
   .optional();
 
-const gatewayConfigSchema = z.object({
-  port: z.number().default(18789),
-  mode: z.literal("local").default("local"),
-  bind: z.enum(["loopback", "lan", "auto"]).default("lan"),
-  auth: gatewayAuthSchema,
-  reload: gatewayReloadSchema.default({ mode: "hybrid" }),
-  controlUi: controlUiSchema,
-});
+const gatewayToolsSchema = z
+  .object({
+    allow: z.array(z.string()).optional(),
+    deny: z.array(z.string()).optional(),
+  })
+  .passthrough()
+  .optional();
+
+const gatewayConfigSchema = z
+  .object({
+    port: z.number().default(18789),
+    mode: z.literal("local").default("local"),
+    bind: z.enum(["loopback", "lan", "auto"]).default("lan"),
+    auth: gatewayAuthSchema,
+    reload: gatewayReloadSchema.default({ mode: "hybrid" }),
+    controlUi: controlUiSchema,
+    tools: gatewayToolsSchema,
+  })
+  .passthrough();
 
 const agentModelSchema = z.union([
   z.string(),
@@ -150,15 +161,19 @@ const feishuAccountSchema = z.object({
   appSecret: z.string(),
 });
 
-const feishuChannelSchema = z.object({
-  enabled: z.boolean().optional(),
-  connectionMode: z.enum(["websocket", "webhook"]).optional(),
-  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
-  groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
-  requireMention: z.boolean().optional(),
-  allowFrom: z.array(z.string()).optional(),
-  accounts: z.record(z.string(), feishuAccountSchema),
-});
+const feishuChannelSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    connectionMode: z.enum(["websocket", "webhook"]).optional(),
+    streaming: z.boolean().optional(),
+    renderMode: z.enum(["auto", "raw", "card"]).optional(),
+    dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+    groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+    requireMention: z.boolean().optional(),
+    allowFrom: z.array(z.string()).optional(),
+    accounts: z.record(z.string(), feishuAccountSchema),
+  })
+  .passthrough();
 
 const channelsConfigSchema = z
   .object({
