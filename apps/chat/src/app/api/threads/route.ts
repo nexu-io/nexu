@@ -10,9 +10,10 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to create thread."
+        error:
+          error instanceof Error ? error.message : "Failed to create thread.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

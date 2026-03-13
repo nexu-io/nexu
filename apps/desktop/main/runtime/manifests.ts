@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  type DesktopRuntimeConfig,
   getDesktopRuntimeConfig,
-  type DesktopRuntimeConfig
 } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
@@ -24,14 +24,18 @@ function getBooleanEnv(name: string, fallback: boolean): boolean {
 
 export function createRuntimeUnitManifests(
   electronRoot: string,
-  userDataPath: string
+  userDataPath: string,
 ): RuntimeUnitManifest[] {
   const repoRoot = getWorkspaceRoot();
   const nexuRoot = repoRoot;
-  const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(process.env);
+  const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
+    process.env,
+  );
   const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
   const pgliteDataPath = ensureDir(resolve(runtimeRoot, "pglite"));
-  const sessionChatDbDataPath = ensureDir(resolve(runtimeRoot, "session-chat-db"));
+  const sessionChatDbDataPath = ensureDir(
+    resolve(runtimeRoot, "session-chat-db"),
+  );
   const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(resolve(openclawRuntimeRoot, "config"));
   const openclawStateDir = ensureDir(resolve(openclawRuntimeRoot, "state"));
@@ -56,12 +60,18 @@ export function createRuntimeUnitManifests(
   const webPort = runtimeConfig.webPort;
   const sessionChatPort = runtimeConfig.sessionChatPort;
   const sessionChatDbPort = runtimeConfig.sessionChatDbPort;
-  const internalApiToken = process.env.NEXU_INTERNAL_API_TOKEN ?? "gw-secret-token";
-  const skillApiToken = process.env.NEXU_SKILL_API_TOKEN ?? "skill-secret-token";
-  const gatewayPoolId = process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
+  const internalApiToken =
+    process.env.NEXU_INTERNAL_API_TOKEN ?? "gw-secret-token";
+  const skillApiToken =
+    process.env.NEXU_SKILL_API_TOKEN ?? "skill-secret-token";
+  const gatewayPoolId =
+    process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
   const webUrl = runtimeConfig.webUrl;
   const authUrl = process.env.NEXU_AUTH_URL ?? runtimeConfig.apiBaseUrl;
-  const sessionChatSidecarRoot = resolve(repoRoot, ".tmp/sidecars/session-chat");
+  const sessionChatSidecarRoot = resolve(
+    repoRoot,
+    ".tmp/sidecars/session-chat",
+  );
   const sessionChatAppRoot = resolve(sessionChatSidecarRoot, "apps/chat");
   const sessionChatModulePath = resolve(sessionChatAppRoot, "server.js");
 
@@ -84,8 +94,8 @@ export function createRuntimeUnitManifests(
       env: {
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
-        WEB_API_ORIGIN: `http://127.0.0.1:${apiPort}`
-      }
+        WEB_API_ORIGIN: `http://127.0.0.1:${apiPort}`,
+      },
     },
     {
       id: "session-chat-db",
@@ -102,8 +112,8 @@ export function createRuntimeUnitManifests(
         PGLITE_DATA_DIR: sessionChatDbDataPath,
         PGLITE_HOST: "127.0.0.1",
         PGLITE_PORT: String(sessionChatDbPort),
-        PGLITE_MIGRATIONS_DIR: sessionChatMigrationsDir
-      }
+        PGLITE_MIGRATIONS_DIR: sessionChatMigrationsDir,
+      },
     },
     {
       id: "session-chat",
@@ -124,10 +134,11 @@ export function createRuntimeUnitManifests(
         // as readiness/config issues rather than renderer boot failures.
         DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:${sessionChatDbPort}/postgres?sslmode=disable`,
         SESSION_CHAT_MIGRATIONS_DIR: resolve(sessionChatAppRoot, "migrations"),
-        OPENCLAW_BASE_URL: process.env.NEXU_OPENCLAW_BASE_URL ?? "http://127.0.0.1:18789",
+        OPENCLAW_BASE_URL:
+          process.env.NEXU_OPENCLAW_BASE_URL ?? "http://127.0.0.1:18789",
         OPENCLAW_GATEWAY_TOKEN: internalApiToken,
-        OPENCLAW_MODEL: process.env.NEXU_OPENCLAW_MODEL ?? "openclaw"
-      }
+        OPENCLAW_MODEL: process.env.NEXU_OPENCLAW_MODEL ?? "openclaw",
+      },
     },
     {
       id: "control-plane",
@@ -135,7 +146,7 @@ export function createRuntimeUnitManifests(
       kind: "surface",
       launchStrategy: "embedded",
       port: null,
-      autoStart: true
+      autoStart: true,
     },
     {
       id: "pglite",
@@ -153,8 +164,8 @@ export function createRuntimeUnitManifests(
         PGLITE_DATA_DIR: pgliteDataPath,
         PGLITE_HOST: "127.0.0.1",
         PGLITE_PORT: String(pglitePort),
-        PGLITE_MIGRATIONS_DIR: migrationsDir
-      }
+        PGLITE_MIGRATIONS_DIR: migrationsDir,
+      },
     },
     {
       id: "api",
@@ -176,8 +187,8 @@ export function createRuntimeUnitManifests(
         BETTER_AUTH_URL: authUrl,
         WEB_URL: webUrl,
         INTERNAL_API_TOKEN: internalApiToken,
-        SKILL_API_TOKEN: skillApiToken
-      }
+        SKILL_API_TOKEN: skillApiToken,
+      },
     },
     {
       id: "gateway",
@@ -202,8 +213,8 @@ export function createRuntimeUnitManifests(
         OPENCLAW_BIN: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
-        RUNTIME_GATEWAY_PROBE_ENABLED: "false"
-      }
+        RUNTIME_GATEWAY_PROBE_ENABLED: "false",
+      },
     },
     {
       id: "openclaw",
@@ -212,7 +223,7 @@ export function createRuntimeUnitManifests(
       launchStrategy: "delegated",
       delegatedProcessMatch: "openclaw-gateway",
       port: null,
-      autoStart: true
-    }
+      autoStart: true,
+    },
   ];
 }

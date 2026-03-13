@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { SessionChatMessage, SessionChatThread, SessionChatTrace } from "../server/db";
+import { useMemo, useState } from "react";
+import type {
+  SessionChatMessage,
+  SessionChatThread,
+  SessionChatTrace,
+} from "../server/db";
 
 type SessionChatConsoleProps = {
   threads: SessionChatThread[];
@@ -14,12 +18,15 @@ async function postJson(url: string, payload: Record<string, string>) {
   const response = await fetch(url, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
-  const json = (await response.json()) as { error?: string; result?: { dispatchOk?: boolean; dispatchError?: string | null } };
+  const json = (await response.json()) as {
+    error?: string;
+    result?: { dispatchOk?: boolean; dispatchError?: string | null };
+  };
 
   if (!response.ok) {
     throw new Error(json.error ?? "Request failed.");
@@ -31,14 +38,18 @@ async function postJson(url: string, payload: Record<string, string>) {
 export function SessionChatConsole({
   threads,
   messagesByThread,
-  tracesByMessage
+  tracesByMessage,
 }: SessionChatConsoleProps) {
   const router = useRouter();
   const [threadTitle, setThreadTitle] = useState("");
   const [messageBody, setMessageBody] = useState("");
-  const [busyAction, setBusyAction] = useState<"thread" | "message" | null>(null);
+  const [busyAction, setBusyAction] = useState<"thread" | "message" | null>(
+    null,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(threads[0]?.id ?? null);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(
+    threads[0]?.id ?? null,
+  );
 
   const activeMessages = useMemo(() => {
     if (!activeThreadId) {
@@ -57,7 +68,9 @@ export function SessionChatConsole({
       setThreadTitle("");
       router.refresh();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create thread.");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to create thread.",
+      );
     } finally {
       setBusyAction(null);
     }
@@ -76,17 +89,22 @@ export function SessionChatConsole({
       const json = await postJson("/api/messages", {
         threadId: activeThreadId,
         role: "user",
-        body: messageBody
+        body: messageBody,
       });
 
       if (json.result?.dispatchOk === false) {
-        setErrorMessage(json.result.dispatchError ?? "Dispatch failed after local persistence.");
+        setErrorMessage(
+          json.result.dispatchError ??
+            "Dispatch failed after local persistence.",
+        );
       }
 
       setMessageBody("");
       router.refresh();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create message.");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to create message.",
+      );
     } finally {
       setBusyAction(null);
     }
@@ -113,17 +131,33 @@ export function SessionChatConsole({
             placeholder="Cold-start probe"
             value={threadTitle}
           />
-          <button disabled={busyAction !== null} onClick={() => void handleCreateThread()} type="button">
+          <button
+            disabled={busyAction !== null}
+            onClick={() => void handleCreateThread()}
+            type="button"
+          >
             Create
           </button>
         </div>
 
-        <div className="thread-list" role="tablist" aria-label="Session threads">
-          {threads.length === 0 ? <p className="empty-copy">No threads yet. Create one to verify write paths.</p> : null}
+        <div
+          className="thread-list"
+          role="tablist"
+          aria-label="Session threads"
+        >
+          {threads.length === 0 ? (
+            <p className="empty-copy">
+              No threads yet. Create one to verify write paths.
+            </p>
+          ) : null}
           {threads.map((thread) => (
             <button
               aria-selected={activeThreadId === thread.id}
-              className={activeThreadId === thread.id ? "thread-item is-active" : "thread-item"}
+              className={
+                activeThreadId === thread.id
+                  ? "thread-item is-active"
+                  : "thread-item"
+              }
               key={thread.id}
               onClick={() => setActiveThreadId(thread.id)}
               role="tab"
@@ -131,7 +165,11 @@ export function SessionChatConsole({
             >
               <strong>{thread.title}</strong>
               <small>
-                {thread.status} · {new Date(thread.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {thread.status} ·{" "}
+                {new Date(thread.updatedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </small>
             </button>
           ))}
@@ -151,7 +189,10 @@ export function SessionChatConsole({
 
         <div className="message-stack">
           {activeMessages.length === 0 ? (
-          <p className="empty-copy">Messages now persist locally first, then try a direct OpenClaw responses dispatch using the shared gateway token.</p>
+            <p className="empty-copy">
+              Messages now persist locally first, then try a direct OpenClaw
+              responses dispatch using the shared gateway token.
+            </p>
           ) : null}
 
           {activeMessages.map((message) => (
@@ -190,8 +231,15 @@ export function SessionChatConsole({
           value={messageBody}
         />
         <div className="composer-row">
-          <p>Current mode: persist locally, then dispatch to `OpenClaw /v1/responses` when available.</p>
-          <button disabled={busyAction !== null || !activeThreadId} onClick={() => void handleSendMessage()} type="button">
+          <p>
+            Current mode: persist locally, then dispatch to `OpenClaw
+            /v1/responses` when available.
+          </p>
+          <button
+            disabled={busyAction !== null || !activeThreadId}
+            onClick={() => void handleSendMessage()}
+            type="button"
+          >
             Save message
           </button>
         </div>

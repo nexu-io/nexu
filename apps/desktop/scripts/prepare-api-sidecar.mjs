@@ -1,10 +1,19 @@
-import { cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const nexuRoot = repoRoot;
 const apiRoot = resolve(nexuRoot, "apps/api");
 const apiDistRoot = resolve(apiRoot, "dist");
@@ -42,7 +51,7 @@ async function ensureBuildArtifacts() {
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing API sidecar prerequisites: ${missing.join(", ")}. Build/install nexu first.`
+      `Missing API sidecar prerequisites: ${missing.join(", ")}. Build/install nexu first.`,
     );
   }
 }
@@ -56,18 +65,23 @@ async function prepareApiSidecar() {
   // sidecar automatically, so desktop-specific env injection needs to happen from the manifest.
   await cp(apiDistRoot, sidecarDistRoot, { recursive: true });
 
-  const apiPackageJson = JSON.parse(await readFile(resolve(apiRoot, "package.json"), "utf8"));
+  const apiPackageJson = JSON.parse(
+    await readFile(resolve(apiRoot, "package.json"), "utf8"),
+  );
   const sidecarPackageJson = {
     name: `${apiPackageJson.name}-sidecar`,
     private: true,
-    type: apiPackageJson.type
+    type: apiPackageJson.type,
   };
 
-  await writeFile(sidecarPackageJsonPath, `${JSON.stringify(sidecarPackageJson, null, 2)}\n`);
+  await writeFile(
+    sidecarPackageJsonPath,
+    `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
+  );
   await symlink(
     apiNodeModules,
     sidecarNodeModules,
-    process.platform === "win32" ? "junction" : "dir"
+    process.platform === "win32" ? "junction" : "dir",
   );
 }
 

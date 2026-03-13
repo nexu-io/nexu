@@ -3,11 +3,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Session Chat",
-  description: "Minimal session chat sidecar for Nexu Desktop cold-start validation"
+  description:
+    "Minimal session chat sidecar for Nexu Desktop cold-start validation",
 };
 
 export default function RootLayout({
-  children
+  children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {

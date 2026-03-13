@@ -11,16 +11,17 @@ export async function POST(request: Request) {
 
     const result = await dispatchSessionChatTurn({
       threadId: typeof body.threadId === "string" ? body.threadId : "",
-      body: typeof body.body === "string" ? body.body : ""
+      body: typeof body.body === "string" ? body.body : "",
     });
 
     return NextResponse.json({ result }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to create message."
+        error:
+          error instanceof Error ? error.message : "Failed to create message.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

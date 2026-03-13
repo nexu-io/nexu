@@ -1,17 +1,17 @@
-import { app, BrowserWindow, shell } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { BrowserWindow, app, shell } from "electron";
+import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { bootstrapDesktopAuthSession } from "./desktop-bootstrap";
 import { registerIpcHandlers } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
-import { getDesktopAppRoot } from "../shared/workspace-paths";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const electronRoot = getDesktopAppRoot();
 const orchestrator = new RuntimeOrchestrator(
-  createRuntimeUnitManifests(electronRoot, app.getPath("userData"))
+  createRuntimeUnitManifests(electronRoot, app.getPath("userData")),
 );
 
 app.setName("Nexu Desktop");
@@ -26,7 +26,8 @@ function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   try {
     stream.write(message);
   } catch (error) {
-    const errorCode = error instanceof Error && "code" in error ? String(error.code) : null;
+    const errorCode =
+      error instanceof Error && "code" in error ? String(error.code) : null;
     if (errorCode === "EIO" || errorCode === "EPIPE") {
       return;
     }
@@ -70,8 +71,8 @@ function createMainWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      webviewTag: true
-    }
+      webviewTag: true,
+    },
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -79,24 +80,40 @@ function createMainWindow(): BrowserWindow {
     return { action: "deny" };
   });
 
-  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
-    const levelLabel = ["verbose", "info", "warning", "error"][level] ?? String(level);
-    safeWrite(process.stdout, `[renderer:${levelLabel}] ${message} (${sourceId}:${line})\n`);
-  });
+  window.webContents.on(
+    "console-message",
+    (_event, level, message, line, sourceId) => {
+      const levelLabel =
+        ["verbose", "info", "warning", "error"][level] ?? String(level);
+      safeWrite(
+        process.stdout,
+        `[renderer:${levelLabel}] ${message} (${sourceId}:${line})\n`,
+      );
+    },
+  );
 
   window.webContents.on(
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedUrl) => {
-      safeWrite(process.stderr, `[renderer:fail-load] ${errorCode} ${errorDescription} ${validatedUrl}\n`);
-    }
+      safeWrite(
+        process.stderr,
+        `[renderer:fail-load] ${errorCode} ${errorDescription} ${validatedUrl}\n`,
+      );
+    },
   );
 
   window.webContents.on("did-finish-load", () => {
-    safeWrite(process.stdout, `[renderer] did-finish-load ${window.webContents.getURL()}\n`);
+    safeWrite(
+      process.stdout,
+      `[renderer] did-finish-load ${window.webContents.getURL()}\n`,
+    );
   });
 
   window.webContents.on("render-process-gone", (_event, details) => {
-    safeWrite(process.stderr, `[renderer:gone] reason=${details.reason} exitCode=${details.exitCode}\n`);
+    safeWrite(
+      process.stderr,
+      `[renderer:gone] reason=${details.reason} exitCode=${details.exitCode}\n`,
+    );
   });
 
   window.once("ready-to-show", () => {
@@ -125,7 +142,7 @@ app.whenReady().then(async () => {
     } catch (error) {
       safeWrite(
         process.stderr,
-        `[runtime:start-all] ${error instanceof Error ? error.message : String(error)}\n`
+        `[runtime:start-all] ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
 
@@ -134,7 +151,7 @@ app.whenReady().then(async () => {
     } catch (error) {
       safeWrite(
         process.stderr,
-        `[desktop:auth-bootstrap] ${error instanceof Error ? error.message : String(error)}\n`
+        `[desktop:auth-bootstrap] ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
   })();

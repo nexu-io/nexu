@@ -2,7 +2,7 @@ import type {
   RuntimeUnitId,
   RuntimeUnitKind,
   RuntimeUnitLaunchStrategy,
-  RuntimeUnitPhase
+  RuntimeUnitPhase,
 } from "../../shared/host";
 
 export type RuntimeUnitRunner = "spawn" | "utility-process";

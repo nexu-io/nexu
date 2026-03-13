@@ -1,6 +1,10 @@
-import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  type ChildProcessWithoutNullStreams,
+  execFileSync,
+  spawn,
+} from "node:child_process";
 import { Socket } from "node:net";
-import { utilityProcess, type UtilityProcess } from "electron";
+import { type UtilityProcess, utilityProcess } from "electron";
 import type { RuntimeState, RuntimeUnitState } from "../../shared/host";
 import type { RuntimeUnitManifest, RuntimeUnitRecord } from "./types";
 
@@ -28,13 +32,17 @@ export class RuntimeOrchestrator {
               ? "stopped"
               : "idle",
         pid: null,
-        startedAt: manifest.launchStrategy === "embedded" ? this.startedAt : null,
+        startedAt:
+          manifest.launchStrategy === "embedded" ? this.startedAt : null,
         exitedAt: null,
         exitCode: null,
         lastError: null,
-        logTail: manifest.launchStrategy === "embedded" ? ["embedded runtime unit"] : [],
+        logTail:
+          manifest.launchStrategy === "embedded"
+            ? ["embedded runtime unit"]
+            : [],
         stdoutRemainder: "",
-        stderrRemainder: ""
+        stderrRemainder: "",
       });
     }
   }
@@ -44,13 +52,18 @@ export class RuntimeOrchestrator {
 
     return {
       startedAt: this.startedAt,
-      units: Array.from(this.units.values()).map((record) => this.toRuntimeUnitState(record))
+      units: Array.from(this.units.values()).map((record) =>
+        this.toRuntimeUnitState(record),
+      ),
     };
   }
 
   async startAutoStartManagedUnits(): Promise<void> {
     for (const record of this.units.values()) {
-      if (record.manifest.launchStrategy === "managed" && record.manifest.autoStart) {
+      if (
+        record.manifest.launchStrategy === "managed" &&
+        record.manifest.autoStart
+      ) {
         await this.startUnit(record.manifest.id);
       }
     }
@@ -131,13 +144,16 @@ export class RuntimeOrchestrator {
 
       attachManagedChildEvents(id, child, record, this.children);
 
-      appendLogLine(record, `runtime unit ${id} launched with pid ${record.pid ?? "unknown"}`);
+      appendLogLine(
+        record,
+        `runtime unit ${id} launched with pid ${record.pid ?? "unknown"}`,
+      );
 
       if (record.manifest.port !== null) {
         await waitForPort({
           host: "127.0.0.1",
           port: record.manifest.port,
-          timeoutMs: record.manifest.startupTimeoutMs ?? 10_000
+          timeoutMs: record.manifest.startupTimeoutMs ?? 10_000,
         });
       }
 
@@ -147,8 +163,12 @@ export class RuntimeOrchestrator {
       }
     } catch (error) {
       record.phase = "failed";
-      record.lastError = error instanceof Error ? error.message : "Failed to start daemon.";
-      appendLogLine(record, `runtime unit ${id} failed to start: ${record.lastError}`);
+      record.lastError =
+        error instanceof Error ? error.message : "Failed to start daemon.";
+      appendLogLine(
+        record,
+        `runtime unit ${id} failed to start: ${record.lastError}`,
+      );
     }
   }
 
@@ -164,7 +184,8 @@ export class RuntimeOrchestrator {
     if (!child) {
       if (record.phase === "running" || record.phase === "starting") {
         record.phase = "failed";
-        record.lastError = "Process handle missing while daemon was marked active.";
+        record.lastError =
+          "Process handle missing while daemon was marked active.";
       }
       return;
     }
@@ -229,7 +250,7 @@ export class RuntimeOrchestrator {
           : record.manifest.launchStrategy === "delegated"
             ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
             : null,
-      logTail: record.logTail
+      logTail: record.logTail,
     };
   }
 
@@ -248,7 +269,7 @@ export class RuntimeOrchestrator {
 
       try {
         const output = execFileSync("pgrep", ["-fal", match], {
-          encoding: "utf-8"
+          encoding: "utf-8",
         }).trim();
         const firstLine = output.split(/\r?\n/).find(Boolean) ?? "";
         const pid = Number.parseInt(firstLine.split(" ", 1)[0] ?? "", 10);
@@ -265,7 +286,10 @@ export class RuntimeOrchestrator {
         record.exitedAt = null;
         record.exitCode = null;
         record.lastError = null;
-        appendLogLine(record, `delegated runtime detected via pgrep: pid ${pid}`);
+        appendLogLine(
+          record,
+          `delegated runtime detected via pgrep: pid ${pid}`,
+        );
       } catch {
         record.phase = "stopped";
         record.pid = null;
@@ -273,10 +297,12 @@ export class RuntimeOrchestrator {
     }
   }
 
-  private launchManagedUnit(manifest: RuntimeUnitManifest): ManagedChildProcess {
+  private launchManagedUnit(
+    manifest: RuntimeUnitManifest,
+  ): ManagedChildProcess {
     const env = {
       ...process.env,
-      ...manifest.env
+      ...manifest.env,
     };
 
     if (manifest.runner === "utility-process") {
@@ -288,14 +314,14 @@ export class RuntimeOrchestrator {
         cwd: manifest.cwd,
         env,
         stdio: "pipe",
-        serviceName: manifest.label
+        serviceName: manifest.label,
       });
     }
 
     return spawn(manifest.command ?? "", manifest.args ?? [], {
       cwd: manifest.cwd,
       env,
-      stdio: "pipe"
+      stdio: "pipe",
     });
   }
 }
@@ -303,9 +329,10 @@ export class RuntimeOrchestrator {
 function appendLogChunk(
   record: RuntimeUnitRecord,
   chunk: string,
-  stream: "stdout" | "stderr"
+  stream: "stdout" | "stderr",
 ): void {
-  const remainderKey = stream === "stdout" ? "stdoutRemainder" : "stderrRemainder";
+  const remainderKey =
+    stream === "stdout" ? "stdoutRemainder" : "stderrRemainder";
   const prefix = stream === "stderr" ? "[stderr] " : "";
   const combined = record[remainderKey] + chunk;
   const parts = combined.split(/\r?\n/);
@@ -342,7 +369,7 @@ function attachManagedChildEvents(
   id: string,
   child: ManagedChildProcess,
   record: RuntimeUnitRecord,
-  children: Map<string, ManagedChildProcess>
+  children: Map<string, ManagedChildProcess>,
 ): void {
   onManagedError(child, (error) => {
     const nextError = error instanceof Error ? error.message : String(error);
@@ -358,14 +385,17 @@ function attachManagedChildEvents(
     record.exitedAt = nowIso();
     record.exitCode = code;
     record.phase = code === 0 ? "stopped" : "failed";
-    appendLogLine(record, `runtime unit ${id} exited with code ${code ?? "null"}`);
+    appendLogLine(
+      record,
+      `runtime unit ${id} exited with code ${code ?? "null"}`,
+    );
   });
 }
 
 function flushLogRemainders(record: RuntimeUnitRecord): void {
   for (const [key, prefix] of [
     ["stdoutRemainder", ""],
-    ["stderrRemainder", "[stderr] "]
+    ["stderrRemainder", "[stderr] "],
   ] as const) {
     const remainder = record[key].trimEnd();
     if (remainder.length > 0) {
@@ -381,7 +411,7 @@ function flushLogRemainders(record: RuntimeUnitRecord): void {
 
 function onManagedError(
   child: ManagedChildProcess,
-  listener: (error: unknown) => void
+  listener: (error: unknown) => void,
 ): void {
   const eventful = child as unknown as {
     once(event: "error", listener: (error: unknown) => void): void;
@@ -391,7 +421,7 @@ function onManagedError(
 
 function onManagedExit(
   child: ManagedChildProcess,
-  listener: (code: number | null) => void
+  listener: (code: number | null) => void,
 ): void {
   const eventful = child as unknown as {
     once(event: "exit", listener: (code: number | null) => void): void;
@@ -402,7 +432,7 @@ function onManagedExit(
 function waitForPort({
   host,
   port,
-  timeoutMs
+  timeoutMs,
 }: {
   host: string;
   port: number;

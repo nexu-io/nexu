@@ -17,9 +17,11 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background:
-    radial-gradient(circle at top, rgba(65, 120, 255, 0.18), transparent 35%),
-    linear-gradient(180deg, #091018 0%, #0e1117 100%);
+  background: radial-gradient(
+      circle at top,
+      rgba(65, 120, 255, 0.18),
+      transparent 35%
+    ), linear-gradient(180deg, #091018 0%, #0e1117 100%);
   color: var(--text);
   font-family: "SF Pro Display", "Segoe UI", sans-serif;
 }

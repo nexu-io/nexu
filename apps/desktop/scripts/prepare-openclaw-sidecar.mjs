@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const openclawRoot = resolve(electronRoot, "node_modules/openclaw");
 const sidecarRoot = resolve(repoRoot, ".tmp/sidecars/openclaw");
 const sidecarBinDir = resolve(sidecarRoot, "bin");
@@ -21,7 +22,7 @@ async function pathExists(path) {
 async function prepareOpenclawSidecar() {
   if (!(await pathExists(openclawRoot))) {
     throw new Error(
-      `Electron OpenClaw dependency not found at ${openclawRoot}. Install electron dependencies first.`
+      `Electron OpenClaw dependency not found at ${openclawRoot}. Install electron dependencies first.`,
     );
   }
 
@@ -36,13 +37,13 @@ async function prepareOpenclawSidecar() {
     `#!/usr/bin/env bash
 set -euo pipefail
 exec node "${resolve(openclawRoot, "openclaw.mjs")}" "$@"
-`
+`,
   );
   await chmod(wrapperPath, 0o755);
 
   await writeFile(
     resolve(sidecarBinDir, "openclaw.cmd"),
-    `@echo off\r\nnode "${resolve(openclawRoot, "openclaw.mjs")}" %*\r\n`
+    `@echo off\r\nnode "${resolve(openclawRoot, "openclaw.mjs")}" %*\r\n`,
   );
 
   await writeFile(
@@ -50,11 +51,11 @@ exec node "${resolve(openclawRoot, "openclaw.mjs")}" "$@"
     `${JSON.stringify(
       {
         strategy: "electron-dependency",
-        openclawRoot
+        openclawRoot,
       },
       null,
-      2
-    )}\n`
+      2,
+    )}\n`,
   );
 }
 

@@ -6,12 +6,17 @@ type ParsedCookie = {
   samesite?: string;
 };
 
-export function parseSetCookieHeader(headerValue: string): Map<string, ParsedCookie> {
+export function parseSetCookieHeader(
+  headerValue: string,
+): Map<string, ParsedCookie> {
   const cookies = new Map<string, ParsedCookie>();
   const parts = headerValue.split(/,(?=[^;]+=[^;]+)/g);
 
   for (const rawPart of parts) {
-    const segments = rawPart.split(";").map((segment) => segment.trim()).filter(Boolean);
+    const segments = rawPart
+      .split(";")
+      .map((segment) => segment.trim())
+      .filter(Boolean);
     const [nameValue, ...attributes] = segments;
 
     if (!nameValue) {

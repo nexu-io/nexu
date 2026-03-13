@@ -1,10 +1,19 @@
-import { cp, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const nexuRoot = repoRoot;
 const gatewayRoot = resolve(nexuRoot, "apps/gateway");
 const gatewayDistRoot = resolve(gatewayRoot, "dist");
@@ -42,7 +51,7 @@ async function ensureBuildArtifacts() {
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing gateway sidecar prerequisites: ${missing.join(", ")}. Build/install nexu first.`
+      `Missing gateway sidecar prerequisites: ${missing.join(", ")}. Build/install nexu first.`,
     );
   }
 }
@@ -57,19 +66,22 @@ async function prepareGatewaySidecar() {
   await cp(gatewayDistRoot, sidecarDistRoot, { recursive: true });
 
   const gatewayPackageJson = JSON.parse(
-    await readFile(resolve(gatewayRoot, "package.json"), "utf8")
+    await readFile(resolve(gatewayRoot, "package.json"), "utf8"),
   );
   const sidecarPackageJson = {
     name: `${gatewayPackageJson.name}-sidecar`,
     private: true,
-    type: gatewayPackageJson.type
+    type: gatewayPackageJson.type,
   };
 
-  await writeFile(sidecarPackageJsonPath, `${JSON.stringify(sidecarPackageJson, null, 2)}\n`);
+  await writeFile(
+    sidecarPackageJsonPath,
+    `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
+  );
   await symlink(
     gatewayNodeModules,
     sidecarNodeModules,
-    process.platform === "win32" ? "junction" : "dir"
+    process.platform === "win32" ? "junction" : "dir",
   );
 }
 

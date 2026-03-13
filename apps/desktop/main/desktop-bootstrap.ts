@@ -1,6 +1,6 @@
 import { session } from "electron";
-import { parseSetCookieHeader } from "./cookies";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { parseSetCookieHeader } from "./cookies";
 
 type PgPoolConstructor = typeof import("pg").Pool;
 const runtimeConfig = getDesktopRuntimeConfig(process.env);
@@ -12,7 +12,7 @@ const desktopAuthBootstrap = {
   email: "desktop@nexu.local",
   password: "desktop-local-password",
   appUserId: "desktop-local-user",
-  onboardingRole: "Founder / Manager"
+  onboardingRole: "Founder / Manager",
 };
 
 export async function bootstrapDesktopAuthSession(): Promise<void> {
@@ -21,7 +21,7 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
   const authHeaders = {
     "Content-Type": "application/json",
     Origin: desktopWebUrl,
-    Referer: `${desktopWebUrl}/`
+    Referer: `${desktopWebUrl}/`,
   };
 
   await fetch(`${desktopApiUrl}/api/auth/sign-up/email`, {
@@ -30,36 +30,42 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
     body: JSON.stringify({
       name: desktopAuthBootstrap.name,
       email: desktopAuthBootstrap.email,
-      password: desktopAuthBootstrap.password
-    })
+      password: desktopAuthBootstrap.password,
+    }),
   }).catch(() => null);
 
   const pool = new Pool({
     connectionString:
       process.env.NEXU_DATABASE_URL ??
-      "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable"
+      "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable",
   });
 
   try {
-    await pool.query('update "user" set "emailVerified" = true where email = $1', [
-      desktopAuthBootstrap.email
-    ]);
+    await pool.query(
+      'update "user" set "emailVerified" = true where email = $1',
+      [desktopAuthBootstrap.email],
+    );
   } finally {
     await pool.end();
   }
 
-  const signInResponse = await fetch(`${desktopApiUrl}/api/auth/sign-in/email`, {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      email: desktopAuthBootstrap.email,
-      password: desktopAuthBootstrap.password,
-      rememberMe: true
-    })
-  });
+  const signInResponse = await fetch(
+    `${desktopApiUrl}/api/auth/sign-in/email`,
+    {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({
+        email: desktopAuthBootstrap.email,
+        password: desktopAuthBootstrap.password,
+        rememberMe: true,
+      }),
+    },
+  );
 
   if (!signInResponse.ok) {
-    throw new Error(`Desktop auth bootstrap failed with status ${signInResponse.status}.`);
+    throw new Error(
+      `Desktop auth bootstrap failed with status ${signInResponse.status}.`,
+    );
   }
 
   const signInPayload = (await signInResponse.json()) as {
@@ -77,7 +83,9 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
   const setCookieHeader = signInResponse.headers.get("set-cookie");
 
   if (!setCookieHeader) {
-    throw new Error("Desktop auth bootstrap did not receive Set-Cookie header.");
+    throw new Error(
+      "Desktop auth bootstrap did not receive Set-Cookie header.",
+    );
   }
 
   const cookies = parseSetCookieHeader(setCookieHeader);
@@ -85,7 +93,7 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
   const pool2 = new Pool({
     connectionString:
       process.env.NEXU_DATABASE_URL ??
-      "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable"
+      "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable",
   });
 
   try {
@@ -129,8 +137,8 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
         desktopAuthBootstrap.onboardingRole,
         now,
         now,
-        now
-      ]
+        now,
+      ],
     );
   } finally {
     await pool2.end();
@@ -149,7 +157,7 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
           ? "strict"
           : cookie.samesite === "none"
             ? "no_restriction"
-            : "lax"
+            : "lax",
     });
   }
 }

@@ -1,13 +1,13 @@
 import { SessionChatConsole } from "../components/session-chat-console";
 import {
-  bootstrapSessionChatDatabase,
-  getSessionChatDatabaseUrl,
   type SessionChatMessage,
   type SessionChatTrace,
+  bootstrapSessionChatDatabase,
+  getSessionChatDatabaseUrl,
   listSessionChatMessages,
-  listSessionChatTraces,
   listSessionChatThreads,
-  querySessionChat
+  listSessionChatTraces,
+  querySessionChat,
 } from "../server/db";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const checks = [
   "Next.js sidecar booted inside Electron runtime",
   "Independent surface available from desktop sidebar",
-  "Dedicated PGlite-backed database scaffold is live"
+  "Dedicated PGlite-backed database scaffold is live",
 ];
 
 type BootstrapStatus = {
@@ -29,35 +29,45 @@ async function getBootstrapStatus(): Promise<BootstrapStatus> {
   await bootstrapSessionChatDatabase();
 
   const [{ count: migrationCount }] = await querySessionChat<{ count: string }>(
-    "select count(*)::text as count from session_chat_migrations"
+    "select count(*)::text as count from session_chat_migrations",
   );
   const [{ count: threadCount }] = await querySessionChat<{ count: string }>(
-    "select count(*)::text as count from session_chat_threads"
+    "select count(*)::text as count from session_chat_threads",
   );
   const [{ count: messageCount }] = await querySessionChat<{ count: string }>(
-    "select count(*)::text as count from session_chat_messages"
+    "select count(*)::text as count from session_chat_messages",
   );
 
   return {
     migrationCount: Number.parseInt(migrationCount, 10),
     threadCount: Number.parseInt(threadCount, 10),
     messageCount: Number.parseInt(messageCount, 10),
-    databaseUrl: getSessionChatDatabaseUrl()
+    databaseUrl: getSessionChatDatabaseUrl(),
   };
 }
 
 export default async function SessionChatHome() {
   const status = await getBootstrapStatus();
   const threads = await listSessionChatThreads();
-  const messagesByThread: Record<string, SessionChatMessage[]> = Object.fromEntries(
-    await Promise.all(threads.map(async (thread) => [thread.id, await listSessionChatMessages(thread.id)]))
-  );
-  const allMessages = Object.values(messagesByThread).flatMap((messages) => messages);
-  const tracesByMessage: Record<string, SessionChatTrace[]> = Object.fromEntries(
-    await Promise.all(
-      allMessages.map(async (message) => [message.id, await listSessionChatTraces(message.id)])
-    )
-  );
+  const messagesByThread: Record<string, SessionChatMessage[]> =
+    Object.fromEntries(
+      await Promise.all(
+        threads.map(async (thread) => [
+          thread.id,
+          await listSessionChatMessages(thread.id),
+        ]),
+      ),
+    );
+  const allMessages = Object.values(messagesByThread).flat();
+  const tracesByMessage: Record<string, SessionChatTrace[]> =
+    Object.fromEntries(
+      await Promise.all(
+        allMessages.map(async (message) => [
+          message.id,
+          await listSessionChatTraces(message.id),
+        ]),
+      ),
+    );
 
   return (
     <main className="shell">
@@ -65,9 +75,10 @@ export default async function SessionChatHome() {
         <p className="eyebrow">Session Chat Sidecar</p>
         <h1>Cold start is live.</h1>
         <p className="lede">
-          This surface exists only to prove the standalone Next.js sidecar can boot cleanly under the
-          local desktop orchestrator, with its own dedicated PGlite backend, before we wire real
-          OpenClaw channel traffic.
+          This surface exists only to prove the standalone Next.js sidecar can
+          boot cleanly under the local desktop orchestrator, with its own
+          dedicated PGlite backend, before we wire real OpenClaw channel
+          traffic.
         </p>
         <div className="status-row">
           <span className="status-dot" />
