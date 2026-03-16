@@ -37,8 +37,19 @@ module.exports = async function notarize(context) {
     return;
   }
 
-  const requiredEnv = ["APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"];
-  const missingEnv = requiredEnv.filter((name) => !process.env[name]);
+  const apiKey = process.env.NEXU_APPLE_API_KEY ?? process.env.APPLE_API_KEY;
+  const apiKeyId =
+    process.env.NEXU_APPLE_API_KEY_ID ?? process.env.APPLE_API_KEY_ID;
+  const apiIssuer =
+    process.env.NEXU_APPLE_API_ISSUER ?? process.env.APPLE_API_ISSUER;
+  const teamId = process.env.NEXU_APPLE_TEAM_ID ?? process.env.APPLE_TEAM_ID;
+  const missingEnv = [
+    ["NEXU_APPLE_API_KEY", apiKey],
+    ["NEXU_APPLE_API_KEY_ID", apiKeyId],
+    ["NEXU_APPLE_API_ISSUER", apiIssuer],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
 
   if (missingEnv.length > 0) {
     console.log(
@@ -64,10 +75,7 @@ module.exports = async function notarize(context) {
   const zipPath = path.join(tempDir, `${productFilename}.zip`);
 
   try {
-    await writeFile(
-      apiKeyPath,
-      process.env.APPLE_API_KEY.replace(/\\n/g, "\n"),
-    );
+    await writeFile(apiKeyPath, apiKey.replace(/\\n/g, "\n"));
 
     await run("ditto", [
       "-c",
@@ -84,15 +92,15 @@ module.exports = async function notarize(context) {
       zipPath,
       "--wait",
       "--issuer",
-      process.env.APPLE_API_ISSUER,
+      apiIssuer,
       "--key-id",
-      process.env.APPLE_API_KEY_ID,
+      apiKeyId,
       "--key",
       apiKeyPath,
     ];
 
-    if (process.env.APPLE_TEAM_ID) {
-      submitArgs.push("--team-id", process.env.APPLE_TEAM_ID);
+    if (teamId) {
+      submitArgs.push("--team-id", teamId);
     }
 
     await run("xcrun", submitArgs);

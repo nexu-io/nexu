@@ -1,11 +1,13 @@
 import { cp, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
+  copyRuntimeDependencyClosure,
   getSidecarRoot,
   linkOrCopyDirectory,
   pathExists,
   repoRoot,
   resetDir,
+  shouldCopyRuntimeDependencies,
 } from "./lib/sidecar-paths.mjs";
 
 const nexuRoot = repoRoot;
@@ -62,6 +64,15 @@ async function prepareGatewaySidecar() {
     sidecarPackageJsonPath,
     `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
   );
+
+  if (shouldCopyRuntimeDependencies()) {
+    await copyRuntimeDependencyClosure({
+      packageRoot: gatewayRoot,
+      targetNodeModules: sidecarNodeModules,
+    });
+    return;
+  }
+
   await linkOrCopyDirectory(gatewayNodeModules, sidecarNodeModules);
 }
 

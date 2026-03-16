@@ -148,6 +148,30 @@ async function main() {
     ...desktopEnv,
     NEXU_WORKSPACE_ROOT: repoRoot,
   };
+  const {
+    APPLE_API_KEY: appleApiKey,
+    APPLE_API_KEY_ID: appleApiKeyId,
+    APPLE_API_ISSUER: appleApiIssuer,
+    APPLE_TEAM_ID: appleTeamId,
+    ...notarizeEnv
+  } = env;
+
+  if (appleApiKey) {
+    notarizeEnv.NEXU_APPLE_API_KEY = appleApiKey;
+  }
+
+  if (appleApiKeyId) {
+    notarizeEnv.NEXU_APPLE_API_KEY_ID = appleApiKeyId;
+  }
+
+  if (appleApiIssuer) {
+    notarizeEnv.NEXU_APPLE_API_ISSUER = appleApiIssuer;
+  }
+
+  if (appleTeamId) {
+    notarizeEnv.NEXU_APPLE_TEAM_ID = appleTeamId;
+  }
+
   const webPort = process.env.NEXU_WEB_PORT ?? "50810";
 
   await rm(resolve(electronRoot, "release"), { recursive: true, force: true });
@@ -200,11 +224,11 @@ async function main() {
       cwd: electronRoot,
       env: isUnsigned
         ? {
-            ...env,
+            ...notarizeEnv,
             CSC_IDENTITY_AUTO_DISCOVERY: "false",
             NEXU_DESKTOP_MAC_UNSIGNED: "true",
           }
-        : env,
+        : notarizeEnv,
     },
   );
 }

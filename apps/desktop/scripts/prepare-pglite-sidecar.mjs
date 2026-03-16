@@ -2,6 +2,7 @@ import { cp, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pruneOpenclawPackage } from "./lib/prune-openclaw-package.mjs";
 import {
+  copyRuntimeDependencyClosure,
   electronRoot,
   getSidecarRoot,
   linkOrCopyDirectory,
@@ -9,6 +10,7 @@ import {
   removePathIfExists,
   repoRoot,
   resetDir,
+  shouldCopyRuntimeDependencies,
 } from "./lib/sidecar-paths.mjs";
 
 const sidecarRoot = getSidecarRoot("pglite");
@@ -135,9 +137,18 @@ process.on("SIGINT", () => {
     });
   }
 
-  await linkOrCopyDirectory(electronNodeModules, sidecarNodeModules);
-  await removePathIfExists(resolve(sidecarNodeModules, "electron"));
-  await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
+  if (shouldCopyRuntimeDependencies()) {
+    await copyRuntimeDependencyClosure({
+      packageRoot: electronRoot,
+      targetNodeModules: sidecarNodeModules,
+      dependencyNames: ["@electric-sql/pglite", "@electric-sql/pglite-socket"],
+    });
+  } else {
+    await linkOrCopyDirectory(electronNodeModules, sidecarNodeModules);
+    await removePathIfExists(resolve(sidecarNodeModules, "electron"));
+    await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
+  }
+
   await pruneOpenclawPackage(sidecarNodeModules);
 }
 
