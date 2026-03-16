@@ -1553,6 +1553,7 @@ export type GetApiInternalPoolsByPoolIdConfigResponses = {
                         connectionMode?: 'websocket' | 'webhook';
                         webhookPath?: string;
                         webhookPort?: number;
+                        webhookHost?: string;
                         verificationToken?: string;
                     };
                 };
@@ -1608,7 +1609,7 @@ export type GetApiInternalPoolsByPoolIdConfigResponses = {
 export type GetApiInternalPoolsByPoolIdConfigResponse = GetApiInternalPoolsByPoolIdConfigResponses[keyof GetApiInternalPoolsByPoolIdConfigResponses];
 
 export type PostApiInternalPoolsRegisterData = {
-    body?: {
+    body: {
         poolId: string;
         podIp?: string;
         status?: 'pending' | 'active' | 'degraded' | 'unhealthy' | 'draining' | 'terminated';
@@ -1631,7 +1632,7 @@ export type PostApiInternalPoolsRegisterResponses = {
 export type PostApiInternalPoolsRegisterResponse = PostApiInternalPoolsRegisterResponses[keyof PostApiInternalPoolsRegisterResponses];
 
 export type PostApiInternalPoolsHeartbeatData = {
-    body?: {
+    body: {
         poolId: string;
         podIp?: string;
         status?: 'pending' | 'active' | 'degraded' | 'unhealthy' | 'draining' | 'terminated';
@@ -1889,6 +1890,7 @@ export type GetApiInternalPoolsByPoolIdConfigLatestResponses = {
                             connectionMode?: 'websocket' | 'webhook';
                             webhookPath?: string;
                             webhookPort?: number;
+                            webhookHost?: string;
                             verificationToken?: string;
                         };
                     };
@@ -2149,6 +2151,7 @@ export type GetApiInternalPoolsByPoolIdConfigVersionsByVersionResponses = {
                             connectionMode?: 'websocket' | 'webhook';
                             webhookPath?: string;
                             webhookPort?: number;
+                            webhookHost?: string;
                             verificationToken?: string;
                         };
                     };

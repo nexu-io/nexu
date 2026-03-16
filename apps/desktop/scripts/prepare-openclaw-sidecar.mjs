@@ -58,9 +58,35 @@ async function prepareOpenclawSidecar() {
   const wrapperPath = resolve(sidecarBinDir, "openclaw");
   await writeFile(
     wrapperPath,
-    `#!/usr/bin/env bash
-set -euo pipefail
-exec node "${packagedOpenclawEntry}" "$@"
+    `#!/bin/sh
+set -eu
+
+case "$0" in
+  */*) script_parent="\${0%/*}" ;;
+  *) script_parent="." ;;
+esac
+
+script_dir="$(CDPATH= cd -- "$script_parent" && pwd)"
+sidecar_root="$(CDPATH= cd -- "$script_dir/.." && pwd)"
+entry="$sidecar_root/node_modules/openclaw/openclaw.mjs"
+
+if command -v node >/dev/null 2>&1; then
+  exec node "$entry" "$@"
+fi
+
+contents_dir="$(CDPATH= cd -- "$sidecar_root/../../.." && pwd)"
+macos_dir="$contents_dir/MacOS"
+
+if [ -d "$macos_dir" ]; then
+  for candidate in "$macos_dir"/*; do
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      ELECTRON_RUN_AS_NODE=1 exec "$candidate" "$entry" "$@"
+    fi
+  done
+fi
+
+echo "openclaw launcher could not find node or a bundled Electron executable" >&2
+exit 127
 `,
   );
   await chmod(wrapperPath, 0o755);

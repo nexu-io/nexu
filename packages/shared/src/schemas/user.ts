@@ -7,6 +7,7 @@ export const userProfileResponseSchema = z.object({
   image: z.string().nullable().optional(),
   plan: z.string(),
   inviteAccepted: z.boolean(),
+  onboardingCompleted: z.boolean(),
   authSource: z.string().nullable().optional(),
 });
 

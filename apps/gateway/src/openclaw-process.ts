@@ -183,7 +183,7 @@ function killOrphanedOpenclawProcesses(): void {
 
   // macOS / BSD fallback using pgrep
   try {
-    const output = execSync("pgrep -f 'openclaw.*gateway'", {
+    const output = execSync("/usr/bin/pgrep -f 'openclaw.*gateway'", {
       encoding: "utf-8",
       timeout: 3000,
     }).trim();

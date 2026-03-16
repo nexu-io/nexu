@@ -4154,6 +4154,9 @@
                                   "webhookPort": {
                                     "type": "number"
                                   },
+                                  "webhookHost": {
+                                    "type": "string"
+                                  },
                                   "verificationToken": {
                                     "type": "string"
                                   }
@@ -4367,6 +4370,7 @@
           "Internal"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -4432,6 +4436,7 @@
           "Internal"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -5331,6 +5336,9 @@
                                       },
                                       "webhookPort": {
                                         "type": "number"
+                                      },
+                                      "webhookHost": {
+                                        "type": "string"
                                       },
                                       "verificationToken": {
                                         "type": "string"
@@ -6306,6 +6314,9 @@
                                       },
                                       "webhookPort": {
                                         "type": "number"
+                                      },
+                                      "webhookHost": {
+                                        "type": "string"
                                       },
                                       "verificationToken": {
                                         "type": "string"

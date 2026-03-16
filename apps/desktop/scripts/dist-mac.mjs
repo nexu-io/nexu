@@ -21,6 +21,13 @@ const dmgBuilderChecksum = {
   x86_64: "87b3bb72148b11451ee90ede79cc8d59305c9173b68b0f2b50a3bea51fc4a4e2",
 }[dmgBuilderArch];
 
+const rmWithRetriesOptions = {
+  recursive: true,
+  force: true,
+  maxRetries: 5,
+  retryDelay: 200,
+};
+
 function parseEnvFile(content) {
   const values = {};
 
@@ -108,7 +115,7 @@ async function ensureDmgbuildBundle() {
     // Download below.
   }
 
-  await rm(extractDir, { recursive: true, force: true });
+  await rm(extractDir, rmWithRetriesOptions);
   await mkdir(cacheRoot, { recursive: true });
 
   const response = await fetch(url);
@@ -174,11 +181,8 @@ async function main() {
 
   const webPort = process.env.NEXU_WEB_PORT ?? "50810";
 
-  await rm(resolve(electronRoot, "release"), { recursive: true, force: true });
-  await rm(resolve(electronRoot, ".dist-runtime"), {
-    recursive: true,
-    force: true,
-  });
+  await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
+  await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
 
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], {
     env,

@@ -8,6 +8,28 @@ const version =
   process.env.IMAGE_TAG ??
   process.env.npm_package_version;
 
+function getPinoTransport(): pino.TransportSingleOptions | undefined {
+  if (env === "production") {
+    return undefined;
+  }
+
+  try {
+    require.resolve("pino-pretty");
+    return {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        ignore: "pid,hostname,service,env,log_source,version",
+        translateTime: "HH:MM:ss.l",
+      },
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+const transport = getPinoTransport();
+
 export const logger = pino({
   level: process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
   base: {
@@ -17,18 +39,7 @@ export const logger = pino({
     ...(version ? { version } : {}),
   },
   timestamp: pino.stdTimeFunctions.isoTime,
-  ...(env !== "production"
-    ? {
-        transport: {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-            ignore: "pid,hostname,service,env,log_source,version",
-            translateTime: "HH:MM:ss.l",
-          },
-        },
-      }
-    : {}),
+  ...(transport ? { transport } : {}),
 });
 
 type ErrorContext = Record<string, unknown>;
