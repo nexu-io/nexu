@@ -59,6 +59,15 @@ export async function showRuntimeLogFile(id: RuntimeUnitId): Promise<boolean> {
   return result.ok;
 }
 
+export async function ensureDesktopAuthSession(
+  force = false,
+): Promise<boolean> {
+  const result = await getHostBridge().invoke("desktop:ensure-auth-session", {
+    force,
+  });
+  return result.ok;
+}
+
 export function onDesktopCommand(
   listener: (command: HostDesktopCommand) => void,
 ): () => void {

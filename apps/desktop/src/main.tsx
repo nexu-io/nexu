@@ -107,10 +107,12 @@ function SurfaceFrame({
   title,
   description,
   src,
+  version,
 }: {
   title: string;
   description: string;
   src: string | null;
+  version: number;
 }) {
   return (
     <section className="surface-frame">
@@ -124,7 +126,11 @@ function SurfaceFrame({
       </header>
 
       {src ? (
-        <webview className="desktop-web-frame" src={src} />
+        <webview
+          className="desktop-web-frame"
+          key={`${src}:${version}`}
+          src={src}
+        />
       ) : (
         <div className="surface-frame-empty">
           Waiting for the local runtime to publish this surface.
@@ -418,6 +424,7 @@ function EmbeddedControlPlane() {
 function DesktopShell() {
   const [activeSurface, setActiveSurface] = useState<DesktopSurface>("control");
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>("full");
+  const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
 
@@ -429,6 +436,11 @@ function DesktopShell() {
 
   useEffect(() => {
     return onDesktopCommand((command) => {
+      if (command.type === "desktop:auth-session-restored") {
+        setWebSurfaceVersion((current) => current + 1);
+        return;
+      }
+
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
     });
@@ -488,12 +500,14 @@ function DesktopShell() {
             description="Authenticated workspace surface served by the repo-local web sidecar."
             src={desktopWebUrl}
             title="Nexu Web"
+            version={webSurfaceVersion}
           />
         ) : activeSurface === "openclaw" ? (
           <SurfaceFrame
             description="Local OpenClaw gateway UI for inspecting runtime auth, models, and sessions."
             src={desktopOpenClawUrl}
             title="OpenClaw Gateway"
+            version={0}
           />
         ) : (
           <EmbeddedControlPlane />

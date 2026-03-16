@@ -5,6 +5,7 @@ import {
   hostInvokeChannels,
 } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 
 const validChannels = new Set<string>(hostInvokeChannels);
@@ -84,6 +85,20 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
 
           const result: HostInvokeResultMap["runtime:show-log-file"] = {
             ok: logFilePath !== null,
+          };
+
+          return result;
+        }
+
+        case "desktop:ensure-auth-session": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:ensure-auth-session"];
+          await ensureDesktopAuthSession({
+            force: typedPayload.force === true,
+          });
+
+          const result: HostInvokeResultMap["desktop:ensure-auth-session"] = {
+            ok: true,
           };
 
           return result;

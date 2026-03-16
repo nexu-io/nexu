@@ -3,7 +3,9 @@ import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { parseSetCookieHeader } from "./cookies";
 
 type PgPoolConstructor = typeof import("pg").Pool;
+
 const runtimeConfig = getDesktopRuntimeConfig(process.env);
+
 export const desktopApiUrl = runtimeConfig.apiBaseUrl;
 export const desktopWebUrl = runtimeConfig.webUrl;
 
@@ -15,18 +17,72 @@ const desktopAuthBootstrap = {
   onboardingRole: "Founder / Manager",
 };
 
-export async function bootstrapDesktopAuthSession(): Promise<void> {
-  const { Pool } = (await import("pg")) as { Pool: PgPoolConstructor };
+let ensureSessionPromise: Promise<void> | null = null;
 
-  const authHeaders = {
+function getDatabaseUrl(): string {
+  return (
+    process.env.NEXU_DATABASE_URL ??
+    "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable"
+  );
+}
+
+function getAuthHeaders(): Record<string, string> {
+  return {
     "Content-Type": "application/json",
     Origin: desktopWebUrl,
     Referer: `${desktopWebUrl}/`,
   };
+}
 
+async function getDesktopSessionCookieHeader(): Promise<string | null> {
+  const cookies = await session.defaultSession.cookies.get({
+    url: desktopWebUrl,
+  });
+
+  if (cookies.length === 0) {
+    return null;
+  }
+
+  return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
+}
+
+async function hasValidDesktopAuthSession(): Promise<boolean> {
+  const cookieHeader = await getDesktopSessionCookieHeader();
+
+  if (!cookieHeader) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${desktopApiUrl}/api/auth/get-session`, {
+      headers: {
+        Accept: "application/json",
+        Cookie: cookieHeader,
+        Origin: desktopWebUrl,
+        Referer: `${desktopWebUrl}/`,
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const payload = (await response.json()) as {
+      user?: {
+        id?: string;
+      } | null;
+    } | null;
+
+    return Boolean(payload?.user?.id);
+  } catch {
+    return false;
+  }
+}
+
+async function ensureDesktopBootstrapUser(): Promise<void> {
   await fetch(`${desktopApiUrl}/api/auth/sign-up/email`, {
     method: "POST",
-    headers: authHeaders,
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       name: desktopAuthBootstrap.name,
       email: desktopAuthBootstrap.email,
@@ -34,10 +90,9 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
     }),
   }).catch(() => null);
 
+  const { Pool } = (await import("pg")) as { Pool: PgPoolConstructor };
   const pool = new Pool({
-    connectionString:
-      process.env.NEXU_DATABASE_URL ??
-      "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable",
+    connectionString: getDatabaseUrl(),
   });
 
   try {
@@ -48,12 +103,17 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
   } finally {
     await pool.end();
   }
+}
 
+async function signInDesktopBootstrapUser(): Promise<{
+  authUserId: string;
+  setCookieHeader: string;
+}> {
   const signInResponse = await fetch(
     `${desktopApiUrl}/api/auth/sign-in/email`,
     {
       method: "POST",
-      headers: authHeaders,
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         email: desktopAuthBootstrap.email,
         password: desktopAuthBootstrap.password,
@@ -88,17 +148,21 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
     );
   }
 
-  const cookies = parseSetCookieHeader(setCookieHeader);
+  return {
+    authUserId,
+    setCookieHeader,
+  };
+}
 
-  const pool2 = new Pool({
-    connectionString:
-      process.env.NEXU_DATABASE_URL ??
-      "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable",
+async function ensureDesktopAppUser(authUserId: string): Promise<void> {
+  const { Pool } = (await import("pg")) as { Pool: PgPoolConstructor };
+  const pool = new Pool({
+    connectionString: getDatabaseUrl(),
   });
 
   try {
     const now = new Date().toISOString();
-    await pool2.query(
+    await pool.query(
       `insert into users (
         id,
         auth_user_id,
@@ -141,8 +205,14 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
       ],
     );
   } finally {
-    await pool2.end();
+    await pool.end();
   }
+}
+
+async function persistDesktopSessionCookies(
+  setCookieHeader: string,
+): Promise<void> {
+  const cookies = parseSetCookieHeader(setCookieHeader);
 
   for (const [name, cookie] of cookies.entries()) {
     await session.defaultSession.cookies.set({
@@ -166,6 +236,44 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
   });
 
   console.log(
-    `[desktop:auth-bootstrap] sign-in ok user=${authUserId} setCookies=${Array.from(cookies.keys()).join(",")} persistedCookies=${persistedCookies.map((cookie) => cookie.name).join(",")}`,
+    `[desktop:auth-bootstrap] setCookies=${Array.from(cookies.keys()).join(",")} persistedCookies=${persistedCookies.map((cookie) => cookie.name).join(",")}`,
   );
+}
+
+async function runEnsureDesktopAuthSession(force: boolean): Promise<void> {
+  if (!force && (await hasValidDesktopAuthSession())) {
+    console.log("[desktop:auth-bootstrap] reused existing session");
+    return;
+  }
+
+  await ensureDesktopBootstrapUser();
+  const { authUserId, setCookieHeader } = await signInDesktopBootstrapUser();
+  await ensureDesktopAppUser(authUserId);
+  await persistDesktopSessionCookies(setCookieHeader);
+
+  if (!(await hasValidDesktopAuthSession())) {
+    throw new Error("Desktop auth bootstrap did not produce a valid session.");
+  }
+
+  console.log(
+    `[desktop:auth-bootstrap] ensured session for user=${authUserId}`,
+  );
+}
+
+export async function ensureDesktopAuthSession(options?: {
+  force?: boolean;
+}): Promise<void> {
+  const force = options?.force === true;
+
+  if (!ensureSessionPromise) {
+    ensureSessionPromise = runEnsureDesktopAuthSession(force).finally(() => {
+      ensureSessionPromise = null;
+    });
+  }
+
+  return ensureSessionPromise;
+}
+
+export async function bootstrapDesktopAuthSession(): Promise<void> {
+  return ensureDesktopAuthSession();
 }

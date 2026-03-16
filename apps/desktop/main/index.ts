@@ -6,12 +6,13 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   app,
+  session,
   shell,
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
-import { bootstrapDesktopAuthSession } from "./desktop-bootstrap";
+import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { registerIpcHandlers } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
@@ -39,6 +40,13 @@ function sendDesktopCommand(
         : "develop:show-shell",
     surface,
     chromeMode,
+  });
+}
+
+function notifyDesktopAuthSessionRestored(): void {
+  mainWindow?.webContents.send("host:desktop-command", {
+    type: "desktop:auth-session-restored",
+    surface: "web",
   });
 }
 
@@ -157,7 +165,7 @@ async function runDesktopColdStart(): Promise<void> {
   await waitForApiReadiness();
 
   logColdStart("bootstrapping desktop auth session");
-  await bootstrapDesktopAuthSession();
+  await ensureDesktopAuthSession();
 
   logColdStart("starting web");
   await orchestrator.startOne("web");
@@ -166,6 +174,47 @@ async function runDesktopColdStart(): Promise<void> {
   await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
+}
+
+let authRecoveryPromise: Promise<void> | null = null;
+
+function triggerDesktopAuthRecovery(reason: string): void {
+  if (authRecoveryPromise) {
+    return;
+  }
+
+  authRecoveryPromise = (async () => {
+    safeWrite(process.stdout, `[desktop:auth-recovery] ${reason}\n`);
+
+    try {
+      await ensureDesktopAuthSession({ force: true });
+      notifyDesktopAuthSessionRestored();
+    } catch (error) {
+      safeWrite(
+        process.stderr,
+        `[desktop:auth-recovery] ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    } finally {
+      authRecoveryPromise = null;
+    }
+  })();
+}
+
+function installDesktopAuthRecoveryHooks(): void {
+  session.defaultSession.webRequest.onCompleted(
+    {
+      urls: [`${runtimeConfig.apiBaseUrl}/api/auth/*`],
+    },
+    (details) => {
+      if (
+        details.method === "POST" &&
+        details.statusCode < 400 &&
+        details.url.includes("/api/auth/sign-out")
+      ) {
+        triggerDesktopAuthRecovery("detected desktop sign-out");
+      }
+    },
+  );
 }
 
 function focusMainWindow(): void {
@@ -267,6 +316,7 @@ function createMainWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   installApplicationMenu();
+  installDesktopAuthRecoveryHooks();
   registerIpcHandlers(orchestrator);
 
   void (async () => {

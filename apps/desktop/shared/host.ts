@@ -11,6 +11,7 @@ export const hostInvokeChannels = [
   "runtime:start-all",
   "runtime:stop-all",
   "runtime:show-log-file",
+  "desktop:ensure-auth-session",
   "shell:open-external",
 ] as const;
 
@@ -32,6 +33,9 @@ export type HostInvokePayloadMap = {
   "runtime:show-log-file": {
     id: RuntimeUnitId;
   };
+  "desktop:ensure-auth-session": {
+    force?: boolean;
+  };
   "shell:open-external": {
     url: string;
   };
@@ -49,6 +53,9 @@ export type HostInvokeResultMap = {
   "runtime:start-all": RuntimeState;
   "runtime:stop-all": RuntimeState;
   "runtime:show-log-file": {
+    ok: boolean;
+  };
+  "desktop:ensure-auth-session": {
     ok: boolean;
   };
   "shell:open-external": {
@@ -77,6 +84,10 @@ export type HostDesktopCommand =
       type: "develop:show-shell";
       surface: DesktopSurface;
       chromeMode: DesktopChromeMode;
+    }
+  | {
+      type: "desktop:auth-session-restored";
+      surface: "web";
     };
 
 export type RuntimeUnitId =
