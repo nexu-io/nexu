@@ -26,6 +26,10 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 pnpm install                          # Install
 pnpm dev                              # All apps (API :3000, Web :5173)
 pnpm --filter @nexu/desktop dev       # Desktop shell only
+pnpm desktop:start                    # Build and launch the desktop local runtime stack
+pnpm desktop:stop                     # Stop the desktop local runtime stack
+pnpm desktop:restart                  # Restart the desktop local runtime stack
+pnpm desktop:status                   # Show desktop local runtime status
 pnpm --filter @nexu/chat dev          # Chat surface only
 pnpm --filter @nexu/api dev           # API only
 pnpm --filter @nexu/web dev           # Web only
@@ -43,6 +47,13 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
+
+## Desktop local development
+
+- Use `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
+- The desktop dev launcher is `apps/desktop/dev.sh`; it manages tmux, sidecar builds, and runtime cleanup.
+- Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
+- To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state` after the desktop runtime is stopped.
 
 ## DB schema change workflow
 
