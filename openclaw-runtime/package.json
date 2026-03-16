@@ -1,0 +1,14 @@
+{
+  "name": "openclaw-runtime",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11",
+  "scripts": {
+    "clean": "node ./clean-node-modules.mjs",
+    "install:full": "npm install",
+    "install:pruned": "npm install && node ./prune-runtime.mjs"
+  },
+  "dependencies": {
+    "openclaw": "2026.3.7"
+  }
+}

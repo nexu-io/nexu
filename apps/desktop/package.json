@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist-electron/main/index.js",
+  "main": "dist-electron/main/bootstrap.js",
   "description": "Electron desktop shell for Nexu local runtime",
   "packageManager": "pnpm@10.31.0",
   "scripts": {
@@ -14,7 +14,6 @@
     "prepare:gateway-sidecar": "node ./scripts/prepare-gateway-sidecar.mjs",
     "prepare:openclaw-sidecar": "node ./scripts/prepare-openclaw-sidecar.mjs",
     "prepare:pglite-sidecar": "node ./scripts/prepare-pglite-sidecar.mjs",
-    "prepare:session-chat-sidecar": "node ./scripts/prepare-session-chat-sidecar.mjs",
     "prepare:web-sidecar": "node ./scripts/prepare-web-sidecar.mjs",
     "typecheck": "tsc --noEmit"
   },

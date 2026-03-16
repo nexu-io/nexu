@@ -15,7 +15,7 @@ export default defineConfig({
     tailwindcss(),
     electron([
       {
-        entry: "main/index.ts",
+        entry: "main/bootstrap.ts",
         onstart(options) {
           options.startup();
         },

@@ -330,7 +330,7 @@ function EmbeddedControlPlane() {
 
 function DesktopShell() {
   const [activeSurface, setActiveSurface] = useState<
-    "web" | "session-chat" | "control"
+    "web" | "openclaw" | "control"
   >("control");
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
@@ -344,8 +344,10 @@ function DesktopShell() {
   const desktopWebUrl = runtimeConfig
     ? new URL("/workspace", runtimeConfig.webUrl).toString()
     : null;
-  const desktopSessionChatUrl = runtimeConfig?.sessionChatUrl ?? null;
-
+  const desktopOpenClawUrl = new URL(
+    "/#token=gw-secret-token",
+    "http://127.0.0.1:18789",
+  ).toString();
   return (
     <div className="desktop-shell">
       <aside className="desktop-sidebar">
@@ -369,15 +371,15 @@ function DesktopShell() {
           </button>
           <button
             className={
-              activeSurface === "session-chat"
+              activeSurface === "openclaw"
                 ? "desktop-nav-item is-active"
                 : "desktop-nav-item"
             }
-            onClick={() => setActiveSurface("session-chat")}
+            onClick={() => setActiveSurface("openclaw")}
             type="button"
           >
-            <span>Session Chat</span>
-            <small>Next.js sidecar</small>
+            <span>OpenClaw</span>
+            <small>Gateway Control UI</small>
           </button>
           <button
             className={
@@ -397,8 +399,8 @@ function DesktopShell() {
       <main className="desktop-shell-stage">
         {activeSurface === "web" && desktopWebUrl ? (
           <webview className="desktop-web-frame" src={desktopWebUrl} />
-        ) : activeSurface === "session-chat" && desktopSessionChatUrl ? (
-          <webview className="desktop-web-frame" src={desktopSessionChatUrl} />
+        ) : activeSurface === "openclaw" && desktopOpenClawUrl ? (
+          <webview className="desktop-web-frame" src={desktopOpenClawUrl} />
         ) : (
           <EmbeddedControlPlane />
         )}
