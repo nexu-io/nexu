@@ -8,7 +8,11 @@ Nexu is an OpenClaw multi-tenant platform. Users create AI bots, connect them to
 
 - Monorepo: pnpm workspaces
 - `apps/api` — Hono + Drizzle + Zod OpenAPI (Node ESM)
+- `apps/chat` — Next.js session-chat surface for local OpenClaw probing
+- `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
+- `apps/gateway` — Nexu gateway sidecar for config/skills sync, runtime probing, and optional OpenClaw process management
 - `apps/web` — React + Ant Design + Vite
+- `openclaw-runtime` — Repo-local packaged OpenClaw runtime for local dev and desktop packaging; replaces global `openclaw` CLI
 - `packages/shared` — Shared Zod schemas
 - `deploy/k8s` — Kubernetes manifests
 
@@ -23,6 +27,10 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 ```bash
 pnpm install                          # Install
 pnpm dev                              # All apps (API :3000, Web :5173)
+pnpm desktop:start                    # Build and launch the desktop local runtime stack
+pnpm desktop:stop                     # Stop the desktop local runtime stack
+pnpm desktop:restart                  # Restart the desktop local runtime stack
+pnpm desktop:status                   # Show desktop local runtime status
 pnpm --filter @nexu/api dev           # API only
 pnpm --filter @nexu/web dev           # Web only
 pnpm build                            # Build all
@@ -39,6 +47,16 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
+
+## Desktop local development
+
+- Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
+- The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
+- Treat `pnpm desktop:start` as the canonical cold-start entrypoint for the full local desktop runtime.
+- `tmux` is required for the desktop local-dev workflow.
+- Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
+- For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
+- To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state`.
 
 ## DB schema change workflow
 
@@ -93,6 +111,8 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 - Monorepo: `apps/api` (Hono), `apps/web` (React), `packages/shared` (Zod schemas)
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/api/src/lib/config-generator.ts` builds OpenClaw config from DB
+- Runtime topology: `apps/gateway` acts as the Nexu sidecar that syncs config/skills, probes runtime health, and can manage the OpenClaw process
+- Local runtime flow: `apps/api` produces config data -> `apps/gateway` syncs config/skills and coordinates runtime -> `openclaw-runtime` runs the actual OpenClaw Gateway process
 - Key data flows: Slack OAuth, Slack event routing, config hot-reload
 
 ## Code style (quick reference)
@@ -208,4 +228,7 @@ This note should track:
 - DB (default local): `postgresql://nexu:nexu@localhost:5433/nexu_dev`
 - API env path: `apps/api/.env`
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
+- `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
+- Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
+- When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/gateway` to avoid launching a second OpenClaw process
 - If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by running gateway processes.

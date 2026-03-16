@@ -6,6 +6,7 @@ import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
 import { FeishuBindPage } from "./pages/feishu-bind";
+import { HomePage } from "./pages/home";
 import { IntegrationsPage } from "./pages/integrations";
 import { OAuthCallbackPage } from "./pages/oauth-callback";
 import { SessionsPage } from "./pages/sessions";
@@ -21,7 +22,8 @@ function DocumentTitleSync() {
     const titleByPathname: Record<string, string> = {
       "/auth": "Sign In · Nexu",
       "/claim": "Claim · Nexu",
-      "/workspace": "Workspace · Nexu",
+      "/workspace": "Home · Nexu",
+      "/workspace/home": "Home · Nexu",
       "/workspace/integrations": "Integrations · Nexu",
       "/workspace/skills": "Skills · Nexu",
       "/feishu/bind": "Link Feishu · Nexu",
@@ -55,7 +57,8 @@ export function App() {
               element={<OAuthCallbackPage />}
             />
             <Route element={<WorkspaceLayout />}>
-              <Route path="/workspace" element={<SessionsPage />} />
+              <Route path="/workspace" element={<HomePage />} />
+              <Route path="/workspace/home" element={<HomePage />} />
               <Route path="/workspace/sessions" element={<SessionsPage />} />
               <Route
                 path="/workspace/sessions/:id"

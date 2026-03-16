@@ -104,6 +104,7 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(300_000),
+  RUNTIME_DEFER_FEISHU_INIT: booleanFromEnvSchema.default("true"),
 });
 
 function normalizeConfigPath(path: string): string {

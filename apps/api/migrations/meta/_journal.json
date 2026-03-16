@@ -75,8 +75,22 @@
     {
       "idx": 10,
       "version": "7",
+      "when": 1773370278266,
+      "tag": "0010_e2e_test_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773381860660,
+      "tag": "0011_e2e_test_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
       "when": 1773305994853,
-      "tag": "0010_sticky_betty_brant",
+      "tag": "0012_sticky_betty_brant",
       "breakpoints": true
     }
   ]

@@ -27,7 +27,11 @@ const BASE_RESTART_DELAY_MS = 3000;
 const RESTART_WINDOW_MS = 120_000; // reset counter after 2 min of stable running
 
 function buildOpenclawGatewayArgs(): string[] {
-  const args = ["gateway"];
+  // Use the foreground subcommand so the spawned child remains the actual
+  // Gateway process. Plain `openclaw gateway` may delegate to the service/
+  // supervisor path, which exits while leaving a daemonized gateway behind and
+  // tricks the sidecar into thinking the child crashed.
+  const args = ["gateway", "run"];
 
   if (env.OPENCLAW_PROFILE) {
     args.push("--profile", env.OPENCLAW_PROFILE);

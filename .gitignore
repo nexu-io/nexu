@@ -1,5 +1,9 @@
 node_modules/
 dist/
+.next/
+dist-electron/
+.tmp/
+*.tsbuildinfo
 .env
 .env.*
 !.env.example

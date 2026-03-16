@@ -5,6 +5,7 @@
   --font-sans: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC",
     "PingFang SC", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+  --font-script: "Great Vibes", cursive;
 
   /* shadcn tokens — kept for component compat */
   --color-background: #fdfcfa;

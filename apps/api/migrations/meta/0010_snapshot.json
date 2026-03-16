@@ -1,6 +1,6 @@
 {
-  "id": "b75c76d9-7ba3-4a18-a97d-303605a45c8a",
-  "prevId": "538045d6-5f9d-4697-bfcf-7987135907f9",
+  "id": "ec40c292-28f5-4163-a482-a2ea86a0d72e",
+  "prevId": "a285ff95-0bbe-4621-8257-a5bd63212c66",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -150,7 +150,9 @@
         "api_keys_id_unique": {
           "name": "api_keys_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -181,12 +183,6 @@
         },
         "session_key": {
           "name": "session_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "nexu_user_id": {
-          "name": "nexu_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -299,21 +295,6 @@
           "method": "btree",
           "with": {}
         },
-        "artifacts_nexu_user_id_idx": {
-          "name": "artifacts_nexu_user_id_idx",
-          "columns": [
-            {
-              "expression": "nexu_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "artifacts_session_key_idx": {
           "name": "artifacts_session_key_idx",
           "columns": [
@@ -366,7 +347,9 @@
         "artifacts_id_unique": {
           "name": "artifacts_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -464,8 +447,12 @@
           "name": "account_userId_fkey",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": ["userId"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -537,8 +524,12 @@
           "name": "session_userId_fkey",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": ["userId"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -548,7 +539,9 @@
         "session_token_key": {
           "name": "session_token_key",
           "nullsNotDistinct": false,
-          "columns": ["token"]
+          "columns": [
+            "token"
+          ]
         }
       },
       "policies": {},
@@ -612,7 +605,9 @@
         "user_email_key": {
           "name": "user_email_key",
           "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": [
+            "email"
+          ]
         }
       },
       "policies": {},
@@ -718,12 +713,6 @@
           "notNull": false,
           "default": "'{}'"
         },
-        "connection_mode": {
-          "name": "connection_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -772,7 +761,9 @@
         "bot_channels_id_unique": {
           "name": "bot_channels_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -895,7 +886,9 @@
         "bots_id_unique": {
           "name": "bots_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -972,116 +965,9 @@
         "channel_credentials_id_unique": {
           "name": "channel_credentials_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.claim_card_dedup": {
-      "name": "claim_card_dedup",
-      "schema": "",
-      "columns": {
-        "event_id": {
-          "name": "event_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.claim_tokens": {
-      "name": "claim_tokens",
-      "schema": "",
-      "columns": {
-        "pk": {
-          "name": "pk",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "workspace_key": {
-          "name": "workspace_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "im_user_id": {
-          "name": "im_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bot_id": {
-          "name": "bot_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "used_at": {
-          "name": "used_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "used_by_user_id": {
-          "name": "used_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "claim_tokens_id_unique": {
-          "name": "claim_tokens_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id"]
-        },
-        "claim_tokens_token_unique": {
-          "name": "claim_tokens_token_unique",
-          "nullsNotDistinct": false,
-          "columns": ["token"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -1097,6 +983,18 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true
+        },
+        "probe": {
+          "name": "probe",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "test1": {
+          "name": "test1",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -1156,12 +1054,16 @@
         "gateway_assignments_id_unique": {
           "name": "gateway_assignments_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "gateway_assignments_bot_id_unique": {
           "name": "gateway_assignments_bot_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["bot_id"]
+          "columns": [
+            "bot_id"
+          ]
         }
       },
       "policies": {},
@@ -1258,12 +1160,16 @@
         "gateway_pools_id_unique": {
           "name": "gateway_pools_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "gateway_pools_pool_name_unique": {
           "name": "gateway_pools_pool_name_unique",
           "nullsNotDistinct": false,
-          "columns": ["pool_name"]
+          "columns": [
+            "pool_name"
+          ]
         }
       },
       "policies": {},
@@ -1340,7 +1246,9 @@
         "integration_credentials_id_unique": {
           "name": "integration_credentials_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -1409,12 +1317,16 @@
         "invite_codes_id_unique": {
           "name": "invite_codes_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "invite_codes_code_unique": {
           "name": "invite_codes_code_unique",
           "nullsNotDistinct": false,
-          "columns": ["code"]
+          "columns": [
+            "code"
+          ]
         }
       },
       "policies": {},
@@ -1473,12 +1385,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "workspace_key": {
-          "name": "workspace_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -1493,12 +1399,16 @@
         "oauth_states_id_unique": {
           "name": "oauth_states_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "oauth_states_state_unique": {
           "name": "oauth_states_state_unique",
           "nullsNotDistinct": false,
-          "columns": ["state"]
+          "columns": [
+            "state"
+          ]
         }
       },
       "policies": {},
@@ -1602,7 +1512,9 @@
         "pool_config_snapshots_id_unique": {
           "name": "pool_config_snapshots_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -1692,89 +1604,11 @@
         "pool_secrets_id_unique": {
           "name": "pool_secrets_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.session_participants": {
-      "name": "session_participants",
-      "schema": "",
-      "columns": {
-        "pk": {
-          "name": "pk",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "session_key": {
-          "name": "session_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "nexu_user_id": {
-          "name": "nexu_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "im_user_id": {
-          "name": "im_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "first_seen_at": {
-          "name": "first_seen_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "sp_session_user_idx": {
-          "name": "sp_session_user_idx",
           "columns": [
-            {
-              "expression": "session_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "nexu_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "sp_nexu_user_idx": {
-          "name": "sp_nexu_user_idx",
-          "columns": [
-            {
-              "expression": "nexu_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+            "id"
+          ]
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -1806,12 +1640,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "nexu_user_id": {
-          "name": "nexu_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "channel_type": {
           "name": "channel_type",
@@ -1886,21 +1714,6 @@
           "method": "btree",
           "with": {}
         },
-        "sessions_nexu_user_id_idx": {
-          "name": "sessions_nexu_user_id_idx",
-          "columns": [
-            {
-              "expression": "nexu_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "sessions_status_idx": {
           "name": "sessions_status_idx",
           "columns": [
@@ -1953,12 +1766,16 @@
         "sessions_id_unique": {
           "name": "sessions_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "sessions_session_key_unique": {
           "name": "sessions_session_key_unique",
           "nullsNotDistinct": false,
-          "columns": ["session_key"]
+          "columns": [
+            "session_key"
+          ]
         }
       },
       "policies": {},
@@ -2027,12 +1844,16 @@
         "skills_id_unique": {
           "name": "skills_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "skills_name_unique": {
           "name": "skills_name_unique",
           "nullsNotDistinct": false,
-          "columns": ["name"]
+          "columns": [
+            "name"
+          ]
         }
       },
       "policies": {},
@@ -2087,12 +1908,16 @@
         "skills_snapshots_id_unique": {
           "name": "skills_snapshots_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "skills_snapshots_version_unique": {
           "name": "skills_snapshots_version_unique",
           "nullsNotDistinct": false,
-          "columns": ["version"]
+          "columns": [
+            "version"
+          ]
         }
       },
       "policies": {},
@@ -2218,12 +2043,16 @@
         "supported_skills_id_unique": {
           "name": "supported_skills_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "supported_skills_slug_unique": {
           "name": "supported_skills_slug_unique",
           "nullsNotDistinct": false,
-          "columns": ["slug"]
+          "columns": [
+            "slug"
+          ]
         }
       },
       "policies": {},
@@ -2324,12 +2153,16 @@
         "supported_toolkits_id_unique": {
           "name": "supported_toolkits_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "supported_toolkits_slug_unique": {
           "name": "supported_toolkits_slug_unique",
           "nullsNotDistinct": false,
-          "columns": ["slug"]
+          "columns": [
+            "slug"
+          ]
         }
       },
       "policies": {},
@@ -2398,7 +2231,9 @@
         "usage_metrics_id_unique": {
           "name": "usage_metrics_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -2533,7 +2368,9 @@
         "user_integrations_id_unique": {
           "name": "user_integrations_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -2561,18 +2398,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "auth_source": {
-          "name": "auth_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "auth_source_detail": {
-          "name": "auth_source_detail",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "plan": {
           "name": "plan",
@@ -2661,12 +2486,16 @@
         "users_id_unique": {
           "name": "users_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "users_auth_user_id_unique": {
           "name": "users_auth_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["auth_user_id"]
+          "columns": [
+            "auth_user_id"
+          ]
         }
       },
       "policies": {},
@@ -2773,133 +2602,9 @@
         "webhook_routes_id_unique": {
           "name": "webhook_routes_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.workspace_memberships": {
-      "name": "workspace_memberships",
-      "schema": "",
-      "columns": {
-        "pk": {
-          "name": "pk",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "workspace_key": {
-          "name": "workspace_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bot_id": {
-          "name": "bot_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "im_user_id": {
-          "name": "im_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'member'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "wm_workspace_user_idx": {
-          "name": "wm_workspace_user_idx",
           "columns": [
-            {
-              "expression": "workspace_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "wm_workspace_im_user_idx": {
-          "name": "wm_workspace_im_user_idx",
-          "columns": [
-            {
-              "expression": "workspace_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "im_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "wm_user_idx": {
-          "name": "wm_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "workspace_memberships_id_unique": {
-          "name": "workspace_memberships_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id"]
+            "id"
+          ]
         }
       },
       "policies": {},
@@ -2954,12 +2659,16 @@
         "workspace_template_snapshots_id_unique": {
           "name": "workspace_template_snapshots_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "workspace_template_snapshots_version_unique": {
           "name": "workspace_template_snapshots_version_unique",
           "nullsNotDistinct": false,
-          "columns": ["version"]
+          "columns": [
+            "version"
+          ]
         }
       },
       "policies": {},
@@ -3028,12 +2737,16 @@
         "workspace_templates_id_unique": {
           "name": "workspace_templates_id_unique",
           "nullsNotDistinct": false,
-          "columns": ["id"]
+          "columns": [
+            "id"
+          ]
         },
         "workspace_templates_name_unique": {
           "name": "workspace_templates_name_unique",
           "nullsNotDistinct": false,
-          "columns": ["name"]
+          "columns": [
+            "name"
+          ]
         }
       },
       "policies": {},

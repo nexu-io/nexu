@@ -4,7 +4,7 @@ import { readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkSlackTokens, registerPool } from "./api.js";
-import { fetchInitialConfig } from "./config.js";
+import { fetchInitialConfig, pollLatestConfig } from "./config.js";
 import { env, envWarnings } from "./env.js";
 import { waitGatewayReady } from "./gateway-health.js";
 import { BaseError, GatewayError, logger } from "./log.js";
@@ -369,4 +369,23 @@ export async function bootstrapGateway(state: RuntimeState): Promise<void> {
   // Re-touch the config file so OpenClaw's file watcher picks up the
   // initial config that was written before the watcher was ready.
   await touchConfigFile();
+
+  // After other channels are ready and the event loop is idle, inject
+  // the full config (including Feishu) via hot-reload.  This avoids the
+  // 10 s Feishu bot-info probe timeout caused by event-loop saturation
+  // during concurrent Slack/Discord startup.
+  if (env.RUNTIME_DEFER_FEISHU_INIT) {
+    try {
+      const changed = await pollLatestConfig(state);
+      if (changed) {
+        logger.info("deferred feishu config injected via hot-reload");
+      }
+    } catch (error) {
+      const baseError = BaseError.from(error);
+      logger.warn(
+        { reason: baseError.message },
+        "failed to inject deferred feishu config; will retry in poll loop",
+      );
+    }
+  }
 }
