@@ -1,6 +1,22 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { app } from "electron";
+
+function loadDesktopDevEnv(): void {
+  const workspaceRoot = process.env.NEXU_WORKSPACE_ROOT;
+
+  if (!workspaceRoot || app.isPackaged) {
+    return;
+  }
+
+  const apiEnvPath = resolve(workspaceRoot, "apps/api/.env");
+
+  if (!existsSync(apiEnvPath)) {
+    return;
+  }
+
+  process.loadEnvFile(apiEnvPath);
+}
 
 function configureLocalDevPaths(): void {
   const runtimeRoot = process.env.NEXU_DESKTOP_RUNTIME_ROOT;
@@ -27,6 +43,7 @@ function configureLocalDevPaths(): void {
   );
 }
 
+loadDesktopDevEnv();
 configureLocalDevPaths();
 
 await import("./index");
