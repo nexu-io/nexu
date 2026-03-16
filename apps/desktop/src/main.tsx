@@ -6,6 +6,8 @@ import ReactDOM from "react-dom/client";
 import { Toaster } from "sonner";
 import type {
   DesktopRuntimeConfig,
+  DesktopChromeMode,
+  DesktopSurface,
   RuntimeState,
   RuntimeUnitId,
   RuntimeUnitPhase,
@@ -14,6 +16,7 @@ import type {
 import {
   getRuntimeConfig,
   getRuntimeState,
+  onDesktopCommand,
   startUnit,
   stopUnit,
 } from "./lib/host-api";
@@ -56,6 +59,76 @@ function phaseTone(phase: RuntimeUnitPhase): string {
 
 function kindLabel(unit: RuntimeUnitState): string {
   return `${unit.kind} / ${unit.launchStrategy}`;
+}
+
+function SurfaceButton({
+  active,
+  disabled,
+  label,
+  meta,
+  onClick,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  meta: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={active ? "desktop-nav-item is-active" : "desktop-nav-item"}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      <span>{label}</span>
+      <small>{meta}</small>
+    </button>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function SurfaceFrame({
+  title,
+  description,
+  src,
+}: {
+  title: string;
+  description: string;
+  src: string | null;
+}) {
+  return (
+    <section className="surface-frame">
+      <header className="surface-frame-header">
+        <div>
+          <span className="surface-frame-eyebrow">embedded surface</span>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <code>{src ?? "Resolving local runtime URL..."}</code>
+      </header>
+
+      {src ? (
+        <webview className="desktop-web-frame" src={src} />
+      ) : (
+        <div className="surface-frame-empty">Waiting for the local runtime to publish this surface.</div>
+      )}
+    </section>
+  );
 }
 
 function RuntimeUnitCard({
@@ -232,22 +305,10 @@ function RuntimePage() {
       </header>
 
       <section className="runtime-summary">
-        <div>
-          <dt>Started at</dt>
-          <dd>{runtimeState?.startedAt ?? "-"}</dd>
-        </div>
-        <div>
-          <dt>Running</dt>
-          <dd>{summary.running}</dd>
-        </div>
-        <div>
-          <dt>Managed</dt>
-          <dd>{summary.managed}</dd>
-        </div>
-        <div>
-          <dt>Failed</dt>
-          <dd>{summary.failed}</dd>
-        </div>
+        <SummaryCard label="Started at" value={runtimeState?.startedAt ?? "-"} />
+        <SummaryCard label="Running" value={summary.running} />
+        <SummaryCard label="Managed" value={summary.managed} />
+        <SummaryCard label="Failed" value={summary.failed} />
       </section>
 
       <p className="runtime-note">
@@ -311,9 +372,9 @@ function EmbeddedControlPlane() {
 }
 
 function DesktopShell() {
-  const [activeSurface, setActiveSurface] = useState<
-    "web" | "openclaw" | "control"
-  >("control");
+  const [activeSurface, setActiveSurface] =
+    useState<DesktopSurface>("control");
+  const [chromeMode, setChromeMode] = useState<DesktopChromeMode>("full");
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
 
@@ -321,6 +382,13 @@ function DesktopShell() {
     void getRuntimeConfig()
       .then(setRuntimeConfig)
       .catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    return onDesktopCommand((command) => {
+      setActiveSurface(command.surface);
+      setChromeMode(command.chromeMode);
+    });
   }, []);
 
   const desktopWebUrl = runtimeConfig
@@ -331,58 +399,56 @@ function DesktopShell() {
     "http://127.0.0.1:18789",
   ).toString();
   return (
-    <div className="desktop-shell">
+    <div
+      className={
+        chromeMode === "immersive"
+          ? "desktop-shell is-immersive"
+          : "desktop-shell"
+      }
+    >
       <aside className="desktop-sidebar">
         <div className="desktop-sidebar-brand">
           <span className="desktop-shell-eyebrow">nexu desktop</span>
           <h1>Runtime Console</h1>
+          <p>One local shell for bootstrap health, web verification, and gateway inspection.</p>
         </div>
 
         <nav className="desktop-nav" aria-label="Desktop surfaces">
-          <button
-            className={
-              activeSurface === "web"
-                ? "desktop-nav-item is-active"
-                : "desktop-nav-item"
-            }
-            onClick={() => setActiveSurface("web")}
-            type="button"
-          >
-            <span>Web</span>
-            <small>HTTP sidecar</small>
-          </button>
-          <button
-            className={
-              activeSurface === "openclaw"
-                ? "desktop-nav-item is-active"
-                : "desktop-nav-item"
-            }
-            onClick={() => setActiveSurface("openclaw")}
-            type="button"
-          >
-            <span>OpenClaw</span>
-            <small>Gateway Control UI</small>
-          </button>
-          <button
-            className={
-              activeSurface === "control"
-                ? "desktop-nav-item is-active"
-                : "desktop-nav-item"
-            }
+          <SurfaceButton
+            active={activeSurface === "control"}
+            label="Control Plane"
+            meta="Bootstrap status and per-unit intervention"
             onClick={() => setActiveSurface("control")}
-            type="button"
-          >
-            <span>Control Plane</span>
-            <small>Local operator UI</small>
-          </button>
+          />
+          <SurfaceButton
+            active={activeSurface === "web"}
+            disabled={!desktopWebUrl}
+            label="Web"
+            meta="Workspace surface via local HTTP sidecar"
+            onClick={() => setActiveSurface("web")}
+          />
+          <SurfaceButton
+            active={activeSurface === "openclaw"}
+            label="OpenClaw"
+            meta="Gateway control UI with local token routing"
+            onClick={() => setActiveSurface("openclaw")}
+          />
         </nav>
       </aside>
 
       <main className="desktop-shell-stage">
-        {activeSurface === "web" && desktopWebUrl ? (
-          <webview className="desktop-web-frame" src={desktopWebUrl} />
-        ) : activeSurface === "openclaw" && desktopOpenClawUrl ? (
-          <webview className="desktop-web-frame" src={desktopOpenClawUrl} />
+        {activeSurface === "web" ? (
+          <SurfaceFrame
+            description="Authenticated workspace surface served by the repo-local web sidecar."
+            src={desktopWebUrl}
+            title="Nexu Web"
+          />
+        ) : activeSurface === "openclaw" ? (
+          <SurfaceFrame
+            description="Local OpenClaw gateway UI for inspecting runtime auth, models, and sessions."
+            src={desktopOpenClawUrl}
+            title="OpenClaw Gateway"
+          />
         ) : (
           <EmbeddedControlPlane />
         )}

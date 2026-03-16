@@ -1,7 +1,14 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BrowserWindow, app, shell } from "electron";
+import {
+  BrowserWindow,
+  Menu,
+  type MenuItemConstructorOptions,
+  app,
+  shell,
+} from "electron";
+import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { bootstrapDesktopAuthSession } from "./desktop-bootstrap";
@@ -20,6 +27,65 @@ const orchestrator = new RuntimeOrchestrator(
 app.setName("Nexu Desktop");
 
 let mainWindow: BrowserWindow | null = null;
+
+function sendDesktopCommand(
+  surface: DesktopSurface,
+  chromeMode: DesktopChromeMode,
+): void {
+  mainWindow?.webContents.send("host:desktop-command", {
+    type:
+      chromeMode === "immersive" && surface !== "control"
+        ? "develop:focus-surface"
+        : "develop:show-shell",
+    surface,
+    chromeMode,
+  });
+}
+
+function installApplicationMenu(): void {
+  const developMenu: MenuItemConstructorOptions = {
+    label: "Develop",
+    submenu: [
+      {
+        label: "Focus Web Surface",
+        accelerator: "CmdOrCtrl+Shift+1",
+        click: () => sendDesktopCommand("web", "immersive"),
+      },
+      {
+        label: "Focus OpenClaw Surface",
+        accelerator: "CmdOrCtrl+Shift+2",
+        click: () => sendDesktopCommand("openclaw", "immersive"),
+      },
+      { type: "separator" },
+      {
+        label: "Show Desktop Shell",
+        accelerator: "CmdOrCtrl+Shift+0",
+        click: () => sendDesktopCommand("control", "full"),
+      },
+      {
+        label: "Show Web In Shell",
+        click: () => sendDesktopCommand("web", "full"),
+      },
+      {
+        label: "Show OpenClaw In Shell",
+        click: () => sendDesktopCommand("openclaw", "full"),
+      },
+    ],
+  };
+
+  const template: MenuItemConstructorOptions[] = [
+    ...(process.platform === "darwin"
+      ? ([{ role: "appMenu" }] satisfies MenuItemConstructorOptions[])
+      : []),
+    { role: "fileMenu" },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    developMenu,
+    { role: "windowMenu" },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   if (stream.destroyed || !stream.writable) {
@@ -198,6 +264,7 @@ function createMainWindow(): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  installApplicationMenu();
   registerIpcHandlers(orchestrator);
 
   void (async () => {

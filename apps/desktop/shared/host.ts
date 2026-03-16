@@ -56,6 +56,22 @@ export type AppInfo = {
   isDev: boolean;
 };
 
+export type DesktopSurface = "web" | "openclaw" | "control";
+
+export type DesktopChromeMode = "full" | "immersive";
+
+export type HostDesktopCommand =
+  | {
+      type: "develop:focus-surface";
+      surface: Exclude<DesktopSurface, "control">;
+      chromeMode: DesktopChromeMode;
+    }
+  | {
+      type: "develop:show-shell";
+      surface: DesktopSurface;
+      chromeMode: DesktopChromeMode;
+    };
+
 export type RuntimeUnitId =
   | "web"
   | "control-plane"
@@ -103,4 +119,5 @@ export type HostBridge = {
     channel: TChannel,
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
+  onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
 };

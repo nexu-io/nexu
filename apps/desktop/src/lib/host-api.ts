@@ -1,6 +1,9 @@
 import type {
   AppInfo,
+  DesktopChromeMode,
   DesktopRuntimeConfig,
+  DesktopSurface,
+  HostDesktopCommand,
   RuntimeState,
   RuntimeUnitId,
 } from "@shared/host";
@@ -51,4 +54,17 @@ export async function startUnit(id: RuntimeUnitId): Promise<RuntimeState> {
 
 export async function stopUnit(id: RuntimeUnitId): Promise<RuntimeState> {
   return getHostBridge().invoke("runtime:stop-unit", { id });
+}
+
+export function onDesktopCommand(
+  listener: (command: HostDesktopCommand) => void,
+): () => void {
+  return getHostBridge().onDesktopCommand(listener);
+}
+
+export function isDesktopSurfaceFocused(
+  activeSurface: DesktopSurface,
+  chromeMode: DesktopChromeMode,
+): boolean {
+  return chromeMode === "immersive" && activeSurface !== "control";
 }

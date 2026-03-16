@@ -1,6 +1,26 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 .desktop-shell {
   display: flex;
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   background: #11161d;
   color: #f5f7fb;
 }
@@ -24,6 +44,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.desktop-sidebar-brand p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .desktop-shell-eyebrow {
@@ -73,6 +100,10 @@
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
 }
 
 .desktop-nav-item small {
@@ -89,23 +120,129 @@
   color: #5f584d;
 }
 
+.desktop-nav-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.desktop-nav-item:not(:disabled):hover {
+  border-color: rgba(139, 167, 255, 0.34);
+  transform: translateY(-1px);
+}
+
 .desktop-shell-stage {
   flex: 1;
   min-height: 0;
+  padding: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(139, 167, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, #141b24 0%, #10161d 100%);
+}
+
+.desktop-shell.is-immersive .desktop-sidebar {
+  display: none;
+}
+
+.desktop-shell.is-immersive .desktop-shell-stage {
+  padding: 0;
+  background: #10161d;
 }
 
 .desktop-web-frame {
   width: 100%;
-  height: 100vh;
+  min-height: 0;
+  flex: 1;
   border: 0;
   background: #fff;
+  border-radius: 22px;
+}
+
+.surface-frame {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.surface-frame-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(12, 16, 22, 0.78);
+  color: #f5f7fb;
+  backdrop-filter: blur(12px);
+}
+
+.surface-frame-header h2 {
+  margin: 4px 0 8px;
+  font-size: 1.6rem;
+}
+
+.surface-frame-header p {
+  margin: 0;
+  color: rgba(245, 247, 251, 0.62);
+  line-height: 1.5;
+}
+
+.surface-frame-eyebrow {
+  display: inline-block;
+  color: #8ba7ff;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.surface-frame-header code {
+  max-width: 36ch;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #dce4f5;
+  font-size: 0.82rem;
+}
+
+.surface-frame-empty {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding: 32px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  background: rgba(12, 16, 22, 0.46);
+  color: rgba(245, 247, 251, 0.72);
+}
+
+.desktop-shell.is-immersive .surface-frame {
+  gap: 0;
+}
+
+.desktop-shell.is-immersive .surface-frame-header {
+  display: none;
+}
+
+.desktop-shell.is-immersive .desktop-web-frame,
+.desktop-shell.is-immersive .surface-frame-empty,
+.desktop-shell.is-immersive .runtime-page {
+  border-radius: 0;
 }
 
 .runtime-page {
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   padding: 32px;
+  overflow: auto;
   background: #f7f4ed;
   color: #1f242c;
+  border-radius: 28px;
 }
 
 .runtime-header,
@@ -378,5 +515,18 @@
     width: auto;
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .desktop-shell-stage,
+  .runtime-page {
+    padding: 18px;
+  }
+
+  .surface-frame {
+    min-height: auto;
+  }
+
+  .surface-frame-header {
+    flex-direction: column;
   }
 }

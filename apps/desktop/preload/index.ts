@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   type HostBridge,
+  type HostDesktopCommand,
   type HostInvokeChannel,
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -21,6 +22,18 @@ const hostBridge: HostBridge = {
     return ipcRenderer.invoke("host:invoke", channel, payload) as Promise<
       HostInvokeResultMap[TChannel]
     >;
+  },
+
+  onDesktopCommand(listener) {
+    const wrapped = (_event: Electron.IpcRendererEvent, command: HostDesktopCommand) => {
+      listener(command);
+    };
+
+    ipcRenderer.on("host:desktop-command", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("host:desktop-command", wrapped);
+    };
   },
 };
 
