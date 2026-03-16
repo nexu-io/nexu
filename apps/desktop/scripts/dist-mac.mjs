@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -165,6 +165,39 @@ async function ensureDmgbuildBundle() {
   return dmgbuildPath;
 }
 
+async function stapleNotarizedArtifacts() {
+  if (isUnsigned) {
+    return;
+  }
+
+  const releaseRoot = resolve(electronRoot, "release");
+  const releaseEntries = await readdir(releaseRoot, { withFileTypes: true });
+
+  for (const entry of releaseEntries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("mac-")) {
+      continue;
+    }
+
+    await run(
+      "xcrun",
+      ["stapler", "staple", resolve(releaseRoot, entry.name, "Nexu.app")],
+      { cwd: electronRoot },
+    );
+  }
+
+  for (const entry of releaseEntries) {
+    if (!entry.isFile() || !entry.name.endsWith(".dmg")) {
+      continue;
+    }
+
+    await run(
+      "xcrun",
+      ["stapler", "staple", resolve(releaseRoot, entry.name)],
+      { cwd: electronRoot },
+    );
+  }
+}
+
 async function main() {
   const desktopEnv = await loadDesktopEnv();
   const env = {
@@ -244,6 +277,7 @@ async function main() {
         : notarizeEnv,
     },
   );
+  await stapleNotarizedArtifacts();
 }
 
 await main();
