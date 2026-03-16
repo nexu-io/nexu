@@ -91,7 +91,7 @@ export function HomePage() {
           <div className="relative">
             <div className="aspect-[16/9] max-h-48 bg-surface-2">
               <video
-                src="/nexu-alpha.mp4"
+                src="https://static.refly.ai/video/nexu-alpha.mp4"
                 poster="/nexu-alpha-poster.jpg"
                 preload="auto"
                 autoPlay
