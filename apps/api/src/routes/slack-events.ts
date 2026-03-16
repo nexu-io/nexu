@@ -336,84 +336,84 @@ class SlackEventsTraceHandler {
           (eventType === "message" || eventType === "app_mention");
 
         if (isUserMessageEvent && channel?.botId) {
-        const workspaceKey = `slack:${teamId}`;
+          const workspaceKey = `slack:${teamId}`;
 
-        const [membership] = await db
-          .select({ userId: workspaceMemberships.userId })
-          .from(workspaceMemberships)
-          .where(
-            and(
-              eq(workspaceMemberships.workspaceKey, workspaceKey),
-              eq(workspaceMemberships.imUserId, senderSlackUserId),
-            ),
-          );
+          const [membership] = await db
+            .select({ userId: workspaceMemberships.userId })
+            .from(workspaceMemberships)
+            .where(
+              and(
+                eq(workspaceMemberships.workspaceKey, workspaceKey),
+                eq(workspaceMemberships.imUserId, senderSlackUserId),
+              ),
+            );
 
-        if (!membership) {
-          logger.info({
-            message: "slack_events_unclaimed_user_intercepted",
-            team_id: teamId,
-            slack_user_id: senderSlackUserId,
-            event_type: eventType,
-          });
-
-          const botToken = await getDecryptedBotToken(route.botChannelId);
-          if (!botToken) {
-            logger.error({
-              message: "slack_events_no_bot_token_for_claim",
-              bot_channel_id: route.botChannelId,
+          if (!membership) {
+            logger.info({
+              message: "slack_events_unclaimed_user_intercepted",
+              team_id: teamId,
+              slack_user_id: senderSlackUserId,
+              event_type: eventType,
             });
+
+            const botToken = await getDecryptedBotToken(route.botChannelId);
+            if (!botToken) {
+              logger.error({
+                message: "slack_events_no_bot_token_for_claim",
+                bot_channel_id: route.botChannelId,
+              });
+              return c.json({ ok: true });
+            }
+
+            const claimResult = await generateClaimToken({
+              workspaceKey,
+              imUserId: senderSlackUserId,
+              botId: route.botId ?? channel.botId,
+            });
+
+            const msgChannelId = event?.channel as string;
+
+            // Check if DM via conversations.info
+            let isImChannel = false;
+            try {
+              const infoResp = await fetch(
+                `https://slack.com/api/conversations.info?channel=${msgChannelId}`,
+                { headers: { Authorization: `Bearer ${botToken}` } },
+              );
+              const infoData = (await infoResp.json()) as {
+                ok: boolean;
+                channel?: { is_im?: boolean };
+              };
+              isImChannel = infoData.ok && infoData.channel?.is_im === true;
+            } catch {
+              // Default to non-IM if lookup fails
+            }
+
+            const blocks = buildClaimCardBlocks(claimResult.claimUrl);
+            const fallbackText =
+              "Welcome to Nexu! Set up your account to get started.";
+
+            if (isImChannel) {
+              await sendSlackMessage({
+                botToken,
+                channel: msgChannelId,
+                text: fallbackText,
+                blocks,
+              });
+            } else {
+              await sendSlackEphemeral({
+                botToken,
+                channel: msgChannelId,
+                user: senderSlackUserId,
+                text: fallbackText,
+                blocks,
+              });
+            }
+
             return c.json({ ok: true });
           }
-
-          const claimResult = await generateClaimToken({
-            workspaceKey,
-            imUserId: senderSlackUserId,
-            botId: route.botId ?? channel.botId,
-          });
-
-          const msgChannelId = event?.channel as string;
-
-          // Check if DM via conversations.info
-          let isImChannel = false;
-          try {
-            const infoResp = await fetch(
-              `https://slack.com/api/conversations.info?channel=${msgChannelId}`,
-              { headers: { Authorization: `Bearer ${botToken}` } },
-            );
-            const infoData = (await infoResp.json()) as {
-              ok: boolean;
-              channel?: { is_im?: boolean };
-            };
-            isImChannel = infoData.ok && infoData.channel?.is_im === true;
-          } catch {
-            // Default to non-IM if lookup fails
-          }
-
-          const blocks = buildClaimCardBlocks(claimResult.claimUrl);
-          const fallbackText =
-            "Welcome to Nexu! Set up your account to get started.";
-
-          if (isImChannel) {
-            await sendSlackMessage({
-              botToken,
-              channel: msgChannelId,
-              text: fallbackText,
-              blocks,
-            });
-          } else {
-            await sendSlackEphemeral({
-              botToken,
-              channel: msgChannelId,
-              user: senderSlackUserId,
-              text: fallbackText,
-              blocks,
-            });
-          }
-
-          return c.json({ ok: true });
         }
       }
-      } // end of isSharedApp else block
 
       // Upsert session for message events (fire-and-forget)
       const isMessageEvent =
