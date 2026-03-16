@@ -85,6 +85,13 @@
       "when": 1773381860660,
       "tag": "0011_e2e_test_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773655170991,
+      "tag": "0012_shared-slack-app-support",
+      "breakpoints": true
     }
   ]
 }

@@ -20,7 +20,6 @@ export function SlackOAuthCallbackPage() {
   const success = searchParams.get("success") === "true";
   const error = searchParams.get("error");
   const teamName = searchParams.get("teamName");
-  const returnTo = searchParams.get("returnTo");
 
   // Clear OAuth pending flag on both success and error paths
   useEffect(() => {
@@ -36,11 +35,7 @@ export function SlackOAuthCallbackPage() {
       identify({ channels_connected: 1 });
 
       const timer = setTimeout(() => {
-        if (returnTo === "/onboarding") {
-          navigate("/onboarding?slackConnected=true", { replace: true });
-        } else {
-          navigate("/workspace/channels", { replace: true });
-        }
+        navigate("/workspace/channels", { replace: true });
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -49,18 +44,11 @@ export function SlackOAuthCallbackPage() {
     const errorMsg = error ?? "Authorization was not completed";
     const encodedError = encodeURIComponent(errorMsg);
 
-    if (returnTo === "/onboarding") {
-      navigate(
-        `/onboarding?openModal=slack&slackManual=true&slackError=${encodedError}`,
-        { replace: true },
-      );
-    } else {
-      navigate(
-        `/workspace/channels?slackManual=true&slackError=${encodedError}`,
-        { replace: true },
-      );
-    }
-  }, [success, error, teamName, queryClient, navigate, returnTo]);
+    navigate(
+      `/workspace/channels?slackManual=true&slackError=${encodedError}`,
+      { replace: true },
+    );
+  }, [success, error, teamName, queryClient, navigate]);
 
   // Only the success path renders UI; error path navigates away immediately
   if (success) {

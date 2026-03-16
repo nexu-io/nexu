@@ -204,25 +204,31 @@ export async function uploadFileToFeishu(
 
 export async function sendFeishuCardMessage(
   card: Record<string, unknown>,
-  chatId: string,
+  receiveId: string,
   tenantToken: string,
+  receiveIdType: "chat_id" | "open_id" = "chat_id",
+  replyMessageId?: string,
 ): Promise<string | null> {
   try {
-    const resp = await fetch(
-      "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tenantToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          receive_id: chatId,
-          msg_type: "interactive",
-          content: JSON.stringify(card),
-        }),
+    const content = JSON.stringify(card);
+
+    // If replyMessageId is provided, use the reply endpoint to quote the original message
+    const url = replyMessageId
+      ? `https://open.feishu.cn/open-apis/im/v1/messages/${replyMessageId}/reply`
+      : `https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`;
+
+    const reqBody = replyMessageId
+      ? { msg_type: "interactive", content }
+      : { receive_id: receiveId, msg_type: "interactive", content };
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tenantToken}`,
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify(reqBody),
+    });
 
     if (!resp.ok) return null;
 

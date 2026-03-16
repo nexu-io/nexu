@@ -647,6 +647,58 @@ export type PostApiInternalFeedbackResponses = {
 
 export type PostApiInternalFeedbackResponse = PostApiInternalFeedbackResponses[keyof PostApiInternalFeedbackResponses];
 
+export type PostApiInternalSharedSlackClaimKeyData = {
+    body?: {
+        teamId: string;
+        teamName?: string;
+        imUserId: string;
+        botId?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/shared-slack/claim-key';
+};
+
+export type PostApiInternalSharedSlackClaimKeyResponses = {
+    /**
+     * Claim token generated
+     */
+    200: {
+        claimUrl: string;
+        token: string;
+        expiresAt: string;
+    };
+};
+
+export type PostApiInternalSharedSlackClaimKeyResponse = PostApiInternalSharedSlackClaimKeyResponses[keyof PostApiInternalSharedSlackClaimKeyResponses];
+
+export type GetApiSharedSlackResolveClaimKeyData = {
+    body?: never;
+    path?: never;
+    query: {
+        token: string;
+    };
+    url: '/api/shared-slack/resolve-claim-key';
+};
+
+export type GetApiSharedSlackResolveClaimKeyResponses = {
+    /**
+     * Claim token resolved
+     */
+    200: {
+        valid: boolean;
+        expired: boolean;
+        used: boolean;
+        teamId?: string;
+        teamName?: string;
+        imUserId?: string;
+        isExistingWorkspace?: boolean;
+        memberCount?: number;
+    };
+};
+
+export type GetApiSharedSlackResolveClaimKeyResponse = GetApiSharedSlackResolveClaimKeyResponses[keyof GetApiSharedSlackResolveClaimKeyResponses];
+
 export type GetApiV1MeData = {
     body?: never;
     path?: never;
@@ -666,37 +718,32 @@ export type GetApiV1MeResponses = {
         plan: string;
         inviteAccepted: boolean;
         onboardingCompleted: boolean;
+        authSource?: string;
     };
 };
 
 export type GetApiV1MeResponse = GetApiV1MeResponses[keyof GetApiV1MeResponses];
 
-export type PostApiV1OnboardingCompleteData = {
+export type PostApiV1MeAuthSourceData = {
     body?: {
-        role: string;
-        company?: string;
-        useCases: Array<string>;
-        referralSource: string;
-        referralDetail?: string;
-        channelVotes?: Array<string>;
-        selectedAvatar: string;
-        avatarVotes?: Array<string>;
+        source: 'email' | 'google' | 'slack_shared_claim' | 'IM' | 'Landing';
+        detail?: string;
     };
     path?: never;
     query?: never;
-    url: '/api/v1/onboarding/complete';
+    url: '/api/v1/me/auth-source';
 };
 
-export type PostApiV1OnboardingCompleteResponses = {
+export type PostApiV1MeAuthSourceResponses = {
     /**
-     * Onboarding completed
+     * Auth source updated
      */
     200: {
         ok: boolean;
     };
 };
 
-export type PostApiV1OnboardingCompleteResponse = PostApiV1OnboardingCompleteResponses[keyof PostApiV1OnboardingCompleteResponses];
+export type PostApiV1MeAuthSourceResponse = PostApiV1MeAuthSourceResponses[keyof PostApiV1MeAuthSourceResponses];
 
 export type GetApiV1BotsData = {
     body?: never;
@@ -1128,6 +1175,49 @@ export type PostApiV1ChannelsDiscordConnectResponses = {
 
 export type PostApiV1ChannelsDiscordConnectResponse = PostApiV1ChannelsDiscordConnectResponses[keyof PostApiV1ChannelsDiscordConnectResponses];
 
+export type PostApiV1ChannelsFeishuConnectData = {
+    body?: {
+        appId: string;
+        appSecret: string;
+        connectionMode?: 'websocket' | 'webhook';
+        verificationToken?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/feishu/connect';
+};
+
+export type PostApiV1ChannelsFeishuConnectErrors = {
+    /**
+     * Invalid credentials or already connected
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsFeishuConnectError = PostApiV1ChannelsFeishuConnectErrors[keyof PostApiV1ChannelsFeishuConnectErrors];
+
+export type PostApiV1ChannelsFeishuConnectResponses = {
+    /**
+     * Feishu channel connected
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsFeishuConnectResponse = PostApiV1ChannelsFeishuConnectResponses[keyof PostApiV1ChannelsFeishuConnectResponses];
+
 export type GetApiV1ChannelsData = {
     body?: never;
     path?: never;
@@ -1460,6 +1550,10 @@ export type GetApiInternalPoolsByPoolIdConfigResponses = {
                         enabled?: boolean;
                         appId: string;
                         appSecret: string;
+                        connectionMode?: 'websocket' | 'webhook';
+                        webhookPath?: string;
+                        webhookPort?: number;
+                        verificationToken?: string;
                     };
                 };
             };
@@ -1792,6 +1886,10 @@ export type GetApiInternalPoolsByPoolIdConfigLatestResponses = {
                             enabled?: boolean;
                             appId: string;
                             appSecret: string;
+                            connectionMode?: 'websocket' | 'webhook';
+                            webhookPath?: string;
+                            webhookPort?: number;
+                            verificationToken?: string;
                         };
                     };
                 };
@@ -2048,6 +2146,10 @@ export type GetApiInternalPoolsByPoolIdConfigVersionsByVersionResponses = {
                             enabled?: boolean;
                             appId: string;
                             appSecret: string;
+                            connectionMode?: 'websocket' | 'webhook';
+                            webhookPath?: string;
+                            webhookPort?: number;
+                            verificationToken?: string;
                         };
                     };
                 };
@@ -2181,6 +2283,27 @@ export type PostApiInternalPoolsByPoolIdCheckSlackTokensResponses = {
 };
 
 export type PostApiInternalPoolsByPoolIdCheckSlackTokensResponse = PostApiInternalPoolsByPoolIdCheckSlackTokensResponses[keyof PostApiInternalPoolsByPoolIdCheckSlackTokensResponses];
+
+export type PostApiV1SharedSlackClaimData = {
+    body?: {
+        token: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/shared-slack/claim';
+};
+
+export type PostApiV1SharedSlackClaimResponses = {
+    /**
+     * Shared Slack user identity claimed
+     */
+    200: {
+        ok: boolean;
+        orgAuthorized: boolean;
+    };
+};
+
+export type PostApiV1SharedSlackClaimResponse = PostApiV1SharedSlackClaimResponses[keyof PostApiV1SharedSlackClaimResponses];
 
 export type GetApiV1ArtifactsData = {
     body?: never;
@@ -2422,6 +2545,44 @@ export type GetApiV1SessionsByIdResponses = {
 
 export type GetApiV1SessionsByIdResponse = GetApiV1SessionsByIdResponses[keyof GetApiV1SessionsByIdResponses];
 
+export type GetApiV1FeishuBindOauthUrlData = {
+    body?: never;
+    path?: never;
+    query: {
+        workspaceKey: string;
+        botId: string;
+    };
+    url: '/api/v1/feishu/bind/oauth-url';
+};
+
+export type GetApiV1FeishuBindOauthUrlErrors = {
+    /**
+     * Invalid workspace key
+     */
+    400: {
+        message: string;
+    };
+    /**
+     * Feishu app not found
+     */
+    404: {
+        message: string;
+    };
+};
+
+export type GetApiV1FeishuBindOauthUrlError = GetApiV1FeishuBindOauthUrlErrors[keyof GetApiV1FeishuBindOauthUrlErrors];
+
+export type GetApiV1FeishuBindOauthUrlResponses = {
+    /**
+     * Feishu OAuth authorization URL
+     */
+    200: {
+        url: string;
+    };
+};
+
+export type GetApiV1FeishuBindOauthUrlResponse = GetApiV1FeishuBindOauthUrlResponses[keyof GetApiV1FeishuBindOauthUrlResponses];
+
 export type GetApiV1IntegrationsData = {
     body?: never;
     path?: never;
@@ -2490,6 +2651,12 @@ export type PostApiV1IntegrationsConnectErrors = {
      * Toolkit not found
      */
     404: {
+        message: string;
+    };
+    /**
+     * User bot context is ambiguous
+     */
+    409: {
         message: string;
     };
     /**
@@ -2568,6 +2735,12 @@ export type PostApiV1IntegrationsByIntegrationIdRefreshErrors = {
      * Integration not found
      */
     404: {
+        message: string;
+    };
+    /**
+     * User bot context is ambiguous
+     */
+    409: {
         message: string;
     };
     /**

@@ -1,25 +1,33 @@
 import { createId } from "@paralleldrive/cuid2";
-import { and, eq, gte, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bots, gatewayAssignments, gatewayPools } from "../db/schema/index.js";
 import { DAILY_BOT_LIMIT, todayMidnightCST } from "./bot-quota.js";
 import { ServiceError } from "./error.js";
 
 export async function findDefaultPool(): Promise<string> {
-  // Find an active pool — prefer one with a registered gateway (pod_ip set)
+  // Find a usable pool — prefer active, fall back to degraded
   const rows = await db
     .select()
     .from(gatewayPools)
-    .where(eq(gatewayPools.status, "active"));
+    .where(inArray(gatewayPools.status, ["active", "degraded"]));
 
-  const withGateway = rows.find((r) => r.podIp);
-  if (withGateway) {
-    return withGateway.id;
-  }
-  const firstPool = rows[0];
-  if (firstPool) {
-    return firstPool.id;
-  }
+  // Prefer active pool with a registered gateway
+  const activeWithGateway = rows.find((r) => r.status === "active" && r.podIp);
+  if (activeWithGateway) return activeWithGateway.id;
+
+  // Any active pool
+  const active = rows.find((r) => r.status === "active");
+  if (active) return active.id;
+
+  // Fall back to degraded pool (still functional, just partial health check failures)
+  const degradedWithGateway = rows.find(
+    (r) => r.status === "degraded" && r.podIp,
+  );
+  if (degradedWithGateway) return degradedWithGateway.id;
+
+  const degraded = rows.find((r) => r.status === "degraded");
+  if (degraded) return degraded.id;
 
   throw ServiceError.from("bot-helpers", { code: "default_pool_not_found" });
 }

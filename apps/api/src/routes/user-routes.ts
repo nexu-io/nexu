@@ -1,6 +1,10 @@
 import { createRoute } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import { userProfileResponseSchema } from "@nexu/shared";
+import {
+  updateAuthSourceResponseSchema,
+  updateAuthSourceSchema,
+  userProfileResponseSchema,
+} from "@nexu/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -17,6 +21,25 @@ const getMeRoute = createRoute({
         "application/json": { schema: userProfileResponseSchema },
       },
       description: "Current user profile",
+    },
+  },
+});
+
+const updateAuthSourceRoute = createRoute({
+  method: "post",
+  path: "/api/v1/me/auth-source",
+  tags: ["User"],
+  request: {
+    body: {
+      content: { "application/json": { schema: updateAuthSourceSchema } },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: updateAuthSourceResponseSchema },
+      },
+      description: "Auth source updated",
     },
   },
 });
@@ -55,9 +78,26 @@ export function registerUserRoutes(app: OpenAPIHono<AppBindings>) {
         image: session.user.image ?? null,
         plan: appUser?.plan ?? "free",
         inviteAccepted: true,
-        onboardingCompleted: !!appUser?.onboardingCompletedAt,
+        authSource: appUser?.authSource ?? null,
       },
       200,
     );
+  });
+
+  app.openapi(updateAuthSourceRoute, async (c) => {
+    const authUserId = c.get("userId");
+    const input = c.req.valid("json");
+    const now = new Date().toISOString();
+
+    await db
+      .update(users)
+      .set({
+        authSource: input.source,
+        authSourceDetail: input.detail ?? null,
+        updatedAt: now,
+      })
+      .where(eq(users.authUserId, authUserId));
+
+    return c.json({ ok: true }, 200);
   });
 }

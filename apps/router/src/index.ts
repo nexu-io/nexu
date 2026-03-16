@@ -24,6 +24,7 @@ export default {
     if (
       url.pathname.startsWith("/workspace") ||
       url.pathname.startsWith("/auth") ||
+      url.pathname.startsWith("/claim") ||
       url.pathname.startsWith("/invite") ||
       url.pathname.startsWith("/assets/") ||
       url.pathname.startsWith("/toolkit-icons/")

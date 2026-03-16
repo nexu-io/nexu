@@ -1,10 +1,12 @@
 import { BrandMark } from "@/components/brand-mark";
 import { authClient } from "@/lib/auth-client";
 import { identify, setUserId, track } from "@/lib/tracking";
+import "@/lib/api";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { postApiV1MeAuthSource } from "../../lib/api/sdk.gen";
 
 const CAPABILITY_PILLS = [
   { emoji: "\u{1F4BB}", label: "Code & Deploy" },
@@ -89,6 +91,12 @@ export function AuthPage() {
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
   const isLogin = searchParams.get("mode") !== "signup";
+  const returnToParam = searchParams.get("returnTo");
+  const returnTo =
+    returnToParam?.startsWith("/") && !returnToParam.startsWith("//")
+      ? returnToParam
+      : "/workspace";
+  const authSourceParam = searchParams.get("source");
   const [loading, setLoading] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -151,13 +159,15 @@ export function AuthPage() {
           return;
         }
       }
-      track(isLogin ? "login_email_success" : "signup_email_success");
+      track(isLogin ? "login_email_success" : "signup_email_success", {
+        source: authSourceParam ?? "Landing",
+      });
       identify({
         auth_method: "email",
         user_email: email,
         ...(isLogin ? {} : { signup_date: new Date().toISOString() }),
       });
-      navigate("/workspace");
+      navigate(returnTo);
     } catch {
       toast.error("Verification failed");
       setVerifying(false);
@@ -165,21 +175,47 @@ export function AuthPage() {
   };
 
   useEffect(() => {
+    if (authSourceParam) {
+      sessionStorage.setItem("nexu_auth_source", authSourceParam);
+    }
+  }, [authSourceParam]);
+
+  useEffect(() => {
     if (!session?.user) return;
     setUserId(session.user.id);
     const mode = sessionStorage.getItem("nexu_auth_mode");
     const provider = sessionStorage.getItem("nexu_auth_provider");
+    const source = sessionStorage.getItem("nexu_auth_source");
     sessionStorage.removeItem("nexu_auth_mode");
     sessionStorage.removeItem("nexu_auth_provider");
+    sessionStorage.removeItem("nexu_auth_source");
     if (provider) {
       const event =
         mode === "login"
           ? `login_${provider}_success`
           : `signup_${provider}_success`;
-      track(event);
+      track(event, { source: source ?? "Landing" });
       identify({
         auth_method: provider,
         user_email: session.user.email,
+      });
+    }
+    const validSources = [
+      "email",
+      "google",
+      "slack_shared_claim",
+      "IM",
+      "Landing",
+    ] as const;
+    type AuthSource = (typeof validSources)[number];
+    if (source && validSources.includes(source as AuthSource)) {
+      postApiV1MeAuthSource({
+        body: {
+          source: source as AuthSource,
+          detail: provider ? `provider:${provider}` : undefined,
+        },
+      }).catch(() => {
+        // Best-effort tracking; do not block login success flow.
       });
     }
   }, [session?.user]);
@@ -193,17 +229,20 @@ export function AuthPage() {
   }
 
   if (session?.user) {
-    return <Navigate to="/workspace" replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   const handleOAuth = async (provider: "google") => {
     setLoading(provider);
     sessionStorage.setItem("nexu_auth_mode", isLogin ? "login" : "signup");
     sessionStorage.setItem("nexu_auth_provider", provider);
+    if (authSourceParam) {
+      sessionStorage.setItem("nexu_auth_source", authSourceParam);
+    }
     try {
       await authClient.signIn.social({
         provider,
-        callbackURL: `${window.location.origin}/workspace`,
+        callbackURL: `${window.location.origin}${returnTo}`,
       });
     } catch {
       setLoading(null);
@@ -240,9 +279,9 @@ export function AuthPage() {
           setLoading(null);
           return;
         }
-        track("login_email_success");
+        track("login_email_success", { source: authSourceParam ?? "Landing" });
         identify({ auth_method: "email", user_email: email });
-        navigate("/workspace");
+        navigate(returnTo);
       } else {
         const { error } = await authClient.signUp.email({
           email,

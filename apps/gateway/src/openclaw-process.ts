@@ -228,17 +228,23 @@ export function startManagedOpenclawGateway(): void {
     : undefined;
 
   const child = spawn(env.OPENCLAW_BIN, args, {
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
     cwd: openclawCwd,
     env: {
       ...safeEnv,
       SKILL_API_TOKEN: env.SKILL_API_TOKEN,
-      OPENCLAW_LOG_LEVEL: "error",
+      OPENCLAW_LOG_LEVEL: "info",
     },
   });
 
   openclawGatewayProcess = child;
   lastStartTime = Date.now();
+
+  if (child.stdout) {
+    createInterface({ input: child.stdout }).on("line", (line) => {
+      logger.info({ stream: "stdout", log_source: "openclaw" }, line);
+    });
+  }
 
   if (child.stderr) {
     createInterface({ input: child.stderr }).on("line", (line) => {

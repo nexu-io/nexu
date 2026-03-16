@@ -27,8 +27,21 @@
       }
     }
   },
+  "overrides": [
+    {
+      "include": ["**/*.test.ts", "**/*.e2e.test.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
   "files": {
     "ignore": [
+      ".claude",
       "node_modules",
       "**/node_modules",
       "dist",

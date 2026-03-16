@@ -27,6 +27,8 @@ export const connectDiscordSchema = z.object({
 export const connectFeishuSchema = z.object({
   appId: z.string().min(1),
   appSecret: z.string().min(1),
+  connectionMode: z.enum(["websocket", "webhook"]).optional(),
+  verificationToken: z.string().optional(),
 });
 
 export const channelResponseSchema = z.object({

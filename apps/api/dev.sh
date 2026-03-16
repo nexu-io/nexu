@@ -20,9 +20,16 @@ fi
 NODE_OPTIONS=--conditions=development DD_TRACE_PRELOADED="$DD_TRACE_PRELOADED" node "${node_args[@]}" &
 node_pid=$!
 
+# Kill a process and its entire process group
+kill_tree() {
+  local pid=$1
+  kill -- -"$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+}
+
 cleanup() {
-  kill "$node_pid" 2>/dev/null || true
-  kill "$tsc_pid" 2>/dev/null || true
+  kill_tree "$node_pid"
+  kill_tree "$tsc_pid"
+  lsof -ti:3000 2>/dev/null | xargs kill -9 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM
@@ -32,8 +39,8 @@ trap cleanup EXIT INT TERM
     sleep 1
   done
 
-  kill "$node_pid" 2>/dev/null || true
-  kill "$tsc_pid" 2>/dev/null || true
+  kill_tree "$node_pid"
+  kill_tree "$tsc_pid"
 ) &
 watchdog_pid=$!
 

@@ -8,7 +8,7 @@ import {
   updateArtifactSchema,
 } from "@nexu/shared";
 import { createId } from "@paralleldrive/cuid2";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { artifacts, bots, sessions } from "../db/schema/index.js";
 import { ServiceError } from "../lib/error.js";
@@ -201,6 +201,30 @@ async function findArtifactBySessionPreview(input: {
     .orderBy(desc(artifacts.updatedAt), desc(artifacts.createdAt));
 
   return rows[0];
+}
+
+// TODO: Optimize by passing nexuUserId from session upsert instead of a separate query.
+// Acceptable for now — hits an indexed column and artifact creation is less frequent than messages.
+async function resolveArtifactNexuUserId(input: {
+  botId: string;
+  sessionKey?: string;
+}): Promise<string | undefined> {
+  const sessionKey = input.sessionKey?.trim();
+  if (!sessionKey) {
+    return undefined;
+  }
+  const normalized = normalizeSessionKey(sessionKey);
+  const [row] = await db
+    .select({ nexuUserId: sessions.nexuUserId })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.botId, input.botId),
+        sql`lower(${sessions.sessionKey}) = ${normalized}`,
+      ),
+    )
+    .orderBy(desc(sessions.updatedAt));
+  return row?.nexuUserId ?? undefined;
 }
 
 // --- Helper ---
@@ -466,6 +490,10 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
       sessionKey: resolved.sessionKey,
       previewUrl: normalizedPreviewUrl,
     });
+    const resolvedNexuUserId = await resolveArtifactNexuUserId({
+      botId: input.botId,
+      sessionKey: resolved.sessionKey,
+    });
 
     if (duplicate) {
       await db
@@ -486,6 +514,9 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
           fileCount: input.fileCount,
           durationMs: input.durationMs,
           metadata: input.metadata ? JSON.stringify(input.metadata) : undefined,
+          ...(resolvedNexuUserId !== undefined && {
+            nexuUserId: resolvedNexuUserId,
+          }),
           updatedAt: now,
         })
         .where(eq(artifacts.id, duplicate.id));
@@ -495,6 +526,7 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
         botId: input.botId,
         title: input.title,
         sessionKey: resolved.sessionKey,
+        nexuUserId: resolvedNexuUserId,
         channelType: input.channelType,
         channelId: input.channelId,
         artifactType: input.artifactType,
@@ -581,6 +613,29 @@ export function registerArtifactInternalRoutes(app: OpenAPIHono<AppBindings>) {
 
     return c.json(formatArtifact(updated), 200);
   });
+}
+
+// ============================================================
+// Access control helper
+// ============================================================
+
+function buildAccessClause(
+  table: {
+    botId: typeof artifacts.botId;
+    nexuUserId: typeof artifacts.nexuUserId;
+  },
+  userId: string,
+  botIds: string[],
+  queryBotId?: string,
+) {
+  if (queryBotId) {
+    return botIds.includes(queryBotId)
+      ? eq(table.botId, queryBotId)
+      : and(eq(table.nexuUserId, userId), eq(table.botId, queryBotId));
+  }
+  return botIds.length > 0
+    ? or(inArray(table.botId, botIds), eq(table.nexuUserId, userId))
+    : eq(table.nexuUserId, userId);
 }
 
 // ============================================================
@@ -684,18 +739,14 @@ export function registerArtifactRoutes(app: OpenAPIHono<AppBindings>) {
     const { limit, offset } = query;
 
     const botIds = await getUserBotIds(userId);
-    if (botIds.length === 0) {
-      return c.json({ artifacts: [], total: 0, limit, offset }, 200);
-    }
+    const accessClause = buildAccessClause(
+      artifacts,
+      userId,
+      botIds,
+      query.botId,
+    );
 
-    // If botId filter specified, verify ownership
-    if (query.botId && !botIds.includes(query.botId)) {
-      return c.json({ artifacts: [], total: 0, limit, offset }, 200);
-    }
-
-    const targetBotIds = query.botId ? [query.botId] : botIds;
-
-    const conditions = [inArray(artifacts.botId, targetBotIds)];
+    const conditions = [accessClause];
     if (query.sessionKey) {
       conditions.push(eq(artifacts.sessionKey, query.sessionKey));
     }
@@ -737,20 +788,7 @@ export function registerArtifactRoutes(app: OpenAPIHono<AppBindings>) {
     const userId = c.get("userId");
     const botIds = await getUserBotIds(userId);
 
-    if (botIds.length === 0) {
-      return c.json(
-        {
-          totalArtifacts: 0,
-          liveCount: 0,
-          buildingCount: 0,
-          failedCount: 0,
-          codingCount: 0,
-          contentCount: 0,
-          totalLinesOfCode: 0,
-        },
-        200,
-      );
-    }
+    const accessClause = buildAccessClause(artifacts, userId, botIds);
 
     const [stats] = await db
       .select({
@@ -763,7 +801,7 @@ export function registerArtifactRoutes(app: OpenAPIHono<AppBindings>) {
         totalLinesOfCode: sql<number>`coalesce(sum(lines_of_code), 0)::int`,
       })
       .from(artifacts)
-      .where(inArray(artifacts.botId, botIds));
+      .where(accessClause);
 
     return c.json(stats, 200);
   });
@@ -782,7 +820,11 @@ export function registerArtifactRoutes(app: OpenAPIHono<AppBindings>) {
       return c.json({ message: "Artifact not found" }, 404);
     }
 
-    // Verify ownership via bot
+    if (artifact.nexuUserId === userId) {
+      return c.json(formatArtifact(artifact), 200);
+    }
+
+    // Verify ownership via bot (legacy/owned-bot access)
     const [bot] = await db
       .select({ id: bots.id })
       .from(bots)
@@ -809,7 +851,12 @@ export function registerArtifactRoutes(app: OpenAPIHono<AppBindings>) {
       return c.json({ message: "Artifact not found" }, 404);
     }
 
-    // Verify ownership via bot
+    if (artifact.nexuUserId === userId) {
+      await db.delete(artifacts).where(eq(artifacts.id, id));
+      return c.json({ message: "Artifact deleted" }, 200);
+    }
+
+    // Verify ownership via bot (legacy/owned-bot access)
     const [bot] = await db
       .select({ id: bots.id })
       .from(bots)

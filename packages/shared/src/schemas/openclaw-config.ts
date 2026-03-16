@@ -155,11 +155,18 @@ const discordChannelSchema = z.object({
   accounts: z.record(z.string(), discordAccountSchema),
 });
 
-const feishuAccountSchema = z.object({
-  enabled: z.boolean().default(true),
-  appId: z.string(),
-  appSecret: z.string(),
-});
+const feishuAccountSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    appId: z.string(),
+    appSecret: z.string(),
+    connectionMode: z.enum(["websocket", "webhook"]).optional(),
+    webhookPath: z.string().optional(),
+    webhookPort: z.number().optional(),
+    webhookHost: z.string().optional(),
+    verificationToken: z.string().optional(),
+  })
+  .passthrough();
 
 const feishuChannelSchema = z
   .object({

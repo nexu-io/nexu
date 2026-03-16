@@ -1,3 +1,4 @@
+import { createId } from "@paralleldrive/cuid2";
 import {
   boolean,
   foreignKey,
@@ -117,6 +118,7 @@ export const botChannels = pgTable(
     accountId: text("account_id").notNull(),
     status: text("status").default("pending"),
     channelConfig: text("channel_config").default("{}"),
+    connectionMode: text("connection_mode"),
     createdAt: text("created_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -181,6 +183,8 @@ export const users = pgTable("users", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
   authUserId: text("auth_user_id").notNull().unique(),
+  authSource: text("auth_source"),
+  authSourceDetail: text("auth_source_detail"),
   plan: text("plan").default("free"),
   inviteAcceptedAt: text("invite_accepted_at"),
   onboardingRole: text("onboarding_role"),
@@ -328,6 +332,7 @@ export const oauthStates = pgTable("oauth_states", {
   expiresAt: text("expires_at").notNull(),
   usedAt: text("used_at"),
   returnTo: text("return_to"),
+  workspaceKey: text("workspace_key"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -382,6 +387,7 @@ export const artifacts = pgTable(
     id: text("id").notNull().unique(),
     botId: text("bot_id").notNull(),
     sessionKey: text("session_key"),
+    nexuUserId: text("nexu_user_id"),
     channelType: text("channel_type"),
     channelId: text("channel_id"),
     title: text("title").notNull(),
@@ -404,6 +410,7 @@ export const artifacts = pgTable(
   },
   (table) => [
     index("artifacts_bot_id_idx").on(table.botId),
+    index("artifacts_nexu_user_id_idx").on(table.nexuUserId),
     index("artifacts_session_key_idx").on(table.sessionKey),
     index("artifacts_status_idx").on(table.status),
     index("artifacts_created_at_idx").on(table.createdAt),
@@ -438,6 +445,7 @@ export const sessions = pgTable(
     id: text("id").notNull().unique(),
     botId: text("bot_id").notNull(),
     sessionKey: text("session_key").notNull().unique(),
+    nexuUserId: text("nexu_user_id"),
     channelType: text("channel_type"),
     channelId: text("channel_id"),
     title: text("title").notNull(),
@@ -454,11 +462,87 @@ export const sessions = pgTable(
   },
   (table) => [
     index("sessions_bot_id_idx").on(table.botId),
+    index("sessions_nexu_user_id_idx").on(table.nexuUserId),
     index("sessions_status_idx").on(table.status),
     index("sessions_created_at_idx").on(table.createdAt),
     index("sessions_channel_type_idx").on(table.channelType),
   ],
 );
+
+// ============ Session Participants ============
+
+export const sessionParticipants = pgTable(
+  "session_participants",
+  {
+    pk: serial("pk").primaryKey(),
+    sessionKey: text("session_key").notNull(),
+    nexuUserId: text("nexu_user_id").notNull(),
+    imUserId: text("im_user_id").notNull(),
+    firstSeenAt: text("first_seen_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("sp_session_user_idx").on(table.sessionKey, table.nexuUserId),
+    index("sp_nexu_user_idx").on(table.nexuUserId),
+  ],
+);
+
+// ============ Workspace Memberships ============
+
+export const workspaceMemberships = pgTable(
+  "workspace_memberships",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id")
+      .notNull()
+      .unique()
+      .$defaultFn(() => createId()),
+    workspaceKey: text("workspace_key").notNull(),
+    userId: text("user_id").notNull(),
+    botId: text("bot_id").notNull(),
+    imUserId: text("im_user_id"),
+    role: text("role").default("member"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("wm_workspace_user_idx").on(table.workspaceKey, table.userId),
+    uniqueIndex("wm_workspace_im_user_idx").on(
+      table.workspaceKey,
+      table.imUserId,
+    ),
+    index("wm_user_idx").on(table.userId),
+  ],
+);
+
+// ============ Claim Tokens ============
+
+export const claimTokens = pgTable("claim_tokens", {
+  pk: serial("pk").primaryKey(),
+  id: text("id")
+    .notNull()
+    .unique()
+    .$defaultFn(() => createId()),
+  token: text("token").notNull().unique(),
+  workspaceKey: text("workspace_key").notNull(),
+  imUserId: text("im_user_id").notNull(),
+  botId: text("bot_id").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  usedByUserId: text("used_by_user_id"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+// Idempotency lock for claim card sending — prevents duplicate cards
+// when multiple API pods process the same feishu event concurrently.
+export const claimCardDedup = pgTable("claim_card_dedup", {
+  eventId: text("event_id").primaryKey(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
 
 export const supportedToolkits = pgTable("supported_toolkits", {
   pk: serial("pk").primaryKey(),

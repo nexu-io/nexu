@@ -5,13 +5,14 @@ import { InviteGuardLayout } from "./layouts/invite-guard-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
+import { FeishuBindPage } from "./pages/feishu-bind";
 import { HomePage } from "./pages/home";
 import { IntegrationsPage } from "./pages/integrations";
 import { OAuthCallbackPage } from "./pages/oauth-callback";
-import { OnboardingPage } from "./pages/onboarding";
 import { SessionsPage } from "./pages/sessions";
 import { SkillDetailPage } from "./pages/skill-detail";
 import { SkillsPage } from "./pages/skills";
+import { SlackClaimPage } from "./pages/slack-claim";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
 
 function DocumentTitleSync() {
@@ -20,11 +21,12 @@ function DocumentTitleSync() {
   useEffect(() => {
     const titleByPathname: Record<string, string> = {
       "/auth": "Sign In · Nexu",
-      "/onboarding": "Get Started · Nexu",
+      "/claim": "Claim · Nexu",
       "/workspace": "Home · Nexu",
       "/workspace/home": "Home · Nexu",
       "/workspace/integrations": "Integrations · Nexu",
       "/workspace/skills": "Skills · Nexu",
+      "/feishu/bind": "Link Feishu · Nexu",
     };
 
     if (location.pathname.startsWith("/workspace/oauth-callback")) {
@@ -45,9 +47,10 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/workspace" replace />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/claim" element={<SlackClaimPage />} />
+        <Route path="/feishu/bind" element={<FeishuBindPage />} />
         <Route element={<AuthLayout />}>
           <Route element={<InviteGuardLayout />}>
-            <Route path="/onboarding" element={<OnboardingPage />} />
             {/* OAuth callback — outside WorkspaceLayout for clean full-page card */}
             <Route
               path="/workspace/oauth-callback/:integrationId"
