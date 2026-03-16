@@ -9,7 +9,7 @@ import type {
   SlackAccountConfig,
 } from "@nexu/shared";
 import { openclawConfigSchema } from "@nexu/shared";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Database } from "../db/index.js";
 import {
   botChannels,
@@ -17,9 +17,15 @@ import {
   channelCredentials,
   gatewayPools,
   modelProviders,
+  poolSecrets,
 } from "../db/schema/index.js";
 import { decrypt } from "./crypto.js";
 import { ServiceError } from "./error.js";
+import {
+  buildConfiguredModelProviders,
+  getOpenclawModelSettingsSecretName,
+  parseStoredOpenclawModelSettings,
+} from "./openclaw-model-settings.js";
 
 /**
  * Load cloud connection credentials (Link gateway) in desktop mode.
@@ -569,6 +575,41 @@ export async function generatePoolConfig(
         providers: { [providerKey]: byokProvider },
       };
     }
+  }
+
+  const [storedModelSettingsSecret] = await db
+    .select({ encryptedValue: poolSecrets.encryptedValue })
+    .from(poolSecrets)
+    .where(
+      and(
+        eq(poolSecrets.poolId, poolId),
+        eq(poolSecrets.secretName, getOpenclawModelSettingsSecretName()),
+      ),
+    )
+    .limit(1);
+
+  let configuredModelProviders = buildConfiguredModelProviders(null);
+  if (storedModelSettingsSecret) {
+    try {
+      const decryptedSettings = decrypt(
+        storedModelSettingsSecret.encryptedValue,
+      );
+      const parsedSettings =
+        parseStoredOpenclawModelSettings(decryptedSettings);
+      configuredModelProviders = buildConfiguredModelProviders(parsedSettings);
+    } catch {
+      configuredModelProviders = undefined;
+    }
+  }
+
+  if (configuredModelProviders) {
+    config.models = {
+      mode: "merge",
+      providers: {
+        ...(config.models?.providers ?? {}),
+        ...configuredModelProviders.providers,
+      },
+    };
   }
 
   if (Object.keys(slackAccounts).length > 0) {

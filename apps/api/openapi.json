@@ -3444,6 +3444,204 @@
         }
       }
     },
+    "/api/v1/openclaw/model-settings": {
+      "get": {
+        "tags": [
+          "OpenClaw Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current OpenClaw model provider settings for the user's pool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "poolId": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "providers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "baseUrl": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "apiKeyConfigured": {
+                            "type": "boolean"
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "enabled": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "enabled"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "apiKeyConfigured",
+                          "models"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "poolId",
+                    "updatedAt",
+                    "providers"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "OpenClaw Settings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "providers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "baseUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "apiKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "clearApiKey": {
+                          "type": "boolean"
+                        },
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "enabled"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "models"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "providers"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OpenClaw model provider settings saved and published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "poolId": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "publishedVersion": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "poolId",
+                    "updatedAt",
+                    "publishedVersion"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/pools/{poolId}/config": {
       "get": {
         "tags": [
@@ -8396,7 +8594,8 @@
                             "type": "string",
                             "enum": [
                               "official",
-                              "custom"
+                              "custom",
+                              "community"
                             ]
                           },
                           "tools": {
@@ -8431,6 +8630,12 @@
                           },
                           "githubUrl": {
                             "type": "string"
+                          },
+                          "installed": {
+                            "type": "boolean"
+                          },
+                          "updatable": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -8556,7 +8761,8 @@
                       "type": "string",
                       "enum": [
                         "official",
-                        "custom"
+                        "custom",
+                        "community"
                       ]
                     },
                     "tools": {
@@ -8660,7 +8866,8 @@
                             "type": "string",
                             "enum": [
                               "official",
-                              "custom"
+                              "custom",
+                              "community"
                             ]
                           },
                           "tools": {
@@ -8695,6 +8902,12 @@
                           },
                           "githubUrl": {
                             "type": "string"
+                          },
+                          "installed": {
+                            "type": "boolean"
+                          },
+                          "updatable": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -8724,6 +8937,186 @@
           },
           "404": {
             "description": "Skill not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills/filesystem": {
+      "get": {
+        "tags": [
+          "Skills"
+        ],
+        "responses": {
+          "200": {
+            "description": "Merged list of catalog and locally installed skills",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "skills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "longDescription": {
+                            "type": "string"
+                          },
+                          "iconName": {
+                            "type": "string"
+                          },
+                          "iconUrl": {
+                            "type": "string"
+                          },
+                          "fallbackIconUrl": {
+                            "type": "string"
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "examples": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "tag": {
+                            "type": "string",
+                            "enum": [
+                              "office-collab",
+                              "file-knowledge",
+                              "creative-design",
+                              "biz-analysis",
+                              "av-generation",
+                              "info-content",
+                              "dev-tools"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "official",
+                              "custom",
+                              "community"
+                            ]
+                          },
+                          "tools": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "slug": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "provider": {
+                                  "type": "string"
+                                },
+                                "iconUrl": {
+                                  "type": "string"
+                                },
+                                "fallbackIconUrl": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "slug",
+                                "name",
+                                "provider",
+                                "iconUrl",
+                                "fallbackIconUrl"
+                              ]
+                            }
+                          },
+                          "githubUrl": {
+                            "type": "string"
+                          },
+                          "installed": {
+                            "type": "boolean"
+                          },
+                          "updatable": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "description",
+                          "iconName",
+                          "prompt",
+                          "tag",
+                          "source"
+                        ]
+                      }
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "office-collab",
+                              "file-knowledge",
+                              "creative-design",
+                              "biz-analysis",
+                              "av-generation",
+                              "info-content",
+                              "dev-tools"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "skills",
+                    "tags"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {

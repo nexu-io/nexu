@@ -3,13 +3,18 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { createRoute } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
-import type { Model } from "@nexu/shared";
-import { modelListResponseSchema } from "@nexu/shared";
-import { eq } from "drizzle-orm";
+import { type Model, modelListResponseSchema } from "@nexu/shared";
+import { and, eq } from "drizzle-orm";
 import { db, pool } from "../db/index.js";
-import { modelProviders } from "../db/schema/index.js";
+import { modelProviders, poolSecrets } from "../db/schema/index.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
 import { PLATFORM_MODELS } from "../lib/models.js";
+import {
+  buildConfiguredModels,
+  getOpenclawModelSettingsSecretName,
+  parseStoredOpenclawModelSettings,
+} from "../lib/openclaw-model-settings.js";
+import { resolvePrimaryUserPoolId } from "../lib/user-pool.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -110,7 +115,38 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   app.openapi(listModelsRoute, async (c) => {
     const cloudModels = getCloudModels();
     const byokModels = await getByokModels();
+    const userId = c.get("userId");
+    const poolId = await resolvePrimaryUserPoolId(db, userId);
+    const [modelSettingsSecret] = await db
+      .select({ encryptedValue: poolSecrets.encryptedValue })
+      .from(poolSecrets)
+      .where(
+        and(
+          eq(poolSecrets.poolId, poolId),
+          eq(poolSecrets.secretName, getOpenclawModelSettingsSecretName()),
+        ),
+      )
+      .limit(1);
+
+    let configuredModels: Model[] = [];
+    if (modelSettingsSecret) {
+      try {
+        const decrypted = decrypt(modelSettingsSecret.encryptedValue);
+        configuredModels = buildConfiguredModels(
+          parseStoredOpenclawModelSettings(decrypted),
+        );
+      } catch {
+        configuredModels = [];
+      }
+    }
+
     const models = [...PLATFORM_MODELS, ...cloudModels, ...byokModels];
+    for (const model of configuredModels) {
+      if (!models.some((existing) => existing.id === model.id)) {
+        models.push(model);
+      }
+    }
+
     return c.json({ models }, 200);
   });
 

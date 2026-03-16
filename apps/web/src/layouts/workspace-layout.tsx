@@ -14,6 +14,8 @@ import {
   Rocket,
   Settings,
   Sparkles,
+  SlidersHorizontal,
+  Zap,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -181,6 +183,7 @@ function WorkspaceLayoutInner() {
     location.pathname === "/workspace" ||
     location.pathname === "/workspace/home";
   const isChannelsPage = location.pathname.includes("/channels");
+  const isSettingsPage = location.pathname.includes("/settings");
   const isSkillsPage = location.pathname.includes("/skills");
   const isModelsPage = location.pathname.includes("/models");
 
@@ -197,6 +200,7 @@ function WorkspaceLayoutInner() {
     sessions.length === 0 &&
     !isHomePage &&
     !isChannelsPage &&
+    !isSettingsPage &&
     !isSkillsPage &&
     !isModelsPage &&
     !selectedSessionId;
@@ -208,19 +212,23 @@ function WorkspaceLayoutInner() {
     ? "Home"
     : isChannelsPage
       ? "Deployments"
-      : isSkillsPage
-        ? "Skills"
-        : isModelsPage
-          ? "Settings"
+      : isSettingsPage
+        ? "Settings"
+        : isSkillsPage
+          ? "Skills"
+          : isModelsPage
+            ? "Models"
           : selectedSession?.title || "Conversations";
   const mobileSubtitle = isHomePage
     ? "Welcome to nexu"
     : isChannelsPage
       ? "All deployment records"
-      : isSkillsPage
-        ? "Browse AI capabilities"
-        : isModelsPage
-          ? "Manage AI model providers"
+      : isSettingsPage
+        ? "OpenClaw and runtime preferences"
+        : isSkillsPage
+          ? "Browse AI capabilities"
+          : isModelsPage
+            ? "Manage AI model providers"
           : selectedSession
             ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
             : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
@@ -335,7 +343,7 @@ function WorkspaceLayoutInner() {
             </Link>
             <Link
               to="/workspace/models"
-              title={collapsed ? "Settings" : undefined}
+              title={collapsed ? "Models" : undefined}
               onClick={() => track("workspace_settings_click")}
               className={cn(
                 "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
@@ -346,6 +354,21 @@ function WorkspaceLayoutInner() {
               )}
             >
               <Settings size={14} />
+              {!collapsed && "Models"}
+            </Link>
+            <Link
+              to="/workspace/settings"
+              title={collapsed ? "Settings" : undefined}
+              onClick={() => track("workspace_openclaw_settings_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isSettingsPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <SlidersHorizontal size={14} />
               {!collapsed && "Settings"}
             </Link>
           </div>
@@ -412,7 +435,24 @@ function WorkspaceLayoutInner() {
                 );
               })}
             </div>
-          </div>
+          ) : !collapsed ? (
+            <div className="px-4 py-6 text-center">
+              <div className="flex justify-center items-center mx-auto mb-2 w-8 h-8 rounded-lg bg-accent/10">
+                <Zap size={14} className="text-accent" />
+              </div>
+              <p className="text-[12px] text-text-muted leading-relaxed">
+                Once your bot is set up, conversations with 🦞 will appear here
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/workspace/channels")}
+                className="mt-3 text-[12px] text-accent font-medium hover:underline"
+              >
+                Set up →
+              </button>
+            </div>
+          ) : null}
+
         </div>
 
         {/* Account */}
@@ -597,6 +637,22 @@ function WorkspaceLayoutInner() {
                     )}
                   >
                     <Settings size={14} />
+                    Models
+                  </Link>
+                  <Link
+                    to="/workspace/settings"
+                    onClick={() => {
+                      track("workspace_openclaw_settings_click");
+                      setMobileDrawerOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5 px-3 py-2",
+                      isSettingsPage
+                        ? "bg-accent/10 text-accent"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                    )}
+                  >
+                    <SlidersHorizontal size={14} />
                     Settings
                   </Link>
                 </div>
@@ -652,7 +708,27 @@ function WorkspaceLayoutInner() {
                       );
                     })}
                   </div>
-                </div>
+                ) : (
+                  <div className="px-4 py-6 text-center">
+                    <div className="flex justify-center items-center mx-auto mb-2 w-8 h-8 rounded-lg bg-accent/10">
+                      <Zap size={14} className="text-accent" />
+                    </div>
+                    <p className="text-[12px] text-text-muted leading-relaxed">
+                      Once your bot is set up, conversations with 🦞 will appear
+                      here
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileDrawerOpen(false);
+                        navigate("/workspace/channels");
+                      }}
+                      className="mt-3 text-[12px] text-accent font-medium hover:underline"
+                    >
+                      Set up →
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div

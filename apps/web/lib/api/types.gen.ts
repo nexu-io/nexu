@@ -1363,6 +1363,83 @@ export type GetApiV1ModelsResponses = {
 
 export type GetApiV1ModelsResponse = GetApiV1ModelsResponses[keyof GetApiV1ModelsResponses];
 
+export type GetApiV1OpenclawModelSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/openclaw/model-settings';
+};
+
+export type GetApiV1OpenclawModelSettingsResponses = {
+    /**
+     * Current OpenClaw model provider settings for the user's pool
+     */
+    200: {
+        poolId: string;
+        updatedAt: string;
+        providers: {
+            [key: string]: {
+                enabled: boolean;
+                baseUrl?: string;
+                apiKeyConfigured: boolean;
+                models: Array<{
+                    id: string;
+                    name?: string;
+                    enabled: boolean;
+                }>;
+            };
+        };
+    };
+};
+
+export type GetApiV1OpenclawModelSettingsResponse = GetApiV1OpenclawModelSettingsResponses[keyof GetApiV1OpenclawModelSettingsResponses];
+
+export type PutApiV1OpenclawModelSettingsData = {
+    body?: {
+        providers: {
+            [key: string]: {
+                enabled: boolean;
+                baseUrl?: string;
+                apiKey?: string;
+                clearApiKey?: boolean;
+                models: Array<{
+                    id: string;
+                    name?: string;
+                    enabled: boolean;
+                }>;
+            };
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/openclaw/model-settings';
+};
+
+export type PutApiV1OpenclawModelSettingsErrors = {
+    /**
+     * Invalid request
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PutApiV1OpenclawModelSettingsError = PutApiV1OpenclawModelSettingsErrors[keyof PutApiV1OpenclawModelSettingsErrors];
+
+export type PutApiV1OpenclawModelSettingsResponses = {
+    /**
+     * OpenClaw model provider settings saved and published
+     */
+    200: {
+        ok: boolean;
+        poolId: string;
+        updatedAt: string;
+        publishedVersion: number;
+    };
+};
+
+export type PutApiV1OpenclawModelSettingsResponse = PutApiV1OpenclawModelSettingsResponses[keyof PutApiV1OpenclawModelSettingsResponses];
+
 export type GetApiInternalPoolsByPoolIdConfigData = {
     body?: never;
     path: {
@@ -2873,7 +2950,7 @@ export type GetApiV1SkillsResponses = {
             prompt: string;
             examples?: Array<string>;
             tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-            source: 'official' | 'custom';
+            source: 'official' | 'custom' | 'community';
             tools?: Array<{
                 slug: string;
                 name: string;
@@ -2882,6 +2959,8 @@ export type GetApiV1SkillsResponses = {
                 fallbackIconUrl: string;
             }>;
             githubUrl?: string;
+            installed?: boolean;
+            updatable?: boolean;
         }>;
         tags: Array<{
             id: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
@@ -2928,7 +3007,7 @@ export type GetApiV1SkillsBySlugResponses = {
         prompt: string;
         examples?: Array<string>;
         tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-        source: 'official' | 'custom';
+        source: 'official' | 'custom' | 'community';
         tools?: Array<{
             slug: string;
             name: string;
@@ -2951,7 +3030,7 @@ export type GetApiV1SkillsBySlugResponses = {
             prompt: string;
             examples?: Array<string>;
             tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-            source: 'official' | 'custom';
+            source: 'official' | 'custom' | 'community';
             tools?: Array<{
                 slug: string;
                 name: string;
@@ -2960,11 +3039,69 @@ export type GetApiV1SkillsBySlugResponses = {
                 fallbackIconUrl: string;
             }>;
             githubUrl?: string;
+            installed?: boolean;
+            updatable?: boolean;
         }>;
     };
 };
 
 export type GetApiV1SkillsBySlugResponse = GetApiV1SkillsBySlugResponses[keyof GetApiV1SkillsBySlugResponses];
+
+export type GetApiV1SkillsFilesystemData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/skills/filesystem';
+};
+
+export type GetApiV1SkillsFilesystemErrors = {
+    /**
+     * Internal server error
+     */
+    500: {
+        message: string;
+    };
+};
+
+export type GetApiV1SkillsFilesystemError = GetApiV1SkillsFilesystemErrors[keyof GetApiV1SkillsFilesystemErrors];
+
+export type GetApiV1SkillsFilesystemResponses = {
+    /**
+     * Merged list of catalog and locally installed skills
+     */
+    200: {
+        skills: Array<{
+            slug: string;
+            name: string;
+            description: string;
+            longDescription?: string;
+            iconName: string;
+            iconUrl?: string;
+            fallbackIconUrl?: string;
+            prompt: string;
+            examples?: Array<string>;
+            tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
+            source: 'official' | 'custom' | 'community';
+            tools?: Array<{
+                slug: string;
+                name: string;
+                provider: string;
+                iconUrl: string;
+                fallbackIconUrl: string;
+            }>;
+            githubUrl?: string;
+            installed?: boolean;
+            updatable?: boolean;
+        }>;
+        tags: Array<{
+            id: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
+            label: string;
+            count: number;
+        }>;
+    };
+};
+
+export type GetApiV1SkillsFilesystemResponse = GetApiV1SkillsFilesystemResponses[keyof GetApiV1SkillsFilesystemResponses];
 
 export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});

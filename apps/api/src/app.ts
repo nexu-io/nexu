@@ -40,6 +40,7 @@ import {
 import { registerIntegrationRoutes } from "./routes/integration-routes.js";
 import { registerInviteRoutes } from "./routes/invite-routes.js";
 import { registerModelRoutes } from "./routes/model-routes.js";
+import { registerOpenclawModelSettingsRoutes } from "./routes/openclaw-model-settings-routes.js";
 import { registerPoolRoutes } from "./routes/pool-routes.js";
 import { registerSecretRoutes } from "./routes/secret-routes.js";
 import {
@@ -153,6 +154,7 @@ export function createApp() {
   registerChannelRoutes(app);
   registerInviteRoutes(app);
   registerModelRoutes(app);
+  registerOpenclawModelSettingsRoutes(app);
   registerPoolRoutes(app);
   registerSharedSlackClaimRoutes(app);
   registerArtifactRoutes(app);
