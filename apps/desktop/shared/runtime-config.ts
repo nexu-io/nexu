@@ -7,8 +7,6 @@ export type DesktopRuntimeConfig = {
   apiBaseUrl: string;
   webPort: number;
   webUrl: string;
-  openclawBaseUrl: string;
-  openclawGatewayToken: string;
   pglitePort: number;
 };
 
@@ -36,12 +34,6 @@ export function getDesktopRuntimeConfig(
       `http://127.0.0.1:${apiPort}`,
     webPort,
     webUrl: env.NEXU_WEB_URL ?? `http://127.0.0.1:${webPort}`,
-    openclawBaseUrl:
-      env.NEXU_OPENCLAW_BASE_URL ?? "http://127.0.0.1:18789",
-    openclawGatewayToken:
-      env.NEXU_OPENCLAW_GATEWAY_TOKEN ??
-      env.NEXU_INTERNAL_API_TOKEN ??
-      "gw-secret-token",
     pglitePort,
   };
 }
