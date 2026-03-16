@@ -68,6 +68,13 @@ function getPackagePathParts(packageName) {
   return packageName.startsWith("@") ? packageName.split("/") : [packageName];
 }
 
+function getRootPackageName(packageName) {
+  const packagePathParts = getPackagePathParts(packageName);
+  return packagePathParts.length === 1
+    ? packagePathParts[0]
+    : `${packagePathParts[0]}/${packagePathParts[1]}`;
+}
+
 async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
@@ -77,11 +84,16 @@ async function resolveInstalledPackageRoot(packageRoot, packageName) {
     resolve(packageRoot, "package.json"),
   );
   const resolvedEntryPath = requireFromPackage.resolve(packageName);
+  const rootPackageName = getRootPackageName(packageName);
 
   let currentPath = dirname(resolvedEntryPath);
   while (currentPath !== dirname(currentPath)) {
-    if (await pathExists(resolve(currentPath, "package.json"))) {
-      return realpath(currentPath);
+    const packageJsonPath = resolve(currentPath, "package.json");
+    if (await pathExists(packageJsonPath)) {
+      const packageJson = await readJson(packageJsonPath);
+      if (packageJson.name === rootPackageName) {
+        return realpath(currentPath);
+      }
     }
     currentPath = dirname(currentPath);
   }
@@ -99,39 +111,34 @@ export async function copyRuntimeDependencyClosure({
   await mkdir(targetNodeModules, { recursive: true });
 
   const rootPackageJson = await readJson(resolve(packageRoot, "package.json"));
-  const pending = [
-    ...(dependencyNames ?? Object.keys(rootPackageJson.dependencies ?? {})).map(
-      (packageName) => ({ packageName, resolutionBaseRoot: packageRoot }),
-    ),
-    ...Object.keys(rootPackageJson.optionalDependencies ?? {}).map(
-      (packageName) => ({ packageName, resolutionBaseRoot: packageRoot }),
-    ),
-  ];
   const seen = new Set();
 
-  while (pending.length > 0) {
-    const nextPackage = pending.pop();
-    const packageName = nextPackage?.packageName;
-    const resolutionBaseRoot = nextPackage?.resolutionBaseRoot;
-
-    if (!packageName || !resolutionBaseRoot || seen.has(packageName)) {
-      continue;
-    }
-
-    seen.add(packageName);
-
-    const packagePathParts = getPackagePathParts(packageName);
+  async function copyDependencyTree({
+    dependencyName,
+    resolutionBaseRoot,
+    destinationNodeModules,
+  }) {
+    const packagePathParts = getPackagePathParts(dependencyName);
     let sourcePackageRoot;
     try {
       sourcePackageRoot = await resolveInstalledPackageRoot(
         resolutionBaseRoot,
-        packageName,
+        dependencyName,
       );
     } catch {
-      continue;
+      return;
     }
 
-    const targetPackageRoot = resolve(targetNodeModules, ...packagePathParts);
+    const targetPackageRoot = resolve(
+      destinationNodeModules,
+      ...packagePathParts,
+    );
+    const seenKey = `${sourcePackageRoot}:${targetPackageRoot}`;
+    if (seen.has(seenKey)) {
+      return;
+    }
+    seen.add(seenKey);
+
     await mkdir(dirname(targetPackageRoot), { recursive: true });
     await rm(targetPackageRoot, { recursive: true, force: true });
     await cp(sourcePackageRoot, targetPackageRoot, {
@@ -153,23 +160,34 @@ export async function copyRuntimeDependencyClosure({
 
     const packageJsonPath = resolve(sourcePackageRoot, "package.json");
     if (!(await pathExists(packageJsonPath))) {
-      continue;
+      return;
     }
 
     const packageJson = await readJson(packageJsonPath);
-    for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
-      pending.push({
-        packageName: dependencyName,
+    const childDependencyNames = [
+      ...Object.keys(packageJson.dependencies ?? {}),
+      ...Object.keys(packageJson.optionalDependencies ?? {}),
+    ];
+
+    for (const childDependencyName of childDependencyNames) {
+      await copyDependencyTree({
+        dependencyName: childDependencyName,
         resolutionBaseRoot: sourcePackageRoot,
+        destinationNodeModules: resolve(targetPackageRoot, "node_modules"),
       });
     }
-    for (const dependencyName of Object.keys(
-      packageJson.optionalDependencies ?? {},
-    )) {
-      pending.push({
-        packageName: dependencyName,
-        resolutionBaseRoot: sourcePackageRoot,
-      });
-    }
+  }
+
+  const rootDependencyNames = [
+    ...(dependencyNames ?? Object.keys(rootPackageJson.dependencies ?? {})),
+    ...Object.keys(rootPackageJson.optionalDependencies ?? {}),
+  ];
+
+  for (const dependencyName of rootDependencyNames) {
+    await copyDependencyTree({
+      dependencyName,
+      resolutionBaseRoot: packageRoot,
+      destinationNodeModules: targetNodeModules,
+    });
   }
 }
