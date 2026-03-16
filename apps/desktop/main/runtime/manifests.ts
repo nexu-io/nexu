@@ -36,6 +36,7 @@ export function createRuntimeUnitManifests(
   const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(resolve(openclawRuntimeRoot, "config"));
   const openclawStateDir = ensureDir(resolve(openclawRuntimeRoot, "state"));
+  const openclawTempDir = ensureDir(resolve(openclawRuntimeRoot, "tmp"));
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
@@ -157,6 +158,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
         OPENCLAW_BIN: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
+        TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
       },
