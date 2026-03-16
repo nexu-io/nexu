@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ChevronUp,
   Cpu,
+  Home,
   LogOut,
   Menu,
   MessageSquare,
@@ -154,6 +155,9 @@ export function WorkspaceLayout() {
 
   const sessionMatch = location.pathname.match(/\/workspace\/sessions\/(.+)/);
   const selectedSessionId = sessionMatch?.[1] ?? null;
+  const isHomePage =
+    location.pathname === "/workspace" ||
+    location.pathname === "/workspace/home";
   const isChannelsPage = location.pathname.includes("/channels");
   const isModelsPage = location.pathname.includes("/models");
   const isSkillsPage = location.pathname.includes("/skills");
@@ -169,6 +173,7 @@ export function WorkspaceLayout() {
 
   const showEmptyState =
     sessions.length === 0 &&
+    !isHomePage &&
     !isChannelsPage &&
     !isModelsPage &&
     !isSkillsPage &&
@@ -177,22 +182,26 @@ export function WorkspaceLayout() {
   const selectedSession = selectedSessionId
     ? sessions.find((s) => s.id === selectedSessionId)
     : null;
-  const mobileTitle = isChannelsPage
-    ? "Channels"
-    : isModelsPage
-      ? "Models"
-      : isSkillsPage
-        ? "Skills"
-        : selectedSession?.title || "Conversations";
-  const mobileSubtitle = isChannelsPage
-    ? "Configure your channels"
-    : isModelsPage
-      ? "Manage AI models"
-      : isSkillsPage
-        ? "Browse AI capabilities"
-        : selectedSession
-        ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
-        : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
+  const mobileTitle = isHomePage
+    ? "Home"
+    : isChannelsPage
+      ? "Channels"
+      : isModelsPage
+        ? "Models"
+        : isSkillsPage
+          ? "Skills"
+          : selectedSession?.title || "Conversations";
+  const mobileSubtitle = isHomePage
+    ? "Welcome to nexu"
+    : isChannelsPage
+      ? "Configure your channels"
+      : isModelsPage
+        ? "Manage AI models"
+        : isSkillsPage
+          ? "Browse AI capabilities"
+          : selectedSession
+            ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
+            : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
     <div className="flex h-screen">
@@ -333,6 +342,21 @@ export function WorkspaceLayout() {
           {/* Channel config entry */}
           <div className={cn(collapsed ? "px-2" : "px-3", "pb-3")}>
             <div className="border-t border-border pt-2" />
+            <Link
+              to="/workspace/home"
+              title={collapsed ? "Home" : undefined}
+              onClick={() => track("workspace_home_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isHomePage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <Home size={14} />
+              {!collapsed && "Home"}
+            </Link>
             <Link
               to="/workspace/channels"
               title={collapsed ? "Channels" : undefined}
@@ -570,6 +594,22 @@ export function WorkspaceLayout() {
 
                 <div className="px-3 pb-3">
                   <div className="border-t border-border pt-2" />
+                  <Link
+                    to="/workspace/home"
+                    onClick={() => {
+                      track("workspace_home_click");
+                      setMobileDrawerOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1 px-3 py-2",
+                      isHomePage
+                        ? "bg-accent/10 text-accent"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                    )}
+                  >
+                    <Home size={14} />
+                    Home
+                  </Link>
                   <Link
                     to="/workspace/channels"
                     onClick={() => {
