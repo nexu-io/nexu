@@ -7,7 +7,6 @@
     "dev:landing": "pnpm --filter @nexu/landing dev",
     "dev:sidecar": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
     "dev:desktop": "pnpm --filter @nexu/desktop dev",
-    "dev:chat": "pnpm --filter @nexu/chat dev",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
