@@ -107,7 +107,7 @@ const server = new PGLiteSocketServer({
   db,
   host,
   port,
-  maxConnections: 10,
+  maxConnections: 32,
 });
 
 server.addEventListener("listening", (event) => {

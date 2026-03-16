@@ -157,7 +157,15 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
           ? "strict"
           : cookie.samesite === "none"
             ? "no_restriction"
-            : "lax",
+          : "lax",
     });
   }
+
+  const persistedCookies = await session.defaultSession.cookies.get({
+    url: desktopWebUrl,
+  });
+
+  console.log(
+    `[desktop:auth-bootstrap] sign-in ok user=${authUserId} setCookies=${Array.from(cookies.keys()).join(",")} persistedCookies=${persistedCookies.map((cookie) => cookie.name).join(",")}`,
+  );
 }
