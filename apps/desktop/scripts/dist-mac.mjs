@@ -184,18 +184,6 @@ async function stapleNotarizedArtifacts() {
       { cwd: electronRoot },
     );
   }
-
-  for (const entry of releaseEntries) {
-    if (!entry.isFile() || !entry.name.endsWith(".dmg")) {
-      continue;
-    }
-
-    await run(
-      "xcrun",
-      ["stapler", "staple", resolve(releaseRoot, entry.name)],
-      { cwd: electronRoot },
-    );
-  }
 }
 
 async function main() {
