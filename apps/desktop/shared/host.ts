@@ -58,8 +58,6 @@ export type AppInfo = {
 
 export type RuntimeUnitId =
   | "web"
-  | "session-chat"
-  | "session-chat-db"
   | "control-plane"
   | "pglite"
   | "api"

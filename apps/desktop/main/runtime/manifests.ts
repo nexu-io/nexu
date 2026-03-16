@@ -33,12 +33,10 @@ export function createRuntimeUnitManifests(
   );
   const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
   const pgliteDataPath = ensureDir(resolve(runtimeRoot, "pglite"));
-  const sessionChatDbDataPath = ensureDir(
-    resolve(runtimeRoot, "session-chat-db"),
-  );
   const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(resolve(openclawRuntimeRoot, "config"));
   const openclawStateDir = ensureDir(resolve(openclawRuntimeRoot, "state"));
+  const openclawTempDir = ensureDir(resolve(openclawRuntimeRoot, "tmp"));
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
@@ -52,14 +50,11 @@ export function createRuntimeUnitManifests(
   const pgliteSidecarRoot = resolve(repoRoot, ".tmp/sidecars/pglite");
   const pgliteModulePath = resolve(pgliteSidecarRoot, "index.js");
   const migrationsDir = resolve(nexuRoot, "apps/api/migrations");
-  const sessionChatMigrationsDir = resolve(repoRoot, "apps/chat/migrations");
   const webSidecarRoot = resolve(repoRoot, ".tmp/sidecars/web");
   const webModulePath = resolve(webSidecarRoot, "index.js");
   const apiPort = runtimeConfig.apiPort;
   const pglitePort = runtimeConfig.pglitePort;
   const webPort = runtimeConfig.webPort;
-  const sessionChatPort = runtimeConfig.sessionChatPort;
-  const sessionChatDbPort = runtimeConfig.sessionChatDbPort;
   const internalApiToken =
     process.env.NEXU_INTERNAL_API_TOKEN ?? "gw-secret-token";
   const skillApiToken =
@@ -68,12 +63,6 @@ export function createRuntimeUnitManifests(
     process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
   const webUrl = runtimeConfig.webUrl;
   const authUrl = process.env.NEXU_AUTH_URL ?? runtimeConfig.apiBaseUrl;
-  const sessionChatSidecarRoot = resolve(
-    repoRoot,
-    ".tmp/sidecars/session-chat",
-  );
-  const sessionChatAppRoot = resolve(sessionChatSidecarRoot, "apps/chat");
-  const sessionChatModulePath = resolve(sessionChatAppRoot, "server.js");
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
   // entry points still mirror a few of these defaults directly, so changes here should be treated
@@ -95,49 +84,6 @@ export function createRuntimeUnitManifests(
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
         WEB_API_ORIGIN: `http://127.0.0.1:${apiPort}`,
-      },
-    },
-    {
-      id: "session-chat-db",
-      label: "Session Chat PGlite",
-      kind: "service",
-      launchStrategy: "managed",
-      runner: "utility-process",
-      modulePath: pgliteModulePath,
-      cwd: pgliteSidecarRoot,
-      port: sessionChatDbPort,
-      startupTimeoutMs: 10_000,
-      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_SESSION_CHAT_DB", true),
-      env: {
-        PGLITE_DATA_DIR: sessionChatDbDataPath,
-        PGLITE_HOST: "127.0.0.1",
-        PGLITE_PORT: String(sessionChatDbPort),
-        PGLITE_MIGRATIONS_DIR: sessionChatMigrationsDir,
-      },
-    },
-    {
-      id: "session-chat",
-      label: "Session Chat Surface",
-      kind: "surface",
-      launchStrategy: "managed",
-      runner: "utility-process",
-      modulePath: sessionChatModulePath,
-      cwd: sessionChatAppRoot,
-      port: sessionChatPort,
-      startupTimeoutMs: 20_000,
-      autoStart: true,
-      env: {
-        HOSTNAME: "127.0.0.1",
-        PORT: String(sessionChatPort),
-        // Session Chat currently talks to the local OpenClaw HTTP endpoint directly. It can cold
-        // start before Gateway/OpenClaw is fully ready, so dispatch failures should be interpreted
-        // as readiness/config issues rather than renderer boot failures.
-        DATABASE_URL: `postgresql://postgres:postgres@127.0.0.1:${sessionChatDbPort}/postgres?sslmode=disable`,
-        SESSION_CHAT_MIGRATIONS_DIR: resolve(sessionChatAppRoot, "migrations"),
-        OPENCLAW_BASE_URL:
-          process.env.NEXU_OPENCLAW_BASE_URL ?? "http://127.0.0.1:18789",
-        OPENCLAW_GATEWAY_TOKEN: internalApiToken,
-        OPENCLAW_MODEL: process.env.NEXU_OPENCLAW_MODEL ?? "openclaw",
       },
     },
     {
@@ -217,6 +163,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
         OPENCLAW_BIN: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
+        TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
       },

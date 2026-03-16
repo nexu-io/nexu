@@ -25,8 +25,10 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 ```bash
 pnpm install                          # Install
 pnpm dev                              # All apps (API :3000, Web :5173)
-pnpm --filter @nexu/desktop dev       # Desktop shell only
-pnpm --filter @nexu/chat dev          # Chat surface only
+pnpm desktop:start                    # Build and launch the desktop local runtime stack
+pnpm desktop:stop                     # Stop the desktop local runtime stack
+pnpm desktop:restart                  # Restart the desktop local runtime stack
+pnpm desktop:status                   # Show desktop local runtime status
 pnpm --filter @nexu/api dev           # API only
 pnpm --filter @nexu/web dev           # Web only
 pnpm build                            # Build all
@@ -43,6 +45,16 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
+
+## Desktop local development
+
+- Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
+- The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
+- Treat `pnpm desktop:start` as the canonical cold-start entrypoint for the full local desktop runtime.
+- `tmux` is required for the desktop local-dev workflow.
+- Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
+- For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
+- To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state`.
 
 ## DB schema change workflow
 
@@ -211,5 +223,4 @@ This note should track:
 
 - DB (default local): `postgresql://nexu:nexu@localhost:5433/nexu_dev`
 - API env path: `apps/api/.env`
-- OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by running gateway processes.
