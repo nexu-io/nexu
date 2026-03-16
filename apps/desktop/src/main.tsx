@@ -136,6 +136,15 @@ function RuntimeUnitCard({
         <p className="runtime-error">{unit.lastError}</p>
       ) : null}
 
+      {unit.binaryPath ? (
+        <div className="runtime-binary-path">
+          <div className="runtime-logs-head">
+            <strong>OPENCLAW_BIN</strong>
+          </div>
+          <code>{unit.binaryPath}</code>
+        </div>
+      ) : null}
+
       <div className="runtime-logs">
         <div className="runtime-logs-head">
           <strong>Tail 200 logs</strong>

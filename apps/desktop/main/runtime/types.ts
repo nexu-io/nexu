@@ -18,6 +18,7 @@ export type RuntimeUnitManifest = {
   modulePath?: string;
   cwd?: string;
   delegatedProcessMatch?: string;
+  binaryPath?: string;
   port: number | null;
   startupTimeoutMs?: number;
   autoStart: boolean;

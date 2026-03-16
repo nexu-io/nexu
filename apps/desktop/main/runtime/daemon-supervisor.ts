@@ -250,6 +250,7 @@ export class RuntimeOrchestrator {
           : record.manifest.launchStrategy === "delegated"
             ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
             : null,
+      binaryPath: record.manifest.binaryPath ?? null,
       logTail: record.logTail,
     };
   }

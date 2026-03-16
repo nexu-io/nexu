@@ -23,7 +23,7 @@ function getBooleanEnv(name: string, fallback: boolean): boolean {
 }
 
 export function createRuntimeUnitManifests(
-  electronRoot: string,
+  _electronRoot: string,
   userDataPath: string,
 ): RuntimeUnitManifest[] {
   const repoRoot = getWorkspaceRoot();
@@ -40,9 +40,11 @@ export function createRuntimeUnitManifests(
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
-  const openclawPackageRoot = resolve(electronRoot, "node_modules/openclaw");
-  const openclawSidecarRoot = resolve(repoRoot, ".tmp/sidecars/openclaw");
-  const openclawBinPath = resolve(openclawSidecarRoot, "bin/openclaw");
+  const openclawPackageRoot = resolve(
+    repoRoot,
+    "openclaw-runtime/node_modules/openclaw",
+  );
+  const openclawBinPath = resolve(repoRoot, "openclaw-wrapper");
   const apiSidecarRoot = resolve(repoRoot, ".tmp/sidecars/api");
   const apiModulePath = resolve(apiSidecarRoot, "dist/index.js");
   const gatewaySidecarRoot = resolve(repoRoot, ".tmp/sidecars/gateway");
@@ -169,6 +171,7 @@ export function createRuntimeUnitManifests(
       kind: "runtime",
       launchStrategy: "delegated",
       delegatedProcessMatch: "openclaw-gateway",
+      binaryPath: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
       port: null,
       autoStart: true,
     },
