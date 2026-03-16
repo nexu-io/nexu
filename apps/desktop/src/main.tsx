@@ -14,9 +14,7 @@ import type {
 import {
   getRuntimeConfig,
   getRuntimeState,
-  startAllUnits,
   startUnit,
-  stopAllUnits,
   stopUnit,
 } from "./lib/host-api";
 import "./runtime-page.css";
@@ -230,22 +228,6 @@ function RuntimePage() {
             Renderer keeps the browser mental model. Electron main orchestrates
             local runtime units.
           </p>
-        </div>
-        <div className="runtime-header-actions">
-          <button
-            disabled={busyId !== null}
-            onClick={() => void runAction("all:start", startAllUnits)}
-            type="button"
-          >
-            Start all
-          </button>
-          <button
-            disabled={busyId !== null}
-            onClick={() => void runAction("all:stop", stopAllUnits)}
-            type="button"
-          >
-            Stop all
-          </button>
         </div>
       </header>
 
