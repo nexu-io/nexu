@@ -157,7 +157,7 @@ export async function bootstrapDesktopAuthSession(): Promise<void> {
           ? "strict"
           : cookie.samesite === "none"
             ? "no_restriction"
-          : "lax",
+            : "lax",
     });
   }
 

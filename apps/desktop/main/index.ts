@@ -131,7 +131,9 @@ async function waitForApiReadiness(): Promise<void> {
       });
 
       if (response.status < 500) {
-        logColdStart(`api ready via ${probeUrl.pathname} status=${response.status}`);
+        logColdStart(
+          `api ready via ${probeUrl.pathname} status=${response.status}`,
+        );
         return;
       }
     } catch {

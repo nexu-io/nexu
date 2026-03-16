@@ -25,7 +25,10 @@ const hostBridge: HostBridge = {
   },
 
   onDesktopCommand(listener) {
-    const wrapped = (_event: Electron.IpcRendererEvent, command: HostDesktopCommand) => {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      command: HostDesktopCommand,
+    ) => {
       listener(command);
     };
 

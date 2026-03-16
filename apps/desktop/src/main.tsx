@@ -5,8 +5,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import type {
-  DesktopRuntimeConfig,
   DesktopChromeMode,
+  DesktopRuntimeConfig,
   DesktopSurface,
   RuntimeState,
   RuntimeUnitId,
@@ -126,7 +126,9 @@ function SurfaceFrame({
       {src ? (
         <webview className="desktop-web-frame" src={src} />
       ) : (
-        <div className="surface-frame-empty">Waiting for the local runtime to publish this surface.</div>
+        <div className="surface-frame-empty">
+          Waiting for the local runtime to publish this surface.
+        </div>
       )}
     </section>
   );
@@ -175,7 +177,9 @@ function RuntimeUnitCard({
       toast.success(`Revealed log file for ${unit.label}.`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to open runtime log file.",
+        error instanceof Error
+          ? error.message
+          : "Failed to open runtime log file.",
       );
     }
   }
@@ -342,7 +346,10 @@ function RuntimePage() {
       </header>
 
       <section className="runtime-summary">
-        <SummaryCard label="Started at" value={runtimeState?.startedAt ?? "-"} />
+        <SummaryCard
+          label="Started at"
+          value={runtimeState?.startedAt ?? "-"}
+        />
         <SummaryCard label="Running" value={summary.running} />
         <SummaryCard label="Managed" value={summary.managed} />
         <SummaryCard label="Failed" value={summary.failed} />
@@ -409,8 +416,7 @@ function EmbeddedControlPlane() {
 }
 
 function DesktopShell() {
-  const [activeSurface, setActiveSurface] =
-    useState<DesktopSurface>("control");
+  const [activeSurface, setActiveSurface] = useState<DesktopSurface>("control");
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>("full");
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
@@ -447,7 +453,10 @@ function DesktopShell() {
         <div className="desktop-sidebar-brand">
           <span className="desktop-shell-eyebrow">nexu desktop</span>
           <h1>Runtime Console</h1>
-          <p>One local shell for bootstrap health, web verification, and gateway inspection.</p>
+          <p>
+            One local shell for bootstrap health, web verification, and gateway
+            inspection.
+          </p>
         </div>
 
         <nav className="desktop-nav" aria-label="Desktop surfaces">

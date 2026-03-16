@@ -100,10 +100,8 @@ body,
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms
+    ease;
 }
 
 .desktop-nav-item small {
@@ -135,9 +133,11 @@ body,
   min-height: 0;
   padding: 18px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(139, 167, 255, 0.16), transparent 28%),
-    linear-gradient(180deg, #141b24 0%, #10161d 100%);
+  background: radial-gradient(
+      circle at top left,
+      rgba(139, 167, 255, 0.16),
+      transparent 28%
+    ), linear-gradient(180deg, #141b24 0%, #10161d 100%);
 }
 
 .desktop-shell.is-immersive .desktop-sidebar {
