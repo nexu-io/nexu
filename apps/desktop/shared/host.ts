@@ -10,6 +10,7 @@ export const hostInvokeChannels = [
   "runtime:stop-unit",
   "runtime:start-all",
   "runtime:stop-all",
+  "runtime:show-log-file",
   "shell:open-external",
 ] as const;
 
@@ -28,6 +29,9 @@ export type HostInvokePayloadMap = {
   };
   "runtime:start-all": undefined;
   "runtime:stop-all": undefined;
+  "runtime:show-log-file": {
+    id: RuntimeUnitId;
+  };
   "shell:open-external": {
     url: string;
   };
@@ -44,6 +48,9 @@ export type HostInvokeResultMap = {
   "runtime:stop-unit": RuntimeState;
   "runtime:start-all": RuntimeState;
   "runtime:stop-all": RuntimeState;
+  "runtime:show-log-file": {
+    ok: boolean;
+  };
   "shell:open-external": {
     ok: boolean;
   };
@@ -106,6 +113,7 @@ export type RuntimeUnitState = {
   exitCode: number | null;
   lastError: string | null;
   commandSummary: string | null;
+  logFilePath: string | null;
   logTail: string[];
 };
 

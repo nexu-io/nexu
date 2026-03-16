@@ -3,7 +3,7 @@ import { Identify } from "@amplitude/unified";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import type {
   DesktopRuntimeConfig,
   DesktopChromeMode,
@@ -17,6 +17,7 @@ import {
   getRuntimeConfig,
   getRuntimeState,
   onDesktopCommand,
+  showRuntimeLogFile,
   startUnit,
   stopUnit,
 } from "./lib/host-api";
@@ -151,6 +152,34 @@ function RuntimeUnitCard({
   const canStop =
     isManaged && (unit.phase === "running" || unit.phase === "starting");
 
+  async function handleCopyLogs(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(unit.logTail.join("\n"));
+      toast.success(`Copied recent logs for ${unit.label}.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to copy runtime logs.",
+      );
+    }
+  }
+
+  async function handleExportLogs(): Promise<void> {
+    try {
+      const ok = await showRuntimeLogFile(unit.id);
+
+      if (!ok) {
+        toast.error(`No log file available for ${unit.label}.`);
+        return;
+      }
+
+      toast.success(`Revealed log file for ${unit.label}.`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to open runtime log file.",
+      );
+    }
+  }
+
   return (
     <article className="runtime-card">
       <div className="runtime-card-head">
@@ -210,7 +239,15 @@ function RuntimeUnitCard({
       <div className="runtime-logs">
         <div className="runtime-logs-head">
           <strong>Tail 200 logs</strong>
-          <span>{unit.logTail.length} lines</span>
+          <div className="runtime-logs-actions">
+            <span>{unit.logTail.length} lines</span>
+            <button onClick={() => void handleCopyLogs()} type="button">
+              Copy
+            </button>
+            <button onClick={() => void handleExportLogs()} type="button">
+              Reveal
+            </button>
+          </div>
         </div>
         <pre className="runtime-log-tail">
           {unit.logTail.length > 0 ? unit.logTail.join("\n") : "No logs yet."}

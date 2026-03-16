@@ -73,6 +73,22 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
           return orchestrator.stopAll();
         }
 
+        case "runtime:show-log-file": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["runtime:show-log-file"];
+          const logFilePath = orchestrator.getLogFilePath(typedPayload.id);
+
+          if (logFilePath) {
+            shell.showItemInFolder(logFilePath);
+          }
+
+          const result: HostInvokeResultMap["runtime:show-log-file"] = {
+            ok: logFilePath !== null,
+          };
+
+          return result;
+        }
+
         case "shell:open-external": {
           const typedPayload =
             payload as HostInvokePayloadMap["shell:open-external"];

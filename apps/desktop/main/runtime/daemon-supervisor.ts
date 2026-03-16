@@ -3,7 +3,9 @@ import {
   execFileSync,
   spawn,
 } from "node:child_process";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { Socket } from "node:net";
+import { dirname } from "node:path";
 import { type UtilityProcess, utilityProcess } from "electron";
 import type { RuntimeState, RuntimeUnitState } from "../../shared/host";
 import type { RuntimeUnitManifest, RuntimeUnitRecord } from "./types";
@@ -37,6 +39,7 @@ export class RuntimeOrchestrator {
         exitedAt: null,
         exitCode: null,
         lastError: null,
+        logFilePath: manifest.logFilePath ?? null,
         logTail:
           manifest.launchStrategy === "embedded"
             ? ["embedded runtime unit"]
@@ -96,6 +99,10 @@ export class RuntimeOrchestrator {
   async stopOne(id: string): Promise<RuntimeState> {
     await this.stopUnit(id);
     return this.getRuntimeState();
+  }
+
+  getLogFilePath(id: string): string | null {
+    return this.requireRecord(id).logFilePath;
   }
 
   async dispose(): Promise<void> {
@@ -250,6 +257,7 @@ export class RuntimeOrchestrator {
           : record.manifest.launchStrategy === "delegated"
             ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
             : null,
+      logFilePath: record.logFilePath,
       logTail: record.logTail,
     };
   }
@@ -343,11 +351,7 @@ function appendLogChunk(
     if (normalized.length === 0) {
       continue;
     }
-    record.logTail.push(`${prefix}${normalized}`);
-  }
-
-  if (record.logTail.length > LOG_TAIL_LIMIT) {
-    record.logTail.splice(0, record.logTail.length - LOG_TAIL_LIMIT);
+    persistLogLine(record, `${prefix}${normalized}`);
   }
 }
 
@@ -356,11 +360,7 @@ function appendLogLine(record: RuntimeUnitRecord, line: string): void {
     return;
   }
 
-  record.logTail.push(line);
-
-  if (record.logTail.length > LOG_TAIL_LIMIT) {
-    record.logTail.splice(0, record.logTail.length - LOG_TAIL_LIMIT);
-  }
+  persistLogLine(record, line);
 }
 
 type ManagedChildProcess = ChildProcessWithoutNullStreams | UtilityProcess;
@@ -399,13 +399,28 @@ function flushLogRemainders(record: RuntimeUnitRecord): void {
   ] as const) {
     const remainder = record[key].trimEnd();
     if (remainder.length > 0) {
-      record.logTail.push(`${prefix}${remainder}`);
+      persistLogLine(record, `${prefix}${remainder}`);
     }
     record[key] = "";
   }
+}
+
+function persistLogLine(record: RuntimeUnitRecord, line: string): void {
+  record.logTail.push(line);
 
   if (record.logTail.length > LOG_TAIL_LIMIT) {
     record.logTail.splice(0, record.logTail.length - LOG_TAIL_LIMIT);
+  }
+
+  if (!record.logFilePath) {
+    return;
+  }
+
+  try {
+    mkdirSync(dirname(record.logFilePath), { recursive: true });
+    appendFileSync(record.logFilePath, `${line}\n`, "utf8");
+  } catch {
+    // Best-effort runtime log file persistence only.
   }
 }
 

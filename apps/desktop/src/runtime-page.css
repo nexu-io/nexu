@@ -462,6 +462,21 @@ body,
   color: #5f584d;
 }
 
+.runtime-logs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.runtime-logs-actions button {
+  border: 1px solid #d9d0bf;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #1f242c;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
 .runtime-log-tail {
   margin: 0;
   max-height: 240px;

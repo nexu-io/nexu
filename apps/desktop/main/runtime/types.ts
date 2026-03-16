@@ -22,6 +22,7 @@ export type RuntimeUnitManifest = {
   startupTimeoutMs?: number;
   autoStart: boolean;
   env?: NodeJS.ProcessEnv;
+  logFilePath?: string;
 };
 
 export type RuntimeUnitRecord = {
@@ -32,6 +33,7 @@ export type RuntimeUnitRecord = {
   exitedAt: string | null;
   exitCode: number | null;
   lastError: string | null;
+  logFilePath: string | null;
   logTail: string[];
   stdoutRemainder: string;
   stderrRemainder: string;

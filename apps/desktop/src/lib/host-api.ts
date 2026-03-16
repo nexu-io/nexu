@@ -1,8 +1,6 @@
 import type {
   AppInfo,
-  DesktopChromeMode,
   DesktopRuntimeConfig,
-  DesktopSurface,
   HostDesktopCommand,
   RuntimeState,
   RuntimeUnitId,
@@ -56,15 +54,13 @@ export async function stopUnit(id: RuntimeUnitId): Promise<RuntimeState> {
   return getHostBridge().invoke("runtime:stop-unit", { id });
 }
 
+export async function showRuntimeLogFile(id: RuntimeUnitId): Promise<boolean> {
+  const result = await getHostBridge().invoke("runtime:show-log-file", { id });
+  return result.ok;
+}
+
 export function onDesktopCommand(
   listener: (command: HostDesktopCommand) => void,
 ): () => void {
   return getHostBridge().onDesktopCommand(listener);
-}
-
-export function isDesktopSurfaceFocused(
-  activeSurface: DesktopSurface,
-  chromeMode: DesktopChromeMode,
-): boolean {
-  return chromeMode === "immersive" && activeSurface !== "control";
 }
