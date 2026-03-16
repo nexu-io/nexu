@@ -23,11 +23,15 @@ function getBooleanEnv(name: string, fallback: boolean): boolean {
 }
 
 export function createRuntimeUnitManifests(
-  _electronRoot: string,
+  electronRoot: string,
   userDataPath: string,
+  isPackaged: boolean,
 ): RuntimeUnitManifest[] {
   const repoRoot = getWorkspaceRoot();
   const nexuRoot = repoRoot;
+  const runtimeSidecarBaseRoot = isPackaged
+    ? resolve(electronRoot, "runtime")
+    : resolve(repoRoot, ".tmp/sidecars");
   const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
     process.env,
   );
@@ -41,19 +45,20 @@ export function createRuntimeUnitManifests(
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
+  const openclawSidecarRoot = resolve(runtimeSidecarBaseRoot, "openclaw");
   const openclawPackageRoot = resolve(
-    repoRoot,
-    "openclaw-runtime/node_modules/openclaw",
+    openclawSidecarRoot,
+    "node_modules/openclaw",
   );
-  const openclawBinPath = resolve(repoRoot, "openclaw-wrapper");
-  const apiSidecarRoot = resolve(repoRoot, ".tmp/sidecars/api");
+  const openclawBinPath = resolve(openclawSidecarRoot, "bin/openclaw");
+  const apiSidecarRoot = resolve(runtimeSidecarBaseRoot, "api");
   const apiModulePath = resolve(apiSidecarRoot, "dist/index.js");
-  const gatewaySidecarRoot = resolve(repoRoot, ".tmp/sidecars/gateway");
+  const gatewaySidecarRoot = resolve(runtimeSidecarBaseRoot, "gateway");
   const gatewayModulePath = resolve(gatewaySidecarRoot, "dist/index.js");
-  const pgliteSidecarRoot = resolve(repoRoot, ".tmp/sidecars/pglite");
+  const pgliteSidecarRoot = resolve(runtimeSidecarBaseRoot, "pglite");
   const pgliteModulePath = resolve(pgliteSidecarRoot, "index.js");
-  const migrationsDir = resolve(nexuRoot, "apps/api/migrations");
-  const webSidecarRoot = resolve(repoRoot, ".tmp/sidecars/web");
+  const migrationsDir = resolve(pgliteSidecarRoot, "migrations");
+  const webSidecarRoot = resolve(runtimeSidecarBaseRoot, "web");
   const webModulePath = resolve(webSidecarRoot, "index.js");
   const apiPort = runtimeConfig.apiPort;
   const pglitePort = runtimeConfig.pglitePort;

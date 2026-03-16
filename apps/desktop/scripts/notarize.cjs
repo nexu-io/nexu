@@ -28,6 +28,15 @@ module.exports = async function notarize(context) {
     return;
   }
 
+  const unsignedMode =
+    process.env.NEXU_DESKTOP_MAC_UNSIGNED === "1" ||
+    process.env.NEXU_DESKTOP_MAC_UNSIGNED === "true";
+
+  if (unsignedMode) {
+    console.log("[notarize] skipping notarization in unsigned mode");
+    return;
+  }
+
   const requiredEnv = ["APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"];
   const missingEnv = requiredEnv.filter((name) => !process.env[name]);
 

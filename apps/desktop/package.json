@@ -61,6 +61,7 @@
   "build": {
     "appId": "io.nexu.desktop",
     "productName": "Nexu",
+    "icon": "build/icon.icns",
     "directories": {
       "output": "release"
     },
@@ -79,6 +80,7 @@
     ],
     "afterSign": "./scripts/notarize.cjs",
     "mac": {
+      "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
       "target": ["dmg", "zip"],
       "artifactName": "${productName}-${arch}.${ext}",

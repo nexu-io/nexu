@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { cp, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pruneOpenclawPackage } from "./lib/prune-openclaw-package.mjs";
 import {
@@ -7,12 +7,14 @@ import {
   linkOrCopyDirectory,
   pathExists,
   removePathIfExists,
+  repoRoot,
   resetDir,
 } from "./lib/sidecar-paths.mjs";
 
 const sidecarRoot = getSidecarRoot("pglite");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const electronNodeModules = resolve(electronRoot, "node_modules");
+const migrationsRoot = resolve(repoRoot, "apps/api/migrations");
 
 async function preparePgliteSidecar() {
   if (!(await pathExists(electronNodeModules))) {
@@ -126,6 +128,12 @@ process.on("SIGINT", () => {
 });
 `,
   );
+
+  if (await pathExists(migrationsRoot)) {
+    await cp(migrationsRoot, resolve(sidecarRoot, "migrations"), {
+      recursive: true,
+    });
+  }
 
   await linkOrCopyDirectory(electronNodeModules, sidecarNodeModules);
   await removePathIfExists(resolve(sidecarNodeModules, "electron"));

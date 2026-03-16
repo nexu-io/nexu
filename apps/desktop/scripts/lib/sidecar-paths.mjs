@@ -1,5 +1,5 @@
 import { cp, lstat, mkdir, rm, symlink } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -39,6 +39,7 @@ export async function linkOrCopyDirectory(sourcePath, targetPath) {
     await cp(sourcePath, targetPath, {
       recursive: true,
       dereference: true,
+      filter: (source) => basename(source) !== ".bin",
     });
     return;
   }

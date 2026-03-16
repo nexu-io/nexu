@@ -19,10 +19,16 @@ import { createRuntimeUnitManifests } from "./runtime/manifests";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const electronRoot = getDesktopAppRoot();
+const electronRoot = app.isPackaged
+  ? process.resourcesPath
+  : getDesktopAppRoot();
 const runtimeConfig = getDesktopRuntimeConfig(process.env);
 const orchestrator = new RuntimeOrchestrator(
-  createRuntimeUnitManifests(electronRoot, app.getPath("userData")),
+  createRuntimeUnitManifests(
+    electronRoot,
+    app.getPath("userData"),
+    app.isPackaged,
+  ),
 );
 
 app.setName("Nexu Desktop");

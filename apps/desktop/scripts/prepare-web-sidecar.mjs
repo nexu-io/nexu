@@ -1,25 +1,17 @@
-import { cp, lstat, mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { cp, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import {
+  getSidecarRoot,
+  pathExists,
+  repoRoot,
+  resetDir,
+} from "./lib/sidecar-paths.mjs";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const electronRoot = resolve(scriptDir, "..");
-const repoRoot =
-  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const nexuRoot = repoRoot;
 const webRoot = resolve(nexuRoot, "apps/web");
 const webDistRoot = resolve(webRoot, "dist");
-const sidecarRoot = resolve(repoRoot, ".tmp/sidecars/web");
+const sidecarRoot = getSidecarRoot("web");
 const sidecarDistRoot = resolve(sidecarRoot, "dist");
-
-async function pathExists(path) {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function ensureBuildArtifacts() {
   if (!(await pathExists(webDistRoot))) {
@@ -31,8 +23,7 @@ async function ensureBuildArtifacts() {
 
 async function prepareWebSidecar() {
   await ensureBuildArtifacts();
-  await rm(sidecarRoot, { recursive: true, force: true });
-  await mkdir(sidecarRoot, { recursive: true });
+  await resetDir(sidecarRoot);
   await cp(webDistRoot, sidecarDistRoot, { recursive: true });
 
   await writeFile(

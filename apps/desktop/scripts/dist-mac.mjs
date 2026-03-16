@@ -165,6 +165,9 @@ async function main() {
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/gateway", "build"], {
     env,
   });
+  await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
+    env,
+  });
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
     env: {
       ...env,
@@ -199,6 +202,7 @@ async function main() {
         ? {
             ...env,
             CSC_IDENTITY_AUTO_DISCOVERY: "false",
+            NEXU_DESKTOP_MAC_UNSIGNED: "true",
           }
         : env,
     },

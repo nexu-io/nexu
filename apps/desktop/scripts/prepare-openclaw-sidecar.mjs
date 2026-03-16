@@ -2,19 +2,20 @@ import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pruneOpenclawPackage } from "./lib/prune-openclaw-package.mjs";
 import {
-  electronRoot,
   getSidecarRoot,
   linkOrCopyDirectory,
   pathExists,
   removePathIfExists,
+  repoRoot,
   resetDir,
 } from "./lib/sidecar-paths.mjs";
 
-const openclawRoot = resolve(electronRoot, "node_modules/openclaw");
+const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
+const openclawRuntimeNodeModules = resolve(openclawRuntimeRoot, "node_modules");
+const openclawRoot = resolve(openclawRuntimeNodeModules, "openclaw");
 const sidecarRoot = getSidecarRoot("openclaw");
 const sidecarBinDir = resolve(sidecarRoot, "bin");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
-const electronNodeModules = resolve(electronRoot, "node_modules");
 const packagedOpenclawEntry = resolve(
   sidecarNodeModules,
   "openclaw/openclaw.mjs",
@@ -23,13 +24,13 @@ const packagedOpenclawEntry = resolve(
 async function prepareOpenclawSidecar() {
   if (!(await pathExists(openclawRoot))) {
     throw new Error(
-      `Electron OpenClaw dependency not found at ${openclawRoot}. Install electron dependencies first.`,
+      `OpenClaw runtime dependency not found at ${openclawRoot}. Run pnpm openclaw-runtime:install first.`,
     );
   }
 
   await resetDir(sidecarRoot);
   await mkdir(sidecarBinDir, { recursive: true });
-  await linkOrCopyDirectory(electronNodeModules, sidecarNodeModules);
+  await linkOrCopyDirectory(openclawRuntimeNodeModules, sidecarNodeModules);
   await removePathIfExists(resolve(sidecarNodeModules, "electron"));
   await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
   await pruneOpenclawPackage(sidecarNodeModules);
