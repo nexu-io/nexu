@@ -1,0 +1,155 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (for example: desktop-v0.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); process.stdout.write(pkg.version);')
+          expected_tag="desktop-v${desktop_version}"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag_name="${{ inputs.tag_name }}"
+          else
+            tag_name="${GITHUB_REF#refs/tags/}"
+          fi
+
+          if [ "$tag_name" != "$expected_tag" ]; then
+            echo "Expected desktop release tag $expected_tag but received $tag_name" >&2
+            exit 1
+          fi
+
+          if [[ "$desktop_version" == *-* ]]; then
+            prerelease=true
+          else
+            prerelease=false
+          fi
+
+          commit_sha=$(git rev-parse HEAD)
+
+          {
+            echo "desktop_version=$desktop_version"
+            echo "tag_name=$tag_name"
+            echo "release_name=Nexu Desktop v$desktop_version"
+            echo "prerelease=$prerelease"
+            echo "commit_sha=$commit_sha"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Apple signing certificate
+        shell: bash
+        env:
+          APPLE_SIGNING_CERTIFICATE_BASE64: ${{ secrets.APPLE_SIGNING_CERTIFICATE_BASE64 }}
+          APPLE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$APPLE_SIGNING_CERTIFICATE_BASE64" ] || [ -z "$APPLE_SIGNING_CERTIFICATE_PASSWORD" ]; then
+            echo "Missing Apple signing certificate secrets" >&2
+            exit 1
+          fi
+
+          cert_path="$RUNNER_TEMP/nexu-desktop-signing.p12"
+          if ! printf '%s' "$APPLE_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$cert_path" 2>/dev/null; then
+            printf '%s' "$APPLE_SIGNING_CERTIFICATE_BASE64" | base64 -D > "$cert_path"
+          fi
+
+          {
+            echo "CSC_LINK=$cert_path"
+            echo "CSC_KEY_PASSWORD=$APPLE_SIGNING_CERTIFICATE_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build signed desktop release
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @nexu/desktop dist:mac
+
+      - name: Generate release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          artifacts=(apps/desktop/release/*.dmg apps/desktop/release/*.zip)
+
+          if [ "${#artifacts[@]}" -eq 0 ]; then
+            echo "No desktop release artifacts were produced" >&2
+            exit 1
+          fi
+
+          shasum -a 256 "${artifacts[@]}" > apps/desktop/release/desktop-sha256.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-release-${{ steps.meta.outputs.tag_name }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/desktop-sha256.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          target_commitish: ${{ steps.meta.outputs.commit_sha }}
+          name: ${{ steps.meta.outputs.release_name }}
+          draft: true
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Desktop release for `${{ steps.meta.outputs.desktop_version }}`.
+
+            Assets include signed and notarized macOS builds plus `desktop-sha256.txt`.
+          files: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/desktop-sha256.txt

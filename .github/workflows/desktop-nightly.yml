@@ -1,0 +1,165 @@
+name: Desktop Nightly
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 17 * * *"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: desktop-nightly
+  cancel-in-progress: false
+
+jobs:
+  cleanup-artifacts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete old nightly artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          cutoff_date=$(date -d "14 days ago" +%Y-%m-%d)
+
+          gh api "repos/$REPO/actions/artifacts" --paginate | \
+            jq -r '.artifacts[] | select(.name | startswith("desktop-nightly-")) | select(.created_at < "'"$cutoff_date"'") | .id' | \
+            while read -r artifact_id; do
+              if [ -n "$artifact_id" ]; then
+                gh api "repos/$REPO/actions/artifacts/$artifact_id" -X DELETE
+              fi
+            done
+
+  nightly-build:
+    runs-on: macos-14
+    needs: cleanup-artifacts
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Resolve nightly metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); process.stdout.write(pkg.version);')
+          build_date=$(date +"%Y%m%d")
+          short_sha="${GITHUB_SHA::7}"
+
+          {
+            echo "desktop_version=$desktop_version"
+            echo "build_date=$build_date"
+            echo "short_sha=$short_sha"
+            echo "artifact_name=desktop-nightly-${build_date}-${short_sha}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Apple signing certificate
+        shell: bash
+        env:
+          APPLE_SIGNING_CERTIFICATE_BASE64: ${{ secrets.APPLE_SIGNING_CERTIFICATE_BASE64 }}
+          APPLE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$APPLE_SIGNING_CERTIFICATE_BASE64" ] || [ -z "$APPLE_SIGNING_CERTIFICATE_PASSWORD" ]; then
+            echo "Missing Apple signing certificate secrets" >&2
+            exit 1
+          fi
+
+          cert_path="$RUNNER_TEMP/nexu-desktop-signing.p12"
+          if ! printf '%s' "$APPLE_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$cert_path" 2>/dev/null; then
+            printf '%s' "$APPLE_SIGNING_CERTIFICATE_BASE64" | base64 -D > "$cert_path"
+          fi
+
+          {
+            echo "CSC_LINK=$cert_path"
+            echo "CSC_KEY_PASSWORD=$APPLE_SIGNING_CERTIFICATE_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build signed nightly desktop app
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @nexu/desktop dist:mac
+
+      - name: Prepare nightly artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          mkdir -p apps/desktop/nightly-artifacts
+          rm -f apps/desktop/nightly-artifacts/*
+
+          dmg_files=(apps/desktop/release/*.dmg)
+          zip_files=(apps/desktop/release/*.zip)
+
+          if [ "${#dmg_files[@]}" -eq 0 ] || [ "${#zip_files[@]}" -eq 0 ]; then
+            echo "Expected both dmg and zip artifacts in apps/desktop/release" >&2
+            exit 1
+          fi
+
+          cp "${dmg_files[0]}" apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
+          cp "${zip_files[0]}" apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
+
+          shasum -a 256 \
+            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg \
+            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip \
+            > apps/desktop/nightly-artifacts/desktop-sha256.txt
+
+      - name: Upload nightly workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: |
+            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
+            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
+            apps/desktop/nightly-artifacts/desktop-sha256.txt
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish nightly prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-nightly
+          target_commitish: ${{ github.sha }}
+          name: Nexu Desktop Nightly
+          prerelease: true
+          draft: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Automated nightly desktop build.
+
+            - Version: `${{ steps.meta.outputs.desktop_version }}`
+            - Commit: `${{ github.sha }}`
+            - Built: `${{ steps.meta.outputs.build_date }}`
+
+            This build is intended for testing and may be unstable.
+          files: |
+            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
+            apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
+            apps/desktop/nightly-artifacts/desktop-sha256.txt
