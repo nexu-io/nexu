@@ -10,7 +10,9 @@ Nexu is an OpenClaw multi-tenant platform. Users create AI bots, connect them to
 - `apps/api` — Hono + Drizzle + Zod OpenAPI (Node ESM)
 - `apps/chat` — Next.js session-chat surface for local OpenClaw probing
 - `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
+- `apps/gateway` — Nexu gateway sidecar for config/skills sync, runtime probing, and optional OpenClaw process management
 - `apps/web` — React + Ant Design + Vite
+- `openclaw-runtime` — Repo-local packaged OpenClaw runtime for local dev and desktop packaging; replaces global `openclaw` CLI
 - `packages/shared` — Shared Zod schemas
 - `deploy/k8s` — Kubernetes manifests
 
@@ -109,6 +111,8 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 - Monorepo: `apps/api` (Hono), `apps/web` (React), `packages/shared` (Zod schemas)
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/api/src/lib/config-generator.ts` builds OpenClaw config from DB
+- Runtime topology: `apps/gateway` acts as the Nexu sidecar that syncs config/skills, probes runtime health, and can manage the OpenClaw process
+- Local runtime flow: `apps/api` produces config data -> `apps/gateway` syncs config/skills and coordinates runtime -> `openclaw-runtime` runs the actual OpenClaw Gateway process
 - Key data flows: Slack OAuth, Slack event routing, config hot-reload
 
 ## Code style (quick reference)
@@ -223,4 +227,8 @@ This note should track:
 
 - DB (default local): `postgresql://nexu:nexu@localhost:5433/nexu_dev`
 - API env path: `apps/api/.env`
+- OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
+- `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
+- Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
+- When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/gateway` to avoid launching a second OpenClaw process
 - If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by running gateway processes.

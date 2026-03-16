@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "OPENCLAW_STATE_DIR=$HOME/.openclaw RUNTIME_MANAGE_OPENCLAW_PROCESS=true RUNTIME_GATEWAY_PROBE_ENABLED=false RUNTIME_POOL_ID=pool_local_01 RUNTIME_POD_IP=127.0.0.1 NODE_OPTIONS=--conditions=development tsx watch src/index.ts",
+    "dev": "OPENCLAW_STATE_DIR=${OPENCLAW_STATE_DIR:-$HOME/.openclaw} RUNTIME_MANAGE_OPENCLAW_PROCESS=${RUNTIME_MANAGE_OPENCLAW_PROCESS:-true} RUNTIME_GATEWAY_PROBE_ENABLED=${RUNTIME_GATEWAY_PROBE_ENABLED:-false} RUNTIME_POOL_ID=${RUNTIME_POOL_ID:-pool_local_01} RUNTIME_POD_IP=${RUNTIME_POD_IP:-127.0.0.1} NODE_OPTIONS=--conditions=development tsx watch src/index.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
