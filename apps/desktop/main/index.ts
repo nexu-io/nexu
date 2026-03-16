@@ -1,6 +1,8 @@
+import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BrowserWindow, app, shell } from "electron";
+import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { bootstrapDesktopAuthSession } from "./desktop-bootstrap";
 import { registerIpcHandlers } from "./ipc";
@@ -10,6 +12,7 @@ import { createRuntimeUnitManifests } from "./runtime/manifests";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const electronRoot = getDesktopAppRoot();
+const runtimeConfig = getDesktopRuntimeConfig(process.env);
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(electronRoot, app.getPath("userData")),
 );
@@ -33,6 +36,68 @@ function safeWrite(stream: NodeJS.WriteStream, message: string): void {
     }
     throw error;
   }
+}
+
+function logColdStart(message: string): void {
+  const line = `[desktop:cold-start] ${message}\n`;
+  safeWrite(process.stdout, line);
+
+  try {
+    const logsPath = app.getPath("logs");
+    mkdirSync(logsPath, { recursive: true });
+    appendFileSync(resolve(logsPath, "cold-start.log"), line, "utf8");
+  } catch {
+    // Best-effort file logging only.
+  }
+}
+
+async function waitForApiReadiness(): Promise<void> {
+  const startedAt = Date.now();
+  const timeoutMs = 15_000;
+  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.apiBaseUrl);
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(probeUrl, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (response.status < 500) {
+        logColdStart(`api ready via ${probeUrl.pathname} status=${response.status}`);
+        return;
+      }
+    } catch {
+      // Ignore transient startup failures while the socket and DB warm up.
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  throw new Error(`API readiness probe timed out for ${probeUrl.toString()}`);
+}
+
+async function runDesktopColdStart(): Promise<void> {
+  logColdStart("starting pglite");
+  await orchestrator.startOne("pglite");
+
+  logColdStart("starting api");
+  await orchestrator.startOne("api");
+
+  logColdStart("waiting for api readiness");
+  await waitForApiReadiness();
+
+  logColdStart("bootstrapping desktop auth session");
+  await bootstrapDesktopAuthSession();
+
+  logColdStart("starting web");
+  await orchestrator.startOne("web");
+
+  logColdStart("starting gateway");
+  await orchestrator.startOne("gateway");
+
+  logColdStart("cold start complete");
 }
 
 function focusMainWindow(): void {
@@ -134,26 +199,18 @@ function createMainWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   registerIpcHandlers(orchestrator);
-  createMainWindow();
 
   void (async () => {
     try {
-      await orchestrator.startAutoStartManagedUnits();
+      await runDesktopColdStart();
     } catch (error) {
       safeWrite(
         process.stderr,
-        `[runtime:start-all] ${error instanceof Error ? error.message : String(error)}\n`,
+        `[desktop:cold-start] ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
 
-    try {
-      await bootstrapDesktopAuthSession();
-    } catch (error) {
-      safeWrite(
-        process.stderr,
-        `[desktop:auth-bootstrap] ${error instanceof Error ? error.message : String(error)}\n`,
-      );
-    }
+    createMainWindow();
   })();
 
   app.on("activate", () => {
