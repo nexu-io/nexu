@@ -447,10 +447,23 @@ body,
   color: #6d665b;
 }
 
+.runtime-binary-path,
 .runtime-logs {
   margin-top: 16px;
   border-top: 1px solid #e4ddcf;
   padding-top: 14px;
+}
+
+.runtime-binary-path code {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #12161d;
+  color: #d8e0f0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .runtime-logs-head {

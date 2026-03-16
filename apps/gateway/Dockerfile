@@ -27,7 +27,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/gateway/package.json apps/gateway/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN pnpm install --filter @nexu/gateway... --frozen-lockfile
+RUN pnpm install --filter @nexu/gateway... --frozen-lockfile --ignore-scripts
 
 COPY apps/gateway ./apps/gateway
 COPY packages/shared ./packages/shared

@@ -124,6 +124,7 @@ export type RuntimeUnitState = {
   exitCode: number | null;
   lastError: string | null;
   commandSummary: string | null;
+  binaryPath: string | null;
   logFilePath: string | null;
   logTail: string[];
 };
