@@ -11,6 +11,7 @@
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && pnpm -r typecheck",
+    "lint:fix": "biome check --write --unsafe . && pnpm -r typecheck",
     "format": "biome check --write .",
     "test": "vitest run",
     "generate-types": "pnpm --filter @nexu/api generate-openapi && pnpm --filter @nexu/web generate-sdk",

@@ -28,7 +28,7 @@ export function createRuntimeUnitManifests(
   isPackaged: boolean,
 ): RuntimeUnitManifest[] {
   const repoRoot = getWorkspaceRoot();
-  const nexuRoot = repoRoot;
+  const _nexuRoot = repoRoot;
   const runtimeSidecarBaseRoot = isPackaged
     ? resolve(electronRoot, "runtime")
     : resolve(repoRoot, ".tmp/sidecars");
