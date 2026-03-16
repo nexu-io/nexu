@@ -8,6 +8,10 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
 const repoRoot =
   process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const isUnsigned =
+  process.argv.includes("--unsigned") ||
+  process.env.NEXU_DESKTOP_MAC_UNSIGNED === "1" ||
+  process.env.NEXU_DESKTOP_MAC_UNSIGNED?.toLowerCase() === "true";
 const dmgBuilderReleaseName = "dmg-builder@1.2.0";
 const dmgBuilderReleaseVersion = "75c8a6c";
 const dmgBuilderArch = process.arch === "arm64" ? "arm64" : "x86_64";
@@ -16,6 +20,48 @@ const dmgBuilderChecksum = {
   arm64: "a785f2a385c8c31996a089ef8e26361904b40c772d5ea65a36001212f1fc25e0",
   x86_64: "87b3bb72148b11451ee90ede79cc8d59305c9173b68b0f2b50a3bea51fc4a4e2",
 }[dmgBuilderArch];
+
+function parseEnvFile(content) {
+  const values = {};
+
+  for (const rawLine of content.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    let value = line.slice(separatorIndex + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    values[key] = value;
+  }
+
+  return values;
+}
+
+async function loadDesktopEnv() {
+  const envPath = resolve(electronRoot, ".env.local");
+
+  try {
+    const content = await readFile(envPath, "utf8");
+    return parseEnvFile(content);
+  } catch {
+    return {};
+  }
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
@@ -96,8 +142,10 @@ async function ensureDmgbuildBundle() {
 }
 
 async function main() {
+  const desktopEnv = await loadDesktopEnv();
   const env = {
     ...process.env,
+    ...desktopEnv,
     NEXU_WORKSPACE_ROOT: repoRoot,
   };
   const webPort = process.env.NEXU_WEB_PORT ?? "50810";
@@ -135,10 +183,24 @@ async function main() {
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
   await run(
     "pnpm",
-    ["exec", "electron-builder", "--mac", "--publish", "never"],
+    [
+      "exec",
+      "electron-builder",
+      "--mac",
+      "--publish",
+      "never",
+      ...(isUnsigned
+        ? ["--config.mac.identity=null", "--config.mac.hardenedRuntime=false"]
+        : []),
+    ],
     {
       cwd: electronRoot,
-      env,
+      env: isUnsigned
+        ? {
+            ...env,
+            CSC_IDENTITY_AUTO_DISCOVERY: "false",
+          }
+        : env,
     },
   );
 }
