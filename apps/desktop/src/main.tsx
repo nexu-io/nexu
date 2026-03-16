@@ -344,7 +344,10 @@ function DesktopShell() {
   const desktopWebUrl = runtimeConfig
     ? new URL("/workspace", runtimeConfig.webUrl).toString()
     : null;
-  const desktopOpenClawUrl = new URL("/#token=gw-secret-token", "http://127.0.0.1:18789").toString();
+  const desktopOpenClawUrl = new URL(
+    "/#token=gw-secret-token",
+    "http://127.0.0.1:18789",
+  ).toString();
   return (
     <div className="desktop-shell">
       <aside className="desktop-sidebar">
