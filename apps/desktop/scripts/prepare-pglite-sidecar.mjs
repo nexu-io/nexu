@@ -1,23 +1,18 @@
-import { lstat, mkdir, rm, symlink, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pruneOpenclawPackage } from "./lib/prune-openclaw-package.mjs";
+import {
+  electronRoot,
+  getSidecarRoot,
+  linkOrCopyDirectory,
+  pathExists,
+  removePathIfExists,
+  resetDir,
+} from "./lib/sidecar-paths.mjs";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const electronRoot = resolve(scriptDir, "..");
-const repoRoot =
-  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
-const sidecarRoot = resolve(repoRoot, ".tmp/sidecars/pglite");
+const sidecarRoot = getSidecarRoot("pglite");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const electronNodeModules = resolve(electronRoot, "node_modules");
-
-async function pathExists(path) {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function preparePgliteSidecar() {
   if (!(await pathExists(electronNodeModules))) {
@@ -26,8 +21,7 @@ async function preparePgliteSidecar() {
     );
   }
 
-  await rm(sidecarRoot, { recursive: true, force: true });
-  await mkdir(sidecarRoot, { recursive: true });
+  await resetDir(sidecarRoot);
 
   await writeFile(
     resolve(sidecarRoot, "package.json"),
@@ -133,11 +127,10 @@ process.on("SIGINT", () => {
 `,
   );
 
-  await symlink(
-    electronNodeModules,
-    sidecarNodeModules,
-    process.platform === "win32" ? "junction" : "dir",
-  );
+  await linkOrCopyDirectory(electronNodeModules, sidecarNodeModules);
+  await removePathIfExists(resolve(sidecarNodeModules, "electron"));
+  await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
+  await pruneOpenclawPackage(sidecarNodeModules);
 }
 
 await preparePgliteSidecar();
