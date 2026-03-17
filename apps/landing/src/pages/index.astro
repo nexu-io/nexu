@@ -1,492 +1,682 @@
 ---
 import "../styles/global.css";
-import {
-  ArrowRight,
-  BarChart3,
-  Blocks,
-  Check,
-  ChevronDown,
-  Clock,
-  Cloud,
-  FileText,
-  MessageSquare,
-  PenTool,
-  Rocket,
-  Terminal,
-  Users,
-  Workflow,
-  X,
-  Zap,
-} from "lucide-react";
-import DemoSection from "../components/DemoSection";
-import FAQSection from "../components/FAQSection";
-import LobsterCursorEffect from "../components/LobsterCursorEffect";
-import BrandMark from "../components/BrandMark.astro";
-
-const capabilities = [
-  { Icon: Rocket, label: "Deploy in 1 min" },
-  { Icon: Cloud, label: "100% office tools & skills built-in" },
-  { Icon: Users, label: "Zero data loss" },
-  { Icon: Clock, label: "Always on, 24/7" },
-];
-
-const features = [
-  {
-    Icon: Rocket,
-    title: "Deploy in 1 min",
-    desc: "No YAML, no config. Add Nexu to your team chat and start working together right away.",
-  },
-  {
-    Icon: Cloud,
-    title: "100% office tools & skills built-in",
-    desc: "Build, analyze, automate - right from chat. No integrations to wire up, no plugins to install.",
-  },
-  {
-    Icon: Users,
-    title: "Zero data loss",
-    desc: "Nexu remembers your conversations, preferences, and context. The more you use it, the sharper it gets.",
-  },
-  {
-    Icon: Clock,
-    title: "Always on, 24/7",
-    desc: "Fully hosted - no server to manage. Your AI is there whenever your team is.",
-  },
-];
-
-const steps = [
-  {
-    step: "01",
-    title: "Add to team chat",
-    desc: "Connect Slack, Discord, or Telegram. Your AI joins the channel in under a minute.",
-    Icon: Blocks,
-  },
-  {
-    step: "02",
-    title: "Say what you need",
-    desc: "Just describe the task in chat - no code, no config. Nexu handles the rest.",
-    Icon: MessageSquare,
-  },
-  {
-    step: "03",
-    title: "24/7 next to you",
-    desc: "Your AI runs with persistent memory and 1,000+ built-in tools. Always available, never in the way.",
-    Icon: Terminal,
-  },
-];
-
-const useCases = [
-  {
-    Icon: FileText,
-    tag: "Startup / Remote",
-    prompt: "Channel or multi-channel daily digest",
-    result:
-      "Turn hundreds of messages into one structured daily: decisions, progress, todos, risks. Everyone catches up in 30 seconds.",
-    time: "Daily",
-  },
-  {
-    Icon: BarChart3,
-    tag: "E-commerce",
-    prompt: "Customer feedback daily",
-    result:
-      "Turn hundreds of support messages into a daily customer feedback report. See what's working and what's not in 30 seconds.",
-    time: "Daily",
-  },
-  {
-    Icon: PenTool,
-    tag: "Startup / Remote",
-    prompt: "Quotes -> brand cards",
-    result:
-      "Auto-detect great quotes and turn them into shareable brand cards. Team thinking becomes external content.",
-    time: "Real-time",
-  },
-  {
-    Icon: MessageSquare,
-    tag: "E-commerce",
-    prompt: "24/7 support auto-reply",
-    result:
-      "Auto-answer FAQs in the group; escalate complex questions to humans. No more repeating \"how to use\" or \"when it ships.\"",
-    time: "24/7",
-  },
-  {
-    Icon: Users,
-    tag: "Content creator",
-    prompt: "Multi-group digest",
-    result:
-      "One digest across all your groups, ranked by importance. See every group's highlights in 5 minutes-no scrolling.",
-    time: "On demand",
-  },
-  {
-    Icon: Workflow,
-    tag: "Content creator",
-    prompt: "Weekly highlights -> Newsletter",
-    result:
-      "Filter a week of group chat into highlights and get a Newsletter draft. 2 hours of manual work -> 5 minutes.",
-    time: "Weekly",
-  },
-];
-
-const stats = [
-  { num: "24/7", label: "Always on", sub: "Your AI never sleeps" },
-  { num: "1,000+", label: "Built-in tools", sub: "No integrations needed" },
-  { num: "<1", label: "Minute to get started", sub: "No YAML, no setup" },
-  { num: "0", label: "Servers to manage", sub: "Fully hosted, auto-updated" },
-];
-
-const compareRows = [
-  {
-    feature: "Setup / Deploy",
-    nexu: "Under 1 minute, no code needed",
-    openclaw: ">24 h (YAML / env / keys)",
-    good: false,
-  },
-  {
-    feature: "Data & memory",
-    nexu: "Persistent - zero data loss, learns your team",
-    openclaw: "Session stateless, no persistent learning",
-    good: true,
-  },
-  {
-    feature: "Tools & skills",
-    nexu: "1,000+ built in, out of the box",
-    openclaw: "You build or plug in integrations",
-    good: true,
-  },
-  {
-    feature: "IM platforms",
-    nexu: "Slack, Discord, Telegram",
-    openclaw: "You build integrations",
-    good: true,
-  },
-  {
-    feature: "Hosting",
-    nexu: "Fully hosted, 24/7",
-    openclaw: "Self-hosted, uptime depends on you",
-    good: true,
-  },
-  {
-    feature: "Updates",
-    nexu: "Automatic",
-    openclaw: "Manual pull / upgrade",
-    good: true,
-  },
-  {
-    feature: "Team context",
-    nexu: "Multi-user, cross-channel awareness",
-    openclaw: "Mostly single-session",
-    good: true,
-  },
-];
+import Nav from "../components/Nav.astro";
+import StrikethroughList from "../components/StrikethroughList.tsx";
+import TextReveal from "../components/TextReveal.tsx";
+import KpiCards from "../components/KpiCards.tsx";
+import FeaturesScrollTunnel from "../components/FeaturesScrollTunnel.tsx";
+import VideoModal from "../components/VideoModal.tsx";
+import ToolsScrollTunnel from "../components/ToolsScrollTunnel.tsx";
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link id="app-favicon" rel="icon" type="image/svg+xml" href="/favicon/favicon-light.svg" />
-    <script>
-      (() => {
-        const media = window.matchMedia("(prefers-color-scheme: dark)");
-        const updateFavicon = () => {
-          const link = document.getElementById("app-favicon");
-          if (!link) return;
-          link.setAttribute("href", media.matches ? "/favicon/favicon-dark.svg" : "/favicon/favicon-light.svg");
-        };
-        updateFavicon();
-        if (typeof media.addEventListener === "function") {
-          media.addEventListener("change", updateFavicon);
-          return;
-        }
-        media.addListener(updateFavicon);
-      })();
-    </script>
-    <title>Your Digital Coworker · Nexu</title>
-    <meta name="description" content="The simplest OpenClaw in team chat - deploy in 1 minute, no YAML, no setup. 100% office tools and skills built-in, always on and always learning." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <LobsterCursorEffect client:load />
-    <div class="min-h-full bg-surface-0 relative">
-      <nav class="sticky top-0 z-50 border-b backdrop-blur-md border-border bg-surface-0/85">
-        <div class="flex justify-between items-center px-4 sm:px-6 mx-auto max-w-5xl h-14">
-          <div class="flex items-center gap-2.5">
-            <BrandMark className="w-7 h-7" />
-            <span class="text-sm font-semibold tracking-tight text-text-primary">Nexu</span>
-          </div>
-          <div class="flex items-center gap-6 text-[13px] text-text-tertiary">
-            <div class="hidden md:flex items-center gap-6">
-              <a href="#scenarios" class="transition-colors hover:text-text-primary">Demos</a>
-              <a href="#features" class="transition-colors hover:text-text-primary">Why Nexu</a>
-              <a href="#vs-openclaw" class="transition-colors hover:text-text-primary">VS OpenClaw</a>
-              <a href="#how" class="transition-colors hover:text-text-primary">How it works</a>
-              <a href="#faq" class="transition-colors hover:text-text-primary">FAQ</a>
+<html lang="en-US" class="scroll-smooth">
+
+<head>
+  <meta charset="UTF-8">
+  <style>
+    .nexu-text {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: white;
+    }
+    .nexu-text.animate {
+      background: linear-gradient(90deg,
+        #ffffff 0%,
+        #ffffff 20%,
+        #ff0000 30%,
+        #ff9900 38%,
+        #ffff00 46%,
+        #00ff00 54%,
+        #00aaff 62%,
+        #aa00ff 70%,
+        #ffffff 80%,
+        #ffffff 100%
+      );
+      background-size: 300% 100%;
+      background-position: 200% center;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: nexu-sweep 1.8s ease-in-out forwards;
+    }
+    @keyframes nexu-sweep {
+      0%   { background-position: 200% center; }
+      100% { background-position: -50% center; }
+    }
+    [data-bg="black"] [data-background] {
+      transform: none !important;
+      transform-origin: center !important;
+    }
+  </style>
+  <style>
+    @keyframes footer-blob-drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33%       { transform: translate(-3%, -6%) scale(1.06); }
+      66%       { transform: translate(4%, 3%) scale(0.96); }
+    }
+    .footer-aurora {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 420px;
+      pointer-events: none;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 2.4s ease;
+      z-index: 0;
+    }
+    .footer-aurora.is-visible { opacity: 1; }
+    .footer-aurora-inner {
+      position: absolute;
+      inset: 0;
+      filter: blur(72px);
+    }
+    .footer-aurora-blob {
+      position: absolute;
+      border-radius: 50%;
+    }
+    .footer-aurora-blob-1 {
+      width: 70%; height: 360px;
+      background: radial-gradient(circle, rgba(106,125,241,.92) 0%, transparent 65%);
+      top: -100px; left: 15%;
+      animation: footer-blob-drift 9s ease-in-out infinite;
+    }
+    .footer-aurora-blob-2 {
+      width: 85%; height: 300px;
+      background: radial-gradient(circle, rgba(248,103,47,.88) 0%, transparent 65%);
+      top: 30px; left: 5%;
+      animation: footer-blob-drift 12s ease-in-out infinite reverse;
+    }
+    .footer-aurora-blob-3 {
+      width: 45%; height: 260px;
+      background: radial-gradient(circle, rgba(217,153,247,.85) 0%, transparent 65%);
+      top: 100px; left: 28%;
+      animation: footer-blob-drift 7s ease-in-out infinite 2s;
+    }
+    .footer-aurora-blob-4 {
+      width: 90%; height: 300px;
+      background: radial-gradient(circle, rgba(6,238,255,.82) 0%, transparent 65%);
+      bottom: -60px; left: 5%;
+      animation: footer-blob-drift 14s ease-in-out infinite 1s;
+    }
+    .footer-aurora-blob-5 {
+      width: 40%; height: 220px;
+      background: radial-gradient(circle, rgba(255,208,50,.80) 0%, transparent 65%);
+      top: -40px; right: 8%;
+      animation: footer-blob-drift 10s ease-in-out infinite 3s reverse;
+    }
+  </style>
+  <style>
+    @keyframes kpi-breathe {
+      0%, 100% { scale: 1; }
+      50% { scale: 1.045; }
+    }
+    .kpi-card {
+      animation: kpi-breathe 4s ease-in-out infinite;
+    }
+  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexu &ndash; Your Digital Employee</title>
+  <meta content="Nexu packages OpenClaw into the simplest multi-agent platform for teams. Deploy in 1 min. Zero data loss. 3,000+ tools, one-click connect." name="description">
+  <meta content="Nexu &ndash; Your Digital Employee" property="og:title">
+  <meta content="Nexu packages OpenClaw into the simplest multi-agent platform for teams. Deploy in 1 min. Zero data loss." property="og:description">
+  <meta content="Nexu" property="og:site_name">
+  <meta content="website" property="og:type">
+  <meta content="all" name="robots">
+
+  <link rel="apple-touch-icon" sizes="57x57" href="/icon/favicon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="/icon/favicon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="/icon/favicon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="/icon/favicon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="/icon/favicon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="/icon/favicon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="/icon/favicon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icon/favicon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon/favicon-180x180.png">
+  <link rel="icon" type="image/svg+xml" href="/icon/logo-0.svg">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icon/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/icon/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon/favicon-192x192.png">
+  <link rel="shortcut icon" type="image/x-icon" href="/icon/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/icon/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="/icon/favicon.ico">
+  <meta name="msapplication-TileColor" content="#ffffff">
+  <meta name="msapplication-TileImage" content="/icon/favicon-144x144.png">
+  <meta name="msapplication-config" content="/icon/browserconfig.xml">
+</head>
+
+<body class="relative">
+  <Nav />
+  <div class="relative bg-white">
+
+  <!-- ==================== HERO ==================== -->
+  <div data-header="light" data-bg="black" class="relative text-white">
+    <div data-background class="absolute inset-0 bg-black"></div>
+    <div class="relative">
+      <div class="relative text-white">
+        <video src="/media/pages/home/ca07be12d8-1772639653/home视频-01.mp4" class="object-cover absolute size-full" autoplay muted loop playsinline></video>
+        <div class="container flex relative flex-col pt-36 pb-8 min-h-lvh">
+          <div class="flex-1 flex flex-col items-center justify-center">
+            <h1 class="t-32 lg:t-80 text-balance max-w-250 mb-6 text-center mx-auto">Get your digital employee for free</h1>
+            <p class="text-center text-white/70 mb-6">The simplest OpenClaw for teams deploy in 1 min. Zero data loss.</p>
+            <div class="flex gap-2 justify-center">
+              <a class="btn btn-primary" href="javascript:void(0)">Get started free</a>
+              <a class="btn btn-primary flex items-center gap-2" href="javascript:void(0)" target="_blank">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;flex-shrink:0"><path d="M12.001 2C6.47598 2 2.00098 6.475 2.00098 12C2.00098 16.425 4.86348 20.1625 8.83848 21.4875C9.33848 21.575 9.52598 21.275 9.52598 21.0125C9.52598 20.775 9.51348 19.9875 9.51348 19.15C7.00098 19.6125 6.35098 18.5375 6.15098 17.975C6.03848 17.6875 5.55098 16.8 5.12598 16.5625C4.77598 16.375 4.27598 15.9125 5.11348 15.9C5.90098 15.8875 6.46348 16.625 6.65098 16.925C7.55098 18.4375 8.98848 18.0125 9.56348 17.75C9.65098 17.1 9.91348 16.6625 10.201 16.4125C7.97598 16.1625 5.65098 15.3 5.65098 11.475C5.65098 10.3875 6.03848 9.4875 6.67598 8.7875C6.57598 8.5375 6.22598 7.5125 6.77598 6.1375C6.77598 6.1375 7.61348 5.875 9.52598 7.1625C10.326 6.9375 11.176 6.825 12.026 6.825C12.876 6.825 13.726 6.9375 14.526 7.1625C16.4385 5.8625 17.276 6.1375 17.276 6.1375C17.826 7.5125 17.476 8.5375 17.376 8.7875C18.0135 9.4875 18.401 10.375 18.401 11.475C18.401 15.3125 16.0635 16.1625 13.8385 16.4125C14.201 16.725 14.5135 17.325 14.5135 18.2625C14.5135 19.6 14.501 20.675 14.501 21.0125C14.501 21.275 14.6885 21.5875 15.1885 21.4875C19.259 20.1133 21.9999 16.2963 22.001 12C22.001 6.475 17.526 2 12.001 2Z"></path></svg>
+                GitHub
+              </a>
             </div>
-            <a href="/auth" class="px-3 sm:px-4 py-1.5 bg-accent hover:bg-accent-hover text-accent-fg rounded-md text-[12px] sm:text-[13px] font-medium transition-colors inline-flex items-center gap-1.5">
-              Get started free <ArrowRight size={14} />
-            </a>
           </div>
         </div>
-      </nav>
-
-      <section class="relative z-10">
-        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(var(--color-accent-rgb,99,102,241),0.06)_0%,transparent_50%)]"></div>
-        <div class="absolute inset-0 opacity-15" style="background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 56px 56px;"></div>
-        <div class="relative px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-14 sm:pb-16 md:pb-20 mx-auto max-w-4xl text-center">
-          <div class="inline-flex gap-2 items-center px-3 py-1 mb-8 text-xs font-medium rounded-full border border-accent/20 text-accent bg-accent/5">
-            <Zap size={12} /> Free during beta
-          </div>
-          <h1 class="text-[32px] sm:text-[40px] md:text-[42px] font-bold text-text-primary mb-5 sm:mb-6 leading-[1.15] tracking-tight">
-            The simplest OpenClaw🦞 for teams
-            <br class="hidden sm:block" />
-            <span class="text-accent">Deploy in 1 min. Zero data loss.</span>
-          </h1>
-          <p class="mx-auto mb-7 sm:mb-8 max-w-2xl text-base sm:text-lg leading-relaxed text-text-tertiary">
-            The simplest OpenClaw in team chat - deploy in 1 minute, no YAML, no setup.
-            <br class="hidden sm:block" />
-            100% office tools and skills built-in, 24/7 next to you in Slack, Discord and Telegram. Always on, always learning.
-          </p>
-
-          <div class="flex flex-wrap gap-2 justify-center mb-10">
-            {capabilities.map((cap) => (
-              <span class="inline-flex gap-1.5 items-center px-3 py-1.5 rounded-full text-[13px] font-medium border transition-colors bg-surface-1 text-text-secondary border-border hover:border-border-hover">
-                <cap.Icon size={14} />
-                {cap.label}
-              </span>
-            ))}
-          </div>
-
-          <div class="flex flex-col sm:flex-row gap-3 justify-center items-center mx-auto mb-6 max-w-md">
-            <a href="/auth" class="flex gap-2 items-center justify-center px-6 sm:px-8 py-3 text-sm font-semibold rounded-lg transition-all bg-accent hover:bg-accent-hover text-accent-fg hover:shadow-lg hover:shadow-accent/20 w-full sm:w-auto">
-              Get started free <ArrowRight size={14} />
-            </a>
-            <details class="relative w-full sm:w-auto">
-              <summary class="list-none cursor-pointer flex gap-2 items-center justify-center px-6 py-3 text-sm font-semibold rounded-lg border transition-all text-text-primary border-border hover:border-border-hover hover:bg-surface-1 w-full sm:w-auto">
-                Add to your team chat <ChevronDown size={14} />
-              </summary>
-              <div class="absolute left-0 top-full mt-2 w-full sm:w-56 bg-surface-0 border border-border rounded-lg shadow-lg z-50">
-                <a href="https://join.slack.com/t/nexu-ixl1131/shared_invite/zt-3ridrx1sn-Cbu6IFNcdjKq4c1p27ZGUw" target="_blank" rel="noreferrer" class="flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors">
-                  <div class="w-8 h-8 flex items-center justify-center shrink-0 text-lg">💬</div>
-                  <div class="flex-1 min-w-0 text-left">
-                    <div class="text-sm font-medium text-text-primary">Slack</div>
-                    <div class="text-[11px] text-text-muted">Join group to try</div>
-                  </div>
-                </a>
-                <!--
-                <a href="/auth" class="flex items-center gap-3 px-4 py-3 hover:bg-surface-1 transition-colors">
-                  <div class="w-8 h-8 flex items-center justify-center shrink-0 text-lg">🟢</div>
-                  <div class="flex-1 min-w-0 text-left">
-                    <div class="text-sm font-medium text-text-primary">WhatsApp</div>
-                    <div class="text-[11px] text-text-muted">Scan QR to join group</div>
-                  </div>
-                </a>
-                -->
-              </div>
-            </details>
-          </div>
-          <div class="flex items-center justify-center text-[13px] text-text-muted">
-            <span>The simplest OpenClaw. Free to get started.</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="px-4 sm:px-6 py-12 sm:py-16 mx-auto max-w-3xl text-center">
-        <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-text-primary mb-3">
-          Works where your team already works
-        </h2>
-        <p class="text-sm text-text-tertiary leading-relaxed mb-10">
-          One AI, all your communication channels-add the bot to Slack, Discord, or Telegram in under a minute.
-        </p>
-        <div class="flex flex-wrap gap-4 justify-center mb-6">
-          <div class="flex flex-col items-center gap-2 w-20 py-4 rounded-xl border border-border bg-surface-1 hover:border-border-hover transition-colors"><span class="text-2xl">💬</span><span class="text-[12px] font-medium text-text-secondary">Slack</span></div>
-          <div class="flex flex-col items-center gap-2 w-20 py-4 rounded-xl border border-border bg-surface-1 hover:border-border-hover transition-colors"><span class="text-2xl">🎮</span><span class="text-[12px] font-medium text-text-secondary">Discord</span></div>
-          <div class="flex flex-col items-center gap-2 w-20 py-4 rounded-xl border border-border bg-surface-1 hover:border-border-hover transition-colors"><span class="text-2xl">✈️</span><span class="text-[12px] font-medium text-text-secondary">Telegram</span></div>
-          <!-- <div class="flex flex-col items-center gap-2 w-20 py-4 rounded-xl border border-border bg-surface-1 hover:border-border-hover transition-colors"><span class="text-2xl">🟢</span><span class="text-[12px] font-medium text-text-secondary">WhatsApp</span></div> -->
-          <div class="flex flex-col items-center gap-2 w-20 py-4 rounded-xl border border-border bg-surface-1 hover:border-border-hover transition-colors"><span class="text-2xl">👥</span><span class="text-[12px] font-medium text-text-secondary">Teams</span></div>
-        </div>
-        <p class="text-[12px] text-text-muted">Signal, Matrix, WebChat and more coming soon.</p>
-      </section>
-
-      <DemoSection client:visible />
-
-      <section id="features" class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
-        <div class="mb-14 text-center">
-          <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">Why Nexu</div>
-          <h2 class="text-2xl font-bold tracking-tight text-text-primary">The simplest OpenClaw. Built for your team.</h2>
-          <p class="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-text-tertiary">
-            The simplest OpenClaw - ready in under a minute, with persistent memory and every tool your team needs. Always on in Slack, Discord and Telegram.
-          </p>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {features.map((f) => (
-            <div class="p-6 rounded-xl border transition-colors bg-surface-1 border-border hover:border-border-hover group">
-              <div class="flex justify-center items-center w-10 h-10 rounded-xl bg-accent/10 mb-4">
-                <f.Icon size={20} className="text-accent" />
-              </div>
-              <div class="text-[14px] font-semibold text-text-primary mb-2">{f.title}</div>
-              <div class="text-[13px] text-text-muted leading-relaxed">{f.desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
-
-      <section id="vs-openclaw" class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
-        <div class="mb-14 text-center">
-          <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">Compare</div>
-          <h2 class="text-2xl font-bold tracking-tight text-text-primary">How Nexu stacks up</h2>
-          <p class="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-text-tertiary">Compared to self-hosting OpenClaw and other hosted options.</p>
-        </div>
-        <div class="overflow-x-auto rounded-xl border border-border bg-surface-1">
-          <table class="w-full text-left text-sm">
-            <thead>
-              <tr class="border-b border-border">
-                <th class="px-5 py-4 font-semibold text-text-primary">Feature</th>
-                <th class="px-5 py-4 font-semibold text-accent">Nexu</th>
-                <th class="px-5 py-4 font-semibold text-text-secondary">OpenClaw (Self-Hosted)</th>
-              </tr>
-            </thead>
-            <tbody class="text-text-secondary">
-              {compareRows.map((row) => (
-                <tr class="border-b border-border last:border-b-0">
-                  <td class="px-5 py-3 font-medium text-text-primary">{row.feature}</td>
-                  <td class="px-5 py-3">
-                    <span class="inline-flex items-center gap-1.5">
-                      <Check size={14} className="text-green-500 shrink-0" />
-                      {row.nexu}
-                    </span>
-                  </td>
-                  <td class="px-5 py-3">
-                    <span class="inline-flex items-center gap-1.5">
-                      <X size={14} className="text-red-400 shrink-0" />
-                      {row.openclaw}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p class="mt-4 text-center text-[13px] text-text-muted">The simplest OpenClaw. Ready in under a minute, with persistent memory and 1,000+ tools - always on in Slack, Discord and Telegram.</p>
-      </section>
-
-      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
-
-      <section id="how" class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
-        <div class="mb-14 text-center">
-          <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">How it works</div>
-          <h2 class="text-2xl font-bold tracking-tight text-text-primary">Get Your OpenClaw in 3 Quick Steps</h2>
-          <p class="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-text-tertiary">Add Nexu to your team chat and start working together in minutes.</p>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
-          {steps.map((s, i) => (
-            <div class="relative text-center">
-              {i < 2 && <div class="hidden md:block absolute -right-5 top-7 w-10 border-t border-dashed border-border"></div>}
-              <div class="flex justify-center items-center mx-auto mb-5 w-14 h-14 rounded-2xl bg-accent/10">
-                <s.Icon size={24} className="text-accent" />
-              </div>
-              <div class="mb-2 font-mono text-xs font-semibold text-accent">STEP {s.step}</div>
-              <h3 class="text-[15px] font-semibold text-text-primary mb-2">{s.title}</h3>
-              <p class="text-sm leading-relaxed text-text-tertiary">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
-
-      <section class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-5xl">
-        <div class="mb-14 text-center">
-          <div class="text-[11px] font-semibold text-accent mb-3 tracking-widest uppercase">Use cases</div>
-          <h2 class="text-2xl font-bold tracking-tight text-text-primary">You chat in your team. Nexu gets it done.</h2>
-          <p class="mx-auto mt-2 max-w-lg text-sm leading-relaxed text-text-tertiary">Startup/remote teams · E-commerce · Creators & multi-group users. Slack, Discord, Telegram.</p>
-        </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {useCases.map((c) => (
-            <div class="flex gap-5 items-start p-5 rounded-xl border bg-surface-1 border-border">
-              <div class="flex justify-center items-center w-10 h-10 rounded-xl shrink-0 bg-accent/10">
-                <c.Icon size={18} className="text-accent" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex gap-2 items-center mb-1.5">
-                  <span class="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">{c.tag}</span>
-                </div>
-                <div class="text-[14px] font-semibold text-text-primary mb-1">{c.prompt}</div>
-                <div class="text-[13px] text-text-muted mb-2">{c.result}</div>
-                <div class="inline-flex gap-1 items-center text-[11px] text-accent bg-accent/10 px-2 py-0.5 rounded-full font-medium">
-                  <Clock size={10} /> {c.time}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
-
-      <section class="px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-4xl">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          {stats.map((n) => (
-            <div>
-              <div class="font-mono text-3xl font-bold tracking-tight text-accent">{n.num}</div>
-              <div class="mt-1 text-sm font-medium text-text-primary">{n.label}</div>
-              <div class="text-[11px] text-text-muted mt-0.5">{n.sub}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div class="px-4 sm:px-6 mx-auto max-w-4xl"><div class="border-t border-border"></div></div>
-
-      <FAQSection client:visible />
-
-      <section class="overflow-hidden relative">
-        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(var(--color-accent-rgb,99,102,241),0.05)_0%,transparent_60%)]"></div>
-        <div class="relative px-4 sm:px-6 py-16 sm:py-20 md:py-24 mx-auto max-w-3xl text-center">
-          <h2 class="mb-4 text-3xl font-bold tracking-tight text-text-primary">The simplest OpenClaw. Always on, always learning.</h2>
-          <p class="mb-8 text-base text-text-tertiary">Free to get started. Works in Slack, Discord and Telegram.</p>
-          <div class="flex gap-3 justify-center">
-            <a href="/auth" class="flex gap-2 items-center px-6 sm:px-8 py-3 text-sm font-semibold rounded-lg transition-all bg-accent hover:bg-accent-hover text-accent-fg hover:shadow-lg hover:shadow-accent/20">
-              Get started free <ArrowRight size={14} />
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <footer class="border-t border-border">
-        <div class="flex flex-col gap-4 md:flex-row md:justify-between md:items-center px-4 sm:px-6 py-8 mx-auto max-w-5xl">
-          <div class="flex items-center gap-2.5">
-            <BrandMark className="w-5 h-5" />
-            <span class="text-xs text-text-muted">&copy; 2026 Powerformer, Inc.</span>
-          </div>
-          <div class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-text-muted">
-            <a href="#" class="transition-colors hover:text-text-secondary">X / Twitter</a>
-            <a href="#" class="transition-colors hover:text-text-secondary">Docs</a>
-            <a href="/privacy" class="transition-colors hover:text-text-secondary">Privacy Policy</a>
-            <a href="/terms" class="transition-colors hover:text-text-secondary">Terms of Service</a>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
-    <script>
-      import * as amplitude from "@amplitude/unified";
+  </div>
 
-      const apiKey = import.meta.env.PUBLIC_AMPLITUDE_API_KEY;
-      if (apiKey) {
-        amplitude.initAll(apiKey, {
-          analytics: { autocapture: true },
-          sessionReplay: { sampleRate: 1 },
+  <!-- ==================== FEATURE INTRO ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <div class="relative">
+      <div class="pt-16 lg:pt-32">
+        <div class="container">
+          <div class="grid grid-cols-2 gap-x-4 py-4 lg:grid-cols-12">
+            <div class="col-start-1 row-start-1 py-2 lg:col-span-2 lg:col-start-1 tm-12">
+              核心卖点
+            </div>
+            <div class="col-start-1 row-start-2 lg:row-start-1 col-span-2 lg:col-span-8 lg:col-start-3 text-left flex justify-start">
+              <div>
+                <h2 class="text-balance t-20 lg:t-32">由开源人工智能代理框架 OpenClaw 提供支持</h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 3-UP FEATURE CARDS ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <div class="relative">
+      <div class="container-outer pt-8 lg:pt-16 pb-16 lg:pb-32 bg-white">
+        <div class="container">
+          <div class="grid-cols-12 gap-4 lg:grid">
+            <div class="col-span-10 col-start-3">
+              <div class="grid-cols-2 grid-rows-2 gap-2 lg:grid max-lg:space-y-4">
+
+                <!-- Left card: 3 steps -->
+                <div class="col-span-1 row-span-2 row-start-1 p-6 rounded-lg lg:p-12 bg-gray-light">
+                  <img alt="" class="w-full object-cover aspect-square" height="914" loading="lazy" sizes="(min-width: 1024px) 600px, 100vw" src="/media/pages/home/d8a080417b-1772639654/multi-agent-system.jpg" srcset="/media/pages/home/d8a080417b-1772639654/multi-agent-system-200x-q95.webp 200w, /media/pages/home/d8a080417b-1772639654/multi-agent-system-400x-q95.webp 400w, /media/pages/home/d8a080417b-1772639654/multi-agent-system-800x-q95.webp 800w, /media/pages/home/d8a080417b-1772639654/multi-agent-system-1200x-q95.webp 1200w, /media/pages/home/d8a080417b-1772639654/multi-agent-system-2400x-q95.webp 2400w" width="978">
+                  <div class="mt-10 t-16 max-w-100">
+                    <strong>Get Your OpenClaw in 3 Quick Steps</strong>
+                  </div>
+                  <div class="mt-4 t-16 whitespace-nowrap">
+                    Add Nexu to your team chat and start working together in minutes.
+                  </div>
+                </div>
+
+                <!-- Top-right: Data Security -->
+                <div class="flex col-span-1 col-start-2 row-start-1 gap-8 p-6 rounded-lg lg:p-12 bg-gray-light">
+                  <div class="basis-4/10">
+                    <img alt="" class="size-full rounded object-cover" height="800" loading="lazy" sizes="(min-width: 1024px) 400px, 100vw" src="/media/pages/home/b7905abe84-1772639652/1747398282829.jpeg" srcset="/media/pages/home/b7905abe84-1772639652/1747398282829-200x-q95.webp 200w, /media/pages/home/b7905abe84-1772639652/1747398282829-400x-q95.webp 400w, /media/pages/home/b7905abe84-1772639652/1747398282829-800x-q95.webp 800w, /media/pages/home/b7905abe84-1772639652/1747398282829-1200x-q95.webp 1200w, /media/pages/home/b7905abe84-1772639652/1747398282829-2400x-q95.webp 2400w" width="800">
+                  </div>
+                  <div class="self-end basis-6/10">
+                    <blockquote class="t-16">
+                      <strong>Data Security</strong>
+                    </blockquote>
+                    <div class="mt-6 tm-12 text-black/60">
+                      Nexu remembers your conversations, preferences, and context. The more you use it, the sharper it gets.
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bottom-right: Built-in tools + logo ticker -->
+                <div class="flex flex-col col-span-1 col-start-2 row-start-2 pb-6 rounded-lg lg:pb-12 bg-gray-light">
+                  <div class="p-6 lg:p-12 t-16">
+                    <strong>Built-in all office tools and skills</strong>
+                  </div>
+                  <div class="overflow-clip mask-x-from-90% mask-x-to-100% my-auto">
+                    <div class="flex select-none">
+                      <div class="flex gap-20 px-10 shrink-0 ticker grayscale" style="--duration: 45s">
+                        <img alt="SAP" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1.png" srcset="/media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-200x-q95.webp 200w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-400x-q95.webp 400w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-800x-q95.webp 800w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-1200x-q95.webp 1200w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-2400x-q95.webp 2400w">
+                        <img alt="Coupa" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44.png" srcset="/media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-200x-q95.webp 200w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-400x-q95.webp 400w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-800x-q95.webp 800w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-1200x-q95.webp 1200w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-2400x-q95.webp 2400w">
+                        <img alt="Oracle" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/1ec86cc22d-1772639648/oracle-m02.png" srcset="/media/pages/home/1ec86cc22d-1772639648/oracle-m02-200x-q95.webp 200w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-400x-q95.webp 400w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-800x-q95.webp 800w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-1200x-q95.webp 1200w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-2400x-q95.webp 2400w">
+                        <img alt="Dynamics 365" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/8aee413abe-1772639655/logo_dynamics.webp" srcset="/media/pages/home/8aee413abe-1772639655/logo_dynamics-200x-q95.webp 200w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-400x-q95.webp 400w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-800x-q95.webp 800w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-1200x-q95.webp 1200w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-2400x-q95.webp 2400w">
+                        <img alt="SAP Ariba" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0.png" srcset="/media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-200x-q95.webp 200w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-400x-q95.webp 400w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-800x-q95.webp 800w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-1200x-q95.webp 1200w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-2400x-q95.webp 2400w">
+                        <img alt="Workday" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/0b5657ccf5-1772639650/workday_logo.svg.png" srcset="/media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-200x-q95.webp 200w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-400x-q95.webp 400w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-800x-q95.webp 800w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-1200x-q95.webp 1200w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-2400x-q95.webp 2400w">
+                        <img alt="Teams" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg.png" srcset="/media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-200x-q95.webp 200w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-400x-q95.webp 400w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-800x-q95.webp 800w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-1200x-q95.webp 1200w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-2400x-q95.webp 2400w">
+                        <img alt="Outlook" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg.png" srcset="/media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-200x-q95.webp 200w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-400x-q95.webp 400w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-800x-q95.webp 800w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-1200x-q95.webp 1200w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-2400x-q95.webp 2400w">
+                        <img alt="Ivalua" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/4b16742dbb-1772639649/ivalua.svg.png" srcset="/media/pages/home/4b16742dbb-1772639649/ivalua.svg-200x-q95.webp 200w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-400x-q95.webp 400w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-800x-q95.webp 800w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-1200x-q95.webp 1200w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-2400x-q95.webp 2400w">
+                      </div>
+                      <!-- Duplicate for infinite scroll -->
+                      <div class="flex gap-20 px-10 shrink-0 ticker grayscale" style="--duration: 45s">
+                        <img alt="SAP" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1.png" srcset="/media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-200x-q95.webp 200w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-400x-q95.webp 400w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-800x-q95.webp 800w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-1200x-q95.webp 1200w, /media/pages/home/b89a0b2a30-1772639655/sap-logo-2011-1-2400x-q95.webp 2400w">
+                        <img alt="Coupa" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44.png" srcset="/media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-200x-q95.webp 200w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-400x-q95.webp 400w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-800x-q95.webp 800w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-1200x-q95.webp 1200w, /media/pages/home/d70ae66121-1772639646/coup_big-46b5bd44-2400x-q95.webp 2400w">
+                        <img alt="Oracle" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/1ec86cc22d-1772639648/oracle-m02.png" srcset="/media/pages/home/1ec86cc22d-1772639648/oracle-m02-200x-q95.webp 200w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-400x-q95.webp 400w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-800x-q95.webp 800w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-1200x-q95.webp 1200w, /media/pages/home/1ec86cc22d-1772639648/oracle-m02-2400x-q95.webp 2400w">
+                        <img alt="Dynamics 365" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/8aee413abe-1772639655/logo_dynamics.webp" srcset="/media/pages/home/8aee413abe-1772639655/logo_dynamics-200x-q95.webp 200w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-400x-q95.webp 400w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-800x-q95.webp 800w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-1200x-q95.webp 1200w, /media/pages/home/8aee413abe-1772639655/logo_dynamics-2400x-q95.webp 2400w">
+                        <img alt="SAP Ariba" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0.png" srcset="/media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-200x-q95.webp 200w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-400x-q95.webp 400w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-800x-q95.webp 800w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-1200x-q95.webp 1200w, /media/pages/home/b90f28058f-1772639656/sap-ariba-logo_1.11.16_0-2400x-q95.webp 2400w">
+                        <img alt="Workday" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/0b5657ccf5-1772639650/workday_logo.svg.png" srcset="/media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-200x-q95.webp 200w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-400x-q95.webp 400w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-800x-q95.webp 800w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-1200x-q95.webp 1200w, /media/pages/home/0b5657ccf5-1772639650/workday_logo.svg-2400x-q95.webp 2400w">
+                        <img alt="Teams" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg.png" srcset="/media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-200x-q95.webp 200w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-400x-q95.webp 400w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-800x-q95.webp 800w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-1200x-q95.webp 1200w, /media/pages/home/2a075c9505-1772639645/microsoft_office_teams_-20192025-.svg-2400x-q95.webp 2400w">
+                        <img alt="Outlook" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg.png" srcset="/media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-200x-q95.webp 200w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-400x-q95.webp 400w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-800x-q95.webp 800w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-1200x-q95.webp 1200w, /media/pages/home/2a76412038-1772639644/microsoft_office_outlook_-20182024-.svg-2400x-q95.webp 2400w">
+                        <img alt="Ivalua" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/4b16742dbb-1772639649/ivalua.svg.png" srcset="/media/pages/home/4b16742dbb-1772639649/ivalua.svg-200x-q95.webp 200w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-400x-q95.webp 400w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-800x-q95.webp 800w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-1200x-q95.webp 1200w, /media/pages/home/4b16742dbb-1772639649/ivalua.svg-2400x-q95.webp 2400w">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GRADIENT DIVIDER (white → black) ==================== -->
+  <div style="height: 260px; background: linear-gradient(to bottom, #ffffff 0%, #f5eaf7 18%, #ddb8e0 32%, #8898ae 52%, #1e3040 72%, #111518 88%, #000000 100%);"></div>
+
+  <!-- ==================== TOOLS HEADER ==================== -->
+  <div data-header="light" data-bg="black" class="relative text-white">
+    <div data-background class="absolute inset-0 bg-black"></div>
+    <div class="relative" style="position:relative;z-index:10;">
+      <div class="pt-1 lg:pt-2 pb-0 lg:pb-1">
+        <div class="container">
+          <div class="grid grid-cols-2 gap-x-4 py-2 lg:grid-cols-12">
+            <div class="col-start-1 row-start-1 py-2 lg:col-span-2 lg:col-start-1 tm-12">
+              For your Industry
+            </div>
+            <div class="col-start-1 row-start-2 lg:row-start-1 col-span-2 lg:col-span-8 lg:col-start-3 text-left flex justify-start">
+              <div>
+                <div class="t-16 mb-2">Comprehensive skills</div>
+                <h2 class="text-balance t-20 lg:t-32">3,000+ TOOLS, ONE-CLICK CONNECT</h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOOLS SCROLL TUNNEL ==================== -->
+  <div data-header="light" data-bg="black" class="relative text-white">
+    <ToolsScrollTunnel client:visible />
+  </div>
+
+  <!-- ==================== STRIKETHROUGH LIST ==================== -->
+  <div data-header="light" data-bg="black" class="relative text-white">
+    <StrikethroughList client:visible />
+  </div>
+
+  <!-- ==================== EVERYTHING YOU NEED ==================== -->
+  <div data-header="light" data-bg="black" class="relative text-white">
+    <div data-background class="absolute inset-0 bg-black"></div>
+    <div class="relative">
+      <div class="pt-16 lg:pt-32 pb-16 lg:pb-32">
+        <div class="container">
+          <div class="grid grid-cols-2 gap-x-4 py-4 lg:grid-cols-12">
+            <div class="col-start-1 row-start-2 lg:row-start-1 col-span-2 lg:col-span-8 lg:col-start-3 text-center flex justify-center">
+              <div>
+                <h2 class="text-balance t-20 lg:t-32 inline-flex items-center gap-3">Everything you need is in <svg class="inline-block h-8 w-auto" viewBox="0 0 800 800" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M193.435 0C300.266 0 386.869 86.6036 386.869 193.435V345.42C386.869 368.312 368.311 386.87 345.419 386.87H41.4502C18.5579 386.87 0 368.311 0 345.419V193.435C0 86.6036 86.6036 0 193.435 0ZM180.539 206.328V386.867H206.331V206.328H180.539Z" fill="currentColor"/><path d="M606.095 799.53C499.264 799.53 412.661 712.926 412.661 606.095L412.661 454.11C412.661 431.217 431.219 412.659 454.111 412.659L758.08 412.659C780.972 412.659 799.53 431.218 799.53 454.111L799.53 606.095C799.53 712.926 712.926 799.53 606.095 799.53ZM618.991 593.2L618.991 412.661L593.2 412.661L593.2 593.2L618.991 593.2Z" fill="currentColor"/><path d="M799.531 193.447C799.531 193.551 799.53 193.655 799.53 193.759L799.53 193.134C799.53 193.238 799.531 193.343 799.531 193.447ZM412.662 193.447C412.662 86.6158 499.265 0.0122032 606.096 0.0121986C708.589 0.0121941 792.462 79.725 799.105 180.537L618.991 180.537L618.991 206.329L799.107 206.329C792.478 307.154 708.598 386.881 606.096 386.881C499.265 386.881 412.662 300.278 412.662 193.447Z" fill="currentColor"/><path d="M-8.45487e-06 606.105C-1.0587e-05 557.327 18.0554 512.768 47.8447 478.741L148.407 579.303L166.645 561.066L66.082 460.504C100.109 430.715 144.667 412.66 193.444 412.66C240.179 412.66 283.043 429.237 316.478 456.83L212.225 561.084L230.462 579.322L335.244 474.538C367.28 509.055 386.869 555.285 386.869 606.09C386.869 654.866 368.812 699.424 339.022 733.45L227.657 622.084L209.42 640.322L320.784 751.688C286.758 781.475 242.203 799.53 193.43 799.53C142.628 799.53 96.4006 779.944 61.8848 747.913L169.45 640.348L151.213 622.111L44.1758 729.148C16.5783 695.712 1.56674e-15 652.844 -8.45487e-06 606.105Z" fill="currentColor"/></svg></h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SKILLS TICKER ROWS ==================== -->
+  <div data-header="light" data-bg="black" class="relative text-white">
+    <div data-background class="absolute inset-0 bg-black"></div>
+    <div class="relative">
+      <div class="overflow-clip max-w-screen-2xl mx-auto 2xl:mask-x-from-80% 2xl:mask-x-to-100% pt-16 lg:pt-32 pb-16 lg:pb-32">
+        <div class="space-y-12 mask-radial-at-top mask-radial-from-30% mask-radial-to-100%">
+
+          <!-- Row 1: ticker-reverse, 96.3s -->
+          <div class="flex select-none" style="--duration: 96.3s">
+            <div class="flex gap-10 px-5 shrink-0 ticker-reverse">
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Drive</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> NotebookLM</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Sites</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Slack</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Sheets</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Forms</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Slides</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Vids</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Tasks</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> AppSheet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Notion</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Docs</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Calendar</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Keep</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Meet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Gmail</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Gemini</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Chat</div>
+            </div>
+            <!-- Duplicate for infinite scroll -->
+            <div class="flex gap-10 px-5 shrink-0 ticker-reverse">
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Drive</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> NotebookLM</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Sites</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Slack</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Sheets</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Forms</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Slides</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Vids</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Tasks</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> AppSheet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Notion</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Docs</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Calendar</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Keep</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Meet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Gmail</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Gemini</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Chat</div>
+            </div>
+          </div>
+
+          <!-- Row 2: ticker, 94.5s -->
+          <div class="flex select-none" style="--duration: 94.5s">
+            <div class="flex gap-10 px-5 shrink-0 ticker">
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Drive</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> NotebookLM</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Sites</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Slack</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Sheets</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Forms</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Slides</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Vids</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Tasks</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> AppSheet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Notion</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Docs</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Calendar</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Keep</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Meet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Gmail</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Gemini</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Chat</div>
+            </div>
+            <!-- Duplicate -->
+            <div class="flex gap-10 px-5 shrink-0 ticker">
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Drive</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> NotebookLM</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Sites</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Slack</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Sheets</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Forms</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Slides</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Vids</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Tasks</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> AppSheet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/f4cf98c741-1772639655/1.png" srcset="/media/pages/home/f4cf98c741-1772639655/1-200x-q95.webp 200w, /media/pages/home/f4cf98c741-1772639655/1-400x-q95.webp 400w, /media/pages/home/f4cf98c741-1772639655/1-800x-q95.webp 800w, /media/pages/home/f4cf98c741-1772639655/1-1200x-q95.webp 1200w, /media/pages/home/f4cf98c741-1772639655/1-2400x-q95.webp 2400w"> Notion</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Docs</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Calendar</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/8cf01e4116-1772639655/3.png" srcset="/media/pages/home/8cf01e4116-1772639655/3-200x-q95.webp 200w, /media/pages/home/8cf01e4116-1772639655/3-400x-q95.webp 400w, /media/pages/home/8cf01e4116-1772639655/3-800x-q95.webp 800w, /media/pages/home/8cf01e4116-1772639655/3-1200x-q95.webp 1200w, /media/pages/home/8cf01e4116-1772639655/3-2400x-q95.webp 2400w"> Keep</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/0a4b5ac7a7-1772639654/2.png" srcset="/media/pages/home/0a4b5ac7a7-1772639654/2-200x-q95.webp 200w, /media/pages/home/0a4b5ac7a7-1772639654/2-400x-q95.webp 400w, /media/pages/home/0a4b5ac7a7-1772639654/2-800x-q95.webp 800w, /media/pages/home/0a4b5ac7a7-1772639654/2-1200x-q95.webp 1200w, /media/pages/home/0a4b5ac7a7-1772639654/2-2400x-q95.webp 2400w"> Meet</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/3eb80cbf33-1772639652/5.png" srcset="/media/pages/home/3eb80cbf33-1772639652/5-200x-q95.webp 200w, /media/pages/home/3eb80cbf33-1772639652/5-400x-q95.webp 400w, /media/pages/home/3eb80cbf33-1772639652/5-800x-q95.webp 800w, /media/pages/home/3eb80cbf33-1772639652/5-1200x-q95.webp 1200w, /media/pages/home/3eb80cbf33-1772639652/5-2400x-q95.webp 2400w"> Gmail</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Gemini</div>
+              <div class="flex gap-2 justify-center items-center px-2 pr-4 h-10 rounded-lg border bg-white/5 border-white/5 tm-14"><img alt="" class="size-6 rounded block" loading="lazy" sizes="100px" src="/media/pages/home/1f28b923b2-1772639652/4.png" srcset="/media/pages/home/1f28b923b2-1772639652/4-200x-q95.webp 200w, /media/pages/home/1f28b923b2-1772639652/4-400x-q95.webp 400w, /media/pages/home/1f28b923b2-1772639652/4-800x-q95.webp 800w, /media/pages/home/1f28b923b2-1772639652/4-1200x-q95.webp 1200w, /media/pages/home/1f28b923b2-1772639652/4-2400x-q95.webp 2400w"> Chat</div>
+            </div>
+          </div>
+
+          <!-- Rows 3 and 4 follow the same pattern with ticker-reverse (104.4s) and ticker (96.3s) - omitted for brevity, using rows 1 and 2 patterns -->
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GRADIENT DIVIDER (black → white) ==================== -->
+  <div style="height: 260px; background: linear-gradient(to bottom, #0a0b0c 0%, #111518 12%, #1e3040 28%, #8898ae 48%, #ddb8e0 68%, #f5eaf7 82%, #ffffff 100%);"></div>
+
+  <!-- ==================== TEXT REVEAL ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <div class="relative">
+      <div class="pt-8 lg:pt-8 pb-2 bg-white">
+        <div class="container">
+          <div class="mx-auto max-w-[58.625rem]">
+            <TextReveal client:visible>
+              <div class="mb-10 tm-12">
+                The simplest OpenClaw. Built for your team.
+              </div>
+              <div id="nexu-text-reveal" class="space-y-8 t-24 lg:t-32">
+                <p>Born to truly work for you</p>
+              </div>
+            </TextReveal>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== FEATURES SCROLL TUNNEL ==================== -->
+  <div id="toc-module" data-header="dark" data-bg="white" class="relative text-black">
+    <FeaturesScrollTunnel client:visible />
+  </div>
+
+  <!-- ==================== KPI CARDS ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <KpiCards client:visible />
+  </div>
+
+  <!-- ==================== OUR PROMISE ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <div class="relative">
+      <div class="pt-16 lg:pt-32 pb-16 lg:pb-32 bg-white">
+        <div class="container">
+          <div class="mx-auto max-w-[58.625rem]">
+            <div class="mb-10 tm-12">
+              Our Promise to you
+            </div>
+            <TextReveal client:visible>
+              <div class="space-y-8 t-24 lg:t-32">
+                <p>OpenClaw should be powerful for builders, but simple enough for anyone to start using on day one. That is the product standard we are building toward.</p>
+                <p>Too many open-source agent tools ask users to fight installation guides, environment dependencies, and scattered integrations before they feel any real value. We think the first experience should be the opposite: download the client, double-click to install, and start working in minutes.</p>
+                <p>That is why Nexu packages OpenClaw into a local Mac app, bundles OpenClaw Skills with full Feishu Skills, and removes the friction between ideas and execution.</p>
+                <p>You can begin instantly with Nexu access to top-tier models, or stay fully in control with your own API Key and no login at all.</p>
+                <p>Open source should not mean harder to use. It should mean more freedom, more trust, and more leverage for every team.</p>
+              </div>
+            </TextReveal>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== AWARDS HEADER ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <div class="relative">
+      <div class="pt-8 lg:pt-16">
+        <div class="container">
+          <div class="grid grid-cols-2 gap-x-4 py-4 lg:grid-cols-12">
+            <div class="col-start-1 row-start-1 py-2 lg:col-span-2 lg:col-start-1 tm-12">
+              Proven. Recognized. Adopted.
+            </div>
+            <div class="col-start-1 row-start-2 lg:row-start-1 col-span-2 lg:col-span-8 lg:col-start-3 text-left flex justify-start">
+              <div>
+                <h2 class="text-balance t-20 lg:t-32">The most awarded and adopted multi-agent<br />procurement system worldwide</h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== AWARDS CARDS ==================== -->
+  <div data-header="dark" data-bg="white" class="relative text-black">
+    <div class="relative">
+      <div class="container-outer pt-16 lg:pt-32 pb-8 lg:pb-16 bg-white">
+        <div class="container">
+          <div class="grid-cols-12 gap-4 lg:grid">
+            <div class="col-span-10 col-start-3">
+              <div class="grid-cols-6 gap-2 lg:grid max-lg:space-y-4">
+
+                <!-- DPW Growth Award -->
+                <div class="col-span-3 row-span-2 p-6 rounded-lg lg:p-12 bg-gray-light">
+                  <img alt="" class="w-full object-cover aspect-square" height="898" loading="lazy" sizes="(min-width: 1024px) 600px, 100vw" src="/media/pages/home/b08578e26e-1772639644/dpw-award.jpg" srcset="/media/pages/home/b08578e26e-1772639644/dpw-award-200x-q95.webp 200w, /media/pages/home/b08578e26e-1772639644/dpw-award-400x-q95.webp 400w, /media/pages/home/b08578e26e-1772639644/dpw-award-800x-q95.webp 800w, /media/pages/home/b08578e26e-1772639644/dpw-award-1200x-q95.webp 1200w, /media/pages/home/b08578e26e-1772639644/dpw-award-2400x-q95.webp 2400w" width="978">
+                  <div class="mt-12 t-16">
+                    Over 150 procurement solutions applied &ndash; and we prevailed against competitors twice our age. A jury of 80+ international CPOs from leading enterprises selected Lio as the winner for DPW Growth Award.
+                  </div>
+                </div>
+
+                <!-- BME Award -->
+                <div class="flex flex-col col-span-3 p-6 rounded-lg lg:p-12 bg-gray-light">
+                  <img alt="" class="object-contain w-20 h-10 ml-auto mb-6" loading="lazy" sizes="(min-width: 1024px) 600px, 100vw" src="/media/pages/home/d0ead2bafb-1772639645/bme-logo.9707614d.svg">
+                  <div class="mt-auto t-20">
+                    Awarded the BME Procurement Excellence Award with REHAU &mdash; recognizing our innovation and the trust our customers place in us.
+                  </div>
+                </div>
+
+                <!-- Award logos ticker -->
+                <div class="flex flex-col col-span-3 p-6 rounded-lg lg:p-12 bg-gray-light">
+                  <div class="tm-12">
+                    We won every Award we ever participated in
+                  </div>
+                  <div class="overflow-clip mask-x-from-90% mask-x-to-100% my-auto max-lg:pt-8">
+                    <div class="flex select-none">
+                      <div class="flex gap-20 px-10 shrink-0 ticker grayscale" style="--duration: 25s">
+                        <img alt="Handelsblatt" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/0bcf04f89e-1772639654/handelsblatt.svg">
+                        <img alt="" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/8bc0759200-1772639642/idmmyqwegn_1760464458851-4.svg">
+                        <img alt="BME" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/d0ead2bafb-1772639645/bme-logo.9707614d.svg">
+                        <img alt="Fortune500" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/598838fbc5-1772639648/fortune500.svg">
+                        <img alt="ProcureTech" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/0ff5b5d994-1772639649/procuretech.svg">
+                      </div>
+                      <!-- Duplicate for infinite scroll -->
+                      <div class="flex gap-20 px-10 shrink-0 ticker grayscale" style="--duration: 25s">
+                        <img alt="Handelsblatt" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/0bcf04f89e-1772639654/handelsblatt.svg">
+                        <img alt="" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/8bc0759200-1772639642/idmmyqwegn_1760464458851-4.svg">
+                        <img alt="BME" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/d0ead2bafb-1772639645/bme-logo.9707614d.svg">
+                        <img alt="Fortune500" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/598838fbc5-1772639648/fortune500.svg">
+                        <img alt="ProcureTech" class="h-6 w-auto" loading="lazy" sizes="200px" src="/media/pages/home/0ff5b5d994-1772639649/procuretech.svg">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIDEO MODAL ==================== -->
+  <VideoModal client:visible />
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="w-full text-black bg-white relative overflow-hidden">
+    <div class="container flex relative flex-col max-lg:space-y-12 lg:h-90" style="z-index:1">
+
+      <div class="flex pointer-events-none lg:absolute lg:inset-0 lg:size-full">
+        <div class="flex gap-12 items-center m-auto t-16 lg:t-40">
+          <div>
+            <svg id="footer-logo" style="height:48px;width:auto;pointer-events:auto" viewBox="0 0 186 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path style="fill:#2D2D2D;transition:none" data-hover-fill="#F8672F" d="M20.5645 0C31.9219 0 41.1289 9.20701 41.1289 20.5645V36.7227C41.1288 39.1562 39.1562 41.1287 36.7227 41.1289H21.9355V21.9355H19.1934V41.1289H4.40625C1.97279 41.1287 0.000138274 39.1561 0 36.7227V20.5645C3.84333e-05 9.20704 9.20704 3.19551e-05 20.5645 0Z"/>
+              <path style="fill:#2D2D2D;transition:none" data-hover-fill="#F3B0FF" d="M164.564 41.1289C153.207 41.1289 144 31.9219 144 20.5644L144 4.40625C144 1.97273 145.973 0.000167371 148.406 -3.21038e-06L163.193 -1.91765e-06L163.193 19.1934L165.936 19.1934L165.936 -1.67792e-06L180.723 -3.85189e-07C183.156 0.000235526 185.129 1.97277 185.129 4.40625L185.129 20.5645C185.129 31.9219 175.922 41.1289 164.564 41.1289Z"/>
+              <path style="fill:#2D2D2D;transition:none" data-hover-fill="#EDC337" d="M48 20.5645C48 9.20701 57.207 3.15549e-05 68.5645 -8.98901e-07C79.4608 -1.3752e-06 88.376 8.47467 89.082 19.1924L69.9355 19.1924L69.9355 21.9336L89.082 21.9336C88.3773 32.6526 79.4618 41.1289 68.5645 41.1289C57.207 41.1289 48 31.9219 48 20.5645Z"/>
+              <path style="fill:#2D2D2D;transition:none" data-hover-fill="#346E58" d="M96 20.5654C96 15.38 97.9192 10.6428 101.086 7.02539L111.777 17.7158L113.717 15.7773L103.025 5.08691C106.643 1.91987 111.38 2.64066e-05 116.565 -8.98943e-07C121.534 -1.11613e-06 126.091 1.76265 129.646 4.69629L118.562 15.7793L120.501 17.7178L131.64 6.58008C135.045 10.2495 137.129 15.1626 137.129 20.5635C137.129 25.7492 135.209 30.487 132.042 34.1045L120.203 22.2646L118.264 24.2031L130.103 36.043C126.485 39.2093 121.749 41.1288 116.564 41.1289C111.163 41.1289 106.249 39.0462 102.579 35.6406L114.015 24.2061L112.076 22.2666L100.696 33.6465C97.7624 30.0918 96 25.5344 96 20.5654Z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="pb-10 mt-auto lg:flex t-12 max-lg:space-y-4">
+        <nav class="flex gap-6 ml-auto">
+          <a class="text-black transition-colors flex items-center gap-1" href="javascript:void(0)" rel="noopener noreferrer" target="_blank"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="height:16px;width:16px"><path d="M17.6874 3.0625L12.6907 8.77425L8.37045 3.0625H2.11328L9.58961 12.8387L2.50378 20.9375H5.53795L11.0068 14.6886L15.7863 20.9375H21.8885L14.095 10.6342L20.7198 3.0625H17.6874ZM16.6232 19.1225L5.65436 4.78217H7.45745L18.3034 19.1225H16.6232Z"></path></svg>x</a>
+          <a class="text-black transition-colors flex items-center gap-1" href="javascript:void(0)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="height:16px;width:16px"><path d="M13.0281 2.00073C14.1535 2.00259 14.7238 2.00855 15.2166 2.02322L15.4107 2.02956C15.6349 2.03753 15.8561 2.04753 16.1228 2.06003C17.1869 2.1092 17.9128 2.27753 18.5503 2.52503C19.2094 2.7792 19.7661 3.12253 20.3219 3.67837C20.8769 4.2342 21.2203 4.79253 21.4753 5.45003C21.7219 6.0867 21.8903 6.81337 21.9403 7.87753C21.9522 8.1442 21.9618 8.3654 21.9697 8.58964L21.976 8.78373C21.9906 9.27647 21.9973 9.84686 21.9994 10.9723L22.0002 11.7179C22.0003 11.809 22.0003 11.903 22.0003 12L22.0002 12.2821L21.9996 13.0278C21.9977 14.1532 21.9918 14.7236 21.9771 15.2163L21.9707 15.4104C21.9628 15.6347 21.9528 15.8559 21.9403 16.1225C21.8911 17.1867 21.7219 17.9125 21.4753 18.55C21.2211 19.2092 20.8769 19.7659 20.3219 20.3217C19.7661 20.8767 19.2069 21.22 18.5503 21.475C17.9128 21.7217 17.1869 21.89 16.1228 21.94C15.8561 21.9519 15.6349 21.9616 15.4107 21.9694L15.2166 21.9757C14.7238 21.9904 14.1535 21.997 13.0281 21.9992L12.2824 22C12.1913 22 12.0973 22 12.0003 22L11.7182 22L10.9725 21.9993C9.8471 21.9975 9.27672 21.9915 8.78397 21.9768L8.58989 21.9705C8.36564 21.9625 8.14444 21.9525 7.87778 21.94C6.81361 21.8909 6.08861 21.7217 5.45028 21.475C4.79194 21.2209 4.23444 20.8767 3.67861 20.3217C3.12278 19.7659 2.78028 19.2067 2.52528 18.55C2.27778 17.9125 2.11028 17.1867 2.06028 16.1225C2.0484 15.8559 2.03871 15.6347 2.03086 15.4104L2.02457 15.2163C2.00994 14.7236 2.00327 14.1532 2.00111 13.0278L2.00098 10.9723C2.00284 9.84686 2.00879 9.27647 2.02346 8.78373L2.02981 8.58964C2.03778 8.3654 2.04778 8.1442 2.06028 7.87753C2.10944 6.81253 2.27778 6.08753 2.52528 5.45003C2.77944 4.7917 3.12278 4.2342 3.67861 3.67837C4.23444 3.12253 4.79278 2.78003 5.45028 2.52503C6.08778 2.27753 6.81278 2.11003 7.87778 2.06003C8.14444 2.04816 8.36564 2.03847 8.58989 2.03062L8.78397 2.02433C9.27672 2.00969 9.8471 2.00302 10.9725 2.00086L13.0281 2.00073ZM12.0003 7.00003C9.23738 7.00003 7.00028 9.23956 7.00028 12C7.00028 14.7629 9.23981 17 12.0003 17C14.7632 17 17.0003 14.7605 17.0003 12C17.0003 9.23713 14.7607 7.00003 12.0003 7.00003ZM12.0003 9.00003C13.6572 9.00003 15.0003 10.3427 15.0003 12C15.0003 13.6569 13.6576 15 12.0003 15C10.3434 15 9.00028 13.6574 9.00028 12C9.00028 10.3431 10.3429 9.00003 12.0003 9.00003ZM17.2503 5.50003C16.561 5.50003 16.0003 6.05994 16.0003 6.74918C16.0003 7.43843 16.5602 7.9992 17.2503 7.9992C17.9395 7.9992 18.5003 7.4393 18.5003 6.74918C18.5003 6.05994 17.9386 5.49917 17.2503 5.50003Z"></path></svg>instagram</a>
+          <a class="text-black transition-colors flex items-center gap-1" href="javascript:void(0)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="height:16px;width:16px"><path d="M3 3H21C21.5523 3 22 3.44772 22 4V20C22 20.5523 21.5523 21 21 21H3C2.44772 21 2 20.5523 2 20V4C2 3.44772 2.44772 3 3 3ZM12.0606 11.6829L5.64722 6.2377L4.35278 7.7623L12.0731 14.3171L19.6544 7.75616L18.3456 6.24384L12.0606 11.6829Z"></path></svg>email</a>
+          <a href="javascript:void(0)" target="_blank" rel="noopener noreferrer" class="text-black transition-colors">Join Us</a>
+        </nav>
+
+        <div class="lg:order-first">
+          &copy; 2026 nexu Technologies, Inc.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  </div><!-- /relative bg-white -->
+
+  <!-- ==================== AFTER-BODY SCRIPTS ==================== -->
+  <script>
+    // Nexu heading animation observer
+    const nexuEl = document.getElementById('nexu-heading');
+    if (nexuEl) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            nexuEl.classList.remove('animate');
+            void nexuEl.offsetWidth;
+            nexuEl.classList.add('animate');
+            nexuEl.addEventListener('animationend', () => {
+              nexuEl.classList.remove('animate');
+            }, { once: true });
+          }
         });
+      }, { threshold: 0.5 });
+      observer.observe(nexuEl);
+    }
+  </script>
+  <script>
+    // Text reveal → toc-module sequencing
+    const textRevealEl = document.getElementById('nexu-text-reveal');
+    const tocModule = document.getElementById('toc-module');
+    if (textRevealEl && tocModule) {
+      let triggered = false;
 
-        amplitude.track("landing_view");
-
-        document.querySelectorAll<HTMLAnchorElement>('a[href="/auth"]').forEach((el) => {
-          el.addEventListener("click", () => {
-            amplitude.track("landing_cta_click");
-          });
-        });
+      function showToc() {
+        if (triggered) return;
+        triggered = true;
+        tocModule.style.opacity = '1';
+        tocModule.style.transform = 'translateY(0)';
       }
-    </script>
-  </body>
+
+      const fullyVisible = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && !triggered) {
+            const words = textRevealEl.innerText.trim().split(/\s+/).length;
+            const delay = words * 55 + 800;
+            setTimeout(showToc, delay);
+            fullyVisible.unobserve(textRevealEl);
+          }
+        });
+      }, { threshold: 1.0 });
+
+      fullyVisible.observe(textRevealEl);
+
+      // Fallback
+      const fallback = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting && !triggered) {
+            setTimeout(showToc, 500);
+          }
+        });
+      }, { threshold: 0 });
+      fallback.observe(textRevealEl);
+    }
+  </script>
+  <script>
+    // Footer logo hover effects
+    const footerLogo = document.getElementById('footer-logo');
+    if (footerLogo) {
+      footerLogo.querySelectorAll('path[data-hover-fill]').forEach(path => {
+        const hoverColor = path.getAttribute('data-hover-fill');
+        path.addEventListener('mouseenter', () => { path.style.fill = hoverColor; });
+        path.addEventListener('mouseleave', () => { path.style.fill = '#2D2D2D'; });
+      });
+    }
+  </script>
+  <script>
+    // Footer aurora observer
+    const footerAurora = document.getElementById('footer-aurora');
+    if (footerAurora) {
+      new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) footerAurora.classList.add('is-visible'); });
+      }, { threshold: 0.05 }).observe(footerAurora);
+    }
+  </script>
+</body>
+
 </html>

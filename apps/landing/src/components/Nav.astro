@@ -1,0 +1,193 @@
+---
+// Nav.astro — Fixed navigation matching source nav.html
+---
+
+<header
+  id="site-nav"
+  class="fixed top-0 z-20 w-full transition-all duration-500"
+  data-theme="light"
+>
+  <div id="nav-blur-wrap">
+    <div class="container">
+      <div class="flex items-center h-14 rounded-lg transition-all duration-500 lg:px-6 lg:-mx-6">
+        <!-- Logo: full SVG wordmark from source -->
+        <a href="/" class="block transition-colors nav-fill">
+          <svg style="height:24px;width:auto" viewBox="0 0 285 85" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20.5645 0C31.9219 0 41.1289 9.20701 41.1289 20.5645V36.7227C41.1288 39.1562 39.1562 41.1287 36.7227 41.1289H21.9355V21.9355H19.1934V41.1289H4.40625C1.97279 41.1287 0.000138274 39.1561 0 36.7227V20.5645C3.84333e-05 9.20704 9.20704 3.19551e-05 20.5645 0Z" fill="currentColor"/><path d="M64.4355 85C53.0781 85 43.8711 75.793 43.8711 64.4355L43.8711 48.2773C43.8712 45.8438 45.8438 43.8713 48.2773 43.8711L63.0645 43.8711L63.0645 63.0645L65.8066 63.0645L65.8066 43.8711L80.5938 43.8711C83.0272 43.8713 84.9999 45.8439 85 48.2773L85 64.4355C85 75.793 75.793 85 64.4355 85Z" fill="currentColor"/><path d="M43.8711 20.5659C43.8711 9.20847 53.0781 0.0014964 64.4355 0.00146394C75.3319 0.00146347 84.2471 8.47613 84.9531 19.1938L65.8066 19.1938L65.8066 21.9351L84.9531 21.9351C84.2484 32.6541 75.3329 41.1304 64.4355 41.1304C53.0781 41.1303 43.8711 31.9233 43.8711 20.5659Z" fill="currentColor"/><path d="M-8.98858e-07 64.4365C-1.12552e-06 59.2511 1.91919 54.5139 5.08594 50.8965L15.7773 61.5869L17.7168 59.6484L7.02539 48.958C10.6429 45.791 15.3797 43.8711 20.5654 43.8711C25.5341 43.8711 30.0909 45.6337 33.6455 48.5674L22.5625 59.6504L24.501 61.5889L35.6396 50.4512C39.0451 54.1206 41.1288 59.0337 41.1289 64.4346C41.1289 69.6203 39.2093 74.3581 36.042 77.9756L24.2031 66.1357L22.2637 68.0742L34.1025 79.9141C30.4854 83.0804 25.7492 84.9999 20.5645 85C15.1634 85 10.2486 82.9172 6.5791 79.5117L18.0146 68.0771L16.0762 66.1377L4.69629 77.5176C1.76236 73.9629 1.29779e-06 69.4055 -8.98858e-07 64.4365Z" fill="currentColor"/><path d="M97.774 62.1873V42.5934C97.774 33.1247 105.45 25.4487 114.919 25.4487C124.387 25.4487 132.063 33.1247 132.063 42.5934V62.1873" stroke="currentColor" stroke-width="7.60233"/><mask id="nav-logo-mask-1" fill="white"><path d="M164.882 23.0129C175.704 23.0129 184.476 31.7855 184.476 42.6067C184.476 43.3676 184.431 44.1183 184.346 44.8567H176.663C176.801 44.1279 176.875 43.3758 176.875 42.6067C176.874 35.9841 171.505 30.6155 164.882 30.6155C158.26 30.6156 152.891 35.9842 152.891 42.6067C152.891 49.2294 158.26 54.5987 164.882 54.5989C169.298 54.5989 173.154 52.2109 175.235 48.6575H183.523C180.974 56.5175 173.592 62.2004 164.882 62.2004C154.061 62.2003 145.289 53.428 145.289 42.6067C145.289 31.7855 154.061 23.0131 164.882 23.0129Z"/></mask><path d="M164.882 23.0129C175.704 23.0129 184.476 31.7855 184.476 42.6067C184.476 43.3676 184.431 44.1183 184.346 44.8567H176.663C176.801 44.1279 176.875 43.3758 176.875 42.6067C176.874 35.9841 171.505 30.6155 164.882 30.6155C158.26 30.6156 152.891 35.9842 152.891 42.6067C152.891 49.2294 158.26 54.5987 164.882 54.5989C169.298 54.5989 173.154 52.2109 175.235 48.6575H183.523C180.974 56.5175 173.592 62.2004 164.882 62.2004C154.061 62.2003 145.289 53.428 145.289 42.6067C145.289 31.7855 154.061 23.0131 164.882 23.0129Z" fill="currentColor" mask="url(#nav-logo-mask-1)"/><path d="M160.493 39.1547L182.35 39.1547L184.251 44.8564L160.493 44.8564V39.1547Z" fill="currentColor"/><mask id="nav-logo-mask-2" fill="white"><path d="M232.941 23.0061C232.938 33.8252 224.167 42.595 213.347 42.595C202.528 42.5949 193.756 33.8251 193.754 23.0061H201.356C201.359 29.6265 206.726 34.9933 213.347 34.9934C219.968 34.9934 225.337 29.6265 225.339 23.0061H232.941Z"/></mask><path d="M232.941 23.0061C232.938 33.8252 224.167 42.595 213.347 42.595C202.528 42.5949 193.756 33.8251 193.754 23.0061H201.356C201.359 29.6265 206.726 34.9933 213.347 34.9934C219.968 34.9934 225.337 29.6265 225.339 23.0061H232.941Z" fill="currentColor" mask="url(#nav-logo-mask-2)"/><mask id="nav-logo-mask-3" fill="white"><path d="M193.757 62.1821C193.76 51.3631 202.531 42.5933 213.35 42.5933C224.17 42.5934 232.941 51.3632 232.944 62.1821L225.342 62.1821C225.339 55.5618 219.971 50.1949 213.35 50.1948C206.729 50.1948 201.361 55.5618 201.358 62.1821L193.757 62.1821Z"/></mask><path d="M193.757 62.1821C193.76 51.3631 202.531 42.5933 213.35 42.5933C224.17 42.5934 232.941 51.3632 232.944 62.1821L225.342 62.1821C225.339 55.5618 219.971 50.1949 213.35 50.1948C206.729 50.1948 201.361 55.5618 201.358 62.1821L193.757 62.1821Z" fill="currentColor" mask="url(#nav-logo-mask-3)"/></svg>
+        </a>
+
+        <!-- Desktop nav links -->
+        <nav class="flex gap-2 items-center ml-auto font-medium transition-colors t-14 max-lg:hidden">
+          <a class="px-2.5 font-medium transition-opacity hover:opacity-70 nav-link" href="javascript:void(0)">Installation</a>
+          <a class="px-2.5 font-medium transition-opacity hover:opacity-70 nav-link" href="javascript:void(0)">Skills</a>
+          <a class="px-2.5 font-medium transition-opacity hover:opacity-70 nav-link" href="javascript:void(0)">Model</a>
+          <a class="px-2.5 font-medium transition-opacity hover:opacity-70 nav-link" href="javascript:void(0)" target="_blank">nexu Blog</a>
+          <a class="px-2.5 font-medium transition-opacity hover:opacity-70 nav-link" href="javascript:void(0)">Open source</a>
+
+          <!-- Language switcher -->
+          <div class="relative h-14 flex items-center" id="lang-switcher">
+            <button type="button" id="lang-toggle" class="flex items-center gap-1 px-2.5 font-medium transition-opacity hover:opacity-70 nav-link">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="height:16px;width:16px"><path d="M19.7134 8.12811L19.4668 8.69379C19.2864 9.10792 18.7136 9.10792 18.5331 8.69379L18.2866 8.12811C17.8471 7.11947 17.0555 6.31641 16.0677 5.87708L15.308 5.53922C14.8973 5.35653 14.8973 4.75881 15.308 4.57612L16.0252 4.25714C17.0384 3.80651 17.8442 2.97373 18.2761 1.93083L18.5293 1.31953C18.7058 0.893489 19.2942 0.893489 19.4706 1.31953L19.7238 1.93083C20.1558 2.97373 20.9616 3.80651 21.9748 4.25714L22.6919 4.57612C23.1027 4.75881 23.1027 5.35653 22.6919 5.53922L21.9323 5.87708C20.9445 6.31641 20.1529 7.11947 19.7134 8.12811ZM5 17V15H3V17C3 19.2091 4.79086 21 7 21H10V19H7L6.85074 18.9945C5.81588 18.9182 5 18.0544 5 17ZM22.4 21L18 10H16L11.601 21H13.755L14.954 18H19.044L20.245 21H22.4ZM15.753 16L17 12.8852L18.245 16H15.753ZM8 4V2H6V4H2V11H6V14H8V11H12V4H8ZM4 6H6V9H4V6ZM8 6H10V9H8V6Z"></path></svg>
+              English
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="height:20px;width:20px"><path d="M12 14L8 10H16L12 14Z"></path></svg>
+            </button>
+            <div id="lang-dropdown" class="absolute top-full right-0 bg-white shadow-xl p-4 min-w-36 z-50 opacity-0 pointer-events-none transition-opacity duration-200" style="margin-top:4px;border-radius:8px;display:flex;flex-direction:column;gap:12px;border:1px solid #e5e7eb">
+              <a href="javascript:void(0)" class="block text-black font-medium hover:opacity-70 transition-opacity whitespace-nowrap text-base" style="margin-bottom:8px">English</a>
+              <a href="javascript:void(0)" class="block text-black font-medium hover:opacity-70 transition-opacity whitespace-nowrap text-base">中文</a>
+            </div>
+          </div>
+
+          <!-- CTA button -->
+          <a class="flex justify-center items-center px-3 font-medium rounded backdrop-blur-xl transition-all nav-cta" href="javascript:void(0)" style="height:34px;background:rgba(255,255,255,0.15)">
+            Download Mac client
+          </a>
+        </nav>
+
+        <!-- Mobile hamburger -->
+        <button
+          type="button"
+          id="mobile-menu-toggle"
+          class="flex justify-center items-center ml-auto transition-colors lg:hidden size-6"
+          aria-label="Toggle menu"
+        >
+          <svg id="hamburger-open" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 nav-link" viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg>
+          <svg id="hamburger-close" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 nav-link" style="display:none"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Mobile nav -->
+<div id="mobile-nav" class="overflow-y-auto fixed inset-x-0 top-14 z-20 bg-white lg:hidden" style="max-height:calc(100dvh - 3.5rem);display:none;transform:translateY(-100%);transition:transform 0.2s ease">
+  <div class="container flex flex-col pt-5 pb-5 min-h-full">
+    <nav class="flex-1 space-y-1">
+      <a class="block py-4 font-medium text-black t-14 mobile-nav-link" href="javascript:void(0)">Installation</a>
+      <a class="block py-4 font-medium text-black t-14 mobile-nav-link" href="javascript:void(0)">Skills</a>
+      <a class="block py-4 font-medium text-black t-14 mobile-nav-link" href="javascript:void(0)">Model</a>
+      <a class="block py-4 font-medium text-black t-14 mobile-nav-link" href="javascript:void(0)">nexu Blog</a>
+      <a class="block py-4 font-medium text-black t-14 mobile-nav-link" href="javascript:void(0)">Open source</a>
+      <a class="btn btn-gray my-2" href="javascript:void(0)">Download Mac client</a>
+    </nav>
+  </div>
+</div>
+
+<style>
+  /* Theme: light = white text, dark = black text */
+  #site-nav[data-theme="light"] .nav-link,
+  #site-nav[data-theme="light"] .nav-fill {
+    color: white;
+    fill: white;
+  }
+  #site-nav[data-theme="dark"] .nav-link,
+  #site-nav[data-theme="dark"] .nav-fill {
+    color: black;
+    fill: black;
+  }
+  #site-nav[data-theme="dark"] .nav-cta {
+    background: rgba(0,0,0,0.08) !important;
+    color: black;
+  }
+  #site-nav[data-theme="light"] .nav-cta {
+    background: rgba(255,255,255,0.15) !important;
+    color: white;
+  }
+  #site-nav.scrolled #nav-blur-wrap {
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  #site-nav[data-theme="dark"].scrolled #nav-blur-wrap {
+    background: rgba(255,255,255,0.8);
+  }
+  #site-nav[data-theme="light"].scrolled #nav-blur-wrap {
+    background: rgba(0,0,0,0.01);
+  }
+</style>
+
+<script>
+  const nav = document.getElementById("site-nav") as HTMLElement;
+  const mobileToggle = document.getElementById("mobile-menu-toggle") as HTMLElement;
+  const mobileNav = document.getElementById("mobile-nav") as HTMLElement;
+  const langToggle = document.getElementById("lang-toggle") as HTMLElement;
+  const langDropdown = document.getElementById("lang-dropdown") as HTMLElement;
+  const hamburgerOpen = document.getElementById("hamburger-open") as HTMLElement;
+  const hamburgerClose = document.getElementById("hamburger-close") as HTMLElement;
+
+  // --- Scroll-based theme detection ---
+  const NAV_PROBE_Y = 44;
+  const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-header]"));
+
+  function updateTheme() {
+    let theme = "light";
+    for (let i = sections.length - 1; i >= 0; i--) {
+      const rect = sections[i].getBoundingClientRect();
+      if (rect.top <= NAV_PROBE_Y) {
+        theme = sections[i].dataset.header || "light";
+        break;
+      }
+    }
+    nav.dataset.theme = theme;
+  }
+
+  function updateScrollState() {
+    if (window.scrollY > 20) {
+      nav.classList.add("scrolled");
+    } else {
+      nav.classList.remove("scrolled");
+    }
+  }
+
+  window.addEventListener("scroll", () => {
+    updateTheme();
+    updateScrollState();
+  }, { passive: true });
+
+  updateTheme();
+  updateScrollState();
+
+  // --- Mobile menu ---
+  let menuOpen = false;
+  mobileToggle.addEventListener("click", () => {
+    menuOpen = !menuOpen;
+    if (menuOpen) {
+      mobileNav.style.display = "block";
+      requestAnimationFrame(() => { mobileNav.style.transform = "translateY(0)"; });
+      hamburgerOpen.style.display = "none";
+      hamburgerClose.style.display = "block";
+      document.body.style.overflow = "hidden";
+    } else {
+      mobileNav.style.transform = "translateY(-100%)";
+      setTimeout(() => { mobileNav.style.display = "none"; }, 200);
+      hamburgerOpen.style.display = "block";
+      hamburgerClose.style.display = "none";
+      document.body.style.overflow = "";
+    }
+  });
+
+  mobileNav.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      menuOpen = false;
+      mobileNav.style.transform = "translateY(-100%)";
+      setTimeout(() => { mobileNav.style.display = "none"; }, 200);
+      hamburgerOpen.style.display = "block";
+      hamburgerClose.style.display = "none";
+      document.body.style.overflow = "";
+    });
+  });
+
+  // --- Language dropdown ---
+  let langOpen = false;
+  langToggle?.addEventListener("click", () => {
+    langOpen = !langOpen;
+    langDropdown.style.opacity = langOpen ? "1" : "0";
+    langDropdown.style.pointerEvents = langOpen ? "auto" : "none";
+  });
+
+  document.addEventListener("click", (e) => {
+    const switcher = document.getElementById("lang-switcher");
+    if (switcher && !switcher.contains(e.target as Node) && langOpen) {
+      langOpen = false;
+      langDropdown.style.opacity = "0";
+      langDropdown.style.pointerEvents = "none";
+    }
+  });
+</script>
