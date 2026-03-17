@@ -81,6 +81,7 @@ const poolRegisterRoute = createRoute({
   tags: ["Internal"],
   request: {
     body: {
+      required: true,
       content: { "application/json": { schema: runtimePoolRegisterSchema } },
     },
   },
@@ -100,6 +101,7 @@ const poolHeartbeatRoute = createRoute({
   tags: ["Internal"],
   request: {
     body: {
+      required: true,
       content: { "application/json": { schema: runtimePoolHeartbeatSchema } },
     },
   },
@@ -472,7 +474,7 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
 
   app.openapi(poolRegisterRoute, async (c) => {
     requireInternalToken(c);
-    const input = c.req.valid("json");
+    const input = runtimePoolRegisterSchema.parse(await c.req.json());
     const now = new Date().toISOString();
 
     await db
@@ -500,7 +502,7 @@ export function registerPoolRoutes(app: OpenAPIHono<AppBindings>) {
 
   app.openapi(poolHeartbeatRoute, async (c) => {
     requireInternalToken(c);
-    const input = c.req.valid("json");
+    const input = runtimePoolHeartbeatSchema.parse(await c.req.json());
     const now = input.timestamp ?? new Date().toISOString();
 
     await db

@@ -36,8 +36,8 @@ export async function seedDev(dbUrl?: string) {
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();
 
-  // In Docker Compose, 'gateway' resolves via DNS; locally use '127.0.0.1'
-  const podIp = process.env.AUTO_SEED === "true" ? "gateway" : "127.0.0.1";
+  // In Docker/K8s, 'gateway' resolves via DNS; locally use '127.0.0.1'
+  const podIp = process.env.RUNTIME_POD_IP ?? "127.0.0.1";
 
   try {
     // Gateway pool for local dev

@@ -26,7 +26,7 @@ After any API route/schema change: `pnpm generate-types` then `pnpm typecheck`.
 | `/workspace` | Sessions | Bot conversation sessions |
 | `/workspace/sessions` | Sessions | Bot conversation sessions |
 | `/workspace/sessions/:id` | Sessions | Session detail |
-| `/workspace/channels` | Channels | Connected Slack workspaces, "Add to Slack" |
+| `/workspace/channels` | Channels | Multi-platform channel management (Slack, Discord, Feishu) |
 | `/workspace/channels/slack/callback` | Slack OAuth Callback | Handles Slack redirect |
 | `/workspace/integrations` | Integrations | Composio toolkit connections (OAuth) |
 | `/workspace/oauth-callback/:integrationId` | OAuth Callback | Handles Composio OAuth redirect |

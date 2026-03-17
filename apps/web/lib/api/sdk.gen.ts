@@ -342,8 +342,8 @@ export const getApiInternalPoolsByPoolIdConfig = <ThrowOnError extends boolean =
     });
 };
 
-export const postApiInternalPoolsRegister = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalPoolsRegisterData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalPoolsRegisterResponse, unknown, ThrowOnError>({
+export const postApiInternalPoolsRegister = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalPoolsRegisterData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalPoolsRegisterResponse, unknown, ThrowOnError>({
         url: '/api/internal/pools/register',
         ...options,
         headers: {
@@ -353,8 +353,8 @@ export const postApiInternalPoolsRegister = <ThrowOnError extends boolean = fals
     });
 };
 
-export const postApiInternalPoolsHeartbeat = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalPoolsHeartbeatData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalPoolsHeartbeatResponse, unknown, ThrowOnError>({
+export const postApiInternalPoolsHeartbeat = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalPoolsHeartbeatData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalPoolsHeartbeatResponse, unknown, ThrowOnError>({
         url: '/api/internal/pools/heartbeat',
         ...options,
         headers: {

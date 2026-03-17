@@ -1,38 +1,25 @@
+import { cp, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
-  cp,
-  lstat,
-  mkdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+  copyRuntimeDependencyClosure,
+  getSidecarRoot,
+  linkOrCopyDirectory,
+  pathExists,
+  repoRoot,
+  resetDir,
+  shouldCopyRuntimeDependencies,
+} from "./lib/sidecar-paths.mjs";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const electronRoot = resolve(scriptDir, "..");
-const repoRoot =
-  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const nexuRoot = repoRoot;
 const gatewayRoot = resolve(nexuRoot, "apps/gateway");
 const gatewayDistRoot = resolve(gatewayRoot, "dist");
 const sharedRoot = resolve(nexuRoot, "packages/shared");
 const sharedDistRoot = resolve(sharedRoot, "dist");
-const sidecarRoot = resolve(repoRoot, ".tmp/sidecars/gateway");
+const sidecarRoot = getSidecarRoot("gateway");
 const sidecarDistRoot = resolve(sidecarRoot, "dist");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const gatewayNodeModules = resolve(gatewayRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
-
-async function pathExists(path) {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function ensureBuildArtifacts() {
   const missing = [];
@@ -58,8 +45,7 @@ async function ensureBuildArtifacts() {
 
 async function prepareGatewaySidecar() {
   await ensureBuildArtifacts();
-  await rm(sidecarRoot, { recursive: true, force: true });
-  await mkdir(sidecarRoot, { recursive: true });
+  await resetDir(sidecarRoot);
 
   // Like the API sidecar, this stages compiled output only. Any runtime secrets or .env-backed
   // settings must be provided explicitly by the desktop runtime manifest.
@@ -78,11 +64,16 @@ async function prepareGatewaySidecar() {
     sidecarPackageJsonPath,
     `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
   );
-  await symlink(
-    gatewayNodeModules,
-    sidecarNodeModules,
-    process.platform === "win32" ? "junction" : "dir",
-  );
+
+  if (shouldCopyRuntimeDependencies()) {
+    await copyRuntimeDependencyClosure({
+      packageRoot: gatewayRoot,
+      targetNodeModules: sidecarNodeModules,
+    });
+    return;
+  }
+
+  await linkOrCopyDirectory(gatewayNodeModules, sidecarNodeModules);
 }
 
 await prepareGatewaySidecar();

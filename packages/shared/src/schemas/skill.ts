@@ -10,7 +10,7 @@ export const skillTagSchema = z.enum([
   "dev-tools",
 ]);
 
-export const skillSourceSchema = z.enum(["official", "custom"]);
+export const skillSourceSchema = z.enum(["official", "custom", "community"]);
 
 export const skillToolRefSchema = z.object({
   slug: z.string(),
@@ -34,6 +34,8 @@ export const skillInfoSchema = z.object({
   source: skillSourceSchema,
   tools: z.array(skillToolRefSchema).optional(),
   githubUrl: z.string().optional(),
+  installed: z.boolean().optional(),
+  updatable: z.boolean().optional(),
 });
 
 export const skillListResponseSchema = z.object({

@@ -11,8 +11,9 @@
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check . && pnpm -r typecheck",
+    "lint:fix": "biome check --write --unsafe . && pnpm -r typecheck",
     "format": "biome check --write .",
-    "test": "pnpm -r test",
+    "test": "vitest run",
     "generate-types": "pnpm --filter @nexu/api generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:pruned",
     "preinstall": "npm --prefix ./openclaw-runtime run clean",
@@ -30,12 +31,16 @@
     "desktop:stop": "./apps/desktop/dev.sh stop",
     "desktop:restart": "./apps/desktop/dev.sh restart",
     "desktop:status": "./apps/desktop/dev.sh status",
-    "desktop:logs": "./apps/desktop/dev.sh logs"
+    "desktop:logs": "./apps/desktop/dev.sh logs",
+    "desktop:dist:mac": "pnpm --filter @nexu/desktop dist:mac",
+    "desktop:dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^25.3.1",
-    "concurrently": "^9.2.1"
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.2.1",
+    "vitest": "^3.0.7"
   },
   "engines": {
     "node": ">=20",

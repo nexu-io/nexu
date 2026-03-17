@@ -14,7 +14,11 @@
     "prepare:gateway-sidecar": "node ./scripts/prepare-gateway-sidecar.mjs",
     "prepare:openclaw-sidecar": "node ./scripts/prepare-openclaw-sidecar.mjs",
     "prepare:pglite-sidecar": "node ./scripts/prepare-pglite-sidecar.mjs",
+    "prepare:runtime-sidecars": "node ./scripts/prepare-runtime-sidecars.mjs",
     "prepare:web-sidecar": "node ./scripts/prepare-web-sidecar.mjs",
+    "package:sidecars": "node ./scripts/prepare-runtime-sidecars.mjs --release",
+    "dist:mac": "node ./scripts/dist-mac.mjs",
+    "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -41,16 +45,53 @@
     "tailwind-merge": "^3.0.1"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.13.4",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
+    "electron-builder": "^26.0.12",
     "electron": "^37.2.5",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "build": {
+    "appId": "io.nexu.desktop",
+    "productName": "Nexu",
+    "icon": "build/icon.icns",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!node_modules/openclaw",
+      "!node_modules/openclaw/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".dist-runtime",
+        "to": "runtime"
+      }
+    ],
+    "afterSign": "./scripts/notarize.cjs",
+    "mac": {
+      "icon": "build/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg", "zip"],
+      "artifactName": "${productName}-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist"
+    },
+    "dmg": {
+      "size": "2g"
+    }
   }
 }

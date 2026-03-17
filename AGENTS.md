@@ -30,6 +30,8 @@ pnpm desktop:start                    # Build and launch the desktop local runti
 pnpm desktop:stop                     # Stop the desktop local runtime stack
 pnpm desktop:restart                  # Restart the desktop local runtime stack
 pnpm desktop:status                   # Show desktop local runtime status
+pnpm desktop:dist:mac                 # Build signed macOS desktop distributables
+pnpm desktop:dist:mac:unsigned        # Build unsigned macOS desktop distributables
 pnpm --filter @nexu/api dev           # API only
 pnpm --filter @nexu/web dev           # Web only
 pnpm build                            # Build all
@@ -114,12 +116,12 @@ When changing DB structure, follow this workflow.
 
 See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 
-- Monorepo: `apps/api` (Hono), `apps/web` (React), `packages/shared` (Zod schemas)
+- Monorepo: `apps/api` (Hono), `apps/web` (React), `apps/desktop` (Electron), `packages/shared` (Zod schemas), `nexu-skills/` (skill repo)
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/api/src/lib/config-generator.ts` builds OpenClaw config from DB
 - Runtime topology: `apps/gateway` acts as the Nexu sidecar that syncs config/skills, probes runtime health, and can manage the OpenClaw process
 - Local runtime flow: `apps/api` produces config data -> `apps/gateway` syncs config/skills and coordinates runtime -> `openclaw-runtime` runs the actual OpenClaw Gateway process
-- Key data flows: Slack OAuth, Slack event routing, config hot-reload
+- Key data flows: Slack OAuth, Slack/Feishu event routing, config hot-reload, file-based skill catalog
 
 ## Code style (quick reference)
 
@@ -157,6 +159,9 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | E2E gateway testing | `skills/localdev/nexu-e2e-test/SKILL.md` |
 | Production operations | `skills/localdev/prod-ops/SKILL.md` |
 | Nano Banana (image gen) | `skills/nexubot/nano-banana/SKILL.md` |
+| Skill repo & catalog | `nexu-skills/`, `apps/api/src/services/runtime/skill-catalog.ts` |
+| File-based skills design | `docs/plans/2026-03-15-skill-repo-design.md` |
+| Feishu channel setup | `apps/web/src/components/channel-setup/feishu-setup-view.tsx` |
 
 ## Documentation maintenance
 
@@ -176,6 +181,10 @@ git diff --name-only $(git merge-base HEAD origin/main)...HEAD
 | `apps/api/src/routes/` | `docs/references/api-patterns.md`, `docs/product-specs/*.md` |
 | `apps/web/src/pages/` or routing | `docs/FRONTEND.md` |
 | `apps/gateway/src/` | `ARCHITECTURE.md`, `docs/RELIABILITY.md` |
+| `apps/api/src/services/runtime/` | `ARCHITECTURE.md` (skill catalog) |
+| `apps/web/src/components/channel-setup/` | `docs/FRONTEND.md` |
+| `nexu-skills/` | `ARCHITECTURE.md` (monorepo layout) |
+| `packages/shared/src/schemas/` | `ARCHITECTURE.md` (type safety) |
 | `package.json` scripts | `AGENTS.md` Commands section |
 | New/moved doc files | `AGENTS.md` Where to look |
 

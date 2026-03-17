@@ -7,8 +7,6 @@
     "dev": "concurrently --kill-others --names tsc,api \"tsc -p tsconfig.build.json -w\" \"node --watch --conditions=development --import tsx dist/index.js\"",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "generate-openapi": "tsx scripts/generate-openapi.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

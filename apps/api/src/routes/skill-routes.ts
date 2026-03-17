@@ -16,6 +16,7 @@ import {
   userIntegrations,
 } from "../db/schema/index.js";
 import { requireInternalToken } from "../middleware/internal-auth.js";
+import type { SkillCatalog } from "../services/runtime/skill-catalog.js";
 import {
   getLatestSkillsSnapshot,
   publishSkillsSnapshot,
@@ -226,100 +227,102 @@ const getSkillDetailRoute = createRoute({
 });
 
 export function registerSkillCatalogRoutes(app: OpenAPIHono<AppBindings>) {
+  // --------------------------------------------------------------------------
+  // File-based skill listing (replaces DB-backed supportedSkills query)
+  // --------------------------------------------------------------------------
   app.openapi(listSkillsRoute, async (c) => {
-    const rows = await db
-      .select()
-      .from(supportedSkills)
-      .where(eq(supportedSkills.enabled, true))
-      .orderBy(supportedSkills.sortOrder);
+    const { resolveSkillsDir, scanInstalledSkills } = await import(
+      "../services/runtime/skill-scanner.js"
+    );
+    const { fetchSkillCatalog } = await import(
+      "../services/runtime/skill-catalog.js"
+    );
 
-    const toolkits = await db
-      .select({
-        slug: supportedToolkits.slug,
-        displayName: supportedToolkits.displayName,
-        domain: supportedToolkits.domain,
-      })
-      .from(supportedToolkits)
-      .where(eq(supportedToolkits.enabled, true));
+    const skillsDir = resolveSkillsDir();
+    const [installedSkills, catalogResult] = await Promise.all([
+      scanInstalledSkills(skillsDir),
+      fetchSkillCatalog().catch(
+        (): SkillCatalog => ({ version: 0, skills: {} }),
+      ),
+    ]);
 
-    const toolkitMap = new Map(toolkits.map((t) => [t.slug, t]));
+    const installedByName = new Map(installedSkills.map((s) => [s.name, s]));
+
+    type SkillTag =
+      | "office-collab"
+      | "file-knowledge"
+      | "creative-design"
+      | "biz-analysis"
+      | "av-generation"
+      | "info-content"
+      | "dev-tools";
+
+    const VALID_TAGS = new Set(Object.keys(TAG_LABELS));
+    const toTag = (t: string): SkillTag =>
+      VALID_TAGS.has(t) ? (t as SkillTag) : "dev-tools";
+    const toSource = (s: string) =>
+      s === "official" || s === "custom" || s === "community"
+        ? (s as "official" | "custom" | "community")
+        : ("custom" as const);
 
     const tagCounts: Record<string, number> = {};
+    const skills: Array<{
+      slug: string;
+      name: string;
+      description: string;
+      longDescription?: string;
+      iconName: string;
+      prompt: string;
+      examples?: string[];
+      tag: SkillTag;
+      source: "official" | "custom" | "community";
+      githubUrl?: string;
+      installed?: boolean;
+      updatable?: boolean;
+    }> = [];
 
-    const skills = rows.map((row) => {
-      tagCounts[row.tag] = (tagCounts[row.tag] ?? 0) + 1;
+    // Catalog skills (mark installed if found locally)
+    for (const [slug, cs] of Object.entries(catalogResult.skills)) {
+      const isInstalled = installedByName.has(slug);
+      const tag = toTag(cs.tag);
+      tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+      skills.push({
+        slug,
+        name: slug,
+        description: cs.description,
+        longDescription: cs.longDescription,
+        iconName: cs.icon || "Sparkles",
+        prompt: cs.prompt,
+        examples: cs.examples?.length ? [...cs.examples] : undefined,
+        tag,
+        source: toSource(cs.source),
+        installed: isInstalled,
+        updatable: false,
+      });
+      installedByName.delete(slug);
+    }
 
-      const toolkitSlugs = parseJsonArray(row.toolkitSlugs);
-      const tools = toolkitSlugs
-        .map((slug) => {
-          const tk = toolkitMap.get(slug);
-          return tk
-            ? {
-                slug,
-                name: tk.displayName,
-                provider: tk.domain,
-                iconUrl: getToolkitIconUrl(slug),
-                fallbackIconUrl: getToolkitFallbackIconUrl(tk.domain),
-              }
-            : null;
-        })
-        .filter(
-          (
-            t,
-          ): t is {
-            slug: string;
-            name: string;
-            provider: string;
-            iconUrl: string;
-            fallbackIconUrl: string;
-          } => t !== null,
-        );
-
-      const examples = parseJsonArray(row.examples);
-
-      // Derive skill icon from the first linked toolkit
-      const firstToolkitSlug = toolkitSlugs[0];
-      const firstToolkit = firstToolkitSlug
-        ? toolkitMap.get(firstToolkitSlug)
-        : undefined;
-
-      return {
-        slug: row.slug,
-        name: row.name,
-        description: row.description,
-        longDescription: row.longDescription ?? undefined,
-        iconName: row.iconName,
-        iconUrl: firstToolkitSlug
-          ? getToolkitIconUrl(firstToolkitSlug)
-          : undefined,
-        fallbackIconUrl: firstToolkit
-          ? getToolkitFallbackIconUrl(firstToolkit.domain)
-          : undefined,
-        prompt: row.prompt,
-        examples: examples.length > 0 ? examples : undefined,
-        tag: row.tag as
-          | "office-collab"
-          | "file-knowledge"
-          | "creative-design"
-          | "biz-analysis"
-          | "av-generation"
-          | "info-content"
-          | "dev-tools",
-        source: row.source as "official" | "custom",
-        tools: tools.length > 0 ? tools : undefined,
-        githubUrl: row.githubUrl ?? undefined,
-      };
-    });
+    // Local-only skills (not in catalog)
+    for (const local of installedByName.values()) {
+      const tag = toTag(local.tag);
+      tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+      skills.push({
+        slug: local.name,
+        name: local.name,
+        description: local.description,
+        longDescription: local.longDescription,
+        iconName: local.icon || "Sparkles",
+        prompt: local.prompt,
+        examples: local.examples?.length ? [...local.examples] : undefined,
+        tag,
+        source: "custom",
+        installed: true,
+        updatable: false,
+      });
+    }
 
     const tags = Object.entries(TAG_LABELS).map(([id, label]) => ({
-      id: id as
-        | "office-collab"
-        | "file-knowledge"
-        | "creative-design"
-        | "biz-analysis"
-        | "av-generation"
-        | "info-content"
-        | "dev-tools",
+      id: id as SkillTag,
       label,
       count: tagCounts[id] ?? 0,
     }));

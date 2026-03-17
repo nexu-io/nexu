@@ -1,38 +1,25 @@
+import { cp, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
-  cp,
-  lstat,
-  mkdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+  copyRuntimeDependencyClosure,
+  getSidecarRoot,
+  linkOrCopyDirectory,
+  pathExists,
+  repoRoot,
+  resetDir,
+  shouldCopyRuntimeDependencies,
+} from "./lib/sidecar-paths.mjs";
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const electronRoot = resolve(scriptDir, "..");
-const repoRoot =
-  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const nexuRoot = repoRoot;
 const apiRoot = resolve(nexuRoot, "apps/api");
 const apiDistRoot = resolve(apiRoot, "dist");
 const sharedRoot = resolve(nexuRoot, "packages/shared");
 const sharedDistRoot = resolve(sharedRoot, "dist");
-const sidecarRoot = resolve(repoRoot, ".tmp/sidecars/api");
+const sidecarRoot = getSidecarRoot("api");
 const sidecarDistRoot = resolve(sidecarRoot, "dist");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const apiNodeModules = resolve(apiRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
-
-async function pathExists(path) {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function ensureBuildArtifacts() {
   const missing = [];
@@ -58,8 +45,7 @@ async function ensureBuildArtifacts() {
 
 async function prepareApiSidecar() {
   await ensureBuildArtifacts();
-  await rm(sidecarRoot, { recursive: true, force: true });
-  await mkdir(sidecarRoot, { recursive: true });
+  await resetDir(sidecarRoot);
 
   // Only the built server artifact is staged here. Runtime .env files are not copied into the
   // sidecar automatically, so desktop-specific env injection needs to happen from the manifest.
@@ -78,11 +64,16 @@ async function prepareApiSidecar() {
     sidecarPackageJsonPath,
     `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
   );
-  await symlink(
-    apiNodeModules,
-    sidecarNodeModules,
-    process.platform === "win32" ? "junction" : "dir",
-  );
+
+  if (shouldCopyRuntimeDependencies()) {
+    await copyRuntimeDependencyClosure({
+      packageRoot: apiRoot,
+      targetNodeModules: sidecarNodeModules,
+    });
+    return;
+  }
+
+  await linkOrCopyDirectory(apiNodeModules, sidecarNodeModules);
 }
 
 await prepareApiSidecar();

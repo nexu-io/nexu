@@ -1,5 +1,10 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "organizeImports": {
     "enabled": true
   },
@@ -42,28 +47,14 @@
   "files": {
     "ignore": [
       ".claude",
-      "node_modules",
-      "**/node_modules",
-      "dist",
-      "**/dist",
-      "coverage",
       "docs/cowork",
       "apps/web/lib/api",
       "apps/api/migrations/meta/*.json",
-      ".tmp",
-      "**/.tmp",
-      ".next",
-      "**/.next",
-      "dist-electron",
-      "**/dist-electron",
-      "**/*.tsbuildinfo",
       "*.gen.ts",
       "*.d.ts",
       "openapi.json",
-      ".astro",
       "*.astro",
-      ".openclaw",
-      ".vscode"
+      ".turbo"
     ]
   }
 }

@@ -1,0 +1,104 @@
+name: Desktop Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version bump type or exact version (patch / minor / major / x.y.z / x.y.z-beta.N)"
+        required: true
+        default: "patch"
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compute next desktop version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd apps/desktop
+          npm version "${{ inputs.version }}" --no-git-tag-version
+          desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); process.stdout.write(pkg.version);')
+
+          echo "desktop_version=$desktop_version" >> "$GITHUB_OUTPUT"
+          echo "tag_name=desktop-v$desktop_version" >> "$GITHUB_OUTPUT"
+          echo "branch_name=release/desktop-v$desktop_version" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git ls-remote --exit-code --heads origin "${{ steps.version.outputs.branch_name }}" >/dev/null 2>&1; then
+            echo "Branch ${{ steps.version.outputs.branch_name }} already exists on origin" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git switch -c "${{ steps.version.outputs.branch_name }}"
+          git add apps/desktop/package.json
+
+          if git diff --cached --quiet; then
+            echo "No desktop version change detected" >&2
+            exit 1
+          fi
+
+          git commit -m "chore(desktop): prepare ${{ steps.version.outputs.tag_name }}"
+          git push --set-upstream origin "${{ steps.version.outputs.branch_name }}"
+
+      - name: Create release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body_path="$RUNNER_TEMP/desktop-release-pr.md"
+          cat > "$body_path" <<EOF
+          ## Summary
+          - bump \\`apps/desktop/package.json\\` to \\`${{ steps.version.outputs.desktop_version }}\\`
+          - prepare the desktop release branch for tag \\`${{ steps.version.outputs.tag_name }}\\`
+
+          Merge this PR, then push or dispatch the desktop release workflow using \\`${{ steps.version.outputs.tag_name }}\\`.
+          EOF
+
+          existing_pr=$(gh pr list \
+            --head "${{ steps.version.outputs.branch_name }}" \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+
+          if [ -n "$existing_pr" ]; then
+            echo "PR #$existing_pr already exists for ${{ steps.version.outputs.branch_name }}"
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head "${{ steps.version.outputs.branch_name }}" \
+            --title "chore(desktop): prepare ${{ steps.version.outputs.tag_name }}" \
+            --body-file "$body_path"

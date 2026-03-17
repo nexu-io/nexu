@@ -44,6 +44,7 @@ import {
   registerSharedSlackClaimPublicRoutes,
   registerSharedSlackClaimRoutes,
 } from "./routes/shared-slack-claim-routes.js";
+import { registerFilesystemSkillRoutes } from "./routes/skill-filesystem-routes.js";
 import {
   registerSkillCatalogRoutes,
   registerSkillRoutes,
@@ -123,6 +124,7 @@ export function createApp() {
   registerFeishuOAuthRoutes(app);
   registerIntegrationRoutes(app);
   registerSkillCatalogRoutes(app);
+  registerFilesystemSkillRoutes(app);
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",
