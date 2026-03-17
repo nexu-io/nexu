@@ -470,6 +470,79 @@ body,
   color: #b33c2f;
 }
 
+.component-update-section {
+  max-width: 1080px;
+  margin: 0 auto 16px;
+  padding: 12px 16px;
+  background: #181e28;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+}
+
+.component-update-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.component-update-head strong {
+  font-size: 13px;
+  color: #c8cdd5;
+}
+
+.component-update-head button {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid #3a4050;
+  border-radius: 4px;
+  background: #232a36;
+  color: #f5f7fb;
+  cursor: pointer;
+}
+
+.component-update-head button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.component-update-message {
+  font-size: 12px;
+  color: #8a8f99;
+  margin: 4px 0;
+}
+
+.component-update-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.component-update-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid #2a2f3a;
+  font-size: 12px;
+  color: #c8cdd5;
+}
+
+.component-update-list button {
+  padding: 3px 10px;
+  font-size: 11px;
+  border: 1px solid #3a7;
+  border-radius: 4px;
+  background: #1a3028;
+  color: #6fd89a;
+  cursor: pointer;
+}
+
+.component-update-list button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .runtime-note {
   max-width: 1080px;
   margin: 0 auto 16px;
@@ -575,6 +648,95 @@ body,
 
 .cloud-disconnect-btn:hover {
   background: #ffe7e2 !important;
+}
+
+/* Update Banner */
+.update-banner {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9000;
+  max-width: 420px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  font-size: 0.88rem;
+  animation: update-banner-in 240ms ease;
+}
+
+@keyframes update-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.update-banner--available,
+.update-banner--downloading,
+.update-banner--ready {
+  border: 1px solid rgba(139, 167, 255, 0.3);
+  background: rgba(12, 16, 22, 0.92);
+  color: #f5f7fb;
+}
+
+.update-banner--error {
+  border: 1px solid rgba(179, 60, 47, 0.4);
+  background: rgba(30, 12, 12, 0.92);
+  color: #f5d0cc;
+}
+
+.update-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.update-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.update-banner-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background 120ms ease;
+}
+
+.update-banner-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.update-banner-btn--primary {
+  background: #8ba7ff;
+  color: #0c1016;
+  border-color: transparent;
+}
+
+.update-banner-btn--primary:hover {
+  background: #a3baff;
+}
+
+.update-banner-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.update-banner-progress-bar {
+  height: 100%;
+  background: #8ba7ff;
+  border-radius: 2px;
+  transition: width 300ms ease;
 }
 
 @media (max-width: 860px) {

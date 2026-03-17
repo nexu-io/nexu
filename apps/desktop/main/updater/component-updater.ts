@@ -14,8 +14,7 @@ import { app } from "electron";
 import type { UpdateSource } from "../../shared/host";
 
 const GITHUB_BASE_URL = "https://github.com/nexu-io/nexu/releases/download";
-const OSS_BASE_URL =
-  "https://nexu-desktop-release.oss-cn-hangzhou.aliyuncs.com";
+export const R2_BASE_URL = "https://desktop-releases.nexu.io";
 
 export type ComponentInfo = {
   id: string;
@@ -58,7 +57,9 @@ export class ComponentUpdater {
   private readonly stateFilePath: string;
 
   constructor(source: UpdateSource = "github") {
-    this.baseUrl = source === "oss" ? OSS_BASE_URL : GITHUB_BASE_URL;
+    const envOverride = process.env.NEXU_COMPONENT_FEED_URL;
+    this.baseUrl =
+      envOverride ?? (source === "r2" ? R2_BASE_URL : GITHUB_BASE_URL);
     this.componentsDir = join(app.getPath("userData"), "components");
     this.stateFilePath = join(this.componentsDir, "state.json");
     mkdirSync(this.componentsDir, { recursive: true });

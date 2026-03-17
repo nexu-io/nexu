@@ -1,4 +1,4 @@
-import { app, ipcMain, shell } from "electron";
+import { BrowserWindow, app, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -7,14 +7,20 @@ import {
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
 
 const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
+let componentUpdater: ComponentUpdater | null = null;
 
 export function setUpdateManager(manager: UpdateManager): void {
   updateManager = manager;
+}
+
+export function setComponentUpdater(updater: ComponentUpdater): void {
+  componentUpdater = updater;
 }
 
 function assertValidChannel(
@@ -26,6 +32,12 @@ function assertValidChannel(
 }
 
 export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
+  orchestrator.subscribe((runtimeEvent) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send("host:runtime-event", runtimeEvent);
+    }
+  });
+
   ipcMain.handle(
     "host:invoke",
     async (_event, channel: string, payload: unknown) => {
@@ -97,6 +109,12 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
           return result;
         }
 
+        case "runtime:query-events": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["runtime:query-events"];
+          return orchestrator.queryEvents(typedPayload);
+        }
+
         case "desktop:ensure-auth-session": {
           const typedPayload =
             payload as HostInvokePayloadMap["desktop:ensure-auth-session"];
@@ -160,6 +178,40 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
           const typedPayload =
             payload as HostInvokePayloadMap["update:set-source"];
           updateManager?.setSource(typedPayload.source);
+          return { ok: true };
+        }
+
+        case "component:check": {
+          if (!componentUpdater) {
+            return { updates: [] };
+          }
+          const updates = await componentUpdater.checkForUpdates(
+            app.getVersion(),
+          );
+          return {
+            updates: updates.map((u) => ({
+              id: u.id,
+              currentVersion: u.currentVersion,
+              newVersion: u.newVersion,
+              size: u.size,
+            })),
+          };
+        }
+
+        case "component:install": {
+          if (!componentUpdater) {
+            return { ok: false };
+          }
+          const typedPayload =
+            payload as HostInvokePayloadMap["component:install"];
+          const updates = await componentUpdater.checkForUpdates(
+            app.getVersion(),
+          );
+          const update = updates.find((u) => u.id === typedPayload.id);
+          if (!update) {
+            return { ok: false };
+          }
+          await componentUpdater.installUpdate(update);
           return { ok: true };
         }
 

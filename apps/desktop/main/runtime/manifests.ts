@@ -33,19 +33,7 @@ function getBooleanEnv(name: string, fallback: boolean): boolean {
 }
 
 function resolveElectronNodeRunner(): string {
-  if (!app.isPackaged || process.platform !== "darwin") {
-    return process.execPath;
-  }
-
-  const macOsDir = dirname(process.execPath);
-  const executableName = basename(process.execPath);
-  const helperCandidate = resolve(
-    macOsDir,
-    "../Frameworks",
-    `${executableName} Helper.app/Contents/MacOS/${executableName} Helper`,
-  );
-
-  return existsSync(helperCandidate) ? helperCandidate : process.execPath;
+  return process.execPath;
 }
 
 /**
@@ -131,6 +119,7 @@ export function createRuntimeUnitManifests(
     process.env,
     {
       openclawBinPath: resolve(openclawSidecarRoot, "bin/openclaw"),
+      resourcesPath: isPackaged ? electronRoot : undefined,
     },
   );
   const logsDir = ensureDir(resolve(userDataPath, "../logs/runtime-units"));
@@ -177,7 +166,7 @@ export function createRuntimeUnitManifests(
       kind: "surface",
       launchStrategy: "managed",
       runner: "spawn",
-      command: "node",
+      command: electronNodeRunner,
       args: [webModulePath],
       cwd: webSidecarRoot,
       port: webPort,
@@ -185,6 +174,7 @@ export function createRuntimeUnitManifests(
       autoStart: true,
       logFilePath: resolve(logsDir, "web.log"),
       env: {
+        ELECTRON_RUN_AS_NODE: "1",
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
         WEB_API_ORIGIN: runtimeConfig.urls.apiBase,
@@ -224,7 +214,7 @@ export function createRuntimeUnitManifests(
       kind: "service",
       launchStrategy: "managed",
       runner: "spawn",
-      command: "node",
+      command: electronNodeRunner,
       args: [apiModulePath],
       cwd: apiSidecarRoot,
       port: apiPort,
@@ -232,6 +222,7 @@ export function createRuntimeUnitManifests(
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_API", true),
       logFilePath: resolve(logsDir, "api.log"),
       env: {
+        ELECTRON_RUN_AS_NODE: "1",
         FORCE_COLOR: "1",
         PORT: String(apiPort),
         DATABASE_URL: runtimeConfig.database.pgliteUrl,
@@ -240,6 +231,10 @@ export function createRuntimeUnitManifests(
         INTERNAL_API_TOKEN: internalApiToken,
         SKILL_API_TOKEN: skillApiToken,
         NEXU_DESKTOP_MODE: "true",
+        NEXU_CLOUD_URL: runtimeConfig.urls.nexuCloud,
+        ...(runtimeConfig.urls.nexuLink
+          ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
+          : {}),
       },
     },
     {
@@ -248,13 +243,14 @@ export function createRuntimeUnitManifests(
       kind: "service",
       launchStrategy: "managed",
       runner: "spawn",
-      command: "node",
+      command: electronNodeRunner,
       args: [gatewayModulePath],
       cwd: gatewaySidecarRoot,
       port: null,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_GATEWAY", true),
       logFilePath: resolve(logsDir, "gateway.log"),
       env: {
+        ELECTRON_RUN_AS_NODE: "1",
         FORCE_COLOR: "1",
         NODE_ENV: "development",
         RUNTIME_API_BASE_URL: `http://127.0.0.1:${apiPort}`,

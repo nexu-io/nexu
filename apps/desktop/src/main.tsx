@@ -8,15 +8,23 @@ import type {
   DesktopChromeMode,
   DesktopRuntimeConfig,
   DesktopSurface,
+  RuntimeEvent,
+  RuntimeLogEntry,
   RuntimeState,
   RuntimeUnitId,
   RuntimeUnitPhase,
+  RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { UpdateBanner } from "./components/update-banner";
+import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
+  checkComponentUpdates,
   getRuntimeConfig,
   getRuntimeState,
+  installComponent,
   onDesktopCommand,
+  onRuntimeEvent,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -60,6 +68,90 @@ function phaseTone(phase: RuntimeUnitPhase): string {
 
 function kindLabel(unit: RuntimeUnitState): string {
   return `${unit.kind} / ${unit.launchStrategy}`;
+}
+
+function formatLogLine(entry: RuntimeLogEntry): string {
+  const actionLabel = entry.actionId ? ` [action=${entry.actionId}]` : "";
+  return `#${entry.cursor} ${entry.ts} [${entry.stream}] [${entry.kind}] [reason=${entry.reasonCode}]${actionLabel} ${entry.message}`;
+}
+
+function logFilterLabel(filter: LogFilter): string {
+  switch (filter) {
+    case "errors":
+      return "Errors";
+    case "lifecycle":
+      return "Lifecycle";
+    default:
+      return "All";
+  }
+}
+
+type LogFilter = "all" | "errors" | "lifecycle";
+
+function mergeUnitSnapshot(
+  current: RuntimeUnitState,
+  snapshot: RuntimeUnitSnapshot,
+): RuntimeUnitState {
+  return {
+    ...current,
+    ...snapshot,
+  };
+}
+
+function applyRuntimeEvent(
+  current: RuntimeState,
+  event: RuntimeEvent,
+): RuntimeState {
+  switch (event.type) {
+    case "runtime:unit-state": {
+      const existingIndex = current.units.findIndex(
+        (unit) => unit.id === event.unit.id,
+      );
+
+      if (existingIndex === -1) {
+        return current;
+      }
+
+      const nextUnits = [...current.units];
+      const existingUnit = nextUnits[existingIndex];
+      if (!existingUnit) {
+        return current;
+      }
+      nextUnits[existingIndex] = mergeUnitSnapshot(existingUnit, event.unit);
+      return {
+        ...current,
+        units: nextUnits,
+      };
+    }
+    case "runtime:unit-log": {
+      const existingIndex = current.units.findIndex(
+        (unit) => unit.id === event.unitId,
+      );
+
+      if (existingIndex === -1) {
+        return current;
+      }
+
+      const target = current.units[existingIndex];
+      if (!target) {
+        return current;
+      }
+      if (target.logTail.some((entry) => entry.id === event.entry.id)) {
+        return current;
+      }
+
+      const nextUnits = [...current.units];
+      nextUnits[existingIndex] = {
+        ...target,
+        logTail: [...target.logTail, event.entry].slice(-200),
+      };
+
+      return {
+        ...current,
+        units: nextUnits,
+      };
+    }
+  }
 }
 
 function SurfaceButton({
@@ -152,6 +244,7 @@ function RuntimeUnitCard({
   onStop: (id: RuntimeUnitId) => Promise<void>;
   busy: boolean;
 }) {
+  const [logFilter, setLogFilter] = useState<LogFilter>("all");
   const isManaged = unit.launchStrategy === "managed";
   const canStart =
     isManaged &&
@@ -163,7 +256,9 @@ function RuntimeUnitCard({
 
   async function handleCopyLogs(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(unit.logTail.join("\n"));
+      await navigator.clipboard.writeText(
+        filteredLogTail.map((entry) => formatLogLine(entry)).join("\n"),
+      );
       toast.success(`Copied recent logs for ${unit.label}.`);
     } catch (error) {
       toast.error(
@@ -190,6 +285,17 @@ function RuntimeUnitCard({
       );
     }
   }
+
+  const filteredLogTail = useMemo(() => {
+    switch (logFilter) {
+      case "errors":
+        return unit.logTail.filter((entry) => entry.stream === "stderr");
+      case "lifecycle":
+        return unit.logTail.filter((entry) => entry.kind === "lifecycle");
+      default:
+        return unit.logTail;
+    }
+  }, [logFilter, unit.logTail]);
 
   return (
     <article className="runtime-card">
@@ -241,6 +347,18 @@ function RuntimeUnitCard({
           <dt>Exit code</dt>
           <dd>{unit.exitCode ?? "-"}</dd>
         </div>
+        <div>
+          <dt>Last reason</dt>
+          <dd>{unit.lastReasonCode ?? "-"}</dd>
+        </div>
+        <div>
+          <dt>Restarts</dt>
+          <dd>{unit.restartCount}</dd>
+        </div>
+        <div>
+          <dt>Last probe</dt>
+          <dd>{unit.lastProbeAt ?? "-"}</dd>
+        </div>
       </dl>
 
       {unit.lastError ? (
@@ -260,7 +378,17 @@ function RuntimeUnitCard({
         <div className="runtime-logs-head">
           <strong>Tail 200 logs</strong>
           <div className="runtime-logs-actions">
-            <span>{unit.logTail.length} lines</span>
+            <span>{filteredLogTail.length} lines</span>
+            {(["all", "errors", "lifecycle"] as const).map((filter) => (
+              <button
+                aria-pressed={logFilter === filter}
+                key={filter}
+                onClick={() => setLogFilter(filter)}
+                type="button"
+              >
+                {logFilterLabel(filter)}
+              </button>
+            ))}
             <button onClick={() => void handleCopyLogs()} type="button">
               Copy
             </button>
@@ -270,18 +398,32 @@ function RuntimeUnitCard({
           </div>
         </div>
         <pre className="runtime-log-tail">
-          {unit.logTail.length > 0 ? unit.logTail.join("\n") : "No logs yet."}
+          {filteredLogTail.length > 0
+            ? filteredLogTail.map((entry) => formatLogLine(entry)).join("\n")
+            : "No logs yet."}
         </pre>
       </div>
     </article>
   );
 }
 
+type ComponentUpdateInfo = {
+  id: string;
+  currentVersion: string | null;
+  newVersion: string;
+  size: number;
+};
+
 function RuntimePage() {
   const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeUnitId, setActiveUnitId] = useState<RuntimeUnitId | null>(null);
+  const [componentUpdates, setComponentUpdates] = useState<
+    ComponentUpdateInfo[] | null
+  >(null);
+  const [componentBusy, setComponentBusy] = useState(false);
+  const [componentMessage, setComponentMessage] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -299,11 +441,23 @@ function RuntimePage() {
 
   useEffect(() => {
     void loadState();
+    const unsubscribe = onRuntimeEvent((event) => {
+      setRuntimeState((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return applyRuntimeEvent(current, event);
+      });
+      setErrorMessage(null);
+    });
+
     const timer = window.setInterval(() => {
       void loadState();
-    }, 2000);
+    }, 15000);
 
     return () => {
+      unsubscribe();
       window.clearInterval(timer);
     };
   }, [loadState]);
@@ -369,6 +523,85 @@ function RuntimePage() {
         <SummaryCard label="Running" value={summary.running} />
         <SummaryCard label="Managed" value={summary.managed} />
         <SummaryCard label="Failed" value={summary.failed} />
+      </section>
+
+      <section className="component-update-section">
+        <div className="component-update-head">
+          <strong>Component Updates</strong>
+          <button
+            disabled={componentBusy}
+            onClick={() => {
+              setComponentBusy(true);
+              setComponentMessage(null);
+              void checkComponentUpdates()
+                .then((result) => {
+                  setComponentUpdates(result.updates);
+                  setComponentMessage(
+                    result.updates.length === 0
+                      ? "All components are up to date."
+                      : `${result.updates.length} update(s) available.`,
+                  );
+                })
+                .catch((error) => {
+                  setComponentMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to check component updates.",
+                  );
+                })
+                .finally(() => setComponentBusy(false));
+            }}
+            type="button"
+          >
+            {componentBusy ? "Checking..." : "Check"}
+          </button>
+        </div>
+        {componentMessage ? (
+          <p className="component-update-message">{componentMessage}</p>
+        ) : null}
+        {componentUpdates && componentUpdates.length > 0 ? (
+          <ul className="component-update-list">
+            {componentUpdates.map((u) => (
+              <li key={u.id}>
+                <span>
+                  {u.id}: {u.currentVersion ?? "none"} → {u.newVersion} (
+                  {u.size} bytes)
+                </span>
+                <button
+                  disabled={componentBusy}
+                  onClick={() => {
+                    setComponentBusy(true);
+                    void installComponent(u.id)
+                      .then((result) => {
+                        setComponentMessage(
+                          result.ok
+                            ? `Installed ${u.id} successfully.`
+                            : `Failed to install ${u.id}.`,
+                        );
+                        if (result.ok) {
+                          setComponentUpdates(
+                            (prev) =>
+                              prev?.filter((item) => item.id !== u.id) ?? null,
+                          );
+                        }
+                      })
+                      .catch((error) => {
+                        setComponentMessage(
+                          error instanceof Error
+                            ? error.message
+                            : `Install failed for ${u.id}.`,
+                        );
+                      })
+                      .finally(() => setComponentBusy(false));
+                  }}
+                  type="button"
+                >
+                  Install
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
 
       <p className="runtime-note">
@@ -437,6 +670,7 @@ function DesktopShell() {
   const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
+  const update = useAutoUpdate();
 
   useEffect(() => {
     void getRuntimeConfig()
@@ -574,6 +808,16 @@ function DesktopShell() {
           />
         </div>
       </main>
+
+      <UpdateBanner
+        errorMessage={update.errorMessage}
+        onDismiss={update.dismiss}
+        onDownload={() => void update.download()}
+        onInstall={() => void update.install()}
+        percent={update.percent}
+        phase={update.phase}
+        version={update.version}
+      />
     </div>
   );
 }

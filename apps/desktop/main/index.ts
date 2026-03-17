@@ -1,4 +1,3 @@
-import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -13,9 +12,19 @@ import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
-import { registerIpcHandlers, setUpdateManager } from "./ipc";
+import {
+  registerIpcHandlers,
+  setComponentUpdater,
+  setUpdateManager,
+} from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
+import {
+  flushRuntimeLoggers,
+  rotateDesktopLogSession,
+  writeDesktopMainLog,
+} from "./runtime/runtime-logger";
+import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
 
@@ -24,7 +33,9 @@ const __dirname = dirname(__filename);
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
-const runtimeConfig = getDesktopRuntimeConfig(process.env);
+const runtimeConfig = getDesktopRuntimeConfig(process.env, {
+  resourcesPath: electronRoot,
+});
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
@@ -103,34 +114,57 @@ function installApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function safeWrite(stream: NodeJS.WriteStream, message: string): void {
-  if (stream.destroyed || !stream.writable) {
-    return;
-  }
+function getDesktopLogFilePath(name: string): string {
+  return resolve(app.getPath("logs"), name);
+}
 
-  try {
-    stream.write(message);
-  } catch (error) {
-    const errorCode =
-      error instanceof Error && "code" in error ? String(error.code) : null;
-    if (errorCode === "EIO" || errorCode === "EPIPE") {
-      return;
-    }
-    throw error;
-  }
+function getMainWindowId(): number | null {
+  return mainWindow?.webContents.id ?? null;
 }
 
 function logColdStart(message: string): void {
-  const line = `[desktop:cold-start] ${message}\n`;
-  safeWrite(process.stdout, line);
+  writeDesktopMainLog({
+    source: "cold-start",
+    stream: "system",
+    kind: "lifecycle",
+    message,
+    logFilePath: getDesktopLogFilePath("cold-start.log"),
+    windowId: getMainWindowId(),
+  });
+}
 
-  try {
-    const logsPath = app.getPath("logs");
-    mkdirSync(logsPath, { recursive: true });
-    appendFileSync(resolve(logsPath, "cold-start.log"), line, "utf8");
-  } catch {
-    // Best-effort file logging only.
-  }
+function logAuthRecovery(message: string, stream: "stdout" | "stderr"): void {
+  writeDesktopMainLog({
+    source: "auth-recovery",
+    stream,
+    kind: "lifecycle",
+    message,
+    logFilePath: getDesktopLogFilePath("desktop-main.log"),
+    windowId: getMainWindowId(),
+  });
+}
+
+function logRendererEvent({
+  source,
+  stream,
+  kind,
+  message,
+  windowId,
+}: {
+  source: string;
+  stream: "stdout" | "stderr";
+  kind: "app" | "lifecycle";
+  message: string;
+  windowId?: number | null;
+}): void {
+  writeDesktopMainLog({
+    source,
+    stream,
+    kind,
+    message,
+    logFilePath: getDesktopLogFilePath("desktop-main.log"),
+    windowId,
+  });
 }
 
 async function waitForApiReadiness(): Promise<void> {
@@ -174,6 +208,8 @@ async function runDesktopColdStart(): Promise<void> {
 
   logColdStart("bootstrapping desktop auth session");
   await ensureDesktopAuthSession();
+  const sessionId = rotateDesktopLogSession();
+  logColdStart(`desktop auth session ready sessionId=${sessionId}`);
 
   logColdStart("starting web");
   await orchestrator.startOne("web");
@@ -192,15 +228,20 @@ function triggerDesktopAuthRecovery(reason: string): void {
   }
 
   authRecoveryPromise = (async () => {
-    safeWrite(process.stdout, `[desktop:auth-recovery] ${reason}\n`);
+    logAuthRecovery(reason, "stdout");
 
     try {
       await ensureDesktopAuthSession({ force: true });
+      const sessionId = rotateDesktopLogSession();
+      logAuthRecovery(
+        `desktop auth session restored sessionId=${sessionId}`,
+        "stdout",
+      );
       notifyDesktopAuthSessionRestored();
     } catch (error) {
-      safeWrite(
-        process.stderr,
-        `[desktop:auth-recovery] ${error instanceof Error ? error.message : String(error)}\n`,
+      logAuthRecovery(
+        error instanceof Error ? error.message : String(error),
+        "stderr",
       );
     } finally {
       authRecoveryPromise = null;
@@ -275,35 +316,47 @@ function createMainWindow(): BrowserWindow {
     (_event, level, message, line, sourceId) => {
       const levelLabel =
         ["verbose", "info", "warning", "error"][level] ?? String(level);
-      safeWrite(
-        process.stdout,
-        `[renderer:${levelLabel}] ${message} (${sourceId}:${line})\n`,
-      );
+      logRendererEvent({
+        source: `renderer:${levelLabel}`,
+        stream: level >= 3 ? "stderr" : "stdout",
+        kind: "app",
+        message: `${message} (${sourceId}:${line})`,
+        windowId: window.webContents.id,
+      });
     },
   );
 
   window.webContents.on(
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedUrl) => {
-      safeWrite(
-        process.stderr,
-        `[renderer:fail-load] ${errorCode} ${errorDescription} ${validatedUrl}\n`,
-      );
+      logRendererEvent({
+        source: "renderer:fail-load",
+        stream: "stderr",
+        kind: "lifecycle",
+        message: `${errorCode} ${errorDescription} ${validatedUrl}`,
+        windowId: window.webContents.id,
+      });
     },
   );
 
   window.webContents.on("did-finish-load", () => {
-    safeWrite(
-      process.stdout,
-      `[renderer] did-finish-load ${window.webContents.getURL()}\n`,
-    );
+    logRendererEvent({
+      source: "renderer",
+      stream: "stdout",
+      kind: "lifecycle",
+      message: `did-finish-load ${window.webContents.getURL()}`,
+      windowId: window.webContents.id,
+    });
   });
 
   window.webContents.on("render-process-gone", (_event, details) => {
-    safeWrite(
-      process.stderr,
-      `[renderer:gone] reason=${details.reason} exitCode=${details.exitCode}\n`,
-    );
+    logRendererEvent({
+      source: "renderer:gone",
+      stream: "stderr",
+      kind: "lifecycle",
+      message: `reason=${details.reason} exitCode=${details.exitCode}`,
+      windowId: window.webContents.id,
+    });
   });
 
   window.once("ready-to-show", () => {
@@ -355,19 +408,28 @@ app.whenReady().then(async () => {
       healthCheck.recordSuccess();
     } catch (error) {
       healthCheck.recordFailure();
-      safeWrite(
-        process.stderr,
-        `[desktop:cold-start] ${error instanceof Error ? error.message : String(error)}\n`,
-      );
+      writeDesktopMainLog({
+        source: "cold-start",
+        stream: "stderr",
+        kind: "lifecycle",
+        message: error instanceof Error ? error.message : String(error),
+        logFilePath: getDesktopLogFilePath("cold-start.log"),
+        windowId: getMainWindowId(),
+      });
     }
 
     const win = createMainWindow();
 
     if (app.isPackaged) {
-      const updateMgr = new UpdateManager(win, orchestrator);
+      const updateMgr = new UpdateManager(win, orchestrator, {
+        feedUrl: runtimeConfig.urls.updateFeed,
+      });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
     }
+
+    const compUpdater = new ComponentUpdater();
+    setComponentUpdater(compUpdater);
   })();
 
   app.on("activate", () => {
@@ -387,5 +449,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  flushRuntimeLoggers();
   void orchestrator.dispose();
 });

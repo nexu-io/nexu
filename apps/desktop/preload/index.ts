@@ -5,6 +5,7 @@ import {
   type HostInvokeChannel,
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
+  type RuntimeEvent,
   type UpdaterBridge,
   type UpdaterEvent,
   type UpdaterEventMap,
@@ -40,6 +41,21 @@ const hostBridge: HostBridge = {
 
     return () => {
       ipcRenderer.removeListener("host:desktop-command", wrapped);
+    };
+  },
+
+  onRuntimeEvent(listener) {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      event: RuntimeEvent,
+    ) => {
+      listener(event);
+    };
+
+    ipcRenderer.on("host:runtime-event", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("host:runtime-event", wrapped);
     };
   },
 };

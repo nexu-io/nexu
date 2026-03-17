@@ -1,9 +1,10 @@
-import type { HostBridge } from "@shared/host";
+import type { HostBridge, UpdaterBridge } from "@shared/host";
 import type * as React from "react";
 
 declare global {
   interface Window {
     nexuHost: HostBridge;
+    nexuUpdater?: UpdaterBridge;
   }
 
   namespace JSX {

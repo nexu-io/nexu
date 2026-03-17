@@ -154,3 +154,24 @@ jobs:
             apps/desktop/release/*.dmg
             apps/desktop/release/*.zip
             apps/desktop/release/desktop-sha256.txt
+
+      - name: Upload to Cloudflare R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          version="${{ steps.meta.outputs.desktop_version }}"
+          if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
+            channel="beta"
+          else
+            channel="stable"
+          fi
+
+          for file in apps/desktop/release/*.dmg apps/desktop/release/*.zip apps/desktop/release/latest-mac.yml apps/desktop/release/desktop-sha256.txt; do
+            [ -f "$file" ] || continue
+            key="${channel}/$(basename "$file")"
+            echo "Uploading $file → $key"
+            npx wrangler r2 object put "nexu-desktop-releases/${key}" --file "$file" --remote
+          done

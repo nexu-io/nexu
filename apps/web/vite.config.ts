@@ -3,6 +3,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+process.env.VITE_COMMIT_HASH ??= "local-dev";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {

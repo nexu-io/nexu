@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -194,7 +194,26 @@ async function stapleNotarizedAppBundles() {
   }
 }
 
+async function ensureBuildConfig() {
+  const configPath = resolve(electronRoot, "build-config.json");
+
+  try {
+    await readFile(configPath, "utf8");
+    console.log("[dist:mac] using existing build-config.json");
+  } catch {
+    // Create default build config (production URLs)
+    const defaultConfig = {
+      NEXU_CLOUD_URL: "https://nexu.io",
+      NEXU_LINK_URL: null,
+    };
+    await writeFile(configPath, JSON.stringify(defaultConfig, null, 2));
+    console.log("[dist:mac] created default build-config.json");
+  }
+}
+
 async function main() {
+  await ensureBuildConfig();
+
   const desktopEnv = await loadDesktopEnv();
   const env = {
     ...process.env,
@@ -256,11 +275,23 @@ async function main() {
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
+  // Use git short SHA as CFBundleVersion (shown in parentheses in About dialog).
+  // Falls back to "dev" for local builds outside a git repo.
+  let buildVersion = "dev";
+  try {
+    buildVersion = execFileSync("git", ["rev-parse", "--short=7", "HEAD"], {
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    // Not a git repo or git not available — use fallback.
+  }
+
   await runElectronBuilder(
     [
       "--mac",
       "--publish",
       "never",
+      `--config.buildVersion=${buildVersion}`,
       ...(isUnsigned
         ? ["--config.mac.identity=null", "--config.mac.hardenedRuntime=false"]
         : []),

@@ -2,8 +2,13 @@ import type {
   AppInfo,
   DesktopRuntimeConfig,
   HostDesktopCommand,
+  RuntimeEvent,
+  RuntimeEventQuery,
+  RuntimeEventQueryResult,
   RuntimeState,
   RuntimeUnitId,
+  UpdateChannelName,
+  UpdateSource,
 } from "@shared/host";
 
 function getHostBridge() {
@@ -59,6 +64,13 @@ export async function showRuntimeLogFile(id: RuntimeUnitId): Promise<boolean> {
   return result.ok;
 }
 
+export async function queryRuntimeEvents(
+  input: RuntimeEventQuery,
+): Promise<RuntimeEventQueryResult> {
+  const result = await getHostBridge().invoke("runtime:query-events", input);
+  return result;
+}
+
 export async function ensureDesktopAuthSession(
   force = false,
 ): Promise<boolean> {
@@ -72,4 +84,61 @@ export function onDesktopCommand(
   listener: (command: HostDesktopCommand) => void,
 ): () => void {
   return getHostBridge().onDesktopCommand(listener);
+}
+
+export function onRuntimeEvent(
+  listener: (event: RuntimeEvent) => void,
+): () => void {
+  return getHostBridge().onRuntimeEvent(listener);
+}
+
+export async function checkForUpdate(): Promise<boolean> {
+  const result = await getHostBridge().invoke("update:check", undefined);
+  return result.updateAvailable;
+}
+
+export async function downloadUpdate(): Promise<boolean> {
+  const result = await getHostBridge().invoke("update:download", undefined);
+  return result.ok;
+}
+
+export async function installUpdate(): Promise<void> {
+  await getHostBridge().invoke("update:install", undefined);
+}
+
+export async function getCurrentVersion(): Promise<string> {
+  const result = await getHostBridge().invoke(
+    "update:get-current-version",
+    undefined,
+  );
+  return result.version;
+}
+
+export async function setUpdateChannel(
+  channel: UpdateChannelName,
+): Promise<boolean> {
+  const result = await getHostBridge().invoke("update:set-channel", {
+    channel,
+  });
+  return result.ok;
+}
+
+export async function setUpdateSource(source: UpdateSource): Promise<boolean> {
+  const result = await getHostBridge().invoke("update:set-source", { source });
+  return result.ok;
+}
+
+export async function checkComponentUpdates(): Promise<{
+  updates: Array<{
+    id: string;
+    currentVersion: string | null;
+    newVersion: string;
+    size: number;
+  }>;
+}> {
+  return getHostBridge().invoke("component:check", undefined);
+}
+
+export async function installComponent(id: string): Promise<{ ok: boolean }> {
+  return getHostBridge().invoke("component:install", { id });
 }
