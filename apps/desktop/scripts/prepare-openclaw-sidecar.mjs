@@ -316,6 +316,10 @@ if command -v node >/dev/null 2>&1; then
   exec node "$entry" "$@"
 fi
 
+if [ -n "\${OPENCLAW_ELECTRON_EXECUTABLE:-}" ] && [ -x "$OPENCLAW_ELECTRON_EXECUTABLE" ]; then
+  ELECTRON_RUN_AS_NODE=1 exec "$OPENCLAW_ELECTRON_EXECUTABLE" "$entry" "$@"
+fi
+
 contents_dir="$(CDPATH= cd -- "$sidecar_root/../../.." && pwd)"
 macos_dir="$contents_dir/MacOS"
 

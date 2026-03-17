@@ -217,6 +217,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_CONFIG_PATH: resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
         OPENCLAW_BIN: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
+        OPENCLAW_ELECTRON_EXECUTABLE: process.execPath,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
