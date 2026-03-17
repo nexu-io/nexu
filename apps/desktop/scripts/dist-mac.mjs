@@ -221,7 +221,10 @@ async function ensureBuildConfig() {
   };
 
   await writeFile(configPath, JSON.stringify(config, null, 2));
-  console.log("[dist:mac] generated build-config.json from env:", JSON.stringify(config));
+  console.log(
+    "[dist:mac] generated build-config.json from env:",
+    JSON.stringify(config),
+  );
 }
 
 async function main() {

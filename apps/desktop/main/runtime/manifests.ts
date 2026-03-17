@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
