@@ -2,18 +2,20 @@ import { type BrowserWindow, app } from "electron";
 import { autoUpdater } from "electron-updater";
 import type { UpdateChannelName, UpdateSource } from "../../shared/host";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
+import { R2_BASE_URL } from "./component-updater";
 
 export interface UpdateManagerOptions {
   source?: UpdateSource;
   channel?: UpdateChannelName;
+  feedUrl?: string | null;
   autoDownload?: boolean;
   checkIntervalMs?: number;
   initialDelayMs?: number;
 }
 
-const OSS_FEED_URLS: Record<UpdateChannelName, string> = {
-  stable: "https://nexu-desktop-release.oss-cn-hangzhou.aliyuncs.com/stable",
-  beta: "https://nexu-desktop-release.oss-cn-hangzhou.aliyuncs.com/beta",
+const R2_FEED_URLS: Record<UpdateChannelName, string> = {
+  stable: `${R2_BASE_URL}/stable`,
+  beta: `${R2_BASE_URL}/beta`,
 };
 
 export class UpdateManager {
@@ -21,6 +23,7 @@ export class UpdateManager {
   private readonly orchestrator: RuntimeOrchestrator;
   private source: UpdateSource;
   private channel: UpdateChannelName;
+  private readonly feedUrl: string | null;
   private readonly checkIntervalMs: number;
   private readonly initialDelayMs: number;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -34,6 +37,7 @@ export class UpdateManager {
     this.orchestrator = orchestrator;
     this.source = options?.source ?? "github";
     this.channel = options?.channel ?? "stable";
+    this.feedUrl = options?.feedUrl ?? null;
     this.checkIntervalMs = options?.checkIntervalMs ?? 4 * 60 * 60 * 1000;
     this.initialDelayMs = options?.initialDelayMs ?? 60_000;
 
@@ -44,6 +48,17 @@ export class UpdateManager {
   }
 
   private configureFeedUrl(): void {
+    // Priority: env var > build config > source/channel logic
+    const overrideUrl = process.env.NEXU_UPDATE_FEED_URL ?? this.feedUrl;
+
+    if (overrideUrl) {
+      autoUpdater.setFeedURL({
+        provider: "generic",
+        url: overrideUrl,
+      });
+      return;
+    }
+
     if (this.source === "github") {
       autoUpdater.setFeedURL({
         provider: "github",
@@ -53,7 +68,7 @@ export class UpdateManager {
     } else {
       autoUpdater.setFeedURL({
         provider: "generic",
-        url: OSS_FEED_URLS[this.channel],
+        url: R2_FEED_URLS[this.channel],
       });
     }
   }

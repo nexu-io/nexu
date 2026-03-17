@@ -87,6 +87,7 @@
       }
     ],
     "afterSign": "./scripts/notarize.cjs",
+    "copyright": "Copyright © 2026 Powerformer, Inc.",
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
@@ -99,6 +100,13 @@
     },
     "dmg": {
       "size": "2g"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nexu-io",
+        "repo": "nexu"
+      }
+    ]
   }
 }

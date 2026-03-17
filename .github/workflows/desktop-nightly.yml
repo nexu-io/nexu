@@ -19,7 +19,8 @@ jobs:
     with:
       environment: prod
       cloud_url: "https://nexu.io"
-      link_url: "null"
+      link_url: "https://link.nexu.io"
+      update_feed_url: "https://desktop-releases.nexu.io/nightly"
       release_tag: desktop-nightly
       release_name: "Nexu Desktop Nightly"
       artifact_suffix: ""

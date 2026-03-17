@@ -24,6 +24,11 @@ on:
         description: "GitHub release display name"
         required: true
         type: string
+      update_feed_url:
+        description: "NEXU_UPDATE_FEED_URL for auto-update (R2 path)"
+        required: false
+        type: string
+        default: ""
       artifact_suffix:
         description: "Suffix for artifact names (e.g. '-test' or empty)"
         required: false
@@ -102,22 +107,21 @@ jobs:
         env:
           CLOUD_URL: ${{ inputs.cloud_url }}
           LINK_URL: ${{ inputs.link_url }}
+          UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
         run: |
-          if [ "$LINK_URL" = "null" ]; then
-            cat > apps/desktop/build-config.json << EOF
-          {
-            "NEXU_CLOUD_URL": "$CLOUD_URL",
-            "NEXU_LINK_URL": null
-          }
-          EOF
-          else
-            cat > apps/desktop/build-config.json << EOF
-          {
-            "NEXU_CLOUD_URL": "$CLOUD_URL",
-            "NEXU_LINK_URL": "$LINK_URL"
-          }
-          EOF
-          fi
+          node -e '
+            const config = {
+              NEXU_CLOUD_URL: process.env.CLOUD_URL,
+              NEXU_LINK_URL: process.env.LINK_URL === "null" ? null : process.env.LINK_URL,
+            };
+            if (process.env.UPDATE_FEED_URL) {
+              config.NEXU_UPDATE_FEED_URL = process.env.UPDATE_FEED_URL;
+            }
+            require("fs").writeFileSync(
+              "apps/desktop/build-config.json",
+              JSON.stringify(config, null, 2) + "\n"
+            );
+          '
 
           echo "[build] Generated build-config.json for ${{ inputs.environment }} environment:"
           cat apps/desktop/build-config.json
@@ -192,6 +196,28 @@ jobs:
             apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.dmg
             apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.zip
             apps/desktop/nightly-artifacts/desktop-sha256.txt
+
+      - name: Upload to Cloudflare R2
+        if: inputs.update_feed_url != ''
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Extract R2 prefix from feed URL path (e.g. https://desktop-releases.nexu.io/nightly → nightly)
+          r2_prefix=$(node -e "process.stdout.write(new URL(process.env.UPDATE_FEED_URL).pathname.slice(1))")
+
+          echo "[r2] uploading to prefix: ${r2_prefix}/"
+
+          for file in apps/desktop/release/latest-mac.yml apps/desktop/release/*.zip; do
+            [ -f "$file" ] || continue
+            key="${r2_prefix}/$(basename "$file")"
+            echo "Uploading $file → $key"
+            npx wrangler r2 object put "nexu-desktop-releases/${key}" --file "$file" --remote
+          done
 
   cleanup-artifacts:
     runs-on: ubuntu-latest

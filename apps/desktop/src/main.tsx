@@ -16,9 +16,13 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { UpdateBanner } from "./components/update-banner";
+import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
+  checkComponentUpdates,
   getRuntimeConfig,
   getRuntimeState,
+  installComponent,
   onDesktopCommand,
   onRuntimeEvent,
   showRuntimeLogFile,
@@ -403,11 +407,23 @@ function RuntimeUnitCard({
   );
 }
 
+type ComponentUpdateInfo = {
+  id: string;
+  currentVersion: string | null;
+  newVersion: string;
+  size: number;
+};
+
 function RuntimePage() {
   const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeUnitId, setActiveUnitId] = useState<RuntimeUnitId | null>(null);
+  const [componentUpdates, setComponentUpdates] = useState<
+    ComponentUpdateInfo[] | null
+  >(null);
+  const [componentBusy, setComponentBusy] = useState(false);
+  const [componentMessage, setComponentMessage] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -509,6 +525,85 @@ function RuntimePage() {
         <SummaryCard label="Failed" value={summary.failed} />
       </section>
 
+      <section className="component-update-section">
+        <div className="component-update-head">
+          <strong>Component Updates</strong>
+          <button
+            disabled={componentBusy}
+            onClick={() => {
+              setComponentBusy(true);
+              setComponentMessage(null);
+              void checkComponentUpdates()
+                .then((result) => {
+                  setComponentUpdates(result.updates);
+                  setComponentMessage(
+                    result.updates.length === 0
+                      ? "All components are up to date."
+                      : `${result.updates.length} update(s) available.`,
+                  );
+                })
+                .catch((error) => {
+                  setComponentMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to check component updates.",
+                  );
+                })
+                .finally(() => setComponentBusy(false));
+            }}
+            type="button"
+          >
+            {componentBusy ? "Checking..." : "Check"}
+          </button>
+        </div>
+        {componentMessage ? (
+          <p className="component-update-message">{componentMessage}</p>
+        ) : null}
+        {componentUpdates && componentUpdates.length > 0 ? (
+          <ul className="component-update-list">
+            {componentUpdates.map((u) => (
+              <li key={u.id}>
+                <span>
+                  {u.id}: {u.currentVersion ?? "none"} → {u.newVersion} (
+                  {u.size} bytes)
+                </span>
+                <button
+                  disabled={componentBusy}
+                  onClick={() => {
+                    setComponentBusy(true);
+                    void installComponent(u.id)
+                      .then((result) => {
+                        setComponentMessage(
+                          result.ok
+                            ? `Installed ${u.id} successfully.`
+                            : `Failed to install ${u.id}.`,
+                        );
+                        if (result.ok) {
+                          setComponentUpdates(
+                            (prev) =>
+                              prev?.filter((item) => item.id !== u.id) ?? null,
+                          );
+                        }
+                      })
+                      .catch((error) => {
+                        setComponentMessage(
+                          error instanceof Error
+                            ? error.message
+                            : `Install failed for ${u.id}.`,
+                        );
+                      })
+                      .finally(() => setComponentBusy(false));
+                  }}
+                  type="button"
+                >
+                  Install
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
       <p className="runtime-note">
         Control plane currently renders unit metadata plus in-memory tail 200
         logs from the local orchestrator.
@@ -575,6 +670,7 @@ function DesktopShell() {
   const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
+  const update = useAutoUpdate();
 
   useEffect(() => {
     void getRuntimeConfig()
@@ -712,6 +808,16 @@ function DesktopShell() {
           />
         </div>
       </main>
+
+      <UpdateBanner
+        errorMessage={update.errorMessage}
+        onDismiss={update.dismiss}
+        onDownload={() => void update.download()}
+        onInstall={() => void update.install()}
+        percent={update.percent}
+        phase={update.phase}
+        version={update.version}
+      />
     </div>
   );
 }

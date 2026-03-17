@@ -45,6 +45,7 @@ export type DesktopRuntimeConfig = {
     openclawBase: string;
     nexuCloud: string;
     nexuLink: string | null;
+    updateFeed: string | null;
   };
   tokens: {
     gateway: string;
@@ -105,6 +106,8 @@ export function getDesktopRuntimeConfig(
       DEFAULT_NEXU_CLOUD_URL,
     nexuLink:
       env.NEXU_LINK_URL ?? buildConfig.NEXU_LINK_URL ?? DEFAULT_NEXU_LINK_URL,
+    updateFeed:
+      env.NEXU_UPDATE_FEED_URL ?? buildConfig.NEXU_UPDATE_FEED_URL ?? null,
   };
 
   return {

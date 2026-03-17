@@ -12,7 +12,11 @@ import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
-import { registerIpcHandlers, setUpdateManager } from "./ipc";
+import {
+  registerIpcHandlers,
+  setComponentUpdater,
+  setUpdateManager,
+} from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
 import {
@@ -20,6 +24,7 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
 
@@ -414,10 +419,15 @@ app.whenReady().then(async () => {
     const win = createMainWindow();
 
     if (app.isPackaged) {
-      const updateMgr = new UpdateManager(win, orchestrator);
+      const updateMgr = new UpdateManager(win, orchestrator, {
+        feedUrl: runtimeConfig.urls.updateFeed,
+      });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
     }
+
+    const compUpdater = new ComponentUpdater();
+    setComponentUpdater(compUpdater);
   })();
 
   app.on("activate", () => {
