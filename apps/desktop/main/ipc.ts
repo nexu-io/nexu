@@ -7,8 +7,15 @@ import {
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import type { UpdateManager } from "./updater/update-manager";
 
 const validChannels = new Set<string>(hostInvokeChannels);
+
+let updateManager: UpdateManager | null = null;
+
+export function setUpdateManager(manager: UpdateManager): void {
+  updateManager = manager;
+}
 
 function assertValidChannel(
   channel: string,
@@ -37,7 +44,7 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
         }
 
         case "env:get-api-base-url": {
-          const apiBaseUrl = getDesktopRuntimeConfig(process.env).apiBaseUrl;
+          const apiBaseUrl = getDesktopRuntimeConfig(process.env).urls.apiBase;
 
           const result: HostInvokeResultMap["env:get-api-base-url"] = {
             apiBaseUrl,
@@ -114,6 +121,46 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
           };
 
           return result;
+        }
+
+        case "update:check": {
+          if (!updateManager) {
+            return { updateAvailable: false };
+          }
+          return updateManager.checkNow();
+        }
+
+        case "update:download": {
+          if (!updateManager) {
+            return { ok: false };
+          }
+          return updateManager.downloadUpdate();
+        }
+
+        case "update:install": {
+          if (!updateManager) {
+            return undefined;
+          }
+          await updateManager.quitAndInstall();
+          return undefined;
+        }
+
+        case "update:get-current-version": {
+          return { version: app.getVersion() };
+        }
+
+        case "update:set-channel": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["update:set-channel"];
+          updateManager?.setChannel(typedPayload.channel);
+          return { ok: true };
+        }
+
+        case "update:set-source": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["update:set-source"];
+          updateManager?.setSource(typedPayload.source);
+          return { ok: true };
         }
 
         default:

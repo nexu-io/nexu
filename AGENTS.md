@@ -49,6 +49,13 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 
+## Branch model
+
+- `main` is the integration branch and should stay releasable.
+- Do feature work on short-lived branches named with a clear prefix such as `feat/...`, `fix/...`, or `chore/...`.
+- Prefer merging the latest `main` into long-running feature branches instead of rewriting shared history once a PR is under review.
+- After a PR merges, sync local `main`, then delete the merged feature branch locally and remotely when it is no longer needed.
+
 ## Desktop local development
 
 - Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.

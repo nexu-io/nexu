@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -94,6 +94,23 @@ function run(command, args, options = {}) {
   });
 }
 
+function shellEscape(value) {
+  return `'${String(value).replace(/'/gu, `'"'"'`)}'`;
+}
+
+async function runElectronBuilder(args, options = {}) {
+  const targetOpenFiles = process.env.NEXU_DESKTOP_MAX_OPEN_FILES ?? "8192";
+  const command = [
+    `target=${shellEscape(targetOpenFiles)}`,
+    'hard_limit=$(ulimit -Hn 2>/dev/null || printf %s "$target")',
+    'if [ "$hard_limit" != "unlimited" ] && [ "$hard_limit" -lt "$target" ]; then target="$hard_limit"; fi',
+    'ulimit -n "$target" 2>/dev/null || true',
+    `exec pnpm exec electron-builder ${args.map(shellEscape).join(" ")}`,
+  ].join("; ");
+
+  await run("bash", ["-lc", command], options);
+}
+
 async function ensureDmgbuildBundle() {
   if (process.env.CUSTOM_DMGBUILD_PATH) {
     return process.env.CUSTOM_DMGBUILD_PATH;
@@ -146,6 +163,35 @@ async function ensureDmgbuildBundle() {
   ]);
 
   return dmgbuildPath;
+}
+
+async function stapleNotarizedAppBundles() {
+  if (isUnsigned) {
+    console.log("[dist:mac] skipping stapling in unsigned mode");
+    return;
+  }
+
+  const releaseRoot = resolve(electronRoot, "release");
+  const releaseEntries = await readdir(releaseRoot, { withFileTypes: true });
+  const appBundleDirs = releaseEntries.filter(
+    (entry) => entry.isDirectory() && entry.name.startsWith("mac-"),
+  );
+
+  if (appBundleDirs.length === 0) {
+    throw new Error(
+      `Expected packaged macOS app bundles under ${releaseRoot}, but none were found.`,
+    );
+  }
+
+  for (const entry of appBundleDirs) {
+    const appPath = resolve(releaseRoot, entry.name, "Nexu.app");
+
+    console.log(`[dist:mac] stapling notarized app bundle: ${appPath}`);
+    await run("xcrun", ["stapler", "staple", appPath], { cwd: electronRoot });
+    await run("xcrun", ["stapler", "validate", appPath], {
+      cwd: electronRoot,
+    });
+  }
 }
 
 async function main() {
@@ -203,15 +249,15 @@ async function main() {
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
     {
       cwd: electronRoot,
-      env,
+      env: {
+        ...env,
+        ...(isUnsigned ? { NEXU_DESKTOP_MAC_UNSIGNED: "true" } : {}),
+      },
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
-  await run(
-    "pnpm",
+  await runElectronBuilder(
     [
-      "exec",
-      "electron-builder",
       "--mac",
       "--publish",
       "never",
@@ -230,6 +276,7 @@ async function main() {
         : notarizeEnv,
     },
   );
+  await stapleNotarizedAppBundles();
 }
 
 await main();

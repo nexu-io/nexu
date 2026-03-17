@@ -16,6 +16,7 @@
     "test": "vitest run",
     "generate-types": "pnpm --filter @nexu/api generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:pruned",
+    "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
     "preinstall": "npm --prefix ./openclaw-runtime run clean",
     "postinstall": "npm --prefix ./openclaw-runtime run install:pruned",
     "seed": "pnpm --filter @nexu/api db:seed",

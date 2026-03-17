@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import {
   type DesktopRuntimeConfig,
@@ -47,6 +56,44 @@ function buildNode22Path(): string | undefined {
   return undefined;
 }
 
+function ensurePackagedOpenclawSidecar(
+  runtimeSidecarBaseRoot: string,
+  runtimeRoot: string,
+): string {
+  const packagedSidecarRoot = resolve(runtimeSidecarBaseRoot, "openclaw");
+  const archivePath = resolve(packagedSidecarRoot, "payload.tar.gz");
+
+  if (!existsSync(archivePath)) {
+    return packagedSidecarRoot;
+  }
+
+  const extractedSidecarRoot = ensureDir(
+    resolve(runtimeRoot, "openclaw-sidecar"),
+  );
+  const stampPath = resolve(extractedSidecarRoot, ".archive-stamp");
+  const archiveStat = statSync(archivePath);
+  const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
+  const extractedOpenclawEntry = resolve(
+    extractedSidecarRoot,
+    "node_modules/openclaw/openclaw.mjs",
+  );
+
+  if (
+    existsSync(stampPath) &&
+    existsSync(extractedOpenclawEntry) &&
+    readFileSync(stampPath, "utf8") === archiveStamp
+  ) {
+    return extractedSidecarRoot;
+  }
+
+  rmSync(extractedSidecarRoot, { recursive: true, force: true });
+  mkdirSync(extractedSidecarRoot, { recursive: true });
+  execFileSync("tar", ["-xzf", archivePath, "-C", extractedSidecarRoot]);
+  writeFileSync(stampPath, archiveStamp);
+
+  return extractedSidecarRoot;
+}
+
 export function createRuntimeUnitManifests(
   electronRoot: string,
   userDataPath: string,
@@ -57,10 +104,16 @@ export function createRuntimeUnitManifests(
   const runtimeSidecarBaseRoot = isPackaged
     ? resolve(electronRoot, "runtime")
     : resolve(repoRoot, ".tmp/sidecars");
+  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
+  const openclawSidecarRoot = isPackaged
+    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
+    : resolve(runtimeSidecarBaseRoot, "openclaw");
   const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
     process.env,
+    {
+      openclawBinPath: resolve(openclawSidecarRoot, "bin/openclaw"),
+    },
   );
-  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
   const logsDir = ensureDir(resolve(userDataPath, "../logs/runtime-units"));
   const pgliteDataPath = ensureDir(resolve(runtimeRoot, "pglite"));
   const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
@@ -70,12 +123,10 @@ export function createRuntimeUnitManifests(
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
-  const openclawSidecarRoot = resolve(runtimeSidecarBaseRoot, "openclaw");
   const openclawPackageRoot = resolve(
     openclawSidecarRoot,
     "node_modules/openclaw",
   );
-  const openclawBinPath = resolve(openclawSidecarRoot, "bin/openclaw");
   const apiSidecarRoot = resolve(runtimeSidecarBaseRoot, "api");
   const apiModulePath = resolve(apiSidecarRoot, "dist/index.js");
   const gatewaySidecarRoot = resolve(runtimeSidecarBaseRoot, "gateway");
@@ -85,17 +136,14 @@ export function createRuntimeUnitManifests(
   const migrationsDir = resolve(pgliteSidecarRoot, "migrations");
   const webSidecarRoot = resolve(runtimeSidecarBaseRoot, "web");
   const webModulePath = resolve(webSidecarRoot, "index.js");
-  const apiPort = runtimeConfig.apiPort;
-  const pglitePort = runtimeConfig.pglitePort;
-  const webPort = runtimeConfig.webPort;
-  const internalApiToken =
-    process.env.NEXU_INTERNAL_API_TOKEN ?? "gw-secret-token";
-  const skillApiToken =
-    process.env.NEXU_SKILL_API_TOKEN ?? "skill-secret-token";
-  const gatewayPoolId =
-    process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
-  const webUrl = runtimeConfig.webUrl;
-  const authUrl = process.env.NEXU_AUTH_URL ?? runtimeConfig.apiBaseUrl;
+  const apiPort = runtimeConfig.ports.api;
+  const pglitePort = runtimeConfig.ports.pglite;
+  const webPort = runtimeConfig.ports.web;
+  const internalApiToken = runtimeConfig.tokens.internalApi;
+  const skillApiToken = runtimeConfig.tokens.skill;
+  const gatewayPoolId = runtimeConfig.gateway.poolId;
+  const webUrl = runtimeConfig.urls.web;
+  const authUrl = runtimeConfig.urls.auth;
   const node22Path = buildNode22Path();
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
@@ -119,7 +167,7 @@ export function createRuntimeUnitManifests(
       env: {
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
-        WEB_API_ORIGIN: `http://127.0.0.1:${apiPort}`,
+        WEB_API_ORIGIN: runtimeConfig.urls.apiBase,
       },
     },
     {
@@ -166,9 +214,7 @@ export function createRuntimeUnitManifests(
       env: {
         FORCE_COLOR: "1",
         PORT: String(apiPort),
-        DATABASE_URL:
-          process.env.NEXU_DATABASE_URL ??
-          `postgresql://postgres:postgres@127.0.0.1:${pglitePort}/postgres?sslmode=disable`,
+        DATABASE_URL: runtimeConfig.database.pgliteUrl,
         BETTER_AUTH_URL: authUrl,
         WEB_URL: webUrl,
         INTERNAL_API_TOKEN: internalApiToken,
@@ -198,7 +244,8 @@ export function createRuntimeUnitManifests(
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
-        OPENCLAW_BIN: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
+        OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
+        OPENCLAW_ELECTRON_EXECUTABLE: process.execPath,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
@@ -214,7 +261,7 @@ export function createRuntimeUnitManifests(
       kind: "runtime",
       launchStrategy: "delegated",
       delegatedProcessMatch: "openclaw-gateway",
-      binaryPath: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
+      binaryPath: runtimeConfig.paths.openclawBin,
       port: null,
       autoStart: true,
       logFilePath: resolve(logsDir, "openclaw.log"),

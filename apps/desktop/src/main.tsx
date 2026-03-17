@@ -466,7 +466,7 @@ function DesktopShell() {
     let cancelled = false;
     const readyUrl = new URL(
       "/api/internal/desktop/ready",
-      runtimeConfig.webUrl,
+      runtimeConfig.urls.web,
     ).toString();
 
     async function poll() {
@@ -493,12 +493,14 @@ function DesktopShell() {
 
   const desktopWebUrl =
     runtimeConfig && apiReady
-      ? new URL("/workspace", runtimeConfig.webUrl).toString()
+      ? new URL("/workspace", runtimeConfig.urls.web).toString()
       : null;
-  const desktopOpenClawUrl = new URL(
-    "/#token=gw-secret-token",
-    "http://127.0.0.1:18789",
-  ).toString();
+  const desktopOpenClawUrl = runtimeConfig
+    ? new URL(
+        `/#token=${runtimeConfig.tokens.gateway}`,
+        runtimeConfig.urls.openclawBase,
+      ).toString()
+    : null;
   return (
     <div
       className={

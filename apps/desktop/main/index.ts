@@ -13,9 +13,11 @@ import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
-import { registerIpcHandlers } from "./ipc";
+import { registerIpcHandlers, setUpdateManager } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
+import { StartupHealthCheck } from "./updater/rollback";
+import { UpdateManager } from "./updater/update-manager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -134,7 +136,7 @@ function logColdStart(message: string): void {
 async function waitForApiReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.apiBaseUrl);
+  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -209,7 +211,7 @@ function triggerDesktopAuthRecovery(reason: string): void {
 function installDesktopAuthRecoveryHooks(): void {
   session.defaultSession.webRequest.onCompleted(
     {
-      urls: [`${runtimeConfig.apiBaseUrl}/api/auth/*`],
+      urls: [`${runtimeConfig.urls.apiBase}/api/auth/*`],
     },
     (details) => {
       if (
@@ -337,16 +339,33 @@ app.whenReady().then(async () => {
   registerIpcHandlers(orchestrator);
 
   void (async () => {
+    const healthCheck = new StartupHealthCheck();
+    const health = healthCheck.check();
+
+    if (!health.healthy) {
+      logColdStart(
+        `unhealthy: ${health.consecutiveFailures} consecutive cold-start failures`,
+      );
+    }
+
     try {
       await runDesktopColdStart();
+      healthCheck.recordSuccess();
     } catch (error) {
+      healthCheck.recordFailure();
       safeWrite(
         process.stderr,
         `[desktop:cold-start] ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
 
-    createMainWindow();
+    const win = createMainWindow();
+
+    if (app.isPackaged) {
+      const updateMgr = new UpdateManager(win, orchestrator);
+      setUpdateManager(updateMgr);
+      updateMgr.startPeriodicCheck();
+    }
   })();
 
   app.on("activate", () => {

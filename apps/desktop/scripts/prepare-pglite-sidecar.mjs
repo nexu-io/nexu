@@ -1,6 +1,5 @@
 import { cp, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { pruneOpenclawPackage } from "./lib/prune-openclaw-package.mjs";
 import {
   copyRuntimeDependencyClosure,
   electronRoot,
@@ -148,8 +147,6 @@ process.on("SIGINT", () => {
     await removePathIfExists(resolve(sidecarNodeModules, "electron"));
     await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
   }
-
-  await pruneOpenclawPackage(sidecarNodeModules);
 }
 
 await preparePgliteSidecar();

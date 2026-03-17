@@ -14,30 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  cleanup-artifacts:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Delete old nightly artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          cutoff_date=$(date -d "14 days ago" +%Y-%m-%d)
-
-          gh api "repos/$REPO/actions/artifacts" --paginate | \
-            jq -r '.artifacts[] | select(.name | startswith("desktop-nightly-")) | select(.created_at < "'"$cutoff_date"'") | .id' | \
-            while read -r artifact_id; do
-              if [ -n "$artifact_id" ]; then
-                gh api "repos/$REPO/actions/artifacts/$artifact_id" -X DELETE
-              fi
-            done
-
   nightly-build:
     runs-on: macos-14
-    needs: cleanup-artifacts
 
     steps:
       - name: Checkout
@@ -53,6 +31,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Resolve nightly metadata
         id: meta
@@ -157,8 +136,32 @@ jobs:
             - Commit: `${{ github.sha }}`
             - Built: `${{ steps.meta.outputs.build_date }}`
 
+            The packaged `Nexu.app` bundle is notarized and stapled before the nightly `.dmg` and `.zip` artifacts are published.
+
             This build is intended for testing and may be unstable.
           files: |
             apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg
             apps/desktop/nightly-artifacts/Nexu-nightly-arm64.zip
             apps/desktop/nightly-artifacts/desktop-sha256.txt
+
+  cleanup-artifacts:
+    runs-on: ubuntu-latest
+    needs: nightly-build
+
+    steps:
+      - name: Delete old nightly artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          cutoff_date=$(date -d "14 days ago" +%Y-%m-%d)
+
+          gh api "repos/$REPO/actions/artifacts" --paginate | \
+            jq -r '.artifacts[] | select(.name | startswith("desktop-nightly-")) | select(.created_at < "'"$cutoff_date"'") | .id' | \
+            while read -r artifact_id; do
+              if [ -n "$artifact_id" ]; then
+                gh api "repos/$REPO/actions/artifacts/$artifact_id" -X DELETE
+              fi
+            done

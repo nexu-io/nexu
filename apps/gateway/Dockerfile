@@ -33,7 +33,7 @@ COPY apps/gateway ./apps/gateway
 COPY packages/shared ./packages/shared
 
 RUN pnpm --filter @nexu/gateway... build
-RUN pnpm --filter @nexu/gateway... install --prod --frozen-lockfile
+RUN pnpm --filter @nexu/gateway... install --prod --frozen-lockfile --ignore-scripts
 
 FROM base AS runtime
 

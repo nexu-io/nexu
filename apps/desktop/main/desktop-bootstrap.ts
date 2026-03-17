@@ -6,24 +6,13 @@ type PgPoolConstructor = typeof import("pg").Pool;
 
 const runtimeConfig = getDesktopRuntimeConfig(process.env);
 
-export const desktopApiUrl = runtimeConfig.apiBaseUrl;
-export const desktopWebUrl = runtimeConfig.webUrl;
-
-const desktopAuthBootstrap = {
-  name: "NexU Desktop",
-  email: "desktop@nexu.local",
-  password: "desktop-local-password",
-  appUserId: "desktop-local-user",
-  onboardingRole: "Founder / Manager",
-};
+export const desktopApiUrl = runtimeConfig.urls.apiBase;
+export const desktopWebUrl = runtimeConfig.urls.web;
 
 let ensureSessionPromise: Promise<void> | null = null;
 
 function getDatabaseUrl(): string {
-  return (
-    process.env.NEXU_DATABASE_URL ??
-    "postgresql://postgres:postgres@127.0.0.1:50832/postgres?sslmode=disable"
-  );
+  return runtimeConfig.database.pgliteUrl;
 }
 
 function getAuthHeaders(): Record<string, string> {
@@ -84,9 +73,9 @@ async function ensureDesktopBootstrapUser(): Promise<void> {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({
-      name: desktopAuthBootstrap.name,
-      email: desktopAuthBootstrap.email,
-      password: desktopAuthBootstrap.password,
+      name: runtimeConfig.desktopAuth.name,
+      email: runtimeConfig.desktopAuth.email,
+      password: runtimeConfig.desktopAuth.password,
     }),
   }).catch(() => null);
 
@@ -98,7 +87,7 @@ async function ensureDesktopBootstrapUser(): Promise<void> {
   try {
     await pool.query(
       'update "user" set "emailVerified" = true where email = $1',
-      [desktopAuthBootstrap.email],
+      [runtimeConfig.desktopAuth.email],
     );
   } finally {
     await pool.end();
@@ -115,8 +104,8 @@ async function signInDesktopBootstrapUser(): Promise<{
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
-        email: desktopAuthBootstrap.email,
-        password: desktopAuthBootstrap.password,
+        email: runtimeConfig.desktopAuth.email,
+        password: runtimeConfig.desktopAuth.password,
         rememberMe: true,
       }),
     },
@@ -195,10 +184,10 @@ async function ensureDesktopAppUser(authUserId: string): Promise<void> {
         onboarding_completed_at = excluded.onboarding_completed_at,
         updated_at = excluded.updated_at`,
       [
-        desktopAuthBootstrap.appUserId,
+        runtimeConfig.desktopAuth.appUserId,
         authUserId,
         now,
-        desktopAuthBootstrap.onboardingRole,
+        runtimeConfig.desktopAuth.onboardingRole,
         now,
         now,
         now,
