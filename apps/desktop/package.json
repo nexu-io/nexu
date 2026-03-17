@@ -93,6 +93,13 @@
     },
     "dmg": {
       "size": "2g"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "nexu-io",
+        "repo": "nexu"
+      }
+    ]
   }
 }

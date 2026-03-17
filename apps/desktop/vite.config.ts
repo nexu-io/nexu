@@ -21,6 +21,7 @@ export default defineConfig({
         },
         vite: {
           build: {
+            target: "esnext",
             outDir: "dist-electron/main",
             rollupOptions: {
               external: ["electron"],
