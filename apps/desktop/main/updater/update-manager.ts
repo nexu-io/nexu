@@ -2,6 +2,7 @@ import { type BrowserWindow, app } from "electron";
 import { autoUpdater } from "electron-updater";
 import type { UpdateChannelName, UpdateSource } from "../../shared/host";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
+import { R2_BASE_URL } from "./component-updater";
 
 export interface UpdateManagerOptions {
   source?: UpdateSource;
@@ -13,8 +14,8 @@ export interface UpdateManagerOptions {
 }
 
 const R2_FEED_URLS: Record<UpdateChannelName, string> = {
-  stable: "https://desktop-releases.nexu.io/stable",
-  beta: "https://desktop-releases.nexu.io/beta",
+  stable: `${R2_BASE_URL}/stable`,
+  beta: `${R2_BASE_URL}/beta`,
 };
 
 export class UpdateManager {

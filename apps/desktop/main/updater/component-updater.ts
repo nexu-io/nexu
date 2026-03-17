@@ -14,7 +14,7 @@ import { app } from "electron";
 import type { UpdateSource } from "../../shared/host";
 
 const GITHUB_BASE_URL = "https://github.com/nexu-io/nexu/releases/download";
-const R2_BASE_URL = "https://desktop-releases.nexu.io";
+export const R2_BASE_URL = "https://desktop-releases.nexu.io";
 
 export type ComponentInfo = {
   id: string;
