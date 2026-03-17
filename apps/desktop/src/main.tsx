@@ -5,21 +5,27 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import type {
+  AppInfo,
   DesktopChromeMode,
   DesktopRuntimeConfig,
   DesktopSurface,
+  DiagnosticsInfo,
   RuntimeState,
   RuntimeUnitId,
   RuntimeUnitPhase,
   RuntimeUnitState,
 } from "../shared/host";
 import {
+  getAppInfo,
+  getDiagnosticsInfo,
   getRuntimeConfig,
   getRuntimeState,
   onDesktopCommand,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
+  triggerMainProcessCrash,
+  triggerRendererProcessCrash,
 } from "./lib/host-api";
 import "./runtime-page.css";
 
@@ -430,6 +436,189 @@ function EmbeddedControlPlane() {
   );
 }
 
+type DiagnosticsActionId =
+  | "renderer-exception"
+  | "renderer-crash"
+  | "main-crash";
+
+function DiagnosticsActionCard({
+  description,
+  disabled,
+  label,
+  onClick,
+}: {
+  description: string;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <article className="diagnostics-action-card">
+      <div>
+        <strong>{label}</strong>
+        <p>{description}</p>
+      </div>
+      <button disabled={disabled} onClick={onClick} type="button">
+        Trigger
+      </button>
+    </article>
+  );
+}
+
+function DiagnosticsPage() {
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [diagnosticsInfo, setDiagnosticsInfo] =
+    useState<DiagnosticsInfo | null>(null);
+  const [busyAction, setBusyAction] = useState<DiagnosticsActionId | null>(
+    null,
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<string>(
+    "Ready for diagnostics.",
+  );
+
+  useEffect(() => {
+    void Promise.all([getAppInfo(), getDiagnosticsInfo()])
+      .then(([nextAppInfo, nextDiagnosticsInfo]) => {
+        setAppInfo(nextAppInfo);
+        setDiagnosticsInfo(nextDiagnosticsInfo);
+        setErrorMessage(null);
+      })
+      .catch((error) => {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to load diagnostics metadata.",
+        );
+      });
+  }, []);
+
+  const runAction = useCallback(
+    async (actionId: DiagnosticsActionId, action: () => Promise<void>) => {
+      setBusyAction(actionId);
+      setErrorMessage(null);
+
+      try {
+        await action();
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Diagnostics action failed.",
+        );
+      } finally {
+        setBusyAction(null);
+      }
+    },
+    [],
+  );
+
+  const triggerRendererException = useCallback(() => {
+    setLastAction(
+      `Renderer exception scheduled at ${new Date().toLocaleTimeString()}.`,
+    );
+
+    window.setTimeout(() => {
+      throw new Error(
+        "Diagnostics test: renderer exception thrown from the UI thread.",
+      );
+    }, 0);
+  }, []);
+
+  const triggerRendererCrash = useCallback(() => {
+    setLastAction(
+      `Renderer crash requested at ${new Date().toLocaleTimeString()}.`,
+    );
+
+    void runAction("renderer-crash", async () => {
+      await triggerRendererProcessCrash();
+    });
+  }, [runAction]);
+
+  const triggerMainCrash = useCallback(() => {
+    setLastAction(
+      `Main crash requested at ${new Date().toLocaleTimeString()}.`,
+    );
+
+    void runAction("main-crash", async () => {
+      await triggerMainProcessCrash();
+    });
+  }, [runAction]);
+
+  return (
+    <div className="runtime-page diagnostics-page">
+      <header className="runtime-header diagnostics-header">
+        <div>
+          <span className="runtime-eyebrow">Crash Diagnostics</span>
+          <h1>Exercise the Electron failure paths on demand</h1>
+          <p>
+            Use one page to validate renderer exceptions, renderer process
+            exits, and main process crashes before wiring a remote crash
+            backend.
+          </p>
+        </div>
+      </header>
+
+      <section className="runtime-summary diagnostics-summary">
+        <SummaryCard
+          label="App"
+          value={appInfo ? `${appInfo.appName} ${appInfo.appVersion}` : "-"}
+        />
+        <SummaryCard label="Platform" value={appInfo?.platform ?? "-"} />
+        <SummaryCard
+          label="Mode"
+          value={appInfo ? (appInfo.isDev ? "development" : "packaged") : "-"}
+        />
+        <SummaryCard
+          label="Crash dumps"
+          value={diagnosticsInfo?.crashDumpsPath ?? "-"}
+        />
+      </section>
+
+      <p className="runtime-note diagnostics-note">
+        Renderer exception keeps the process alive. Renderer crash terminates
+        only the window renderer. Main crash terminates the Electron host
+        process.
+      </p>
+
+      {errorMessage ? (
+        <p className="runtime-error-banner">{errorMessage}</p>
+      ) : null}
+
+      <section className="diagnostics-grid">
+        <DiagnosticsActionCard
+          description="Throws an unhandled Error from the renderer event loop. Use this to validate JavaScript exception capture without killing the app."
+          disabled={busyAction !== null}
+          label="Throw Renderer Error"
+          onClick={triggerRendererException}
+        />
+        <DiagnosticsActionCard
+          description="Asks the main process to forcefully crash the current renderer process. Use this to validate renderer crash handling and crash dump creation."
+          disabled={busyAction !== null}
+          label="Crash Renderer"
+          onClick={triggerRendererCrash}
+        />
+        <DiagnosticsActionCard
+          description="Invokes a deliberate main process crash. Use this to validate the native crash pipeline for the Electron host itself."
+          disabled={busyAction !== null}
+          label="Crash Main"
+          onClick={triggerMainCrash}
+        />
+      </section>
+
+      <section className="diagnostics-status-card">
+        <div>
+          <span className="runtime-eyebrow">Last action</span>
+          <h2>{lastAction}</h2>
+          <p>
+            Renderer process type: {diagnosticsInfo?.processType ?? "unknown"}.
+            After a process crash, reopen the app and inspect the crash dumps
+            path plus console logs from the Electron main process.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DesktopShell() {
   const [activeSurface, setActiveSurface] = useState<DesktopSurface>("control");
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>("full");
@@ -502,6 +691,12 @@ function DesktopShell() {
             meta="Gateway control UI with local token routing"
             onClick={() => setActiveSurface("openclaw")}
           />
+          <SurfaceButton
+            active={activeSurface === "diagnostics"}
+            label="Diagnostics"
+            meta="Crash and exception test bench"
+            onClick={() => setActiveSurface("diagnostics")}
+          />
         </nav>
       </aside>
 
@@ -520,6 +715,8 @@ function DesktopShell() {
             title="OpenClaw Gateway"
             version={0}
           />
+        ) : activeSurface === "diagnostics" ? (
+          <DiagnosticsPage />
         ) : (
           <EmbeddedControlPlane />
         )}
