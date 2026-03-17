@@ -99,6 +99,13 @@
       "when": 1773729569604,
       "tag": "0013_device-auth-and-model-providers",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1773930000000,
+      "tag": "0014_add-model-providers",
+      "breakpoints": true
     }
   ]
 }
