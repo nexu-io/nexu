@@ -197,18 +197,31 @@ async function stapleNotarizedAppBundles() {
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
 
+  // Always regenerate build-config.json from environment variables so that
+  // secrets (cloud/link URLs) are never committed to the repo.
+  // Falls back to sensible defaults when env vars are not set.
+  const envPath = resolve(electronRoot, ".env.local");
+  let fileEnv = {};
   try {
-    await readFile(configPath, "utf8");
-    console.log("[dist:mac] using existing build-config.json");
+    fileEnv = parseEnvFile(await readFile(envPath, "utf8"));
   } catch {
-    // Create default build config (production URLs)
-    const defaultConfig = {
-      NEXU_CLOUD_URL: "https://nexu.io",
-      NEXU_LINK_URL: null,
-    };
-    await writeFile(configPath, JSON.stringify(defaultConfig, null, 2));
-    console.log("[dist:mac] created default build-config.json");
+    // .env.local is optional
   }
+  const merged = { ...fileEnv, ...process.env };
+
+  const config = {
+    NEXU_CLOUD_URL: merged.NEXU_CLOUD_URL ?? "https://nexu.io",
+    NEXU_LINK_URL: merged.NEXU_LINK_URL ?? null,
+    ...(merged.NEXU_DESKTOP_SENTRY_DSN
+      ? { NEXU_DESKTOP_SENTRY_DSN: merged.NEXU_DESKTOP_SENTRY_DSN }
+      : {}),
+    ...(merged.NEXU_UPDATE_FEED_URL
+      ? { NEXU_UPDATE_FEED_URL: merged.NEXU_UPDATE_FEED_URL }
+      : {}),
+  };
+
+  await writeFile(configPath, JSON.stringify(config, null, 2));
+  console.log("[dist:mac] generated build-config.json from env:", JSON.stringify(config));
 }
 
 async function main() {
