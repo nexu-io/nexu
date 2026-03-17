@@ -53,14 +53,16 @@ export const pruneDependencyTargets = [
 // `./src/*`, so deleting extension source trees here breaks runtime loading in
 // desktop sidecars while leaving plain local runtime installs unaffected.
 //
-// Keep this list intentionally conservative and share it across all runtime
-// assembly paths so `dev`, `desktop dev`, and `desktop dist` consume the same
-// OpenClaw package baseline.
-export const openclawPackagePruneTargets = ["docs"];
-
-export const pruneTargets = [
-  ...pruneDependencyTargets,
-  ...openclawPackagePruneTargets.map(
-    (relativePath) => `node_modules/openclaw/${relativePath}`,
-  ),
+// `openclaw/docs` must be preserved because the runtime reads
+// `docs/reference/templates/*` as workspace seed files while handling inbound
+// messages. Keep docs pruning explicit so we do not accidentally remove runtime
+// assets hidden under generic `docs/` paths.
+export const docsPruneTargets = [
+  "node_modules/@mariozechner/pi-coding-agent/docs",
+  "node_modules/pino/docs",
+  "node_modules/smart-buffer/docs",
+  "node_modules/socks/docs",
+  "node_modules/undici/docs",
 ];
+
+export const pruneTargets = [...pruneDependencyTargets, ...docsPruneTargets];
