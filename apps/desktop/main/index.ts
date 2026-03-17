@@ -16,6 +16,7 @@ import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import {
   registerIpcHandlers,
+  setCatalogManager,
   setComponentUpdater,
   setUpdateManager,
 } from "./ipc";
@@ -26,6 +27,7 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import { CatalogManager } from "./skillhub/catalog-manager";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
@@ -89,6 +91,7 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let catalogMgr: CatalogManager | null = null;
 
 function sendDesktopCommand(
   surface: DesktopSurface,
@@ -460,6 +463,10 @@ app.whenReady().then(async () => {
       });
     }
 
+    catalogMgr = new CatalogManager(app.getPath("userData"));
+    setCatalogManager(catalogMgr);
+    catalogMgr.start();
+
     const win = createMainWindow();
 
     if (app.isPackaged) {
@@ -491,6 +498,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  catalogMgr?.dispose();
   flushRuntimeLoggers();
   void orchestrator.dispose();
 });

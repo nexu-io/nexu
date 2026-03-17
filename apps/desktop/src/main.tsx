@@ -223,17 +223,40 @@ function SummaryCard({
   );
 }
 
+function getWebviewPreloadUrl(): string {
+  return new URL(
+    "../dist-electron/preload/webview-preload.js",
+    document.location.href,
+  ).href;
+}
+
 function SurfaceFrame({
   title,
   description,
   src,
   version,
+  preload,
 }: {
   title: string;
   description: string;
   src: string | null;
   version: number;
+  preload?: string;
 }) {
+  // React doesn't forward unknown attributes to custom elements like <webview>.
+  // We must set `preload` BEFORE `src` — otherwise the webview navigates without it.
+  // Use a ref callback to set both attributes in the correct order via DOM API.
+  const webviewRefCallback = useCallback(
+    (el: HTMLElement | null) => {
+      if (!el || !src) return;
+      if (preload) {
+        el.setAttribute("preload", preload);
+      }
+      el.setAttribute("src", src);
+    },
+    [preload, src],
+  );
+
   return (
     <section className="surface-frame">
       <header className="surface-frame-header">
@@ -247,9 +270,9 @@ function SurfaceFrame({
 
       {src ? (
         <webview
+          ref={webviewRefCallback as React.Ref<HTMLWebViewElement>}
           className="desktop-web-frame"
           key={`${src}:${version}`}
-          src={src}
         />
       ) : (
         <div className="surface-frame-empty">
@@ -1040,6 +1063,7 @@ function DesktopShell() {
             src={desktopWebUrl}
             title="Nexu Web"
             version={webSurfaceVersion}
+            preload={getWebviewPreloadUrl()}
           />
         </div>
         <div

@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import * as path from "node:path";
+import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
 import {
   type DesktopRuntimeConfig,
   getDesktopRuntimeConfig,
@@ -133,7 +134,7 @@ export function createRuntimeUnitManifests(
     path.resolve(openclawRuntimeRoot, "state"),
   );
   const openclawTempDir = ensureDir(path.resolve(openclawRuntimeRoot, "tmp"));
-  ensureDir(path.resolve(openclawStateDir, "skills"));
+  ensureDir(getOpenclawSkillsDir(userDataPath));
   ensureDir(path.resolve(openclawStateDir, "plugin-docs"));
   ensureDir(path.resolve(openclawStateDir, "agents"));
   const openclawPackageRoot = path.resolve(
@@ -240,6 +241,9 @@ export function createRuntimeUnitManifests(
         ...(runtimeConfig.urls.nexuLink
           ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
           : {}),
+        OPENCLAW_STATE_DIR: openclawStateDir,
+        SKILLHUB_CACHE_DIR: path.resolve(runtimeRoot, "skillhub-cache"),
+        OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
       },
     },
     {
@@ -264,7 +268,7 @@ export function createRuntimeUnitManifests(
         SKILL_API_TOKEN: skillApiToken,
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
-        OPENCLAW_SKILLS_DIR: path.resolve(openclawStateDir, "skills"),
+        OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
         OPENCLAW_ELECTRON_EXECUTABLE: electronNodeRunner,
         OPENCLAW_EXTENSIONS_DIR: path.resolve(

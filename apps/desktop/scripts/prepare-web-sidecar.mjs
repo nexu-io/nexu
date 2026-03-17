@@ -72,7 +72,7 @@ const HOP_BY_HOP = new Set([
 
 const PROXY_RETRY_ATTEMPTS = 10;
 const PROXY_RETRY_DELAY_MS = 500;
-const PROXY_TIMEOUT_MS = 5_000;
+const PROXY_TIMEOUT_MS = 120_000;
 
 async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));

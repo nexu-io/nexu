@@ -8332,14 +8332,14 @@
         }
       }
     },
-    "/api/v1/skills": {
+    "/api/v1/skillhub/catalog": {
       "get": {
         "tags": [
-          "Skills"
+          "SkillHub"
         ],
         "responses": {
           "200": {
-            "description": "List of available skills",
+            "description": "SkillHub community skill catalog",
             "content": {
               "application/json": {
                 "schema": {
@@ -8359,77 +8359,22 @@
                           "description": {
                             "type": "string"
                           },
-                          "longDescription": {
-                            "type": "string"
+                          "downloads": {
+                            "type": "number"
                           },
-                          "iconName": {
-                            "type": "string"
+                          "stars": {
+                            "type": "number"
                           },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "examples": {
+                          "tags": {
                             "type": "array",
                             "items": {
                               "type": "string"
                             }
                           },
-                          "tag": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
+                          "version": {
+                            "type": "string"
                           },
-                          "source": {
-                            "type": "string",
-                            "enum": [
-                              "official",
-                              "custom"
-                            ]
-                          },
-                          "tools": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "slug": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "provider": {
-                                  "type": "string"
-                                },
-                                "iconUrl": {
-                                  "type": "string"
-                                },
-                                "fallbackIconUrl": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "slug",
-                                "name",
-                                "provider",
-                                "iconUrl",
-                                "fallbackIconUrl"
-                              ]
-                            }
-                          },
-                          "githubUrl": {
+                          "updatedAt": {
                             "type": "string"
                           }
                         },
@@ -8437,48 +8382,45 @@
                           "slug",
                           "name",
                           "description",
-                          "iconName",
-                          "prompt",
-                          "tag",
-                          "source"
+                          "downloads",
+                          "stars",
+                          "tags",
+                          "version",
+                          "updatedAt"
                         ]
                       }
                     },
-                    "tags": {
+                    "installedSlugs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "count": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "label",
-                          "count"
-                        ]
+                        "type": "string"
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "version": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "skillCount": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "updatedAt",
+                        "skillCount"
+                      ]
                     }
                   },
                   "required": [
                     "skills",
-                    "tags"
+                    "installedSlugs",
+                    "meta"
                   ]
                 }
               }
@@ -8487,15 +8429,146 @@
         }
       }
     },
-    "/api/v1/skills/{slug}": {
+    "/api/v1/skillhub/install": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Install result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/refresh": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "responses": {
+          "200": {
+            "description": "Refresh result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "skillCount": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "skillCount"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/uninstall": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Uninstall result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/skills/{slug}": {
       "get": {
         "tags": [
-          "Skills"
+          "SkillHub"
         ],
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
             },
             "required": true,
             "name": "slug",
@@ -8504,7 +8577,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Skill detail with tool auth status",
+            "description": "Skill detail with SKILL.md content",
             "content": {
               "application/json": {
                 "schema": {
@@ -8519,193 +8592,38 @@
                     "description": {
                       "type": "string"
                     },
-                    "longDescription": {
-                      "type": "string"
+                    "downloads": {
+                      "type": "number"
                     },
-                    "iconName": {
-                      "type": "string"
+                    "stars": {
+                      "type": "number"
                     },
-                    "iconUrl": {
-                      "type": "string"
-                    },
-                    "fallbackIconUrl": {
-                      "type": "string"
-                    },
-                    "prompt": {
-                      "type": "string"
-                    },
-                    "examples": {
+                    "tags": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
-                    "tag": {
-                      "type": "string",
-                      "enum": [
-                        "office-collab",
-                        "file-knowledge",
-                        "creative-design",
-                        "biz-analysis",
-                        "av-generation",
-                        "info-content",
-                        "dev-tools"
-                      ]
-                    },
-                    "source": {
-                      "type": "string",
-                      "enum": [
-                        "official",
-                        "custom"
-                      ]
-                    },
-                    "tools": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "provider": {
-                            "type": "string"
-                          },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "authScheme": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "connected",
-                              "not_connected",
-                              "initiated",
-                              "expired"
-                            ]
-                          },
-                          "integrationId": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "provider",
-                          "iconUrl",
-                          "fallbackIconUrl",
-                          "authScheme",
-                          "status"
-                        ]
-                      }
-                    },
-                    "githubUrl": {
+                    "version": {
                       "type": "string"
                     },
-                    "relatedSkills": {
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "homepage": {
+                      "type": "string"
+                    },
+                    "installed": {
+                      "type": "boolean"
+                    },
+                    "skillContent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "files": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "type": "string"
-                          },
-                          "longDescription": {
-                            "type": "string"
-                          },
-                          "iconName": {
-                            "type": "string"
-                          },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "examples": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "tag": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "source": {
-                            "type": "string",
-                            "enum": [
-                              "official",
-                              "custom"
-                            ]
-                          },
-                          "tools": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "slug": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "provider": {
-                                  "type": "string"
-                                },
-                                "iconUrl": {
-                                  "type": "string"
-                                },
-                                "fallbackIconUrl": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "slug",
-                                "name",
-                                "provider",
-                                "iconUrl",
-                                "fallbackIconUrl"
-                              ]
-                            }
-                          },
-                          "githubUrl": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "description",
-                          "iconName",
-                          "prompt",
-                          "tag",
-                          "source"
-                        ]
+                        "type": "string"
                       }
                     }
                   },
@@ -8713,10 +8631,15 @@
                     "slug",
                     "name",
                     "description",
-                    "iconName",
-                    "prompt",
-                    "tag",
-                    "source"
+                    "downloads",
+                    "stars",
+                    "tags",
+                    "version",
+                    "updatedAt",
+                    "homepage",
+                    "installed",
+                    "skillContent",
+                    "files"
                   ]
                 }
               }

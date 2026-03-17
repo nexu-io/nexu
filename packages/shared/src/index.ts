@@ -10,7 +10,6 @@ export * from "./schemas/session.js";
 export * from "./schemas/user.js";
 export * from "./schemas/shared-slack-claim.js";
 export * from "./schemas/integration.js";
-export * from "./schemas/skill.js";
 export {
   skillFrontmatterSchema,
   type SkillFrontmatter,

@@ -6,13 +6,13 @@ import { InviteGuardLayout } from "./layouts/invite-guard-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
+import { CommunitySkillDetailPage } from "./pages/community-skill-detail";
 import { FeishuBindPage } from "./pages/feishu-bind";
 import { HomePage } from "./pages/home";
 import { IntegrationsPage } from "./pages/integrations";
 import { ModelsPage } from "./pages/models";
 import { OAuthCallbackPage } from "./pages/oauth-callback";
 import { SessionsPage } from "./pages/sessions";
-import { SkillDetailPage } from "./pages/skill-detail";
 import { SkillsPage } from "./pages/skills";
 import { SlackClaimPage } from "./pages/slack-claim";
 import { SlackOAuthCallbackPage } from "./pages/slack-oauth-callback";
@@ -78,7 +78,7 @@ export function App() {
               <Route path="/workspace/skills" element={<SkillsPage />} />
               <Route
                 path="/workspace/skills/:slug"
-                element={<SkillDetailPage />}
+                element={<CommunitySkillDetailPage />}
               />
               <Route
                 path="/workspace/channels/slack/callback"

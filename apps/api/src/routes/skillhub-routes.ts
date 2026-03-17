@@ -1,0 +1,537 @@
+import { execFile } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
+import { createRoute, z } from "@hono/zod-openapi";
+import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { AppBindings } from "../types.js";
+import {
+  resolveSkillhubPath,
+  skillhubSlugSchema,
+} from "./skillhub-route-helpers.js";
+
+const execFileAsync = promisify(execFile);
+
+const VERSION_CHECK_URL =
+  "https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/version.json";
+const CATALOG_DOWNLOAD_URL =
+  "https://skillhub-1251783334.cos.ap-guangzhou.myqcloud.com/install/latest.tar.gz";
+
+const minimalSkillSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  description: z.string(),
+  downloads: z.number(),
+  stars: z.number(),
+  tags: z.array(z.string()),
+  version: z.string(),
+  updatedAt: z.string(),
+});
+
+const catalogMetaSchema = z.object({
+  version: z.string(),
+  updatedAt: z.string(),
+  skillCount: z.number(),
+});
+
+const skillhubCatalogResponseSchema = z.object({
+  skills: z.array(minimalSkillSchema),
+  installedSlugs: z.array(z.string()),
+  meta: catalogMetaSchema.nullable(),
+});
+
+const skillhubMutationResultSchema = z.object({
+  ok: z.boolean(),
+  error: z.string().optional(),
+});
+
+const skillhubRefreshResultSchema = z.object({
+  ok: z.boolean(),
+  skillCount: z.number(),
+  error: z.string().optional(),
+});
+
+const skillhubDetailResponseSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  description: z.string(),
+  downloads: z.number(),
+  stars: z.number(),
+  tags: z.array(z.string()),
+  version: z.string(),
+  updatedAt: z.string(),
+  homepage: z.string(),
+  installed: z.boolean(),
+  skillContent: z.string().nullable(),
+  files: z.array(z.string()),
+});
+
+const skillhubCatalogRoute = createRoute({
+  method: "get",
+  path: "/api/v1/skillhub/catalog",
+  tags: ["SkillHub"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: skillhubCatalogResponseSchema },
+      },
+      description: "SkillHub community skill catalog",
+    },
+  },
+});
+
+const skillhubInstallRoute = createRoute({
+  method: "post",
+  path: "/api/v1/skillhub/install",
+  tags: ["SkillHub"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ slug: skillhubSlugSchema }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: skillhubMutationResultSchema },
+      },
+      description: "Install result",
+    },
+  },
+});
+
+const skillhubUninstallRoute = createRoute({
+  method: "post",
+  path: "/api/v1/skillhub/uninstall",
+  tags: ["SkillHub"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ slug: skillhubSlugSchema }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: skillhubMutationResultSchema },
+      },
+      description: "Uninstall result",
+    },
+  },
+});
+
+const skillhubRefreshRoute = createRoute({
+  method: "post",
+  path: "/api/v1/skillhub/refresh",
+  tags: ["SkillHub"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: skillhubRefreshResultSchema },
+      },
+      description: "Refresh result",
+    },
+  },
+});
+
+const skillhubDetailRoute = createRoute({
+  method: "get",
+  path: "/api/v1/skillhub/skills/{slug}",
+  tags: ["SkillHub"],
+  request: {
+    params: z.object({ slug: skillhubSlugSchema }),
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: skillhubDetailResponseSchema },
+      },
+      description: "Skill detail with SKILL.md content",
+    },
+    404: {
+      content: {
+        "application/json": { schema: z.object({ message: z.string() }) },
+      },
+      description: "Skill not found",
+    },
+  },
+});
+
+function getSkillsDir(): string | undefined {
+  return process.env.OPENCLAW_SKILLS_DIR;
+}
+
+function getCacheDir(): string | undefined {
+  return process.env.SKILLHUB_CACHE_DIR;
+}
+
+function readJsonFile<T>(path: string): T | null {
+  if (!existsSync(path)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+function getInstalledSlugs(skillsDir: string | undefined): string[] {
+  if (!skillsDir || !existsSync(skillsDir)) return [];
+  try {
+    return readdirSync(skillsDir, { withFileTypes: true })
+      .filter(
+        (e) =>
+          e.isDirectory() && existsSync(resolve(skillsDir, e.name, "SKILL.md")),
+      )
+      .map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
+
+function readCatalog(cacheDir: string): z.infer<typeof minimalSkillSchema>[] {
+  return (
+    readJsonFile<z.infer<typeof minimalSkillSchema>[]>(
+      resolve(cacheDir, "catalog.json"),
+    ) ?? []
+  );
+}
+
+function readMeta(cacheDir: string): z.infer<typeof catalogMetaSchema> | null {
+  return readJsonFile<z.infer<typeof catalogMetaSchema>>(
+    resolve(cacheDir, "meta.json"),
+  );
+}
+
+function findIndexFile(dir: string): string | null {
+  const candidates = [
+    "skills_index.local.json",
+    "skills_index.json",
+    "index.json",
+    "catalog.json",
+    "skills.json",
+  ];
+
+  try {
+    const dirs = [dir];
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        dirs.push(resolve(dir, entry.name));
+      }
+    }
+
+    for (const name of candidates) {
+      for (const searchDir of dirs) {
+        const path = resolve(searchDir, name);
+        if (existsSync(path)) {
+          return path;
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function buildMinimalCatalog(extractDir: string) {
+  const indexPath = findIndexFile(extractDir);
+
+  if (!indexPath) {
+    throw new Error("No index JSON found in extracted catalog archive");
+  }
+
+  const parsed = JSON.parse(readFileSync(indexPath, "utf8")) as unknown;
+  const raw: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : typeof parsed === "object" &&
+        parsed !== null &&
+        "skills" in parsed &&
+        Array.isArray((parsed as { skills: unknown }).skills)
+      ? (parsed as { skills: unknown[] }).skills
+      : [];
+
+  return raw
+    .filter(
+      (entry): entry is Record<string, unknown> =>
+        typeof entry === "object" && entry !== null,
+    )
+    .map((entry) => {
+      const stats =
+        typeof entry.stats === "object" && entry.stats !== null
+          ? (entry.stats as Record<string, unknown>)
+          : {};
+
+      const updatedAtRaw = entry.updated_at ?? entry.updatedAt ?? "";
+      const updatedAt =
+        typeof updatedAtRaw === "number"
+          ? new Date(updatedAtRaw).toISOString()
+          : String(updatedAtRaw);
+
+      return {
+        slug: String(entry.slug ?? ""),
+        name: String(entry.name ?? entry.slug ?? ""),
+        description: String(entry.description ?? "").slice(0, 150),
+        downloads: Number(stats.downloads ?? entry.downloads ?? 0),
+        stars: Number(stats.stars ?? entry.stars ?? 0),
+        tags: Array.isArray(entry.tags)
+          ? entry.tags.filter((tag): tag is string => typeof tag === "string")
+          : [],
+        version: String(entry.version ?? "0.0.0"),
+        updatedAt,
+      };
+    });
+}
+
+async function fetchRemoteVersion(): Promise<string> {
+  const response = await fetch(VERSION_CHECK_URL);
+
+  if (!response.ok) {
+    throw new Error(`Version check failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as { version?: unknown };
+
+  if (typeof data.version !== "string" || data.version.length === 0) {
+    throw new Error("Version response missing version");
+  }
+
+  return data.version;
+}
+
+async function refreshCatalogCache(cacheDir: string) {
+  mkdirSync(cacheDir, { recursive: true });
+
+  const currentMeta = readMeta(cacheDir);
+  const remoteVersion = await fetchRemoteVersion();
+  if (currentMeta && currentMeta.version === remoteVersion) {
+    return { ok: true as const, skillCount: currentMeta.skillCount };
+  }
+
+  const archivePath = resolve(cacheDir, "latest.tar.gz");
+  const extractDir = resolve(cacheDir, ".extract-staging");
+  const tempCatalogPath = resolve(cacheDir, ".catalog-next.json");
+
+  try {
+    const response = await fetch(CATALOG_DOWNLOAD_URL);
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Catalog download failed: ${response.status}`);
+    }
+
+    const chunks: Uint8Array[] = [];
+    const reader = response.body.getReader();
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      chunks.push(value);
+    }
+
+    writeFileSync(archivePath, Buffer.concat(chunks));
+
+    rmSync(extractDir, { recursive: true, force: true });
+    mkdirSync(extractDir, { recursive: true });
+    await execFileAsync("tar", ["-xzf", archivePath, "-C", extractDir]);
+
+    const skills = buildMinimalCatalog(extractDir);
+    writeFileSync(tempCatalogPath, JSON.stringify(skills), "utf8");
+    renameSync(tempCatalogPath, resolve(cacheDir, "catalog.json"));
+    writeFileSync(
+      resolve(cacheDir, "meta.json"),
+      JSON.stringify(
+        {
+          version: remoteVersion,
+          updatedAt: new Date().toISOString(),
+          skillCount: skills.length,
+        } satisfies z.infer<typeof catalogMetaSchema>,
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    return { ok: true as const, skillCount: skills.length };
+  } finally {
+    rmSync(archivePath, { force: true });
+    rmSync(extractDir, { recursive: true, force: true });
+    rmSync(tempCatalogPath, { force: true });
+  }
+}
+
+export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
+  app.openapi(skillhubCatalogRoute, async (c) => {
+    const cacheDir = getCacheDir();
+
+    if (!cacheDir) {
+      return c.json({ skills: [], installedSlugs: [], meta: null }, 200);
+    }
+
+    const skills = readCatalog(cacheDir);
+    const meta = readMeta(cacheDir);
+    const installedSlugs = getInstalledSlugs(getSkillsDir());
+
+    return c.json({ skills, installedSlugs, meta }, 200);
+  });
+
+  app.openapi(skillhubInstallRoute, async (c) => {
+    const { slug } = c.req.valid("json");
+    const skillsDir = getSkillsDir();
+
+    if (!skillsDir) {
+      return c.json(
+        { ok: false, error: "Skills directory not configured" },
+        200,
+      );
+    }
+
+    try {
+      await execFileAsync("npx", [
+        "clawhub",
+        "install",
+        slug,
+        "--force",
+        "--dir",
+        skillsDir,
+      ]);
+      return c.json({ ok: true }, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return c.json({ ok: false, error: message }, 200);
+    }
+  });
+
+  app.openapi(skillhubRefreshRoute, async (c) => {
+    const cacheDir = getCacheDir();
+
+    if (!cacheDir) {
+      return c.json(
+        { ok: false, skillCount: 0, error: "SkillHub cache not configured" },
+        200,
+      );
+    }
+
+    try {
+      const result = await refreshCatalogCache(cacheDir);
+      return c.json(result, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return c.json({ ok: false, skillCount: 0, error: message }, 200);
+    }
+  });
+
+  app.openapi(skillhubUninstallRoute, async (c) => {
+    const { slug } = c.req.valid("json");
+    const skillsDir = getSkillsDir();
+
+    if (!skillsDir) {
+      return c.json(
+        { ok: false, error: "Skills directory not configured" },
+        200,
+      );
+    }
+
+    try {
+      const skillDir = resolveSkillhubPath(skillsDir, slug);
+
+      if (!skillDir) {
+        return c.json({ ok: false, error: "Invalid skill slug" }, 200);
+      }
+
+      if (existsSync(skillDir)) {
+        rmSync(skillDir, { recursive: true, force: true });
+      }
+
+      return c.json({ ok: true }, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return c.json({ ok: false, error: message }, 200);
+    }
+  });
+
+  app.openapi(skillhubDetailRoute, async (c) => {
+    const { slug } = c.req.valid("param");
+    const cacheDir = getCacheDir();
+    const skillsDir = getSkillsDir();
+
+    // Find catalog entry
+    let catalogEntry: Record<string, unknown> | null = null;
+    if (cacheDir) {
+      const all = readJsonFile<Array<Record<string, unknown>>>(
+        resolve(cacheDir, "catalog.json"),
+      );
+      catalogEntry = all?.find((s) => s.slug === slug) ?? null;
+    }
+
+    // Read SKILL.md if installed
+    let skillContent: string | null = null;
+    let installed = false;
+    let files: string[] = [];
+    if (skillsDir) {
+      const skillDir = resolveSkillhubPath(skillsDir, slug);
+      const skillMdPath = skillDir ? resolve(skillDir, "SKILL.md") : null;
+      if (skillDir && skillMdPath && existsSync(skillMdPath)) {
+        installed = true;
+        skillContent = readFileSync(skillMdPath, "utf8");
+        try {
+          files = readdirSync(skillDir, { recursive: true })
+            .map(String)
+            .filter((f) => !f.startsWith(".clawhub") && f !== "_meta.json");
+        } catch {
+          // Ignore
+        }
+      }
+    }
+
+    if (!catalogEntry && !installed) {
+      return c.json({ message: "Skill not found" }, 404);
+    }
+
+    const stats =
+      catalogEntry &&
+      typeof catalogEntry.stats === "object" &&
+      catalogEntry.stats !== null
+        ? (catalogEntry.stats as Record<string, unknown>)
+        : {};
+
+    return c.json(
+      {
+        slug,
+        name: String(catalogEntry?.name ?? slug),
+        description: String(catalogEntry?.description ?? ""),
+        downloads: Number(stats.downloads ?? catalogEntry?.downloads ?? 0),
+        stars: Number(stats.stars ?? catalogEntry?.stars ?? 0),
+        tags: Array.isArray(catalogEntry?.tags) ? catalogEntry.tags : [],
+        version: String(catalogEntry?.version ?? ""),
+        updatedAt: String(
+          catalogEntry?.updated_at ?? catalogEntry?.updatedAt ?? "",
+        ),
+        homepage: String(catalogEntry?.homepage ?? ""),
+        installed,
+        skillContent,
+        files,
+      },
+      200,
+    );
+  });
+}

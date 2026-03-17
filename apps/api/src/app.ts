@@ -50,11 +50,8 @@ import {
   registerSharedSlackClaimPublicRoutes,
   registerSharedSlackClaimRoutes,
 } from "./routes/shared-slack-claim-routes.js";
-import { registerFilesystemSkillRoutes } from "./routes/skill-filesystem-routes.js";
-import {
-  registerSkillCatalogRoutes,
-  registerSkillRoutes,
-} from "./routes/skill-routes.js";
+import { registerSkillRoutes } from "./routes/skill-routes.js";
+import { registerSkillhubRoutes } from "./routes/skillhub-routes.js";
 import { registerSlackEvents } from "./routes/slack-events.js";
 import { registerUserRoutes } from "./routes/user-routes.js";
 import { registerWorkspaceTemplateRoutes } from "./routes/workspace-template-routes.js";
@@ -160,8 +157,7 @@ export function createApp() {
   registerClaimRoutes(app);
   registerFeishuOAuthRoutes(app);
   registerIntegrationRoutes(app);
-  registerSkillCatalogRoutes(app);
-  registerFilesystemSkillRoutes(app);
+  registerSkillhubRoutes(app);
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",

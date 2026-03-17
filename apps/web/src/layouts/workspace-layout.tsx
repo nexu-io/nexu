@@ -353,11 +353,6 @@ function WorkspaceLayoutInner() {
                 <Sparkles size={14} />
                 {!collapsed && t("layout.nav.skills")}
               </span>
-              {!collapsed && (
-                <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
-                  {sessions.length > 0 ? sessions.length : ""}
-                </span>
-              )}
             </Link>
             <Link
               to="/workspace/models"

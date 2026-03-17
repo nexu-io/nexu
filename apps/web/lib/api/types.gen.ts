@@ -2850,59 +2850,111 @@ export type DeleteApiV1IntegrationsByIntegrationIdResponses = {
 
 export type DeleteApiV1IntegrationsByIntegrationIdResponse = DeleteApiV1IntegrationsByIntegrationIdResponses[keyof DeleteApiV1IntegrationsByIntegrationIdResponses];
 
-export type GetApiV1SkillsData = {
+export type GetApiV1SkillhubCatalogData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/skills';
+    url: '/api/v1/skillhub/catalog';
 };
 
-export type GetApiV1SkillsResponses = {
+export type GetApiV1SkillhubCatalogResponses = {
     /**
-     * List of available skills
+     * SkillHub community skill catalog
      */
     200: {
         skills: Array<{
             slug: string;
             name: string;
             description: string;
-            longDescription?: string;
-            iconName: string;
-            iconUrl?: string;
-            fallbackIconUrl?: string;
-            prompt: string;
-            examples?: Array<string>;
-            tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-            source: 'official' | 'custom';
-            tools?: Array<{
-                slug: string;
-                name: string;
-                provider: string;
-                iconUrl: string;
-                fallbackIconUrl: string;
-            }>;
-            githubUrl?: string;
+            downloads: number;
+            stars: number;
+            tags: Array<string>;
+            version: string;
+            updatedAt: string;
         }>;
-        tags: Array<{
-            id: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-            label: string;
-            count: number;
-        }>;
+        installedSlugs: Array<string>;
+        meta: {
+            version: string;
+            updatedAt: string;
+            skillCount: number;
+        };
     };
 };
 
-export type GetApiV1SkillsResponse = GetApiV1SkillsResponses[keyof GetApiV1SkillsResponses];
+export type GetApiV1SkillhubCatalogResponse = GetApiV1SkillhubCatalogResponses[keyof GetApiV1SkillhubCatalogResponses];
 
-export type GetApiV1SkillsBySlugData = {
+export type PostApiV1SkillhubInstallData = {
+    body?: {
+        slug: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/skillhub/install';
+};
+
+export type PostApiV1SkillhubInstallResponses = {
+    /**
+     * Install result
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiV1SkillhubInstallResponse = PostApiV1SkillhubInstallResponses[keyof PostApiV1SkillhubInstallResponses];
+
+export type PostApiV1SkillhubRefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/skillhub/refresh';
+};
+
+export type PostApiV1SkillhubRefreshResponses = {
+    /**
+     * Refresh result
+     */
+    200: {
+        ok: boolean;
+        skillCount: number;
+        error?: string;
+    };
+};
+
+export type PostApiV1SkillhubRefreshResponse = PostApiV1SkillhubRefreshResponses[keyof PostApiV1SkillhubRefreshResponses];
+
+export type PostApiV1SkillhubUninstallData = {
+    body?: {
+        slug: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/skillhub/uninstall';
+};
+
+export type PostApiV1SkillhubUninstallResponses = {
+    /**
+     * Uninstall result
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiV1SkillhubUninstallResponse = PostApiV1SkillhubUninstallResponses[keyof PostApiV1SkillhubUninstallResponses];
+
+export type GetApiV1SkillhubSkillsBySlugData = {
     body?: never;
     path: {
         slug: string;
     };
     query?: never;
-    url: '/api/v1/skills/{slug}';
+    url: '/api/v1/skillhub/skills/{slug}';
 };
 
-export type GetApiV1SkillsBySlugErrors = {
+export type GetApiV1SkillhubSkillsBySlugErrors = {
     /**
      * Skill not found
      */
@@ -2911,60 +2963,29 @@ export type GetApiV1SkillsBySlugErrors = {
     };
 };
 
-export type GetApiV1SkillsBySlugError = GetApiV1SkillsBySlugErrors[keyof GetApiV1SkillsBySlugErrors];
+export type GetApiV1SkillhubSkillsBySlugError = GetApiV1SkillhubSkillsBySlugErrors[keyof GetApiV1SkillhubSkillsBySlugErrors];
 
-export type GetApiV1SkillsBySlugResponses = {
+export type GetApiV1SkillhubSkillsBySlugResponses = {
     /**
-     * Skill detail with tool auth status
+     * Skill detail with SKILL.md content
      */
     200: {
         slug: string;
         name: string;
         description: string;
-        longDescription?: string;
-        iconName: string;
-        iconUrl?: string;
-        fallbackIconUrl?: string;
-        prompt: string;
-        examples?: Array<string>;
-        tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-        source: 'official' | 'custom';
-        tools?: Array<{
-            slug: string;
-            name: string;
-            provider: string;
-            iconUrl: string;
-            fallbackIconUrl: string;
-            authScheme: string;
-            status: 'connected' | 'not_connected' | 'initiated' | 'expired';
-            integrationId?: string;
-        }>;
-        githubUrl?: string;
-        relatedSkills?: Array<{
-            slug: string;
-            name: string;
-            description: string;
-            longDescription?: string;
-            iconName: string;
-            iconUrl?: string;
-            fallbackIconUrl?: string;
-            prompt: string;
-            examples?: Array<string>;
-            tag: 'office-collab' | 'file-knowledge' | 'creative-design' | 'biz-analysis' | 'av-generation' | 'info-content' | 'dev-tools';
-            source: 'official' | 'custom';
-            tools?: Array<{
-                slug: string;
-                name: string;
-                provider: string;
-                iconUrl: string;
-                fallbackIconUrl: string;
-            }>;
-            githubUrl?: string;
-        }>;
+        downloads: number;
+        stars: number;
+        tags: Array<string>;
+        version: string;
+        updatedAt: string;
+        homepage: string;
+        installed: boolean;
+        skillContent: string;
+        files: Array<string>;
     };
 };
 
-export type GetApiV1SkillsBySlugResponse = GetApiV1SkillsBySlugResponses[keyof GetApiV1SkillsBySlugResponses];
+export type GetApiV1SkillhubSkillsBySlugResponse = GetApiV1SkillhubSkillsBySlugResponses[keyof GetApiV1SkillhubSkillsBySlugResponses];
 
 export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
