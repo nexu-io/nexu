@@ -1,4 +1,4 @@
-import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
+import { BrowserWindow, app, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -44,10 +44,14 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
         }
 
         case "diagnostics:get-info": {
+          const sentryDsn = process.env.NEXU_DESKTOP_SENTRY_DSN ?? null;
+          const sentryMainEnabled = Boolean(sentryDsn);
           const result: HostInvokeResultMap["diagnostics:get-info"] = {
             crashDumpsPath: app.getPath("crashDumps"),
             processType: process.type,
-            crashReporterUploadToServer: crashReporter.getUploadToServer(),
+            sentryMainEnabled,
+            sentryDsn,
+            nativeCrashPipeline: sentryMainEnabled ? "sentry" : "local-only",
           };
 
           return result;

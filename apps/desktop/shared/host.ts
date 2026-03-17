@@ -100,7 +100,9 @@ export type AppInfo = {
 export type DiagnosticsInfo = {
   crashDumpsPath: string;
   processType: string;
-  crashReporterUploadToServer: boolean;
+  sentryMainEnabled: boolean;
+  sentryDsn: string | null;
+  nativeCrashPipeline: "local-only" | "sentry";
 };
 
 export type DesktopSurface = "web" | "openclaw" | "control" | "diagnostics";
@@ -168,11 +170,16 @@ export type RuntimeState = {
 };
 
 export type HostBridge = {
+  bootstrap: HostBootstrap;
   invoke<TChannel extends HostInvokeChannel>(
     channel: TChannel,
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
+};
+
+export type HostBootstrap = {
+  sentryDsn: string | null;
 };
 
 export type UpdateSource = "oss" | "github";

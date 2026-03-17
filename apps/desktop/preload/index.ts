@@ -15,6 +15,10 @@ import {
 const validChannels = new Set<string>(hostInvokeChannels);
 
 const hostBridge: HostBridge = {
+  bootstrap: {
+    sentryDsn: process.env.NEXU_DESKTOP_SENTRY_DSN ?? null,
+  },
+
   invoke<TChannel extends HostInvokeChannel>(
     channel: TChannel,
     payload: HostInvokePayloadMap[TChannel],

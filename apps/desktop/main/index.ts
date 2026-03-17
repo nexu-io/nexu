@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as Sentry from "@sentry/electron/main";
 import {
   BrowserWindow,
   Menu,
@@ -36,17 +37,27 @@ const orchestrator = new RuntimeOrchestrator(
 
 app.setName("Nexu Desktop");
 
-crashReporter.start({
-  companyName: "Nexu",
-  productName: app.getName(),
-  submitURL: "https://127.0.0.1/desktop-crash-reporter-disabled",
-  uploadToServer: false,
-  compress: true,
-  ignoreSystemCrashHandler: false,
-  extra: {
+const sentryDsn = process.env.NEXU_DESKTOP_SENTRY_DSN;
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
     environment: app.isPackaged ? "production" : "development",
-  },
-});
+    release: `@nexu/desktop@${app.getVersion()}`,
+  });
+} else {
+  crashReporter.start({
+    companyName: "Nexu",
+    productName: app.getName(),
+    submitURL: "https://127.0.0.1/desktop-crash-reporter-disabled",
+    uploadToServer: false,
+    compress: true,
+    ignoreSystemCrashHandler: false,
+    extra: {
+      environment: app.isPackaged ? "production" : "development",
+    },
+  });
+}
 
 let mainWindow: BrowserWindow | null = null;
 

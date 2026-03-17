@@ -1,5 +1,6 @@
 import * as amplitude from "@amplitude/unified";
 import { Identify } from "@amplitude/unified";
+import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -30,6 +31,27 @@ import {
 import "./runtime-page.css";
 
 const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
+const rendererSentryDsn =
+  typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
+
+let rendererSentryInitialized = false;
+
+function initializeRendererSentry(dsn: string): void {
+  if (rendererSentryInitialized) {
+    return;
+  }
+
+  Sentry.init({
+    dsn,
+    environment: import.meta.env.MODE,
+  });
+
+  rendererSentryInitialized = true;
+}
+
+if (rendererSentryDsn) {
+  initializeRendererSentry(rendererSentryDsn);
+}
 
 if (amplitudeApiKey) {
   amplitude.initAll(amplitudeApiKey, {
@@ -551,8 +573,8 @@ function DiagnosticsPage() {
           <h1>Exercise the Electron failure paths on demand</h1>
           <p>
             Use one page to validate renderer exceptions, renderer process
-            exits, and main process crashes before wiring a remote crash
-            backend.
+            exits, and main process crashes through the local desktop
+            observability stack.
           </p>
         </div>
       </header>
@@ -572,21 +594,41 @@ function DiagnosticsPage() {
           value={diagnosticsInfo?.crashDumpsPath ?? "-"}
         />
         <SummaryCard
-          label="Crash upload"
+          label="Native crashes"
           value={
             diagnosticsInfo
-              ? diagnosticsInfo.crashReporterUploadToServer
-                ? "enabled"
+              ? diagnosticsInfo.nativeCrashPipeline === "sentry"
+                ? "sentry"
                 : "local-only"
+              : "-"
+          }
+        />
+        <SummaryCard
+          label="Sentry main"
+          value={
+            diagnosticsInfo
+              ? diagnosticsInfo.sentryMainEnabled
+                ? "enabled"
+                : "off"
+              : "-"
+          }
+        />
+        <SummaryCard
+          label="Sentry renderer"
+          value={
+            diagnosticsInfo
+              ? diagnosticsInfo.sentryMainEnabled
+                ? "enabled"
+                : "off"
               : "-"
           }
         />
       </section>
 
       <p className="runtime-note diagnostics-note">
-        Renderer exception keeps the process alive. Renderer crash terminates
-        only the window renderer. Main crash terminates the Electron host
-        process.
+        The renderer exception path keeps the process alive and is meant for
+        JavaScript error capture. The renderer crash and main crash paths
+        terminate a process and are meant for native crash capture.
       </p>
 
       {errorMessage ? (
@@ -597,19 +639,19 @@ function DiagnosticsPage() {
         <DiagnosticsActionCard
           description="Throws an unhandled Error from the renderer event loop. Use this to validate JavaScript exception capture without killing the app."
           disabled={busyAction !== null}
-          label="Throw Renderer Error"
+          label="Test Renderer Exception"
           onClick={triggerRendererException}
         />
         <DiagnosticsActionCard
           description="Asks the main process to forcefully crash the current renderer process. Use this to validate renderer crash handling and crash dump creation."
           disabled={busyAction !== null}
-          label="Crash Renderer"
+          label="Test Renderer Crash"
           onClick={triggerRendererCrash}
         />
         <DiagnosticsActionCard
           description="Invokes a deliberate main process crash. Use this to validate the native crash pipeline for the Electron host itself."
           disabled={busyAction !== null}
-          label="Crash Main"
+          label="Test Main Crash"
           onClick={triggerMainCrash}
         />
       </section>
@@ -620,8 +662,9 @@ function DiagnosticsPage() {
           <h2>{lastAction}</h2>
           <p>
             Renderer process type: {diagnosticsInfo?.processType ?? "unknown"}.
-            After a process crash, reopen the app and inspect the crash dumps
-            path plus console logs from the Electron main process.
+            JavaScript exceptions should stay visible in the renderer and in
+            Sentry when configured. Process crashes should leave Crashpad dumps
+            and, with Sentry enabled, upload native crash events.
           </p>
         </div>
       </section>

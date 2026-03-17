@@ -14,6 +14,7 @@ config:
   LOG_ERROR_STACK_LIMIT_LINES: "0"
   WEB_URL: "https://nexu.example.com"
   BETTER_AUTH_URL: "https://api.nexu.example.com"
+  NEXU_DESKTOP_SENTRY_DSN: ""
   VITE_WHATSAPP_WA_ME_URL: "https://wa.me/15551846745?text=Hello%20Nexu"
   DEFAULT_MODEL_ID: "anthropic/claude-sonnet-4"
   RUNTIME_MANAGE_OPENCLAW_PROCESS: "true"
