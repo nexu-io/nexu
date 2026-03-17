@@ -68,6 +68,7 @@ export type DesktopRuntimeConfig = {
     appUserId: string;
     onboardingRole: string;
   };
+  sentryDsn: string | null;
 };
 
 export function getDesktopRuntimeConfig(
@@ -141,5 +142,9 @@ export function getDesktopRuntimeConfig(
       appUserId: "desktop-local-user",
       onboardingRole: "Founder / Manager",
     },
+    sentryDsn:
+      env.NEXU_DESKTOP_SENTRY_DSN ??
+      buildConfig.NEXU_DESKTOP_SENTRY_DSN ??
+      null,
   };
 }

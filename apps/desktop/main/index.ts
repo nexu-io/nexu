@@ -1,10 +1,12 @@
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as Sentry from "@sentry/electron/main";
 import {
   BrowserWindow,
   Menu,
   type MenuItemConstructorOptions,
   app,
+  crashReporter,
   session,
   shell,
 } from "electron";
@@ -45,6 +47,46 @@ const orchestrator = new RuntimeOrchestrator(
 );
 
 app.setName("Nexu Desktop");
+
+const sentryDsn = runtimeConfig.sentryDsn;
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: app.isPackaged ? "production" : "development",
+    release: `@nexu/desktop@${app.getVersion()}`,
+    beforeSend(event) {
+      const testTitle =
+        typeof event.tags?.["nexu.test_title"] === "string"
+          ? event.tags["nexu.test_title"]
+          : typeof event.extra?.["nexu.test_title"] === "string"
+            ? event.extra["nexu.test_title"]
+            : null;
+
+      if (!testTitle) {
+        return event;
+      }
+
+      return {
+        ...event,
+        message: testTitle,
+        fingerprint: [testTitle],
+      };
+    },
+  });
+} else {
+  crashReporter.start({
+    companyName: "Nexu",
+    productName: app.getName(),
+    submitURL: "https://127.0.0.1/desktop-crash-reporter-disabled",
+    uploadToServer: false,
+    compress: true,
+    ignoreSystemCrashHandler: false,
+    extra: {
+      environment: app.isPackaged ? "production" : "development",
+    },
+  });
+}
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -391,7 +433,7 @@ app.on("web-contents-created", (_event, contents) => {
 app.whenReady().then(async () => {
   installApplicationMenu();
   installDesktopAuthRecoveryHooks();
-  registerIpcHandlers(orchestrator);
+  registerIpcHandlers(orchestrator, runtimeConfig);
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();

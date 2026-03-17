@@ -345,7 +345,7 @@ body,
 
 .runtime-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -650,6 +650,82 @@ body,
   background: #ffe7e2 !important;
 }
 
+.diagnostics-page {
+  background: radial-gradient(
+      circle at top right,
+      rgba(232, 101, 49, 0.14),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at bottom left,
+      rgba(17, 22, 29, 0.08),
+      transparent 28%
+    ), #f7f4ed;
+}
+
+.diagnostics-header,
+.diagnostics-summary,
+.diagnostics-grid,
+.diagnostics-status-card {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.diagnostics-note {
+  margin-bottom: 20px;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.diagnostics-action-card,
+.diagnostics-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #ddd5c5;
+  border-radius: 22px;
+  background: rgba(255, 252, 245, 0.94);
+}
+
+.diagnostics-action-card strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 1.02rem;
+}
+
+.diagnostics-action-card p,
+.diagnostics-status-card p {
+  margin: 0;
+  color: #5e636d;
+  line-height: 1.5;
+}
+
+.diagnostics-action-card button {
+  align-self: flex-start;
+  border: 1px solid #d9d0bf;
+  border-radius: 999px;
+  background: #1f242c;
+  color: #f7f4ed;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.diagnostics-action-card button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.diagnostics-status-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.3rem;
+}
+
 /* Update Banner */
 .update-banner {
   position: fixed;
@@ -757,7 +833,8 @@ body,
 
   .runtime-pane-layout,
   .runtime-summary,
-  .runtime-grid {
+  .runtime-grid,
+  .diagnostics-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   DesktopRuntimeConfig,
+  DiagnosticsInfo,
   HostDesktopCommand,
   RuntimeEvent,
   RuntimeEventQuery,
@@ -21,6 +22,18 @@ function getHostBridge() {
 
 export async function getAppInfo(): Promise<AppInfo> {
   return getHostBridge().invoke("app:get-info", undefined);
+}
+
+export async function getDiagnosticsInfo(): Promise<DiagnosticsInfo> {
+  return getHostBridge().invoke("diagnostics:get-info", undefined);
+}
+
+export async function triggerMainProcessCrash(): Promise<void> {
+  await getHostBridge().invoke("diagnostics:crash-main", undefined);
+}
+
+export async function triggerRendererProcessCrash(): Promise<void> {
+  await getHostBridge().invoke("diagnostics:crash-renderer", undefined);
 }
 
 export async function getApiBaseUrl(): Promise<string> {

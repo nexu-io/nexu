@@ -1,10 +1,14 @@
+import * as Sentry from "@sentry/electron/main";
 import { BrowserWindow, app, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
   hostInvokeChannels,
 } from "../shared/host";
-import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import {
+  type DesktopRuntimeConfig,
+  getDesktopRuntimeConfig,
+} from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import type { ComponentUpdater } from "./updater/component-updater";
@@ -14,6 +18,27 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
+
+const nativeCrashTestTitles = {
+  main: "desktop.main.crash",
+  renderer: "desktop.renderer.crash",
+} as const;
+
+async function prepareNativeCrashScope(
+  title: (typeof nativeCrashTestTitles)[keyof typeof nativeCrashTestTitles],
+): Promise<void> {
+  if (!Sentry.isInitialized()) {
+    return;
+  }
+
+  const scope = Sentry.getCurrentScope();
+  scope.setTag("nexu.test_title", title);
+  scope.setTag("nexu.test_kind", "native_crash");
+  scope.setExtra("nexu.test_title", title);
+  scope.setFingerprint([title]);
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
 
 export function setUpdateManager(manager: UpdateManager): void {
   updateManager = manager;
@@ -31,7 +56,10 @@ function assertValidChannel(
   }
 }
 
-export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
+export function registerIpcHandlers(
+  orchestrator: RuntimeOrchestrator,
+  runtimeConfig: DesktopRuntimeConfig,
+): void {
   orchestrator.subscribe((runtimeEvent) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send("host:runtime-event", runtimeEvent);
@@ -53,6 +81,38 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
           };
 
           return result;
+        }
+
+        case "diagnostics:get-info": {
+          const sentryDsn = runtimeConfig.sentryDsn;
+          const sentryMainEnabled = Boolean(sentryDsn);
+          const result: HostInvokeResultMap["diagnostics:get-info"] = {
+            crashDumpsPath: app.getPath("crashDumps"),
+            processType: process.type,
+            sentryMainEnabled,
+            sentryDsn,
+            nativeCrashPipeline: sentryMainEnabled ? "sentry" : "local-only",
+          };
+
+          return result;
+        }
+
+        case "diagnostics:crash-main": {
+          await prepareNativeCrashScope(nativeCrashTestTitles.main);
+          process.crash();
+          return undefined;
+        }
+
+        case "diagnostics:crash-renderer": {
+          const browserWindow = BrowserWindow.fromWebContents(_event.sender);
+
+          if (!browserWindow) {
+            throw new Error("Could not resolve the active browser window.");
+          }
+
+          await prepareNativeCrashScope(nativeCrashTestTitles.renderer);
+          browserWindow.webContents.forcefullyCrashRenderer();
+          return undefined;
         }
 
         case "env:get-api-base-url": {

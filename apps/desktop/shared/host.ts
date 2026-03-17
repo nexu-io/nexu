@@ -3,6 +3,9 @@ export type { DesktopRuntimeConfig } from "./runtime-config";
 
 export const hostInvokeChannels = [
   "app:get-info",
+  "diagnostics:get-info",
+  "diagnostics:crash-main",
+  "diagnostics:crash-renderer",
   "env:get-api-base-url",
   "env:get-runtime-config",
   "runtime:get-state",
@@ -41,6 +44,9 @@ export type RuntimeEventQueryResult = {
 
 export type HostInvokePayloadMap = {
   "app:get-info": undefined;
+  "diagnostics:get-info": undefined;
+  "diagnostics:crash-main": undefined;
+  "diagnostics:crash-renderer": undefined;
   "env:get-api-base-url": undefined;
   "env:get-runtime-config": undefined;
   "runtime:get-state": undefined;
@@ -74,6 +80,9 @@ export type HostInvokePayloadMap = {
 
 export type HostInvokeResultMap = {
   "app:get-info": AppInfo;
+  "diagnostics:get-info": DiagnosticsInfo;
+  "diagnostics:crash-main": undefined;
+  "diagnostics:crash-renderer": undefined;
   "env:get-api-base-url": {
     apiBaseUrl: string;
   };
@@ -117,7 +126,15 @@ export type AppInfo = {
   isDev: boolean;
 };
 
-export type DesktopSurface = "web" | "openclaw" | "control";
+export type DiagnosticsInfo = {
+  crashDumpsPath: string;
+  processType: string;
+  sentryMainEnabled: boolean;
+  sentryDsn: string | null;
+  nativeCrashPipeline: "local-only" | "sentry";
+};
+
+export type DesktopSurface = "web" | "openclaw" | "control" | "diagnostics";
 
 export type DesktopChromeMode = "full" | "immersive";
 
@@ -228,12 +245,17 @@ export type RuntimeState = {
 };
 
 export type HostBridge = {
+  bootstrap: HostBootstrap;
   invoke<TChannel extends HostInvokeChannel>(
     channel: TChannel,
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
   onRuntimeEvent(listener: (event: RuntimeEvent) => void): () => void;
+};
+
+export type HostBootstrap = {
+  sentryDsn: string | null;
 };
 
 export type UpdateSource = "r2" | "github";
