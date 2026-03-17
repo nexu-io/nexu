@@ -27,8 +27,8 @@ import {
 } from "./routes/claim-routes.js";
 import { registerComposioRoutes } from "./routes/composio-routes.js";
 import {
-  registerDesktopDeviceRoutes,
   registerDesktopAuthorizeRoute,
+  registerDesktopDeviceRoutes,
 } from "./routes/desktop-auth-routes.js";
 import { registerDesktopLocalRoutes } from "./routes/desktop-local-routes.js";
 import { registerFeedbackRoutes } from "./routes/feedback-routes.js";
