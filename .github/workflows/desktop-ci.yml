@@ -57,6 +57,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install tmux
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install tmux
+
       - name: Show desktop toolchain versions
         shell: bash
         run: |
