@@ -21,39 +21,45 @@ const version =
   process.env.GIT_COMMIT_SHA ??
   process.env.npm_package_version;
 
-function getPinoTransport(): pino.TransportSingleOptions | undefined {
-  if (env === "production") {
-    return undefined;
-  }
+class SafeConsoleStream extends Writable {
+  override _write(
+    chunk: string | Buffer,
+    encoding: BufferEncoding,
+    callback: (error?: Error | null) => void,
+  ): void {
+    if (process.stdout.destroyed || !process.stdout.writable) {
+      callback(null);
+      return;
+    }
 
-  try {
-    require.resolve("pino-pretty");
-    return {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        ignore: "pid,hostname,service,env,log_source,version",
-        translateTime: "HH:MM:ss.l",
-      },
-    };
-  } catch {
-    return undefined;
+    process.stdout.write(chunk, encoding, (error) => {
+      if (error) {
+        const errorCode =
+          error instanceof Error && "code" in error ? String(error.code) : null;
+        if (errorCode === "EIO" || errorCode === "EPIPE") {
+          callback(null);
+          return;
+        }
+      }
+
+      callback(error);
+    });
   }
 }
 
-const transport = getPinoTransport();
-
-const runtimeConsoleLogger = pino({
-  level: process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
-  base: {
-    service: "nexu-desktop",
-    env,
-    log_source: "desktop-runtime",
-    ...(version ? { version } : {}),
+const runtimeConsoleLogger = pino(
+  {
+    level: process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
+    base: {
+      service: "nexu-desktop",
+      env,
+      log_source: "desktop-runtime",
+      ...(version ? { version } : {}),
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
   },
-  timestamp: pino.stdTimeFunctions.isoTime,
-  ...(transport ? { transport } : {}),
-});
+  new SafeConsoleStream(),
+);
 
 const MAX_LOG_FILE_BYTES = 1_000_000;
 const MAX_LOG_FILE_BACKUPS = 5;
@@ -123,12 +129,14 @@ function getDesktopMainLevel({
 }
 
 class BufferedRotatingFileStream extends Writable {
-  private stream = this.openStream();
+  private stream;
 
-  private currentBytes = this.getExistingSize();
+  private currentBytes;
 
   constructor(private readonly logFilePath: string) {
     super();
+    this.stream = this.openStream();
+    this.currentBytes = this.getExistingSize();
   }
 
   flushSync(): void {

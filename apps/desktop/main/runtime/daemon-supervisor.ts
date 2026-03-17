@@ -30,6 +30,23 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function safeWrite(stream: NodeJS.WriteStream, message: string): void {
+  if (stream.destroyed || !stream.writable) {
+    return;
+  }
+
+  try {
+    stream.write(message);
+  } catch (error) {
+    const errorCode =
+      error instanceof Error && "code" in error ? String(error.code) : null;
+    if (errorCode === "EIO" || errorCode === "EPIPE") {
+      return;
+    }
+    throw error;
+  }
+}
+
 export class RuntimeOrchestrator {
   private readonly startedAt = nowIso();
 
@@ -304,13 +321,13 @@ export class RuntimeOrchestrator {
 
       child.stdout?.on("data", (chunk) => {
         const text = String(chunk);
-        process.stdout.write(`[daemon:${id}] ${text}`);
+        safeWrite(process.stdout, `[daemon:${id}] ${text}`);
         this.logChunk(record, text, "stdout", actionId);
       });
 
       child.stderr?.on("data", (chunk) => {
         const text = String(chunk);
-        process.stderr.write(`[daemon:${id}] ${text}`);
+        safeWrite(process.stderr, `[daemon:${id}] ${text}`);
         this.logChunk(record, text, "stderr", actionId);
       });
 

@@ -64,6 +64,10 @@ After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 - `tmux` is required for the desktop local-dev workflow.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
 - For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
+- If `pnpm desktop:start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `docs/guides/desktop-runtime-guide.md` before changing the launcher flow.
+- Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
+- For deeper desktop runtime inspection, use the existing event/query path (`onRuntimeEvent(...)`, `runtime:query-events`, `queryRuntimeEvents(...)`) instead of rebuilding one-off diagnostics.
+- Use `actionId`, `reasonCode`, and `cursor` / `nextCursor` as the primary correlation and incremental-fetch primitives for desktop runtime debugging.
 - To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state`.
 - Desktop runtime guide: `docs/guides/desktop-runtime-guide.md`.
 

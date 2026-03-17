@@ -7,7 +7,6 @@ import { Toaster, toast } from "sonner";
 import type {
   DesktopChromeMode,
   RuntimeLogEntry,
-  RuntimeReasonCode,
   DesktopRuntimeConfig,
   DesktopSurface,
   RuntimeEvent,
@@ -22,7 +21,6 @@ import {
   getRuntimeState,
   onDesktopCommand,
   onRuntimeEvent,
-  queryRuntimeEvents,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -85,30 +83,6 @@ function logFilterLabel(filter: LogFilter): string {
 }
 
 type LogFilter = "all" | "errors" | "lifecycle";
-
-const runtimeReasonCodes: RuntimeReasonCode[] = [
-  "embedded_unit",
-  "start_requested",
-  "start_succeeded",
-  "port_ready",
-  "start_failed",
-  "stop_requested",
-  "managed_error",
-  "process_exited",
-  "delegated_process_detected",
-  "delegated_process_missing",
-  "stdout_line",
-  "stderr_line",
-];
-
-function parseRuntimeReasonCode(value: string): RuntimeReasonCode | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  return runtimeReasonCodes.find((code) => code === trimmed);
-}
 
 function mergeUnitSnapshot(
   current: RuntimeUnitState,
@@ -433,11 +407,6 @@ function RuntimePage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeUnitId, setActiveUnitId] = useState<RuntimeUnitId | null>(null);
-  const [queryBusy, setQueryBusy] = useState(false);
-  const [queryActionId, setQueryActionId] = useState("");
-  const [queryReasonCode, setQueryReasonCode] = useState("");
-  const [queriedEntries, setQueriedEntries] = useState<RuntimeLogEntry[]>([]);
-  const [queryCursor, setQueryCursor] = useState(0);
 
   const loadState = useCallback(async () => {
     try {
@@ -500,48 +469,6 @@ function RuntimePage() {
 
   const activeUnit =
     units.find((unit) => unit.id === activeUnitId) ?? units[0] ?? null;
-
-  async function runDiagnosticQuery(mode: "reset" | "newer"): Promise<void> {
-    if (!activeUnit) {
-      return;
-    }
-
-    setQueryBusy(true);
-    try {
-      const result = await queryRuntimeEvents({
-        unitId: activeUnit.id,
-        actionId: queryActionId.trim() || undefined,
-        reasonCode: parseRuntimeReasonCode(queryReasonCode),
-        afterCursor: mode === "newer" ? queryCursor : undefined,
-        limit: mode === "newer" ? 100 : 50,
-      });
-
-      setQueryCursor(result.nextCursor);
-      setQueriedEntries((current) => {
-        if (mode === "reset") {
-          return result.entries;
-        }
-
-        const seen = new Set(current.map((entry) => entry.id));
-        const appended = result.entries.filter((entry) => !seen.has(entry.id));
-        return [...current, ...appended].slice(-200);
-      });
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to query runtime diagnostic events.",
-      );
-    } finally {
-      setQueryBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    void activeUnitId;
-    setQueriedEntries([]);
-    setQueryCursor(0);
-  }, [activeUnitId]);
 
   async function runAction(id: string, action: () => Promise<RuntimeState>) {
     setBusyId(id);
@@ -615,70 +542,12 @@ function RuntimePage() {
 
         <div className="runtime-detail-pane">
           {activeUnit ? (
-            <>
-              <RuntimeUnitCard
-                busy={busyId !== null}
-                onStart={(id) => runAction(`start:${id}`, () => startUnit(id))}
-                onStop={(id) => runAction(`stop:${id}`, () => stopUnit(id))}
-                unit={activeUnit}
-              />
-              <section className="runtime-card">
-                <div className="runtime-card-head">
-                  <div>
-                    <div className="runtime-label-row">
-                      <strong>Diagnostic Query</strong>
-                    </div>
-                    <p className="runtime-kind">{activeUnit.label}</p>
-                    <p className="runtime-command">cursor {queryCursor}</p>
-                  </div>
-                  <div className="runtime-actions">
-                    <button
-                      disabled={queryBusy}
-                      onClick={() => void runDiagnosticQuery("reset")}
-                      type="button"
-                    >
-                      Query recent
-                    </button>
-                    <button
-                      disabled={queryBusy || queryCursor === 0}
-                      onClick={() => void runDiagnosticQuery("newer")}
-                      type="button"
-                    >
-                      Load newer
-                    </button>
-                  </div>
-                </div>
-                <dl className="runtime-grid">
-                  <div>
-                    <dt>Action filter</dt>
-                    <dd>
-                      <input
-                        onChange={(event) => setQueryActionId(event.target.value)}
-                        placeholder="action id"
-                        type="text"
-                        value={queryActionId}
-                      />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Reason filter</dt>
-                    <dd>
-                      <input
-                        onChange={(event) => setQueryReasonCode(event.target.value)}
-                        placeholder="reason code"
-                        type="text"
-                        value={queryReasonCode}
-                      />
-                    </dd>
-                  </div>
-                </dl>
-                <pre className="runtime-log-tail">
-                  {queriedEntries.length > 0
-                    ? queriedEntries.map((entry) => formatLogLine(entry)).join("\n")
-                    : "No queried events yet."}
-                </pre>
-              </section>
-            </>
+            <RuntimeUnitCard
+              busy={busyId !== null}
+              onStart={(id) => runAction(`start:${id}`, () => startUnit(id))}
+              onStop={(id) => runAction(`stop:${id}`, () => stopUnit(id))}
+              unit={activeUnit}
+            />
           ) : (
             <section className="runtime-empty-state">
               No runtime units available.

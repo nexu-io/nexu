@@ -2,6 +2,23 @@ import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { app } from "electron";
 
+function safeWrite(stream: NodeJS.WriteStream, message: string): void {
+  if (stream.destroyed || !stream.writable) {
+    return;
+  }
+
+  try {
+    stream.write(message);
+  } catch (error) {
+    const errorCode =
+      error instanceof Error && "code" in error ? String(error.code) : null;
+    if (errorCode === "EIO" || errorCode === "EPIPE") {
+      return;
+    }
+    throw error;
+  }
+}
+
 function loadDesktopDevEnv(): void {
   const workspaceRoot = process.env.NEXU_WORKSPACE_ROOT;
 
@@ -38,7 +55,8 @@ function configureLocalDevPaths(): void {
   app.setPath("sessionData", sessionDataPath);
   app.setPath("logs", logsPath);
 
-  process.stdout.write(
+  safeWrite(
+    process.stdout,
     `[desktop:paths] runtimeRoot=${runtimeRoot} userData=${userDataPath} sessionData=${sessionDataPath} logs=${logsPath}\n`,
   );
 }
