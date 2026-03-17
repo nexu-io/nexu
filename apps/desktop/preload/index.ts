@@ -5,7 +5,11 @@ import {
   type HostInvokeChannel,
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
+  type UpdaterBridge,
+  type UpdaterEvent,
+  type UpdaterEventMap,
   hostInvokeChannels,
+  updaterEvents,
 } from "../shared/host";
 
 const validChannels = new Set<string>(hostInvokeChannels);
@@ -41,3 +45,31 @@ const hostBridge: HostBridge = {
 };
 
 contextBridge.exposeInMainWorld("nexuHost", hostBridge);
+
+const validUpdaterEvents = new Set<string>(updaterEvents);
+
+const updaterBridge: UpdaterBridge = {
+  onEvent<TEvent extends UpdaterEvent>(
+    event: TEvent,
+    callback: (data: UpdaterEventMap[TEvent]) => void,
+  ): () => void {
+    if (!validUpdaterEvents.has(event)) {
+      throw new Error(`Invalid updater event: ${event}`);
+    }
+
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: UpdaterEventMap[TEvent],
+    ) => {
+      callback(data);
+    };
+
+    ipcRenderer.on(event, handler);
+
+    return () => {
+      ipcRenderer.removeListener(event, handler);
+    };
+  },
+};
+
+contextBridge.exposeInMainWorld("nexuUpdater", updaterBridge);

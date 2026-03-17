@@ -13,6 +13,12 @@ export const hostInvokeChannels = [
   "runtime:show-log-file",
   "desktop:ensure-auth-session",
   "shell:open-external",
+  "update:check",
+  "update:download",
+  "update:install",
+  "update:get-current-version",
+  "update:set-channel",
+  "update:set-source",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -39,6 +45,12 @@ export type HostInvokePayloadMap = {
   "shell:open-external": {
     url: string;
   };
+  "update:check": undefined;
+  "update:download": undefined;
+  "update:install": undefined;
+  "update:get-current-version": undefined;
+  "update:set-channel": { channel: UpdateChannelName };
+  "update:set-source": { source: UpdateSource };
 };
 
 export type HostInvokeResultMap = {
@@ -61,6 +73,12 @@ export type HostInvokeResultMap = {
   "shell:open-external": {
     ok: boolean;
   };
+  "update:check": { updateAvailable: boolean };
+  "update:download": { ok: boolean };
+  "update:install": undefined;
+  "update:get-current-version": { version: string };
+  "update:set-channel": { ok: boolean };
+  "update:set-source": { ok: boolean };
 };
 
 export type AppInfo = {
@@ -140,4 +158,39 @@ export type HostBridge = {
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
+};
+
+export type UpdateSource = "oss" | "github";
+export type UpdateChannelName = "stable" | "beta";
+
+export const updaterEvents = [
+  "update:checking",
+  "update:available",
+  "update:up-to-date",
+  "update:progress",
+  "update:downloaded",
+  "update:error",
+] as const;
+
+export type UpdaterEvent = (typeof updaterEvents)[number];
+
+export type UpdaterEventMap = {
+  "update:checking": Record<string, never>;
+  "update:available": { version: string; releaseNotes?: string };
+  "update:up-to-date": Record<string, never>;
+  "update:progress": {
+    percent: number;
+    bytesPerSecond: number;
+    transferred: number;
+    total: number;
+  };
+  "update:downloaded": { version: string };
+  "update:error": { message: string };
+};
+
+export type UpdaterBridge = {
+  onEvent<TEvent extends UpdaterEvent>(
+    event: TEvent,
+    callback: (data: UpdaterEventMap[TEvent]) => void,
+  ): () => void;
 };
