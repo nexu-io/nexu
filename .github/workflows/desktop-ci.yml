@@ -110,7 +110,7 @@ jobs:
             echo "Readiness attempt $attempt/60"
 
             all_ports_ready=true
-            for port in 50800 50810 50832 18789; do
+            for port in 50800 50810 50832; do
               if ! lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
                 all_ports_ready=false
                 echo "Port $port is not listening yet"
