@@ -3,7 +3,6 @@ import { chmod, mkdir, readdir, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pruneOpenclawPackage } from "./lib/prune-openclaw-package.mjs";
 import {
   electronRoot,
   getSidecarRoot,
@@ -275,7 +274,6 @@ async function prepareOpenclawSidecar() {
   await linkOrCopyDirectory(openclawRuntimeNodeModules, sidecarNodeModules);
   await removePathIfExists(resolve(sidecarNodeModules, "electron"));
   await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
-  await pruneOpenclawPackage(sidecarNodeModules);
   await chmod(packagedOpenclawEntry, 0o755).catch(() => null);
   await writeFile(
     resolve(sidecarRoot, "package.json"),

@@ -1,6 +1,6 @@
 // Baseline installed size: 665M.
 
-export const pruneTargets = [
+export const pruneDependencyTargets = [
   // Round 1: actual savings 191M; actual pruned size 474M.
   // - Why these targets:
   //   biggest early size win
@@ -46,4 +46,21 @@ export const pruneTargets = [
   "node_modules/simple-git",
   "node_modules/ipull",
   "node_modules/fast-xml-builder",
+];
+
+// Package-content pruning must stay compatible with the runtime's published
+// extension entrypoints. Many `extensions/*/index.ts` files still import
+// `./src/*`, so deleting extension source trees here breaks runtime loading in
+// desktop sidecars while leaving plain local runtime installs unaffected.
+//
+// Keep this list intentionally conservative and share it across all runtime
+// assembly paths so `dev`, `desktop dev`, and `desktop dist` consume the same
+// OpenClaw package baseline.
+export const openclawPackagePruneTargets = ["docs"];
+
+export const pruneTargets = [
+  ...pruneDependencyTargets,
+  ...openclawPackagePruneTargets.map(
+    (relativePath) => `node_modules/openclaw/${relativePath}`,
+  ),
 ];
