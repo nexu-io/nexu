@@ -37,7 +37,7 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
         }
 
         case "env:get-api-base-url": {
-          const apiBaseUrl = getDesktopRuntimeConfig(process.env).apiBaseUrl;
+          const apiBaseUrl = getDesktopRuntimeConfig(process.env).urls.apiBase;
 
           const result: HostInvokeResultMap["env:get-api-base-url"] = {
             apiBaseUrl,

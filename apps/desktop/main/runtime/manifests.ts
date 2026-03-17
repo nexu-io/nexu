@@ -30,6 +30,9 @@ export function createRuntimeUnitManifests(
   const nexuRoot = repoRoot;
   const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
     process.env,
+    {
+      openclawBinPath: resolve(repoRoot, "openclaw-wrapper"),
+    },
   );
   const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
   const logsDir = ensureDir(resolve(userDataPath, "../logs/runtime-units"));
@@ -45,7 +48,6 @@ export function createRuntimeUnitManifests(
     repoRoot,
     "openclaw-runtime/node_modules/openclaw",
   );
-  const openclawBinPath = resolve(repoRoot, "openclaw-wrapper");
   const apiSidecarRoot = resolve(repoRoot, ".tmp/sidecars/api");
   const apiModulePath = resolve(apiSidecarRoot, "dist/index.js");
   const gatewaySidecarRoot = resolve(repoRoot, ".tmp/sidecars/gateway");
@@ -55,17 +57,14 @@ export function createRuntimeUnitManifests(
   const migrationsDir = resolve(nexuRoot, "apps/api/migrations");
   const webSidecarRoot = resolve(repoRoot, ".tmp/sidecars/web");
   const webModulePath = resolve(webSidecarRoot, "index.js");
-  const apiPort = runtimeConfig.apiPort;
-  const pglitePort = runtimeConfig.pglitePort;
-  const webPort = runtimeConfig.webPort;
-  const internalApiToken =
-    process.env.NEXU_INTERNAL_API_TOKEN ?? "gw-secret-token";
-  const skillApiToken =
-    process.env.NEXU_SKILL_API_TOKEN ?? "skill-secret-token";
-  const gatewayPoolId =
-    process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
-  const webUrl = runtimeConfig.webUrl;
-  const authUrl = process.env.NEXU_AUTH_URL ?? runtimeConfig.apiBaseUrl;
+  const apiPort = runtimeConfig.ports.api;
+  const pglitePort = runtimeConfig.ports.pglite;
+  const webPort = runtimeConfig.ports.web;
+  const internalApiToken = runtimeConfig.tokens.internalApi;
+  const skillApiToken = runtimeConfig.tokens.skill;
+  const gatewayPoolId = runtimeConfig.gateway.poolId;
+  const webUrl = runtimeConfig.urls.web;
+  const authUrl = runtimeConfig.urls.auth;
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
   // entry points still mirror a few of these defaults directly, so changes here should be treated
@@ -87,7 +86,7 @@ export function createRuntimeUnitManifests(
       env: {
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
-        WEB_API_ORIGIN: `http://127.0.0.1:${apiPort}`,
+        WEB_API_ORIGIN: runtimeConfig.urls.apiBase,
       },
     },
     {
@@ -134,9 +133,7 @@ export function createRuntimeUnitManifests(
       env: {
         FORCE_COLOR: "1",
         PORT: String(apiPort),
-        DATABASE_URL:
-          process.env.NEXU_DATABASE_URL ??
-          `postgresql://postgres:postgres@127.0.0.1:${pglitePort}/postgres?sslmode=disable`,
+        DATABASE_URL: runtimeConfig.database.pgliteUrl,
         BETTER_AUTH_URL: authUrl,
         WEB_URL: webUrl,
         INTERNAL_API_TOKEN: internalApiToken,
@@ -164,7 +161,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
-        OPENCLAW_BIN: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
+        OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
         OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
@@ -177,7 +174,7 @@ export function createRuntimeUnitManifests(
       kind: "runtime",
       launchStrategy: "delegated",
       delegatedProcessMatch: "openclaw-gateway",
-      binaryPath: process.env.NEXU_OPENCLAW_BIN ?? openclawBinPath,
+      binaryPath: runtimeConfig.paths.openclawBin,
       port: null,
       autoStart: true,
       logFilePath: resolve(logsDir, "openclaw.log"),
