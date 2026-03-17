@@ -99,7 +99,7 @@ created: "2026-03-17"
 
 ## Further actions
 
-- [ ] Provision the Sentry project via Terraform (currently dev-only and not Terraform-managed).
+- [x] Provision the Sentry project via Terraform (currently dev-only and not Terraform-managed).
 - [ ] Wire `NEXU_DESKTOP_SENTRY_DSN` into the production environment once the Terraform-managed project is ready.
 - [ ] Verify the prod DSN is pointing to the correct Sentry project before enabling crash reporting in production.
 
