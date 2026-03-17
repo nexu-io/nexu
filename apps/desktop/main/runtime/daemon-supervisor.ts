@@ -6,13 +6,13 @@ import {
 import { Socket } from "node:net";
 import { type UtilityProcess, utilityProcess } from "electron";
 import type {
-  RuntimeLogEntry,
-  RuntimeLogKind,
-  RuntimeReasonCode,
-  RuntimeLogStream,
   RuntimeEvent,
   RuntimeEventQuery,
   RuntimeEventQueryResult,
+  RuntimeLogEntry,
+  RuntimeLogKind,
+  RuntimeLogStream,
+  RuntimeReasonCode,
   RuntimeState,
   RuntimeUnitSnapshot,
   RuntimeUnitState,
@@ -187,7 +187,10 @@ export class RuntimeOrchestrator {
     this.recentEntries.push(entry);
 
     if (this.recentEntries.length > RECENT_EVENT_LIMIT) {
-      this.recentEntries.splice(0, this.recentEntries.length - RECENT_EVENT_LIMIT);
+      this.recentEntries.splice(
+        0,
+        this.recentEntries.length - RECENT_EVENT_LIMIT,
+      );
     }
   }
 
@@ -483,7 +486,9 @@ export class RuntimeOrchestrator {
     };
   }
 
-  private toRuntimeUnitSnapshot(record: RuntimeUnitRecord): RuntimeUnitSnapshot {
+  private toRuntimeUnitSnapshot(
+    record: RuntimeUnitRecord,
+  ): RuntimeUnitSnapshot {
     const state = this.toRuntimeUnitState(record);
     const { logTail: _logTail, ...snapshot } = state;
     return snapshot;
@@ -531,7 +536,10 @@ export class RuntimeOrchestrator {
       record.lastError = "Missing delegatedProcessMatch.";
       markProbeFailure(record);
 
-      if (previousPhase !== record.phase || previousError !== record.lastError) {
+      if (
+        previousPhase !== record.phase ||
+        previousError !== record.lastError
+      ) {
         const actionId = beginAction(record, "probe");
         this.logStateChange(record, {
           kind: "probe",

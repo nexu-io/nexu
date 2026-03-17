@@ -226,7 +226,10 @@ function triggerDesktopAuthRecovery(reason: string): void {
     try {
       await ensureDesktopAuthSession({ force: true });
       const sessionId = rotateDesktopLogSession();
-      logAuthRecovery(`desktop auth session restored sessionId=${sessionId}`, "stdout");
+      logAuthRecovery(
+        `desktop auth session restored sessionId=${sessionId}`,
+        "stdout",
+      );
       notifyDesktopAuthSessionRestored();
     } catch (error) {
       logAuthRecovery(

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   createWriteStream,
   existsSync,
@@ -7,7 +8,6 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { Writable } from "node:stream";
 import pino from "pino";
@@ -160,7 +160,10 @@ class BufferedRotatingFileStream extends Writable {
       : Buffer.byteLength(chunk, encoding);
 
     try {
-      if (this.currentBytes > 0 && this.currentBytes + size > MAX_LOG_FILE_BYTES) {
+      if (
+        this.currentBytes > 0 &&
+        this.currentBytes + size > MAX_LOG_FILE_BYTES
+      ) {
         this.rotateFiles();
       }
     } catch (error) {
@@ -190,7 +193,10 @@ class BufferedRotatingFileStream extends Writable {
 
   private openStream() {
     mkdirSync(dirname(this.logFilePath), { recursive: true });
-    return createWriteStream(this.logFilePath, { flags: "a", encoding: "utf8" });
+    return createWriteStream(this.logFilePath, {
+      flags: "a",
+      encoding: "utf8",
+    });
   }
 
   private rotateFiles(): void {
@@ -231,8 +237,7 @@ function getFileLogger(logFilePath: string): Logger {
   const destination = new BufferedRotatingFileStream(logFilePath);
   const logger = pino(
     {
-      level:
-        process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
+      level: process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
       base: {
         service: "nexu-desktop",
         env,
