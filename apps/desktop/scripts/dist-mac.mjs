@@ -28,6 +28,10 @@ const rmWithRetriesOptions = {
   retryDelay: 200,
 };
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(2)}s`;
+}
+
 function parseEnvFile(content) {
   const values = {};
 
@@ -72,6 +76,10 @@ async function loadDesktopEnv() {
 
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
+    const startedAt = Date.now();
+    const label = options.label ?? `${command} ${args.join(" ")}`;
+
+    console.log(`[dist:mac] start ${label}`);
     const child = spawn(command, args, {
       cwd: options.cwd ?? repoRoot,
       env: options.env ?? process.env,
@@ -81,6 +89,9 @@ function run(command, args, options = {}) {
     child.once("error", rejectRun);
     child.once("exit", (code) => {
       if (code === 0) {
+        console.log(
+          `[dist:mac] done ${label} in ${formatDurationMs(Date.now() - startedAt)}`,
+        );
         resolveRun();
         return;
       }
@@ -212,8 +223,8 @@ async function ensureBuildConfig() {
 }
 
 async function main() {
+  const startedAt = Date.now();
   await ensureBuildConfig();
-
   const desktopEnv = await loadDesktopEnv();
   const env = {
     ...process.env,
@@ -241,28 +252,38 @@ async function main() {
 
   const webPort = process.env.NEXU_WEB_PORT ?? "50810";
 
+  console.log("[dist:mac] cleaning previous release outputs");
   await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
 
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], {
     env,
+    label: "build @nexu/shared",
   });
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/api", "build"], {
     env,
+    label: "build @nexu/api",
   });
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/gateway", "build"], {
     env,
+    label: "build @nexu/gateway",
   });
   await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
     env,
+    label: "install openclaw runtime",
   });
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
     env: {
       ...env,
       VITE_AUTH_BASE_URL: `http://127.0.0.1:${webPort}`,
     },
+    label: "build @nexu/web",
   });
-  await run("pnpm", ["run", "build"], { cwd: electronRoot, env });
+  await run("pnpm", ["run", "build"], {
+    cwd: electronRoot,
+    env,
+    label: "build @nexu/desktop",
+  });
   await run(
     "node",
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
@@ -272,6 +293,7 @@ async function main() {
         ...env,
         ...(isUnsigned ? { NEXU_DESKTOP_MAC_UNSIGNED: "true" } : {}),
       },
+      label: "prepare runtime sidecars",
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
@@ -293,9 +315,13 @@ async function main() {
             NEXU_DESKTOP_MAC_UNSIGNED: "true",
           }
         : notarizeEnv,
+      label: "electron-builder mac packaging",
     },
   );
   await stapleNotarizedAppBundles();
+  console.log(
+    `[dist:mac] completed full mac dist in ${formatDurationMs(Date.now() - startedAt)}`,
+  );
 }
 
 await main();

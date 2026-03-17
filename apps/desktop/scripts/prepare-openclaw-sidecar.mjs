@@ -29,6 +29,10 @@ const inheritEntitlementsPath = resolve(
   "build/entitlements.mac.inherit.plist",
 );
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(2)}s`;
+}
+
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
     const child = spawn(command, args, {
@@ -234,8 +238,14 @@ async function signOpenclawNativeBinaries() {
     return;
   }
 
+  const startedAt = Date.now();
   const identity = await ensureCodesignIdentity();
   const files = await collectFiles(sidecarRoot);
+  let machOCount = 0;
+
+  console.log(
+    `[openclaw-sidecar] scanning ${files.length} files for native binaries`,
+  );
 
   for (const filePath of files) {
     const { stdout } = await runAndCapture("file", ["-b", filePath]);
@@ -245,6 +255,8 @@ async function signOpenclawNativeBinaries() {
     if (!isMachO) {
       continue;
     }
+
+    machOCount += 1;
 
     const isExecutable =
       description.includes("executable") || description.includes("bundle");
@@ -260,6 +272,12 @@ async function signOpenclawNativeBinaries() {
     ];
     await run("codesign", args);
   }
+
+  console.log(
+    `[openclaw-sidecar] signed ${machOCount} native binaries in ${formatDurationMs(
+      Date.now() - startedAt,
+    )}`,
+  );
 }
 
 async function prepareOpenclawSidecar() {
