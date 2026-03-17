@@ -9,8 +9,11 @@ on:
       - "apps/web/**"
       - "packages/shared/**"
       - "openclaw-runtime/**"
+      - ".npmrc"
       - "package.json"
       - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
       - ".github/workflows/desktop-ci.yml"
   push:
     branches:
@@ -22,8 +25,11 @@ on:
       - "apps/web/**"
       - "packages/shared/**"
       - "openclaw-runtime/**"
+      - ".npmrc"
       - "package.json"
       - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
       - ".github/workflows/desktop-ci.yml"
 
 permissions:
@@ -102,14 +108,22 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
-          artifacts=(apps/desktop/release/*.dmg apps/desktop/release/*.zip)
-          if [ "${#artifacts[@]}" -eq 0 ]; then
-            echo "No desktop artifacts were produced" >&2
+          dmg_artifacts=(apps/desktop/release/*.dmg)
+          zip_artifacts=(apps/desktop/release/*.zip)
+
+          if [ "${#dmg_artifacts[@]}" -eq 0 ]; then
+            echo "No desktop DMG artifact was produced" >&2
+            exit 1
+          fi
+
+          if [ "${#zip_artifacts[@]}" -eq 0 ]; then
+            echo "No desktop ZIP artifact was produced" >&2
             exit 1
           fi
 
           printf 'Built artifacts:\n'
-          printf ' - %s\n' "${artifacts[@]}"
+          printf ' - %s\n' "${dmg_artifacts[@]}"
+          printf ' - %s\n' "${zip_artifacts[@]}"
 
           test -d "$PACKAGED_APP"
           test -x "$PACKAGED_EXECUTABLE"
@@ -130,6 +144,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          app_pid=$(cat "$RUNNER_TEMP/desktop-ci/packaged-app.pid")
+
           check_url() {
             local name="$1"
             local url="$2"
@@ -140,8 +156,21 @@ jobs:
             [[ "$body" == *'"ready":true'* ]]
           }
 
+          check_web_surface() {
+            local body
+
+            body=$(curl --silent --show-error --fail "http://127.0.0.1:50810/")
+            echo "[web-surface] received ${#body} bytes"
+            [[ "$body" == *"<div id=\"root\"></div>"* ]]
+          }
+
           for attempt in {1..60}; do
             echo "Readiness attempt $attempt/60"
+
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Packaged desktop app exited before readiness checks completed" >&2
+              exit 1
+            fi
 
             all_ports_ready=true
             for port in 50800 50810 50832; do
@@ -153,6 +182,7 @@ jobs:
 
             api_ready=false
             web_ready=false
+            web_surface_ready=false
 
             if check_url "api" "http://127.0.0.1:50800/api/internal/desktop/ready"; then
               api_ready=true
@@ -162,7 +192,11 @@ jobs:
               web_ready=true
             fi
 
-            if [ "$all_ports_ready" = true ] && [ "$api_ready" = true ] && [ "$web_ready" = true ]; then
+            if check_web_surface; then
+              web_surface_ready=true
+            fi
+
+            if [ "$all_ports_ready" = true ] && [ "$api_ready" = true ] && [ "$web_ready" = true ] && [ "$web_surface_ready" = true ]; then
               echo "All desktop sidecars are ready"
               exit 0
             fi
@@ -179,6 +213,7 @@ jobs:
           set -euo pipefail
 
           app_log="$RUNNER_TEMP/desktop-ci/packaged-app.log"
+          app_pid=$(cat "$RUNNER_TEMP/desktop-ci/packaged-app.pid")
 
           require_log() {
             local message="$1"
@@ -209,6 +244,11 @@ jobs:
           require_log "[gateway] listening on ws://0.0.0.0:18789" "OpenClaw websocket listener log not found"
           require_log "Browser control listening on http://127.0.0.1:18791/" "OpenClaw browser control listener log not found"
           require_log "did-finish-load" "Packaged renderer load log not found"
+
+          kill -0 "$app_pid" 2>/dev/null || {
+            echo "Packaged desktop app exited before health verification completed" >&2
+            exit 1
+          }
 
       - name: Capture desktop logs
         if: always()
