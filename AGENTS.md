@@ -65,6 +65,7 @@ After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
 - For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
 - To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state`.
+- Desktop runtime guide: `docs/guides/desktop-runtime-guide.md`.
 
 ## DB schema change workflow
 
@@ -148,6 +149,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Workspace templates | `docs/guides/workspace-templates.md` |
 | Local Slack testing | `docs/references/local-slack-testing.md` |
 | Frontend conventions | `docs/FRONTEND.md` |
+| Desktop runtime guide | `docs/guides/desktop-runtime-guide.md` |
 | Security posture | `docs/SECURITY.md` |
 | Reliability | `docs/RELIABILITY.md` |
 | Product model | `docs/PRODUCT_SENSE.md` |

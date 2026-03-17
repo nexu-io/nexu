@@ -11,6 +11,7 @@ export const hostInvokeChannels = [
   "runtime:start-all",
   "runtime:stop-all",
   "runtime:show-log-file",
+  "runtime:query-events",
   "desktop:ensure-auth-session",
   "shell:open-external",
   "update:check",
@@ -22,6 +23,19 @@ export const hostInvokeChannels = [
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
+
+export type RuntimeEventQuery = {
+  unitId?: RuntimeUnitId;
+  actionId?: string;
+  reasonCode?: RuntimeReasonCode;
+  afterCursor?: number;
+  limit?: number;
+};
+
+export type RuntimeEventQueryResult = {
+  entries: RuntimeLogEntry[];
+  nextCursor: number;
+};
 
 export type HostInvokePayloadMap = {
   "app:get-info": undefined;
@@ -39,6 +53,7 @@ export type HostInvokePayloadMap = {
   "runtime:show-log-file": {
     id: RuntimeUnitId;
   };
+  "runtime:query-events": RuntimeEventQuery;
   "desktop:ensure-auth-session": {
     force?: boolean;
   };
@@ -67,6 +82,7 @@ export type HostInvokeResultMap = {
   "runtime:show-log-file": {
     ok: boolean;
   };
+  "runtime:query-events": RuntimeEventQueryResult;
   "desktop:ensure-auth-session": {
     ok: boolean;
   };
@@ -108,6 +124,19 @@ export type HostDesktopCommand =
       surface: "web";
     };
 
+export type RuntimeUnitSnapshot = Omit<RuntimeUnitState, "logTail">;
+
+export type RuntimeEvent =
+  | {
+      type: "runtime:unit-state";
+      unit: RuntimeUnitSnapshot;
+    }
+  | {
+      type: "runtime:unit-log";
+      unitId: RuntimeUnitId;
+      entry: RuntimeLogEntry;
+    };
+
 export type RuntimeUnitId =
   | "web"
   | "control-plane"
@@ -128,6 +157,36 @@ export type RuntimeUnitPhase =
   | "stopped"
   | "failed";
 
+export type RuntimeLogStream = "stdout" | "stderr" | "system";
+
+export type RuntimeLogKind = "app" | "lifecycle" | "probe";
+
+export type RuntimeReasonCode =
+  | "embedded_unit"
+  | "start_requested"
+  | "start_succeeded"
+  | "port_ready"
+  | "start_failed"
+  | "stop_requested"
+  | "managed_error"
+  | "process_exited"
+  | "delegated_process_detected"
+  | "delegated_process_missing"
+  | "stdout_line"
+  | "stderr_line";
+
+export type RuntimeLogEntry = {
+  id: string;
+  cursor: number;
+  ts: string;
+  unitId: RuntimeUnitId;
+  stream: RuntimeLogStream;
+  kind: RuntimeLogKind;
+  actionId: string | null;
+  reasonCode: RuntimeReasonCode;
+  message: string;
+};
+
 export type RuntimeUnitState = {
   id: RuntimeUnitId;
   label: string;
@@ -141,10 +200,13 @@ export type RuntimeUnitState = {
   exitedAt: string | null;
   exitCode: number | null;
   lastError: string | null;
+  lastReasonCode: RuntimeReasonCode | null;
+  lastProbeAt: string | null;
+  restartCount: number;
   commandSummary: string | null;
   binaryPath: string | null;
   logFilePath: string | null;
-  logTail: string[];
+  logTail: RuntimeLogEntry[];
 };
 
 export type RuntimeState = {
@@ -158,6 +220,7 @@ export type HostBridge = {
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
+  onRuntimeEvent(listener: (event: RuntimeEvent) => void): () => void;
 };
 
 export type UpdateSource = "oss" | "github";

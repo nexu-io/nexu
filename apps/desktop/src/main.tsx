@@ -6,17 +6,23 @@ import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import type {
   DesktopChromeMode,
+  RuntimeLogEntry,
+  RuntimeReasonCode,
   DesktopRuntimeConfig,
   DesktopSurface,
+  RuntimeEvent,
   RuntimeState,
   RuntimeUnitId,
   RuntimeUnitPhase,
+  RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
 import {
   getRuntimeConfig,
   getRuntimeState,
   onDesktopCommand,
+  onRuntimeEvent,
+  queryRuntimeEvents,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -60,6 +66,114 @@ function phaseTone(phase: RuntimeUnitPhase): string {
 
 function kindLabel(unit: RuntimeUnitState): string {
   return `${unit.kind} / ${unit.launchStrategy}`;
+}
+
+function formatLogLine(entry: RuntimeLogEntry): string {
+  const actionLabel = entry.actionId ? ` [action=${entry.actionId}]` : "";
+  return `#${entry.cursor} ${entry.ts} [${entry.stream}] [${entry.kind}] [reason=${entry.reasonCode}]${actionLabel} ${entry.message}`;
+}
+
+function logFilterLabel(filter: LogFilter): string {
+  switch (filter) {
+    case "errors":
+      return "Errors";
+    case "lifecycle":
+      return "Lifecycle";
+    default:
+      return "All";
+  }
+}
+
+type LogFilter = "all" | "errors" | "lifecycle";
+
+const runtimeReasonCodes: RuntimeReasonCode[] = [
+  "embedded_unit",
+  "start_requested",
+  "start_succeeded",
+  "port_ready",
+  "start_failed",
+  "stop_requested",
+  "managed_error",
+  "process_exited",
+  "delegated_process_detected",
+  "delegated_process_missing",
+  "stdout_line",
+  "stderr_line",
+];
+
+function parseRuntimeReasonCode(value: string): RuntimeReasonCode | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return runtimeReasonCodes.find((code) => code === trimmed);
+}
+
+function mergeUnitSnapshot(
+  current: RuntimeUnitState,
+  snapshot: RuntimeUnitSnapshot,
+): RuntimeUnitState {
+  return {
+    ...current,
+    ...snapshot,
+  };
+}
+
+function applyRuntimeEvent(
+  current: RuntimeState,
+  event: RuntimeEvent,
+): RuntimeState {
+  switch (event.type) {
+    case "runtime:unit-state": {
+      const existingIndex = current.units.findIndex(
+        (unit) => unit.id === event.unit.id,
+      );
+
+      if (existingIndex === -1) {
+        return current;
+      }
+
+      const nextUnits = [...current.units];
+      const existingUnit = nextUnits[existingIndex];
+      if (!existingUnit) {
+        return current;
+      }
+      nextUnits[existingIndex] = mergeUnitSnapshot(existingUnit, event.unit);
+      return {
+        ...current,
+        units: nextUnits,
+      };
+    }
+    case "runtime:unit-log": {
+      const existingIndex = current.units.findIndex(
+        (unit) => unit.id === event.unitId,
+      );
+
+      if (existingIndex === -1) {
+        return current;
+      }
+
+      const target = current.units[existingIndex];
+      if (!target) {
+        return current;
+      }
+      if (target.logTail.some((entry) => entry.id === event.entry.id)) {
+        return current;
+      }
+
+      const nextUnits = [...current.units];
+      nextUnits[existingIndex] = {
+        ...target,
+        logTail: [...target.logTail, event.entry].slice(-200),
+      };
+
+      return {
+        ...current,
+        units: nextUnits,
+      };
+    }
+  }
 }
 
 function SurfaceButton({
@@ -151,6 +265,7 @@ function RuntimeUnitCard({
   onStop: (id: RuntimeUnitId) => Promise<void>;
   busy: boolean;
 }) {
+  const [logFilter, setLogFilter] = useState<LogFilter>("all");
   const isManaged = unit.launchStrategy === "managed";
   const canStart =
     isManaged &&
@@ -162,7 +277,9 @@ function RuntimeUnitCard({
 
   async function handleCopyLogs(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(unit.logTail.join("\n"));
+      await navigator.clipboard.writeText(
+        filteredLogTail.map((entry) => formatLogLine(entry)).join("\n"),
+      );
       toast.success(`Copied recent logs for ${unit.label}.`);
     } catch (error) {
       toast.error(
@@ -189,6 +306,17 @@ function RuntimeUnitCard({
       );
     }
   }
+
+  const filteredLogTail = useMemo(() => {
+    switch (logFilter) {
+      case "errors":
+        return unit.logTail.filter((entry) => entry.stream === "stderr");
+      case "lifecycle":
+        return unit.logTail.filter((entry) => entry.kind === "lifecycle");
+      default:
+        return unit.logTail;
+    }
+  }, [logFilter, unit.logTail]);
 
   return (
     <article className="runtime-card">
@@ -240,6 +368,18 @@ function RuntimeUnitCard({
           <dt>Exit code</dt>
           <dd>{unit.exitCode ?? "-"}</dd>
         </div>
+        <div>
+          <dt>Last reason</dt>
+          <dd>{unit.lastReasonCode ?? "-"}</dd>
+        </div>
+        <div>
+          <dt>Restarts</dt>
+          <dd>{unit.restartCount}</dd>
+        </div>
+        <div>
+          <dt>Last probe</dt>
+          <dd>{unit.lastProbeAt ?? "-"}</dd>
+        </div>
       </dl>
 
       {unit.lastError ? (
@@ -259,7 +399,17 @@ function RuntimeUnitCard({
         <div className="runtime-logs-head">
           <strong>Tail 200 logs</strong>
           <div className="runtime-logs-actions">
-            <span>{unit.logTail.length} lines</span>
+            <span>{filteredLogTail.length} lines</span>
+            {(["all", "errors", "lifecycle"] as const).map((filter) => (
+              <button
+                aria-pressed={logFilter === filter}
+                key={filter}
+                onClick={() => setLogFilter(filter)}
+                type="button"
+              >
+                {logFilterLabel(filter)}
+              </button>
+            ))}
             <button onClick={() => void handleCopyLogs()} type="button">
               Copy
             </button>
@@ -269,7 +419,9 @@ function RuntimeUnitCard({
           </div>
         </div>
         <pre className="runtime-log-tail">
-          {unit.logTail.length > 0 ? unit.logTail.join("\n") : "No logs yet."}
+          {filteredLogTail.length > 0
+            ? filteredLogTail.map((entry) => formatLogLine(entry)).join("\n")
+            : "No logs yet."}
         </pre>
       </div>
     </article>
@@ -281,6 +433,11 @@ function RuntimePage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeUnitId, setActiveUnitId] = useState<RuntimeUnitId | null>(null);
+  const [queryBusy, setQueryBusy] = useState(false);
+  const [queryActionId, setQueryActionId] = useState("");
+  const [queryReasonCode, setQueryReasonCode] = useState("");
+  const [queriedEntries, setQueriedEntries] = useState<RuntimeLogEntry[]>([]);
+  const [queryCursor, setQueryCursor] = useState(0);
 
   const loadState = useCallback(async () => {
     try {
@@ -298,11 +455,23 @@ function RuntimePage() {
 
   useEffect(() => {
     void loadState();
+    const unsubscribe = onRuntimeEvent((event) => {
+      setRuntimeState((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return applyRuntimeEvent(current, event);
+      });
+      setErrorMessage(null);
+    });
+
     const timer = window.setInterval(() => {
       void loadState();
-    }, 2000);
+    }, 15000);
 
     return () => {
+      unsubscribe();
       window.clearInterval(timer);
     };
   }, [loadState]);
@@ -331,6 +500,48 @@ function RuntimePage() {
 
   const activeUnit =
     units.find((unit) => unit.id === activeUnitId) ?? units[0] ?? null;
+
+  async function runDiagnosticQuery(mode: "reset" | "newer"): Promise<void> {
+    if (!activeUnit) {
+      return;
+    }
+
+    setQueryBusy(true);
+    try {
+      const result = await queryRuntimeEvents({
+        unitId: activeUnit.id,
+        actionId: queryActionId.trim() || undefined,
+        reasonCode: parseRuntimeReasonCode(queryReasonCode),
+        afterCursor: mode === "newer" ? queryCursor : undefined,
+        limit: mode === "newer" ? 100 : 50,
+      });
+
+      setQueryCursor(result.nextCursor);
+      setQueriedEntries((current) => {
+        if (mode === "reset") {
+          return result.entries;
+        }
+
+        const seen = new Set(current.map((entry) => entry.id));
+        const appended = result.entries.filter((entry) => !seen.has(entry.id));
+        return [...current, ...appended].slice(-200);
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to query runtime diagnostic events.",
+      );
+    } finally {
+      setQueryBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void activeUnitId;
+    setQueriedEntries([]);
+    setQueryCursor(0);
+  }, [activeUnitId]);
 
   async function runAction(id: string, action: () => Promise<RuntimeState>) {
     setBusyId(id);
@@ -404,12 +615,70 @@ function RuntimePage() {
 
         <div className="runtime-detail-pane">
           {activeUnit ? (
-            <RuntimeUnitCard
-              busy={busyId !== null}
-              onStart={(id) => runAction(`start:${id}`, () => startUnit(id))}
-              onStop={(id) => runAction(`stop:${id}`, () => stopUnit(id))}
-              unit={activeUnit}
-            />
+            <>
+              <RuntimeUnitCard
+                busy={busyId !== null}
+                onStart={(id) => runAction(`start:${id}`, () => startUnit(id))}
+                onStop={(id) => runAction(`stop:${id}`, () => stopUnit(id))}
+                unit={activeUnit}
+              />
+              <section className="runtime-card">
+                <div className="runtime-card-head">
+                  <div>
+                    <div className="runtime-label-row">
+                      <strong>Diagnostic Query</strong>
+                    </div>
+                    <p className="runtime-kind">{activeUnit.label}</p>
+                    <p className="runtime-command">cursor {queryCursor}</p>
+                  </div>
+                  <div className="runtime-actions">
+                    <button
+                      disabled={queryBusy}
+                      onClick={() => void runDiagnosticQuery("reset")}
+                      type="button"
+                    >
+                      Query recent
+                    </button>
+                    <button
+                      disabled={queryBusy || queryCursor === 0}
+                      onClick={() => void runDiagnosticQuery("newer")}
+                      type="button"
+                    >
+                      Load newer
+                    </button>
+                  </div>
+                </div>
+                <dl className="runtime-grid">
+                  <div>
+                    <dt>Action filter</dt>
+                    <dd>
+                      <input
+                        onChange={(event) => setQueryActionId(event.target.value)}
+                        placeholder="action id"
+                        type="text"
+                        value={queryActionId}
+                      />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Reason filter</dt>
+                    <dd>
+                      <input
+                        onChange={(event) => setQueryReasonCode(event.target.value)}
+                        placeholder="reason code"
+                        type="text"
+                        value={queryReasonCode}
+                      />
+                    </dd>
+                  </div>
+                </dl>
+                <pre className="runtime-log-tail">
+                  {queriedEntries.length > 0
+                    ? queriedEntries.map((entry) => formatLogLine(entry)).join("\n")
+                    : "No queried events yet."}
+                </pre>
+              </section>
+            </>
           ) : (
             <section className="runtime-empty-state">
               No runtime units available.

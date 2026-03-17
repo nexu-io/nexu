@@ -1,4 +1,6 @@
 import type {
+  RuntimeLogEntry,
+  RuntimeReasonCode,
   RuntimeUnitId,
   RuntimeUnitKind,
   RuntimeUnitLaunchStrategy,
@@ -34,8 +36,12 @@ export type RuntimeUnitRecord = {
   exitedAt: string | null;
   exitCode: number | null;
   lastError: string | null;
+  lastReasonCode: RuntimeReasonCode | null;
+  lastProbeAt: string | null;
+  restartCount: number;
+  currentActionId: string | null;
   logFilePath: string | null;
-  logTail: string[];
+  logTail: RuntimeLogEntry[];
   stdoutRemainder: string;
   stderrRemainder: string;
 };
