@@ -86,6 +86,7 @@
       }
     ],
     "afterSign": "./scripts/notarize.cjs",
+    "copyright": "Copyright © 2026 Powerformer, Inc.",
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
