@@ -136,6 +136,8 @@ jobs:
             - Commit: `${{ github.sha }}`
             - Built: `${{ steps.meta.outputs.build_date }}`
 
+            The packaged `Nexu.app` bundle is notarized and stapled before the nightly `.dmg` and `.zip` artifacts are published.
+
             This build is intended for testing and may be unstable.
           files: |
             apps/desktop/nightly-artifacts/Nexu-nightly-arm64.dmg

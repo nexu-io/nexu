@@ -147,7 +147,9 @@ jobs:
           body: |
             Desktop release for `${{ steps.meta.outputs.desktop_version }}`.
 
-            Assets include signed and notarized macOS builds plus `desktop-sha256.txt`.
+            Assets include signed macOS `.dmg` and `.zip` packages plus `desktop-sha256.txt`.
+
+            The packaged `Nexu.app` bundle is notarized and stapled during the build before the archives are published.
           files: |
             apps/desktop/release/*.dmg
             apps/desktop/release/*.zip

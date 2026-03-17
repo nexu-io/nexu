@@ -165,24 +165,32 @@ async function ensureDmgbuildBundle() {
   return dmgbuildPath;
 }
 
-async function stapleNotarizedArtifacts() {
+async function stapleNotarizedAppBundles() {
   if (isUnsigned) {
+    console.log("[dist:mac] skipping stapling in unsigned mode");
     return;
   }
 
   const releaseRoot = resolve(electronRoot, "release");
   const releaseEntries = await readdir(releaseRoot, { withFileTypes: true });
+  const appBundleDirs = releaseEntries.filter(
+    (entry) => entry.isDirectory() && entry.name.startsWith("mac-"),
+  );
 
-  for (const entry of releaseEntries) {
-    if (!entry.isDirectory() || !entry.name.startsWith("mac-")) {
-      continue;
-    }
-
-    await run(
-      "xcrun",
-      ["stapler", "staple", resolve(releaseRoot, entry.name, "Nexu.app")],
-      { cwd: electronRoot },
+  if (appBundleDirs.length === 0) {
+    throw new Error(
+      `Expected packaged macOS app bundles under ${releaseRoot}, but none were found.`,
     );
+  }
+
+  for (const entry of appBundleDirs) {
+    const appPath = resolve(releaseRoot, entry.name, "Nexu.app");
+
+    console.log(`[dist:mac] stapling notarized app bundle: ${appPath}`);
+    await run("xcrun", ["stapler", "staple", appPath], { cwd: electronRoot });
+    await run("xcrun", ["stapler", "validate", appPath], {
+      cwd: electronRoot,
+    });
   }
 }
 
@@ -265,7 +273,7 @@ async function main() {
         : notarizeEnv,
     },
   );
-  await stapleNotarizedArtifacts();
+  await stapleNotarizedAppBundles();
 }
 
 await main();
