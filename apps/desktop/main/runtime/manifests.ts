@@ -78,13 +78,16 @@ export function createRuntimeUnitManifests(
   const runtimeSidecarBaseRoot = isPackaged
     ? resolve(electronRoot, "runtime")
     : resolve(repoRoot, ".tmp/sidecars");
+  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
+  const openclawSidecarRoot = isPackaged
+    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
+    : resolve(runtimeSidecarBaseRoot, "openclaw");
   const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
     process.env,
     {
-      openclawBinPath: resolve(runtimeSidecarBaseRoot, "openclaw/bin/openclaw"),
+      openclawBinPath: resolve(openclawSidecarRoot, "bin/openclaw"),
     },
   );
-  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
   const logsDir = ensureDir(resolve(userDataPath, "../logs/runtime-units"));
   const pgliteDataPath = ensureDir(resolve(runtimeRoot, "pglite"));
   const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
@@ -94,9 +97,6 @@ export function createRuntimeUnitManifests(
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
-  const openclawSidecarRoot = isPackaged
-    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
-    : resolve(runtimeSidecarBaseRoot, "openclaw");
   const openclawPackageRoot = resolve(
     openclawSidecarRoot,
     "node_modules/openclaw",
