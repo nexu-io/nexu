@@ -157,18 +157,39 @@ export async function generatePoolConfig(
     }
   }
 
-  // LiteLLM provider config from env vars
-  const litellmBaseUrl = process.env.LITELLM_BASE_URL;
-  const litellmApiKey = process.env.LITELLM_API_KEY;
+  // LiteLLM provider config from env vars (server-only, never desktop)
+  const isDesktop = process.env.NEXU_DESKTOP_MODE === "true";
+  const litellmBaseUrl = isDesktop ? undefined : process.env.LITELLM_BASE_URL;
+  const litellmApiKey = isDesktop ? undefined : process.env.LITELLM_API_KEY;
   const hasLitellm = Boolean(litellmBaseUrl && litellmApiKey);
 
   // Link gateway provider (desktop cloud connection)
   const cloudCfg = loadCloudConfig();
   const hasLink = Boolean(cloudCfg && cloudCfg.models.length > 0);
 
-  // Prefix model ID with provider namespace for routing
+  // Load BYOK providers early so resolveModelId can route correctly
+  const byokProviders = await db
+    .select()
+    .from(modelProviders)
+    .where(eq(modelProviders.enabled, true));
+
+  const byokProviderKeys = new Set(
+    byokProviders.map((bp) =>
+      bp.providerId === "custom" ? `custom_${bp.id}` : bp.providerId,
+    ),
+  );
+
+  // Prefix model ID with provider namespace for routing.
+  // Model IDs from the UI use the format "{provider}/{model}" — e.g.
+  // "link/gemini-2.5-flash", "anthropic/claude-sonnet-4".
+  // If the provider prefix matches a BYOK provider configured by the user,
+  // keep it as-is so OpenClaw routes to the user's own API key.
   function resolveModelId(rawModelId: string): string {
     if (rawModelId.startsWith("litellm/") || rawModelId.startsWith("link/"))
+      return rawModelId;
+    // Check if prefix matches a BYOK provider — route to user's own key
+    const slashIdx = rawModelId.indexOf("/");
+    if (slashIdx > 0 && byokProviderKeys.has(rawModelId.substring(0, slashIdx)))
       return rawModelId;
     if (hasLitellm) return `litellm/${rawModelId}`;
     if (hasLink) return `link/${rawModelId}`;
@@ -526,12 +547,7 @@ export async function generatePoolConfig(
     }
   }
 
-  // Add BYOK (user-provided) providers from database
-  const byokProviders = await db
-    .select()
-    .from(modelProviders)
-    .where(eq(modelProviders.enabled, true));
-
+  // Add BYOK (user-provided) providers (already loaded above for resolveModelId)
   const byokDefaultBaseUrls: Record<string, string> = {
     anthropic: "https://api.anthropic.com/v1",
     openai: "https://api.openai.com/v1",
