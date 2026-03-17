@@ -71,10 +71,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          runner_home="$HOME"
           packaged_home="$RUNNER_TEMP/desktop-home"
           packaged_logs_dir="$packaged_home/Library/Logs/Nexu Desktop"
           packaged_user_data_dir="$packaged_home/Library/Application Support/Nexu Desktop"
           packaged_runtime_logs_dir="$packaged_home/Library/Application Support/logs/runtime-units"
+          default_logs_dir="$runner_home/Library/Logs/Nexu Desktop"
+          default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
+          default_runtime_logs_dir="$runner_home/Library/Application Support/logs/runtime-units"
           packaged_app="apps/desktop/release/mac-arm64/Nexu.app"
           packaged_executable="$packaged_app/Contents/MacOS/Nexu"
 
@@ -85,6 +89,9 @@ jobs:
             echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
             echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
             echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
+            echo "DEFAULT_LOGS_DIR=$default_logs_dir"
+            echo "DEFAULT_USER_DATA_DIR=$default_user_data_dir"
+            echo "DEFAULT_RUNTIME_LOGS_DIR=$default_runtime_logs_dir"
             echo "PACKAGED_APP=$packaged_app"
             echo "PACKAGED_EXECUTABLE=$packaged_executable"
           } >> "$GITHUB_ENV"
@@ -173,36 +180,36 @@ jobs:
 
           app_log="$RUNNER_TEMP/desktop-ci/packaged-app.log"
 
-          grep -F '"runtime_unit_id":"control-plane"' "$app_log" >/dev/null || {
-            echo "Control plane runtime log not found" >&2
-            exit 1
+          require_log() {
+            local message="$1"
+            local error_message="$2"
+            grep -F "$message" "$app_log" >/dev/null || {
+              echo "$error_message" >&2
+              exit 1
+            }
           }
-          grep -F "embedded runtime unit" "$app_log" >/dev/null || {
-            echo "Control plane embedded unit log not found" >&2
-            exit 1
-          }
-          grep -F "runtime unit web is running" "$app_log" >/dev/null || {
-            echo "Web runtime log not found" >&2
-            exit 1
-          }
-          grep -F "runtime unit pglite port 50832 is ready" "$app_log" >/dev/null || {
-            echo "PGlite readiness log not found" >&2
-            exit 1
-          }
-          grep -F "runtime unit api port 50800 is ready" "$app_log" >/dev/null || {
-            echo "API readiness log not found" >&2
-            exit 1
-          }
-          grep -F "runtime unit gateway is running" "$app_log" >/dev/null || {
-            echo "Gateway runtime log not found" >&2
-            exit 1
-          }
-          grep -F "delegated runtime detected via pgrep" "$app_log" >/dev/null || {
-            echo "OpenClaw delegated runtime log not found" >&2
-            exit 1
-          }
-          grep -F "did-finish-load" "$app_log" >/dev/null || {
-            echo "Packaged renderer load log not found" >&2
+
+          for attempt in {1..60}; do
+            echo "Runtime health attempt $attempt/60"
+
+            if grep -F "spawned openclaw gateway process" "$app_log" >/dev/null && \
+              lsof -iTCP:18789 -sTCP:LISTEN >/dev/null 2>&1; then
+              break
+            fi
+
+            sleep 2
+          done
+
+          require_log "cold start complete" "Cold start completion log not found"
+          require_log "runtime unit pglite port 50832 is ready" "PGlite readiness log not found"
+          require_log "runtime unit api port 50800 is ready" "API readiness log not found"
+          require_log "runtime unit web is running" "Web runtime log not found"
+          require_log "runtime unit gateway is running" "Gateway runtime log not found"
+          require_log "spawned openclaw gateway process" "OpenClaw spawn log not found"
+          require_log "did-finish-load" "Packaged renderer load log not found"
+
+          lsof -iTCP:18789 -sTCP:LISTEN >/dev/null 2>&1 || {
+            echo "OpenClaw port 18789 is not listening" >&2
             exit 1
           }
 
@@ -220,6 +227,15 @@ jobs:
           fi
           if [ -d "$PACKAGED_USER_DATA_DIR" ]; then
             cp -R "$PACKAGED_USER_DATA_DIR" "$RUNNER_TEMP/desktop-ci/user-data"
+          fi
+          if [ -d "$DEFAULT_LOGS_DIR" ]; then
+            cp -R "$DEFAULT_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-logs"
+          fi
+          if [ -d "$DEFAULT_RUNTIME_LOGS_DIR" ]; then
+            cp -R "$DEFAULT_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-runtime-unit-logs"
+          fi
+          if [ -d "$DEFAULT_USER_DATA_DIR" ]; then
+            cp -R "$DEFAULT_USER_DATA_DIR" "$RUNNER_TEMP/desktop-ci/default-user-data"
           fi
 
       - name: Upload desktop logs
