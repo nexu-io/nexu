@@ -13,9 +13,11 @@ import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
-import { registerIpcHandlers } from "./ipc";
+import { registerIpcHandlers, setUpdateManager } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
+import { StartupHealthCheck } from "./updater/rollback";
+import { UpdateManager } from "./updater/update-manager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -326,16 +328,33 @@ app.whenReady().then(async () => {
   registerIpcHandlers(orchestrator);
 
   void (async () => {
+    const healthCheck = new StartupHealthCheck();
+    const health = healthCheck.check();
+
+    if (!health.healthy) {
+      logColdStart(
+        `unhealthy: ${health.consecutiveFailures} consecutive cold-start failures`,
+      );
+    }
+
     try {
       await runDesktopColdStart();
+      healthCheck.recordSuccess();
     } catch (error) {
+      healthCheck.recordFailure();
       safeWrite(
         process.stderr,
         `[desktop:cold-start] ${error instanceof Error ? error.message : String(error)}\n`,
       );
     }
 
-    createMainWindow();
+    const win = createMainWindow();
+
+    if (app.isPackaged) {
+      const updateMgr = new UpdateManager(win, orchestrator);
+      setUpdateManager(updateMgr);
+      updateMgr.startPeriodicCheck();
+    }
   })();
 
   app.on("activate", () => {
