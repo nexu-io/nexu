@@ -194,13 +194,64 @@ async function ensureDesktopAppUser(authUserId: string): Promise<void> {
       ],
     );
 
-    // Ensure a gateway pool exists for local desktop runtime
+    // Ensure a gateway pool exists for local desktop runtime.
+    // The pool ID must match the gateway's RUNTIME_POOL_ID (defaults to "desktop-local-pool"
+    // in manifests.ts) so that generatePoolConfig() can find bots assigned to this pool.
+    const gatewayPoolId =
+      process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
     await pool.query(
       `INSERT INTO gateway_pools (id, pool_name, pool_type, max_bots, status, pod_ip, created_at)
-       VALUES ('pool_local_01', 'local-dev', 'shared', 50, 'active', '127.0.0.1', $1)
+       VALUES ($2, 'desktop-local', 'shared', 50, 'active', '127.0.0.1', $1)
        ON CONFLICT (id) DO UPDATE SET pod_ip = '127.0.0.1', status = 'active'`,
-      [now],
+      [now, gatewayPoolId],
     );
+
+    // Migrate bots & assignments from the legacy pool ID ("pool_local_01") to the
+    // current gateway pool ID so that generatePoolConfig() picks them up.
+    const legacyPoolId = "pool_local_01";
+    if (gatewayPoolId !== legacyPoolId) {
+      await pool.query(
+        "UPDATE bots SET pool_id = $1, updated_at = $2 WHERE pool_id = $3",
+        [gatewayPoolId, now, legacyPoolId],
+      );
+      await pool.query(
+        "UPDATE gateway_assignments SET pool_id = $1 WHERE pool_id = $2",
+        [gatewayPoolId, legacyPoolId],
+      );
+      // Clean up the legacy pool row
+      await pool.query("DELETE FROM gateway_pools WHERE id = $1", [
+        legacyPoolId,
+      ]);
+    }
+
+    // Ensure at least one bot exists so the /api/internal/desktop/ready
+    // endpoint returns 200 and the webview can mount.
+    const botResult = (await pool.query(
+      "SELECT id FROM bots WHERE user_id = $1 LIMIT 1",
+      [runtimeConfig.desktopAuth.appUserId],
+    )) as { rows: Array<{ id: string }> };
+    if (botResult.rows.length === 0) {
+      const botId = `bot_desktop_${Date.now()}`;
+      await pool.query(
+        `INSERT INTO bots (id, user_id, name, slug, model_id, pool_id, created_at, updated_at)
+         VALUES ($1, $2, 'My Bot', 'my-bot', $3, $4, $5, $6)
+         ON CONFLICT DO NOTHING`,
+        [
+          botId,
+          runtimeConfig.desktopAuth.appUserId,
+          process.env.DEFAULT_MODEL_ID ?? "anthropic/claude-sonnet-4",
+          gatewayPoolId,
+          now,
+          now,
+        ],
+      );
+      await pool.query(
+        `INSERT INTO gateway_assignments (id, bot_id, pool_id, assigned_at)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT DO NOTHING`,
+        [`ga_desktop_${Date.now()}`, botId, gatewayPoolId, now],
+      );
+    }
   } finally {
     await pool.end();
   }

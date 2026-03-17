@@ -164,49 +164,55 @@ export function ChannelConnectModal({
     if (!allFilled || loading) return;
     setLoading(true);
 
-    let error: { message?: string } | undefined;
-    let response: Response | undefined;
+    try {
+      let error: { message?: string } | undefined;
+      let response: Response | undefined;
 
-    if (channelType === "feishu") {
-      ({ error, response } = await postApiV1ChannelsFeishuConnect({
-        body: {
-          appId: fieldValues.appId ?? "",
-          appSecret: fieldValues.appSecret ?? "",
-        },
-      }));
-    } else if (channelType === "slack") {
-      ({ error, response } = await postApiV1ChannelsSlackConnect({
-        body: {
-          botToken: fieldValues.botToken ?? "",
-          signingSecret: fieldValues.signingSecret ?? "",
-        },
-      }));
-    } else if (channelType === "discord") {
-      ({ error, response } = await postApiV1ChannelsDiscordConnect({
-        body: {
-          botToken: fieldValues.botToken ?? "",
-          appId: fieldValues.appId ?? "",
-        },
-      }));
-    }
-
-    if (error) {
-      if (response?.status === 409) {
-        toast.info("渠道已连接，正在刷新...");
-        await onConnected();
-        setLoading(false);
-        return;
+      if (channelType === "feishu") {
+        ({ error, response } = await postApiV1ChannelsFeishuConnect({
+          body: {
+            appId: fieldValues.appId ?? "",
+            appSecret: fieldValues.appSecret ?? "",
+          },
+        }));
+      } else if (channelType === "slack") {
+        ({ error, response } = await postApiV1ChannelsSlackConnect({
+          body: {
+            botToken: fieldValues.botToken ?? "",
+            signingSecret: fieldValues.signingSecret ?? "",
+          },
+        }));
+      } else if (channelType === "discord") {
+        ({ error, response } = await postApiV1ChannelsDiscordConnect({
+          body: {
+            botToken: fieldValues.botToken ?? "",
+            appId: fieldValues.appId ?? "",
+          },
+        }));
       }
-      setLoading(false);
-      toast.error(error.message ?? "连接失败");
-      return;
-    }
 
-    toast.success(`${config.name} 连接成功`);
-    track("channel_ready", { channel: channelType });
-    identify({ [`${channelType}_connected`]: true });
-    await onConnected();
-    setLoading(false);
+      if (error) {
+        if (response?.status === 409) {
+          toast.info("渠道已连接，正在刷新...");
+        } else {
+          toast.error(error.message ?? "连接失败");
+          return;
+        }
+      } else {
+        toast.success(`${config.name} 连接成功`);
+        track("channel_ready", { channel: channelType });
+        identify({ [`${channelType}_connected`]: true });
+      }
+
+      // Close modal immediately, then refresh list in the background
+      onClose();
+      Promise.resolve(onConnected()).catch(() => {});
+    } catch {
+      toast.error("连接失败，请重试");
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

@@ -30,7 +30,7 @@ body,
   width: 240px;
   flex-direction: column;
   gap: 24px;
-  padding: 20px 18px;
+  padding: 48px 18px 20px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: #0c1016;
 }
@@ -146,7 +146,18 @@ body,
 
 .desktop-shell.is-immersive .desktop-shell-stage {
   padding: 0;
-  background: #10161d;
+  background: none;
+}
+
+/* Transparent drag bar overlaying window top — always present for dragging */
+.window-drag-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  z-index: 9999;
+  -webkit-app-region: drag;
 }
 
 .desktop-web-frame {
@@ -210,14 +221,32 @@ body,
 }
 
 .surface-frame-empty {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   flex: 1;
-  place-items: center;
   padding: 32px;
   border: 1px dashed rgba(255, 255, 255, 0.18);
   border-radius: 24px;
   background: rgba(12, 16, 22, 0.46);
   color: rgba(245, 247, 251, 0.72);
+}
+
+.surface-frame-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .desktop-shell.is-immersive .surface-frame {
@@ -511,6 +540,41 @@ body,
   border-radius: 16px;
   background: #ffe7e2;
   border: 1px solid #f1c3bb;
+}
+
+/* Cloud Connection Card */
+.cloud-section {
+  max-width: 1080px;
+  margin: 0 auto 16px;
+}
+
+.cloud-card {
+  border: 1px solid #ddd5c5;
+  border-radius: 20px;
+  background: rgba(255, 252, 245, 0.92);
+  padding: 18px;
+}
+
+.cloud-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.cloud-user-info {
+  margin: 6px 0 0;
+  color: #5e636d;
+  font-size: 0.85rem;
+}
+
+.cloud-disconnect-btn {
+  border-color: #e8b4b0 !important;
+  color: #a33a33 !important;
+}
+
+.cloud-disconnect-btn:hover {
+  background: #ffe7e2 !important;
 }
 
 @media (max-width: 860px) {

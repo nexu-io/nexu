@@ -255,6 +255,8 @@ function createMainWindow(): BrowserWindow {
     minHeight: 760,
     backgroundColor: "#0B1020",
     title: "Nexu Desktop",
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 18, y: 18 },
     show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -265,10 +267,8 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: "deny" };
-  });
+  // Per-webContents handler is set globally via app.on('web-contents-created')
+  // so we don't need one here on the main window.
 
   window.webContents.on(
     "console-message",
@@ -321,6 +321,19 @@ function createMainWindow(): BrowserWindow {
   mainWindow = window;
   return window;
 }
+
+// Intercept window.open() in ALL webContents (main window + webviews) and open
+// the URL in the user's default system browser instead.
+app.on("web-contents-created", (_event, contents) => {
+  contents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      setImmediate(() => {
+        void shell.openExternal(url);
+      });
+    }
+    return { action: "deny" };
+  });
+});
 
 app.whenReady().then(async () => {
   installApplicationMenu();

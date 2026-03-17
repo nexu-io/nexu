@@ -14,7 +14,7 @@ declare global {
       > & {
         src?: string;
         partition?: string;
-        allowpopups?: boolean;
+        allowpopups?: string | boolean;
       };
     }
   }

@@ -249,7 +249,10 @@ async function main() {
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
     {
       cwd: electronRoot,
-      env,
+      env: {
+        ...env,
+        ...(isUnsigned ? { NEXU_DESKTOP_MAC_UNSIGNED: "true" } : {}),
+      },
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();

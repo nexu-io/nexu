@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type {
   AgentConfig,
   BindingConfig,
@@ -14,9 +16,57 @@ import {
   bots,
   channelCredentials,
   gatewayPools,
+  modelProviders,
 } from "../db/schema/index.js";
 import { decrypt } from "./crypto.js";
 import { ServiceError } from "./error.js";
+
+/**
+ * Load cloud connection credentials (Link gateway) in desktop mode.
+ * Returns null if not in desktop mode or no credentials exist.
+ */
+function loadCloudConfig(): {
+  linkUrl: string;
+  apiKey: string;
+  models: Array<{ id: string; name: string; provider?: string }>;
+} | null {
+  if (process.env.NEXU_DESKTOP_MODE !== "true") return null;
+
+  const stateDir =
+    process.env.OPENCLAW_STATE_DIR ?? path.join(process.cwd(), ".nexu-state");
+  const credPath = path.join(stateDir, "cloud-credentials.json");
+  if (!fs.existsSync(credPath)) return null;
+
+  try {
+    const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
+    if (!creds.encryptedApiKey || !creds.linkGatewayUrl) return null;
+    return {
+      linkUrl: creds.linkGatewayUrl,
+      apiKey: decrypt(creds.encryptedApiKey),
+      models: creds.cloudModels ?? [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the user-selected default model from desktop state file.
+ * Returns null if not in desktop mode or no selection exists.
+ */
+function loadDesktopSelectedModel(): string | null {
+  if (process.env.NEXU_DESKTOP_MODE !== "true") return null;
+  const stateDir =
+    process.env.OPENCLAW_STATE_DIR ?? path.join(process.cwd(), ".nexu-state");
+  const configPath = path.join(stateDir, "desktop-config.json");
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    return cfg.selectedModelId || null;
+  } catch {
+    return null;
+  }
+}
 
 interface ChannelCredentialRow {
   credentialType: string;
@@ -112,12 +162,17 @@ export async function generatePoolConfig(
   const litellmApiKey = process.env.LITELLM_API_KEY;
   const hasLitellm = Boolean(litellmBaseUrl && litellmApiKey);
 
-  // Prefix model ID with "litellm/" when LiteLLM is configured
+  // Link gateway provider (desktop cloud connection)
+  const cloudCfg = loadCloudConfig();
+  const hasLink = Boolean(cloudCfg && cloudCfg.models.length > 0);
+
+  // Prefix model ID with provider namespace for routing
   function resolveModelId(rawModelId: string): string {
-    if (!hasLitellm) return rawModelId;
-    // Already prefixed — skip
-    if (rawModelId.startsWith("litellm/")) return rawModelId;
-    return `litellm/${rawModelId}`;
+    if (rawModelId.startsWith("litellm/") || rawModelId.startsWith("link/"))
+      return rawModelId;
+    if (hasLitellm) return `litellm/${rawModelId}`;
+    if (hasLink) return `link/${rawModelId}`;
+    return rawModelId;
   }
 
   // Workspace path must be under the PVC mount so agent files survive pod restarts.
@@ -282,6 +337,7 @@ export async function generatePoolConfig(
   ];
   const defaultModelId = resolveModelId(
     activeBots[0]?.modelId ??
+      loadDesktopSelectedModel() ??
       process.env.DEFAULT_MODEL_ID ??
       "anthropic/claude-sonnet-4",
   );
@@ -440,6 +496,79 @@ export async function generatePoolConfig(
         },
       },
     };
+  }
+
+  // Add Link gateway provider when cloud-connected in desktop mode
+  if (cloudCfg && cloudCfg.models.length > 0) {
+    const linkProvider = {
+      baseUrl: `${cloudCfg.linkUrl}/v1`,
+      apiKey: cloudCfg.apiKey,
+      api: "openai-completions",
+      models: cloudCfg.models.map((m) => ({
+        id: m.id,
+        name: m.name || m.id,
+        reasoning: false,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200000,
+        maxTokens: 8192,
+        compat: { supportsStore: false },
+      })),
+    };
+
+    if (config.models) {
+      config.models.providers.link = linkProvider;
+    } else {
+      config.models = {
+        mode: "merge",
+        providers: { link: linkProvider },
+      };
+    }
+  }
+
+  // Add BYOK (user-provided) providers from database
+  const byokProviders = await db
+    .select()
+    .from(modelProviders)
+    .where(eq(modelProviders.enabled, true));
+
+  const byokDefaultBaseUrls: Record<string, string> = {
+    anthropic: "https://api.anthropic.com/v1",
+    openai: "https://api.openai.com/v1",
+    google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  };
+
+  for (const bp of byokProviders) {
+    const providerKey =
+      bp.providerId === "custom" ? `custom_${bp.id}` : bp.providerId;
+    const baseUrl = bp.baseUrl ?? byokDefaultBaseUrls[bp.providerId];
+    if (!baseUrl) continue;
+
+    const modelIds: string[] = JSON.parse(bp.modelsJson || "[]");
+    const byokProvider = {
+      baseUrl,
+      apiKey: decrypt(bp.encryptedApiKey),
+      api: "openai-completions",
+      models: modelIds.map((id) => ({
+        id,
+        name: id,
+        reasoning: false,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200000,
+        maxTokens: 8192,
+        compat: { supportsStore: false },
+      })),
+    };
+
+    if (config.models) {
+      config.models.providers[providerKey] = byokProvider;
+    } else {
+      config.models = {
+        mode: "merge",
+        providers: { [providerKey]: byokProvider },
+      };
+    }
   }
 
   if (Object.keys(slackAccounts).length > 0) {

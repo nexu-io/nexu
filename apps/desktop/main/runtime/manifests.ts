@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -45,6 +46,33 @@ function resolveElectronNodeRunner(): string {
   );
 
   return existsSync(helperCandidate) ? helperCandidate : process.execPath;
+}
+
+/**
+ * Build a PATH prefix that puts a Node.js >= 22 binary first.
+ * OpenClaw requires Node 22.12+; in dev mode the system `node` may be
+ * older (e.g. nvm defaulting to v20).  We scan NVM_DIR for a v22 install
+ * and, if found, prepend its bin directory to the inherited PATH.
+ */
+function buildNode22Path(): string | undefined {
+  const nvmDir = process.env.NVM_DIR;
+  if (!nvmDir) return undefined;
+  try {
+    const versionsDir = resolve(nvmDir, "versions/node");
+    const dirs = readdirSync(versionsDir)
+      .filter((d) => d.startsWith("v22."))
+      .sort()
+      .reverse();
+    for (const d of dirs) {
+      const binDir = resolve(versionsDir, d, "bin");
+      if (existsSync(resolve(binDir, "node"))) {
+        return `${binDir}:${process.env.PATH ?? ""}`;
+      }
+    }
+  } catch {
+    /* nvm dir not present or unreadable */
+  }
+  return undefined;
 }
 
 function ensurePackagedOpenclawSidecar(
@@ -95,13 +123,16 @@ export function createRuntimeUnitManifests(
   const runtimeSidecarBaseRoot = isPackaged
     ? resolve(electronRoot, "runtime")
     : resolve(repoRoot, ".tmp/sidecars");
+  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
+  const openclawSidecarRoot = isPackaged
+    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
+    : resolve(runtimeSidecarBaseRoot, "openclaw");
   const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
     process.env,
     {
-      openclawBinPath: resolve(runtimeSidecarBaseRoot, "openclaw/bin/openclaw"),
+      openclawBinPath: resolve(openclawSidecarRoot, "bin/openclaw"),
     },
   );
-  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
   const logsDir = ensureDir(resolve(userDataPath, "../logs/runtime-units"));
   const pgliteDataPath = ensureDir(resolve(runtimeRoot, "pglite"));
   const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
@@ -111,9 +142,6 @@ export function createRuntimeUnitManifests(
   ensureDir(resolve(openclawStateDir, "skills"));
   ensureDir(resolve(openclawStateDir, "plugin-docs"));
   ensureDir(resolve(openclawStateDir, "agents"));
-  const openclawSidecarRoot = isPackaged
-    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
-    : resolve(runtimeSidecarBaseRoot, "openclaw");
   const openclawPackageRoot = resolve(
     openclawSidecarRoot,
     "node_modules/openclaw",
@@ -136,6 +164,7 @@ export function createRuntimeUnitManifests(
   const webUrl = runtimeConfig.urls.web;
   const authUrl = runtimeConfig.urls.auth;
   const electronNodeRunner = resolveElectronNodeRunner();
+  const node22Path = buildNode22Path();
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
   // entry points still mirror a few of these defaults directly, so changes here should be treated
@@ -147,8 +176,9 @@ export function createRuntimeUnitManifests(
       label: "Nexu Web Surface",
       kind: "surface",
       launchStrategy: "managed",
-      runner: "utility-process",
-      modulePath: webModulePath,
+      runner: "spawn",
+      command: "node",
+      args: [webModulePath],
       cwd: webSidecarRoot,
       port: webPort,
       startupTimeoutMs: 10_000,
@@ -193,8 +223,9 @@ export function createRuntimeUnitManifests(
       label: "Nexu API",
       kind: "service",
       launchStrategy: "managed",
-      runner: "utility-process",
-      modulePath: apiModulePath,
+      runner: "spawn",
+      command: "node",
+      args: [apiModulePath],
       cwd: apiSidecarRoot,
       port: apiPort,
       startupTimeoutMs: 20_000,
@@ -208,6 +239,7 @@ export function createRuntimeUnitManifests(
         WEB_URL: webUrl,
         INTERNAL_API_TOKEN: internalApiToken,
         SKILL_API_TOKEN: skillApiToken,
+        NEXU_DESKTOP_MODE: "true",
       },
     },
     {
@@ -215,8 +247,9 @@ export function createRuntimeUnitManifests(
       label: "Nexu Gateway",
       kind: "service",
       launchStrategy: "managed",
-      runner: "utility-process",
-      modulePath: gatewayModulePath,
+      runner: "spawn",
+      command: "node",
+      args: [gatewayModulePath],
       cwd: gatewaySidecarRoot,
       port: null,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_GATEWAY", true),
@@ -237,6 +270,9 @@ export function createRuntimeUnitManifests(
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
+        // OpenClaw needs Node 22.12+; ensure it's on PATH when gateway
+        // spawns the openclaw binary (which runs `exec node ...`).
+        ...(node22Path ? { PATH: node22Path } : {}),
       },
     },
     {

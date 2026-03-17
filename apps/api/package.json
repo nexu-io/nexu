@@ -25,6 +25,7 @@
     "@hono/zod-openapi": "^0.18.4",
     "@nexu/shared": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",
+    "bcryptjs": "^3.0.3",
     "better-auth": "^1.2.7",
     "dd-trace": "^5.87.0",
     "dotenv": "^16.6.1",
@@ -37,6 +38,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.13.4",
     "@types/pg": "^8.11.11",
     "drizzle-kit": "^0.31.4",
