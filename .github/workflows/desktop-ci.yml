@@ -57,21 +57,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install tmux
-        shell: bash
-        run: |
-          set -euo pipefail
-          brew install tmux
-
       - name: Show desktop toolchain versions
         shell: bash
         run: |
           set -euo pipefail
           pnpm exec electron --version
-          tmux -V
 
       - name: Build unsigned macOS desktop bundle
         run: pnpm desktop:dist:mac:unsigned
+
+      - name: Set packaged app paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          packaged_home="$RUNNER_TEMP/desktop-home"
+          packaged_logs_dir="$packaged_home/Library/Logs/Nexu Desktop"
+          packaged_user_data_dir="$packaged_home/Library/Application Support/Nexu Desktop"
+          packaged_runtime_logs_dir="$packaged_home/Library/Application Support/logs/runtime-units"
+          packaged_app="apps/desktop/release/mac-arm64/Nexu.app"
+          packaged_executable="$packaged_app/Contents/MacOS/Nexu"
+
+          mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
+
+          {
+            echo "PACKAGED_HOME=$packaged_home"
+            echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
+            echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
+            echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
+            echo "PACKAGED_APP=$packaged_app"
+            echo "PACKAGED_EXECUTABLE=$packaged_executable"
+          } >> "$GITHUB_ENV"
 
       - name: Verify packaged desktop artifacts
         shell: bash
@@ -88,8 +104,19 @@ jobs:
           printf 'Built artifacts:\n'
           printf ' - %s\n' "${artifacts[@]}"
 
-      - name: Start desktop runtime
-        run: pnpm desktop:start
+          test -d "$PACKAGED_APP"
+          test -x "$PACKAGED_EXECUTABLE"
+
+      - name: Launch packaged desktop app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          HOME="$PACKAGED_HOME" TMPDIR="$RUNNER_TEMP/desktop-tmp" "$PACKAGED_EXECUTABLE" \
+            > "$RUNNER_TEMP/desktop-ci/packaged-app.log" 2>&1 &
+          app_pid=$!
+          echo "$app_pid" > "$RUNNER_TEMP/desktop-ci/packaged-app.pid"
+          echo "Launched packaged app pid=$app_pid"
 
       - name: Wait for desktop sidecars to become ready
         shell: bash
@@ -139,25 +166,43 @@ jobs:
           echo "Desktop sidecars did not become ready in time" >&2
           exit 1
 
-      - name: Verify desktop runtime activity
+      - name: Verify packaged runtime unit health
         shell: bash
         run: |
           set -euo pipefail
 
-          pnpm desktop:status
+          app_log="$RUNNER_TEMP/desktop-ci/packaged-app.log"
 
-          pnpm desktop:logs > "$RUNNER_TEMP/desktop-runtime.log"
-
-          grep -F "did-finish-load" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
-            echo "Electron renderer load log not found" >&2
+          grep -F '"runtime_unit_id":"control-plane"' "$app_log" >/dev/null || {
+            echo "Control plane runtime log not found" >&2
             exit 1
           }
-          grep -F "initial workspace templates synced" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
-            echo "Gateway sync log not found" >&2
+          grep -F "embedded runtime unit" "$app_log" >/dev/null || {
+            echo "Control plane embedded unit log not found" >&2
             exit 1
           }
-          grep -F "spawned openclaw gateway process" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
-            echo "OpenClaw spawn log not found" >&2
+          grep -F "runtime unit web is running" "$app_log" >/dev/null || {
+            echo "Web runtime log not found" >&2
+            exit 1
+          }
+          grep -F "runtime unit pglite port 50832 is ready" "$app_log" >/dev/null || {
+            echo "PGlite readiness log not found" >&2
+            exit 1
+          }
+          grep -F "runtime unit api port 50800 is ready" "$app_log" >/dev/null || {
+            echo "API readiness log not found" >&2
+            exit 1
+          }
+          grep -F "runtime unit gateway is running" "$app_log" >/dev/null || {
+            echo "Gateway runtime log not found" >&2
+            exit 1
+          }
+          grep -F "delegated runtime detected via pgrep" "$app_log" >/dev/null || {
+            echo "OpenClaw delegated runtime log not found" >&2
+            exit 1
+          }
+          grep -F "did-finish-load" "$app_log" >/dev/null || {
+            echo "Packaged renderer load log not found" >&2
             exit 1
           }
 
@@ -167,11 +212,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/desktop-ci"
-          if [ -d .tmp/logs ]; then
-            cp -R .tmp/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
+          if [ -d "$PACKAGED_LOGS_DIR" ]; then
+            cp -R "$PACKAGED_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/packaged-logs"
           fi
-          if tmux has-session -t nexu-desktop 2>/dev/null; then
-            tmux capture-pane -pt nexu-desktop:0 -S -400 > "$RUNNER_TEMP/desktop-ci/tmux.log"
+          if [ -d "$PACKAGED_RUNTIME_LOGS_DIR" ]; then
+            cp -R "$PACKAGED_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/runtime-unit-logs"
+          fi
+          if [ -d "$PACKAGED_USER_DATA_DIR" ]; then
+            cp -R "$PACKAGED_USER_DATA_DIR" "$RUNNER_TEMP/desktop-ci/user-data"
           fi
 
       - name: Upload desktop logs
@@ -183,6 +231,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Stop desktop runtime
+      - name: Stop packaged desktop app
         if: always()
-        run: pnpm desktop:stop
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/desktop-ci/packaged-app.pid" ]; then
+            app_pid=$(cat "$RUNNER_TEMP/desktop-ci/packaged-app.pid")
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          fi
