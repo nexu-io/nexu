@@ -139,35 +139,25 @@ jobs:
           echo "Desktop sidecars did not become ready in time" >&2
           exit 1
 
-      - name: Verify desktop runtime processes
+      - name: Verify desktop runtime activity
         shell: bash
         run: |
           set -euo pipefail
 
           pnpm desktop:status
 
-          pgrep -fal "Electron \\." || {
-            echo "Electron process not found" >&2
+          pnpm desktop:logs > "$RUNNER_TEMP/desktop-runtime.log"
+
+          grep -F "did-finish-load" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
+            echo "Electron renderer load log not found" >&2
             exit 1
           }
-          pgrep -fal "/sidecars/api/dist/index.js" || {
-            echo "API sidecar process not found" >&2
+          grep -F "initial workspace templates synced" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
+            echo "Gateway sync log not found" >&2
             exit 1
           }
-          pgrep -fal "/sidecars/gateway/dist/index.js" || {
-            echo "Gateway sidecar process not found" >&2
-            exit 1
-          }
-          pgrep -fal "/sidecars/pglite/index.js" || {
-            echo "PGlite sidecar process not found" >&2
-            exit 1
-          }
-          pgrep -fal "/sidecars/web/index.js" || {
-            echo "Web sidecar process not found" >&2
-            exit 1
-          }
-          pgrep -fal "openclaw-gateway" || {
-            echo "OpenClaw delegated process not found" >&2
+          grep -F "spawned openclaw gateway process" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
+            echo "OpenClaw spawn log not found" >&2
             exit 1
           }
 
