@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/electron/main";
 import { BrowserWindow, app, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
@@ -14,6 +15,27 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
+
+const nativeCrashTestTitles = {
+  main: "desktop.main.crash.test",
+  renderer: "desktop.renderer.crash.test",
+} as const;
+
+async function prepareNativeCrashScope(
+  title: (typeof nativeCrashTestTitles)[keyof typeof nativeCrashTestTitles],
+): Promise<void> {
+  if (!Sentry.isInitialized()) {
+    return;
+  }
+
+  const scope = Sentry.getCurrentScope();
+  scope.setTag("nexu.test_title", title);
+  scope.setTag("nexu.test_kind", "native_crash");
+  scope.setExtra("nexu.test_title", title);
+  scope.setFingerprint([title]);
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
 
 export function setUpdateManager(manager: UpdateManager): void {
   updateManager = manager;
@@ -70,6 +92,7 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
         }
 
         case "diagnostics:crash-main": {
+          await prepareNativeCrashScope(nativeCrashTestTitles.main);
           process.crash();
           return undefined;
         }
@@ -81,6 +104,7 @@ export function registerIpcHandlers(orchestrator: RuntimeOrchestrator): void {
             throw new Error("Could not resolve the active browser window.");
           }
 
+          await prepareNativeCrashScope(nativeCrashTestTitles.renderer);
           browserWindow.webContents.forcefullyCrashRenderer();
           return undefined;
         }

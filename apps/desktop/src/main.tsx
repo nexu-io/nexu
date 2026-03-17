@@ -768,14 +768,13 @@ function DiagnosticsPage() {
   );
 
   const triggerRendererException = useCallback(() => {
+    const title = "desktop.renderer.exception.test";
     setLastAction(
       `Renderer exception scheduled at ${new Date().toLocaleTimeString()}.`,
     );
 
     window.setTimeout(() => {
-      throw new Error(
-        "Diagnostics test: renderer exception thrown from the UI thread.",
-      );
+      throw new Error(title);
     }, 0);
   }, []);
 
@@ -871,19 +870,19 @@ function DiagnosticsPage() {
 
       <section className="diagnostics-grid">
         <DiagnosticsActionCard
-          description="Throws an unhandled Error from the renderer event loop. Use this to validate JavaScript exception capture without killing the app."
+          description="Throws an unhandled renderer Error named desktop.renderer.exception.test. Use this to validate JavaScript exception capture without killing the app."
           disabled={busyAction !== null}
           label="Test Renderer Exception"
           onClick={triggerRendererException}
         />
         <DiagnosticsActionCard
-          description="Asks the main process to forcefully crash the current renderer process. Use this to validate renderer crash handling and crash dump creation."
+          description="Asks the main process to forcefully crash the current renderer process with the title desktop.renderer.crash.test. Use this to validate renderer crash handling and crash dump creation."
           disabled={busyAction !== null}
           label="Test Renderer Crash"
           onClick={triggerRendererCrash}
         />
         <DiagnosticsActionCard
-          description="Invokes a deliberate main process crash. Use this to validate the native crash pipeline for the Electron host itself."
+          description="Invokes a deliberate main process crash with the title desktop.main.crash.test. Use this to validate the native crash pipeline for the Electron host itself."
           disabled={busyAction !== null}
           label="Test Main Crash"
           onClick={triggerMainCrash}

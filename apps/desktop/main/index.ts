@@ -55,6 +55,24 @@ if (sentryDsn) {
     dsn: sentryDsn,
     environment: app.isPackaged ? "production" : "development",
     release: `@nexu/desktop@${app.getVersion()}`,
+    beforeSend(event) {
+      const testTitle =
+        typeof event.tags?.["nexu.test_title"] === "string"
+          ? event.tags["nexu.test_title"]
+          : typeof event.extra?.["nexu.test_title"] === "string"
+            ? event.extra["nexu.test_title"]
+            : null;
+
+      if (!testTitle) {
+        return event;
+      }
+
+      return {
+        ...event,
+        message: testTitle,
+        fingerprint: [testTitle],
+      };
+    },
   });
 } else {
   crashReporter.start({
