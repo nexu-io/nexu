@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { chmod, mkdir, readdir, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   electronRoot,
@@ -28,6 +28,10 @@ const inheritEntitlementsPath = resolve(
   electronRoot,
   "build/entitlements.mac.inherit.plist",
 );
+
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(2)}s`;
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
@@ -103,6 +107,17 @@ async function collectFiles(rootPath) {
   }
 
   return files;
+}
+
+const nativeBinaryNamePattern = /\.(?:node|dylib|so|dll)$/u;
+const nativeBinaryBasenames = new Set(["spawn-helper"]);
+
+function isNativeBinaryCandidate(filePath) {
+  const baseName = basename(filePath);
+  return (
+    nativeBinaryNamePattern.test(baseName) ||
+    nativeBinaryBasenames.has(baseName)
+  );
 }
 
 async function resolveCodesignIdentity() {
@@ -234,10 +249,17 @@ async function signOpenclawNativeBinaries() {
     return;
   }
 
+  const startedAt = Date.now();
   const identity = await ensureCodesignIdentity();
   const files = await collectFiles(sidecarRoot);
+  const candidateFiles = files.filter(isNativeBinaryCandidate);
+  let machOCount = 0;
 
-  for (const filePath of files) {
+  console.log(
+    `[openclaw-sidecar] scanning ${candidateFiles.length} native-binary candidates out of ${files.length} files`,
+  );
+
+  for (const filePath of candidateFiles) {
     const { stdout } = await runAndCapture("file", ["-b", filePath]);
     const description = stdout.trim();
     const isMachO = description.includes("Mach-O");
@@ -245,6 +267,8 @@ async function signOpenclawNativeBinaries() {
     if (!isMachO) {
       continue;
     }
+
+    machOCount += 1;
 
     const isExecutable =
       description.includes("executable") || description.includes("bundle");
@@ -260,6 +284,12 @@ async function signOpenclawNativeBinaries() {
     ];
     await run("codesign", args);
   }
+
+  console.log(
+    `[openclaw-sidecar] signed ${machOCount} native binaries in ${formatDurationMs(
+      Date.now() - startedAt,
+    )}`,
+  );
 }
 
 async function prepareOpenclawSidecar() {

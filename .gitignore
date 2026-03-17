@@ -27,3 +27,4 @@ playwright-report/
 apps/desktop/release/
 apps/desktop/.dist-runtime/
 apps/desktop/.cache/
+.claude/settings.local.json

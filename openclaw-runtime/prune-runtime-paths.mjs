@@ -46,6 +46,26 @@ export const pruneDependencyTargets = [
   "node_modules/simple-git",
   "node_modules/ipull",
   "node_modules/fast-xml-builder",
+
+  // Round 4: desktop signing/packaging focused pruning.
+  // - Why these targets:
+  //   remove only the signed macOS native binaries that are currently bloating
+  //   the packaged OpenClaw sidecar and slowing `codesign`, while keeping the
+  //   surrounding JS packages in place for the lowest-risk desktop optimization.
+  // - Impact:
+  //   these paths are the exact Mach-O files currently re-signed during desktop
+  //   packaging. If one of the related optional features is actually exercised at
+  //   runtime, that feature may fail to load on macOS arm64, but the package
+  //   metadata and JS wrappers remain intact.
+  "node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64.node",
+  "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.17.3.dylib",
+  "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/pty.node",
+  "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/spawn-helper",
+  "node_modules/@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
+  "node_modules/@mariozechner/clipboard-darwin-universal/clipboard.darwin-universal.node",
+  "node_modules/@reflink/reflink-darwin-arm64/reflink.darwin-arm64.node",
+  "node_modules/@snazzah/davey-darwin-arm64/davey.darwin-arm64.node",
+  "node_modules/sqlite-vec-darwin-arm64/vec0.dylib",
 ];
 
 // Package-content pruning must stay compatible with the runtime's published
