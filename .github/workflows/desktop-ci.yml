@@ -1,0 +1,192 @@
+name: Desktop CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "apps/api/**"
+      - "apps/gateway/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "openclaw-runtime/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/desktop-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/desktop/**"
+      - "apps/api/**"
+      - "apps/gateway/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "openclaw-runtime/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/desktop-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-ci:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Show desktop toolchain versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec electron --version
+          tmux -V
+
+      - name: Build unsigned macOS desktop bundle
+        run: pnpm desktop:dist:mac:unsigned
+
+      - name: Verify packaged desktop artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          artifacts=(apps/desktop/release/*.dmg apps/desktop/release/*.zip)
+          if [ "${#artifacts[@]}" -eq 0 ]; then
+            echo "No desktop artifacts were produced" >&2
+            exit 1
+          fi
+
+          printf 'Built artifacts:\n'
+          printf ' - %s\n' "${artifacts[@]}"
+
+      - name: Start desktop runtime
+        run: pnpm desktop:start
+
+      - name: Wait for desktop sidecars to become ready
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_url() {
+            local name="$1"
+            local url="$2"
+            local body
+
+            body=$(curl --silent --show-error --fail "$url")
+            echo "[$name] $body"
+            [[ "$body" == *'"ready":true'* ]]
+          }
+
+          for attempt in {1..60}; do
+            echo "Readiness attempt $attempt/60"
+
+            all_ports_ready=true
+            for port in 50800 50810 50832 18789; do
+              if ! lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+                all_ports_ready=false
+                echo "Port $port is not listening yet"
+              fi
+            done
+
+            api_ready=false
+            web_ready=false
+
+            if check_url "api" "http://127.0.0.1:50800/api/internal/desktop/ready"; then
+              api_ready=true
+            fi
+
+            if check_url "web" "http://127.0.0.1:50810/api/internal/desktop/ready"; then
+              web_ready=true
+            fi
+
+            if [ "$all_ports_ready" = true ] && [ "$api_ready" = true ] && [ "$web_ready" = true ]; then
+              echo "All desktop sidecars are ready"
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "Desktop sidecars did not become ready in time" >&2
+          exit 1
+
+      - name: Verify desktop runtime processes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pnpm desktop:status
+
+          pgrep -fal "Electron \\." || {
+            echo "Electron process not found" >&2
+            exit 1
+          }
+          pgrep -fal "/sidecars/api/dist/index.js" || {
+            echo "API sidecar process not found" >&2
+            exit 1
+          }
+          pgrep -fal "/sidecars/gateway/dist/index.js" || {
+            echo "Gateway sidecar process not found" >&2
+            exit 1
+          }
+          pgrep -fal "/sidecars/pglite/index.js" || {
+            echo "PGlite sidecar process not found" >&2
+            exit 1
+          }
+          pgrep -fal "/sidecars/web/index.js" || {
+            echo "Web sidecar process not found" >&2
+            exit 1
+          }
+          pgrep -fal "openclaw-gateway" || {
+            echo "OpenClaw delegated process not found" >&2
+            exit 1
+          }
+
+      - name: Capture desktop logs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/desktop-ci"
+          if [ -d .tmp/logs ]; then
+            cp -R .tmp/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
+          fi
+          if tmux has-session -t nexu-desktop 2>/dev/null; then
+            tmux capture-pane -pt nexu-desktop:0 -S -400 > "$RUNNER_TEMP/desktop-ci/tmux.log"
+          fi
+
+      - name: Upload desktop logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-logs
+          path: ${{ runner.temp }}/desktop-ci
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Stop desktop runtime
+        if: always()
+        run: pnpm desktop:stop
