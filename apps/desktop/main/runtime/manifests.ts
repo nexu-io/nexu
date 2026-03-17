@@ -8,7 +8,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { resolve } from "node:path";
+import * as path from "node:path";
 import {
   type DesktopRuntimeConfig,
   getDesktopRuntimeConfig,
@@ -45,14 +45,14 @@ function buildNode22Path(): string | undefined {
   const nvmDir = process.env.NVM_DIR;
   if (!nvmDir) return undefined;
   try {
-    const versionsDir = resolve(nvmDir, "versions/node");
+    const versionsDir = path.resolve(nvmDir, "versions/node");
     const dirs = readdirSync(versionsDir)
       .filter((d) => d.startsWith("v22."))
       .sort()
       .reverse();
     for (const d of dirs) {
-      const binDir = resolve(versionsDir, d, "bin");
-      if (existsSync(resolve(binDir, "node"))) {
+      const binDir = path.resolve(versionsDir, d, "bin");
+      if (existsSync(path.resolve(binDir, "node"))) {
         return `${binDir}:${process.env.PATH ?? ""}`;
       }
     }
@@ -66,20 +66,20 @@ function ensurePackagedOpenclawSidecar(
   runtimeSidecarBaseRoot: string,
   runtimeRoot: string,
 ): string {
-  const packagedSidecarRoot = resolve(runtimeSidecarBaseRoot, "openclaw");
-  const archivePath = resolve(packagedSidecarRoot, "payload.tar.gz");
+  const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
+  const archivePath = path.resolve(packagedSidecarRoot, "payload.tar.gz");
 
   if (!existsSync(archivePath)) {
     return packagedSidecarRoot;
   }
 
   const extractedSidecarRoot = ensureDir(
-    resolve(runtimeRoot, "openclaw-sidecar"),
+    path.resolve(runtimeRoot, "openclaw-sidecar"),
   );
-  const stampPath = resolve(extractedSidecarRoot, ".archive-stamp");
+  const stampPath = path.resolve(extractedSidecarRoot, ".archive-stamp");
   const archiveStat = statSync(archivePath);
   const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
-  const extractedOpenclawEntry = resolve(
+  const extractedOpenclawEntry = path.resolve(
     extractedSidecarRoot,
     "node_modules/openclaw/openclaw.mjs",
   );
@@ -108,41 +108,47 @@ export function createRuntimeUnitManifests(
   const repoRoot = getWorkspaceRoot();
   const _nexuRoot = repoRoot;
   const runtimeSidecarBaseRoot = isPackaged
-    ? resolve(electronRoot, "runtime")
-    : resolve(repoRoot, ".tmp/sidecars");
-  const runtimeRoot = ensureDir(resolve(userDataPath, "runtime"));
+    ? path.resolve(electronRoot, "runtime")
+    : path.resolve(repoRoot, ".tmp/sidecars");
+  const runtimeRoot = ensureDir(path.resolve(userDataPath, "runtime"));
   const openclawSidecarRoot = isPackaged
     ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
-    : resolve(runtimeSidecarBaseRoot, "openclaw");
+    : path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
     process.env,
     {
-      openclawBinPath: resolve(openclawSidecarRoot, "bin/openclaw"),
+      openclawBinPath: path.resolve(openclawSidecarRoot, "bin/openclaw"),
       resourcesPath: isPackaged ? electronRoot : undefined,
     },
   );
-  const logsDir = ensureDir(resolve(userDataPath, "../logs/runtime-units"));
-  const pgliteDataPath = ensureDir(resolve(runtimeRoot, "pglite"));
-  const openclawRuntimeRoot = ensureDir(resolve(runtimeRoot, "openclaw"));
-  const openclawConfigDir = ensureDir(resolve(openclawRuntimeRoot, "config"));
-  const openclawStateDir = ensureDir(resolve(openclawRuntimeRoot, "state"));
-  const openclawTempDir = ensureDir(resolve(openclawRuntimeRoot, "tmp"));
-  ensureDir(resolve(openclawStateDir, "skills"));
-  ensureDir(resolve(openclawStateDir, "plugin-docs"));
-  ensureDir(resolve(openclawStateDir, "agents"));
-  const openclawPackageRoot = resolve(
+  const logsDir = ensureDir(
+    path.resolve(userDataPath, "../logs/runtime-units"),
+  );
+  const pgliteDataPath = ensureDir(path.resolve(runtimeRoot, "pglite"));
+  const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
+  const openclawConfigDir = ensureDir(
+    path.resolve(openclawRuntimeRoot, "config"),
+  );
+  const openclawStateDir = ensureDir(
+    path.resolve(openclawRuntimeRoot, "state"),
+  );
+  const openclawTempDir = ensureDir(path.resolve(openclawRuntimeRoot, "tmp"));
+  ensureDir(path.resolve(openclawStateDir, "skills"));
+  ensureDir(path.resolve(openclawStateDir, "plugin-docs"));
+  ensureDir(path.resolve(openclawStateDir, "agents"));
+  const openclawPackageRoot = path.resolve(
     openclawSidecarRoot,
     "node_modules/openclaw",
   );
-  const apiSidecarRoot = resolve(runtimeSidecarBaseRoot, "api");
-  const apiModulePath = resolve(apiSidecarRoot, "dist/index.js");
-  const gatewaySidecarRoot = resolve(runtimeSidecarBaseRoot, "gateway");
-  const gatewayModulePath = resolve(gatewaySidecarRoot, "dist/index.js");
-  const pgliteSidecarRoot = resolve(runtimeSidecarBaseRoot, "pglite");
-  const pgliteModulePath = resolve(pgliteSidecarRoot, "index.js");
-  const migrationsDir = resolve(pgliteSidecarRoot, "migrations");
-  const webSidecarRoot = resolve(runtimeSidecarBaseRoot, "web");
-  const webModulePath = resolve(webSidecarRoot, "index.js");
+  const apiSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "api");
+  const apiModulePath = path.resolve(apiSidecarRoot, "dist/index.js");
+  const gatewaySidecarRoot = path.resolve(runtimeSidecarBaseRoot, "gateway");
+  const gatewayModulePath = path.resolve(gatewaySidecarRoot, "dist/index.js");
+  const pgliteSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "pglite");
+  const pgliteModulePath = path.resolve(pgliteSidecarRoot, "index.js");
+  const migrationsDir = path.resolve(pgliteSidecarRoot, "migrations");
+  const webSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "web");
+  const webModulePath = path.resolve(webSidecarRoot, "index.js");
   const apiPort = runtimeConfig.ports.api;
   const pglitePort = runtimeConfig.ports.pglite;
   const webPort = runtimeConfig.ports.web;
@@ -171,7 +177,7 @@ export function createRuntimeUnitManifests(
       port: webPort,
       startupTimeoutMs: 10_000,
       autoStart: true,
-      logFilePath: resolve(logsDir, "web.log"),
+      logFilePath: path.resolve(logsDir, "web.log"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
         WEB_HOST: "127.0.0.1",
@@ -186,7 +192,7 @@ export function createRuntimeUnitManifests(
       launchStrategy: "embedded",
       port: null,
       autoStart: true,
-      logFilePath: resolve(logsDir, "control-plane.log"),
+      logFilePath: path.resolve(logsDir, "control-plane.log"),
     },
     {
       id: "pglite",
@@ -199,7 +205,7 @@ export function createRuntimeUnitManifests(
       port: pglitePort,
       startupTimeoutMs: 10_000,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_PGLITE", true),
-      logFilePath: resolve(logsDir, "pglite.log"),
+      logFilePath: path.resolve(logsDir, "pglite.log"),
       env: {
         PGLITE_DATA_DIR: pgliteDataPath,
         PGLITE_HOST: "127.0.0.1",
@@ -219,7 +225,7 @@ export function createRuntimeUnitManifests(
       port: apiPort,
       startupTimeoutMs: 20_000,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_API", true),
-      logFilePath: resolve(logsDir, "api.log"),
+      logFilePath: path.resolve(logsDir, "api.log"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
         FORCE_COLOR: "1",
@@ -247,7 +253,7 @@ export function createRuntimeUnitManifests(
       cwd: gatewaySidecarRoot,
       port: null,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_GATEWAY", true),
-      logFilePath: resolve(logsDir, "gateway.log"),
+      logFilePath: path.resolve(logsDir, "gateway.log"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
         FORCE_COLOR: "1",
@@ -257,11 +263,14 @@ export function createRuntimeUnitManifests(
         INTERNAL_API_TOKEN: internalApiToken,
         SKILL_API_TOKEN: skillApiToken,
         OPENCLAW_STATE_DIR: openclawStateDir,
-        OPENCLAW_CONFIG_PATH: resolve(openclawConfigDir, "openclaw.json"),
-        OPENCLAW_SKILLS_DIR: resolve(openclawStateDir, "skills"),
+        OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
+        OPENCLAW_SKILLS_DIR: path.resolve(openclawStateDir, "skills"),
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
         OPENCLAW_ELECTRON_EXECUTABLE: electronNodeRunner,
-        OPENCLAW_EXTENSIONS_DIR: resolve(openclawPackageRoot, "extensions"),
+        OPENCLAW_EXTENSIONS_DIR: path.resolve(
+          openclawPackageRoot,
+          "extensions",
+        ),
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
@@ -279,7 +288,7 @@ export function createRuntimeUnitManifests(
       binaryPath: runtimeConfig.paths.openclawBin,
       port: null,
       autoStart: true,
-      logFilePath: resolve(logsDir, "openclaw.log"),
+      logFilePath: path.resolve(logsDir, "openclaw.log"),
     },
   ];
 }

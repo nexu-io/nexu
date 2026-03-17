@@ -21,6 +21,12 @@ const version =
   process.env.GIT_COMMIT_SHA ??
   process.env.npm_package_version;
 
+function isIgnorableWriteError(error: unknown): boolean {
+  const errorCode =
+    error instanceof Error && "code" in error ? String(error.code) : null;
+  return errorCode === "EIO" || errorCode === "EPIPE";
+}
+
 class SafeConsoleStream extends Writable {
   override _write(
     chunk: string | Buffer,
@@ -32,18 +38,23 @@ class SafeConsoleStream extends Writable {
       return;
     }
 
-    process.stdout.write(chunk, encoding, (error) => {
-      if (error) {
-        const errorCode =
-          error instanceof Error && "code" in error ? String(error.code) : null;
-        if (errorCode === "EIO" || errorCode === "EPIPE") {
+    try {
+      process.stdout.write(chunk, encoding, (error) => {
+        if (isIgnorableWriteError(error)) {
           callback(null);
           return;
         }
+
+        callback(error);
+      });
+    } catch (error) {
+      if (isIgnorableWriteError(error)) {
+        callback(null);
+        return;
       }
 
-      callback(error);
-    });
+      callback(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
