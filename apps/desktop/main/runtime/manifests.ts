@@ -8,8 +8,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
-import { app } from "electron";
+import { resolve } from "node:path";
 import {
   type DesktopRuntimeConfig,
   getDesktopRuntimeConfig,
