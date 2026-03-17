@@ -136,7 +136,7 @@ function logColdStart(message: string): void {
 async function waitForApiReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.apiBaseUrl);
+  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -211,7 +211,7 @@ function triggerDesktopAuthRecovery(reason: string): void {
 function installDesktopAuthRecoveryHooks(): void {
   session.defaultSession.webRequest.onCompleted(
     {
-      urls: [`${runtimeConfig.apiBaseUrl}/api/auth/*`],
+      urls: [`${runtimeConfig.urls.apiBase}/api/auth/*`],
     },
     (details) => {
       if (
