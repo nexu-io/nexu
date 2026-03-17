@@ -193,7 +193,7 @@ jobs:
             echo "Runtime health attempt $attempt/60"
 
             if grep -F "spawned openclaw gateway process" "$app_log" >/dev/null && \
-              lsof -iTCP:18789 -sTCP:LISTEN >/dev/null 2>&1; then
+              grep -F "[gateway] listening on ws://0.0.0.0:18789" "$app_log" >/dev/null; then
               break
             fi
 
@@ -206,12 +206,9 @@ jobs:
           require_log "runtime unit web is running" "Web runtime log not found"
           require_log "runtime unit gateway is running" "Gateway runtime log not found"
           require_log "spawned openclaw gateway process" "OpenClaw spawn log not found"
+          require_log "[gateway] listening on ws://0.0.0.0:18789" "OpenClaw websocket listener log not found"
+          require_log "Browser control listening on http://127.0.0.1:18791/" "OpenClaw browser control listener log not found"
           require_log "did-finish-load" "Packaged renderer load log not found"
-
-          lsof -iTCP:18789 -sTCP:LISTEN >/dev/null 2>&1 || {
-            echo "OpenClaw port 18789 is not listening" >&2
-            exit 1
-          }
 
       - name: Capture desktop logs
         if: always()
@@ -225,17 +222,11 @@ jobs:
           if [ -d "$PACKAGED_RUNTIME_LOGS_DIR" ]; then
             cp -R "$PACKAGED_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/runtime-unit-logs"
           fi
-          if [ -d "$PACKAGED_USER_DATA_DIR" ]; then
-            cp -R "$PACKAGED_USER_DATA_DIR" "$RUNNER_TEMP/desktop-ci/user-data"
-          fi
           if [ -d "$DEFAULT_LOGS_DIR" ]; then
             cp -R "$DEFAULT_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-logs"
           fi
           if [ -d "$DEFAULT_RUNTIME_LOGS_DIR" ]; then
             cp -R "$DEFAULT_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-runtime-unit-logs"
-          fi
-          if [ -d "$DEFAULT_USER_DATA_DIR" ]; then
-            cp -R "$DEFAULT_USER_DATA_DIR" "$RUNNER_TEMP/desktop-ci/default-user-data"
           fi
 
       - name: Upload desktop logs
