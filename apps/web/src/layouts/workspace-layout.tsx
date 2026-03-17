@@ -1,4 +1,5 @@
 import { BrandMark } from "@/components/brand-mark";
+import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,6 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { type Locale, useLocale } from "@/hooks/use-locale";
 import "@/lib/api";
 import { getApiV1Sessions } from "../../lib/api/sdk.gen";
 
