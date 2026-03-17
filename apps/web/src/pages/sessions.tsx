@@ -9,6 +9,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { getApiV1Artifacts, getApiV1SessionsById } from "../../lib/api/sdk.gen";
 
@@ -38,21 +39,6 @@ const STATUS_CONFIG: Record<
   failed: { icon: AlertTriangle, color: "text-red-500" },
 };
 
-function formatTime(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return d.toLocaleDateString();
-}
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const y = d.getFullYear();
@@ -64,6 +50,7 @@ function formatDate(iso: string): string {
 }
 
 function EmptyState() {
+  const { t } = useTranslation();
   return (
     <div className="flex h-full items-center justify-center">
       <div className="flex flex-col items-center text-center">
@@ -71,11 +58,10 @@ function EmptyState() {
           <MessageSquare className="h-8 w-8 text-text-muted" />
         </div>
         <h3 className="mb-2 text-lg font-medium text-text-primary">
-          Select a session
+          {t("sessions.selectSession")}
         </h3>
         <p className="max-w-sm text-sm text-text-muted">
-          Pick a session from the sidebar to view details, or start a
-          conversation through your connected channels.
+          {t("sessions.selectSessionDesc")}
         </p>
       </div>
     </div>
@@ -96,6 +82,7 @@ function MetaTag({
 }
 
 export function SessionsPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
 
   useEffect(() => {
@@ -125,6 +112,21 @@ export function SessionsPage() {
     enabled: !!session?.sessionKey,
   });
 
+  const formatTime = (iso: string | null): string => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return t("sessions.justNow");
+    if (diffMin < 60) return t("sessions.minutesAgo", { count: diffMin });
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return t("sessions.hoursAgo", { count: diffHr });
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return t("sessions.daysAgo", { count: diffDay });
+    return d.toLocaleDateString();
+  };
+
   if (!id) {
     return <EmptyState />;
   }
@@ -132,7 +134,7 @@ export function SessionsPage() {
   if (!session) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-text-muted">
-        Loading...
+        {t("sessions.loading")}
       </div>
     );
   }
@@ -174,7 +176,7 @@ export function SessionsPage() {
               {session.status === "active" ? "Active" : session.status}
             </MetaTag>
             <span className="text-[11px] text-text-muted">
-              {session.messageCount} messages
+              {t("sessions.messages", { count: session.messageCount })}
               {(session.lastMessageAt || session.updatedAt) &&
                 ` \u00B7 ${formatTime(session.lastMessageAt || session.updatedAt)}`}
               {session.createdAt &&
@@ -189,7 +191,7 @@ export function SessionsPage() {
         <div className="flex gap-2 items-center">
           <Code2 size={14} className="text-accent" />
           <h3 className="text-[13px] font-semibold text-text-primary">
-            Deployments
+            {t("sessions.deployments")}
           </h3>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-accent/15 text-accent">
             {codingArtifacts.length}
@@ -199,7 +201,7 @@ export function SessionsPage() {
         <div className="rounded-xl border bg-surface-1 border-border">
           {codingArtifacts.length === 0 ? (
             <div className="text-[13px] text-text-muted py-8 text-center">
-              No deployments yet
+              {t("sessions.noDeployments")}
             </div>
           ) : (
             <div>
@@ -242,7 +244,8 @@ export function SessionsPage() {
                           className="text-[11px] text-emerald-600 shrink-0 hover:underline"
                           onClick={() => track("channel_detail_deploy_preview")}
                         >
-                          Preview <ExternalLink size={9} className="inline" />
+                          {t("sessions.preview")}{" "}
+                          <ExternalLink size={9} className="inline" />
                         </a>
                       )}
                     </div>

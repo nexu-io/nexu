@@ -10,6 +10,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "@/lib/api";
 import {
@@ -246,6 +247,7 @@ function ProcessingCard({
 }: {
   state: Extract<CallbackState, { phase: "processing" }>;
 }) {
+  const { t } = useTranslation();
   const toolkit =
     state.toolkitDisplayName && state.toolkitSlug && state.toolkitIconUrl
       ? {
@@ -270,19 +272,19 @@ function ProcessingCard({
               providerName={toolkit.displayName}
             />
             <h1 className="text-[18px] font-bold text-text-primary mb-1">
-              Connect {toolkit.displayName}
+              {t("oauth.connectTitle", { name: toolkit.displayName })}
             </h1>
             <p className="text-[13px] text-text-muted">
-              nexu is requesting access to your {toolkit.displayName} account
+              {t("oauth.requestingAccess", { name: toolkit.displayName })}
             </p>
           </>
         ) : (
           <>
             <h1 className="text-[18px] font-bold text-text-primary mb-1">
-              Connecting your account...
+              {t("oauth.connectingAccount")}
             </h1>
             <p className="text-[13px] text-text-muted">
-              Please wait while we establish the connection.
+              {t("oauth.waitingForAuth")}
             </p>
           </>
         )}
@@ -293,7 +295,7 @@ function ProcessingCard({
         {toolkit && permissions.length > 0 && (
           <div className="rounded-xl bg-surface-0 border border-border p-4 mb-4">
             <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-3">
-              Permissions requested
+              {t("oauth.permissionsRequested")}
             </div>
             <div className="space-y-2.5">
               {permissions.map((perm) => (
@@ -312,13 +314,12 @@ function ProcessingCard({
         <div className="flex items-center justify-center gap-3 py-4">
           <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           <span className="text-[13px] text-text-muted">
-            Waiting for authorization...
+            {t("oauth.waitingAuth")}
           </span>
         </div>
 
         <p className="text-[11px] text-text-muted text-center leading-relaxed">
-          nexu uses OAuth 2.0. Your credentials are never stored. You can revoke
-          access anytime.
+          {t("oauth.securityNote")}
         </p>
       </div>
     </div>
@@ -332,6 +333,8 @@ function SuccessCard({
 }: {
   state: Extract<CallbackState, { phase: "success" }>;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="rounded-2xl border border-border bg-surface-1 shadow-lg overflow-hidden">
       <div className="px-6 pt-6 pb-4 text-center">
@@ -346,10 +349,10 @@ function SuccessCard({
         </div>
 
         <h1 className="text-[18px] font-bold text-text-primary mb-1">
-          Authorization Successful
+          {t("oauth.authSuccess")}
         </h1>
         <p className="text-[13px] text-text-muted mb-6">
-          {state.toolkitName} has been connected to nexu
+          {t("oauth.connectedTo", { name: state.toolkitName })}
         </p>
       </div>
 
@@ -383,7 +386,7 @@ function SuccessCard({
                 )}
               >
                 <SlackIcon size={16} />
-                Return to Slack
+                {t("oauth.returnSlack")}
                 <ExternalLink size={12} className="opacity-60" />
               </button>
             )}
@@ -397,7 +400,7 @@ function SuccessCard({
                 )}
               >
                 <DiscordIcon size={16} />
-                Return to Discord
+                {t("oauth.returnDiscord")}
                 <ExternalLink size={12} className="opacity-60 ml-0.5" />
               </a>
             )}
@@ -414,13 +417,13 @@ function SuccessCard({
               "hover:bg-accent-hover transition-colors mb-4",
             )}
           >
-            Go to Integrations
+            {t("oauth.goToIntegrations")}
           </Link>
         )}
 
         {/* Footer hint */}
         <p className="text-[11px] text-text-muted text-center leading-relaxed">
-          Manage connected services in workspace settings
+          {t("oauth.manageHint")}
         </p>
       </div>
     </div>
@@ -450,6 +453,8 @@ function ConnectionGraphicSuccess({
 // ─── Error Card ─────────────────────────────────────────────
 
 function ErrorCard({ message }: { message: string }) {
+  const { t } = useTranslation();
+
   return (
     <div className="rounded-2xl border border-border bg-surface-1 shadow-lg overflow-hidden">
       <div className="px-6 py-6 text-center">
@@ -457,7 +462,7 @@ function ErrorCard({ message }: { message: string }) {
           <AlertCircle size={24} className="text-red-500" />
         </div>
         <h1 className="text-[18px] font-bold text-text-primary mb-2">
-          Connection Failed
+          {t("oauth.connectionFailed")}
         </h1>
         <p className="text-[13px] text-text-muted mb-6">{message}</p>
         <Link
@@ -465,7 +470,7 @@ function ErrorCard({ message }: { message: string }) {
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-[13px] font-medium hover:bg-accent-hover transition-colors"
         >
           <ArrowLeft size={14} />
-          Go to Integrations
+          {t("oauth.goToIntegrations")}
         </Link>
       </div>
     </div>

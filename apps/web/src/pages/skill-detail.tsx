@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import type { ElementType } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
@@ -181,6 +182,7 @@ function DisconnectDialog({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
@@ -196,10 +198,10 @@ function DisconnectDialog({
           </div>
           <div>
             <h3 className="text-[14px] font-semibold text-text-primary">
-              Disconnect {name}?
+              {t("skillDetail.disconnectTitle", { name })}
             </h3>
             <p className="text-[12px] text-text-muted">
-              This will remove the connection and any stored credentials.
+              {t("skillDetail.disconnectDesc")}
             </p>
           </div>
         </div>
@@ -209,7 +211,7 @@ function DisconnectDialog({
             onClick={onCancel}
             className="px-4 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-surface-3 transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -222,7 +224,7 @@ function DisconnectDialog({
             ) : (
               <Trash2 size={14} />
             )}
-            Disconnect
+            {t("skillDetail.disconnect")}
           </button>
         </div>
       </div>
@@ -243,6 +245,7 @@ function ToolAuthCard({
   onDisconnect: () => void;
   isConnecting: boolean;
 }) {
+  const { t } = useTranslation();
   const isConnected = tool.status === "connected";
 
   return (
@@ -267,14 +270,14 @@ function ToolAuthCard({
       {isConnected ? (
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-[12px] text-emerald-600 font-medium px-3 py-1.5 rounded-lg bg-emerald-500/10">
-            <Check size={12} /> Connected
+            <Check size={12} /> {t("skillDetail.connected")}
           </span>
           <button
             type="button"
             onClick={onDisconnect}
             className="text-[11px] text-text-muted hover:text-red-500 transition-colors"
           >
-            Disconnect
+            {t("skillDetail.disconnect")}
           </button>
         </div>
       ) : (
@@ -287,12 +290,12 @@ function ToolAuthCard({
           {isConnecting ? (
             <>
               <Loader2 size={12} className="animate-spin" />
-              Connecting...
+              {t("skillDetail.connecting")}
             </>
           ) : (
             <>
               <ExternalLink size={12} />
-              Connect
+              {t("skillDetail.connect")}
             </>
           )}
         </button>
@@ -329,12 +332,12 @@ function RelatedSkillCard({ skill }: { skill: RelatedSkill }) {
       </p>
       {skill.tools && skill.tools.length > 0 && (
         <div className="flex gap-1.5 mt-3">
-          {skill.tools.map((t) => (
+          {skill.tools.map((tool) => (
             <span
-              key={t.slug}
+              key={tool.slug}
               className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium"
             >
-              {t.provider}
+              {tool.provider}
             </span>
           ))}
         </div>
@@ -346,6 +349,7 @@ function RelatedSkillCard({ skill }: { skill: RelatedSkill }) {
 // ─── Main Page ──────────────────────────────────────────────
 
 export function SkillDetailPage() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const queryClient = useQueryClient();
 
@@ -529,17 +533,17 @@ export function SkillDetailPage() {
             <Search size={20} className="text-accent" />
           </div>
           <h1 className="text-lg font-bold text-text-primary mb-2">
-            Skill not found
+            {t("skillDetail.notFound")}
           </h1>
           <p className="text-[13px] text-text-muted mb-6">
-            This skill does not exist or has been removed.
+            {t("skillDetail.notFoundDesc")}
           </p>
           <Link
             to="/workspace/skills"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-[13px] font-medium hover:bg-accent-hover transition-colors"
           >
             <ArrowLeft size={14} />
-            Back to Skills
+            {t("skillDetail.backToSkills")}
           </Link>
         </div>
       </div>
@@ -559,7 +563,7 @@ export function SkillDetailPage() {
             className="flex items-center gap-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors"
           >
             <ArrowLeft size={14} />
-            Back to Skills
+            {t("skillDetail.backToSkills")}
           </Link>
         </div>
       </div>
@@ -618,20 +622,24 @@ export function SkillDetailPage() {
             {/* Right: quick info card */}
             <div className="w-full lg:w-72 shrink-0 rounded-xl border border-border bg-surface-1 p-5">
               <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-3">
-                Quick Info
+                {t("skillDetail.quickInfo")}
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-text-muted">Category</span>
+                  <span className="text-[12px] text-text-muted">
+                    {t("skillDetail.category")}
+                  </span>
                   <span className="text-[12px] text-text-primary font-medium">
                     {categoryLabel}
                   </span>
                 </div>
                 <div className="border-t border-border/50" />
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-text-muted">Auth</span>
+                  <span className="text-[12px] text-text-muted">
+                    {t("skillDetail.auth")}
+                  </span>
                   <span className="text-[12px] text-text-primary font-medium">
-                    {hasTools ? "OAuth" : "No auth needed"}
+                    {hasTools ? "OAuth" : t("skillDetail.noAuthNeeded")}
                   </span>
                 </div>
                 <div className="border-t border-border/50" />
@@ -639,15 +647,15 @@ export function SkillDetailPage() {
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-text-muted">
-                        Providers
+                        {t("skillDetail.providers")}
                       </span>
                       <div className="flex gap-1">
-                        {skill.tools?.map((t) => (
+                        {skill.tools?.map((tool) => (
                           <span
-                            key={t.slug}
+                            key={tool.slug}
                             className="text-[11px] px-2 py-0.5 rounded-md bg-accent/10 text-accent font-medium"
                           >
-                            {t.provider}
+                            {tool.provider}
                           </span>
                         ))}
                       </div>
@@ -656,7 +664,9 @@ export function SkillDetailPage() {
                   </>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-text-muted">Platforms</span>
+                  <span className="text-[12px] text-text-muted">
+                    {t("skillDetail.platforms")}
+                  </span>
                   <div className="flex items-center gap-2">
                     <SlackIcon size={14} />
                     <DiscordIcon size={14} />
@@ -678,13 +688,13 @@ export function SkillDetailPage() {
         <section className="px-6 py-12 mx-auto max-w-4xl">
           <div className="mb-8">
             <div className="text-[11px] font-semibold text-accent mb-2 tracking-widest uppercase">
-              Connect
+              {t("skillDetail.connect")}
             </div>
             <h2 className="text-xl font-bold text-text-primary mb-2">
-              Tool Authorization
+              {t("skillDetail.toolAuth")}
             </h2>
             <p className="text-[14px] text-text-muted">
-              We manage OAuth, token refresh, and scopes — you just chat.
+              {t("skillDetail.toolAuthDesc")}
             </p>
           </div>
           <div className="grid gap-3">
@@ -713,13 +723,13 @@ export function SkillDetailPage() {
           <section className="px-6 py-12 mx-auto max-w-4xl">
             <div className="mb-8">
               <div className="text-[11px] font-semibold text-accent mb-2 tracking-widest uppercase">
-                Examples
+                {t("skillDetail.examples")}
               </div>
               <h2 className="text-xl font-bold text-text-primary mb-2">
-                Try these prompts
+                {t("skillDetail.tryPrompts")}
               </h2>
               <p className="text-[14px] text-text-muted">
-                Copy a prompt and send it to your Nexu bot to try this skill.
+                {t("skillDetail.tryPromptsDesc")}
               </p>
             </div>
 
@@ -749,11 +759,11 @@ export function SkillDetailPage() {
                   >
                     {copiedPrompt === i ? (
                       <>
-                        <Check size={12} /> Copied
+                        <Check size={12} /> {t("skills.copied")}
                       </>
                     ) : (
                       <>
-                        <Copy size={12} /> Copy
+                        <Copy size={12} /> {t("skillDetail.copy")}
                       </>
                     )}
                   </div>
@@ -774,17 +784,17 @@ export function SkillDetailPage() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <div className="text-[11px] font-semibold text-accent mb-2 tracking-widest uppercase">
-                Explore
+                {t("skillDetail.explore")}
               </div>
               <h2 className="text-xl font-bold text-text-primary">
-                Related Skills
+                {t("skillDetail.relatedSkills")}
               </h2>
             </div>
             <Link
               to="/workspace/skills"
               className="text-[13px] text-accent font-medium hover:underline flex items-center gap-1"
             >
-              View all skills <ArrowRight size={14} />
+              {t("skillDetail.viewAll")} <ArrowRight size={14} />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

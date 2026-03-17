@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthLayout } from "./layouts/auth-layout";
 import { InviteGuardLayout } from "./layouts/invite-guard-layout";
@@ -19,26 +20,27 @@ import { WelcomePage } from "./pages/welcome";
 
 function DocumentTitleSync() {
   const location = useLocation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const titleByPathname: Record<string, string> = {
-      "/auth": "Sign In · Nexu",
-      "/claim": "Claim · Nexu",
-      "/workspace": "Home · Nexu",
-      "/workspace/home": "Home · Nexu",
-      "/workspace/integrations": "Integrations · Nexu",
-      "/workspace/skills": "Skills · Nexu",
-      "/workspace/models": "Settings · Nexu",
-      "/feishu/bind": "Link Feishu · Nexu",
+      "/auth": t("title.signIn"),
+      "/claim": t("title.claim"),
+      "/workspace": t("title.home"),
+      "/workspace/home": t("title.home"),
+      "/workspace/integrations": t("title.integrations"),
+      "/workspace/skills": t("title.skills"),
+      "/workspace/models": t("title.settings"),
+      "/feishu/bind": t("title.linkFeishu"),
     };
 
     if (location.pathname.startsWith("/workspace/oauth-callback")) {
-      document.title = "Connecting · Nexu";
+      document.title = t("title.connecting");
       return;
     }
 
-    document.title = titleByPathname[location.pathname] ?? "Nexu";
-  }, [location.pathname]);
+    document.title = titleByPathname[location.pathname] ?? t("title.default");
+  }, [location.pathname, t]);
 
   return null;
 }

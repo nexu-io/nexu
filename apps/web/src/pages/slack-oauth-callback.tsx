@@ -9,10 +9,12 @@ import { identify, track } from "@/lib/tracking";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 export function SlackOAuthCallbackPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -57,14 +59,15 @@ export function SlackOAuthCallbackPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
-            <CardTitle className="mt-4">Slack Connected</CardTitle>
+            <CardTitle className="mt-4">{t("slackOAuth.connected")}</CardTitle>
             <CardDescription>
-              Workspace &ldquo;{teamName}&rdquo; has been successfully connected
-              to your bot.
+              {t("slackOAuth.connectedDesc", { teamName })}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="mb-4 text-sm text-muted-foreground">Redirecting...</p>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {t("slackOAuth.redirecting")}
+            </p>
             <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
           </CardContent>
         </Card>

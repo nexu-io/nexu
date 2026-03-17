@@ -11,13 +11,14 @@ import {
   Lock,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { postApiV1ChannelsFeishuConnect } from "../../../lib/api/sdk.gen";
 
-const FEISHU_SETUP_STEPS = [
-  { title: "Create App" },
-  { title: "Permissions" },
-  { title: "Credentials" },
+const FEISHU_SETUP_STEP_KEYS = [
+  "feishuSetup.stepCreateApp",
+  "feishuSetup.stepPermissions",
+  "feishuSetup.stepCredentials",
 ];
 
 const FEISHU_PERMISSIONS_JSON = JSON.stringify(
@@ -120,6 +121,7 @@ export function FeishuSetupView({
   variant = "page",
   disabled,
 }: FeishuSetupViewProps) {
+  const { t } = useTranslation();
   const [activeStep, setActiveStep] = useState(0);
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
@@ -139,10 +141,10 @@ export function FeishuSetupView({
         body: { appId: appId.trim(), appSecret: appSecret.trim() },
       });
       if (error) {
-        toast.error(error.message ?? "Failed to connect Feishu");
+        toast.error(error.message ?? t("feishuSetup.connectFailed"));
         return;
       }
-      toast.success("Feishu bot connected!");
+      toast.success(t("feishuSetup.connectSuccess"));
       track("channel_ready", {
         channel: "feishu",
         channel_type: "feishu_app",
@@ -150,7 +152,7 @@ export function FeishuSetupView({
       identify({ channels_connected: 1 });
       onConnected();
     } catch {
-      toast.error("Failed to connect Feishu");
+      toast.error(t("feishuSetup.connectFailed"));
     } finally {
       setConnecting(false);
     }
@@ -160,10 +162,10 @@ export function FeishuSetupView({
     <div className={variant === "modal" ? "" : ""}>
       {/* Step indicator */}
       <div className="grid grid-cols-3 gap-2 mb-6">
-        {FEISHU_SETUP_STEPS.map((s, i) => (
+        {FEISHU_SETUP_STEP_KEYS.map((key, i) => (
           <button
             type="button"
-            key={s.title}
+            key={key}
             onClick={() => setActiveStep(i)}
             className="text-left cursor-pointer"
           >
@@ -181,14 +183,14 @@ export function FeishuSetupView({
                     : "text-text-muted/50"
               }`}
             >
-              Step {i + 1}
+              {t("feishuSetup.step", { number: i + 1 })}
             </div>
             <div
               className={`text-[10px] mt-0.5 leading-tight transition-all ${
                 i === activeStep ? "text-text-secondary" : "text-text-muted/40"
               }`}
             >
-              {s.title}
+              {t(key)}
             </div>
           </button>
         ))}
@@ -203,20 +205,20 @@ export function FeishuSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Create a Feishu App
+                {t("feishuSetup.createTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Go to the Feishu Open Platform and create a new custom app.
+                {t("feishuSetup.createDesc")}
               </p>
             </div>
           </div>
           <div className="ml-11 space-y-3">
             <div className="space-y-2">
               {[
-                "Open Feishu Open Platform Developer Console",
-                'Click "Create Custom App"',
-                "Enter your App Name and description",
-                'Under "App Capabilities", enable "Bot"',
+                t("feishuSetup.createStep1"),
+                t("feishuSetup.createStep2"),
+                t("feishuSetup.createStep3"),
+                t("feishuSetup.createStep4"),
               ].map((item, i) => (
                 <div key={item} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
@@ -235,7 +237,7 @@ export function FeishuSetupView({
               className="inline-flex gap-1.5 items-center px-3.5 py-2 text-[12px] font-medium rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover hover:bg-surface-3 transition-all"
             >
               <ExternalLink size={12} />
-              Open Developer Console
+              {t("feishuSetup.openConsole")}
             </a>
           </div>
         </div>
@@ -250,11 +252,10 @@ export function FeishuSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Configure Permissions & Publish
+                {t("feishuSetup.permissionsTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Import the permissions JSON below, then create a version and
-                publish the app.
+                {t("feishuSetup.permissionsDesc")}
               </p>
             </div>
           </div>
@@ -262,7 +263,7 @@ export function FeishuSetupView({
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="flex items-center justify-between px-3.5 py-2.5 bg-surface-3 border-b border-border">
                 <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">
-                  Permissions JSON
+                  {t("feishuSetup.permissionsJson")}
                 </span>
                 <button
                   type="button"
@@ -272,12 +273,14 @@ export function FeishuSetupView({
                   {jsonCopied ? (
                     <>
                       <Check size={11} className="text-emerald-500" />
-                      <span className="text-emerald-500">Copied</span>
+                      <span className="text-emerald-500">
+                        {t("feishuSetup.copied")}
+                      </span>
                     </>
                   ) : (
                     <>
                       <Copy size={11} />
-                      Copy
+                      {t("feishuSetup.copy")}
                     </>
                   )}
                 </button>
@@ -288,10 +291,10 @@ export function FeishuSetupView({
             </div>
             <div className="space-y-2">
               {[
-                'Go to "Permissions & Scopes" \u2192 click "Batch Enable"',
-                "Paste the JSON above and confirm",
-                'Go to "Version Management" \u2192 "Create Version"',
-                "Submit for review and publish",
+                t("feishuSetup.permStep1"),
+                t("feishuSetup.permStep2"),
+                t("feishuSetup.permStep3"),
+                t("feishuSetup.permStep4"),
               ].map((item, i) => (
                 <div key={item} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
@@ -316,14 +319,10 @@ export function FeishuSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Enter Credentials
+                {t("feishuSetup.credentialsTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Find your App ID and App Secret on the{" "}
-                <span className="font-medium text-text-secondary">
-                  Credentials & Basic Info
-                </span>{" "}
-                page of your Feishu app.
+                {t("feishuSetup.credentialsDesc")}
               </p>
             </div>
           </div>
@@ -334,17 +333,16 @@ export function FeishuSetupView({
                   htmlFor="feishu-app-id"
                   className="text-[12px] text-text-primary font-medium"
                 >
-                  App ID
+                  {t("feishuSetup.appIdLabel")}
                 </label>
                 <span className="text-[11px] text-text-muted">
-                  — starts with{" "}
-                  <code className="text-[10px] font-mono">cli_</code>
+                  {t("feishuSetup.appIdHint")}
                 </span>
               </div>
               <Input
                 id="feishu-app-id"
                 type="text"
-                placeholder="e.g. cli_a1b2c3d4e5f6g7h8"
+                placeholder={t("feishuSetup.appIdPlaceholder")}
                 value={appId}
                 onChange={(e) => setAppId(e.target.value)}
                 className="text-[13px] font-mono"
@@ -356,14 +354,14 @@ export function FeishuSetupView({
                   htmlFor="feishu-app-secret"
                   className="text-[12px] text-text-primary font-medium"
                 >
-                  App Secret
+                  {t("feishuSetup.appSecretLabel")}
                 </label>
               </div>
               <div className="relative">
                 <Input
                   id="feishu-app-secret"
                   type="password"
-                  placeholder="Your app secret"
+                  placeholder={t("feishuSetup.appSecretPlaceholder")}
                   value={appSecret}
                   onChange={(e) => setAppSecret(e.target.value)}
                   className="text-[13px] font-mono pr-9"
@@ -387,7 +385,7 @@ export function FeishuSetupView({
               ) : (
                 <Check size={14} />
               )}
-              Verify & Connect
+              {t("feishuSetup.verifyConnect")}
             </button>
           </div>
         </div>
@@ -402,15 +400,15 @@ export function FeishuSetupView({
           className="flex gap-1.5 items-center text-[12px] text-text-muted hover:text-text-secondary transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
         >
           <ArrowLeft size={13} />
-          Previous
+          {t("feishuSetup.previous")}
         </button>
-        {activeStep < FEISHU_SETUP_STEPS.length - 1 && (
+        {activeStep < FEISHU_SETUP_STEP_KEYS.length - 1 && (
           <button
             type="button"
             onClick={() => setActiveStep(activeStep + 1)}
             className="flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#3370FF] hover:bg-[#2860E6] transition-all cursor-pointer"
           >
-            Next
+            {t("feishuSetup.next")}
             <ChevronRight size={13} />
           </button>
         )}
@@ -420,16 +418,16 @@ export function FeishuSetupView({
       <div className="flex gap-3 items-center p-4 mt-5 rounded-xl border bg-surface-1 border-border">
         <BookOpen size={14} className="text-[#3370FF] shrink-0" />
         <p className="text-[11px] text-text-muted leading-relaxed">
-          Need help? Read the{" "}
+          {t("feishuSetup.helpText")}{" "}
           <a
             href="https://open.feishu.cn/document/home/introduction-to-custom-app-development/self-built-application-development-process"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#3370FF] hover:underline underline-offset-2 font-medium"
           >
-            Feishu Custom App Development Guide
+            {t("feishuSetup.helpLinkText")}
           </a>{" "}
-          for detailed instructions.
+          {t("feishuSetup.helpSuffix")}
         </p>
       </div>
     </div>

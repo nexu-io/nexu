@@ -11,14 +11,15 @@ import {
   Lock,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { postApiV1ChannelsDiscordConnect } from "../../../lib/api/sdk.gen";
 
-const DISCORD_SETUP_STEPS = [
-  { title: "Create App" },
-  { title: "Configure Bot" },
-  { title: "Permissions" },
-  { title: "Credentials" },
+const DISCORD_SETUP_STEP_KEYS = [
+  "discordSetup.stepCreateApp",
+  "discordSetup.stepConfigureBot",
+  "discordSetup.stepPermissions",
+  "discordSetup.stepCredentials",
 ];
 
 const DISCORD_INTENTS = [
@@ -54,6 +55,7 @@ export function DiscordSetupView({
   variant = "page",
   disabled,
 }: DiscordSetupViewProps) {
+  const { t } = useTranslation();
   const [activeStep, setActiveStep] = useState(0);
   const [appId, setAppId] = useState("");
   const [botToken, setBotToken] = useState("");
@@ -66,10 +68,12 @@ export function DiscordSetupView({
         body: { botToken: botToken.trim(), appId: appId.trim() },
       });
       if (error) {
-        toast.error(error.message ?? "Failed to connect Discord");
+        toast.error(error.message ?? t("discordSetup.connectFailed"));
         return;
       }
-      toast.success(`Discord server "${data?.teamName ?? ""}" connected!`);
+      toast.success(
+        t("discordSetup.connectSuccess", { teamName: data?.teamName ?? "" }),
+      );
       track("channel_ready", {
         channel: "discord",
         channel_type: "discord_token",
@@ -77,7 +81,7 @@ export function DiscordSetupView({
       identify({ channels_connected: 1 });
       onConnected();
     } catch {
-      toast.error("Failed to connect Discord");
+      toast.error(t("discordSetup.connectFailed"));
     } finally {
       setConnecting(false);
     }
@@ -87,10 +91,10 @@ export function DiscordSetupView({
     <div className={variant === "modal" ? "" : ""}>
       {/* Step indicator */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
-        {DISCORD_SETUP_STEPS.map((s, i) => (
+        {DISCORD_SETUP_STEP_KEYS.map((key, i) => (
           <button
             type="button"
-            key={s.title}
+            key={key}
             onClick={() => setActiveStep(i)}
             className="text-left cursor-pointer"
           >
@@ -108,14 +112,14 @@ export function DiscordSetupView({
                     : "text-text-muted/50"
               }`}
             >
-              Step {i + 1}
+              {t("discordSetup.step", { number: i + 1 })}
             </div>
             <div
               className={`text-[10px] mt-0.5 leading-tight transition-all ${
                 i === activeStep ? "text-text-secondary" : "text-text-muted/40"
               }`}
             >
-              {s.title}
+              {t(key)}
             </div>
           </button>
         ))}
@@ -130,20 +134,20 @@ export function DiscordSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Create a Discord Application
+                {t("discordSetup.createTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Go to the Discord Developer Portal and create a new application.
+                {t("discordSetup.createDesc")}
               </p>
             </div>
           </div>
           <div className="ml-11 space-y-3">
             <div className="space-y-2">
               {[
-                "Open Discord Developer Portal",
-                'Click "New Application"',
-                "Enter your App Name",
-                'Click "Create" to confirm',
+                t("discordSetup.createStep1"),
+                t("discordSetup.createStep2"),
+                t("discordSetup.createStep3"),
+                t("discordSetup.createStep4"),
               ].map((item, i) => (
                 <div key={item} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
@@ -162,7 +166,7 @@ export function DiscordSetupView({
               className="inline-flex gap-1.5 items-center px-3.5 py-2 text-[12px] font-medium rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover hover:bg-surface-3 transition-all"
             >
               <ExternalLink size={12} />
-              Open Developer Portal
+              {t("discordSetup.openPortal")}
             </a>
           </div>
         </div>
@@ -177,22 +181,19 @@ export function DiscordSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Configure Bot
+                {t("discordSetup.configureBotTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Navigate to the{" "}
-                <span className="font-medium text-text-secondary">Bot</span>{" "}
-                page in your app&apos;s settings. Click &ldquo;Reset
-                Token&rdquo; to generate a Bot Token (save it securely).
+                {t("discordSetup.configureBotDesc")}
               </p>
             </div>
           </div>
           <div className="ml-11 space-y-4">
             <div className="space-y-2">
               {[
-                "Go to Application → Bot page",
-                'Click "Reset Token" and copy the Bot Token',
-                "Enable Privileged Gateway Intents (see below)",
+                t("discordSetup.botStep1"),
+                t("discordSetup.botStep2"),
+                t("discordSetup.botStep3"),
               ].map((item, i) => (
                 <div key={item} className="flex gap-2.5 items-start">
                   <div className="flex justify-center items-center w-5 h-5 rounded-full bg-surface-3 text-[9px] font-bold text-text-muted shrink-0 mt-0.5">
@@ -207,7 +208,7 @@ export function DiscordSetupView({
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="px-3.5 py-2.5 bg-surface-3 border-b border-border">
                 <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">
-                  Required Privileged Intents
+                  {t("discordSetup.requiredIntents")}
                 </span>
               </div>
               {DISCORD_INTENTS.map((intent, i) => (
@@ -244,15 +245,10 @@ export function DiscordSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Set Installation & Permissions
+                {t("discordSetup.permissionsTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Go to{" "}
-                <span className="font-medium text-text-secondary">
-                  Installation
-                </span>{" "}
-                page. Under &ldquo;Guild Install&rdquo;, add the required scopes
-                and permissions.
+                {t("discordSetup.permissionsDesc")}
               </p>
             </div>
           </div>
@@ -260,7 +256,7 @@ export function DiscordSetupView({
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="px-3.5 py-2.5 bg-surface-3 border-b border-border">
                 <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">
-                  OAuth2 Scopes
+                  {t("discordSetup.oauthScopes")}
                 </span>
               </div>
               {DISCORD_SCOPES.map((s, i) => (
@@ -286,7 +282,7 @@ export function DiscordSetupView({
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="px-3.5 py-2.5 bg-surface-3 border-b border-border">
                 <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide">
-                  Bot Permissions
+                  {t("discordSetup.botPermissions")}
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 p-3.5">
@@ -302,11 +298,7 @@ export function DiscordSetupView({
               </div>
             </div>
             <p className="text-[11px] text-text-muted leading-relaxed">
-              After configuring, copy the generated{" "}
-              <span className="font-medium text-text-secondary">
-                Install Link
-              </span>{" "}
-              and open it in your browser to add the bot to your server.
+              {t("discordSetup.installLinkHint")}
             </p>
           </div>
         </div>
@@ -321,16 +313,10 @@ export function DiscordSetupView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Enter Credentials
+                {t("discordSetup.credentialsTitle")}
               </h3>
               <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-                Paste your Discord Application credentials below. Find them on
-                the{" "}
-                <span className="font-medium text-text-secondary">
-                  General Information
-                </span>{" "}
-                and <span className="font-medium text-text-secondary">Bot</span>{" "}
-                pages.
+                {t("discordSetup.credentialsDesc")}
               </p>
             </div>
           </div>
@@ -341,13 +327,10 @@ export function DiscordSetupView({
                   htmlFor="discord-app-id"
                   className="text-[12px] text-text-primary font-medium"
                 >
-                  Application ID
+                  {t("discordSetup.appIdLabel")}
                 </label>
                 <span className="text-[11px] text-text-muted">
-                  — found in{" "}
-                  <span className="font-medium text-text-secondary">
-                    General Information
-                  </span>
+                  {t("discordSetup.appIdHint")}
                 </span>
               </div>
               <Input
@@ -365,14 +348,10 @@ export function DiscordSetupView({
                   htmlFor="discord-bot-token"
                   className="text-[12px] text-text-primary font-medium"
                 >
-                  Bot Token
+                  {t("discordSetup.botTokenLabel")}
                 </label>
                 <span className="text-[11px] text-text-muted">
-                  — found in{" "}
-                  <span className="font-medium text-text-secondary">
-                    Bot → Reset Token
-                  </span>{" "}
-                  (only shown once)
+                  {t("discordSetup.botTokenHint")}
                 </span>
               </div>
               <div className="relative">
@@ -403,7 +382,7 @@ export function DiscordSetupView({
               ) : (
                 <Check size={14} />
               )}
-              Verify & Connect
+              {t("discordSetup.verifyConnect")}
             </button>
           </div>
         </div>
@@ -418,15 +397,15 @@ export function DiscordSetupView({
           className="flex gap-1.5 items-center text-[12px] text-text-muted hover:text-text-secondary transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
         >
           <ArrowLeft size={13} />
-          Previous
+          {t("discordSetup.previous")}
         </button>
-        {activeStep < DISCORD_SETUP_STEPS.length - 1 && (
+        {activeStep < DISCORD_SETUP_STEP_KEYS.length - 1 && (
           <button
             type="button"
             onClick={() => setActiveStep(activeStep + 1)}
             className="flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#5865F2] hover:bg-[#4752C4] transition-all cursor-pointer"
           >
-            Next
+            {t("discordSetup.next")}
             <ChevronRight size={13} />
           </button>
         )}
@@ -436,16 +415,16 @@ export function DiscordSetupView({
       <div className="flex gap-3 items-center p-4 mt-5 rounded-xl border bg-surface-1 border-border">
         <BookOpen size={14} className="text-[#5865F2] shrink-0" />
         <p className="text-[11px] text-text-muted leading-relaxed">
-          Need help? Read the{" "}
+          {t("discordSetup.helpText")}{" "}
           <a
             href="https://discord.com/developers/docs/getting-started"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#5865F2] hover:underline underline-offset-2 font-medium"
           >
-            Discord Getting Started Guide
+            {t("discordSetup.helpLinkText")}
           </a>{" "}
-          for detailed instructions.
+          {t("discordSetup.helpSuffix")}
         </p>
       </div>
     </div>

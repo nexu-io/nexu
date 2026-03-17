@@ -12,6 +12,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   getApiV1ChannelsSlackOauthUrl,
@@ -19,11 +20,11 @@ import {
   postApiV1ChannelsSlackConnect,
 } from "../../../lib/api/sdk.gen";
 
-const SLACK_MANUAL_STEPS = [
-  { title: "Create Slack App" },
-  { title: "Signing Secret" },
-  { title: "Bot Token" },
-  { title: "Enable DMs" },
+const SLACK_MANUAL_STEP_KEYS = [
+  "slackSetup.stepCreateApp",
+  "slackSetup.stepSigningSecret",
+  "slackSetup.stepBotToken",
+  "slackSetup.stepEnableDMs",
 ];
 
 const SLACK_LOGO_PATH =
@@ -123,6 +124,7 @@ export function SlackOAuthView({
   oauthError,
   disabled,
 }: SlackOAuthViewProps) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<"install" | "authorizing" | "manual">(
     initialManual ? "manual" : "install",
   );
@@ -152,10 +154,11 @@ export function SlackOAuthView({
   }, []);
 
   // Detect return from failed OAuth via browser back button
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally run once on mount to check OAuth state
   useEffect(() => {
     const markFailed = () => {
       setOauthFailed(true);
-      setOauthErrorMsg("Authorization was not completed");
+      setOauthErrorMsg(t("slackSetup.authNotCompleted"));
       setPhase("manual");
     };
 
@@ -182,7 +185,7 @@ export function SlackOAuthView({
         query: oauthReturnTo ? { returnTo: oauthReturnTo } : undefined,
       });
       if (error) {
-        toast.error(error.message ?? "Failed to get Slack OAuth URL");
+        toast.error(error.message ?? t("slackSetup.oauthUrlFailed"));
         setPhase("install");
         return;
       }
@@ -191,7 +194,7 @@ export function SlackOAuthView({
         window.location.href = data.url;
       }
     } catch {
-      toast.error("Failed to start Slack connection");
+      toast.error(t("slackSetup.startFailed"));
       setPhase("install");
     }
   };
@@ -206,15 +209,17 @@ export function SlackOAuthView({
         },
       });
       if (error) {
-        toast.error(error.message ?? "Failed to connect Slack");
+        toast.error(error.message ?? t("slackSetup.connectFailed"));
         return;
       }
-      toast.success(`Slack workspace "${data?.teamName ?? ""}" connected!`);
+      toast.success(
+        t("slackSetup.connectSuccess", { teamName: data?.teamName ?? "" }),
+      );
       track("channel_ready", { channel: "slack", channel_type: "slack_token" });
       identify({ channels_connected: 1 });
       onConnected();
     } catch {
-      toast.error("Failed to connect Slack");
+      toast.error(t("slackSetup.connectFailed"));
     } finally {
       setConnecting(false);
     }
@@ -242,11 +247,10 @@ export function SlackOAuthView({
             </svg>
           </div>
           <h3 className="text-[15px] font-semibold text-text-primary mb-1">
-            Add Nexu to Slack
+            {t("slackSetup.addNexuTitle")}
           </h3>
           <p className="text-[12px] text-text-muted mb-6 leading-relaxed max-w-[300px] mx-auto">
-            One-click install — authorize Nexu Bot to your Slack workspace via
-            OAuth
+            {t("slackSetup.addNexuDesc")}
           </p>
           <button
             type="button"
@@ -263,14 +267,14 @@ export function SlackOAuthView({
             >
               <path d={SLACK_LOGO_PATH} />
             </svg>
-            Add to Slack
+            {t("slackSetup.addToSlack")}
           </button>
           <button
             type="button"
             onClick={() => setPhase("manual")}
             className="mt-4 text-[12px] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
           >
-            Or connect manually
+            {t("slackSetup.orConnectManually")}
           </button>
         </div>
       </div>
@@ -286,10 +290,10 @@ export function SlackOAuthView({
             <div className="w-5 h-5 border-2 border-[#4A154B]/30 border-t-[#4A154B] rounded-full animate-spin" />
           </div>
           <h3 className="text-[15px] font-semibold text-text-primary mb-1">
-            Authorizing...
+            {t("slackSetup.authorizing")}
           </h3>
           <p className="text-[12px] text-text-muted leading-relaxed">
-            Connecting to your Slack workspace
+            {t("slackSetup.connectingWorkspace")}
           </p>
         </div>
       </div>
@@ -313,14 +317,15 @@ export function SlackOAuthView({
         />
         <div>
           <div className="text-[13px] font-medium text-text-primary">
-            {oauthFailed ? "OAuth authorization failed" : "Manual connection"}
+            {oauthFailed
+              ? t("slackSetup.oauthFailed")
+              : t("slackSetup.manualConnection")}
           </div>
           <p className="text-[12px] text-text-muted mt-0.5 leading-relaxed">
             {oauthFailed
-              ? oauthErrorMsg ||
-                "The automatic Slack authorization was not completed."
-              : "Enter your existing Slack App credentials below to connect manually."}{" "}
-            You can try OAuth again or use the manual flow below.
+              ? oauthErrorMsg || t("slackSetup.oauthNotCompleted")
+              : t("slackSetup.manualDesc")}{" "}
+            {t("slackSetup.tryOauthSuffix")}
           </p>
           <button
             type="button"
@@ -331,17 +336,17 @@ export function SlackOAuthView({
             }}
             className="mt-2 text-[12px] font-medium text-[#4A154B] hover:underline underline-offset-2 cursor-pointer"
           >
-            Try OAuth again
+            {t("slackSetup.tryOauthAgain")}
           </button>
         </div>
       </div>
 
       {/* Step indicator */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
-        {SLACK_MANUAL_STEPS.map((s, i) => (
+        {SLACK_MANUAL_STEP_KEYS.map((key, i) => (
           <button
             type="button"
-            key={s.title}
+            key={key}
             onClick={() => setActiveStep(i)}
             className="text-left cursor-pointer"
           >
@@ -359,14 +364,14 @@ export function SlackOAuthView({
                     : "text-text-muted/50"
               }`}
             >
-              Step {i + 1}
+              {t("slackSetup.step", { number: i + 1 })}
             </div>
             <div
               className={`text-[10px] mt-0.5 leading-tight transition-all ${
                 i === activeStep ? "text-text-secondary" : "text-text-muted/40"
               }`}
             >
-              {s.title}
+              {t(key)}
             </div>
           </button>
         ))}
@@ -381,14 +386,10 @@ export function SlackOAuthView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Create a Slack App
+                {t("slackSetup.createAppTitle")}
               </h3>
               <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
-                Click the button below to create a pre-configured Slack App with
-                all required scopes, events, and bot settings. After creating,
-                click{" "}
-                <span className="font-medium text-text-primary">Next</span> to
-                enter your credentials.
+                {t("slackSetup.createAppDesc")}
               </p>
             </div>
           </div>
@@ -402,7 +403,7 @@ export function SlackOAuthView({
               className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all"
             >
               <ExternalLink size={12} />
-              Create Slack App
+              {t("slackSetup.createSlackApp")}
             </a>
           </div>
         </div>
@@ -417,10 +418,10 @@ export function SlackOAuthView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Copy your Signing Secret
+                {t("slackSetup.signingSecretTitle")}
               </h3>
               <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
-                Copy the Signing Secret from your Slack App.
+                {t("slackSetup.signingSecretDesc")}
               </p>
             </div>
           </div>
@@ -459,7 +460,7 @@ export function SlackOAuthView({
                   htmlFor="slack-signing-secret"
                   className="text-[12px] text-text-primary font-medium"
                 >
-                  Signing Secret
+                  {t("slackSetup.signingSecretLabel")}
                 </label>
               </div>
               <div className="relative">
@@ -490,10 +491,10 @@ export function SlackOAuthView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Install app & copy Bot Token
+                {t("slackSetup.botTokenTitle")}
               </h3>
               <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
-                Install your Slack App and copy the Bot Token.
+                {t("slackSetup.botTokenDesc")}
               </p>
             </div>
           </div>
@@ -535,7 +536,7 @@ export function SlackOAuthView({
                   htmlFor="slack-bot-token"
                   className="text-[12px] text-text-primary font-medium"
                 >
-                  Bot User OAuth Token
+                  {t("slackSetup.botTokenLabel")}
                 </label>
               </div>
               <div className="relative">
@@ -566,10 +567,10 @@ export function SlackOAuthView({
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-text-primary">
-                Enable Direct Messages
+                {t("slackSetup.enableDMsTitle")}
               </h3>
               <p className="text-[12px] text-text-secondary mt-1 leading-relaxed">
-                Allow users to chat with your bot via DM in Slack.
+                {t("slackSetup.enableDMsDesc")}
               </p>
             </div>
           </div>
@@ -608,9 +609,7 @@ export function SlackOAuthView({
                 className="text-[#4A154B] shrink-0 mt-0.5"
               />
               <p className="text-[11px] text-text-secondary leading-relaxed">
-                Without this setting, users won't be able to send messages to
-                your bot in the{" "}
-                <strong className="text-text-primary">Messages</strong> tab.
+                {t("slackSetup.dmWarning")}
               </p>
             </div>
             <button
@@ -629,7 +628,7 @@ export function SlackOAuthView({
               ) : (
                 <Check size={14} />
               )}
-              Connect
+              {t("slackSetup.connect")}
             </button>
           </div>
         </div>
@@ -647,15 +646,15 @@ export function SlackOAuthView({
           className="flex gap-1.5 items-center text-[12px] text-text-muted hover:text-text-secondary transition-all cursor-pointer"
         >
           <ArrowLeft size={13} />
-          {activeStep === 0 ? "Back" : "Previous"}
+          {activeStep === 0 ? t("slackSetup.back") : t("slackSetup.previous")}
         </button>
-        {activeStep < SLACK_MANUAL_STEPS.length - 1 && (
+        {activeStep < SLACK_MANUAL_STEP_KEYS.length - 1 && (
           <button
             type="button"
             onClick={() => setActiveStep(activeStep + 1)}
             className="flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#4A154B] hover:bg-[#3a1039] transition-all cursor-pointer"
           >
-            Next
+            {t("slackSetup.next")}
             <ChevronRight size={13} />
           </button>
         )}
@@ -665,16 +664,16 @@ export function SlackOAuthView({
       <div className="flex gap-3 items-center p-4 mt-5 rounded-xl border bg-surface-1 border-border">
         <BookOpen size={14} className="text-[#4A154B] shrink-0" />
         <p className="text-[11px] text-text-muted leading-relaxed">
-          Need help? Read the{" "}
+          {t("slackSetup.helpText")}{" "}
           <a
             href="https://api.slack.com/authentication/basics"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#4A154B] hover:underline underline-offset-2 font-medium"
           >
-            Slack Authentication Guide
+            {t("slackSetup.helpLinkText")}
           </a>{" "}
-          for detailed instructions.
+          {t("slackSetup.helpSuffix")}
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { identify, track } from "@/lib/tracking";
 import { ExternalLink, Eye, EyeOff, FileText, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   postApiV1ChannelsDiscordConnect,
@@ -45,7 +46,7 @@ const DiscordIcon = () => (
   </svg>
 );
 
-const CHANNEL_CONFIGS: Record<
+function getChannelConfigs(t: (key: string) => string): Record<
   ChannelType,
   {
     name: string;
@@ -58,79 +59,83 @@ const CHANNEL_CONFIGS: Record<
       helpText: string;
     }[];
   }
-> = {
-  feishu: {
-    name: "飞书 / Feishu",
-    icon: (
-      <img
-        src="/feishu-logo.png"
-        width={18}
-        height={18}
-        alt="飞书"
-        style={{ objectFit: "contain" }}
-      />
-    ),
-    docUrl: "https://docs.nexu.ai/channels/feishu",
-    fields: [
-      {
-        id: "appId",
-        label: "App ID",
-        placeholder: "cli_xxxxxxxxxxxxxxxx",
-        helpText: "从飞书开放平台 > 应用凭证页面获取",
-      },
-      {
-        id: "appSecret",
-        label: "App Secret",
-        placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        helpText: "从飞书开放平台 > 应用凭证页面获取",
-      },
-    ],
-  },
-  slack: {
-    name: "Slack",
-    icon: <SlackIcon />,
-    docUrl: "https://docs.nexu.ai/channels/slack",
-    fields: [
-      {
-        id: "botToken",
-        label: "Bot User OAuth Token",
-        placeholder: "xoxb-...",
-        helpText: "从 Slack App 的 OAuth & Permissions 页面获取",
-      },
-      {
-        id: "signingSecret",
-        label: "Signing Secret",
-        placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        helpText: "从 Slack App 的 Basic Information 页面获取",
-      },
-    ],
-  },
-  discord: {
-    name: "Discord",
-    icon: <DiscordIcon />,
-    docUrl: "https://docs.nexu.ai/channels/discord",
-    fields: [
-      {
-        id: "botToken",
-        label: "Bot Token",
-        placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        helpText: "从 Discord Developer Portal > Bot 页面获取",
-      },
-      {
-        id: "appId",
-        label: "Application ID",
-        placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        helpText: "从 Discord Developer Portal > General Information 获取",
-      },
-    ],
-  },
-};
+> {
+  return {
+    feishu: {
+      name: t("modal.feishu.name"),
+      icon: (
+        <img
+          src="/feishu-logo.png"
+          width={18}
+          height={18}
+          alt="Feishu"
+          style={{ objectFit: "contain" }}
+        />
+      ),
+      docUrl: "https://docs.nexu.ai/channels/feishu",
+      fields: [
+        {
+          id: "appId",
+          label: "App ID",
+          placeholder: "cli_xxxxxxxxxxxxxxxx",
+          helpText: t("modal.feishu.appIdHelp"),
+        },
+        {
+          id: "appSecret",
+          label: "App Secret",
+          placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          helpText: t("modal.feishu.appSecretHelp"),
+        },
+      ],
+    },
+    slack: {
+      name: "Slack",
+      icon: <SlackIcon />,
+      docUrl: "https://docs.nexu.ai/channels/slack",
+      fields: [
+        {
+          id: "botToken",
+          label: "Bot User OAuth Token",
+          placeholder: "xoxb-...",
+          helpText: t("modal.slack.botTokenHelp"),
+        },
+        {
+          id: "signingSecret",
+          label: "Signing Secret",
+          placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          helpText: t("modal.slack.signingSecretHelp"),
+        },
+      ],
+    },
+    discord: {
+      name: "Discord",
+      icon: <DiscordIcon />,
+      docUrl: "https://docs.nexu.ai/channels/discord",
+      fields: [
+        {
+          id: "botToken",
+          label: "Bot Token",
+          placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          helpText: t("modal.discord.botTokenHelp"),
+        },
+        {
+          id: "appId",
+          label: "Application ID",
+          placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          helpText: t("modal.discord.appIdHelp"),
+        },
+      ],
+    },
+  };
+}
 
 export function ChannelConnectModal({
   channelType,
   onClose,
   onConnected,
 }: ChannelConnectModalProps) {
+  const { t } = useTranslation();
+  const CHANNEL_CONFIGS = useMemo(() => getChannelConfigs(t), [t]);
   const config = CHANNEL_CONFIGS[channelType];
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(config.fields.map((f) => [f.id, ""])),
@@ -193,13 +198,13 @@ export function ChannelConnectModal({
 
       if (error) {
         if (response?.status === 409) {
-          toast.info("渠道已连接，正在刷新...");
+          toast.info(t("modal.channelConnected"));
         } else {
-          toast.error(error.message ?? "连接失败");
+          toast.error(error.message ?? t("modal.connectFailed"));
           return;
         }
       } else {
-        toast.success(`${config.name} 连接成功`);
+        toast.success(t("modal.connectSuccess", { name: config.name }));
         track("channel_ready", { channel: channelType });
         identify({ [`${channelType}_connected`]: true });
       }
@@ -208,7 +213,7 @@ export function ChannelConnectModal({
       onClose();
       Promise.resolve(onConnected()).catch(() => {});
     } catch {
-      toast.error("连接失败，请重试");
+      toast.error(t("modal.connectRetryFailed"));
       onClose();
     } finally {
       setLoading(false);
@@ -239,15 +244,17 @@ export function ChannelConnectModal({
             </div>
             <div>
               <div className="text-[14px] font-semibold text-text-primary">
-                连接 {config.name}
+                {t("modal.connect", { name: config.name })}
               </div>
-              <div className="text-[11px] text-text-muted">配置 Bot 凭证</div>
+              <div className="text-[11px] text-text-muted">
+                {t("modal.configureCredentials")}
+              </div>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={t("modal.close")}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
           >
             <X size={16} />
@@ -298,7 +305,7 @@ export function ChannelConnectModal({
             className="flex items-center gap-1.5 text-[12px] text-accent hover:underline mt-1"
           >
             <FileText size={13} />
-            查看 {config.name} 接入教程
+            {t("modal.viewDocs", { name: config.name })}
             <ExternalLink size={12} />
           </a>
         </div>
@@ -310,7 +317,7 @@ export function ChannelConnectModal({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-surface-2 transition-colors"
           >
-            取消
+            {t("modal.cancel")}
           </button>
           <button
             type="button"
@@ -318,7 +325,7 @@ export function ChannelConnectModal({
             disabled={!allFilled || loading}
             className="px-4 py-2 rounded-lg text-[13px] font-medium bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? "连接中..." : "连接"}
+            {loading ? t("modal.connecting") : t("modal.connectButton")}
           </button>
         </div>
       </div>

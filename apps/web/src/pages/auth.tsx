@@ -4,17 +4,20 @@ import { identify, setUserId, track } from "@/lib/tracking";
 import "@/lib/api";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { postApiV1MeAuthSource } from "../../lib/api/sdk.gen";
 
-const CAPABILITY_PILLS = [
-  { emoji: "\u{1F4BB}", label: "Code & Deploy" },
-  { emoji: "\u{1F4CA}", label: "Data Analysis" },
-  { emoji: "\u270D\uFE0F", label: "Content" },
-  { emoji: "\u{1F50D}", label: "Research" },
-  { emoji: "\u2699\uFE0F", label: "Automation" },
-];
+function getCapabilityPills(t: (key: string) => string) {
+  return [
+    { emoji: "\u{1F4BB}", label: t("auth.capability.code") },
+    { emoji: "\u{1F4CA}", label: t("auth.capability.data") },
+    { emoji: "\u270D\uFE0F", label: t("auth.capability.content") },
+    { emoji: "\u{1F50D}", label: t("auth.capability.research") },
+    { emoji: "\u2699\uFE0F", label: t("auth.capability.automation") },
+  ];
+}
 
 const OTP_LENGTH = 6;
 const OTP_SLOTS = Array.from({ length: OTP_LENGTH }, (_, i) => ({
@@ -87,9 +90,11 @@ function OtpInput({
 }
 
 export function AuthPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
+  const CAPABILITY_PILLS = getCapabilityPills(t);
   const isLogin = searchParams.get("mode") !== "signup";
   const isDesktopAuth = searchParams.get("desktop") === "1";
   const deviceId = searchParams.get("device_id");
@@ -414,11 +419,10 @@ export function AuthPage() {
             </svg>
           </div>
           <h1 className="text-[22px] font-bold text-text-primary mb-2">
-            Connected!
+            {t("auth.connected")}
           </h1>
           <p className="text-[14px] text-text-muted leading-relaxed">
-            Your Nexu Desktop app is now connected to your cloud account. You
-            can close this tab and return to the desktop app.
+            {t("auth.desktopConnected")}
           </p>
         </div>
       </div>
@@ -432,7 +436,7 @@ export function AuthPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-accent mx-auto mb-4" />
           <p className="text-[14px] text-text-muted">
-            Connecting your desktop app...
+            {t("auth.connectingDesktop")}
           </p>
         </div>
       </div>
@@ -453,16 +457,14 @@ export function AuthPage() {
           </div>
           <div>
             <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
-              Your digital
+              {t("auth.heroTitle.line1")}
               <br />
-              coworker,
+              {t("auth.heroTitle.line2")}
               <br />
-              always on.
+              {t("auth.heroTitle.line3")}
             </h2>
             <p className="text-[13px] text-white/45 leading-relaxed mb-6 max-w-[280px]">
-              AI avatars that live in Slack — not just chatting, but delivering
-              real results. Build apps, analyze data, write content, run
-              automations.
+              {t("auth.heroBody")}
             </p>
             <div className="flex flex-wrap gap-2">
               {CAPABILITY_PILLS.map((p) => (
@@ -476,9 +478,7 @@ export function AuthPage() {
               ))}
             </div>
           </div>
-          <div className="text-[11px] text-white/20">
-            &copy; 2026 Nexu by Refly
-          </div>
+          <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
         </div>
 
         {/* Right panel — OTP form */}
@@ -498,10 +498,10 @@ export function AuthPage() {
             <div className="w-full max-w-[360px]">
               <div className="mb-8 text-center">
                 <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
-                  Check your email
+                  {t("auth.checkEmail")}
                 </h1>
                 <p className="text-[14px] text-text-muted">
-                  We sent a 6-digit code to{" "}
+                  {t("auth.otpSentTo")}{" "}
                   <span className="font-medium text-text-secondary">
                     {email}
                   </span>
@@ -517,17 +517,17 @@ export function AuthPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {verifying && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Verify
+                  {t("auth.verify")}
                 </button>
               </form>
 
               <div className="text-center mt-6">
                 <span className="text-[13px] text-text-muted">
-                  Didn't receive a code?{" "}
+                  {t("auth.didntReceive")}{" "}
                 </span>
                 {resendCooldown > 0 ? (
                   <span className="text-[13px] text-text-muted">
-                    Resend in {resendCooldown}s
+                    {t("auth.resendIn", { seconds: resendCooldown })}
                   </span>
                 ) : (
                   <button
@@ -535,7 +535,7 @@ export function AuthPage() {
                     onClick={handleResendOtp}
                     className="text-[13px] text-accent font-medium hover:underline underline-offset-2"
                   >
-                    Resend code
+                    {t("auth.resendCode")}
                   </button>
                 )}
               </div>
@@ -549,7 +549,7 @@ export function AuthPage() {
                   }}
                   className="text-[13px] text-text-muted hover:text-text-secondary transition-colors"
                 >
-                  &larr; Back to sign up
+                  &larr; {t("auth.backToSignup")}
                 </button>
               </div>
             </div>
@@ -565,7 +565,7 @@ export function AuthPage() {
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
             >
-              Terms of Service
+              {t("auth.terms")}
             </a>
             <span className="text-border">&middot;</span>
             <a
@@ -574,10 +574,10 @@ export function AuthPage() {
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
             >
-              Privacy Policy
+              {t("auth.privacy")}
             </a>
             <span className="text-border">&middot;</span>
-            <span>&copy; 2026 Nexu by Refly</span>
+            <span>{t("auth.copyright")}</span>
           </div>
         </div>
       </div>
@@ -624,9 +624,7 @@ export function AuthPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-[11px] text-white/20">
-          &copy; 2026 Nexu by Refly
-        </div>
+        <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
       </div>
 
       {/* Right panel — form */}
@@ -650,17 +648,15 @@ export function AuthPage() {
               {isDesktopAuth && (
                 <div className="mb-4 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20">
                   <p className="text-[13px] text-accent font-medium">
-                    Log in to connect your Nexu Desktop app
+                    {t("auth.desktopConnectPrompt")}
                   </p>
                 </div>
               )}
               <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
-                {isLogin ? "Welcome back" : "Create your account"}
+                {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
               </h1>
               <p className="text-[14px] text-text-muted">
-                {isLogin
-                  ? "Log in to your digital clone"
-                  : "Sign up to get your Nexu digital clone"}
+                {isLogin ? t("auth.loginSubtitle") : t("auth.signupSubtitle")}
               </p>
             </div>
 
@@ -699,7 +695,7 @@ export function AuthPage() {
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                       />
                     </svg>
-                    Continue with Google
+                    {t("auth.continueGoogle")}
                   </>
                 )}
               </button>
@@ -711,7 +707,9 @@ export function AuthPage() {
                 <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-[12px]">
-                <span className="bg-surface-0 px-3 text-text-muted">or</span>
+                <span className="bg-surface-0 px-3 text-text-muted">
+                  {t("auth.or")}
+                </span>
               </div>
             </div>
 
@@ -723,12 +721,12 @@ export function AuthPage() {
                     htmlFor="auth-name"
                     className="text-[12px] text-text-secondary font-medium"
                   >
-                    Name
+                    {t("auth.nameLabel")}
                   </label>
                   <input
                     id="auth-name"
                     type="text"
-                    placeholder="Your name"
+                    placeholder={t("auth.namePlaceholder")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-3 py-2.5 text-[13px] rounded-lg border border-border bg-surface-1 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/10 transition-all"
@@ -740,12 +738,12 @@ export function AuthPage() {
                   htmlFor="auth-email"
                   className="text-[12px] text-text-secondary font-medium"
                 >
-                  Email
+                  {t("auth.emailLabel")}
                 </label>
                 <input
                   id="auth-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -757,12 +755,12 @@ export function AuthPage() {
                   htmlFor="auth-password"
                   className="text-[12px] text-text-secondary font-medium"
                 >
-                  Password
+                  {t("auth.passwordLabel")}
                 </label>
                 <input
                   id="auth-password"
                   type="password"
-                  placeholder="Min 8 characters"
+                  placeholder={t("auth.passwordPlaceholder")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -778,16 +776,16 @@ export function AuthPage() {
                 {loading === "email" && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
-                {isLogin ? "Log in" : "Create account"}
+                {isLogin
+                  ? t("auth.loginButton")
+                  : t("auth.createAccountButton")}
               </button>
             </form>
 
             {/* Toggle mode */}
             <div className="text-center mt-6">
               <span className="text-[13px] text-text-muted">
-                {isLogin
-                  ? "Don't have an account?"
-                  : "Already have an account?"}
+                {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}
               </span>
               <Link
                 to={(() => {
@@ -801,7 +799,7 @@ export function AuthPage() {
                 })()}
                 className="text-[13px] text-accent font-medium ml-1 hover:underline underline-offset-2"
               >
-                {isLogin ? "Sign up" : "Log in"}
+                {isLogin ? t("auth.signUp") : t("auth.logIn")}
               </Link>
             </div>
           </div>
@@ -830,7 +828,7 @@ export function AuthPage() {
             Privacy Policy
           </a>
           <span className="text-border">&middot;</span>
-          <span>&copy; 2026 Nexu by Refly</span>
+          <span>{t("auth.copyright")}</span>
         </div>
       </div>
     </div>

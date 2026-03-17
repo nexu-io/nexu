@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronUp,
+  Globe,
   Home,
   LogOut,
   Menu,
@@ -17,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Link,
   Navigate,
@@ -24,6 +26,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import { type Locale, useLocale } from "@/hooks/use-locale";
 import "@/lib/api";
 import { getApiV1Sessions } from "../../lib/api/sdk.gen";
 
@@ -67,6 +70,7 @@ function formatTime(iso: string | null): string {
 }
 
 function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col justify-center items-center h-full px-8">
       <div className="max-w-md text-center">
@@ -74,12 +78,10 @@ function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
           <MessageSquare size={28} className="text-accent" />
         </div>
         <h2 className="mb-2 text-xl font-bold text-text-primary">
-          No conversations yet
+          {t("layout.empty.title")}
         </h2>
         <p className="mb-6 text-sm leading-relaxed text-text-muted">
-          Set up a platform bot first, then mention @Nexu or DM the lobster 🦞
-          in Slack / Discord / WhatsApp — conversations will appear here
-          automatically.
+          {t("layout.empty.description")}
         </p>
         <div className="flex flex-col gap-3 items-center">
           <button
@@ -87,13 +89,13 @@ function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
             onClick={onGoConfig}
             className="flex gap-2 items-center px-6 py-2.5 text-sm font-medium text-white rounded-lg transition-colors bg-accent hover:bg-accent-hover"
           >
-            <Settings size={14} /> Set up Bot
+            <Settings size={14} /> {t("layout.empty.setupBot")}
           </button>
           <div className="flex gap-4 mt-2">
             {[
-              { step: "1", text: "Connect a platform" },
-              { step: "2", text: "Mention @Nexu" },
-              { step: "3", text: "Conversations appear" },
+              { step: "1", text: t("layout.empty.step1") },
+              { step: "2", text: t("layout.empty.step2") },
+              { step: "3", text: t("layout.empty.step3") },
             ].map((s, i) => (
               <div
                 key={s.step}
@@ -113,6 +115,29 @@ function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
   );
 }
 
+function LanguageToggle({ collapsed }: { collapsed: boolean }) {
+  const { locale, setLocale } = useLocale();
+  const nextLocale: Locale = locale === "en" ? "zh" : "en";
+  const label = locale === "en" ? "中文" : "EN";
+
+  return (
+    <div className={cn(collapsed ? "px-2" : "px-3", "pb-1")}>
+      <button
+        type="button"
+        onClick={() => setLocale(nextLocale)}
+        title={locale === "en" ? "切换到中文" : "Switch to English"}
+        className={cn(
+          "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer",
+          collapsed ? "justify-center p-2" : "px-3 py-2",
+        )}
+      >
+        <Globe size={14} />
+        {!collapsed && label}
+      </button>
+    </div>
+  );
+}
+
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
 
 export function WorkspaceLayout() {
@@ -124,6 +149,7 @@ export function WorkspaceLayout() {
 }
 
 function WorkspaceLayoutInner() {
+  const { t } = useTranslation();
   const isDesktopClient = useMemo(
     () =>
       typeof navigator !== "undefined" &&
@@ -205,22 +231,22 @@ function WorkspaceLayoutInner() {
     ? sessions.find((s) => s.id === selectedSessionId)
     : null;
   const mobileTitle = isHomePage
-    ? "Home"
+    ? t("layout.mobile.home")
     : isChannelsPage
-      ? "Deployments"
+      ? t("layout.mobile.deployments")
       : isSkillsPage
-        ? "Skills"
+        ? t("layout.mobile.skills")
         : isModelsPage
-          ? "Settings"
-          : selectedSession?.title || "Conversations";
+          ? t("layout.mobile.settings")
+          : selectedSession?.title || t("layout.mobile.conversations");
   const mobileSubtitle = isHomePage
-    ? "Welcome to nexu"
+    ? t("layout.mobile.homeSubtitle")
     : isChannelsPage
-      ? "All deployment records"
+      ? t("layout.mobile.deploymentsSubtitle")
       : isSkillsPage
-        ? "Browse AI capabilities"
+        ? t("layout.mobile.skillsSubtitle")
         : isModelsPage
-          ? "Manage AI model providers"
+          ? t("layout.mobile.settingsSubtitle")
           : selectedSession
             ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
             : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
@@ -249,7 +275,7 @@ function WorkspaceLayoutInner() {
                 type="button"
                 onClick={() => setCollapsed(false)}
                 className="absolute inset-0 flex justify-center items-center w-7 h-7 rounded-lg opacity-0 transition-opacity bg-surface-3 text-text-primary group-hover:opacity-100"
-                title="Expand sidebar"
+                title={t("layout.expandSidebar")}
               >
                 <PanelLeftOpen size={14} />
               </button>
@@ -262,14 +288,14 @@ function WorkspaceLayoutInner() {
                   Nexu <span className="text-[11px]">🦞</span>
                 </div>
                 <div className="text-[10px] text-text-tertiary">
-                  Your digital coworker
+                  {t("layout.brand")}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setCollapsed(true)}
                 className="p-1.5 rounded-lg transition-colors text-text-muted hover:text-text-primary hover:bg-surface-3 shrink-0"
-                title="Collapse sidebar"
+                title={t("layout.collapseSidebar")}
               >
                 <PanelLeftClose size={14} />
               </button>
@@ -283,7 +309,7 @@ function WorkspaceLayoutInner() {
           <div className={cn(collapsed ? "px-2" : "px-3", "pt-3 pb-1")}>
             <Link
               to="/workspace/home"
-              title={collapsed ? "Home" : undefined}
+              title={collapsed ? t("layout.nav.home") : undefined}
               onClick={() => track("workspace_home_click")}
               className={cn(
                 "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
@@ -294,11 +320,11 @@ function WorkspaceLayoutInner() {
               )}
             >
               <Home size={14} />
-              {!collapsed && "Home"}
+              {!collapsed && t("layout.nav.home")}
             </Link>
             <Link
               to="/workspace/channels"
-              title={collapsed ? "Deployments" : undefined}
+              title={collapsed ? t("layout.nav.deployments") : undefined}
               onClick={() => track("workspace_deployments_click")}
               className={cn(
                 "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
@@ -309,11 +335,11 @@ function WorkspaceLayoutInner() {
               )}
             >
               <Rocket size={14} />
-              {!collapsed && "Deployments"}
+              {!collapsed && t("layout.nav.deployments")}
             </Link>
             <Link
               to="/workspace/skills"
-              title={collapsed ? "Skills" : undefined}
+              title={collapsed ? t("layout.nav.skills") : undefined}
               onClick={() => track("workspace_skills_click")}
               className={cn(
                 "flex items-center justify-between w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
@@ -325,7 +351,7 @@ function WorkspaceLayoutInner() {
             >
               <span className="flex items-center gap-2">
                 <Sparkles size={14} />
-                {!collapsed && "Skills"}
+                {!collapsed && t("layout.nav.skills")}
               </span>
               {!collapsed && (
                 <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
@@ -335,7 +361,7 @@ function WorkspaceLayoutInner() {
             </Link>
             <Link
               to="/workspace/models"
-              title={collapsed ? "Settings" : undefined}
+              title={collapsed ? t("layout.nav.settings") : undefined}
               onClick={() => track("workspace_settings_click")}
               className={cn(
                 "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
@@ -346,7 +372,7 @@ function WorkspaceLayoutInner() {
               )}
             >
               <Settings size={14} />
-              {!collapsed && "Settings"}
+              {!collapsed && t("layout.nav.settings")}
             </Link>
           </div>
 
@@ -355,7 +381,7 @@ function WorkspaceLayoutInner() {
             <div className="border-t border-border pt-2 mb-1.5" />
             {!collapsed && (
               <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                Conversations
+                {t("layout.conversations")}
               </div>
             )}
             <div className="space-y-0.5">
@@ -415,6 +441,9 @@ function WorkspaceLayoutInner() {
           </div>
         </div>
 
+        {/* Language toggle */}
+        <LanguageToggle collapsed={collapsed} />
+
         {/* Account */}
         <div className="relative" ref={logoutRef}>
           {showLogoutConfirm && (
@@ -439,7 +468,7 @@ function WorkspaceLayoutInner() {
                     className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
                   >
                     <LogOut size={13} />
-                    Sign out
+                    {t("layout.signOut")}
                   </button>
                 </div>
               </div>
@@ -514,7 +543,7 @@ function WorkspaceLayoutInner() {
                       Nexu <span className="text-[11px]">🦞</span>
                     </div>
                     <div className="text-[10px] text-text-tertiary">
-                      Your digital coworker
+                      {t("layout.brand")}
                     </div>
                   </div>
                 </div>
@@ -544,7 +573,7 @@ function WorkspaceLayoutInner() {
                     )}
                   >
                     <Home size={14} />
-                    Home
+                    {t("layout.nav.home")}
                   </Link>
                   <Link
                     to="/workspace/channels"
@@ -560,7 +589,7 @@ function WorkspaceLayoutInner() {
                     )}
                   >
                     <Rocket size={14} />
-                    Deployments
+                    {t("layout.nav.deployments")}
                   </Link>
                   <Link
                     to="/workspace/skills"
@@ -577,7 +606,7 @@ function WorkspaceLayoutInner() {
                   >
                     <span className="flex items-center gap-2">
                       <Sparkles size={14} />
-                      Skills
+                      {t("layout.nav.skills")}
                     </span>
                     <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
                       {sessions.length > 0 ? sessions.length : ""}
@@ -597,7 +626,7 @@ function WorkspaceLayoutInner() {
                     )}
                   >
                     <Settings size={14} />
-                    Settings
+                    {t("layout.nav.settings")}
                   </Link>
                 </div>
 
@@ -605,7 +634,7 @@ function WorkspaceLayoutInner() {
                 <div className="px-3 pt-2 pb-3">
                   <div className="border-t border-border pt-2 mb-1.5" />
                   <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                    Conversations
+                    {t("layout.conversations")}
                   </div>
                   <div className="space-y-0.5">
                     {sessions.map((s) => {
@@ -655,6 +684,11 @@ function WorkspaceLayoutInner() {
                 </div>
               </div>
 
+              {/* Language toggle (mobile) */}
+              <div className="px-3 pb-1">
+                <LanguageToggle collapsed={false} />
+              </div>
+
               <div
                 className="relative border-t border-border p-2"
                 ref={logoutRef}
@@ -674,7 +708,7 @@ function WorkspaceLayoutInner() {
                           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
                         >
                           <LogOut size={13} />
-                          Sign out
+                          {t("layout.signOut")}
                         </button>
                       </div>
                     </div>

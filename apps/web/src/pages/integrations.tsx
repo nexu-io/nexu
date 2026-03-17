@@ -15,6 +15,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
@@ -31,56 +32,65 @@ type Integration = NonNullable<
 
 type StatusFilter = "all" | "connected" | "available";
 
-const STATUS_BADGE: Record<
-  string,
-  { label: string; dot: string; bg: string; text: string }
-> = {
-  active: {
-    label: "Connected",
-    dot: "bg-emerald-500",
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-600",
-  },
-  initiated: {
-    label: "Connecting...",
-    dot: "bg-amber-500",
-    bg: "bg-amber-500/10",
-    text: "text-amber-600",
-  },
-  pending: {
-    label: "Available",
-    dot: "bg-text-muted/30",
-    bg: "bg-surface-3",
-    text: "text-text-muted",
-  },
-  failed: {
-    label: "Failed",
-    dot: "bg-red-500",
-    bg: "bg-red-500/10",
-    text: "text-red-600",
-  },
-  expired: {
-    label: "Expired",
-    dot: "bg-red-500",
-    bg: "bg-red-500/10",
-    text: "text-red-600",
-  },
-  disconnected: {
-    label: "Disconnected",
-    dot: "bg-text-muted/30",
-    bg: "bg-surface-3",
-    text: "text-text-muted",
-  },
-};
+function useStatusBadgeConfig() {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      ({
+        active: {
+          label: t("integrations.statusConnected"),
+          dot: "bg-emerald-500",
+          bg: "bg-emerald-500/10",
+          text: "text-emerald-600",
+        },
+        initiated: {
+          label: t("integrations.statusConnecting"),
+          dot: "bg-amber-500",
+          bg: "bg-amber-500/10",
+          text: "text-amber-600",
+        },
+        pending: {
+          label: t("integrations.statusAvailable"),
+          dot: "bg-text-muted/30",
+          bg: "bg-surface-3",
+          text: "text-text-muted",
+        },
+        failed: {
+          label: t("integrations.statusFailed"),
+          dot: "bg-red-500",
+          bg: "bg-red-500/10",
+          text: "text-red-600",
+        },
+        expired: {
+          label: t("integrations.statusExpired"),
+          dot: "bg-red-500",
+          bg: "bg-red-500/10",
+          text: "text-red-600",
+        },
+        disconnected: {
+          label: t("integrations.statusDisconnected"),
+          dot: "bg-text-muted/30",
+          bg: "bg-surface-3",
+          text: "text-text-muted",
+        },
+      }) as Record<
+        string,
+        { label: string; dot: string; bg: string; text: string }
+      >,
+    [t],
+  );
+}
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
+  const statusBadge = useStatusBadgeConfig();
   const fallback = {
-    label: "Unknown",
+    label: t("integrations.statusUnknown"),
     dot: "bg-text-muted/30",
     bg: "bg-surface-3",
     text: "text-text-muted",
   };
-  const cfg = STATUS_BADGE[status] ?? fallback;
+  const cfg = statusBadge[status] ?? fallback;
   return (
     <span
       className={cn(
@@ -108,6 +118,7 @@ function ApiKeyForm({
   onSubmit: (credentials: Record<string, string>) => void;
   isSubmitting: boolean;
 }) {
+  const { t } = useTranslation();
   const fields = integration.toolkit.authFields ?? [];
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.key, ""])),
@@ -180,8 +191,8 @@ function ApiKeyForm({
           <Key size={14} />
         )}
         {integration.status === "active"
-          ? "Update Credentials"
-          : "Save & Connect"}
+          ? t("integrations.updateCredentials")
+          : t("integrations.saveConnect")}
       </button>
     </form>
   );
@@ -200,6 +211,7 @@ function DisconnectDialog({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
@@ -215,10 +227,10 @@ function DisconnectDialog({
           </div>
           <div>
             <h3 className="text-[14px] font-semibold text-text-primary">
-              Disconnect {name}?
+              {t("integrations.disconnectTitle", { name })}
             </h3>
             <p className="text-[12px] text-text-muted">
-              This will remove the connection and any stored credentials.
+              {t("integrations.disconnectDesc")}
             </p>
           </div>
         </div>
@@ -228,7 +240,7 @@ function DisconnectDialog({
             onClick={onCancel}
             className="px-4 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-surface-3 transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -241,7 +253,7 @@ function DisconnectDialog({
             ) : (
               <Trash2 size={14} />
             )}
-            Disconnect
+            {t("integrations.disconnect")}
           </button>
         </div>
       </div>
@@ -266,6 +278,7 @@ function IntegrationCard({
   expandedSlug: string | null;
   onToggleExpand: (slug: string) => void;
 }) {
+  const { t } = useTranslation();
   const { toolkit, status } = integration;
   const isGlobal = toolkit.authScheme === "api_key_global";
   const isApiKey = toolkit.authScheme === "api_key_user";
@@ -294,7 +307,7 @@ function IntegrationCard({
             </span>
             {isGlobal && (
               <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-medium shrink-0">
-                <Shield size={9} /> Provided
+                <Shield size={9} /> {t("integrations.provided")}
               </span>
             )}
           </div>
@@ -317,7 +330,7 @@ function IntegrationCard({
               onClick={onDisconnect}
               className="text-[11px] text-text-muted hover:text-red-500 transition-colors"
             >
-              Disconnect
+              {t("integrations.disconnect")}
             </button>
           )}
           {!isGlobal && !isActive && !isApiKey && (
@@ -332,7 +345,7 @@ function IntegrationCard({
               ) : (
                 <ExternalLink size={12} />
               )}
-              Connect
+              {t("common.connect")}
             </button>
           )}
           {isApiKey && (
@@ -349,7 +362,9 @@ function IntegrationCard({
               )}
             >
               <Key size={12} />
-              {isActive ? "Update" : "Configure"}
+              {isActive
+                ? t("integrations.update")
+                : t("integrations.configure")}
             </button>
           )}
         </div>
@@ -394,6 +409,7 @@ function IntegrationCard({
 // ─── Main Page ──────────────────────────────────────────────
 
 export function IntegrationsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -604,9 +620,17 @@ export function IntegrationsPage() {
   ).length;
 
   const filterTabs: { id: StatusFilter; label: string; count: number }[] = [
-    { id: "all", label: "All", count: integrations.length },
-    { id: "connected", label: "Connected", count: connectedCount },
-    { id: "available", label: "Available", count: availableCount },
+    { id: "all", label: t("integrations.all"), count: integrations.length },
+    {
+      id: "connected",
+      label: t("integrations.connectedFilter"),
+      count: connectedCount,
+    },
+    {
+      id: "available",
+      label: t("integrations.available"),
+      count: availableCount,
+    },
   ];
 
   return (
@@ -619,16 +643,16 @@ export function IntegrationsPage() {
               <Puzzle size={16} className="text-accent" />
             </div>
             <div className="text-[14px] font-semibold text-text-primary">
-              Integrations
+              {t("integrations.pageTitle")}
             </div>
             <div className="text-[12px] text-text-muted">
-              {integrations.length} tools
+              {t("integrations.tools", { count: integrations.length })}
             </div>
           </div>
           {connectedCount > 0 && (
             <div className="flex items-center gap-1.5 text-[12px] text-emerald-600">
               <Check size={14} />
-              {connectedCount} connected
+              {t("integrations.connected", { count: connectedCount })}
             </div>
           )}
         </div>
@@ -644,7 +668,7 @@ export function IntegrationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search integrations..."
+            placeholder={t("integrations.searchPlaceholder")}
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border bg-surface-1 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30"
           />
         </div>
@@ -725,8 +749,8 @@ export function IntegrationsPage() {
             </div>
             <p className="text-[13px] text-text-muted">
               {query.trim()
-                ? "No integrations match your search"
-                : "No integrations available"}
+                ? t("integrations.noMatchSearch")
+                : t("integrations.noAvailable")}
             </p>
           </div>
         )}

@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
@@ -17,14 +18,6 @@ import {
   getApiSharedSlackResolveClaimKey,
   postApiV1SharedSlackClaim,
 } from "../../lib/api/sdk.gen";
-
-const CAPABILITY_PILLS = [
-  { emoji: "\u{1F4BB}", label: "Code & Deploy" },
-  { emoji: "\u{1F4CA}", label: "Data Analysis" },
-  { emoji: "\u270D\uFE0F", label: "Content" },
-  { emoji: "\u{1F50D}", label: "Research" },
-  { emoji: "\u2699\uFE0F", label: "Automation" },
-];
 
 type ClaimPlatform = "slack" | "feishu";
 
@@ -38,13 +31,11 @@ const PLATFORM_CONFIG: Record<
   {
     label: string;
     returnUrl: (teamId?: string | null) => string;
-    returnLabel: string;
   }
 > = {
   slack: {
     label: "Slack",
     returnUrl: () => "https://app.slack.com",
-    returnLabel: "Back to Slack",
   },
   feishu: {
     label: "Feishu",
@@ -54,7 +45,6 @@ const PLATFORM_CONFIG: Record<
         ? `https://applink.feishu.cn/client/bot/open?appId=${appId}`
         : "https://www.feishu.cn";
     },
-    returnLabel: "Back to Feishu",
   },
 };
 
@@ -73,6 +63,19 @@ const CLAIM_RETURN_KEY = "nexu_claim_return";
 // ── Left panel: product features (new workspace) ──
 
 function NewWorkspacePanel() {
+  const { t } = useTranslation();
+
+  const capabilityPills = useMemo(
+    () => [
+      { emoji: "\u{1F4BB}", label: t("auth.capability.code") },
+      { emoji: "\u{1F4CA}", label: t("auth.capability.data") },
+      { emoji: "\u270D\uFE0F", label: t("auth.capability.content") },
+      { emoji: "\u{1F50D}", label: t("auth.capability.research") },
+      { emoji: "\u2699\uFE0F", label: t("auth.capability.automation") },
+    ],
+    [t],
+  );
+
   return (
     <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
       <div className="flex items-center gap-2.5">
@@ -82,18 +85,17 @@ function NewWorkspacePanel() {
 
       <div>
         <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
-          Your digital
+          {t("auth.heroTitle.line1")}
           <br />
-          coworker,
+          {t("auth.heroTitle.line2")}
           <br />
-          always on.
+          {t("auth.heroTitle.line3")}
         </h2>
         <p className="text-[13px] text-white/45 leading-relaxed mb-6 max-w-[280px]">
-          AI avatars that live in Slack — not just chatting, but delivering real
-          results. Build apps, analyze data, write content, run automations.
+          {t("auth.heroBody")}
         </p>
         <div className="flex flex-wrap gap-2">
-          {CAPABILITY_PILLS.map((p) => (
+          {capabilityPills.map((p) => (
             <span
               key={p.label}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-white/[0.07] text-white/60 border border-white/[0.06]"
@@ -105,7 +107,7 @@ function NewWorkspacePanel() {
         </div>
       </div>
 
-      <div className="text-[11px] text-white/20">&copy; 2026 Nexu by Refly</div>
+      <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
     </div>
   );
 }
@@ -119,6 +121,8 @@ function ExistingWorkspacePanel({
   teamName?: string | null;
   memberCount: number;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
       <div className="flex items-center gap-2.5">
@@ -128,11 +132,11 @@ function ExistingWorkspacePanel({
 
       <div>
         <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
-          Your team
+          {t("claim.teamUsesNexu.line1")}
           <br />
-          already uses
+          {t("claim.teamUsesNexu.line2")}
           <br />
-          Nexu
+          {t("claim.teamUsesNexu.line3")}
         </h2>
         {teamName && (
           <p className="text-[15px] text-white/70 font-medium mb-3">
@@ -144,18 +148,20 @@ function ExistingWorkspacePanel({
             <Users className="w-4 h-4" />
           </div>
           <span className="text-[13px] text-white/50">
-            {memberCount} teammate{memberCount !== 1 ? "s" : ""} already here
+            {t("claim.teammatesHere", {
+              count: memberCount,
+              s: memberCount !== 1 ? "s" : "",
+            })}
           </span>
         </div>
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
           <p className="text-[13px] text-emerald-400/80 leading-relaxed">
-            Your team has already connected Nexu — no additional configuration
-            needed. Just sign in to get started.
+            {t("claim.noConfigNeeded")}
           </p>
         </div>
       </div>
 
-      <div className="text-[11px] text-white/20">&copy; 2026 Nexu by Refly</div>
+      <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
     </div>
   );
 }
@@ -163,6 +169,7 @@ function ExistingWorkspacePanel({
 // ── Main component ──
 
 export function SlackClaimPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { data: session, isPending: authPending } = authClient.useSession();
   const claimSubmittedRef = useRef(false);
@@ -306,16 +313,16 @@ export function SlackClaimPage() {
   if (phase === "invalid" || phase === "expired" || phase === "used") {
     const content = {
       invalid: {
-        title: "Invalid claim link",
-        desc: `This link is not valid. Please check your ${platformCfg.label} message for the correct link.`,
+        title: t("claim.invalidLink"),
+        desc: t("claim.invalidLinkDesc", { platform: platformCfg.label }),
       },
       expired: {
-        title: "Link expired",
-        desc: `This claim link has expired. Send a message to the Nexu bot in ${platformCfg.label} to get a new one.`,
+        title: t("claim.linkExpired"),
+        desc: t("claim.linkExpiredDesc", { platform: platformCfg.label }),
       },
       used: {
-        title: "Link already used",
-        desc: "This claim link has already been used. If this was you, your account is already set up.",
+        title: t("claim.linkUsed"),
+        desc: t("claim.linkUsedDesc"),
       },
     }[phase];
 
@@ -334,14 +341,14 @@ export function SlackClaimPage() {
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
             >
-              Open {platformCfg.label}
+              {t("claim.open", { platform: platformCfg.label })}
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
             <Link
               to="/auth"
               className="text-sm text-text-muted hover:text-text-secondary transition-colors"
             >
-              Go to sign in
+              {t("claim.goToSignIn")}
             </Link>
           </div>
         </div>
@@ -385,14 +392,14 @@ export function SlackClaimPage() {
             <div className="w-full max-w-[360px]">
               <div className="mb-8">
                 <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
-                  {isExisting
-                    ? "Join your team on Nexu"
-                    : "Get started with Nexu"}
+                  {isExisting ? t("claim.joinTeam") : t("claim.getStarted")}
                 </h1>
                 <p className="text-[14px] text-text-muted">
                   {isExisting
-                    ? `Sign in to connect your ${platformCfg.label} identity and start using Nexu with your team.`
-                    : `Create an account to claim your ${platformCfg.label} access and unlock AI-powered workflows.`}
+                    ? t("claim.joinTeamDesc", { platform: platformCfg.label })
+                    : t("claim.createAccountDesc", {
+                        platform: platformCfg.label,
+                      })}
                 </p>
               </div>
 
@@ -401,9 +408,9 @@ export function SlackClaimPage() {
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-emerald-500 shrink-0" />
                     <span className="text-[12px] text-emerald-600 dark:text-emerald-400">
-                      {resolved?.memberCount ?? 0} teammate
-                      {(resolved?.memberCount ?? 0) !== 1 ? "s" : ""} already
-                      using Nexu — no additional configuration needed
+                      {t("claim.teammatesAlready", {
+                        count: resolved?.memberCount ?? 0,
+                      })}
                     </span>
                   </div>
                 </div>
@@ -416,12 +423,12 @@ export function SlackClaimPage() {
                 }
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all"
               >
-                Create account
+                {t("claim.createAccount")}
               </Link>
 
               <div className="text-center mt-4">
                 <span className="text-[13px] text-text-muted">
-                  Already have an account?{" "}
+                  {t("claim.alreadyHaveAccount")}{" "}
                 </span>
                 <Link
                   to={`/auth?source=IM&returnTo=${returnTo}`}
@@ -430,7 +437,7 @@ export function SlackClaimPage() {
                   }
                   className="text-[13px] text-accent font-medium hover:underline underline-offset-2"
                 >
-                  Log in
+                  {t("auth.logIn")}
                 </Link>
               </div>
             </div>
@@ -446,7 +453,7 @@ export function SlackClaimPage() {
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
             >
-              Terms of Service
+              {t("auth.terms")}
             </a>
             <span className="text-border">&middot;</span>
             <a
@@ -455,10 +462,10 @@ export function SlackClaimPage() {
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
             >
-              Privacy Policy
+              {t("auth.privacy")}
             </a>
             <span className="text-border">&middot;</span>
-            <span>&copy; 2026 Nexu by Refly</span>
+            <span>{t("auth.copyright")}</span>
           </div>
         </div>
       </div>
@@ -496,17 +503,22 @@ export function SlackClaimPage() {
             <div className="w-full max-w-[360px] text-center">
               <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
                 {isExisting
-                  ? "Join your team on Nexu"
-                  : `Claim your ${platformCfg.label} access`}
+                  ? t("claim.joinTeam")
+                  : t("claim.claimAccess", { platform: platformCfg.label })}
               </h1>
               <p className="text-[14px] text-text-muted mb-6">
                 {isExisting
-                  ? `Connect your ${platformCfg.label} identity to your Nexu account and join ${resolved?.teamName ?? "your team"}.`
-                  : `Link your ${platformCfg.label} identity to your Nexu account to unlock AI-powered workflows.`}
+                  ? t("claim.claimAccessDescExisting", {
+                      platform: platformCfg.label,
+                      team: resolved?.teamName ?? "your team",
+                    })
+                  : t("claim.claimAccessDescNew", {
+                      platform: platformCfg.label,
+                    })}
               </p>
 
               <p className="text-[13px] text-text-muted mb-6">
-                Signed in as{" "}
+                {t("claim.signedInAs")}{" "}
                 <strong className="text-text-secondary">
                   {session?.user?.email ?? session?.user?.name}
                 </strong>
@@ -517,7 +529,7 @@ export function SlackClaimPage() {
                 onClick={handleConfirmClaim}
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all"
               >
-                Claim your {platformCfg.label} access
+                {t("claim.claimButton", { platform: platformCfg.label })}
               </button>
 
               <div className="text-center mt-4">
@@ -525,7 +537,7 @@ export function SlackClaimPage() {
                   to="/auth"
                   className="text-[13px] text-text-muted hover:text-text-secondary transition-colors"
                 >
-                  Use a different account
+                  {t("claim.useDifferentAccount")}
                 </Link>
               </div>
             </div>
@@ -541,7 +553,7 @@ export function SlackClaimPage() {
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
             >
-              Terms of Service
+              {t("auth.terms")}
             </a>
             <span className="text-border">&middot;</span>
             <a
@@ -550,10 +562,10 @@ export function SlackClaimPage() {
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
             >
-              Privacy Policy
+              {t("auth.privacy")}
             </a>
             <span className="text-border">&middot;</span>
-            <span>&copy; 2026 Nexu by Refly</span>
+            <span>{t("auth.copyright")}</span>
           </div>
         </div>
       </div>
@@ -567,10 +579,10 @@ export function SlackClaimPage() {
         <div className="w-full max-w-md rounded-xl border border-border bg-surface-1 p-8 text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-text-muted" />
           <h1 className="mt-4 text-lg font-semibold text-text-primary">
-            Claiming your {platformCfg.label} access...
+            {t("claim.claiming", { platform: platformCfg.label })}
           </h1>
           <p className="mt-2 text-sm text-text-muted">
-            Linking your {platformCfg.label} identity to your Nexu account.
+            {t("claim.claimingDesc", { platform: platformCfg.label })}
           </p>
         </div>
       </div>
@@ -584,13 +596,15 @@ export function SlackClaimPage() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 mb-5">
           <CheckCircle2 className="h-7 w-7 text-emerald-500" />
         </div>
-        <h1 className="text-xl font-bold text-text-primary">You're all set!</h1>
+        <h1 className="text-xl font-bold text-text-primary">
+          {t("claim.allSet")}
+        </h1>
         <p className="mt-2 text-sm text-text-muted">
-          Your {platformCfg.label} account has been linked to Nexu.
+          {t("claim.allSetDesc", { platform: platformCfg.label })}
           {resolved?.teamName && (
             <>
               {" "}
-              You're now part of <strong>{resolved.teamName}</strong>.
+              {t("claim.nowPartOf")} <strong>{resolved.teamName}</strong>.
             </>
           )}
         </p>
@@ -608,14 +622,14 @@ export function SlackClaimPage() {
             }
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
           >
-            {platformCfg.returnLabel}
+            {t("claim.backTo", { platform: platformCfg.label })}
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
           <Link
             to="/workspace"
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-1 transition-colors"
           >
-            Explore Nexu
+            {t("claim.exploreNexu")}
           </Link>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import { App } from "./app";
 import { LocaleProvider } from "./hooks/use-locale";
+import "./i18n";
 import "./index.css";
 
 const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;

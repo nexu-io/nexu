@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { getApiV1Models } from "../../lib/api/sdk.gen";
 import { markSetupComplete } from "./welcome";
@@ -82,7 +83,7 @@ const PROVIDER_META: Record<
   string,
   {
     name: string;
-    description: string;
+    descriptionKey: string;
     apiDocsUrl?: string;
     apiKeyPlaceholder?: string;
     defaultProxyUrl?: string;
@@ -90,32 +91,32 @@ const PROVIDER_META: Record<
 > = {
   nexu: {
     name: "Nexu Official",
-    description: "登录后使用 Nexu 官方高级模型，无需单独配置 API Key",
+    descriptionKey: "models.provider.nexu.description",
   },
   anthropic: {
     name: "Anthropic",
-    description: "Claude 系列 AI 模型",
+    descriptionKey: "models.provider.anthropic.description",
     apiDocsUrl: "https://console.anthropic.com/settings/keys",
     apiKeyPlaceholder: "sk-ant-api03-...",
     defaultProxyUrl: "https://api.anthropic.com",
   },
   openai: {
     name: "OpenAI",
-    description: "GPT 系列 AI 模型",
+    descriptionKey: "models.provider.openai.description",
     apiDocsUrl: "https://platform.openai.com/api-keys",
     apiKeyPlaceholder: "sk-...",
     defaultProxyUrl: "https://api.openai.com/v1",
   },
   google: {
     name: "Google AI",
-    description: "Gemini 系列 AI 模型",
+    descriptionKey: "models.provider.google.description",
     apiDocsUrl: "https://aistudio.google.com/app/apikey",
     apiKeyPlaceholder: "AIza...",
     defaultProxyUrl: "https://generativelanguage.googleapis.com/v1beta",
   },
   custom: {
-    name: "自定义服务商",
-    description: "任何兼容 OpenAI 的 API 端点",
+    name: "Custom",
+    descriptionKey: "models.provider.custom.description",
     apiKeyPlaceholder: "your-api-key",
   },
 };
@@ -156,12 +157,12 @@ function buildProviders(
   return Array.from(grouped.entries()).map(([providerId, models]) => {
     const meta = PROVIDER_META[providerId] ?? {
       name: providerId,
-      description: "",
+      descriptionKey: "",
     };
     return {
       id: providerId,
       name: meta.name,
-      description: meta.description,
+      description: meta.descriptionKey,
       managed: providerId === "nexu",
       apiDocsUrl: meta.apiDocsUrl,
       models,
@@ -227,6 +228,7 @@ const BYOK_PROVIDER_IDS = ["anthropic", "openai", "google", "custom"] as const;
 // ── Component ──────────────────────────────────────────────────
 
 export function ModelsPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const [_search, _setSearch] = useState("");
@@ -320,7 +322,7 @@ export function ModelsPage() {
   if (modelsLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-[13px] text-text-muted">Loading models...</div>
+        <div className="text-[13px] text-text-muted">{t("models.loading")}</div>
       </div>
     );
   }
@@ -330,10 +332,10 @@ export function ModelsPage() {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-[13px] text-red-500 mb-2">
-            Failed to load models
+            {t("models.loadFailed")}
           </div>
           <p className="text-[12px] text-text-muted">
-            Check that you are logged in and the API server is running.
+            {t("models.loadFailedHint")}
           </p>
         </div>
       </div>
@@ -344,9 +346,11 @@ export function ModelsPage() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <h2 className="text-[18px] font-semibold text-text-primary mb-1">
-          设置
+          {t("models.pageTitle")}
         </h2>
-        <p className="text-[12px] text-text-muted mb-5">管理 AI 模型服务商</p>
+        <p className="text-[12px] text-text-muted mb-5">
+          {t("models.pageSubtitle")}
+        </p>
 
         {/* Main container */}
         <div
@@ -360,7 +364,7 @@ export function ModelsPage() {
               {enabledProviders.length > 0 && (
                 <>
                   <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                    已启用
+                    {t("models.enabled")}
                   </div>
                   <div className="space-y-0.5 mb-3">
                     {enabledProviders.map((item) => {
@@ -401,7 +405,7 @@ export function ModelsPage() {
               {disabledProviders.length > 0 && (
                 <>
                   <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                    未启用
+                    {t("models.disabled")}
                   </div>
                   <div className="space-y-0.5">
                     {disabledProviders.map((item) => {
@@ -449,7 +453,7 @@ export function ModelsPage() {
                       id: activeProvider.id,
                       name: activeProvider.name,
                       description:
-                        PROVIDER_META[activeProvider.id]?.description ?? "",
+                        PROVIDER_META[activeProvider.id]?.descriptionKey ?? "",
                       managed: true,
                       models: [],
                     }
@@ -470,7 +474,7 @@ export function ModelsPage() {
               )
             ) : (
               <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
-                选择一个服务商
+                {t("models.selectProvider")}
               </div>
             )}
           </div>
@@ -507,6 +511,7 @@ async function fetchLinkCatalog(): Promise<LinkProvider[]> {
 // ── Managed provider detail (Nexu Official) ───────────────────
 
 function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
+  const { t } = useTranslation();
   const { data: linkProviders = [], isLoading: catalogLoading } = useQuery({
     queryKey: ["link-catalog"],
     queryFn: fetchLinkCatalog,
@@ -567,7 +572,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
         error?: string;
       };
       if (!res.ok) {
-        setLoginError(data.error ?? "连接失败，请稍后重试");
+        setLoginError(data.error ?? t("welcome.connectFailed"));
         setLoginBusy(false);
         return;
       }
@@ -578,7 +583,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
       }
       // Keep loginBusy=true — polling effect will detect completion.
     } catch {
-      setLoginError("无法连接到 Nexu 云端服务");
+      setLoginError(t("welcome.cloudConnectError"));
       setLoginBusy(false);
     }
   };
@@ -606,7 +611,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
               {provider.name}
             </div>
             <div className="text-[11px] text-text-muted">
-              {provider.description}
+              {t(provider.description)}
             </div>
           </div>
         </div>
@@ -618,7 +623,9 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
               : "border border-accent/20 bg-accent/8 text-accent",
           )}
         >
-          {cloudConnected ? "已连接" : "登录后可用"}
+          {cloudConnected
+            ? t("models.managed.connected")
+            : t("models.managed.loginRequired")}
         </div>
       </div>
 
@@ -631,7 +638,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
                 <Check size={12} className="text-emerald-500" />
               </div>
               <div className="text-[13px] font-semibold text-emerald-600">
-                已连接 Nexu 云端
+                {t("models.managed.cloudConnected")}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -643,7 +650,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
               >
                 <RefreshCw size={11} />
-                刷新
+                {t("models.managed.refresh")}
               </button>
               <button
                 type="button"
@@ -655,35 +662,34 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
                 }}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-red-500/70 hover:text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
               >
-                断开
+                {t("models.managed.disconnect")}
               </button>
             </div>
           </div>
           <div className="text-[12px] text-text-secondary mt-1.5">
-            云端模型已可用，可在下方查看和管理。
+            {t("models.managed.cloudModelsAvailable")}
           </div>
         </div>
       ) : (
         <div className="rounded-xl border border-accent/15 bg-accent/5 px-4 py-4 mb-6">
           <div className="text-[13px] font-semibold text-accent">
-            登录后使用 Nexu 官方模型
+            {t("models.managed.loginPrompt")}
           </div>
           <div className="text-[12px] leading-[1.7] text-text-secondary mt-1.5">
-            登录 Nexu 账号后，即可直接使用官方提供的高级模型，无需单独配置 API
-            Key。
+            {t("models.managed.loginDescription")}
           </div>
           {loginBusy ? (
             <div className="mt-4 flex items-center gap-3">
               <div className="inline-flex items-center gap-2 rounded-lg bg-accent/80 px-3.5 py-2 text-[12px] font-medium text-white">
                 <Loader2 size={13} className="animate-spin" />
-                等待浏览器登录...
+                {t("models.managed.waitingLogin")}
               </div>
               <button
                 type="button"
                 onClick={() => void handleCancelLogin()}
                 className="text-[12px] text-text-muted hover:text-text-primary transition-colors cursor-pointer"
               >
-                取消
+                {t("common.cancel")}
               </button>
             </div>
           ) : (
@@ -692,7 +698,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
               onClick={() => void handleLogin()}
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 cursor-pointer"
             >
-              登录 Nexu 账号
+              {t("models.managed.loginButton")}
               <ArrowUpRight size={13} />
             </button>
           )}
@@ -706,9 +712,11 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
       {provider.models.length > 0 && (
         <div className="mb-6">
           <div className="text-[13px] font-semibold text-text-primary mb-3">
-            已启用模型
+            {t("models.managed.enabledModels")}
             <span className="ml-2 text-[11px] font-normal text-text-muted">
-              共 {provider.models.length} 个
+              {t("models.managed.totalCount", {
+                count: provider.models.length,
+              })}
             </span>
           </div>
           <div className="space-y-1.5">
@@ -741,7 +749,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
       {catalogLoading ? (
         <div className="flex items-center gap-2 text-[12px] text-text-muted py-4">
           <Loader2 size={14} className="animate-spin" />
-          加载模型目录...
+          {t("models.managed.loadingCatalog")}
         </div>
       ) : linkProviders.length > 0 ? (
         <LinkModelCatalog
@@ -765,6 +773,7 @@ function LinkModelCatalog({
   totalModels: number;
   cloudConnected: boolean;
 }) {
+  const { t } = useTranslation();
   // All link model IDs, flattened
   const allModelIds = useMemo(
     () => linkProviders.flatMap((lp) => lp.models.map((m) => m.id)),
@@ -811,15 +820,18 @@ function LinkModelCatalog({
   return (
     <div>
       <div className="text-[13px] font-semibold text-text-primary mb-1">
-        可用模型目录
+        {t("models.catalog.title")}
         <span className="ml-2 text-[11px] font-normal text-text-muted">
-          共 {totalModels} 个模型，来自 {linkProviders.length} 个服务商
+          {t("models.catalog.summary", {
+            totalModels,
+            providerCount: linkProviders.length,
+          })}
         </span>
       </div>
       <div className="text-[11px] text-text-muted mb-4">
         {cloudConnected
-          ? "开启开关后，模型将出现在对话的模型选择列表中"
-          : "以下模型在登录 Nexu 账号后即可使用"}
+          ? t("models.catalog.connectedHint")
+          : t("models.catalog.loginHint")}
       </div>
       <div className="space-y-5">
         {linkProviders.map((lp) => (
@@ -832,7 +844,7 @@ function LinkModelCatalog({
                 {lp.name}
               </span>
               <span className="text-[10px] text-text-muted">
-                {lp.models.length} 个模型
+                {t("models.catalog.modelsCount", { count: lp.models.length })}
               </span>
             </div>
             <div className="space-y-1.5">
@@ -866,7 +878,7 @@ function LinkModelCatalog({
                       />
                     ) : (
                       <span className="text-[10px] text-text-muted/60 shrink-0">
-                        登录后可用
+                        {t("models.catalog.loginToUse")}
                       </span>
                     )}
                   </div>
@@ -893,9 +905,10 @@ function ByokProviderDetail({
   models: ProviderModel[];
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
+  const { t } = useTranslation();
   const meta = PROVIDER_META[providerId] ?? {
     name: providerId,
-    description: "",
+    descriptionKey: "",
     apiDocsUrl: undefined,
     apiKeyPlaceholder: "your-api-key",
     defaultProxyUrl: "",
@@ -1010,13 +1023,13 @@ function ByokProviderDetail({
                   rel="noopener noreferrer"
                   className="text-[11px] text-accent hover:text-accent/80 transition-colors flex items-center gap-0.5"
                 >
-                  获取 API Key
+                  {t("models.byok.getApiKey")}
                   <ExternalLink size={10} />
                 </a>
               )}
             </div>
             <div className="text-[11px] text-text-muted">
-              {meta.description}
+              {t(meta.descriptionKey)}
             </div>
           </div>
         </div>
@@ -1036,7 +1049,7 @@ function ByokProviderDetail({
             API Key
             {dbProvider?.hasApiKey && (
               <span className="ml-2 text-emerald-600 font-normal text-[10px]">
-                (已保存)
+                {t("models.byok.apiKeySaved")}
               </span>
             )}
           </label>
@@ -1065,7 +1078,7 @@ function ByokProviderDetail({
               ) : verifyMutation.isSuccess && verifyMutation.data?.valid ? (
                 <Check size={12} className="text-emerald-600" />
               ) : (
-                "检查"
+                t("models.byok.verify")
               )}
             </button>
           </div>
@@ -1079,8 +1092,14 @@ function ByokProviderDetail({
               )}
             >
               {verifyMutation.data?.valid
-                ? `密钥有效 — 检测到 ${verifyMutation.data.models?.length ?? 0} 个模型`
-                : `密钥无效: ${verifyMutation.data?.error ?? "未知错误"}`}
+                ? t("models.byok.keyValid", {
+                    count: verifyMutation.data.models?.length ?? 0,
+                  })
+                : t("models.byok.keyInvalid", {
+                    error:
+                      verifyMutation.data?.error ??
+                      t("models.byok.keyInvalidUnknown"),
+                  })}
             </div>
           )}
         </div>
@@ -1089,7 +1108,7 @@ function ByokProviderDetail({
             htmlFor={`baseurl-${providerId}`}
             className="block text-[12px] font-medium text-text-secondary mb-1.5"
           >
-            API 代理地址
+            {t("models.byok.proxyUrl")}
           </label>
           <input
             id={`baseurl-${providerId}`}
@@ -1105,9 +1124,9 @@ function ByokProviderDetail({
       {/* Model list */}
       <div>
         <div className="text-[13px] font-semibold text-text-primary mb-3">
-          模型列表
+          {t("models.byok.modelList")}
           <span className="ml-2 text-[11px] font-normal text-text-muted">
-            共 {displayModels.length} 个模型
+            {t("models.byok.modelsTotalCount", { count: displayModels.length })}
           </span>
         </div>
         <div className="space-y-4">
@@ -1115,16 +1134,16 @@ function ByokProviderDetail({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[11px] font-medium text-text-muted">
-                已启用
+                {t("models.byok.enabledSection")}
               </span>
               <span className="text-[10px] text-text-muted/60">
-                启用后将出现在 Nexu 的模型选择列表中
+                {t("models.byok.enabledHint")}
               </span>
             </div>
             <div className="space-y-1.5">
               {enabledModels.length === 0 && (
                 <div className="text-[11px] text-text-muted/60 py-3 text-center">
-                  暂无
+                  {t("models.byok.none")}
                 </div>
               )}
               {enabledModels.map((modelId) => (
@@ -1156,12 +1175,12 @@ function ByokProviderDetail({
           {/* 未启用 */}
           <div>
             <div className="text-[11px] font-medium text-text-muted mb-2">
-              未启用
+              {t("models.byok.disabledSection")}
             </div>
             <div className="space-y-1.5">
               {disabledModels.length === 0 && (
                 <div className="text-[11px] text-text-muted/60 py-3 text-center">
-                  暂无
+                  {t("models.byok.none")}
                 </div>
               )}
               {disabledModels.map((modelId) => (
@@ -1215,7 +1234,9 @@ function ByokProviderDetail({
           {saveMutation.isPending && (
             <Loader2 size={13} className="animate-spin" />
           )}
-          {dbProvider?.hasApiKey ? "更新配置" : "保存并启用"}
+          {dbProvider?.hasApiKey
+            ? t("models.byok.updateConfig")
+            : t("models.byok.saveAndEnable")}
         </button>
 
         {dbProvider?.hasApiKey && (
@@ -1223,7 +1244,7 @@ function ByokProviderDetail({
             type="button"
             disabled={deleteMutation.isPending}
             onClick={() => {
-              if (confirm("确定要移除此服务商配置吗？")) {
+              if (confirm(t("models.byok.confirmRemove"))) {
                 deleteMutation.mutate();
               }
             }}
@@ -1234,16 +1255,20 @@ function ByokProviderDetail({
             ) : (
               <Trash2 size={13} />
             )}
-            移除
+            {t("models.byok.remove")}
           </button>
         )}
       </div>
 
       {saveMutation.isSuccess && (
-        <div className="mt-3 text-[11px] text-emerald-600">保存成功</div>
+        <div className="mt-3 text-[11px] text-emerald-600">
+          {t("models.byok.saveSuccess")}
+        </div>
       )}
       {saveMutation.isError && (
-        <div className="mt-3 text-[11px] text-red-500">保存失败，请重试</div>
+        <div className="mt-3 text-[11px] text-red-500">
+          {t("models.byok.saveFailed")}
+        </div>
       )}
     </div>
   );

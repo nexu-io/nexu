@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import type { ElementType } from "react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import "@/lib/api";
 import { getApiV1Skills } from "../../lib/api/sdk.gen";
@@ -85,6 +86,7 @@ function SkillLucideIcon({ iconName }: { iconName: string }) {
 }
 
 function SkillCard({ skill }: { skill: Skill }) {
+  const { t } = useTranslation();
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   const handleCopyPrompt = () => {
@@ -131,17 +133,17 @@ function SkillCard({ skill }: { skill: Skill }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {skill.tools && skill.tools.length > 0 ? (
-            skill.tools.map((t) => (
+            skill.tools.map((tool) => (
               <span
-                key={t.slug}
+                key={tool.slug}
                 className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium"
               >
-                {t.provider}
+                {tool.provider}
               </span>
             ))
           ) : (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium">
-              No auth needed
+              {t("skills.noAuth")}
             </span>
           )}
         </div>
@@ -161,11 +163,11 @@ function SkillCard({ skill }: { skill: Skill }) {
         >
           {copiedPrompt ? (
             <>
-              <Check size={10} /> Copied
+              <Check size={10} /> {t("skills.copied")}
             </>
           ) : (
             <>
-              <Copy size={10} /> Try
+              <Copy size={10} /> {t("skills.try")}
             </>
           )}
         </button>
@@ -175,6 +177,7 @@ function SkillCard({ skill }: { skill: Skill }) {
 }
 
 export function SkillsPage() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [tagFilter, setTagFilter] = useState<TagFilter>("all");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("official");
@@ -202,9 +205,9 @@ export function SkillsPage() {
     for (const s of sourceFilteredSkills) {
       counts[s.tag] = (counts[s.tag] ?? 0) + 1;
     }
-    return tags.map((t) => ({
-      ...t,
-      count: counts[t.id] ?? 0,
+    return tags.map((tag) => ({
+      ...tag,
+      count: counts[tag.id] ?? 0,
     }));
   }, [sourceFilteredSkills, tags]);
 
@@ -226,8 +229,8 @@ export function SkillsPage() {
   }, [sourceFilteredSkills, tagFilter, query]);
 
   const sourceTabs: { id: SourceFilter; label: string }[] = [
-    { id: "official", label: "Official" },
-    { id: "custom", label: "Custom" },
+    { id: "official", label: t("skills.official") },
+    { id: "custom", label: t("skills.custom") },
   ];
 
   return (
@@ -240,10 +243,10 @@ export function SkillsPage() {
               <Zap size={16} className="text-accent" />
             </div>
             <div className="text-[14px] font-semibold text-text-primary">
-              Skills
+              {t("skills.pageTitle")}
             </div>
             <div className="text-[12px] text-text-muted">
-              {skills.length} skills
+              {t("skills.skillsCount", { count: skills.length })}
             </div>
           </div>
         </div>
@@ -259,7 +262,7 @@ export function SkillsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search skills..."
+            placeholder={t("skills.searchPlaceholder")}
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border bg-surface-1 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30"
           />
         </div>
@@ -314,7 +317,7 @@ export function SkillsPage() {
                   : "text-text-muted hover:text-text-secondary font-normal",
               )}
             >
-              All
+              {t("skills.all")}
               <span
                 className={cn(
                   "ml-1 text-[10px] tabular-nums",
@@ -378,8 +381,8 @@ export function SkillsPage() {
             </div>
             <p className="text-[13px] text-text-muted">
               {query.trim()
-                ? "No skills match your search"
-                : "No skills available"}
+                ? t("skills.noMatchSearch")
+                : t("skills.noAvailable")}
             </p>
           </div>
         )}

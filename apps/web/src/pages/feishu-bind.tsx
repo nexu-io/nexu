@@ -7,10 +7,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import { getApiV1FeishuBindOauthUrl } from "../../lib/api/sdk.gen";
 
 export function FeishuBindPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { data: session, isPending: authPending } = authClient.useSession();
 
@@ -63,11 +65,10 @@ export function FeishuBindPage() {
             <CheckCircle2 className="h-7 w-7 text-emerald-500" />
           </div>
           <h1 className="text-xl font-bold text-text-primary">
-            Feishu account linked!
+            {t("feishuBind.linked")}
           </h1>
           <p className="mt-2 text-sm text-text-muted">
-            Your Feishu identity has been linked to your Nexu account. You can
-            now use the bot normally.
+            {t("feishuBind.linkedDesc")}
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
@@ -77,14 +78,14 @@ export function FeishuBindPage() {
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
             >
-              Back to Feishu
+              {t("feishuBind.backToFeishu")}
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
             <Link
               to="/workspace"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-1 transition-colors"
             >
-              Explore Nexu
+              {t("feishuBind.exploreNexu")}
             </Link>
           </div>
         </div>
@@ -99,7 +100,7 @@ export function FeishuBindPage() {
         <div className="w-full max-w-md rounded-xl border border-border bg-surface-1 p-8 text-center">
           <AlertTriangle className="mx-auto h-8 w-8 text-amber-500 mb-4" />
           <h1 className="text-lg font-semibold text-text-primary">
-            Binding failed
+            {t("feishuBind.bindFailed")}
           </h1>
           <p className="mt-2 text-sm text-text-muted">{errorMsg}</p>
           <div className="mt-6 flex flex-col gap-3">
@@ -108,7 +109,7 @@ export function FeishuBindPage() {
                 to={`/feishu/bind?ws=${encodeURIComponent(ws)}&bot=${encodeURIComponent(bot)}`}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
               >
-                Try again
+                {t("feishuBind.tryAgain")}
               </Link>
             )}
             <a
@@ -117,7 +118,7 @@ export function FeishuBindPage() {
               rel="noopener noreferrer"
               className="text-sm text-text-muted hover:text-text-secondary transition-colors"
             >
-              Back to Feishu
+              {t("feishuBind.backToFeishu")}
             </a>
           </div>
         </div>
@@ -152,21 +153,18 @@ export function FeishuBindPage() {
 
           <div>
             <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
-              Link your
+              {t("feishuBind.linkTitle.line1")}
               <br />
-              Feishu
+              {t("feishuBind.linkTitle.line2")}
               <br />
-              identity
+              {t("feishuBind.linkTitle.line3")}
             </h2>
             <p className="text-[13px] text-white/45 leading-relaxed mb-6 max-w-[280px]">
-              Connect your Feishu account to Nexu to unlock AI-powered workflows
-              directly in your chats.
+              {t("feishuBind.linkDesc")}
             </p>
           </div>
 
-          <div className="text-[11px] text-white/20">
-            &copy; 2026 Nexu by Refly
-          </div>
+          <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
         </div>
 
         {/* Right panel */}
@@ -186,10 +184,10 @@ export function FeishuBindPage() {
             <div className="w-full max-w-[360px]">
               <div className="mb-8">
                 <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
-                  Link your Feishu account
+                  {t("feishuBind.linkAccount")}
                 </h1>
                 <p className="text-[14px] text-text-muted">
-                  Sign in to Nexu first, then bind your Feishu identity.
+                  {t("feishuBind.signInFirst")}
                 </p>
               </div>
 
@@ -197,18 +195,18 @@ export function FeishuBindPage() {
                 to={`/auth?mode=signup&source=feishu_bind&returnTo=${returnTo}`}
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all"
               >
-                Create account
+                {t("claim.createAccount")}
               </Link>
 
               <div className="text-center mt-4">
                 <span className="text-[13px] text-text-muted">
-                  Already have an account?{" "}
+                  {t("claim.alreadyHaveAccount")}{" "}
                 </span>
                 <Link
                   to={`/auth?source=feishu_bind&returnTo=${returnTo}`}
                   className="text-[13px] text-accent font-medium hover:underline underline-offset-2"
                 >
-                  Log in
+                  {t("auth.logIn")}
                 </Link>
               </div>
             </div>
@@ -220,7 +218,7 @@ export function FeishuBindPage() {
               paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
             }}
           >
-            <span>&copy; 2026 Nexu by Refly</span>
+            <span>{t("auth.copyright")}</span>
           </div>
         </div>
       </div>
@@ -232,13 +230,13 @@ export function FeishuBindPage() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md rounded-xl border border-border bg-surface-1 p-8 text-center">
         <h1 className="text-xl font-bold text-text-primary mb-2">
-          Link your Feishu account
+          {t("feishuBind.linkAccount")}
         </h1>
         <p className="text-sm text-text-muted mb-2">
-          Authorize with Feishu to link your identity to your Nexu account.
+          {t("feishuBind.authorizeDesc")}
         </p>
         <p className="text-[13px] text-text-muted mb-6">
-          Signed in as{" "}
+          {t("feishuBind.signedInAs")}{" "}
           <strong className="text-text-secondary">
             {session.user.email ?? session.user.name}
           </strong>
@@ -259,10 +257,10 @@ export function FeishuBindPage() {
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Redirecting to Feishu...
+              {t("feishuBind.redirecting")}
             </>
           ) : (
-            "Bind Feishu Account"
+            t("feishuBind.bindButton")
           )}
         </button>
 
@@ -271,7 +269,7 @@ export function FeishuBindPage() {
             to="/auth"
             className="text-[13px] text-text-muted hover:text-text-secondary transition-colors"
           >
-            Use a different account
+            {t("claim.useDifferentAccount")}
           </Link>
         </div>
       </div>

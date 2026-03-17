@@ -209,7 +209,7 @@ export function WelcomePage() {
         error?: string;
       };
       if (!res.ok) {
-        setLoginError(data.error ?? "连接失败，请稍后重试");
+        setLoginError(data.error ?? t("welcome.connectFailed"));
         setCloudConnecting(false);
         return;
       }
@@ -219,7 +219,7 @@ export function WelcomePage() {
       }
       // Keep cloudConnecting=true — polling effect will detect completion.
     } catch {
-      setLoginError("无法连接到 Nexu 云端服务");
+      setLoginError(t("welcome.cloudConnectError"));
       setCloudConnecting(false);
     }
   };
@@ -307,10 +307,10 @@ export function WelcomePage() {
                               <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
                               <div className="text-center">
                                 <div className="text-[15px] font-semibold">
-                                  等待浏览器登录完成…
+                                  {t("welcome.waitingLogin")}
                                 </div>
                                 <p className="mt-2 text-[12px] text-white/50">
-                                  请在浏览器中完成登录，此页面会自动跳转
+                                  {t("welcome.waitingLoginHint")}
                                 </p>
                               </div>
                               {loginError && (
@@ -323,7 +323,7 @@ export function WelcomePage() {
                                 onClick={() => void handleCancelLogin()}
                                 className="mt-1 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[12px] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white cursor-pointer"
                               >
-                                取消
+                                {t("welcome.cancel")}
                               </button>
                             </div>
                           </div>
