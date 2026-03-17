@@ -107,7 +107,20 @@ build_runtime() {
   run_logged pnpm --dir "$ELECTRON_DIR" build
 }
 
+ensure_electron_symlink() {
+  # pnpm hoisting may not create the electron symlink under apps/desktop/node_modules.
+  # The .bin/electron wrapper expects ../electron/cli.js relative to .bin/, so we
+  # ensure the symlink exists after every build.
+  local target="$ROOT_DIR/node_modules/.pnpm/electron@37.10.3/node_modules/electron"
+  local link="$ELECTRON_DIR/node_modules/electron"
+  if [ ! -e "$link" ] && [ -d "$target" ]; then
+    ln -sf "$target" "$link"
+    log "created electron symlink"
+  fi
+}
+
 start_session() {
+  ensure_electron_symlink
   log "starting tmux session '$SESSION_NAME'"
   tmux new-session -d -s "$SESSION_NAME" \
     "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\"; pnpm --dir \"$ROOT_DIR\" --filter @nexu/desktop run start:electron; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"

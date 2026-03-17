@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { Span } from "./lib/trace-decorator.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { desktopAuthMiddleware } from "./middleware/desktop-auth.js";
 import {
   errorMiddleware,
   logHandledError,
@@ -126,8 +127,23 @@ export function createApp() {
   registerClaimPublicRoutes(app);
   registerSharedSlackClaimPublicRoutes(app);
 
-  // Desktop mode: skip auth for v1 routes (localhost-only trust boundary)
-  if (!isDesktopMode()) {
+  // Auth middleware — validates session cookie and sets userId/session.
+  // Desktop mode: try cookie-based auth first, fall back to desktop-auth
+  // (which resolves the user from DB without cookies) if cookie isn't
+  // synced to the webview yet.
+  if (isDesktopMode()) {
+    app.use("/api/v1/*", async (c, next) => {
+      try {
+        await authMiddleware(c, async () => {});
+        if (c.get("userId")) {
+          return next();
+        }
+      } catch {
+        // Cookie not available yet — fall back to desktop auth
+      }
+      return desktopAuthMiddleware(c, next);
+    });
+  } else {
     app.use("/api/v1/*", authMiddleware);
   }
 

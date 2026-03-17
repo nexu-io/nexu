@@ -205,13 +205,35 @@ async function ensureDesktopAppUser(authUserId: string): Promise<void> {
       ],
     );
 
-    // Ensure a gateway pool exists for local desktop runtime
+    // Ensure a gateway pool exists for local desktop runtime.
+    // The pool ID must match the gateway's RUNTIME_POOL_ID (defaults to "desktop-local-pool"
+    // in manifests.ts) so that generatePoolConfig() can find bots assigned to this pool.
+    const gatewayPoolId =
+      process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
     await pool.query(
       `INSERT INTO gateway_pools (id, pool_name, pool_type, max_bots, status, pod_ip, created_at)
-       VALUES ('pool_local_01', 'local-dev', 'shared', 50, 'active', '127.0.0.1', $1)
+       VALUES ($2, 'desktop-local', 'shared', 50, 'active', '127.0.0.1', $1)
        ON CONFLICT (id) DO UPDATE SET pod_ip = '127.0.0.1', status = 'active'`,
-      [now],
+      [now, gatewayPoolId],
     );
+
+    // Migrate bots & assignments from the legacy pool ID ("pool_local_01") to the
+    // current gateway pool ID so that generatePoolConfig() picks them up.
+    const legacyPoolId = "pool_local_01";
+    if (gatewayPoolId !== legacyPoolId) {
+      await pool.query(
+        `UPDATE bots SET pool_id = $1, updated_at = $2 WHERE pool_id = $3`,
+        [gatewayPoolId, now, legacyPoolId],
+      );
+      await pool.query(
+        `UPDATE gateway_assignments SET pool_id = $1 WHERE pool_id = $2`,
+        [gatewayPoolId, legacyPoolId],
+      );
+      // Clean up the legacy pool row
+      await pool.query(`DELETE FROM gateway_pools WHERE id = $1`, [
+        legacyPoolId,
+      ]);
+    }
   } finally {
     await pool.end();
   }

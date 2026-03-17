@@ -308,7 +308,7 @@ export function HomePage() {
     }
   }, [videoHover]);
 
-  const { data: channelsData } = useQuery({
+  const { data: channelsData, isLoading: channelsLoading } = useQuery({
     queryKey: ["channels"],
     queryFn: async () => {
       const { data } = await getApiV1Channels();
@@ -441,67 +441,71 @@ export function HomePage() {
     CHANNEL_SHORT_NAMES[firstChannelType] ?? firstChannelType;
   const chatUrl = CHAT_URLS[firstChannelType] ?? "https://www.feishu.cn/";
 
-  /* ── Connected dashboard ── */
-  if (connectedCount > 0) {
-    return (
-      <div className="h-full overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Hero card — connected state */}
-          <div className="mb-8 rounded-2xl bg-surface-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <div className="px-6 pt-6 pb-5">
-              {/* Top: Avatar + Identity */}
-              <div className="flex items-start gap-6">
-                {/* Avatar */}
-                <div
-                  className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-surface-2 shrink-0 cursor-default"
-                  onMouseEnter={() => setVideoHover(true)}
-                  onMouseLeave={() => setVideoHover(false)}
-                >
-                  <video
-                    ref={videoRef}
-                    src="https://static.refly.ai/video/nexu-alpha.mp4"
-                    poster="/nexu-alpha-poster.jpg"
-                    preload="auto"
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+  /* ── Always show full dashboard ── */
+  const welcomeMessage = channelsLoading
+    ? "Welcome! 🎉 We're so glad you're here. Loading your setup..."
+    : connectedCount > 0
+      ? `Welcome! 🎉 We're so glad you're here. Your setup is complete — click "Chat in ${chatShortName}" on the right to start chatting with nexu. We're here whenever you need us.`
+      : "Welcome! 🎉 nexu is ready and running. Connect a channel to start chatting, or configure your AI models in Settings.";
 
-                {/* Identity + Status + Actions */}
-                <div className="flex-1 min-w-0 pt-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h2
-                      className="text-[22px] sm:text-[26px] font-normal tracking-tight text-text-primary"
-                      style={{ fontFamily: "var(--font-script)" }}
-                    >
-                      nexu Alpha
-                    </h2>
-                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Running
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
-                    <span className="flex items-center gap-1">
-                      <Cpu size={10} />
-                      {modelName}
-                    </span>
-                    <span className="text-border">&middot;</span>
-                    <span>
-                      {sessionsData ? `今日 ${messagesToday} 条消息` : "..."}
-                    </span>
-                    <span className="text-border">&middot;</span>
-                    <span>
-                      {sessionsData ? formatRelativeTime(lastActiveAt) : "..."}
-                    </span>
-                  </div>
-                  <TypingText
-                    message={`Welcome! 🎉 We're so glad you're here. Your setup is complete — click "Chat in ${chatShortName}" on the right to start chatting with nexu. We're here whenever you need us.`}
-                  />
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 mt-4">
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Hero card */}
+        <div className="mb-8 rounded-2xl bg-surface-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="px-6 pt-6 pb-5">
+            {/* Top: Avatar + Identity */}
+            <div className="flex items-start gap-6">
+              {/* Avatar */}
+              <div
+                className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-surface-2 shrink-0 cursor-default"
+                onMouseEnter={() => setVideoHover(true)}
+                onMouseLeave={() => setVideoHover(false)}
+              >
+                <video
+                  ref={videoRef}
+                  src="https://static.refly.ai/video/nexu-alpha.mp4"
+                  poster="/nexu-alpha-poster.jpg"
+                  preload="auto"
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {/* Identity + Status + Actions */}
+              <div className="flex-1 min-w-0 pt-1">
+                <div className="flex items-center gap-3 mb-1">
+                  <h2
+                    className="text-[22px] sm:text-[26px] font-normal tracking-tight text-text-primary"
+                    style={{ fontFamily: "var(--font-script)" }}
+                  >
+                    nexu Alpha
+                  </h2>
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Running
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
+                  <span className="flex items-center gap-1">
+                    <Cpu size={10} />
+                    {modelName}
+                  </span>
+                  <span className="text-border">&middot;</span>
+                  <span>
+                    {sessionsData ? `今日 ${messagesToday} 条消息` : "..."}
+                  </span>
+                  <span className="text-border">&middot;</span>
+                  <span>
+                    {sessionsData ? formatRelativeTime(lastActiveAt) : "..."}
+                  </span>
+                </div>
+                <TypingText message={welcomeMessage} />
+                {/* Actions */}
+                <div className="flex items-center gap-2 mt-4">
+                  {connectedCount > 0 ? (
                     <a
                       href={chatUrl}
                       target="_blank"
@@ -517,525 +521,427 @@ export function HomePage() {
                       Chat in {chatShortName}
                       <ArrowUpRight size={12} className="opacity-70" />
                     </a>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => setShowChannelManager(!showChannelManager)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium border border-border text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+                      onClick={() => navigate("/workspace/channels")}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
                     >
-                      <Settings size={13} />
-                      更改配置
-                      <ChevronDown
-                        size={12}
-                        className={`transition-transform ${showChannelManager ? "rotate-180" : ""}`}
-                      />
+                      <Plus size={14} />
+                      连接渠道
                     </button>
-                  </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowChannelManager(!showChannelManager)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium border border-border text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+                  >
+                    <Settings size={13} />
+                    更改配置
+                    <ChevronDown
+                      size={12}
+                      className={`transition-transform ${showChannelManager ? "rotate-180" : ""}`}
+                    />
+                  </button>
                 </div>
               </div>
+            </div>
 
-              {/* Channel manager panel */}
-              {showChannelManager && (
-                <div className="mt-4 pt-4 border-t border-border">
-                  <div className="flex items-center gap-2 mb-3">
-                    {BOT_MANAGER_TABS.map((tab) => {
-                      const Icon = tab.icon;
-                      const active = botManagerTab === tab.id;
+            {/* Channel manager panel */}
+            {showChannelManager && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  {BOT_MANAGER_TABS.map((tab) => {
+                    const Icon = tab.icon;
+                    const active = botManagerTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setBotManagerTab(tab.id)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors",
+                          active
+                            ? "border-accent/20 bg-accent/10 text-accent"
+                            : "border-border text-text-muted hover:text-text-primary hover:bg-surface-2",
+                        )}
+                      >
+                        <Icon size={12} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Channels tab */}
+                {botManagerTab === "channels" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {CHANNEL_OPTIONS.map((ch) => {
+                      const isConnected = connectedTypes.has(ch.id);
+                      const connectedChannel = channels.find(
+                        (c) => c.channelType === ch.id,
+                      );
                       return (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => setBotManagerTab(tab.id)}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors",
-                            active
-                              ? "border-accent/20 bg-accent/10 text-accent"
-                              : "border-border text-text-muted hover:text-text-primary hover:bg-surface-2",
-                          )}
+                        <div
+                          key={ch.id}
+                          className={`rounded-xl border px-3 py-3 transition-all ${
+                            isConnected
+                              ? "border-accent/20 bg-accent/5"
+                              : "border-border bg-surface-0"
+                          }`}
                         >
-                          <Icon size={12} />
-                          {tab.label}
-                        </button>
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-white shrink-0">
+                              {ch.smallIcon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-medium text-text-primary">
+                                {ch.name}
+                              </div>
+                              <div className="mt-0.5 text-[11px] text-text-muted">
+                                {channelsLoading ? "加载中..." : isConnected ? "已连接" : "未连接"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex justify-end">
+                            {isConnected && connectedChannel ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDisconnect(connectedChannel.id)
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
+                              >
+                                <Unlink size={12} />
+                                断开连接
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowChannelManager(false);
+                                  setModalChannel(
+                                    ch.id as "feishu" | "slack" | "discord",
+                                  );
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border text-text-secondary hover:bg-surface-2 hover:border-border-hover transition-colors"
+                              >
+                                <Plus size={12} />
+                                连接
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
+                )}
 
-                  {/* Channels tab */}
-                  {botManagerTab === "channels" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {CHANNEL_OPTIONS.map((ch) => {
-                        const isConnected = connectedTypes.has(ch.id);
-                        const connectedChannel = channels.find(
-                          (c) => c.channelType === ch.id,
-                        );
-                        return (
-                          <div
-                            key={ch.id}
-                            className={`rounded-xl border px-3 py-3 transition-all ${
-                              isConnected
-                                ? "border-accent/20 bg-accent/5"
-                                : "border-border bg-surface-0"
-                            }`}
-                          >
-                            <div className="flex items-start gap-2.5">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-white shrink-0">
-                                {ch.smallIcon}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-[13px] font-medium text-text-primary">
-                                  {ch.name}
-                                </div>
-                                <div className="mt-0.5 text-[11px] text-text-muted">
-                                  {isConnected ? "已连接" : "未连接"}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex justify-end">
-                              {isConnected && connectedChannel ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDisconnect(connectedChannel.id)
-                                  }
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
-                                >
-                                  <Unlink size={12} />
-                                  断开连接
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowChannelManager(false);
-                                    setModalChannel(
-                                      ch.id as "feishu" | "slack" | "discord",
-                                    );
-                                  }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border text-text-secondary hover:bg-surface-2 hover:border-border-hover transition-colors"
-                                >
-                                  <Plus size={12} />
-                                  连接
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Models tab */}
-                  {botManagerTab === "models" && (
-                    <div className="space-y-2">
-                      {/* Default model selector */}
-                      <div className="relative" ref={modelDropdownRef}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowModelDropdown(!showModelDropdown)
-                          }
-                          className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-0 px-3 py-2 transition-colors hover:border-border-hover"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {currentModelId ? (
-                              <span className="w-4 h-4 shrink-0 flex items-center justify-center">
-                                <ProviderLogo
-                                  provider={
-                                    models.find(
-                                      (m) => m.id === currentModelId,
-                                    )?.provider ?? "nexu"
-                                  }
-                                  size={14}
-                                />
-                              </span>
-                            ) : (
-                              <Cpu
+                {/* Models tab */}
+                {botManagerTab === "models" && (
+                  <div className="space-y-2">
+                    {/* Default model selector */}
+                    <div className="relative" ref={modelDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowModelDropdown(!showModelDropdown)
+                        }
+                        className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-0 px-3 py-2 transition-colors hover:border-border-hover"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {currentModelId ? (
+                            <span className="w-4 h-4 shrink-0 flex items-center justify-center">
+                              <ProviderLogo
+                                provider={
+                                  models.find(
+                                    (m) => m.id === currentModelId,
+                                  )?.provider ?? "nexu"
+                                }
                                 size={14}
-                                className="text-accent shrink-0"
                               />
-                            )}
-                            <span className="text-[12px] font-medium text-text-primary truncate">
-                              {modelName || "未选择"}
                             </span>
-                          </div>
-                          <ChevronDown
-                            size={12}
-                            className={cn(
-                              "text-text-muted transition-transform shrink-0",
-                              showModelDropdown && "rotate-180",
-                            )}
-                          />
-                        </button>
+                          ) : (
+                            <Cpu
+                              size={14}
+                              className="text-accent shrink-0"
+                            />
+                          )}
+                          <span className="text-[12px] font-medium text-text-primary truncate">
+                            {modelName || "未选择"}
+                          </span>
+                        </div>
+                        <ChevronDown
+                          size={12}
+                          className={cn(
+                            "text-text-muted transition-transform shrink-0",
+                            showModelDropdown && "rotate-180",
+                          )}
+                        />
+                      </button>
 
-                        {showModelDropdown && (() => {
-                          const query = modelSearch.toLowerCase().trim();
-                          const filteredProviders = modelsByProvider
-                            .map((p) => ({
-                              ...p,
-                              models: p.models.filter(
-                                (m) =>
-                                  !query ||
-                                  m.name.toLowerCase().includes(query) ||
-                                  p.name.toLowerCase().includes(query),
-                              ),
-                            }))
-                            .filter((p) => p.models.length > 0);
+                      {showModelDropdown && (() => {
+                        const query = modelSearch.toLowerCase().trim();
+                        const filteredProviders = modelsByProvider
+                          .map((p) => ({
+                            ...p,
+                            models: p.models.filter(
+                              (m) =>
+                                !query ||
+                                m.name.toLowerCase().includes(query) ||
+                                p.name.toLowerCase().includes(query),
+                            ),
+                          }))
+                          .filter((p) => p.models.length > 0);
 
-                          return (
-                            <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-surface-1 shadow-xl">
-                              {/* Search */}
-                              <div className="px-3 pt-3 pb-2">
-                                <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
-                                  <Search
-                                    size={14}
-                                    className="text-text-muted shrink-0"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={modelSearch}
-                                    onChange={(e) => {
-                                      setModelSearch(e.target.value);
-                                      if (e.target.value.trim()) {
-                                        setExpandedProviders(
-                                          new Set(
-                                            modelsByProvider.map(
-                                              (p) => p.id,
-                                            ),
+                        return (
+                          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-surface-1 shadow-xl">
+                            {/* Search */}
+                            <div className="px-3 pt-3 pb-2">
+                              <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
+                                <Search
+                                  size={14}
+                                  className="text-text-muted shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={modelSearch}
+                                  onChange={(e) => {
+                                    setModelSearch(e.target.value);
+                                    if (e.target.value.trim()) {
+                                      setExpandedProviders(
+                                        new Set(
+                                          modelsByProvider.map(
+                                            (p) => p.id,
                                           ),
-                                        );
-                                      }
-                                    }}
-                                    placeholder="搜索模型..."
-                                    className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
-                                    autoFocus
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Provider groups */}
-                              <div className="relative">
-                                <div className="pointer-events-none absolute inset-x-0 top-0 h-4 z-10 bg-gradient-to-b from-surface-1 to-transparent" />
-                                <div
-                                  className="max-h-[360px] overflow-y-auto py-1"
-                                  style={{
-                                    overscrollBehavior: "contain",
-                                    WebkitOverflowScrolling: "touch",
-                                  }}
-                                >
-                                  {filteredProviders.length === 0 ? (
-                                    <div className="px-4 py-8 text-center text-[13px] text-text-muted">
-                                      无匹配模型
-                                    </div>
-                                  ) : (
-                                    filteredProviders.map((provider) => {
-                                      const isExpanded =
-                                        expandedProviders.has(
-                                          provider.id,
-                                        ) || !!query;
-                                      return (
-                                        <div key={provider.id}>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (query) return;
-                                              setExpandedProviders(
-                                                (prev) => {
-                                                  const next = new Set(
-                                                    prev,
-                                                  );
-                                                  if (
-                                                    next.has(provider.id)
-                                                  )
-                                                    next.delete(
-                                                      provider.id,
-                                                    );
-                                                  else
-                                                    next.add(provider.id);
-                                                  return next;
-                                                },
-                                              );
-                                            }}
-                                            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-surface-2/50 transition-colors"
-                                          >
-                                            <ChevronDown
-                                              size={11}
-                                              className={cn(
-                                                "text-text-muted/50 transition-transform",
-                                                !isExpanded && "-rotate-90",
-                                              )}
-                                            />
-                                            <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
-                                              <ProviderLogo
-                                                provider={provider.id}
-                                                size={15}
-                                              />
-                                            </span>
-                                            <span className="text-[12px] font-medium text-text-secondary">
-                                              {provider.name}
-                                            </span>
-                                            <span className="text-[11px] text-text-muted/40 ml-auto tabular-nums">
-                                              {provider.models.length}
-                                            </span>
-                                          </button>
-                                          {isExpanded &&
-                                            provider.models.map(
-                                              (model) => (
-                                                <button
-                                                  key={model.id}
-                                                  type="button"
-                                                  onClick={() =>
-                                                    updateModel.mutate(
-                                                      model.id,
-                                                    )
-                                                  }
-                                                  className={cn(
-                                                    "w-full flex items-center gap-2.5 pl-9 pr-3 py-2 text-left transition-colors hover:bg-surface-2",
-                                                    model.id ===
-                                                      currentModelId &&
-                                                      "bg-accent/5",
-                                                  )}
-                                                >
-                                                  {model.id ===
-                                                  currentModelId ? (
-                                                    <Check
-                                                      size={13}
-                                                      className="text-accent shrink-0"
-                                                    />
-                                                  ) : (
-                                                    <span className="w-[13px] shrink-0" />
-                                                  )}
-                                                  <span className="text-[13px] font-medium text-text-primary truncate flex-1">
-                                                    {model.name}
-                                                  </span>
-                                                </button>
-                                              ),
-                                            )}
-                                        </div>
+                                        ),
                                       );
-                                    })
-                                  )}
-                                </div>
-                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 z-10 bg-gradient-to-t from-surface-1 to-transparent" />
-                              </div>
-
-                              {/* Footer: settings shortcut */}
-                              <div className="border-t border-border px-2 py-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowModelDropdown(false);
-                                    navigate("/workspace/models");
+                                    }
                                   }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface-2"
-                                >
-                                  <Settings
-                                    size={13}
-                                    className="text-text-muted"
-                                  />
-                                  <span className="text-[12px] text-text-muted">
-                                    配置 AI 服务商
-                                  </span>
-                                  <ArrowRight
-                                    size={11}
-                                    className="text-text-muted/50 ml-auto"
-                                  />
-                                </button>
+                                  placeholder="搜索模型..."
+                                  className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
+                                  autoFocus
+                                />
                               </div>
                             </div>
-                          );
-                        })()}
-                      </div>
+
+                            {/* Provider groups */}
+                            <div className="relative">
+                              <div className="pointer-events-none absolute inset-x-0 top-0 h-4 z-10 bg-gradient-to-b from-surface-1 to-transparent" />
+                              <div
+                                className="max-h-[360px] overflow-y-auto py-1"
+                                style={{
+                                  overscrollBehavior: "contain",
+                                  WebkitOverflowScrolling: "touch",
+                                }}
+                              >
+                                {filteredProviders.length === 0 ? (
+                                  <div className="px-4 py-8 text-center text-[13px] text-text-muted">
+                                    无匹配模型
+                                  </div>
+                                ) : (
+                                  filteredProviders.map((provider) => {
+                                    const isExpanded =
+                                      expandedProviders.has(
+                                        provider.id,
+                                      ) || !!query;
+                                    return (
+                                      <div key={provider.id}>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (query) return;
+                                            setExpandedProviders(
+                                              (prev) => {
+                                                const next = new Set(
+                                                  prev,
+                                                );
+                                                if (
+                                                  next.has(provider.id)
+                                                )
+                                                  next.delete(
+                                                    provider.id,
+                                                  );
+                                                else
+                                                  next.add(provider.id);
+                                                return next;
+                                              },
+                                            );
+                                          }}
+                                          className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-surface-2/50 transition-colors"
+                                        >
+                                          <ChevronDown
+                                            size={11}
+                                            className={cn(
+                                              "text-text-muted/50 transition-transform",
+                                              !isExpanded && "-rotate-90",
+                                            )}
+                                          />
+                                          <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
+                                            <ProviderLogo
+                                              provider={provider.id}
+                                              size={15}
+                                            />
+                                          </span>
+                                          <span className="text-[12px] font-medium text-text-secondary">
+                                            {provider.name}
+                                          </span>
+                                          <span className="text-[11px] text-text-muted/40 ml-auto tabular-nums">
+                                            {provider.models.length}
+                                          </span>
+                                        </button>
+                                        {isExpanded &&
+                                          provider.models.map(
+                                            (model) => (
+                                              <button
+                                                key={model.id}
+                                                type="button"
+                                                onClick={() =>
+                                                  updateModel.mutate(
+                                                    model.id,
+                                                  )
+                                                }
+                                                className={cn(
+                                                  "w-full flex items-center gap-2.5 pl-9 pr-3 py-2 text-left transition-colors hover:bg-surface-2",
+                                                  model.id ===
+                                                    currentModelId &&
+                                                    "bg-accent/5",
+                                                )}
+                                              >
+                                                {model.id ===
+                                                currentModelId ? (
+                                                  <Check
+                                                    size={13}
+                                                    className="text-accent shrink-0"
+                                                  />
+                                                ) : (
+                                                  <span className="w-[13px] shrink-0" />
+                                                )}
+                                                <span className="text-[13px] font-medium text-text-primary truncate flex-1">
+                                                  {model.name}
+                                                </span>
+                                              </button>
+                                            ),
+                                          )}
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 z-10 bg-gradient-to-t from-surface-1 to-transparent" />
+                            </div>
+
+                            {/* Footer: settings shortcut */}
+                            <div className="border-t border-border px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowModelDropdown(false);
+                                  navigate("/workspace/models");
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface-2"
+                              >
+                                <Settings
+                                  size={13}
+                                  className="text-text-muted"
+                                />
+                                <span className="text-[12px] text-text-muted">
+                                  配置 AI 服务商
+                                </span>
+                                <ArrowRight
+                                  size={11}
+                                  className="text-text-muted/50 ml-auto"
+                                />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-7">
-            <button
-              type="button"
-              onClick={() => navigate("/workspace/sessions")}
-              className={actionCardBaseClass}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
-                    <MessageSquare size={13} className="text-accent" />
                   </div>
-                  <div className="text-[14px] font-semibold text-text-primary truncate">
-                    View conversations
-                  </div>
-                </div>
-                <ArrowUpRight
-                  size={10}
-                  className="text-text-muted/45 group-hover:text-accent transition-colors shrink-0"
-                />
+                )}
               </div>
-              <div className="mt-1.5 text-[9px] leading-[1.4] text-text-muted/85">
-                Threads and channel activity
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate("/workspace/skills")}
-              className={actionCardBaseClass}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
-                    <Sparkles size={13} className="text-accent" />
-                  </div>
-                  <div className="text-[14px] font-semibold text-text-primary truncate">
-                    Manage skills
-                  </div>
-                </div>
-                <ArrowUpRight
-                  size={10}
-                  className="text-text-muted/45 group-hover:text-accent transition-colors shrink-0"
-                />
-              </div>
-              <div className="mt-1.5 text-[9px] leading-[1.4] text-text-muted/85">
-                Tools and capabilities
-              </div>
-            </button>
-
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={actionCardBaseClass}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-[#111]/8 dark:bg-white/8 flex items-center justify-center shrink-0">
-                    {GITHUB_SVG}
-                  </div>
-                  <div className="text-[14px] font-semibold text-text-primary truncate">
-                    Star us on GitHub
-                  </div>
-                </div>
-                <ArrowUpRight
-                  size={10}
-                  className="text-text-muted/45 group-hover:text-accent transition-colors shrink-0"
-                />
-              </div>
-              <div className="mt-1.5 text-[9px] text-text-muted/85">
-                Follow updates, code, and releases
-              </div>
-            </a>
+            )}
           </div>
         </div>
 
-        {modalChannel && (
-          <ChannelConnectModal
-            channelType={modalChannel}
-            onClose={() => setModalChannel(null)}
-            onConnected={handleConnected}
-          />
-        )}
-      </div>
-    );
-  }
-
-  /* ── Onboarding: no channel connected yet ── */
-  return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Hero card */}
-        <div className="mb-8 rounded-2xl overflow-hidden bg-surface-1 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div className="relative">
-            <div
-              className="aspect-[16/9] max-h-48 bg-surface-2 cursor-default"
-              onMouseEnter={() => setVideoHover(true)}
-              onMouseLeave={() => setVideoHover(false)}
-            >
-              <video
-                ref={videoRef}
-                src="https://static.refly.ai/video/nexu-alpha.mp4"
-                poster="/nexu-alpha-poster.jpg"
-                preload="auto"
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
+        {/* Action cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-7">
+          <button
+            type="button"
+            onClick={() => navigate("/workspace/sessions")}
+            className={actionCardBaseClass}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
+                  <MessageSquare size={13} className="text-accent" />
+                </div>
+                <div className="text-[14px] font-semibold text-text-primary truncate">
+                  View conversations
+                </div>
+              </div>
+              <ArrowUpRight
+                size={10}
+                className="text-text-muted/45 group-hover:text-accent transition-colors shrink-0"
               />
             </div>
-            <h2
-              className="absolute right-40 sm:right-56 top-[55%] -translate-y-1/2 text-[40px] sm:text-[52px] font-normal tracking-tight text-text-primary"
-              style={{ fontFamily: "var(--font-script)" }}
-            >
-              nexu Alpha
-            </h2>
-          </div>
-          <div className="px-6 py-5">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-text-primary leading-relaxed">
-                  连接一个 IM 渠道，激活你的 Bot
-                </p>
-                <div className="mt-1">
-                  <TypingText message="nexu 已就绪，选择一个平台将 Bot 部署到你的工作空间，即可开始使用。" />
+            <div className="mt-1.5 text-[9px] leading-[1.4] text-text-muted/85">
+              Threads and channel activity
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/workspace/skills")}
+            className={actionCardBaseClass}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-accent/8 flex items-center justify-center shrink-0">
+                  <Sparkles size={13} className="text-accent" />
                 </div>
-                <div className="flex items-center gap-3 mt-3 text-[11px] text-text-muted">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                    等待配置
-                  </span>
-                  <span>0 个渠道已连接</span>
+                <div className="text-[14px] font-semibold text-text-primary truncate">
+                  Manage skills
                 </div>
               </div>
+              <ArrowUpRight
+                size={10}
+                className="text-text-muted/45 group-hover:text-accent transition-colors shrink-0"
+              />
             </div>
-          </div>
-        </div>
+            <div className="mt-1.5 text-[9px] leading-[1.4] text-text-muted/85">
+              Tools and capabilities
+            </div>
+          </button>
 
-        {/* Channel selection */}
-        <div className="mb-8">
-          <h2 className="text-[14px] font-semibold text-text-primary mb-3">
-            选择渠道
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {CHANNEL_OPTIONS.map((ch) => (
-              <button
-                key={ch.id}
-                type="button"
-                onClick={() => {
-                  track("home_channel_click", { channel: ch.id });
-                  setModalChannel(ch.id as "feishu" | "slack" | "discord");
-                }}
-                className="group relative flex items-center gap-3.5 px-4 py-4 rounded-xl border border-border bg-surface-1 hover:bg-surface-2 hover:border-border-hover transition-all text-left cursor-pointer active:scale-[0.98]"
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border"
-                  style={{ backgroundColor: "rgba(255, 255, 255, 0.063)" }}
-                >
-                  {ch.icon}
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={actionCardBaseClass}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-[#111]/8 dark:bg-white/8 flex items-center justify-center shrink-0">
+                  {GITHUB_SVG}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-semibold text-text-primary">
-                      {ch.name}
-                    </span>
-                    {ch.recommended && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-accent/10 text-accent border border-accent/20">
-                        推荐
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-text-muted">
-                    {ch.subtitle}
-                  </span>
+                <div className="text-[14px] font-semibold text-text-primary truncate">
+                  Star us on GitHub
                 </div>
-                <ArrowRight
-                  size={14}
-                  className="text-text-muted group-hover:text-text-secondary transition-colors shrink-0"
-                />
-              </button>
-            ))}
-          </div>
+              </div>
+              <ArrowUpRight
+                size={10}
+                className="text-text-muted/45 group-hover:text-accent transition-colors shrink-0"
+              />
+            </div>
+            <div className="mt-1.5 text-[9px] text-text-muted/85">
+              Follow updates, code, and releases
+            </div>
+          </a>
         </div>
       </div>
+
       {modalChannel && (
         <ChannelConnectModal
           channelType={modalChannel}

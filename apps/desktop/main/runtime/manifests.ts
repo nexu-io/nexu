@@ -145,6 +145,7 @@ export function createRuntimeUnitManifests(
         WEB_URL: webUrl,
         INTERNAL_API_TOKEN: internalApiToken,
         SKILL_API_TOKEN: skillApiToken,
+        NEXU_DESKTOP_MODE: "true",
       },
     },
     {

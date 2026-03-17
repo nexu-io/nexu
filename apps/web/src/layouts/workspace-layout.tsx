@@ -11,9 +11,10 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  Rocket,
   Settings,
+  Sparkles,
   X,
-  Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -159,6 +160,7 @@ export function WorkspaceLayout() {
     location.pathname === "/workspace/home";
   const isChannelsPage = location.pathname.includes("/channels");
   const isSkillsPage = location.pathname.includes("/skills");
+  const isModelsPage = location.pathname.includes("/models");
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
@@ -174,6 +176,7 @@ export function WorkspaceLayout() {
     !isHomePage &&
     !isChannelsPage &&
     !isSkillsPage &&
+    !isModelsPage &&
     !selectedSessionId;
 
   const selectedSession = selectedSessionId
@@ -182,17 +185,21 @@ export function WorkspaceLayout() {
   const mobileTitle = isHomePage
     ? "Home"
     : isChannelsPage
-      ? "Channels"
+      ? "Deployments"
       : isSkillsPage
         ? "Skills"
-        : selectedSession?.title || "Conversations";
+        : isModelsPage
+          ? "Settings"
+          : selectedSession?.title || "Conversations";
   const mobileSubtitle = isHomePage
     ? "Welcome to nexu"
     : isChannelsPage
-      ? "Configure your channels"
+      ? "All deployment records"
       : isSkillsPage
         ? "Browse AI capabilities"
-        : selectedSession
+        : isModelsPage
+          ? "Manage AI model providers"
+          : selectedSession
           ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
@@ -247,20 +254,88 @@ export function WorkspaceLayout() {
           )}
         </div>
 
-        {/* Session list */}
+        {/* Main nav + conversations */}
         <div className="flex-1 overflow-y-auto">
-          {!collapsed && (
-            <div className="px-3 pt-3 mb-2">
-              <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider px-1">
-                Conversations ({sessions.length})
-              </div>
-            </div>
-          )}
-
-          {sessions.length > 0 ? (
-            <div
-              className={cn("space-y-0.5 pb-3", collapsed ? "px-2" : "px-3")}
+          {/* Nav items */}
+          <div className={cn(collapsed ? "px-2" : "px-3", "pt-3 pb-1")}>
+            <Link
+              to="/workspace/home"
+              title={collapsed ? "Home" : undefined}
+              onClick={() => track("workspace_home_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isHomePage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
             >
+              <Home size={14} />
+              {!collapsed && "Home"}
+            </Link>
+            <Link
+              to="/workspace/channels"
+              title={collapsed ? "Deployments" : undefined}
+              onClick={() => track("workspace_deployments_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isChannelsPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <Rocket size={14} />
+              {!collapsed && "Deployments"}
+            </Link>
+            <Link
+              to="/workspace/skills"
+              title={collapsed ? "Skills" : undefined}
+              onClick={() => track("workspace_skills_click")}
+              className={cn(
+                "flex items-center justify-between w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isSkillsPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <Sparkles size={14} />
+                {!collapsed && "Skills"}
+              </span>
+              {!collapsed && (
+                <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
+                  {sessions.length > 0 ? sessions.length : ""}
+                </span>
+              )}
+            </Link>
+            <Link
+              to="/workspace/models"
+              title={collapsed ? "Settings" : undefined}
+              onClick={() => track("workspace_settings_click")}
+              className={cn(
+                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                isModelsPage
+                  ? "bg-accent/10 text-accent"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+              )}
+            >
+              <Settings size={14} />
+              {!collapsed && "Settings"}
+            </Link>
+          </div>
+
+          {/* Conversations section */}
+          <div className={cn(collapsed ? "px-2" : "px-3", "pt-2")}>
+            <div className="border-t border-border pt-2 mb-1.5" />
+            {!collapsed && (
+              <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
+                Conversations
+              </div>
+            )}
+            <div className="space-y-0.5">
               {sessions.map((s) => {
                 const isActive = selectedSessionId === s.id;
                 return (
@@ -314,72 +389,6 @@ export function WorkspaceLayout() {
                 );
               })}
             </div>
-          ) : !collapsed ? (
-            <div className="px-4 py-6 text-center">
-              <div className="flex justify-center items-center mx-auto mb-2 w-8 h-8 rounded-lg bg-accent/10">
-                <Zap size={14} className="text-accent" />
-              </div>
-              <p className="text-[12px] text-text-muted leading-relaxed">
-                Once your bot is set up, conversations with 🦞 will appear here
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate("/workspace/channels")}
-                className="mt-3 text-[12px] text-accent font-medium hover:underline"
-              >
-                Set up →
-              </button>
-            </div>
-          ) : null}
-
-          {/* Channel config entry */}
-          <div className={cn(collapsed ? "px-2" : "px-3", "pb-3")}>
-            <div className="border-t border-border pt-2" />
-            <Link
-              to="/workspace/home"
-              title={collapsed ? "Home" : undefined}
-              onClick={() => track("workspace_home_click")}
-              className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                isHomePage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
-              )}
-            >
-              <Home size={14} />
-              {!collapsed && "Home"}
-            </Link>
-            <Link
-              to="/workspace/channels"
-              title={collapsed ? "Channels" : undefined}
-              onClick={() => track("workspace_config_click")}
-              className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                isChannelsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
-              )}
-            >
-              <Settings size={14} />
-              {!collapsed && "Channels"}
-            </Link>
-            <Link
-              to="/workspace/skills"
-              title={collapsed ? "Skills" : undefined}
-              onClick={() => track("workspace_skills_click")}
-              className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                isSkillsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
-              )}
-            >
-              <Zap size={14} />
-              {!collapsed && "Skills"}
-            </Link>
           </div>
         </div>
 
@@ -496,93 +505,14 @@ export function WorkspaceLayout() {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                <div className="px-4 pt-3 mb-2">
-                  <div className="text-[10px] font-medium text-text-muted uppercase tracking-wider px-1">
-                    Conversations ({sessions.length})
-                  </div>
-                </div>
-
-                {sessions.length > 0 ? (
-                  <div className="space-y-0.5 pb-3 px-3">
-                    {sessions.map((s) => {
-                      const isActive = selectedSessionId === s.id;
-                      return (
-                        <button
-                          type="button"
-                          key={s.id}
-                          onClick={() => {
-                            track("workspace_channel_click", {
-                              channel_type: s.channelType ?? "web",
-                            });
-                            setMobileDrawerOpen(false);
-                            navigate(`/workspace/sessions/${s.id}`);
-                          }}
-                          className={cn(
-                            "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer px-2.5 py-2 text-left",
-                            isActive
-                              ? "bg-accent/10 text-accent"
-                              : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
-                          )}
-                        >
-                          <SidebarPlatformIcon
-                            platform={s.channelType ?? "web"}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[13px] truncate font-medium">
-                              {s.title}
-                            </div>
-                            <div className="text-[10px] text-text-muted truncate">
-                              {formatTime(s.lastMessageAt || s.updatedAt)}
-                              {s.channelType && ` · ${s.channelType}`}
-                            </div>
-                          </div>
-                          <div
-                            className={cn(
-                              "w-1.5 h-1.5 rounded-full shrink-0",
-                              s.status === "active"
-                                ? "bg-emerald-500"
-                                : "bg-text-muted/30",
-                            )}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="px-4 py-6 text-center">
-                    <div className="flex justify-center items-center mx-auto mb-2 w-8 h-8 rounded-lg bg-accent/10">
-                      <Zap size={14} className="text-accent" />
-                    </div>
-                    <p className="text-[12px] text-text-muted leading-relaxed">
-                      Once your bot is set up, conversations with 🦞 will appear
-                      here
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMobileDrawerOpen(false);
-                        navigate("/workspace/channels");
-                      }}
-                      className="mt-3 text-[12px] text-accent font-medium hover:underline"
-                    >
-                      Set up →
-                    </button>
-                  </div>
-                )}
-
-                <div className="px-3 pb-3">
-                  <div className="border-t border-border pt-2" />
+                {/* Nav items */}
+                <div className="px-3 pt-3 pb-1">
                   <Link
                     to="/workspace/home"
-                    onClick={() => {
-                      track("workspace_home_click");
-                      setMobileDrawerOpen(false);
-                    }}
+                    onClick={() => { track("workspace_home_click"); setMobileDrawerOpen(false); }}
                     className={cn(
-                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1 px-3 py-2",
-                      isHomePage
-                        ? "bg-accent/10 text-accent"
-                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5 px-3 py-2",
+                      isHomePage ? "bg-accent/10 text-accent" : "text-text-muted hover:text-text-primary hover:bg-surface-3",
                     )}
                   >
                     <Home size={14} />
@@ -590,36 +520,80 @@ export function WorkspaceLayout() {
                   </Link>
                   <Link
                     to="/workspace/channels"
-                    onClick={() => {
-                      track("workspace_config_click");
-                      setMobileDrawerOpen(false);
-                    }}
+                    onClick={() => { track("workspace_deployments_click"); setMobileDrawerOpen(false); }}
                     className={cn(
-                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1 px-3 py-2",
-                      isChannelsPage
-                        ? "bg-accent/10 text-accent"
-                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5 px-3 py-2",
+                      isChannelsPage ? "bg-accent/10 text-accent" : "text-text-muted hover:text-text-primary hover:bg-surface-3",
                     )}
                   >
-                    <Settings size={14} />
-                    Channels
+                    <Rocket size={14} />
+                    Deployments
                   </Link>
                   <Link
                     to="/workspace/skills"
-                    onClick={() => {
-                      track("workspace_skills_click");
-                      setMobileDrawerOpen(false);
-                    }}
+                    onClick={() => { track("workspace_skills_click"); setMobileDrawerOpen(false); }}
                     className={cn(
-                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-1 px-3 py-2",
-                      isSkillsPage
-                        ? "bg-accent/10 text-accent"
-                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                      "flex items-center justify-between w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5 px-3 py-2",
+                      isSkillsPage ? "bg-accent/10 text-accent" : "text-text-muted hover:text-text-primary hover:bg-surface-3",
                     )}
                   >
-                    <Zap size={14} />
-                    Skills
+                    <span className="flex items-center gap-2">
+                      <Sparkles size={14} />
+                      Skills
+                    </span>
+                    <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
+                      {sessions.length > 0 ? sessions.length : ""}
+                    </span>
                   </Link>
+                  <Link
+                    to="/workspace/models"
+                    onClick={() => { track("workspace_settings_click"); setMobileDrawerOpen(false); }}
+                    className={cn(
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5 px-3 py-2",
+                      isModelsPage ? "bg-accent/10 text-accent" : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                    )}
+                  >
+                    <Settings size={14} />
+                    Settings
+                  </Link>
+                </div>
+
+                {/* Conversations section */}
+                <div className="px-3 pt-2 pb-3">
+                  <div className="border-t border-border pt-2 mb-1.5" />
+                  <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
+                    Conversations
+                  </div>
+                  <div className="space-y-0.5">
+                    {sessions.map((s) => {
+                      const isActive = selectedSessionId === s.id;
+                      return (
+                        <button
+                          type="button"
+                          key={s.id}
+                          onClick={() => {
+                            track("workspace_channel_click", { channel_type: s.channelType ?? "web" });
+                            setMobileDrawerOpen(false);
+                            navigate(`/workspace/sessions/${s.id}`);
+                          }}
+                          className={cn(
+                            "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer px-2.5 py-2 text-left",
+                            isActive ? "bg-accent/10 text-accent" : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
+                          )}
+                        >
+                          <SidebarPlatformIcon platform={s.channelType ?? "web"} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] truncate font-medium">{s.title}</div>
+                            <div className="text-[10px] text-text-muted truncate">
+                              {formatTime(s.lastMessageAt || s.updatedAt)}
+                              {s.channelType && ` · ${s.channelType}`}
+                            </div>
+                          </div>
+                          <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", s.status === "active" ? "bg-emerald-500" : "bg-text-muted/30")} />
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
