@@ -638,6 +638,53 @@ export const supportedSkills = pgTable("supported_skills", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+// Desktop cloud connection: stores pending device authorizations for the
+// "Connect to Cloud" flow. Rows are short-lived (5 min expiry) and deleted
+// after the desktop client polls the completed API key.
+export const deviceAuthorizations = pgTable(
+  "device_authorizations",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    deviceId: text("device_id").notNull().unique(),
+    deviceSecretHash: text("device_secret_hash").notNull(),
+    userId: text("user_id"),
+    encryptedApiKey: text("encrypted_api_key"),
+    status: text("status").notNull().default("pending"),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index("device_auth_device_id_idx").on(table.deviceId),
+    index("device_auth_status_idx").on(table.status),
+  ],
+);
+
+// BYOK (Bring Your Own Key) provider credentials.
+// Users configure their own LLM API keys here instead of using Nexu cloud.
+export const modelProviders = pgTable(
+  "model_providers",
+  {
+    pk: serial("pk").primaryKey(),
+    id: text("id").notNull().unique(),
+    providerId: text("provider_id").notNull().unique(),
+    displayName: text("display_name").notNull(),
+    encryptedApiKey: text("encrypted_api_key").notNull(),
+    baseUrl: text("base_url"),
+    enabled: boolean("enabled").notNull().default(true),
+    modelsJson: text("models_json").notNull().default("[]"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [index("model_providers_provider_id_idx").on(table.providerId)],
+);
+
 // Test-only table used to validate post-merge DB migration workflow.
 export const e2eTestMigration = pgTable("e2e_test_migration", {
   id: text("id").primaryKey(),

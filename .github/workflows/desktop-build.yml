@@ -1,0 +1,217 @@
+name: Desktop Build (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target environment name"
+        required: true
+        type: string
+      cloud_url:
+        description: "NEXU_CLOUD_URL value"
+        required: true
+        type: string
+      link_url:
+        description: "NEXU_LINK_URL value (use 'null' for no link)"
+        required: false
+        type: string
+        default: "null"
+      release_tag:
+        description: "GitHub release tag name"
+        required: true
+        type: string
+      release_name:
+        description: "GitHub release display name"
+        required: true
+        type: string
+      artifact_suffix:
+        description: "Suffix for artifact names (e.g. '-test' or empty)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Resolve build metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); process.stdout.write(pkg.version);')
+          build_date=$(date +"%Y%m%d")
+          short_sha="${GITHUB_SHA::7}"
+
+          {
+            echo "desktop_version=$desktop_version"
+            echo "build_date=$build_date"
+            echo "short_sha=$short_sha"
+            echo "artifact_name=desktop-nightly${{ inputs.artifact_suffix }}-${build_date}-${short_sha}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Apple signing certificate
+        shell: bash
+        env:
+          APPLE_SIGNING_CERTIFICATE_BASE64: ${{ secrets.APPLE_SIGNING_CERTIFICATE_BASE64 }}
+          APPLE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$APPLE_SIGNING_CERTIFICATE_BASE64" ] || [ -z "$APPLE_SIGNING_CERTIFICATE_PASSWORD" ]; then
+            echo "Missing Apple signing certificate secrets" >&2
+            exit 1
+          fi
+
+          cert_path="$RUNNER_TEMP/nexu-desktop-signing.p12"
+          if ! printf '%s' "$APPLE_SIGNING_CERTIFICATE_BASE64" | base64 --decode > "$cert_path" 2>/dev/null; then
+            printf '%s' "$APPLE_SIGNING_CERTIFICATE_BASE64" | base64 -D > "$cert_path"
+          fi
+
+          {
+            echo "CSC_LINK=$cert_path"
+            echo "CSC_KEY_PASSWORD=$APPLE_SIGNING_CERTIFICATE_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate build config
+        shell: bash
+        env:
+          CLOUD_URL: ${{ inputs.cloud_url }}
+          LINK_URL: ${{ inputs.link_url }}
+        run: |
+          if [ "$LINK_URL" = "null" ]; then
+            cat > apps/desktop/build-config.json << EOF
+          {
+            "NEXU_CLOUD_URL": "$CLOUD_URL",
+            "NEXU_LINK_URL": null
+          }
+          EOF
+          else
+            cat > apps/desktop/build-config.json << EOF
+          {
+            "NEXU_CLOUD_URL": "$CLOUD_URL",
+            "NEXU_LINK_URL": "$LINK_URL"
+          }
+          EOF
+          fi
+
+          echo "[build] Generated build-config.json for ${{ inputs.environment }} environment:"
+          cat apps/desktop/build-config.json
+
+      - name: Build signed desktop app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @nexu/desktop dist:mac
+
+      - name: Prepare artifacts
+        shell: bash
+        env:
+          SUFFIX: ${{ inputs.artifact_suffix }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          mkdir -p apps/desktop/nightly-artifacts
+          rm -f apps/desktop/nightly-artifacts/*
+
+          dmg_files=(apps/desktop/release/*.dmg)
+          zip_files=(apps/desktop/release/*.zip)
+
+          if [ "${#dmg_files[@]}" -eq 0 ] || [ "${#zip_files[@]}" -eq 0 ]; then
+            echo "Expected both dmg and zip artifacts in apps/desktop/release" >&2
+            exit 1
+          fi
+
+          cp "${dmg_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.dmg"
+          cp "${zip_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.zip"
+
+          shasum -a 256 \
+            "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.dmg" \
+            "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.zip" \
+            > apps/desktop/nightly-artifacts/desktop-sha256.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: |
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.dmg
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.zip
+            apps/desktop/nightly-artifacts/desktop-sha256.txt
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ inputs.release_name }}
+          prerelease: true
+          draft: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Automated desktop build.
+
+            - Version: `${{ steps.meta.outputs.desktop_version }}`
+            - Environment: `${{ inputs.environment }}`
+            - Commit: `${{ github.sha }}`
+            - Built: `${{ steps.meta.outputs.build_date }}`
+
+            The packaged `Nexu.app` bundle is notarized and stapled.
+
+            This build is intended for testing and may be unstable.
+          files: |
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.dmg
+            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.zip
+            apps/desktop/nightly-artifacts/desktop-sha256.txt
+
+  cleanup-artifacts:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Delete old artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PREFIX: desktop-nightly${{ inputs.artifact_suffix }}
+        run: |
+          set -euo pipefail
+
+          cutoff_date=$(date -d "14 days ago" +%Y-%m-%d)
+
+          gh api "repos/$REPO/actions/artifacts" --paginate | \
+            jq -r '.artifacts[] | select(.name | startswith("'"$PREFIX"'")) | select(.created_at < "'"$cutoff_date"'") | .id' | \
+            while read -r artifact_id; do
+              if [ -n "$artifact_id" ]; then
+                gh api "repos/$REPO/actions/artifacts/$artifact_id" -X DELETE
+              fi
+            done

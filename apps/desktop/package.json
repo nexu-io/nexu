@@ -79,6 +79,11 @@
       {
         "from": ".dist-runtime",
         "to": "runtime"
+      },
+      {
+        "from": "build-config.json",
+        "to": "build-config.json",
+        "filter": ["**/*"]
       }
     ],
     "afterSign": "./scripts/notarize.cjs",

@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 export const DEFAULT_API_PORT = 50_800;
 export const DEFAULT_WEB_PORT = 50_810;
 export const DEFAULT_PGLITE_PORT = 50_832;
@@ -7,6 +10,27 @@ export const DEFAULT_SKILL_TOKEN = "skill-secret-token";
 export const DEFAULT_GATEWAY_POOL_ID = "desktop-local-pool";
 export const DEFAULT_PGLITE_DATABASE_URL = (port: number) =>
   `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
+
+// Cloud connection defaults (production)
+export const DEFAULT_NEXU_CLOUD_URL = "https://nexu.io";
+export const DEFAULT_NEXU_LINK_URL: string | null = null;
+
+/**
+ * Read build-time configuration from bundled config file.
+ * This allows CI to inject environment-specific values at build time.
+ */
+function loadBuildConfig(resourcesPath?: string): Record<string, string> {
+  if (!resourcesPath) return {};
+
+  const configPath = resolve(resourcesPath, "build-config.json");
+  if (!existsSync(configPath)) return {};
+
+  try {
+    return JSON.parse(readFileSync(configPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
 
 export type DesktopRuntimeConfig = {
   ports: {
@@ -19,6 +43,8 @@ export type DesktopRuntimeConfig = {
     web: string;
     auth: string;
     openclawBase: string;
+    nexuCloud: string;
+    nexuLink: string | null;
   };
   tokens: {
     gateway: string;
@@ -47,8 +73,11 @@ export function getDesktopRuntimeConfig(
   env: Record<string, string | undefined>,
   defaults?: {
     openclawBinPath?: string;
+    resourcesPath?: string;
   },
 ): DesktopRuntimeConfig {
+  // Load build-time config (for packaged apps)
+  const buildConfig = loadBuildConfig(defaults?.resourcesPath);
   const ports = {
     api: Number.parseInt(env.NEXU_API_PORT ?? String(DEFAULT_API_PORT), 10),
     web: Number.parseInt(env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT), 10),
@@ -70,6 +99,12 @@ export function getDesktopRuntimeConfig(
       env.NEXU_API_BASE_URL ??
       `http://127.0.0.1:${ports.api}`,
     openclawBase: env.NEXU_OPENCLAW_BASE_URL ?? DEFAULT_OPENCLAW_BASE_URL,
+    nexuCloud:
+      env.NEXU_CLOUD_URL ??
+      buildConfig.NEXU_CLOUD_URL ??
+      DEFAULT_NEXU_CLOUD_URL,
+    nexuLink:
+      env.NEXU_LINK_URL ?? buildConfig.NEXU_LINK_URL ?? DEFAULT_NEXU_LINK_URL,
   };
 
   return {

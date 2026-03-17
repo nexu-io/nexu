@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { Span } from "./lib/trace-decorator.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { desktopAuthMiddleware } from "./middleware/desktop-auth.js";
 import {
   errorMiddleware,
   logHandledError,
@@ -25,6 +26,11 @@ import {
   registerClaimRoutes,
 } from "./routes/claim-routes.js";
 import { registerComposioRoutes } from "./routes/composio-routes.js";
+import {
+  registerDesktopAuthorizeRoute,
+  registerDesktopDeviceRoutes,
+} from "./routes/desktop-auth-routes.js";
+import { registerDesktopLocalRoutes } from "./routes/desktop-local-routes.js";
 import { registerFeedbackRoutes } from "./routes/feedback-routes.js";
 import { registerFeishuEvents } from "./routes/feishu-events.js";
 import {
@@ -54,6 +60,11 @@ import { registerUserRoutes } from "./routes/user-routes.js";
 import { registerWorkspaceTemplateRoutes } from "./routes/workspace-template-routes.js";
 
 import type { AppBindings } from "./types.js";
+
+/** Whether this API instance is running in Nexu Desktop (local) mode. */
+export function isDesktopMode(): boolean {
+  return process.env.NEXU_DESKTOP_MODE === "true";
+}
 
 class HealthHandler {
   constructor(private readonly commitHash?: string) {}
@@ -94,6 +105,13 @@ export function createApp() {
     }),
   );
 
+  // Desktop mode: permissive CORS for internal endpoints (localhost-only, safe)
+  if (isDesktopMode()) {
+    app.use("/api/internal/desktop/*", cors({ origin: "*" }));
+    registerDesktopLocalRoutes(app);
+  }
+
+  registerDesktopDeviceRoutes(app);
   registerAuthRoutes(app);
   registerSlackOAuthCallback(app);
   registerFeishuOAuthCallback(app);
@@ -109,8 +127,27 @@ export function createApp() {
   registerClaimPublicRoutes(app);
   registerSharedSlackClaimPublicRoutes(app);
 
-  app.use("/api/v1/*", authMiddleware);
+  // Auth middleware — validates session cookie and sets userId/session.
+  // Desktop mode: try cookie-based auth first, fall back to desktop-auth
+  // (which resolves the user from DB without cookies) if cookie isn't
+  // synced to the webview yet.
+  if (isDesktopMode()) {
+    app.use("/api/v1/*", async (c, next) => {
+      try {
+        await authMiddleware(c, async () => {});
+        if (c.get("userId")) {
+          return next();
+        }
+      } catch {
+        // Cookie not available yet — fall back to desktop auth
+      }
+      return desktopAuthMiddleware(c, next);
+    });
+  } else {
+    app.use("/api/v1/*", authMiddleware);
+  }
 
+  registerDesktopAuthorizeRoute(app);
   registerUserRoutes(app);
   registerBotRoutes(app);
   registerChannelRoutes(app);
