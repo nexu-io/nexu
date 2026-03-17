@@ -504,23 +504,25 @@ function DesktopShell() {
       </aside>
 
       <main className="desktop-shell-stage">
-        {activeSurface === "web" ? (
+        <div style={{ display: activeSurface === "control" ? "contents" : "none" }}>
+          <EmbeddedControlPlane />
+        </div>
+        <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
           <SurfaceFrame
             description="Authenticated workspace surface served by the repo-local web sidecar."
             src={desktopWebUrl}
             title="Nexu Web"
             version={webSurfaceVersion}
           />
-        ) : activeSurface === "openclaw" ? (
+        </div>
+        <div style={{ display: activeSurface === "openclaw" ? "contents" : "none" }}>
           <SurfaceFrame
             description="Local OpenClaw gateway UI for inspecting runtime auth, models, and sessions."
             src={desktopOpenClawUrl}
             title="OpenClaw Gateway"
             version={0}
           />
-        ) : (
-          <EmbeddedControlPlane />
-        )}
+        </div>
       </main>
     </div>
   );
