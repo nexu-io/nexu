@@ -6,7 +6,7 @@
 
 连接飞书、Slack 或 Discord，Agent 直达手机端 📱——在你日常用的聊天工具里直接对话。
 
-![nexu 客户端](/assets/nexu-home.png)
+![nexu 客户端](/assets/nexu-home.webp)
 
 ## 快速导航
 

@@ -5,11 +5,14 @@
   "type": "module",
   "packageManager": "pnpm@10.26.0",
   "scripts": {
-    "dev": "vitepress dev . --host 0.0.0.0",
+    "dev": "node ./scripts/dev.mjs",
     "build": "vitepress build .",
-    "preview": "vitepress preview ."
+    "preview": "vitepress preview .",
+    "normalize-assets": "node ./scripts/normalize-assets.mjs",
+    "normalize-assets:watch": "node ./scripts/watch-assets.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.34.5",
     "vitepress": "^1.6.4"
   }
 }

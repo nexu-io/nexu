@@ -10,53 +10,53 @@ All you need is a Signing Secret and a Bot Token to connect your Slack bot to ne
 
 2. Select the Workspace to install to and click "Next".
 
-![Pick a Workspace](/assets/slack/step1-pick-workspace.png)
+![Pick a Workspace](/assets/slack/step1-pick-workspace.webp)
 
 3. Review the pre-configured permissions and URLs, then click "Create".
 
-![Review and Create](/assets/slack/step1-review-create.png)
+![Review and Create](/assets/slack/step1-review-create.webp)
 
 4. Once created, click "Got It".
 
-![App Created](/assets/slack/step1-welcome.png)
+![App Created](/assets/slack/step1-welcome.webp)
 
 ## Step 2: Get the Signing Secret
 
 Go to "Basic Information" → "App Credentials" and copy:
 - **Signing Secret**
 
-![Get Signing Secret](/assets/slack/step2-signing-secret.png)
+![Get Signing Secret](/assets/slack/step2-signing-secret.webp)
 
 ## Step 3: Get the Bot Token
 
 1. In the sidebar, go to "Install App" and click "Install to Workspace".
 
-![Install App](/assets/slack/step3-install-app.png)
+![Install App](/assets/slack/step3-install-app.webp)
 
 2. On the authorization page, click "Allow".
 
-![Authorize App](/assets/slack/step3-authorize.png)
+![Authorize App](/assets/slack/step3-authorize.webp)
 
 3. Copy and save:
    - **Bot User OAuth Token**
 
-![Get Bot Token](/assets/slack/step3-bot-token.png)
+![Get Bot Token](/assets/slack/step3-bot-token.webp)
 
 ## Step 4: Enable Direct Messages
 
 In the sidebar, go to "App Home", scroll down to "Show Tabs" → "Messages Tab", make sure it's enabled, and check "Allow users to send Slash commands and messages from the messages tab".
 
-![Enable Direct Messages](/assets/slack/step4-app-home.png)
+![Enable Direct Messages](/assets/slack/step4-app-home.webp)
 
 ## Step 5: Add credentials to nexu
 
 Open the nexu client, enter the Bot User OAuth Token and Signing Secret in the Slack channel settings, and click "Connect".
 
-![Add credentials in nexu](/assets/slack/step5-nexu-connect.png)
+![Add credentials in nexu](/assets/slack/step5-nexu-connect.webp)
 
 Once connected, click "Chat" to jump to Slack and chat with your bot 🎉
 
-![Slack connected](/assets/slack/step5-connected.jpg)
+![Slack connected](/assets/slack/step5-connected.webp)
 
 ## FAQ
 

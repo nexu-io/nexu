@@ -10,53 +10,53 @@
 
 2. 选择要安装到的 Workspace，点击「Next」。
 
-![选择 Workspace](/assets/slack/step1-pick-workspace.png)
+![选择 Workspace](/assets/slack/step1-pick-workspace.webp)
 
 3. 确认预配置的权限和 URL，点击「Create」。
 
-![确认配置并创建](/assets/slack/step1-review-create.png)
+![确认配置并创建](/assets/slack/step1-review-create.webp)
 
 4. 创建成功后，点击「Got It」。
 
-![创建成功](/assets/slack/step1-welcome.png)
+![创建成功](/assets/slack/step1-welcome.webp)
 
 ## 第二步：获取 Signing Secret
 
 进入「Basic Information」→「App Credentials」，复制保存：
 - **Signing Secret**
 
-![获取 Signing Secret](/assets/slack/step2-signing-secret.png)
+![获取 Signing Secret](/assets/slack/step2-signing-secret.webp)
 
 ## 第三步：获取 Bot Token
 
 1. 在侧边栏进入「Install App」，点击「Install to Workspace」。
 
-![安装应用](/assets/slack/step3-install-app.png)
+![安装应用](/assets/slack/step3-install-app.webp)
 
 2. 在授权页面点击「允许」。
 
-![授权应用](/assets/slack/step3-authorize.png)
+![授权应用](/assets/slack/step3-authorize.webp)
 
 3. 复制保存：
    - **Bot User OAuth Token**
 
-![获取 Bot Token](/assets/slack/step3-bot-token.png)
+![获取 Bot Token](/assets/slack/step3-bot-token.webp)
 
 ## 第四步：开启私信
 
 在侧边栏进入「App Home」，向下找到「Show Tabs」→「Messages Tab」，确认已开启，并勾选「Allow users to send Slash commands and messages from the messages tab」。
 
-![开启私信](/assets/slack/step4-app-home.png)
+![开启私信](/assets/slack/step4-app-home.webp)
 
 ## 第五步：在 nexu 中填入凭证
 
 打开 nexu 客户端，在 Slack 渠道配置中填入 Bot User OAuth Token 和 Signing Secret，点击「Connect」。
 
-![在 nexu 中填入凭证](/assets/slack/step5-nexu-connect.png)
+![在 nexu 中填入凭证](/assets/slack/step5-nexu-connect.webp)
 
 连接成功后，点击「Chat」即可跳转到 Slack 与机器人对话 🎉
 
-![Slack 已连接](/assets/slack/step5-connected.jpg)
+![Slack 已连接](/assets/slack/step5-connected.webp)
 
 ## 常见问题
 
