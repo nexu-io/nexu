@@ -1,20 +1,24 @@
-# Introduction
+---
+layout: false
+title: Redirecting...
+---
 
-This documentation site is a standalone VitePress project for Nexu.
+<script setup>
+import { onMounted } from "vue";
 
-## Structure
+onMounted(() => {
+  const prefersZh = navigator.languages.some((language) =>
+    language.toLowerCase().startsWith("zh"),
+  );
 
-- English docs live under `docs/en/`
-- Simplified Chinese docs live under `docs/zh/`
-- The `docs/` project is independent from the main monorepo workspace
+  window.location.replace(prefersZh ? "./zh/" : "./en/");
+});
+</script>
 
-## What is included
+<noscript>
+  <meta http-equiv="refresh" content="0; url=./en/" />
+</noscript>
 
-- Channel configuration for Feishu, Slack, and Discord
-- Model configuration for managed and BYOK providers
-- Skill installation guidance for `.openclaw/skills/`
+Redirecting to the documentation...
 
-## Languages
-
-- English: [Open English docs](/en/)
-- 简体中文: [打开中文文档](/zh/)
+If you are not redirected, open [English](./en/) or [简体中文](./zh/).

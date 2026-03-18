@@ -148,16 +148,6 @@ export default defineConfig({
     sidebar: {
       "/en/": enSidebar,
       "/zh/": zhSidebar,
-      "/": [
-        {
-          text: "Docs",
-          items: [
-            { text: "Introduction", link: "/" },
-            { text: "English", link: "/en/" },
-            { text: "简体中文", link: "/zh/" },
-          ],
-        },
-      ],
     },
   },
 });
