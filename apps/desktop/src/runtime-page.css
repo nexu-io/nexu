@@ -408,6 +408,14 @@ body,
   font-weight: 600;
 }
 
+.diagnostics-summary-wide {
+  grid-column: 1 / -1;
+}
+
+.diagnostics-summary-wide dd {
+  overflow-wrap: anywhere;
+}
+
 .runtime-pane-layout {
   max-width: 1080px;
   margin: 0 auto;
