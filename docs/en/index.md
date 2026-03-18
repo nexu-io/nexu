@@ -2,6 +2,8 @@
 
 Welcome to the Nexu docs.
 
+![](../public/assets/cover.png)
+
 ## What is covered
 
 - Channel onboarding for Feishu, Slack, and Discord

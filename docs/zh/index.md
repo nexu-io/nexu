@@ -2,6 +2,8 @@
 
 欢迎使用 Nexu 文档。
 
+![](../public/assets/cover.png)
+
 ## 文档范围
 
 - 飞书、Slack、Discord 渠道接入
