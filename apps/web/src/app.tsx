@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthLayout } from "./layouts/auth-layout";
 import { InviteGuardLayout } from "./layouts/invite-guard-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
+import { shouldAutoRedirectToZh } from "./lib/locale";
 import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
 import { CommunitySkillDetailPage } from "./pages/community-skill-detail";
@@ -46,12 +47,23 @@ function DocumentTitleSync() {
   return null;
 }
 
+function LandingRoute() {
+  const location = useLocation();
+
+  if (shouldAutoRedirectToZh(location.pathname)) {
+    return <Navigate to="/zh" replace />;
+  }
+
+  return <WelcomePage />;
+}
+
 export function App() {
   return (
     <>
       <DocumentTitleSync />
       <Routes>
-        <Route path="/" element={<WelcomePage />} />
+        <Route path="/" element={<LandingRoute />} />
+        <Route path="/zh" element={<WelcomePage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/claim" element={<SlackClaimPage />} />
         <Route path="/feishu/bind" element={<FeishuBindPage />} />
@@ -89,6 +101,7 @@ export function App() {
             </Route>
           </Route>
         </Route>
+        <Route path="/zh/*" element={<Navigate to="/zh" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

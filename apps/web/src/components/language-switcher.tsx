@@ -1,6 +1,7 @@
 import { ChevronDown, Globe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { type Locale, useLocale } from "../hooks/use-locale";
+import { useLocale } from "../hooks/use-locale";
+import type { Locale } from "../lib/locale";
 
 interface Props {
   variant?: "light" | "dark" | "muted";

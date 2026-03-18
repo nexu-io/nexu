@@ -1,6 +1,7 @@
 import { BrandMark } from "@/components/brand-mark";
-import { type Locale, useLocale } from "@/hooks/use-locale";
+import { useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
+import type { Locale } from "@/lib/locale";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";

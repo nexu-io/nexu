@@ -6,26 +6,16 @@ import {
   useContext,
   useState,
 } from "react";
-
-export type Locale = "en" | "zh";
+import {
+  type Locale,
+  detectPreferredLocale,
+  persistLocale,
+} from "../lib/locale";
 
 interface LocaleCtx {
   locale: Locale;
   setLocale: (l: Locale) => void;
   t: (key: string) => string;
-}
-
-const STORAGE_KEY = "nexu_locale";
-
-function detectDefault(): Locale {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "zh") return stored;
-  } catch {
-    /* ignore */
-  }
-  const lang = navigator.language || "";
-  return lang.startsWith("zh") ? "zh" : "en";
 }
 
 const LocaleContext = createContext<LocaleCtx>({
@@ -35,16 +25,12 @@ const LocaleContext = createContext<LocaleCtx>({
 });
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(detectDefault);
+  const [locale, setLocaleState] = useState<Locale>(detectPreferredLocale);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     i18n.changeLanguage(l);
-    try {
-      localStorage.setItem(STORAGE_KEY, l);
-    } catch {
-      /* ignore */
-    }
+    persistLocale(l);
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: locale dependency forces re-render on language change
