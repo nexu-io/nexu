@@ -5,7 +5,13 @@ const enSidebar = [
     text: "Get Started",
     items: [
       { text: "Introduction", link: "/" },
-      { text: "Contributing", link: "/guide/contributing" },
+      { text: "30-Minute Quick Start", link: "/guide/quickstart" },
+      { text: "Key Concepts", link: "/guide/concepts" },
+    ],
+  },
+  {
+    text: "Configuration",
+    items: [
       { text: "Channel Configuration", link: "/guide/channels" },
       { text: "Model Configuration", link: "/guide/models" },
       { text: "Skill Installation", link: "/guide/skills" },
@@ -19,6 +25,12 @@ const enSidebar = [
       { text: "Discord", link: "/guide/channels/discord" },
     ],
   },
+  {
+    text: "Community",
+    items: [
+      { text: "Contributing", link: "/guide/contributing" },
+    ],
+  },
 ];
 
 const zhSidebar = [
@@ -26,7 +38,13 @@ const zhSidebar = [
     text: "快速开始",
     items: [
       { text: "介绍", link: "/zh/" },
-      { text: "参与贡献", link: "/zh/guide/contributing" },
+      { text: "30 分钟快速上手", link: "/zh/guide/quickstart" },
+      { text: "核心概念", link: "/zh/guide/concepts" },
+    ],
+  },
+  {
+    text: "配置指南",
+    items: [
       { text: "渠道配置", link: "/zh/guide/channels" },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
@@ -38,6 +56,12 @@ const zhSidebar = [
       { text: "飞书", link: "/zh/guide/channels/feishu" },
       { text: "Slack", link: "/zh/guide/channels/slack" },
       { text: "Discord", link: "/zh/guide/channels/discord" },
+    ],
+  },
+  {
+    text: "社区",
+    items: [
+      { text: "参与贡献", link: "/zh/guide/contributing" },
     ],
   },
 ];
