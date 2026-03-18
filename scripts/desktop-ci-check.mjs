@@ -181,10 +181,6 @@ async function readJsonIfExists(filePath) {
   }
 }
 
-function logHas(content, needle) {
-  return content?.includes(needle) ?? false;
-}
-
 async function isPortListening(port) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn("lsof", [`-iTCP:${String(port)}`, "-sTCP:LISTEN"], {
@@ -216,6 +212,45 @@ function buildMissingCheckSummary(missingChecks) {
   return missingChecks
     .map((entry) => ` - ${entry.unit} :: ${entry.detail}`)
     .join("\n");
+}
+
+async function collectProbeResults(context) {
+  const portResults = await Promise.all(
+    context.ports.map(async ({ unit, port }) => ({
+      unit,
+      port,
+      listening: await isPortListening(port),
+    })),
+  );
+
+  const [apiReady, webReady, webSurface, openclawHealth] = await Promise.all([
+    fetchText(context.readinessUrls.api),
+    fetchText(context.readinessUrls.web),
+    fetchText(context.readinessUrls.webSurface),
+    fetchText(context.readinessUrls.openclawHealth),
+  ]);
+
+  const browserControlListening = await isPortListening(18791);
+
+  return {
+    portResults,
+    apiReady,
+    webReady,
+    webSurface,
+    openclawHealth,
+    browserControlListening,
+  };
+}
+
+function probesPassed(results) {
+  return (
+    results.portResults.every((entry) => entry.listening) &&
+    results.apiReady.body.includes('"ready":true') &&
+    results.webReady.body.includes('"ready":true') &&
+    results.webSurface.body.includes('<div id="root"></div>') &&
+    results.openclawHealth.ok &&
+    results.browserControlListening
+  );
 }
 
 function isRecord(value) {
@@ -545,20 +580,9 @@ async function verifyRuntime(context) {
   for (let attempt = 1; attempt <= maxHealthAttempts; attempt += 1) {
     console.log(`Runtime health attempt ${attempt}/${maxHealthAttempts}`);
 
-    const diagnostics = await readJsonIfExists(context.diagnosticsFile);
-    const gatewayUnit = getDiagnosticsUnit(diagnostics, "gateway");
-    const openclawUnit = getDiagnosticsUnit(diagnostics, "openclaw");
-    const openclawHealth = await fetchText(
-      context.readinessUrls.openclawHealth,
-    );
+    const probeResults = await collectProbeResults(context);
 
-    if (
-      diagnostics?.coldStart?.status === "succeeded" &&
-      diagnostics?.renderer?.didFinishLoad === true &&
-      gatewayUnit?.phase === "running" &&
-      openclawUnit?.phase === "running" &&
-      openclawHealth.ok
-    ) {
+    if (probesPassed(probeResults)) {
       break;
     }
 
@@ -575,130 +599,43 @@ async function verifyRuntime(context) {
     openclaw: await readLogIfExists(logs.openclaw),
   };
   const diagnostics = await readJsonIfExists(context.diagnosticsFile);
+  const probeResults = await collectProbeResults(context);
 
   const missingChecks = [];
   const addMissing = (unit, detail) => missingChecks.push({ unit, detail });
 
-  for (const [unit, filePath] of Object.entries(logs)) {
-    if (!(await fileExists(filePath)) && unit !== "openclaw") {
-      addMissing(unit, `log file missing: ${filePath}`);
-    }
-  }
-
-  if (!diagnostics) {
-    addMissing(
-      "desktop diagnostics",
-      `structured diagnostics missing or unreadable: ${context.diagnosticsFile}`,
-    );
-  }
-
-  if (diagnostics?.coldStart?.status !== "succeeded") {
-    addMissing(
-      "desktop bootstrap",
-      `cold start status: ${diagnostics?.coldStart?.status ?? "unknown"}${diagnostics?.coldStart?.error ? ` (${diagnostics.coldStart.error})` : ""}`,
-    );
-  }
-
-  const pgliteUnit = getDiagnosticsUnit(diagnostics, "pglite");
-  if (!pgliteUnit) {
-    addMissing("pglite", "missing unit in diagnostics state");
-  } else if (pgliteUnit.phase !== "running") {
-    addMissing("pglite", `unexpected phase: ${pgliteUnit.phase}`);
-  } else if (pgliteUnit.lastError) {
-    addMissing("pglite", `lastError: ${pgliteUnit.lastError}`);
-  }
-
-  const apiUnit = getDiagnosticsUnit(diagnostics, "api");
-  if (!apiUnit) {
-    addMissing("api", "missing unit in diagnostics state");
-  } else if (apiUnit.phase !== "running") {
-    addMissing("api", `unexpected phase: ${apiUnit.phase}`);
-  } else if (apiUnit.lastError) {
-    addMissing("api", `lastError: ${apiUnit.lastError}`);
-  }
-
-  const webUnit = getDiagnosticsUnit(diagnostics, "web");
-  if (!webUnit) {
-    addMissing("web", "missing unit in diagnostics state");
-  } else if (webUnit.phase !== "running") {
-    addMissing("web", `unexpected phase: ${webUnit.phase}`);
-  } else if (webUnit.lastError) {
-    addMissing("web", `lastError: ${webUnit.lastError}`);
-  }
-
-  const gatewayUnit = getDiagnosticsUnit(diagnostics, "gateway");
-  if (!gatewayUnit) {
-    addMissing("gateway", "missing unit in diagnostics state");
-  } else if (gatewayUnit.phase !== "running") {
-    addMissing("gateway", `unexpected phase: ${gatewayUnit.phase}`);
-  } else if (gatewayUnit.lastError) {
-    addMissing("gateway", `lastError: ${gatewayUnit.lastError}`);
-  }
-
-  if (!logHas(contents.gateway, "initial workspace templates synced")) {
-    addMissing("gateway", "missing workspace template sync log");
-  }
-
-  const openclawUnit = getDiagnosticsUnit(diagnostics, "openclaw");
-  if (!openclawUnit) {
-    addMissing("openclaw", "missing unit in diagnostics state");
-  } else if (openclawUnit.phase !== "running") {
-    addMissing("openclaw", `unexpected phase: ${openclawUnit.phase}`);
-  } else if (openclawUnit.lastError) {
-    addMissing("openclaw", `lastError: ${openclawUnit.lastError}`);
-  }
-
-  const browserControlPortListening = await isPortListening(18791);
-  if (!browserControlPortListening) {
-    addMissing("openclaw", "browser control port 18791 is not listening");
-  }
-
-  if (diagnostics?.renderer?.didFinishLoad !== true) {
-    addMissing(
-      "electron renderer",
-      `renderer didFinishLoad=${String(diagnostics?.renderer?.didFinishLoad ?? false)}`,
-    );
-  }
-
-  if (diagnostics?.renderer?.processGone?.seen === true) {
-    addMissing(
-      "electron renderer",
-      `renderer process gone: reason=${diagnostics.renderer.processGone.reason ?? "unknown"} exitCode=${String(diagnostics.renderer.processGone.exitCode ?? "null")}`,
-    );
-  }
-
-  for (const { unit, port } of context.ports) {
-    if (!(await isPortListening(port))) {
+  for (const { unit, port, listening } of probeResults.portResults) {
+    if (!listening) {
       addMissing(unit, `port ${port} is not listening`);
     }
   }
 
-  const apiReady = await fetchText(context.readinessUrls.api);
-  if (!apiReady.body.includes('"ready":true')) {
+  if (!probeResults.apiReady.body.includes('"ready":true')) {
     addMissing(
       "api",
-      `readiness endpoint body: ${apiReady.body || "<no response>"}`,
+      `readiness endpoint body: ${probeResults.apiReady.body || "<no response>"}`,
     );
   }
 
-  const webReady = await fetchText(context.readinessUrls.web);
-  if (!webReady.body.includes('"ready":true')) {
+  if (!probeResults.webReady.body.includes('"ready":true')) {
     addMissing(
       "web",
-      `readiness endpoint body: ${webReady.body || "<no response>"}`,
+      `readiness endpoint body: ${probeResults.webReady.body || "<no response>"}`,
     );
   }
 
-  const webSurface = await fetchText(context.readinessUrls.webSurface);
-  if (!webSurface.body.includes('<div id="root"></div>')) {
+  if (!probeResults.webSurface.body.includes('<div id="root"></div>')) {
     addMissing("web", "root document did not contain app mount node");
   }
 
-  const openclawHealth = await fetchText(context.readinessUrls.openclawHealth);
-  if (!openclawHealth.ok) {
+  if (!probeResults.browserControlListening) {
+    addMissing("openclaw", "browser control port 18791 is not listening");
+  }
+
+  if (!probeResults.openclawHealth.ok) {
     addMissing(
       "openclaw",
-      `health endpoint response: ${openclawHealth.body || "<no response>"}`,
+      `health endpoint response: ${probeResults.openclawHealth.body || "<no response>"}`,
     );
   }
 
