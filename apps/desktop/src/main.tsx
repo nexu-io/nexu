@@ -61,6 +61,24 @@ if (rendererSentryDsn) {
   initializeRendererSentry(rendererSentryDsn);
 }
 
+function maskSentryDsn(dsn: string | null | undefined): string {
+  if (!dsn) {
+    return "missing";
+  }
+
+  const match = dsn.match(/^(https?:\/\/)([^@]+)@(.+)$/);
+
+  if (!match) {
+    return "configured";
+  }
+
+  const [, protocol, publicKey, hostAndPath] = match;
+  const visibleKey = publicKey.slice(-6);
+  const maskedKey = `${"*".repeat(Math.max(publicKey.length - 6, 3))}${visibleKey}`;
+
+  return `${protocol}${maskedKey}@${hostAndPath}`;
+}
+
 if (amplitudeApiKey) {
   amplitude.initAll(amplitudeApiKey, {
     analytics: { autocapture: true },
@@ -211,12 +229,14 @@ function SurfaceButton({
 function SummaryCard({
   label,
   value,
+  className,
 }: {
   label: string;
   value: string | number;
+  className?: string;
 }) {
   return (
-    <div>
+    <div className={className}>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
@@ -848,10 +868,6 @@ function DiagnosticsPage() {
           value={appInfo ? (appInfo.isDev ? "development" : "packaged") : "-"}
         />
         <SummaryCard
-          label="Crash dumps"
-          value={diagnosticsInfo?.crashDumpsPath ?? "-"}
-        />
-        <SummaryCard
           label="Native crashes"
           value={
             diagnosticsInfo
@@ -862,23 +878,15 @@ function DiagnosticsPage() {
           }
         />
         <SummaryCard
-          label="Sentry main"
-          value={
-            diagnosticsInfo
-              ? diagnosticsInfo.sentryMainEnabled
-                ? "enabled"
-                : "off"
-              : "-"
-          }
+          label="Crash dumps"
+          className="diagnostics-summary-wide"
+          value={diagnosticsInfo?.crashDumpsPath ?? "-"}
         />
         <SummaryCard
-          label="Sentry renderer"
+          label="Sentry DSN"
+          className="diagnostics-summary-wide"
           value={
-            diagnosticsInfo
-              ? diagnosticsInfo.sentryMainEnabled
-                ? "enabled"
-                : "off"
-              : "-"
+            diagnosticsInfo ? maskSentryDsn(diagnosticsInfo.sentryDsn) : "-"
           }
         />
       </section>

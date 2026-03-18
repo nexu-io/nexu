@@ -1,7 +1,6 @@
 const { access } = require("node:fs/promises");
 const { constants } = require("node:fs");
 const path = require("node:path");
-const { notarize: notarizeApp } = require("@electron/notarize");
 
 module.exports = async function notarize(context) {
   if (context.electronPlatformName !== "darwin") {
@@ -48,6 +47,8 @@ module.exports = async function notarize(context) {
     );
     return;
   }
+
+  const { notarize: notarizeApp } = await import("@electron/notarize");
 
   await notarizeApp({
     appPath,

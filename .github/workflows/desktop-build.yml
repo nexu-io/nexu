@@ -108,9 +108,16 @@ jobs:
           CLOUD_URL: ${{ inputs.cloud_url }}
           LINK_URL: ${{ inputs.link_url }}
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
-          SENTRY_DSN: ${{ secrets.NEXU_DESKTOP_SENTRY_DSN }}
+          SENTRY_DSN_TEST: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_TEST }}
+          SENTRY_DSN_PROD: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_PROD }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
           node -e '
+            const sentryDsnByEnvironment = {
+              test: process.env.SENTRY_DSN_TEST,
+              prod: process.env.SENTRY_DSN_PROD,
+            };
+            const sentryDsn = sentryDsnByEnvironment[process.env.TARGET_ENVIRONMENT] ?? "";
             const config = {
               NEXU_CLOUD_URL: process.env.CLOUD_URL,
               NEXU_LINK_URL: process.env.LINK_URL === "null" ? null : process.env.LINK_URL,
@@ -118,8 +125,8 @@ jobs:
             if (process.env.UPDATE_FEED_URL) {
               config.NEXU_UPDATE_FEED_URL = process.env.UPDATE_FEED_URL;
             }
-            if (process.env.SENTRY_DSN) {
-              config.NEXU_DESKTOP_SENTRY_DSN = process.env.SENTRY_DSN;
+            if (sentryDsn) {
+              config.NEXU_DESKTOP_SENTRY_DSN = sentryDsn;
             }
             require("fs").writeFileSync(
               "apps/desktop/build-config.json",
