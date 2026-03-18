@@ -197,16 +197,15 @@ async function stapleNotarizedAppBundles() {
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
 
-  // If build-config.json already exists (e.g. CI generated it), keep it.
   try {
     const existing = await readFile(configPath, "utf8");
     console.log(
-      "[dist:mac] using existing build-config.json:",
+      "[dist:mac] using pre-generated build-config.json:",
       existing.trim(),
     );
     return;
   } catch {
-    // File doesn't exist — generate from env below.
+    // Generate from env when no pre-generated config is present.
   }
 
   // Generate build-config.json from environment variables / .env file
@@ -266,7 +265,7 @@ async function main() {
     notarizeEnv.NEXU_APPLE_TEAM_ID = appleTeamId;
   }
 
-  const webPort = process.env.NEXU_WEB_PORT ?? "50810";
+  const apiPort = process.env.NEXU_API_PORT ?? "50800";
 
   await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
@@ -286,7 +285,8 @@ async function main() {
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
     env: {
       ...env,
-      VITE_AUTH_BASE_URL: `http://127.0.0.1:${webPort}`,
+      VITE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+      VITE_AUTH_BASE_URL: `http://127.0.0.1:${apiPort}`,
     },
   });
   await run("pnpm", ["run", "build"], { cwd: electronRoot, env });

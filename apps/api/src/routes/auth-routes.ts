@@ -1,13 +1,42 @@
+import { createRoute } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import { z } from "zod";
 import { auth } from "../auth.js";
 import { pool } from "../db/index.js";
 import type { AppBindings } from "../types.js";
 
+const checkEmailRoute = createRoute({
+  method: "post",
+  path: "/api/auth/check-email",
+  tags: ["Auth"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ email: z.string().optional() }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            exists: z.boolean(),
+            verified: z.boolean(),
+          }),
+        },
+      },
+      description: "Email check result",
+    },
+  },
+});
+
 export function registerAuthRoutes(app: OpenAPIHono<AppBindings>) {
   // Public endpoint: check if an email is already registered and verified.
-  // Used by the signup form to distinguish "verified user" from "unverified user".
-  app.post("/api/auth/check-email", async (c) => {
-    const body = await c.req.json<{ email?: string }>();
+  app.openapi(checkEmailRoute, async (c) => {
+    const body = c.req.valid("json");
     const email = body.email?.trim().toLowerCase();
     if (!email) {
       return c.json({ exists: false, verified: false });

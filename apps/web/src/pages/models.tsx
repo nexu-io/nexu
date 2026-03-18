@@ -18,9 +18,18 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  deleteApiV1ProvidersByProviderId,
+  getApiInternalDesktopCloudStatus,
+  getApiV1LinkCatalog,
   getApiV1Me,
   getApiV1Models,
+  getApiV1Providers,
   patchApiV1Me,
+  postApiInternalDesktopCloudConnect,
+  postApiInternalDesktopCloudDisconnect,
+  postApiV1ProvidersByProviderIdVerify,
+  putApiInternalDesktopCloudModels,
+  putApiV1ProvidersByProviderId,
 } from "../../lib/api/sdk.gen";
 import { markSetupComplete } from "./welcome";
 
@@ -190,10 +199,8 @@ function buildProviders(
 // ── API helpers ───────────────────────────────────────────────
 
 async function fetchProviders(): Promise<DbProvider[]> {
-  const res = await fetch("/api/v1/providers");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { providers: DbProvider[] };
-  return data.providers ?? [];
+  const { data } = await getApiV1Providers();
+  return data?.providers ?? [];
 }
 
 async function saveProvider(
@@ -206,21 +213,19 @@ async function saveProvider(
     modelsJson?: string;
   },
 ): Promise<DbProvider> {
-  const res = await fetch(`/api/v1/providers/${providerId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const { data, error } = await putApiV1ProvidersByProviderId({
+    path: { providerId },
+    body: { ...body, baseUrl: body.baseUrl ?? undefined },
   });
-  if (!res.ok) throw new Error(`Failed to save provider: ${res.status}`);
-  const data = (await res.json()) as { provider: DbProvider };
-  return data.provider;
+  if (error || !data) throw new Error("Failed to save provider");
+  return data.provider as DbProvider;
 }
 
 async function deleteProvider(providerId: string): Promise<void> {
-  const res = await fetch(`/api/v1/providers/${providerId}`, {
-    method: "DELETE",
+  const { error } = await deleteApiV1ProvidersByProviderId({
+    path: { providerId },
   });
-  if (!res.ok) throw new Error(`Failed to delete provider: ${res.status}`);
+  if (error) throw new Error("Failed to delete provider");
 }
 
 async function verifyApiKey(
@@ -228,13 +233,12 @@ async function verifyApiKey(
   apiKey: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
-  const res = await fetch(`/api/v1/providers/${providerId}/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, baseUrl }),
+  const { data, error } = await postApiV1ProvidersByProviderIdVerify({
+    path: { providerId },
+    body: { apiKey, baseUrl },
   });
-  if (!res.ok) throw new Error(`Verify request failed: ${res.status}`);
-  return res.json();
+  if (error || !data) throw new Error("Verify request failed");
+  return data;
 }
 
 // ── BYOK provider sidebar entries ─────────────────────────────
@@ -843,10 +847,8 @@ interface LinkProvider {
 }
 
 async function fetchLinkCatalog(): Promise<LinkProvider[]> {
-  const res = await fetch("/api/v1/link-catalog");
-  if (!res.ok) return [];
-  const data = (await res.json()) as { providers: LinkProvider[] };
-  return data.providers ?? [];
+  const { data } = await getApiV1LinkCatalog();
+  return (data?.providers as LinkProvider[]) ?? [];
 }
 
 // ── Managed provider detail (Nexu Official) ───────────────────
@@ -870,10 +872,9 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
 
   // Check if already connected on mount
   useEffect(() => {
-    fetch("/api/internal/desktop/cloud-status")
-      .then((res) => res.json())
-      .then((data: { connected: boolean }) => {
-        if (data.connected) setCloudConnected(true);
+    getApiInternalDesktopCloudStatus()
+      .then(({ data }) => {
+        if (data?.connected) setCloudConnected(true);
       })
       .catch(() => {});
   }, []);
@@ -883,12 +884,8 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
     if (!loginBusy) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("/api/internal/desktop/cloud-status");
-        const data = (await res.json()) as {
-          connected: boolean;
-          userEmail?: string;
-        };
-        if (data.connected) {
+        const { data } = await getApiInternalDesktopCloudStatus();
+        if (data?.connected) {
           setLoginBusy(false);
           setCloudConnected(true);
           // Refresh provider/model data now that cloud is connected
@@ -905,28 +902,18 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
     setLoginBusy(true);
     setLoginError(null);
     try {
-      let res = await fetch("/api/internal/desktop/cloud-connect", {
-        method: "POST",
-      });
-      // If a stale polling session exists, disconnect and retry once
-      if (res.status === 409) {
-        await fetch("/api/internal/desktop/cloud-disconnect", {
-          method: "POST",
-        }).catch(() => {});
-        res = await fetch("/api/internal/desktop/cloud-connect", {
-          method: "POST",
-        });
+      let { data } = await postApiInternalDesktopCloudConnect();
+      // If a stale polling session exists (error field set), disconnect and retry once
+      if (data?.error) {
+        await postApiInternalDesktopCloudDisconnect().catch(() => {});
+        ({ data } = await postApiInternalDesktopCloudConnect());
       }
-      const data = (await res.json()) as {
-        browserUrl?: string;
-        error?: string;
-      };
-      if (!res.ok) {
+      if (data?.error) {
         setLoginError(data.error ?? t("welcome.connectFailed"));
         setLoginBusy(false);
         return;
       }
-      if (data.browserUrl) {
+      if (data?.browserUrl) {
         window.open(data.browserUrl, "_blank", "noopener,noreferrer");
       }
       // Keep loginBusy=true — polling effect will detect completion.
@@ -938,7 +925,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
 
   const handleCancelLogin = async () => {
     try {
-      await fetch("/api/internal/desktop/cloud-disconnect", { method: "POST" });
+      await postApiInternalDesktopCloudDisconnect();
     } catch {
       // ignore
     }
@@ -1003,9 +990,7 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
               <button
                 type="button"
                 onClick={async () => {
-                  await fetch("/api/internal/desktop/cloud-disconnect", {
-                    method: "POST",
-                  }).catch(() => {});
+                  await postApiInternalDesktopCloudDisconnect().catch(() => {});
                   setCloudConnected(false);
                 }}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-red-500/70 hover:text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
@@ -1143,10 +1128,8 @@ function LinkModelCatalog({
   const persistEnabledModels = useCallback(async (ids: Set<string>) => {
     setSaving(true);
     try {
-      await fetch("/api/internal/desktop/cloud-models", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabledModelIds: Array.from(ids) }),
+      await putApiInternalDesktopCloudModels({
+        body: { enabledModelIds: Array.from(ids) },
       });
     } catch {
       /* best-effort */

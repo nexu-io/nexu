@@ -1,0 +1,111 @@
+name: Desktop CI Dev
+
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/api/**'
+      - 'apps/gateway/**'
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'openclaw-runtime/**'
+      - '.npmrc'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/desktop-check-dev.sh'
+      - 'scripts/desktop-ci-check.mjs'
+      - 'tsconfig.base.json'
+      - '.github/workflows/desktop-ci-dev.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/api/**'
+      - 'apps/gateway/**'
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'openclaw-runtime/**'
+      - '.npmrc'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/desktop-check-dev.sh'
+      - 'scripts/desktop-ci-check.mjs'
+      - 'tsconfig.base.json'
+      - '.github/workflows/desktop-ci-dev.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-ci-dev-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-ci:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install tmux
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install tmux
+
+      - name: Show desktop toolchain versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec electron --version
+          tmux -V
+
+      - name: Verify desktop runtime unit health
+        env:
+          NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
+        run: pnpm desktop:check:dev
+
+      - name: Capture desktop logs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/desktop-ci"
+          if [ -d .tmp/logs ]; then
+            cp -R .tmp/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
+          fi
+          if [ -d .tmp/desktop/electron/logs ]; then
+            cp -R .tmp/desktop/electron/logs "$RUNNER_TEMP/desktop-ci/electron-logs"
+          fi
+          if tmux has-session -t nexu-desktop 2>/dev/null; then
+            tmux capture-pane -pt nexu-desktop -S -400 > "$RUNNER_TEMP/desktop-ci/tmux.log"
+          fi
+
+      - name: Upload desktop logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-logs
+          path: ${{ runner.temp }}/desktop-ci
+          if-no-files-found: warn
+          retention-days: 7

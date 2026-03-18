@@ -1,0 +1,169 @@
+name: Desktop CI Dist
+
+on:
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "apps/api/**"
+      - "apps/gateway/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "openclaw-runtime/**"
+      - ".npmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "scripts/desktop-check-dev.sh"
+      - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-ci-check.mjs"
+      - "tsconfig.base.json"
+      - ".github/workflows/desktop-ci-dist.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/desktop/**"
+      - "apps/api/**"
+      - "apps/gateway/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "openclaw-runtime/**"
+      - ".npmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "scripts/desktop-check-dev.sh"
+      - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-ci-check.mjs"
+      - "tsconfig.base.json"
+      - ".github/workflows/desktop-ci-dist.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-ci-dist-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-ci:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Show desktop toolchain versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec electron --version
+
+      - name: Build unsigned macOS desktop bundle
+        run: pnpm desktop:dist:mac:unsigned
+
+      - name: Set packaged app paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          runner_home="$HOME"
+          packaged_home="$RUNNER_TEMP/desktop-home"
+          packaged_logs_dir="$packaged_home/Library/Logs/Nexu Desktop"
+          packaged_user_data_dir="$packaged_home/Library/Application Support/Nexu Desktop"
+          packaged_runtime_logs_dir="$packaged_home/Library/Application Support/logs/runtime-units"
+          default_logs_dir="$runner_home/Library/Logs/Nexu Desktop"
+          default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
+          default_runtime_logs_dir="$runner_home/Library/Application Support/logs/runtime-units"
+          packaged_app="apps/desktop/release/mac-arm64/Nexu.app"
+          packaged_executable="$packaged_app/Contents/MacOS/Nexu"
+
+          mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
+
+          {
+            echo "PACKAGED_HOME=$packaged_home"
+            echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
+            echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
+            echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
+            echo "DEFAULT_LOGS_DIR=$default_logs_dir"
+            echo "DEFAULT_USER_DATA_DIR=$default_user_data_dir"
+            echo "DEFAULT_RUNTIME_LOGS_DIR=$default_runtime_logs_dir"
+            echo "PACKAGED_APP=$packaged_app"
+            echo "PACKAGED_EXECUTABLE=$packaged_executable"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify packaged desktop artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          dmg_artifacts=(apps/desktop/release/*.dmg)
+          zip_artifacts=(apps/desktop/release/*.zip)
+
+          if [ "${#dmg_artifacts[@]}" -eq 0 ]; then
+            echo "No desktop DMG artifact was produced" >&2
+            exit 1
+          fi
+
+          if [ "${#zip_artifacts[@]}" -eq 0 ]; then
+            echo "No desktop ZIP artifact was produced" >&2
+            exit 1
+          fi
+
+          printf 'Built artifacts:\n'
+          printf ' - %s\n' "${dmg_artifacts[@]}"
+          printf ' - %s\n' "${zip_artifacts[@]}"
+
+          test -d "$PACKAGED_APP"
+          test -x "$PACKAGED_EXECUTABLE"
+
+      - name: Verify packaged runtime unit health
+        env:
+          NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
+          NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
+        run: pnpm desktop:check:dist
+
+      - name: Capture desktop logs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/desktop-ci"
+          if [ -d "$PACKAGED_LOGS_DIR" ]; then
+            cp -R "$PACKAGED_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/packaged-logs"
+          fi
+          if [ -d "$PACKAGED_RUNTIME_LOGS_DIR" ]; then
+            cp -R "$PACKAGED_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/runtime-unit-logs"
+          fi
+          if [ -d "$DEFAULT_LOGS_DIR" ]; then
+            cp -R "$DEFAULT_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-logs"
+          fi
+          if [ -d "$DEFAULT_RUNTIME_LOGS_DIR" ]; then
+            cp -R "$DEFAULT_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-runtime-unit-logs"
+          fi
+
+      - name: Upload desktop logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-logs
+          path: ${{ runner.temp }}/desktop-ci
+          if-no-files-found: warn
+          retention-days: 7

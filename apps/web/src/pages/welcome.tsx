@@ -10,6 +10,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import {
+  getApiInternalDesktopCloudStatus,
+  postApiInternalDesktopCloudConnect,
+  postApiInternalDesktopCloudDisconnect,
+} from "../../lib/api/sdk.gen";
 import { BrandRail } from "../components/brand-rail";
 import { LanguageSwitcher } from "../components/language-switcher";
 import { useLocale } from "../hooks/use-locale";
@@ -144,9 +149,8 @@ export function WelcomePage() {
     if (!cloudConnecting) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("/api/internal/desktop/cloud-status");
-        const data = (await res.json()) as { connected: boolean };
-        if (data.connected) {
+        const { data } = await getApiInternalDesktopCloudStatus();
+        if (data?.connected) {
           setCloudConnecting(false);
           setLoginError(null);
           markSetupComplete();
@@ -201,28 +205,18 @@ export function WelcomePage() {
     setCloudConnecting(true);
     setLoginError(null);
     try {
-      let res = await fetch("/api/internal/desktop/cloud-connect", {
-        method: "POST",
-      });
-      // If a stale polling session exists, disconnect and retry once
-      if (res.status === 409) {
-        await fetch("/api/internal/desktop/cloud-disconnect", {
-          method: "POST",
-        }).catch(() => {});
-        res = await fetch("/api/internal/desktop/cloud-connect", {
-          method: "POST",
-        });
+      let { data } = await postApiInternalDesktopCloudConnect();
+      // If a stale polling session exists (error), disconnect and retry once
+      if (data?.error) {
+        await postApiInternalDesktopCloudDisconnect().catch(() => {});
+        ({ data } = await postApiInternalDesktopCloudConnect());
       }
-      const data = (await res.json()) as {
-        browserUrl?: string;
-        error?: string;
-      };
-      if (!res.ok) {
+      if (data?.error) {
         setLoginError(data.error ?? t("welcome.connectFailed"));
         setCloudConnecting(false);
         return;
       }
-      if (data.browserUrl) {
+      if (data?.browserUrl) {
         window.open(data.browserUrl, "_blank", "noopener,noreferrer");
       }
       // Keep cloudConnecting=true — polling effect will detect completion.
@@ -234,7 +228,7 @@ export function WelcomePage() {
 
   const handleCancelLogin = async () => {
     try {
-      await fetch("/api/internal/desktop/cloud-disconnect", { method: "POST" });
+      await postApiInternalDesktopCloudDisconnect();
     } catch {
       /* ignore */
     }

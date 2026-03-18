@@ -94,7 +94,9 @@ When changing DB structure, follow this workflow.
 - No foreign keys in Drizzle schema — application-level joins only.
 - Credentials (bot tokens, signing secrets) must never appear in logs or errors.
 - Frontend must use generated SDK (`apps/web/lib/api/`), never raw `fetch`.
-- All API responses must use Zod response schemas via `@hono/zod-openapi`.
+- All API routes must use `createRoute()` + `app.openapi()` from `@hono/zod-openapi`. Never use plain `app.get()`/`app.post()` etc — those bypass OpenAPI spec generation and the SDK won't have corresponding functions.
+- All request bodies, path params, query params, and responses must have Zod schemas. Shared schemas go in `packages/shared/src/schemas/`, route-local param schemas (e.g. `z.object({ id: z.string() })`) can stay in the route file.
+- After adding or modifying API routes: run `pnpm generate-types` to regenerate `openapi.json` → `sdk.gen.ts` → `types.gen.ts`, then update frontend call sites to use the new SDK functions.
 - Config generator output must match `docs/references/openclaw-config-schema.md`.
 - Do not add dependencies without explicit approval.
 - Do not modify OpenClaw source code.

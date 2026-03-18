@@ -22,10 +22,12 @@ import { toast } from "sonner";
 import "@/lib/api";
 import {
   deleteApiV1ChannelsByChannelId,
+  getApiInternalDesktopDefaultModel,
   getApiV1Bots,
   getApiV1Channels,
   getApiV1Models,
   getApiV1Sessions,
+  putApiInternalDesktopDefaultModel,
 } from "../../lib/api/sdk.gen";
 
 function formatModelName(modelId: string | null | undefined): string {
@@ -55,6 +57,18 @@ function formatRelativeTime(
 }
 
 const GITHUB_URL = "https://github.com/refly-ai/nexu";
+
+/** Resolve provider group key for a model (link/* → "nexu", others → provider) */
+function getGroupKey(m: { id: string; provider: string }): string {
+  return m.id.startsWith("link/") ? "nexu" : m.provider;
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  nexu: "Nexu Official",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google AI",
+};
 
 function getChatUrl(
   channelType: string,
@@ -364,8 +378,8 @@ export function HomePage() {
   const { data: defaultModelData } = useQuery({
     queryKey: ["desktop-default-model"],
     queryFn: async () => {
-      const res = await fetch("/api/internal/desktop/default-model");
-      return (await res.json()) as { modelId: string | null };
+      const { data } = await getApiInternalDesktopDefaultModel();
+      return data as { modelId: string | null } | undefined;
     },
   });
 
@@ -390,17 +404,11 @@ export function HomePage() {
   const modelsByProvider = useMemo(() => {
     const map = new Map<string, typeof models>();
     for (const m of models) {
-      const groupKey = m.id.startsWith("link/") ? "nexu" : m.provider;
+      const groupKey = getGroupKey(m);
       const list = map.get(groupKey) ?? [];
       list.push(m);
       map.set(groupKey, list);
     }
-    const PROVIDER_LABELS: Record<string, string> = {
-      nexu: "Nexu Official",
-      anthropic: "Anthropic",
-      openai: "OpenAI",
-      google: "Google",
-    };
     const entries = Array.from(map.entries());
     entries.sort((a, b) => {
       if (a[0] === "nexu") return -1;
@@ -414,33 +422,36 @@ export function HomePage() {
     }));
   }, [models]);
 
+  // Current model's provider group info
+  const currentModel = models.find((m) => m.id === currentModelId);
+  const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
+  const currentProviderLabel = currentGroupKey
+    ? (PROVIDER_LABELS[currentGroupKey] ?? currentGroupKey)
+    : "";
+
   // Expand current model's provider on open
   useEffect(() => {
     if (showModelDropdown) {
-      const currentProvider = models.find(
-        (m) => m.id === currentModelId,
-      )?.provider;
+      const groupKey = currentModel ? getGroupKey(currentModel) : "";
       setExpandedProviders(
         new Set(
-          currentProvider
-            ? [currentProvider]
+          groupKey
+            ? [groupKey]
             : modelsByProvider.length > 0 && modelsByProvider[0]
               ? [modelsByProvider[0].id]
               : [],
         ),
       );
     }
-  }, [showModelDropdown, currentModelId, models, modelsByProvider]);
+  }, [showModelDropdown, currentModel, modelsByProvider]);
 
   const updateModel = useMutation({
     mutationFn: async (modelId: string) => {
       const toastId = toast.loading("正在切换模型…");
-      const res = await fetch("/api/internal/desktop/default-model", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelId }),
+      const { error } = await putApiInternalDesktopDefaultModel({
+        body: { modelId },
       });
-      if (!res.ok) {
+      if (error) {
         toast.error("模型切换失败", { id: toastId });
         throw new Error("Failed to update model");
       }
@@ -531,8 +542,17 @@ export function HomePage() {
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
                   <span className="flex items-center gap-1">
-                    <Cpu size={10} />
+                    {currentGroupKey ? (
+                      <ProviderLogo provider={currentGroupKey} size={10} />
+                    ) : (
+                      <Cpu size={10} />
+                    )}
                     {modelName}
+                    {currentProviderLabel && (
+                      <span className="text-text-muted/50">
+                        ({currentProviderLabel})
+                      </span>
+                    )}
                   </span>
                   <span className="text-border">&middot;</span>
                   <span>
@@ -705,10 +725,7 @@ export function HomePage() {
                           {currentModelId ? (
                             <span className="w-4 h-4 shrink-0 flex items-center justify-center">
                               <ProviderLogo
-                                provider={
-                                  models.find((m) => m.id === currentModelId)
-                                    ?.provider ?? "nexu"
-                                }
+                                provider={currentGroupKey || "nexu"}
                                 size={14}
                               />
                             </span>
@@ -718,6 +735,11 @@ export function HomePage() {
                           <span className="text-[12px] font-medium text-text-primary truncate">
                             {modelName || t("home.notSelected")}
                           </span>
+                          {currentProviderLabel && (
+                            <span className="text-[10px] text-text-muted/60 shrink-0">
+                              {currentProviderLabel}
+                            </span>
+                          )}
                         </div>
                         <ChevronDown
                           size={12}

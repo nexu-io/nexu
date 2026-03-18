@@ -27,6 +27,28 @@ function isIgnorableWriteError(error: unknown): boolean {
   return errorCode === "EIO" || errorCode === "EPIPE";
 }
 
+let stdioErrorHandlersAttached = false;
+
+function attachSafeStdioErrorHandlers(): void {
+  if (stdioErrorHandlersAttached) {
+    return;
+  }
+
+  const handleStreamError = (error: Error) => {
+    if (isIgnorableWriteError(error)) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      throw error;
+    });
+  };
+
+  process.stdout.on("error", handleStreamError);
+  process.stderr.on("error", handleStreamError);
+  stdioErrorHandlersAttached = true;
+}
+
 class SafeConsoleStream extends Writable {
   override _write(
     chunk: string | Buffer,
@@ -58,6 +80,8 @@ class SafeConsoleStream extends Writable {
   }
 }
 
+attachSafeStdioErrorHandlers();
+
 const runtimeConsoleLogger = pino(
   {
     level: process.env.LOG_LEVEL ?? (env === "production" ? "info" : "debug"),
@@ -87,6 +111,11 @@ type DesktopLogContext = {
   sessionId: string;
 };
 
+type StructuredLogPayload = {
+  fields: Record<string, unknown>;
+  message: string | null;
+};
+
 const desktopLogContext: DesktopLogContext = {
   bootId: randomUUID(),
   sessionId: randomUUID(),
@@ -107,6 +136,41 @@ function buildContextPayload(windowId?: number | null) {
     desktop_session_id: context.sessionId,
     ...(typeof windowId === "number" ? { desktop_window_id: windowId } : {}),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseStructuredLogMessage(
+  rawMessage: string,
+): StructuredLogPayload | null {
+  const withoutPrefix = rawMessage.startsWith("[stderr] ")
+    ? rawMessage.slice("[stderr] ".length)
+    : rawMessage;
+
+  try {
+    const parsed = JSON.parse(withoutPrefix) as unknown;
+    if (!isRecord(parsed)) {
+      return null;
+    }
+
+    const messageValue =
+      typeof parsed.msg === "string"
+        ? parsed.msg
+        : typeof parsed.message === "string"
+          ? parsed.message
+          : null;
+
+    const { msg: _msg, message: _message, ...fields } = parsed;
+
+    return {
+      fields,
+      message: messageValue,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function getLevel(entry: RuntimeLogEntry): LevelWithSilent {
@@ -270,6 +334,8 @@ export function writeRuntimeLogEntry(
   logFilePath: string | null,
 ): void {
   const level = getLevel(entry);
+  const parsedMessage =
+    entry.kind === "app" ? parseStructuredLogMessage(entry.message) : null;
   const payload = {
     ...buildContextPayload(),
     runtime_unit_id: entry.unitId,
@@ -279,15 +345,17 @@ export function writeRuntimeLogEntry(
     runtime_reason_code: entry.reasonCode,
     runtime_log_stream: entry.stream,
     runtime_log_ts: entry.ts,
+    ...(parsedMessage ? { runtime_app_log: parsedMessage.fields } : {}),
   };
+  const message = parsedMessage?.message ?? entry.message;
 
-  runtimeConsoleLogger[level](payload, entry.message);
+  runtimeConsoleLogger[level](payload, message);
 
   if (!logFilePath) {
     return;
   }
 
-  getFileLogger(logFilePath)[level](payload, entry.message);
+  getFileLogger(logFilePath)[level](payload, message);
 }
 
 export function writeDesktopMainLog({
