@@ -31,11 +31,27 @@ type DesktopRendererSnapshot = {
   };
 };
 
+type DesktopEmbeddedContentSnapshot = {
+  id: number;
+  type: string;
+  didFinishLoad: boolean;
+  lastUrl: string | null;
+  lastEventAt: string | null;
+  lastError: string | null;
+  processGone: {
+    seen: boolean;
+    reason: string | null;
+    exitCode: number | null;
+    at: string | null;
+  };
+};
+
 type DesktopDiagnosticsSnapshot = {
   updatedAt: string;
   isPackaged: boolean;
   coldStart: DesktopColdStartSnapshot;
   renderer: DesktopRendererSnapshot;
+  embeddedContents: DesktopEmbeddedContentSnapshot[];
   runtime: {
     state: RuntimeState;
     recentEvents: RuntimeLogEntry[];
@@ -74,6 +90,11 @@ export class DesktopDiagnosticsReporter {
       at: null,
     },
   };
+
+  private readonly embeddedContents = new Map<
+    number,
+    DesktopEmbeddedContentSnapshot
+  >();
 
   private flushScheduled = false;
 
@@ -149,6 +170,51 @@ export class DesktopDiagnosticsReporter {
     this.scheduleFlush();
   }
 
+  recordEmbeddedDidFinishLoad(details: {
+    id: number;
+    type: string;
+    url: string;
+  }): void {
+    const snapshot = this.getEmbeddedSnapshot(details.id, details.type);
+    snapshot.didFinishLoad = true;
+    snapshot.lastUrl = details.url;
+    snapshot.lastEventAt = nowIso();
+    snapshot.lastError = null;
+    this.scheduleFlush();
+  }
+
+  recordEmbeddedDidFailLoad(details: {
+    id: number;
+    type: string;
+    errorCode: number;
+    errorDescription: string;
+    validatedUrl: string;
+  }): void {
+    const snapshot = this.getEmbeddedSnapshot(details.id, details.type);
+    snapshot.lastEventAt = nowIso();
+    snapshot.lastUrl = details.validatedUrl;
+    snapshot.lastError = `${details.errorCode} ${details.errorDescription} ${details.validatedUrl}`;
+    this.scheduleFlush();
+  }
+
+  recordEmbeddedProcessGone(details: {
+    id: number;
+    type: string;
+    reason: string;
+    exitCode: number;
+  }): void {
+    const snapshot = this.getEmbeddedSnapshot(details.id, details.type);
+    snapshot.lastEventAt = nowIso();
+    snapshot.lastError = `reason=${details.reason} exitCode=${details.exitCode}`;
+    snapshot.processGone = {
+      seen: true,
+      reason: details.reason,
+      exitCode: details.exitCode,
+      at: snapshot.lastEventAt,
+    };
+    this.scheduleFlush();
+  }
+
   async flushNow(): Promise<void> {
     await this.flush();
   }
@@ -199,6 +265,7 @@ export class DesktopDiagnosticsReporter {
         ...this.renderer,
         processGone: { ...this.renderer.processGone },
       },
+      embeddedContents: [...this.embeddedContents.values()],
       runtime: {
         state: this.orchestrator.getRuntimeState(),
         recentEvents: events.entries,
@@ -215,5 +282,33 @@ export class DesktopDiagnosticsReporter {
     await mkdir(directoryPath, { recursive: true });
     await writeFile(tempPath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
     await rename(tempPath, this.filePath);
+  }
+
+  private getEmbeddedSnapshot(
+    id: number,
+    type: string,
+  ): DesktopEmbeddedContentSnapshot {
+    const existing = this.embeddedContents.get(id);
+    if (existing) {
+      return existing;
+    }
+
+    const snapshot: DesktopEmbeddedContentSnapshot = {
+      id,
+      type,
+      didFinishLoad: false,
+      lastUrl: null,
+      lastEventAt: null,
+      lastError: null,
+      processGone: {
+        seen: false,
+        reason: null,
+        exitCode: null,
+        at: null,
+      },
+    };
+
+    this.embeddedContents.set(id, snapshot);
+    return snapshot;
   }
 }

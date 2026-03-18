@@ -73,6 +73,7 @@ export PACKAGED_RUNTIME_LOGS_DIR="$packaged_runtime_logs_dir"
 export DEFAULT_LOGS_DIR="$default_logs_dir"
 export DEFAULT_USER_DATA_DIR="$default_user_data_dir"
 export DEFAULT_RUNTIME_LOGS_DIR="$default_runtime_logs_dir"
+export NEXU_DESKTOP_PACKAGED_PID_PATH="$pid_path"
 
 HOME="$packaged_home" TMPDIR="$tmp_dir" "$packaged_executable" \
   > "$packaged_log_path" 2>&1 &

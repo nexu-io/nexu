@@ -452,6 +452,8 @@ function createMainWindow(): BrowserWindow {
 // Intercept window.open() in ALL webContents (main window + webviews) and open
 // the URL in the user's default system browser instead.
 app.on("web-contents-created", (_event, contents) => {
+  const contentType = contents.getType();
+
   contents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       setImmediate(() => {
@@ -459,6 +461,62 @@ app.on("web-contents-created", (_event, contents) => {
       });
     }
     return { action: "deny" };
+  });
+
+  if (contentType !== "webview") {
+    return;
+  }
+
+  contents.on(
+    "did-fail-load",
+    (_event, errorCode, errorDescription, validatedUrl) => {
+      diagnosticsReporter?.recordEmbeddedDidFailLoad({
+        id: contents.id,
+        type: contentType,
+        errorCode,
+        errorDescription,
+        validatedUrl,
+      });
+      logRendererEvent({
+        source: `embedded:${contentType}:fail-load`,
+        stream: "stderr",
+        kind: "lifecycle",
+        message: `${errorCode} ${errorDescription} ${validatedUrl}`,
+        windowId: contents.id,
+      });
+    },
+  );
+
+  contents.on("did-finish-load", () => {
+    const url = contents.getURL();
+    diagnosticsReporter?.recordEmbeddedDidFinishLoad({
+      id: contents.id,
+      type: contentType,
+      url,
+    });
+    logRendererEvent({
+      source: `embedded:${contentType}`,
+      stream: "stdout",
+      kind: "lifecycle",
+      message: `did-finish-load ${url}`,
+      windowId: contents.id,
+    });
+  });
+
+  contents.on("render-process-gone", (_event, details) => {
+    diagnosticsReporter?.recordEmbeddedProcessGone({
+      id: contents.id,
+      type: contentType,
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
+    logRendererEvent({
+      source: `embedded:${contentType}:gone`,
+      stream: "stderr",
+      kind: "lifecycle",
+      message: `reason=${details.reason} exitCode=${details.exitCode}`,
+      windowId: contents.id,
+    });
   });
 });
 

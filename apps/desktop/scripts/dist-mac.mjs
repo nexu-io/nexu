@@ -197,18 +197,6 @@ async function stapleNotarizedAppBundles() {
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
 
-  // If build-config.json already exists (e.g. CI generated it), keep it.
-  try {
-    const existing = await readFile(configPath, "utf8");
-    console.log(
-      "[dist:mac] using existing build-config.json:",
-      existing.trim(),
-    );
-    return;
-  } catch {
-    // File doesn't exist — generate from env below.
-  }
-
   // Generate build-config.json from environment variables / .env file
   // so that secrets (cloud/link URLs) are never committed to the repo.
   const envPath = resolve(electronRoot, ".env");
