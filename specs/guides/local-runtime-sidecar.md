@@ -18,7 +18,7 @@
 - pnpm 9+
 - Docker（用于本地 PostgreSQL）
 - 本地 OpenClaw 仓库（已 `pnpm install && pnpm build`）
-- 已完成 Slack 本地测试基础配置（可参考 `docs/guides/local-slack-testing.md`）
+- 已完成 Slack 本地测试基础配置（可参考 `specs/guides/local-slack-testing.md`）
 
 ## 二、启动顺序（建议）
 

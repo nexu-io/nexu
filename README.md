@@ -20,7 +20,7 @@ OpenClaw 多租户平台 — 让用户创建自己的 AI Bot，一键连接 Slac
 
 ```
 nexu/
-├── docs/
+├── specs/
 │   ├── designs/             # 架构设计
 │   └── references/          # 编码参考（API 模式、Config schema、基础设施）
 ├── experiments/             # 验证实验脚本（已通过）

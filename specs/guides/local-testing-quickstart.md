@@ -82,5 +82,5 @@ pnpm dev
 
 到这里就完成了最小本地测试环境。若你要继续做 Slack/网关联调，请看：
 
-- `docs/guides/local-slack-testing.md`
-- `docs/guides/local-runtime-sidecar.md`
+- `specs/guides/local-slack-testing.md`
+- `specs/guides/local-runtime-sidecar.md`

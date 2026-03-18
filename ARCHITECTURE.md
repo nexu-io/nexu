@@ -49,7 +49,7 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.
 - **`nexu-skills/`** — Public skill repository. Each skill is a directory with `SKILL.md` frontmatter. `skills.json` is the built catalog index.
 - **`deploy/k8s/`** — Kubernetes manifests.
-- **`docs/`** — Design docs, references, product specs, exec plans, generated artifacts.
+- **`specs/`** — Design docs, references, product specs, exec plans, generated artifacts.
 
 ## Key data flows
 
@@ -82,10 +82,10 @@ Critical constraints:
 - LiteLLM models must set `compat.supportsStore: false`
 - Only one agent should have `default: true`
 
-See `docs/references/openclaw-config-schema.md` for full schema and common pitfalls.
+See `specs/references/openclaw-config-schema.md` for full schema and common pitfalls.
 
 ## Deeper docs
 
-- `docs/designs/openclaw-multi-tenant.md` — Full system design, data model, phased plan
-- `docs/designs/openclaw-architecture-internals.md` — OpenClaw runtime analysis
-- `docs/design-docs/core-beliefs.md` — Engineering principles
+- `specs/designs/openclaw-multi-tenant.md` — Full system design, data model, phased plan
+- `specs/designs/openclaw-architecture-internals.md` — OpenClaw runtime analysis
+- `specs/design-specs/core-beliefs.md` — Engineering principles

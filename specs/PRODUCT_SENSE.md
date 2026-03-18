@@ -31,4 +31,4 @@ Isolation is achieved through OpenClaw's native architecture:
 - Credentials are never visible to users after initial connection
 - The system should scale by adding Gateway pool capacity, not by changing the product model
 
-Detailed specs in `docs/product-specs/`.
+Detailed specs in `specs/product-specs/`.

@@ -2,7 +2,7 @@
 
 Date: 2026-03-06
 Branch: `main` (uncommitted changes)
-Plan: `docs/plans/2026-03-06-session-key-alignment-plan.md`
+Plan: `specs/plans/2026-03-06-session-key-alignment-plan.md`
 
 ## Summary
 

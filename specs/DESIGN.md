@@ -7,8 +7,8 @@ Entry point for design documentation.
 | Doc | Purpose |
 |-----|---------|
 | `design-docs/core-beliefs.md` | Engineering principles and constraints |
-| `design-docs/openclaw-multi-tenant.md` | Primary system architecture, data model, phased plan |
-| `design-docs/openclaw-architecture-internals.md` | Upstream OpenClaw runtime analysis |
+| `designs/openclaw-multi-tenant.md` | Primary system architecture, data model, phased plan |
+| `designs/openclaw-architecture-internals.md` | Upstream OpenClaw runtime analysis |
 
 ## Catalog
 

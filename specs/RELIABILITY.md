@@ -28,7 +28,7 @@
 
 - Structured logging: pino or console JSON to stdout
 - Infrastructure stack: Prometheus + Grafana (metrics), Loki (logs), Tempo (traces), Langfuse (LLM calls), Sentry (errors)
-- See `docs/references/infrastructure.md` for connection details and endpoints
+- See `specs/references/infrastructure.md` for connection details and endpoints
 
 ## Failure modes
 

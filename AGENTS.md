@@ -64,12 +64,12 @@ After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 - `tmux` is required for the desktop local-dev workflow.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
 - For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
-- If `pnpm desktop:start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `docs/guides/desktop-runtime-guide.md` before changing the launcher flow.
+- If `pnpm desktop:start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
 - Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
 - For deeper desktop runtime inspection, use the existing event/query path (`onRuntimeEvent(...)`, `runtime:query-events`, `queryRuntimeEvents(...)`) instead of rebuilding one-off diagnostics.
 - Use `actionId`, `reasonCode`, and `cursor` / `nextCursor` as the primary correlation and incremental-fetch primitives for desktop runtime debugging.
 - To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state`.
-- Desktop runtime guide: `docs/guides/desktop-runtime-guide.md`.
+- Desktop runtime guide: `specs/guides/desktop-runtime-guide.md`.
 
 ## DB schema change workflow
 
@@ -95,12 +95,12 @@ When changing DB structure, follow this workflow.
 - Credentials (bot tokens, signing secrets) must never appear in logs or errors.
 - Frontend must use generated SDK (`apps/web/lib/api/`), never raw `fetch`.
 - All API responses must use Zod response schemas via `@hono/zod-openapi`.
-- Config generator output must match `docs/references/openclaw-config-schema.md`.
+- Config generator output must match `specs/references/openclaw-config-schema.md`.
 - Do not add dependencies without explicit approval.
 - Do not modify OpenClaw source code.
 - Never commit code changes until explicitly told to do so.
 - Whenever you add a new environment variable, update `deploy/helm/nexu/values.yaml` in the same change.
-- Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `docs/guides/gateway-environment-guide.md`.
+- Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `specs/guides/gateway-environment-guide.md`.
 
 ## Observability conventions
 
@@ -143,30 +143,30 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Topic | Location |
 |-------|----------|
 | Architecture & data flows | `ARCHITECTURE.md` |
-| System design | `docs/designs/openclaw-multi-tenant.md` |
-| OpenClaw internals | `docs/designs/openclaw-architecture-internals.md` |
-| Engineering principles | `docs/design-docs/core-beliefs.md` |
-| Config schema & pitfalls | `docs/references/openclaw-config-schema.md` |
-| API coding patterns | `docs/references/api-patterns.md` |
-| Infrastructure | `docs/references/infrastructure.md` |
-| Gateway environment (dev vs prod) | `docs/guides/gateway-environment-guide.md` |
-| Workspace templates | `docs/guides/workspace-templates.md` |
-| Local Slack testing | `docs/references/local-slack-testing.md` |
-| Frontend conventions | `docs/FRONTEND.md` |
-| Desktop runtime guide | `docs/guides/desktop-runtime-guide.md` |
-| Security posture | `docs/SECURITY.md` |
-| Reliability | `docs/RELIABILITY.md` |
-| Product model | `docs/PRODUCT_SENSE.md` |
-| Quality signals | `docs/QUALITY_SCORE.md` |
-| Product specs | `docs/product-specs/` |
-| Execution plans | `docs/exec-plans/` |
-| DB schema reference | `docs/generated/db-schema.md` |
-| Documentation sync | `skills/localdev/sync-docs/SKILL.md` |
+| System design | `specs/designs/openclaw-multi-tenant.md` |
+| OpenClaw internals | `specs/designs/openclaw-architecture-internals.md` |
+| Engineering principles | `specs/design-specs/core-beliefs.md` |
+| Config schema & pitfalls | `specs/references/openclaw-config-schema.md` |
+| API coding patterns | `specs/references/api-patterns.md` |
+| Infrastructure | `specs/references/infrastructure.md` |
+| Gateway environment (dev vs prod) | `specs/guides/gateway-environment-guide.md` |
+| Workspace templates | `specs/guides/workspace-templates.md` |
+| Local Slack testing | `specs/references/local-slack-testing.md` |
+| Frontend conventions | `specs/FRONTEND.md` |
+| Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
+| Security posture | `specs/SECURITY.md` |
+| Reliability | `specs/RELIABILITY.md` |
+| Product model | `specs/PRODUCT_SENSE.md` |
+| Quality signals | `specs/QUALITY_SCORE.md` |
+| Product specs | `specs/product-specs/` |
+| Execution plans | `specs/exec-plans/` |
+| DB schema reference | `specs/generated/db-schema.md` |
+| Documentation sync | `skills/localdev/sync-specs/SKILL.md` |
 | E2E gateway testing | `skills/localdev/nexu-e2e-test/SKILL.md` |
 | Production operations | `skills/localdev/prod-ops/SKILL.md` |
 | Nano Banana (image gen) | `skills/nexubot/nano-banana/SKILL.md` |
 | Skill repo & catalog | `nexu-skills/`, `apps/api/src/services/runtime/skill-catalog.ts` |
-| File-based skills design | `docs/plans/2026-03-15-skill-repo-design.md` |
+| File-based skills design | `specs/plans/2026-03-15-skill-repo-design.md` |
 | Feishu channel setup | `apps/web/src/components/channel-setup/feishu-setup-view.tsx` |
 
 ## Documentation maintenance
@@ -183,12 +183,12 @@ git diff --name-only $(git merge-base HEAD origin/main)...HEAD
 
 | Changed area | Affected docs |
 |---|---|
-| `apps/api/src/db/schema/` | `docs/generated/db-schema.md`, `ARCHITECTURE.md` |
-| `apps/api/src/routes/` | `docs/references/api-patterns.md`, `docs/product-specs/*.md` |
-| `apps/web/src/pages/` or routing | `docs/FRONTEND.md` |
-| `apps/gateway/src/` | `ARCHITECTURE.md`, `docs/RELIABILITY.md` |
+| `apps/api/src/db/schema/` | `specs/generated/db-schema.md`, `ARCHITECTURE.md` |
+| `apps/api/src/routes/` | `specs/references/api-patterns.md`, `specs/product-specs/*.md` |
+| `apps/web/src/pages/` or routing | `specs/FRONTEND.md` |
+| `apps/gateway/src/` | `ARCHITECTURE.md`, `specs/RELIABILITY.md` |
 | `apps/api/src/services/runtime/` | `ARCHITECTURE.md` (skill catalog) |
-| `apps/web/src/components/channel-setup/` | `docs/FRONTEND.md` |
+| `apps/web/src/components/channel-setup/` | `specs/FRONTEND.md` |
 | `nexu-skills/` | `ARCHITECTURE.md` (monorepo layout) |
 | `packages/shared/src/schemas/` | `ARCHITECTURE.md` (type safety) |
 | `package.json` scripts | `AGENTS.md` Commands section |
@@ -197,17 +197,17 @@ git diff --name-only $(git merge-base HEAD origin/main)...HEAD
 ### Cross-reference checklist
 
 1. `AGENTS.md` Where to look table — all paths valid
-2. `docs/DESIGN.md` <-> `docs/design-docs/` + `docs/designs/` (indexed)
-3. `docs/product-specs/index.md` <-> actual spec files
-4. `docs/FRONTEND.md` Pages <-> `apps/web/src/app.tsx` routes
+2. `specs/DESIGN.md` <-> `specs/design-specs/` + `specs/designs/` (indexed)
+3. `specs/product-specs/index.md` <-> actual spec files
+4. `specs/FRONTEND.md` Pages <-> `apps/web/src/app.tsx` routes
 
 ### Rules
 
-- Regenerate `docs/generated/db-schema.md` fully from schema source
+- Regenerate `specs/generated/db-schema.md` fully from schema source
 - Preserve original language (English/Chinese)
 - Do not auto-commit; present changes for review
 
-Full reference: `skills/localdev/sync-docs/SKILL.md`
+Full reference: `skills/localdev/sync-specs/SKILL.md`
 
 ## Cross-project sync rules
 

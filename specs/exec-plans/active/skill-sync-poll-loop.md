@@ -1,6 +1,6 @@
 # Skill Sync via Gateway Poll Loop
 
-Related debug verification plan: `docs/exec-plans/active/skill-sync-debug-verification.md`
+Related debug verification plan: `specs/exec-plans/active/skill-sync-debug-verification.md`
 
 ## Context
 

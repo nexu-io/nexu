@@ -11,4 +11,4 @@
 
 ## Adding design docs
 
-Keep long-form design decisions here. Product behavior specs belong in `docs/product-specs/`. Name files descriptively in `kebab-case`.
+Keep long-form design decisions here. Product behavior specs belong in `specs/product-specs/`. Name files descriptively in `kebab-case`.

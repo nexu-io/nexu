@@ -413,7 +413,7 @@ slack: drop message (channel not allowed)
 
 2. **Pod IP 注册** — Pod 启动后需将自身 IP 写回 `gateway_pools.pod_ip`（通过 K8s downward API 或启动脚本调 Nexu API）
 
-3. **Config Sync Sidecar** — Gateway 的 chokidar 文件监听已内置，不需要改 Gateway 代码。需要实现一个 Sidecar 容器（设计文档：`docs/design-docs/openclaw-multi-tenant.md`），职责：
+3. **Config Sync Sidecar** — Gateway 的 chokidar 文件监听已内置，不需要改 Gateway 代码。需要实现一个 Sidecar 容器（设计文档：`specs/designs/openclaw-multi-tenant.md`），职责：
    - 监听 Redis PubSub 的配置变更通知
    - 调 `GET /api/internal/pools/{poolId}/config` 拉最新配置
    - 原子写入共享卷 `/etc/openclaw/config.json`（写 temp 文件再 rename）

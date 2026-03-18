@@ -173,7 +173,7 @@ Recommended status values:
 
 The main Composio plan file was updated to reflect these decisions:
 
-- [2026-03-07-composio-integration-plan.md](/Users/alche/Documents/digit-sutando/nexu/docs/plans/2026-03-07-composio-integration-plan.md)
+- [2026-03-07-composio-integration-plan.md](/Users/alche/Documents/digit-sutando/nexu/specs/plans/2026-03-07-composio-integration-plan.md)
 
 That plan now reflects:
 
@@ -231,7 +231,7 @@ Only the planning docs were updated.
 ### Relevant Nexu files
 
 - Main plan:
-  - [2026-03-07-composio-integration-plan.md](/Users/alche/Documents/digit-sutando/nexu/docs/plans/2026-03-07-composio-integration-plan.md)
+  - [2026-03-07-composio-integration-plan.md](/Users/alche/Documents/digit-sutando/nexu/specs/plans/2026-03-07-composio-integration-plan.md)
 - Current skill routes:
   - [skill-routes.ts](/Users/alche/Documents/digit-sutando/nexu/apps/api/src/routes/skill-routes.ts)
 - Current app routes:
