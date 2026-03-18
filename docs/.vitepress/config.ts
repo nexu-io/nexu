@@ -45,6 +45,22 @@ export default defineConfig({
   description: "Nexu documentation for channels, models, and skills.",
   cleanUrls: true,
   lastUpdated: true,
+  locales: {
+    en: {
+      label: "English",
+      lang: "en-US",
+      title: "Nexu Docs",
+      description: "Nexu documentation for channels, models, and skills.",
+      link: "/en/",
+    },
+    zh: {
+      label: "简体中文",
+      lang: "zh-CN",
+      title: "Nexu 文档",
+      description: "Nexu 的渠道、模型与技能文档。",
+      link: "/zh/",
+    },
+  },
   head: [
     ["meta", { name: "theme-color", content: "#c96f4a" }],
     ["link", { rel: "icon", href: "/favicon/favicon.ico", sizes: "any" }],
@@ -78,6 +94,7 @@ export default defineConfig({
       alt: "Nexu",
     },
     socialLinks: [{ icon: "github", link: "https://github.com/refly-ai/nexu" }],
+    langMenuLabel: "Language",
     search: {
       provider: "local",
       options: {
