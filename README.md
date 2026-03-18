@@ -30,11 +30,11 @@
 
 ## Overview
 
-**nexu** (next to you) gives you the simplest way to own an OpenClaw 🦞 — download the Mac client, double-click to install, and your OpenClaw 🦞 is ready to work in seconds.
+**nexu** (next to you) gives you the simplest way to own an OpenClaw 🦞 — download, double-click, start working.
 
-nexu is built on the open-source OpenClaw 🦞, pre-loaded with essential Skills (e.g. Feishu Skills, find skills) so your Agent plugs into your team's existing workflows out of the box 🔌. Access Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more — or bring your own API Key with no sign-up required 🔓.
+Built on the open-source OpenClaw 🦞, pre-loaded with essential Skills like Feishu Skills, plus Claude, ChatGPT, Minimax, GLM, Kimi, and more — or bring your own API Key 🔌.
 
-Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — no extra app needed, just chat with your Agent wherever you already are.
+Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — chat with it right inside the tools you already use.
 
 <!-- TODO: Add product demo GIF / screenshot here -->
 
