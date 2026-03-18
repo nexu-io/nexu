@@ -145,41 +145,147 @@ jobs:
         run: |
           set -euo pipefail
 
+          desktop_logs_dir=".tmp/desktop/electron/logs"
+          runtime_unit_logs_dir="$desktop_logs_dir/runtime-units"
+          cold_start_log="$desktop_logs_dir/cold-start.log"
+          desktop_main_log="$desktop_logs_dir/desktop-main.log"
+          pglite_log="$runtime_unit_logs_dir/pglite.log"
+          api_log="$runtime_unit_logs_dir/api.log"
+          web_log="$runtime_unit_logs_dir/web.log"
+          gateway_log="$runtime_unit_logs_dir/gateway.log"
+          openclaw_log="$runtime_unit_logs_dir/openclaw.log"
+
           pnpm desktop:status
 
-          pnpm desktop:logs > "$RUNNER_TEMP/desktop-runtime.log"
+          missing_checks=()
 
-          require_log() {
-            local message="$1"
-            local error_message="$2"
-            grep -F "$message" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null || {
-              echo "$error_message" >&2
-              exit 1
-            }
+          record_missing() {
+            local check_name="$1"
+            local detail="$2"
+            missing_checks+=("$check_name :: $detail")
+          }
+
+          require_file() {
+            local check_name="$1"
+            local file_path="$2"
+            if [ ! -f "$file_path" ]; then
+              record_missing "$check_name" "log file missing: $file_path"
+            fi
+          }
+
+          log_has() {
+            local file_path="$1"
+            local needle="$2"
+            [ -f "$file_path" ] && grep -F "$needle" "$file_path" >/dev/null
+          }
+
+          log_has_any() {
+            local needle="$1"
+            shift
+            local file_path
+            for file_path in "$@"; do
+              if log_has "$file_path" "$needle"; then
+                return 0
+              fi
+            done
+            return 1
           }
 
           for attempt in {1..60}; do
             echo "Runtime health attempt $attempt/60"
 
-            if grep -F "spawned openclaw gateway process" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null && \
-              grep -F "[gateway] listening on ws://0.0.0.0:18789" "$RUNNER_TEMP/desktop-runtime.log" >/dev/null; then
+            if log_has "$cold_start_log" "cold start complete" && \
+              log_has "$gateway_log" "spawned openclaw gateway process" && \
+              log_has_any "[gateway] listening on ws://0.0.0.0:18789" "$gateway_log" "$openclaw_log"; then
               break
             fi
 
             sleep 2
-            pnpm desktop:logs > "$RUNNER_TEMP/desktop-runtime.log"
           done
 
-          require_log "cold start complete" "Cold start completion log not found"
-          require_log "runtime unit pglite port 50832 is ready" "PGlite readiness log not found"
-          require_log "runtime unit api port 50800 is ready" "API readiness log not found"
-          require_log "runtime unit web is running" "Web runtime log not found"
-          require_log "runtime unit gateway is running" "Gateway runtime log not found"
-          require_log "initial workspace templates synced" "Gateway sync log not found"
-          require_log "spawned openclaw gateway process" "OpenClaw spawn log not found"
-          require_log "[gateway] listening on ws://0.0.0.0:18789" "OpenClaw websocket listener log not found"
-          require_log "Browser control listening on http://127.0.0.1:18791/" "OpenClaw browser control listener log not found"
-          require_log "did-finish-load" "Electron renderer load log not found"
+          require_file "desktop bootstrap" "$cold_start_log"
+          require_file "electron renderer" "$desktop_main_log"
+          require_file "pglite" "$pglite_log"
+          require_file "api" "$api_log"
+          require_file "web" "$web_log"
+          require_file "gateway" "$gateway_log"
+
+          if ! log_has "$cold_start_log" "cold start complete"; then
+            record_missing "desktop bootstrap" "missing log: cold start complete"
+          fi
+
+          if ! log_has "$pglite_log" "runtime unit pglite port 50832 is ready"; then
+            record_missing "pglite" "missing readiness log for port 50832"
+          fi
+
+          if ! log_has "$api_log" "runtime unit api port 50800 is ready"; then
+            record_missing "api" "missing readiness log for port 50800"
+          fi
+
+          if ! log_has "$web_log" "runtime unit web is running"; then
+            record_missing "web" "missing running log"
+          fi
+
+          if ! log_has "$gateway_log" "runtime unit gateway is running"; then
+            record_missing "gateway" "missing running log"
+          fi
+
+          if ! log_has "$gateway_log" "initial workspace templates synced"; then
+            record_missing "gateway" "missing workspace template sync log"
+          fi
+
+          if ! log_has "$gateway_log" "spawned openclaw gateway process"; then
+            record_missing "openclaw" "missing spawn log"
+          fi
+
+          if ! log_has_any "[gateway] listening on ws://0.0.0.0:18789" "$gateway_log" "$openclaw_log"; then
+            record_missing "openclaw" "missing websocket listener log on ws://0.0.0.0:18789"
+          fi
+
+          if ! log_has_any "Browser control listening on http://127.0.0.1:18791/" "$gateway_log" "$openclaw_log"; then
+            record_missing "openclaw" "missing browser control listener log on http://127.0.0.1:18791/"
+          fi
+
+          if ! log_has "$desktop_main_log" "did-finish-load"; then
+            record_missing "electron renderer" "missing did-finish-load log"
+          fi
+
+          for port_entry in "pglite:50832" "api:50800" "web:50810"; do
+            unit_name="${port_entry%%:*}"
+            port="${port_entry##*:}"
+            if ! lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+              record_missing "$unit_name" "port $port is not listening"
+            fi
+          done
+
+          api_ready_body=$(curl --silent --show-error "http://127.0.0.1:50800/api/internal/desktop/ready" || true)
+          if [[ "$api_ready_body" != *'"ready":true'* ]]; then
+            record_missing "api" "readiness endpoint body: ${api_ready_body:-<no response>}"
+          fi
+
+          web_ready_body=$(curl --silent --show-error "http://127.0.0.1:50810/api/internal/desktop/ready" || true)
+          if [[ "$web_ready_body" != *'"ready":true'* ]]; then
+            record_missing "web" "readiness endpoint body: ${web_ready_body:-<no response>}"
+          fi
+
+          web_surface_body=$(curl --silent --show-error "http://127.0.0.1:50810/" || true)
+          if [[ "$web_surface_body" != *'<div id="root"></div>'* ]]; then
+            record_missing "web" "root document did not contain app mount node"
+          fi
+
+          if [ "${#missing_checks[@]}" -gt 0 ]; then
+            printf 'Desktop runtime health verification failed. Missing checks:\n' >&2
+            printf ' - %s\n' "${missing_checks[@]}" >&2
+            printf '\nPersistent log files checked:\n' >&2
+            printf ' - %s\n' "$cold_start_log" "$desktop_main_log" "$pglite_log" "$api_log" "$web_log" "$gateway_log" "$openclaw_log" >&2
+            for file_path in "$cold_start_log" "$desktop_main_log" "$pglite_log" "$api_log" "$web_log" "$gateway_log" "$openclaw_log"; do
+              if [ -f "$file_path" ]; then
+                printf '\n--- %s (last 40 lines) ---\n' "$file_path" >&2
+                tail -n 40 "$file_path" >&2 || true
+              fi
+            done
+            exit 1
+          fi
 
       - name: Capture desktop logs
         if: always()
@@ -189,6 +295,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/desktop-ci"
           if [ -d .tmp/logs ]; then
             cp -R .tmp/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
+          fi
+          if [ -d .tmp/desktop/electron/logs ]; then
+            cp -R .tmp/desktop/electron/logs "$RUNNER_TEMP/desktop-ci/electron-logs"
           fi
           if tmux has-session -t nexu-desktop 2>/dev/null; then
             tmux capture-pane -pt nexu-desktop -S -400 > "$RUNNER_TEMP/desktop-ci/tmux.log"
