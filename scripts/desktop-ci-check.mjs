@@ -407,24 +407,54 @@ function getDiagnosticsUnit(diagnostics, unitId) {
   return isRuntimeUnitState(match) ? match : null;
 }
 
+function getLatestWorkspaceWebview(diagnostics) {
+  if (!Array.isArray(diagnostics?.embeddedContents)) {
+    return null;
+  }
+
+  const workspaceEntries = diagnostics.embeddedContents.filter(
+    (entry) =>
+      isRecord(entry) &&
+      entry.type === "webview" &&
+      typeof entry.lastUrl === "string" &&
+      entry.lastUrl.includes("/workspace"),
+  );
+
+  if (workspaceEntries.length === 0) {
+    return null;
+  }
+
+  return workspaceEntries.reduce((latest, entry) => {
+    const latestEventAt =
+      typeof latest.lastEventAt === "string"
+        ? Date.parse(latest.lastEventAt)
+        : Number.NEGATIVE_INFINITY;
+    const entryEventAt =
+      typeof entry.lastEventAt === "string"
+        ? Date.parse(entry.lastEventAt)
+        : Number.NEGATIVE_INFINITY;
+
+    if (entryEventAt > latestEventAt) {
+      return entry;
+    }
+
+    if (entryEventAt < latestEventAt) {
+      return latest;
+    }
+
+    const latestId = typeof latest.id === "number" ? latest.id : -1;
+    const entryId = typeof entry.id === "number" ? entry.id : -1;
+    return entryId > latestId ? entry : latest;
+  });
+}
+
 function diagnosticsChecksPassed(diagnostics) {
   if (!isRecord(diagnostics)) {
     return false;
   }
 
   const gatewayUnit = getDiagnosticsUnit(diagnostics, "gateway");
-  const embeddedContents = Array.isArray(diagnostics.embeddedContents)
-    ? diagnostics.embeddedContents.filter(
-        (entry) =>
-          isRecord(entry) &&
-          entry.type === "webview" &&
-          (typeof entry.lastUrl === "string" || entry.lastUrl === null),
-      )
-    : [];
-  const workspaceWebview = embeddedContents.find(
-    (entry) =>
-      typeof entry.lastUrl === "string" && entry.lastUrl.includes("/workspace"),
-  );
+  const workspaceWebview = getLatestWorkspaceWebview(diagnostics);
 
   return (
     diagnostics.coldStart?.status === "succeeded" &&
@@ -512,18 +542,7 @@ function collectDiagnosticsFailures(diagnostics) {
   }
 
   const gatewayUnit = getDiagnosticsUnit(diagnostics, "gateway");
-  const embeddedContents = Array.isArray(diagnostics.embeddedContents)
-    ? diagnostics.embeddedContents.filter(
-        (entry) =>
-          isRecord(entry) &&
-          entry.type === "webview" &&
-          (typeof entry.lastUrl === "string" || entry.lastUrl === null),
-      )
-    : [];
-  const workspaceWebview = embeddedContents.find(
-    (entry) =>
-      typeof entry.lastUrl === "string" && entry.lastUrl.includes("/workspace"),
-  );
+  const workspaceWebview = getLatestWorkspaceWebview(diagnostics);
   if (!gatewayUnit) {
     failures.push("gateway runtime unit is missing from diagnostics");
   } else {
