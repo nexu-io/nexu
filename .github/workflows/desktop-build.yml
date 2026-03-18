@@ -138,6 +138,7 @@ jobs:
         run: pnpm --filter @nexu/desktop dist:mac
 
       - name: Prepare artifacts
+        id: artifacts
         shell: bash
         env:
           SUFFIX: ${{ inputs.artifact_suffix }}
@@ -156,6 +157,9 @@ jobs:
             exit 1
           fi
 
+          dmg_basename=$(basename "${dmg_files[0]}")
+          zip_basename=$(basename "${zip_files[0]}")
+
           cp "${dmg_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.dmg"
           cp "${zip_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.zip"
 
@@ -163,6 +167,11 @@ jobs:
             "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.dmg" \
             "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.zip" \
             > apps/desktop/nightly-artifacts/desktop-sha256.txt
+
+          {
+            echo "dmg_basename=$dmg_basename"
+            echo "zip_basename=$zip_basename"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -222,6 +231,33 @@ jobs:
             echo "Uploading $file → $key"
             npx wrangler r2 object put "nexu-desktop-releases/${key}" --file "$file" --remote
           done
+
+      - name: Publish Cloudflare download links
+        if: inputs.update_feed_url != ''
+        env:
+          UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
+          DMG_BASENAME: ${{ steps.artifacts.outputs.dmg_basename }}
+          ZIP_BASENAME: ${{ steps.artifacts.outputs.zip_basename }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_url="${UPDATE_FEED_URL%/}"
+          latest_yml_url="${base_url}/latest-mac.yml"
+          dmg_url="${base_url}/${DMG_BASENAME}"
+          zip_url="${base_url}/${ZIP_BASENAME}"
+
+          {
+            echo "## Cloudflare Downloads"
+            echo
+            echo "- DMG: ${dmg_url}"
+            echo "- ZIP: ${zip_url}"
+            echo "- Update feed: ${latest_yml_url}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Cloudflare DMG: ${dmg_url}"
+          echo "Cloudflare ZIP: ${zip_url}"
+          echo "Cloudflare update feed: ${latest_yml_url}"
 
   cleanup-artifacts:
     runs-on: ubuntu-latest
