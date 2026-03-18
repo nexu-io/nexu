@@ -5,18 +5,31 @@ const enSidebar = [
     text: "Get Started",
     items: [
       { text: "Introduction", link: "/" },
-      { text: "Contributing", link: "/guide/contributing" },
-      { text: "Channel Configuration", link: "/guide/channels" },
+      { text: "One-Minute Quick Start", link: "/guide/quickstart" },
+      { text: "Key Concepts", link: "/guide/concepts" },
+    ],
+  },
+  {
+    text: "Configuration",
+    items: [
+      {
+        text: "Channel Configuration",
+        link: "/guide/channels",
+        items: [
+          { text: "Feishu", link: "/guide/channels/feishu" },
+          { text: "Slack", link: "/guide/channels/slack" },
+          { text: "Discord", link: "/guide/channels/discord" },
+        ],
+      },
       { text: "Model Configuration", link: "/guide/models" },
       { text: "Skill Installation", link: "/guide/skills" },
     ],
   },
   {
-    text: "Channel Guides",
+    text: "Community",
     items: [
-      { text: "Feishu", link: "/guide/channels/feishu" },
-      { text: "Slack", link: "/guide/channels/slack" },
-      { text: "Discord", link: "/guide/channels/discord" },
+      { text: "Contributing", link: "/guide/contributing" },
+      { text: "Contact Us", link: "/guide/contact" },
     ],
   },
 ];
@@ -26,18 +39,31 @@ const zhSidebar = [
     text: "快速开始",
     items: [
       { text: "介绍", link: "/zh/" },
-      { text: "参与贡献", link: "/zh/guide/contributing" },
-      { text: "渠道配置", link: "/zh/guide/channels" },
+      { text: "一分钟快速上手", link: "/zh/guide/quickstart" },
+      { text: "核心概念", link: "/zh/guide/concepts" },
+    ],
+  },
+  {
+    text: "配置指南",
+    items: [
+      {
+        text: "渠道配置",
+        link: "/zh/guide/channels",
+        items: [
+          { text: "飞书", link: "/zh/guide/channels/feishu" },
+          { text: "Slack", link: "/zh/guide/channels/slack" },
+          { text: "Discord", link: "/zh/guide/channels/discord" },
+        ],
+      },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
     ],
   },
   {
-    text: "渠道指南",
+    text: "社区",
     items: [
-      { text: "飞书", link: "/zh/guide/channels/feishu" },
-      { text: "Slack", link: "/zh/guide/channels/slack" },
-      { text: "Discord", link: "/zh/guide/channels/discord" },
+      { text: "参与贡献", link: "/zh/guide/contributing" },
+      { text: "联系我们", link: "/zh/guide/contact" },
     ],
   },
 ];

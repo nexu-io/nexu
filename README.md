@@ -18,7 +18,8 @@
   <a href="https://github.com/nexu-io/nexu/releases/latest" target="_blank" rel="noopener"><strong>⬇️ Download</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 Docs</strong></a> &nbsp;·&nbsp;
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 Feishu</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a>
+  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://x.com/Nexu06" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
 <p align="center">
@@ -29,11 +30,11 @@
 
 ## Overview
 
-**nexu** (next to you) turns OpenClaw 🦞 into a desktop experience you can start using in seconds ⚡. Download the Mac client, double-click to install, and your first AI agent is ready before you finish reading this paragraph.
+**nexu** (next to you) gives you the simplest way to own an OpenClaw 🦞 — download, double-click, start working.
 
-Built on the open-source OpenClaw 🦞 core, nexu bundles **OpenClaw 🦞 Skills** and **full Feishu Skills** so agents plug directly into the workflows your team already uses 🔌. Access Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more via your nexu account—or bring your own API Key with no login required 🔓.
+Built on the open-source OpenClaw 🦞, pre-loaded with essential Skills like Feishu Skills, plus Claude, ChatGPT, Minimax, GLM, Kimi, and more — or bring your own API Key 🔌.
 
-Connect to Feishu, Slack, or Discord—and your AI agent goes mobile 📱. No extra app needed; just chat with your agent wherever you already are.
+Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — chat with it right inside the tools you already use.
 
 <!-- TODO: Add product demo GIF / screenshot here -->
 

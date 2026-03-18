@@ -18,7 +18,8 @@
   <a href="https://github.com/nexu-io/nexu/releases/latest" target="_blank" rel="noopener"><strong>⬇️ 下载</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 文档</strong></a> &nbsp;·&nbsp;
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 飞书</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a>
+  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://x.com/Nexu06" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
 <p align="center">
@@ -29,11 +30,11 @@
 
 ## 概述
 
-**nexu**（next to you）将 OpenClaw 🦞 变成一个桌面体验 ⚡——下载 Mac 客户端，双击安装，几秒钟内你的第一个 AI Agent 就已就绪。
+**nexu**（next to you）让你用最简单的方式拥有一个 OpenClaw 🦞——下载、双击、开始工作。
 
-基于开源 OpenClaw 🦞 核心打造，nexu 预装 **OpenClaw 🦞 Skills** 与 **完整飞书 Skills**，让 Agent 直接接入你团队已在用的工作流 🔌。通过 nexu 账号即可使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等顶级模型，也可使用自带 API Key，无需登录 🔓。
+基于开源 OpenClaw 🦞 打造，预装飞书 Skills 等关键能力，内置 Claude、ChatGPT、Minimax、GLM、Kimi 等主流模型，也支持自带 API Key 🔌。
 
-连接飞书、Slack 或 Discord，你的 AI Agent 即刻上手机 📱。无需额外 App，在你常用的聊天工具里直接和 Agent 对话。
+连接飞书、Slack 或 Discord，Agent 直达手机端 📱——在你日常用的聊天工具里直接对话。
 
 <!-- TODO: 添加产品 Demo GIF / 截图 -->
 
