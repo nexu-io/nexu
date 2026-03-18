@@ -45,9 +45,38 @@ export default defineConfig({
   description: "Nexu documentation for channels, models, and skills.",
   cleanUrls: true,
   lastUpdated: true,
-  head: [["meta", { name: "theme-color", content: "#c96f4a" }]],
+  head: [
+    ["meta", { name: "theme-color", content: "#c96f4a" }],
+    ["link", { rel: "icon", href: "/favicon/favicon.ico", sizes: "any" }],
+    [
+      "link",
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/favicon/favicon-light.svg",
+        media: "(prefers-color-scheme: light)",
+      },
+    ],
+    [
+      "link",
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/favicon/favicon-dark.svg",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    [
+      "link",
+      { rel: "apple-touch-icon", href: "/favicon/apple-touch-icon.png" },
+    ],
+  ],
   themeConfig: {
-    logo: "/mark.png",
+    logo: {
+      light: "/favicon/favicon-light.svg",
+      dark: "/favicon/favicon-dark.svg",
+      alt: "Nexu",
+    },
     socialLinks: [{ icon: "github", link: "https://github.com/refly-ai/nexu" }],
     search: {
       provider: "local",
