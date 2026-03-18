@@ -18,7 +18,8 @@
   <a href="https://github.com/nexu-io/nexu/releases/latest" target="_blank" rel="noopener"><strong>⬇️ 下载</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 文档</strong></a> &nbsp;·&nbsp;
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 飞书</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a>
+  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://x.com/Nexu06" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
 <p align="center">

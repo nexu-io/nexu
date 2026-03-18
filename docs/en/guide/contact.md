@@ -16,8 +16,15 @@ Join our Discord server to chat with the team and other users:
 
 👉 [Join nexu Discord](https://discord.gg/Ynv8dFMRRN)
 
+### X (Twitter)
+
+Follow us on X for the latest updates:
+
+👉 [Follow @Nexu06](https://x.com/Nexu06)
+
 ## Links
 
 - **Website**: [nexu.io](https://nexu.io)
 - **GitHub**: [github.com/nexu-io/nexu](https://github.com/nexu-io/nexu)
+- **X (Twitter)**: [x.com/Nexu06](https://x.com/Nexu06)
 - **Email**: [support@nexu.ai](mailto:support@nexu.ai)

@@ -16,8 +16,15 @@
 
 👉 [加入 nexu Discord](https://discord.gg/Ynv8dFMRRN)
 
+### X (Twitter)
+
+关注我们的 X 账号，获取最新动态：
+
+👉 [关注 @Nexu06](https://x.com/Nexu06)
+
 ## 链接
 
 - **官网**：[nexu.io](https://nexu.io)
 - **GitHub**：[github.com/nexu-io/nexu](https://github.com/nexu-io/nexu)
+- **X (Twitter)**：[x.com/Nexu06](https://x.com/Nexu06)
 - **邮箱**：[support@nexu.ai](mailto:support@nexu.ai)
