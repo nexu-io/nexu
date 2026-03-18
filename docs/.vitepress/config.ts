@@ -69,8 +69,8 @@ const zhSidebar = [
 ];
 
 export default defineConfig({
-  title: "Nexu Docs",
-  description: "Nexu documentation for channels, models, and skills.",
+  title: "nexu",
+  description: "nexu documentation for channels, models, and skills.",
   cleanUrls: true,
   lastUpdated: true,
   rewrites: {
@@ -81,15 +81,15 @@ export default defineConfig({
     root: {
       label: "English",
       lang: "en-US",
-      title: "Nexu Docs",
-      description: "Nexu documentation for channels, models, and skills.",
+      title: "nexu",
+      description: "nexu documentation for channels, models, and skills.",
       link: "/",
     },
     zh: {
       label: "简体中文",
       lang: "zh-CN",
-      title: "Nexu 文档",
-      description: "Nexu 的渠道、模型与技能文档。",
+      title: "nexu",
+      description: "nexu 的渠道、模型与技能文档。",
       link: "/zh/",
     },
   },
