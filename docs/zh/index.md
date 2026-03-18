@@ -10,6 +10,7 @@
 
 ## 如何使用
 
+- 如果你要编辑文档或提交更新，请先看 [参与贡献](/zh/guide/contributing)
 - 如果你先接入聊天平台，请从 [渠道配置](/zh/guide/channels) 开始
 - 如果你要配置模型供应商和密钥，请查看 [模型配置](/zh/guide/models)
 - 如果你要管理运行时能力，请查看 [技能安装](/zh/guide/skills)

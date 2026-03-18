@@ -5,6 +5,7 @@ const enSidebar = [
     text: "Get Started",
     items: [
       { text: "Introduction", link: "/en/" },
+      { text: "Contributing", link: "/en/guide/contributing" },
       { text: "Channel Configuration", link: "/en/guide/channels" },
       { text: "Model Configuration", link: "/en/guide/models" },
       { text: "Skill Installation", link: "/en/guide/skills" },
@@ -25,6 +26,7 @@ const zhSidebar = [
     text: "快速开始",
     items: [
       { text: "介绍", link: "/zh/" },
+      { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "渠道配置", link: "/zh/guide/channels" },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
