@@ -4,19 +4,19 @@ const enSidebar = [
   {
     text: "Get Started",
     items: [
-      { text: "Introduction", link: "/en/" },
-      { text: "Contributing", link: "/en/guide/contributing" },
-      { text: "Channel Configuration", link: "/en/guide/channels" },
-      { text: "Model Configuration", link: "/en/guide/models" },
-      { text: "Skill Installation", link: "/en/guide/skills" },
+      { text: "Introduction", link: "/" },
+      { text: "Contributing", link: "/guide/contributing" },
+      { text: "Channel Configuration", link: "/guide/channels" },
+      { text: "Model Configuration", link: "/guide/models" },
+      { text: "Skill Installation", link: "/guide/skills" },
     ],
   },
   {
     text: "Channel Guides",
     items: [
-      { text: "Feishu", link: "/en/guide/channels/feishu" },
-      { text: "Slack", link: "/en/guide/channels/slack" },
-      { text: "Discord", link: "/en/guide/channels/discord" },
+      { text: "Feishu", link: "/guide/channels/feishu" },
+      { text: "Slack", link: "/guide/channels/slack" },
+      { text: "Discord", link: "/guide/channels/discord" },
     ],
   },
 ];
@@ -47,13 +47,17 @@ export default defineConfig({
   description: "Nexu documentation for channels, models, and skills.",
   cleanUrls: true,
   lastUpdated: true,
+  rewrites: {
+    "en/index.md": "index.md",
+    "en/:path*": ":path*",
+  },
   locales: {
-    en: {
+    root: {
       label: "English",
       lang: "en-US",
       title: "Nexu Docs",
       description: "Nexu documentation for channels, models, and skills.",
-      link: "/en/",
+      link: "/",
     },
     zh: {
       label: "简体中文",
@@ -146,7 +150,7 @@ export default defineConfig({
       next: "Next page",
     },
     sidebar: {
-      "/en/": enSidebar,
+      "/": enSidebar,
       "/zh/": zhSidebar,
     },
   },

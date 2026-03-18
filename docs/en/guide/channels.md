@@ -2,9 +2,9 @@
 
 Nexu supports multiple chat channels at the same time. For this documentation set, the core channel guides are:
 
-- [Feishu](/en/guide/channels/feishu)
-- [Slack](/en/guide/channels/slack)
-- [Discord](/en/guide/channels/discord)
+- [Feishu](/guide/channels/feishu)
+- [Slack](/guide/channels/slack)
+- [Discord](/guide/channels/discord)
 
 ## Recommended setup order
 
