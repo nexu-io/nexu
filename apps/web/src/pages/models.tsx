@@ -6,10 +6,13 @@ import {
   ArrowUpRight,
   Camera,
   Check,
+  ChevronDown,
+  Cpu,
   ExternalLink,
   Loader2,
   Pencil,
   RefreshCw,
+  Search,
   Star,
   Trash2,
 } from "lucide-react";
@@ -20,6 +23,7 @@ import { toast } from "sonner";
 import {
   deleteApiV1ProvidersByProviderId,
   getApiInternalDesktopCloudStatus,
+  getApiInternalDesktopDefaultModel,
   getApiV1LinkCatalog,
   getApiV1Me,
   getApiV1Models,
@@ -28,51 +32,16 @@ import {
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
   postApiV1ProvidersByProviderIdVerify,
-  putApiInternalDesktopCloudModels,
+  putApiInternalDesktopDefaultModel,
   putApiV1ProvidersByProviderId,
 } from "../../lib/api/sdk.gen";
 import { markSetupComplete } from "./welcome";
-
-// ── Toggle Switch 组件 ─────────────────────────────────────────
-
-function ToggleSwitch({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0",
-        checked ? "bg-emerald-500" : "bg-surface-3",
-        disabled && "opacity-50 cursor-not-allowed",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform",
-          checked ? "translate-x-[18px]" : "translate-x-[3px]",
-        )}
-      />
-    </button>
-  );
-}
 
 // ── Types ──────────────────────────────────────────────────────
 
 interface ProviderModel {
   id: string;
   name: string;
-  enabled: boolean;
   description?: string;
 }
 
@@ -145,7 +114,7 @@ const PROVIDER_META: Record<
   },
 };
 
-// Well-known models per provider (shown as toggles when no verify result yet)
+// Well-known models per provider (shown when no verify result yet)
 const DEFAULT_MODELS: Record<string, string[]> = {
   anthropic: [
     "claude-opus-4-20250514",
@@ -174,7 +143,6 @@ function buildProviders(
     list.push({
       id: m.id,
       name: m.name,
-      enabled: true,
       description: m.description,
     });
     grouped.set(m.provider, list);
@@ -245,6 +213,19 @@ async function verifyApiKey(
 // Always show these four as configurable, even if no key set yet
 
 const BYOK_PROVIDER_IDS = ["anthropic", "openai", "google", "custom"] as const;
+
+// ── Model grouping helpers (same as home.tsx) ─────────────────
+
+function getGroupKey(m: { id: string; provider: string }): string {
+  return m.id.startsWith("link/") ? "nexu" : m.provider;
+}
+
+const PROVIDER_LABELS: Record<string, string> = {
+  nexu: "Nexu Official",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google AI",
+};
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -516,6 +497,268 @@ function GeneralSettings() {
   );
 }
 
+// ── Current Model Selector ────────────────────────────────────
+
+function CurrentModelSelector({
+  models,
+  currentModelId,
+  onSelectModel,
+}: {
+  models: Array<{ id: string; name: string; provider: string }>;
+  currentModelId: string;
+  onSelectModel: (modelId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const currentModel = models.find((m) => m.id === currentModelId);
+  const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
+
+  // Group models by provider
+  const modelsByProvider = useMemo(() => {
+    const map = new Map<string, typeof models>();
+    for (const m of models) {
+      const groupKey = getGroupKey(m);
+      const list = map.get(groupKey) ?? [];
+      list.push(m);
+      map.set(groupKey, list);
+    }
+    const entries = Array.from(map.entries());
+    entries.sort((a, b) => {
+      if (a[0] === "nexu") return -1;
+      if (b[0] === "nexu") return 1;
+      return 0;
+    });
+    return entries.map(([provider, ms]) => ({
+      id: provider,
+      name: PROVIDER_LABELS[provider] ?? provider,
+      models: ms,
+    }));
+  }, [models]);
+
+  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
+    () => new Set(currentGroupKey ? [currentGroupKey] : []),
+  );
+
+  // Expand current model's provider when opened
+  useEffect(() => {
+    if (open) {
+      const groupKey = currentModel ? getGroupKey(currentModel) : "";
+      setExpandedProviders(
+        new Set(
+          groupKey
+            ? [groupKey]
+            : modelsByProvider.length > 0 && modelsByProvider[0]
+              ? [modelsByProvider[0].id]
+              : [],
+        ),
+      );
+    }
+  }, [open, currentModel, modelsByProvider]);
+
+  // Empty state
+  if (models.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-surface-0 px-4 py-4 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-2 shrink-0">
+            <Cpu size={16} className="text-text-muted" />
+          </div>
+          <div>
+            <div className="text-[13px] font-medium text-text-primary">
+              {t("models.noModelConfigured")}
+            </div>
+            <div className="text-[11px] text-text-muted">
+              {t("models.configureProviderHint")}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const query = search.toLowerCase().trim();
+  const filteredProviders = modelsByProvider
+    .map((p) => ({
+      ...p,
+      models: p.models.filter(
+        (m) =>
+          !query ||
+          m.name.toLowerCase().includes(query) ||
+          p.name.toLowerCase().includes(query),
+      ),
+    }))
+    .filter((p) => p.models.length > 0);
+
+  return (
+    <div className="mb-5" ref={ref}>
+      <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
+        {t("models.currentModel")}
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-surface-0 px-4 py-3 transition-colors hover:border-border-hover"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            {currentGroupKey ? (
+              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                <ProviderLogo provider={currentGroupKey} size={16} />
+              </span>
+            ) : (
+              <Cpu size={16} className="text-accent shrink-0" />
+            )}
+            <span className="text-[13px] font-medium text-text-primary truncate">
+              {currentModel?.name ??
+                (currentModelId || t("models.noModelConfigured"))}
+            </span>
+            {currentGroupKey && (
+              <span className="text-[10px] text-text-muted/60 shrink-0">
+                ({PROVIDER_LABELS[currentGroupKey] ?? currentGroupKey})
+              </span>
+            )}
+          </div>
+          <ChevronDown
+            size={13}
+            className={cn(
+              "text-text-muted transition-transform shrink-0",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+
+        {open && (
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-surface-1 shadow-xl">
+            {/* Search */}
+            <div className="px-3 pt-3 pb-2">
+              <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
+                <Search size={14} className="text-text-muted shrink-0" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    if (e.target.value.trim()) {
+                      setExpandedProviders(
+                        new Set(modelsByProvider.map((p) => p.id)),
+                      );
+                    }
+                  }}
+                  placeholder={t("models.searchModels")}
+                  className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Provider groups */}
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-4 z-10 bg-gradient-to-b from-surface-1 to-transparent" />
+              <div
+                className="max-h-[360px] overflow-y-auto py-1"
+                style={{
+                  overscrollBehavior: "contain",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
+                {filteredProviders.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-[13px] text-text-muted">
+                    {t("models.byok.none")}
+                  </div>
+                ) : (
+                  filteredProviders.map((provider) => {
+                    const isExpanded =
+                      expandedProviders.has(provider.id) || !!query;
+                    return (
+                      <div key={provider.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (query) return;
+                            setExpandedProviders((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(provider.id))
+                                next.delete(provider.id);
+                              else next.add(provider.id);
+                              return next;
+                            });
+                          }}
+                          className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-surface-2/50 transition-colors"
+                        >
+                          <ChevronDown
+                            size={11}
+                            className={cn(
+                              "text-text-muted/50 transition-transform",
+                              !isExpanded && "-rotate-90",
+                            )}
+                          />
+                          <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
+                            <ProviderLogo provider={provider.id} size={15} />
+                          </span>
+                          <span className="text-[12px] font-medium text-text-secondary">
+                            {provider.name}
+                          </span>
+                          <span className="text-[11px] text-text-muted/40 ml-auto tabular-nums">
+                            {provider.models.length}
+                          </span>
+                        </button>
+                        {isExpanded &&
+                          provider.models.map((model) => (
+                            <button
+                              key={model.id}
+                              type="button"
+                              onClick={() => {
+                                onSelectModel(model.id);
+                                setOpen(false);
+                                setSearch("");
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-2.5 pl-9 pr-3 py-2 text-left transition-colors hover:bg-surface-2",
+                                model.id === currentModelId && "bg-accent/5",
+                              )}
+                            >
+                              {model.id === currentModelId ? (
+                                <Check
+                                  size={13}
+                                  className="text-accent shrink-0"
+                                />
+                              ) : (
+                                <span className="w-[13px] shrink-0" />
+                              )}
+                              <span className="text-[13px] font-medium text-text-primary truncate flex-1">
+                                {model.name}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 z-10 bg-gradient-to-t from-surface-1 to-transparent" />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ModelsPage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -526,7 +769,6 @@ export function ModelsPage() {
     : isSetupMode
       ? "providers"
       : "general";
-  const [_search, _setSearch] = useState("");
   const providerParam = searchParams.get("provider");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     providerParam ?? (isSetupMode ? "anthropic" : null),
@@ -551,10 +793,51 @@ export function ModelsPage() {
     queryFn: fetchProviders,
   });
 
-  const providers = useMemo(
-    () => buildProviders(modelsData?.models ?? []),
-    [modelsData],
-  );
+  // Current default model
+  const { data: defaultModelData } = useQuery({
+    queryKey: ["desktop-default-model"],
+    queryFn: async () => {
+      const { data } = await getApiInternalDesktopDefaultModel();
+      return data as { modelId: string | null } | undefined;
+    },
+  });
+
+  const currentModelId = defaultModelData?.modelId ?? "";
+  const models = modelsData?.models ?? [];
+
+  const updateModel = useMutation({
+    mutationFn: async (modelId: string) => {
+      const toastId = toast.loading(t("models.switchingModel"));
+      const { error } = await putApiInternalDesktopDefaultModel({
+        body: { modelId },
+      });
+      if (error) {
+        toast.error(t("models.modelSwitchFailed"), { id: toastId });
+        throw new Error("Failed to update model");
+      }
+      toast.success(t("models.modelSwitched"), { id: toastId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
+    },
+  });
+
+  // Auto-select first model if none is selected and models are available
+  const autoSelectDone = useRef(false);
+  useEffect(() => {
+    if (
+      !autoSelectDone.current &&
+      defaultModelData !== undefined &&
+      !currentModelId &&
+      models.length > 0
+    ) {
+      autoSelectDone.current = true;
+      const firstModel = models[0];
+      if (firstModel) updateModel.mutate(firstModel.id);
+    }
+  }, [defaultModelData, currentModelId, models, updateModel]);
+
+  const providers = useMemo(() => buildProviders(models), [models]);
 
   // Build sidebar items: Nexu first, then BYOK providers
   const sidebarItems = useMemo(() => {
@@ -593,16 +876,6 @@ export function ModelsPage() {
     return items;
   }, [providers, dbProviders]);
 
-  // Split sidebar items into enabled/disabled groups
-  const enabledProviders = useMemo(
-    () => sidebarItems.filter((p) => p.configured),
-    [sidebarItems],
-  );
-  const disabledProviders = useMemo(
-    () => sidebarItems.filter((p) => !p.configured),
-    [sidebarItems],
-  );
-
   const activeProvider =
     sidebarItems.find((p) => p.id === selectedProviderId) ??
     sidebarItems[0] ??
@@ -628,6 +901,16 @@ export function ModelsPage() {
       setSearchParams(next, { replace: true });
     },
     [searchParams, setSearchParams],
+  );
+
+  // Auto-select first model after provider save
+  const handleAutoSelectModel = useCallback(
+    (firstModelId: string) => {
+      if (!currentModelId) {
+        updateModel.mutate(firstModelId);
+      }
+    },
+    [currentModelId, updateModel],
   );
 
   return (
@@ -669,158 +952,124 @@ export function ModelsPage() {
         {settingsTab === "general" ? (
           <GeneralSettings />
         ) : (
-          <div
-            className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
-            style={{ minHeight: 520 }}
-          >
-            <div className="w-56 shrink-0 border-r border-border bg-surface-0 overflow-y-auto">
-              <div className="p-2">
-                {enabledProviders.length > 0 && (
-                  <>
-                    <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                      {t("models.enabled")}
-                    </div>
-                    <div className="space-y-0.5 mb-3">
-                      {enabledProviders.map((item) => {
-                        const isActive = activeProvider?.id === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedProviderId(item.id);
-                              clearSetupParam();
-                            }}
-                            className={cn(
-                              "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                              isActive ? "bg-accent/10" : "hover:bg-surface-2",
-                            )}
-                          >
-                            <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                              <ProviderLogo provider={item.id} size={16} />
-                            </span>
-                            <span
-                              className={cn(
-                                "flex-1 text-[12px] font-medium truncate",
-                                isActive ? "text-accent" : "text-text-primary",
-                              )}
-                            >
-                              {item.name}
-                            </span>
-                            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-500" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
+          <div>
+            {/* Current Model Selector */}
+            <CurrentModelSelector
+              models={models}
+              currentModelId={currentModelId}
+              onSelectModel={(modelId) => updateModel.mutate(modelId)}
+            />
 
-                {disabledProviders.length > 0 && (
-                  <>
-                    <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-muted uppercase tracking-wider">
-                      {t("models.disabled")}
-                    </div>
-                    <div className="space-y-0.5">
-                      {disabledProviders.map((item) => {
-                        const isActive = activeProvider?.id === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedProviderId(item.id);
-                              clearSetupParam();
-                            }}
-                            className={cn(
-                              "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                              isActive ? "bg-accent/10" : "hover:bg-surface-2",
-                            )}
-                          >
-                            <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                              <ProviderLogo provider={item.id} size={16} />
-                            </span>
-                            <span
-                              className={cn(
-                                "flex-1 text-[12px] font-medium truncate",
-                                isActive ? "text-accent" : "text-text-primary",
-                              )}
-                            >
-                              {item.name}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5">
-              {activeProvider ? (
-                activeProvider.managed ? (
-                  modelsLoading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-[13px] text-text-muted">
-                        {t("models.loading")}
-                      </div>
-                    </div>
-                  ) : modelsError ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <div className="text-[13px] text-red-500 mb-2">
-                          {t("models.loadFailed")}
-                        </div>
-                        <p className="text-[12px] text-text-muted mb-3">
-                          {t("models.loadFailedHint")}
-                        </p>
+            {/* Provider sidebar + detail */}
+            <div
+              className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
+              style={{ minHeight: 520 }}
+            >
+              <div className="w-56 shrink-0 border-r border-border bg-surface-0 overflow-y-auto">
+                <div className="p-2">
+                  <div className="space-y-0.5">
+                    {sidebarItems.map((item) => {
+                      const isActive = activeProvider?.id === item.id;
+                      return (
                         <button
+                          key={item.id}
                           type="button"
-                          onClick={() =>
-                            queryClient.invalidateQueries({
-                              queryKey: ["models"],
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
+                          onClick={() => {
+                            setSelectedProviderId(item.id);
+                            clearSetupParam();
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                            isActive ? "bg-accent/10" : "hover:bg-surface-2",
+                          )}
                         >
-                          <RefreshCw size={12} />
-                          {t("models.retry")}
+                          <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                            <ProviderLogo provider={item.id} size={16} />
+                          </span>
+                          <span
+                            className={cn(
+                              "flex-1 text-[12px] font-medium truncate",
+                              isActive ? "text-accent" : "text-text-primary",
+                            )}
+                          >
+                            {item.name}
+                          </span>
+                          {item.configured && (
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-500" />
+                          )}
                         </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5">
+                {activeProvider ? (
+                  activeProvider.managed ? (
+                    modelsLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-[13px] text-text-muted">
+                          {t("models.loading")}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <ManagedProviderDetail
-                      provider={
-                        providers.find((p) => p.id === activeProvider.id) ?? {
-                          id: activeProvider.id,
-                          name: activeProvider.name,
-                          description:
-                            PROVIDER_META[activeProvider.id]?.descriptionKey ??
-                            "",
-                          managed: true,
-                          models: [],
+                    ) : modelsError ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <div className="text-[13px] text-red-500 mb-2">
+                            {t("models.loadFailed")}
+                          </div>
+                          <p className="text-[12px] text-text-muted mb-3">
+                            {t("models.loadFailedHint")}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              queryClient.invalidateQueries({
+                                queryKey: ["models"],
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
+                          >
+                            <RefreshCw size={12} />
+                            {t("models.retry")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <ManagedProviderDetail
+                        provider={
+                          providers.find((p) => p.id === activeProvider.id) ?? {
+                            id: activeProvider.id,
+                            name: activeProvider.name,
+                            description:
+                              PROVIDER_META[activeProvider.id]
+                                ?.descriptionKey ?? "",
+                            managed: true,
+                            models: [],
+                          }
                         }
-                      }
+                        currentModelId={currentModelId}
+                        onAutoSelectModel={handleAutoSelectModel}
+                      />
+                    )
+                  ) : (
+                    <ByokProviderDetail
+                      providerId={activeProvider.id}
+                      dbProvider={dbProviders.find(
+                        (p) => p.providerId === activeProvider.id,
+                      )}
+                      queryClient={queryClient}
+                      currentModelId={currentModelId}
+                      onAutoSelectModel={handleAutoSelectModel}
                     />
                   )
                 ) : (
-                  <ByokProviderDetail
-                    providerId={activeProvider.id}
-                    dbProvider={dbProviders.find(
-                      (p) => p.providerId === activeProvider.id,
-                    )}
-                    models={
-                      providers.find((p) => p.id === activeProvider.id)
-                        ?.models ?? []
-                    }
-                    queryClient={queryClient}
-                  />
-                )
-              ) : (
-                <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
-                  {t("models.selectProvider")}
-                </div>
-              )}
+                  <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
+                    {t("models.selectProvider")}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -853,7 +1102,15 @@ async function fetchLinkCatalog(): Promise<LinkProvider[]> {
 
 // ── Managed provider detail (Nexu Official) ───────────────────
 
-function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
+function ManagedProviderDetail({
+  provider,
+  currentModelId,
+  onAutoSelectModel,
+}: {
+  provider: ProviderConfig;
+  currentModelId: string;
+  onAutoSelectModel: (modelId: string) => void;
+}) {
   const { t } = useTranslation();
   const { data: linkProviders = [], isLoading: catalogLoading } = useQuery({
     queryKey: ["link-catalog"],
@@ -890,13 +1147,19 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
           setCloudConnected(true);
           // Refresh provider/model data now that cloud is connected
           queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
+          queryClient.invalidateQueries({ queryKey: ["models"] });
+          // Auto-select first model if none set
+          const firstModel = provider.models[0];
+          if (firstModel) {
+            onAutoSelectModel(firstModel.id);
+          }
         }
       } catch {
         /* ignore */
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [loginBusy, queryClient]);
+  }, [loginBusy, queryClient, provider.models, onAutoSelectModel]);
 
   const handleLogin = async () => {
     setLoginBusy(true);
@@ -1041,11 +1304,11 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
         </div>
       )}
 
-      {/* Connected cloud models (from API) */}
+      {/* Connected cloud models (from API) — read-only */}
       {provider.models.length > 0 && (
         <div className="mb-6">
           <div className="text-[13px] font-semibold text-text-primary mb-3">
-            {t("models.managed.enabledModels")}
+            {t("models.managed.availableModels")}
             <span className="ml-2 text-[11px] font-normal text-text-muted">
               {t("models.managed.totalCount", {
                 count: provider.models.length,
@@ -1053,27 +1316,37 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
             </span>
           </div>
           <div className="space-y-1.5">
-            {provider.models.map((model) => (
-              <div
-                key={model.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-0 px-3 py-2.5"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                    <ProviderLogo provider={provider.id} size={16} />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-medium text-text-primary truncate">
-                      {model.name}
-                    </div>
-                    <div className="text-[10px] text-text-muted">
-                      {model.id}
+            {provider.models.map((model) => {
+              const isSelected = model.id === currentModelId;
+              return (
+                <div
+                  key={model.id}
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
+                    isSelected
+                      ? "border-accent/20 bg-accent/5"
+                      : "border-border bg-surface-0",
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
+                      <ProviderLogo provider={provider.id} size={16} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-medium text-text-primary truncate">
+                        {model.name}
+                      </div>
+                      <div className="text-[10px] text-text-muted">
+                        {model.id}
+                      </div>
                     </div>
                   </div>
+                  {isSelected && (
+                    <Check size={14} className="text-accent shrink-0" />
+                  )}
                 </div>
-                <ToggleSwitch checked={model.enabled} onChange={() => {}} />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1089,64 +1362,27 @@ function ManagedProviderDetail({ provider }: { provider: ProviderConfig }) {
           linkProviders={linkProviders}
           totalModels={totalModels}
           cloudConnected={cloudConnected}
+          currentModelId={currentModelId}
         />
       ) : null}
     </div>
   );
 }
 
-// ── Link model catalog with toggles ──────────────────────────
+// ── Link model catalog (read-only) ───────────────────────────
 
 function LinkModelCatalog({
   linkProviders,
   totalModels,
   cloudConnected,
+  currentModelId,
 }: {
   linkProviders: LinkProvider[];
   totalModels: number;
   cloudConnected: boolean;
+  currentModelId: string;
 }) {
   const { t } = useTranslation();
-  // All link model IDs, flattened
-  const allModelIds = useMemo(
-    () => linkProviders.flatMap((lp) => lp.models.map((m) => m.id)),
-    [linkProviders],
-  );
-
-  // Enabled set — defaults to all enabled when connected
-  const [enabledIds, setEnabledIds] = useState<Set<string>>(
-    () => new Set(allModelIds),
-  );
-  const [_saving, setSaving] = useState(false);
-
-  // Sync when catalog changes
-  useEffect(() => {
-    setEnabledIds(new Set(allModelIds));
-  }, [allModelIds]);
-
-  // Persist enabled model selection to backend
-  const persistEnabledModels = useCallback(async (ids: Set<string>) => {
-    setSaving(true);
-    try {
-      await putApiInternalDesktopCloudModels({
-        body: { enabledModelIds: Array.from(ids) },
-      });
-    } catch {
-      /* best-effort */
-    } finally {
-      setSaving(false);
-    }
-  }, []);
-
-  const toggleModel = (id: string) => {
-    setEnabledIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      persistEnabledModels(next);
-      return next;
-    });
-  };
 
   return (
     <div>
@@ -1180,12 +1416,15 @@ function LinkModelCatalog({
             </div>
             <div className="space-y-1.5">
               {lp.models.map((m) => {
-                const enabled = enabledIds.has(m.id);
+                const isSelected = m.id === currentModelId;
                 return (
                   <div
                     key={m.id}
                     className={cn(
-                      "flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-0 px-3 py-2.5",
+                      "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
+                      isSelected
+                        ? "border-accent/20 bg-accent/5"
+                        : "border-border bg-surface-0",
                       !cloudConnected && "opacity-70",
                     )}
                   >
@@ -1202,16 +1441,13 @@ function LinkModelCatalog({
                         </div>
                       </div>
                     </div>
-                    {cloudConnected ? (
-                      <ToggleSwitch
-                        checked={enabled}
-                        onChange={() => toggleModel(m.id)}
-                      />
-                    ) : (
+                    {isSelected ? (
+                      <Check size={14} className="text-accent shrink-0" />
+                    ) : !cloudConnected ? (
                       <span className="text-[10px] text-text-muted/60 shrink-0">
                         {t("models.catalog.loginToUse")}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
@@ -1228,13 +1464,15 @@ function LinkModelCatalog({
 function ByokProviderDetail({
   providerId,
   dbProvider,
-  models: _models,
   queryClient,
+  currentModelId,
+  onAutoSelectModel,
 }: {
   providerId: string;
   dbProvider?: DbProvider;
-  models: ProviderModel[];
   queryClient: ReturnType<typeof useQueryClient>;
+  currentModelId: string;
+  onAutoSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
   const meta = PROVIDER_META[providerId] ?? {
@@ -1249,23 +1487,15 @@ function ByokProviderDetail({
   const [baseUrl, setBaseUrl] = useState(
     dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
   );
-  const [providerEnabled, setProviderEnabled] = useState(
-    dbProvider?.hasApiKey ?? false,
-  );
 
   // Available models from verification
   const [verifiedModels, setVerifiedModels] = useState<string[] | null>(null);
-  const [enabledModelIds, setEnabledModelIds] = useState<Set<string>>(
-    () => new Set(JSON.parse(dbProvider?.modelsJson ?? "[]")),
-  );
 
   // Reset form when provider changes
   useEffect(() => {
     setApiKey("");
     setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
-    setProviderEnabled(dbProvider?.hasApiKey ?? false);
     setVerifiedModels(null);
-    setEnabledModelIds(new Set(JSON.parse(dbProvider?.modelsJson ?? "[]")));
   }, [dbProvider, meta.defaultProxyUrl]);
 
   // ── Verify mutation ──────────────────────────────────
@@ -1274,9 +1504,6 @@ function ByokProviderDetail({
     onSuccess: (result) => {
       if (result.valid && result.models) {
         setVerifiedModels(result.models);
-        // Auto-enable all verified models
-        setEnabledModelIds(new Set(result.models));
-        setProviderEnabled(true);
       }
     },
   });
@@ -1288,14 +1515,19 @@ function ByokProviderDetail({
         apiKey: apiKey || undefined,
         baseUrl: baseUrl || null,
         displayName: meta.name,
-        enabled: providerEnabled,
-        modelsJson: JSON.stringify(Array.from(enabledModelIds)),
+        enabled: true,
+        modelsJson: JSON.stringify(displayModels),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
       setApiKey("");
       markSetupComplete();
+      // Auto-select first model if no model is currently selected
+      const firstModel = displayModels[0];
+      if (firstModel) {
+        onAutoSelectModel(firstModel);
+      }
     },
   });
 
@@ -1308,8 +1540,6 @@ function ByokProviderDetail({
       setApiKey("");
       setBaseUrl(meta.defaultProxyUrl ?? "");
       setVerifiedModels(null);
-      setEnabledModelIds(new Set());
-      setProviderEnabled(false);
     },
   });
 
@@ -1320,19 +1550,6 @@ function ByokProviderDetail({
     if (stored.length > 0) return stored;
     return DEFAULT_MODELS[providerId] ?? [];
   }, [verifiedModels, dbProvider, providerId]);
-
-  // Split into enabled/disabled
-  const enabledModels = displayModels.filter((m) => enabledModelIds.has(m));
-  const disabledModels = displayModels.filter((m) => !enabledModelIds.has(m));
-
-  const toggleModel = (modelId: string) => {
-    setEnabledModelIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(modelId)) next.delete(modelId);
-      else next.add(modelId);
-      return next;
-    });
-  };
 
   return (
     <div>
@@ -1364,13 +1581,9 @@ function ByokProviderDetail({
             </div>
           </div>
         </div>
-        <ToggleSwitch
-          checked={providerEnabled}
-          onChange={(v) => setProviderEnabled(v)}
-        />
       </div>
 
-      {/* API Key + API 代理地址 */}
+      {/* API Key + API Proxy URL */}
       <div className="space-y-4 mb-6">
         <div>
           <label
@@ -1452,7 +1665,7 @@ function ByokProviderDetail({
         </div>
       </div>
 
-      {/* Model list */}
+      {/* Model list — read-only */}
       <div>
         <div className="text-[13px] font-semibold text-text-primary mb-3">
           {t("models.byok.modelList")}
@@ -1460,86 +1673,43 @@ function ByokProviderDetail({
             {t("models.byok.modelsTotalCount", { count: displayModels.length })}
           </span>
         </div>
-        <div className="space-y-4">
-          {/* 已启用 */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] font-medium text-text-muted">
-                {t("models.byok.enabledSection")}
-              </span>
-              <span className="text-[10px] text-text-muted/60">
-                {t("models.byok.enabledHint")}
-              </span>
+        <div className="space-y-1.5">
+          {displayModels.length === 0 && (
+            <div className="text-[11px] text-text-muted/60 py-3 text-center">
+              {t("models.byok.none")}
             </div>
-            <div className="space-y-1.5">
-              {enabledModels.length === 0 && (
-                <div className="text-[11px] text-text-muted/60 py-3 text-center">
-                  {t("models.byok.none")}
-                </div>
-              )}
-              {enabledModels.map((modelId) => (
-                <div
-                  key={modelId}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-0 px-3 py-2.5"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                      <ProviderLogo provider={providerId} size={16} />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-medium text-text-primary truncate">
-                        {modelId}
-                      </div>
-                      <div className="text-[10px] text-text-muted">
-                        {providerId}
-                      </div>
+          )}
+          {displayModels.map((modelId) => {
+            const isSelected = modelId === currentModelId;
+            return (
+              <div
+                key={modelId}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
+                  isSelected
+                    ? "border-accent/20 bg-accent/5"
+                    : "border-border bg-surface-0",
+                )}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
+                    <ProviderLogo provider={providerId} size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-medium text-text-primary truncate">
+                      {modelId}
+                    </div>
+                    <div className="text-[10px] text-text-muted">
+                      {providerId}
                     </div>
                   </div>
-                  <ToggleSwitch
-                    checked={true}
-                    onChange={() => toggleModel(modelId)}
-                  />
                 </div>
-              ))}
-            </div>
-          </div>
-          {/* 未启用 */}
-          <div>
-            <div className="text-[11px] font-medium text-text-muted mb-2">
-              {t("models.byok.disabledSection")}
-            </div>
-            <div className="space-y-1.5">
-              {disabledModels.length === 0 && (
-                <div className="text-[11px] text-text-muted/60 py-3 text-center">
-                  {t("models.byok.none")}
-                </div>
-              )}
-              {disabledModels.map((modelId) => (
-                <div
-                  key={modelId}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-0 px-3 py-2.5"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 opacity-50">
-                      <ProviderLogo provider={providerId} size={16} />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-medium text-text-primary truncate">
-                        {modelId}
-                      </div>
-                      <div className="text-[10px] text-text-muted">
-                        {providerId}
-                      </div>
-                    </div>
-                  </div>
-                  <ToggleSwitch
-                    checked={false}
-                    onChange={() => toggleModel(modelId)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+                {isSelected && (
+                  <Check size={14} className="text-accent shrink-0" />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1548,16 +1718,12 @@ function ByokProviderDetail({
         <button
           type="button"
           disabled={
-            saveMutation.isPending ||
-            (!apiKey && !dbProvider?.hasApiKey) ||
-            enabledModelIds.size === 0
+            saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
           }
           onClick={() => saveMutation.mutate()}
           className={cn(
             "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-            !saveMutation.isPending &&
-              (apiKey || dbProvider?.hasApiKey) &&
-              enabledModelIds.size > 0
+            !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
               ? "bg-accent text-white hover:bg-accent/90"
               : "bg-surface-2 text-text-muted cursor-not-allowed",
           )}

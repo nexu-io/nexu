@@ -10,6 +10,7 @@ import { db, pool } from "./db/index.js";
 import { BaseError } from "./lib/error.js";
 import { logger } from "./lib/logger.js";
 import { warmupDesktopAuth } from "./middleware/desktop-auth.js";
+import { refreshCloudModelsOnStartup } from "./routes/desktop-local-routes.js";
 import {
   startPoolHealthMonitor,
   stopPoolHealthMonitor,
@@ -100,6 +101,9 @@ async function main() {
   });
 
   startPoolHealthMonitor(db);
+
+  // Refresh cloud models from Link gateway (best-effort, non-blocking)
+  refreshCloudModelsOnStartup();
 
   const shutdown = () => {
     stopPoolHealthMonitor();

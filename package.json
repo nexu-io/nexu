@@ -52,6 +52,10 @@
   },
   "packageManager": "pnpm@10.26.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["@biomejs/biome", "electron", "esbuild"]
+    "onlyBuiltDependencies": ["@biomejs/biome", "electron", "esbuild"],
+    "overrides": {
+      "react": "^19.2.4",
+      "react-dom": "^19.2.4"
+    }
   }
 }
