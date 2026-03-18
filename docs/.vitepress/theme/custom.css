@@ -1,0 +1,74 @@
+:root {
+  --vp-c-brand-1: #c96f4a;
+  --vp-c-brand-2: #d8825f;
+  --vp-c-brand-3: #ae5f3e;
+  --vp-c-brand-soft: rgba(201, 111, 74, 0.14);
+  --vp-c-bg: #fbf7f2;
+  --vp-c-bg-alt: #f6efe6;
+  --vp-c-bg-elv: #fffdfa;
+  --vp-c-bg-soft: #f1e7db;
+  --vp-c-text-1: #2f241d;
+  --vp-c-text-2: #5b4a3f;
+  --vp-c-text-3: #7b695d;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    120deg,
+    #9d4f2d 0%,
+    #d98d56 55%,
+    #7366d8 100%
+  );
+  --vp-home-hero-image-background-image: radial-gradient(
+      circle at top left,
+      rgba(217, 141, 86, 0.28),
+      transparent 46%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(115, 102, 216, 0.22),
+      transparent 42%
+    );
+  --vp-home-hero-image-filter: blur(52px);
+}
+
+.dark {
+  --vp-c-bg: #191512;
+  --vp-c-bg-alt: #211c18;
+  --vp-c-bg-elv: #29231d;
+  --vp-c-bg-soft: #312922;
+  --vp-c-text-1: #f7efe7;
+  --vp-c-text-2: #dbc8b8;
+  --vp-c-text-3: #b49885;
+}
+
+body {
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.VPNavBarTitle .title,
+.VPHomeHero .name,
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  font-family: "Iowan Old Style", "Georgia", serif;
+}
+
+.VPFeature {
+  border: 1px solid rgba(140, 96, 69, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.88),
+    rgba(247, 240, 232, 0.92)
+  );
+}
+
+.dark .VPFeature {
+  background: linear-gradient(
+    180deg,
+    rgba(49, 41, 34, 0.8),
+    rgba(35, 29, 24, 0.92)
+  );
+}
+
+.vp-doc a {
+  text-underline-offset: 2px;
+}
