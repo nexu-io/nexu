@@ -8,7 +8,8 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
 import type {
@@ -18,6 +19,42 @@ import type {
 } from "../../shared/skillhub-types";
 
 const execFileAsync = promisify(execFile);
+
+const nodeRequire = createRequire(import.meta.url);
+
+function resolveClawHubBin(): string {
+  const pkgPath = nodeRequire.resolve("clawhub/package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
+    bin?: Record<string, string>;
+  };
+  const binRel = pkg.bin?.clawhub ?? pkg.bin?.clawdhub ?? "bin/clawdhub.js";
+  return resolve(dirname(pkgPath), binRel);
+}
+
+const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
+
+function isValidSlug(slug: string): boolean {
+  return SLUG_REGEX.test(slug);
+}
+
+function resolveSkillPath(skillsDir: string, slug: string): string | null {
+  const rootDir = resolve(skillsDir);
+  const skillPath = resolve(rootDir, slug);
+  const normalizedRoot = rootDir.endsWith(sep) ? rootDir : `${rootDir}${sep}`;
+
+  if (skillPath === rootDir || !skillPath.startsWith(normalizedRoot)) {
+    return null;
+  }
+
+  return skillPath;
+}
+
+export type SkillhubLogFn = (
+  level: "info" | "error" | "warn",
+  message: string,
+) => void;
+
+const noopLog: SkillhubLogFn = () => {};
 
 const VERSION_CHECK_URL =
   "https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/version.json";
@@ -32,14 +69,16 @@ export class CatalogManager {
   private readonly metaPath: string;
   private readonly catalogPath: string;
   private readonly tempCatalogPath: string;
+  private readonly log: SkillhubLogFn;
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
-  constructor(userDataPath: string) {
+  constructor(userDataPath: string, log?: SkillhubLogFn) {
     this.cacheDir = resolve(userDataPath, "runtime/skillhub-cache");
     this.skillsDir = getOpenclawSkillsDir(userDataPath);
     this.metaPath = resolve(this.cacheDir, "meta.json");
     this.catalogPath = resolve(this.cacheDir, "catalog.json");
     this.tempCatalogPath = resolve(this.cacheDir, ".catalog-next.json");
+    this.log = log ?? noopLog;
     mkdirSync(this.cacheDir, { recursive: true });
   }
 
@@ -114,33 +153,60 @@ export class CatalogManager {
   }
 
   async installSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
+    if (!isValidSlug(slug)) {
+      this.log("warn", `install rejected slug=${slug} — invalid slug`);
+      return { ok: false, error: "Invalid skill slug" };
+    }
+
+    this.log("info", `installing skill slug=${slug} dir=${this.skillsDir}`);
     try {
-      await execFileAsync("npx", [
-        "clawhub",
+      const clawHubBin = resolveClawHubBin();
+      this.log("info", `install resolved clawhub=${clawHubBin}`);
+      const { stdout, stderr } = await execFileAsync(process.execPath, [
+        clawHubBin,
         "install",
         slug,
         "--force",
         "--dir",
         this.skillsDir,
       ]);
+      if (stdout) this.log("info", `install stdout slug=${slug}: ${stdout.trim()}`);
+      if (stderr) this.log("warn", `install stderr slug=${slug}: ${stderr.trim()}`);
+      this.log("info", `install ok slug=${slug}`);
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      this.log("error", `install failed slug=${slug}: ${message}`);
       return { ok: false, error: message };
     }
   }
 
   async uninstallSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
+    if (!isValidSlug(slug)) {
+      this.log("warn", `uninstall rejected slug=${slug} — invalid slug`);
+      return { ok: false, error: "Invalid skill slug" };
+    }
+
+    this.log("info", `uninstalling skill slug=${slug}`);
     try {
-      const skillDir = resolve(this.skillsDir, slug);
+      const skillDir = resolveSkillPath(this.skillsDir, slug);
+
+      if (!skillDir) {
+        this.log("warn", `uninstall rejected slug=${slug} — path traversal`);
+        return { ok: false, error: "Invalid skill slug" };
+      }
 
       if (existsSync(skillDir)) {
         rmSync(skillDir, { recursive: true, force: true });
+        this.log("info", `uninstall ok slug=${slug}`);
+      } else {
+        this.log("warn", `uninstall skip slug=${slug} — dir not found`);
       }
 
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      this.log("error", `uninstall failed slug=${slug}: ${message}`);
       return { ok: false, error: message };
     }
   }

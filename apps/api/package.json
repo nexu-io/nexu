@@ -27,6 +27,7 @@
     "@paralleldrive/cuid2": "^2.2.2",
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.2.7",
+    "clawhub": "0.8.0",
     "dd-trace": "^5.87.0",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.41.0",

@@ -101,6 +101,7 @@ When changing DB structure, follow this workflow.
 - Never commit code changes until explicitly told to do so.
 - Whenever you add a new environment variable, update `deploy/helm/nexu/values.yaml` in the same change.
 - Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `docs/guides/gateway-environment-guide.md`.
+- Desktop packaged app: never use `npx`, `npm`, `pnpm`, or any shell command that relies on the user's PATH. The packaged Electron app has no shell profile — resolve bin paths programmatically via `require.resolve()` and execute with `process.execPath`. The app must be fully self-contained.
 
 ## Observability conventions
 

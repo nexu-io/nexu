@@ -8,10 +8,12 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import { logger } from "../lib/logger.js";
 import type { AppBindings } from "../types.js";
 import {
   resolveSkillhubPath,
@@ -19,6 +21,17 @@ import {
 } from "./skillhub-route-helpers.js";
 
 const execFileAsync = promisify(execFile);
+
+const require = createRequire(import.meta.url);
+
+function resolveClawHubBin(): string {
+  const pkgPath = require.resolve("clawhub/package.json");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
+    bin?: Record<string, string>;
+  };
+  const binRel = pkg.bin?.clawhub ?? pkg.bin?.clawdhub ?? "bin/clawdhub.js";
+  return resolve(dirname(pkgPath), binRel);
+}
 
 const VERSION_CHECK_URL =
   "https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/version.json";
@@ -398,7 +411,10 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     const { slug } = c.req.valid("json");
     const skillsDir = getSkillsDir();
 
+    logger.info({ slug, skillsDir }, "skillhub install requested");
+
     if (!skillsDir) {
+      logger.error({ slug }, "skillhub install failed: OPENCLAW_SKILLS_DIR not set");
       return c.json(
         { ok: false, error: "Skills directory not configured" },
         200,
@@ -406,17 +422,23 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     try {
-      await execFileAsync("npx", [
-        "clawhub",
+      const clawHubBin = resolveClawHubBin();
+      logger.info({ slug, clawHubBin }, "skillhub install resolving clawhub");
+      const { stdout, stderr } = await execFileAsync(process.execPath, [
+        clawHubBin,
         "install",
         slug,
         "--force",
         "--dir",
         skillsDir,
       ]);
+      if (stdout) logger.info({ slug, stdout: stdout.trim() }, "skillhub install stdout");
+      if (stderr) logger.warn({ slug, stderr: stderr.trim() }, "skillhub install stderr");
+      logger.info({ slug }, "skillhub install ok");
       return c.json({ ok: true }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      logger.error({ slug, error: message }, "skillhub install failed");
       return c.json({ ok: false, error: message }, 200);
     }
   });
@@ -444,7 +466,10 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     const { slug } = c.req.valid("json");
     const skillsDir = getSkillsDir();
 
+    logger.info({ slug }, "skillhub uninstall requested");
+
     if (!skillsDir) {
+      logger.error({ slug }, "skillhub uninstall failed: OPENCLAW_SKILLS_DIR not set");
       return c.json(
         { ok: false, error: "Skills directory not configured" },
         200,
@@ -455,16 +480,21 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
       const skillDir = resolveSkillhubPath(skillsDir, slug);
 
       if (!skillDir) {
+        logger.warn({ slug }, "skillhub uninstall skipped: invalid slug");
         return c.json({ ok: false, error: "Invalid skill slug" }, 200);
       }
 
       if (existsSync(skillDir)) {
         rmSync(skillDir, { recursive: true, force: true });
+        logger.info({ slug }, "skillhub uninstall ok");
+      } else {
+        logger.warn({ slug }, "skillhub uninstall skipped: dir not found");
       }
 
       return c.json({ ok: true }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      logger.error({ slug, error: message }, "skillhub uninstall failed");
       return c.json({ ok: false, error: message }, 200);
     }
   });

@@ -83,7 +83,14 @@ async function resolveInstalledPackageRoot(packageRoot, packageName) {
   const requireFromPackage = createRequire(
     resolve(packageRoot, "package.json"),
   );
-  const resolvedEntryPath = requireFromPackage.resolve(packageName);
+  let resolvedEntryPath;
+  try {
+    resolvedEntryPath = requireFromPackage.resolve(packageName);
+  } catch {
+    // Packages with only `bin` (no `main`/`exports`) can't be resolved
+    // by name alone — fall back to resolving their package.json.
+    resolvedEntryPath = requireFromPackage.resolve(`${packageName}/package.json`);
+  }
   const rootPackageName = getRootPackageName(packageName);
 
   let currentPath = dirname(resolvedEntryPath);
