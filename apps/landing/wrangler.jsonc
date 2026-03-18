@@ -1,5 +1,0 @@
-{
-  "name": "nexu-landing-worker",
-  "compatibility_date": "2025-01-01",
-  "assets": { "directory": "./dist", "not_found_handling": "none" }
-}

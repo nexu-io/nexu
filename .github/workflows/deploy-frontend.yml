@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/landing/**"
       - "apps/web/**"
       - "apps/router/**"
       - "packages/shared/**"
@@ -14,27 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  deploy-landing:
-    runs-on: ubuntu-latest
-    env:
-      PUBLIC_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @nexu/landing build
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4"
-          command: deploy
-          workingDirectory: apps/landing
-
   deploy-app:
     runs-on: ubuntu-latest
     env:
@@ -61,7 +39,7 @@ jobs:
 
   deploy-router:
     runs-on: ubuntu-latest
-    needs: [deploy-landing, deploy-app]
+    needs: [deploy-app]
     steps:
       - uses: actions/checkout@v4
       - uses: cloudflare/wrangler-action@v3
