@@ -266,6 +266,8 @@ async function main() {
     notarizeEnv.NEXU_APPLE_TEAM_ID = appleTeamId;
   }
 
+  const apiPort = process.env.NEXU_API_PORT ?? "50800";
+
   await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
 
