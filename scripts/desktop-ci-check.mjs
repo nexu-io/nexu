@@ -4,7 +4,7 @@ import { access, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 const repoRoot = process.cwd();
-const maxHealthAttempts = 30;
+const maxHealthAttempts = 60;
 
 function parseArgs(argv) {
   const [mode, ...rest] = argv;
@@ -265,18 +265,6 @@ function isRuntimeUnitState(value) {
     (typeof value.lastError === "string" || value.lastError === null) &&
     (typeof value.port === "number" || value.port === null)
   );
-}
-
-function getDiagnosticsUnit(diagnostics, unitId) {
-  const units = diagnostics?.runtime?.state?.units;
-  if (!Array.isArray(units)) {
-    return null;
-  }
-
-  const match = units.find(
-    (unit) => isRuntimeUnitState(unit) && unit.id === unitId,
-  );
-  return isRuntimeUnitState(match) ? match : null;
 }
 
 function collectDiagnosticsIssues(diagnostics, count) {
@@ -557,17 +545,13 @@ async function captureLogs(context, captureDir) {
       child.stdout.on("data", (chunk) => chunks.push(chunk));
       child.on("exit", async (code) => {
         if (code === 0) {
-          await copyFileFromBuffer(tmuxCapturePath, Buffer.concat(chunks));
+          await writeFile(tmuxCapturePath, Buffer.concat(chunks));
         }
         resolvePromise();
       });
       child.on("error", () => resolvePromise());
     });
   }
-}
-
-async function copyFileFromBuffer(filePath, buffer) {
-  await writeFile(filePath, buffer);
 }
 
 async function verifyRuntime(context) {
