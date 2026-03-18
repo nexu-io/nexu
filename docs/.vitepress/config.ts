@@ -5,7 +5,7 @@ const enSidebar = [
     text: "Get Started",
     items: [
       { text: "Introduction", link: "/" },
-      { text: "30-Minute Quick Start", link: "/guide/quickstart" },
+      { text: "One-Minute Quick Start", link: "/guide/quickstart" },
       { text: "Key Concepts", link: "/guide/concepts" },
     ],
   },
@@ -39,7 +39,7 @@ const zhSidebar = [
     text: "快速开始",
     items: [
       { text: "介绍", link: "/zh/" },
-      { text: "30 分钟快速上手", link: "/zh/guide/quickstart" },
+      { text: "一分钟快速上手", link: "/zh/guide/quickstart" },
       { text: "核心概念", link: "/zh/guide/concepts" },
     ],
   },
