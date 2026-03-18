@@ -204,8 +204,15 @@ const en = {
   "models.loadFailedHint":
     "Check that you are logged in and the API server is running.",
   "models.selectProvider": "Select a provider",
-  "models.enabled": "Enabled",
-  "models.disabled": "Not enabled",
+  "models.configured": "Configured",
+  "models.notConfigured": "Not Configured",
+  "models.currentModel": "Current Model",
+  "models.noModelConfigured": "No model configured",
+  "models.configureProviderHint": "Configure a provider below first",
+  "models.searchModels": "Search models...",
+  "models.modelSwitched": "Model switched",
+  "models.modelSwitchFailed": "Failed to switch model",
+  "models.switchingModel": "Switching model…",
   "models.provider.nexu.name": "Nexu Official",
   "models.provider.nexu.description":
     "Use Nexu official premium models after login, no API key needed",
@@ -227,14 +234,14 @@ const en = {
     "After logging into your Nexu account, you can directly use officially provided premium models without configuring an API key separately.",
   "models.managed.waitingLogin": "Waiting for browser login...",
   "models.managed.loginButton": "Log in to Nexu",
-  "models.managed.enabledModels": "Enabled models",
+  "models.managed.availableModels": "Available models",
   "models.managed.totalCount": "{{count}} total",
   "models.managed.loadingCatalog": "Loading model catalog...",
   "models.catalog.title": "Available model catalog",
   "models.catalog.summary":
     "{{totalModels}} models from {{providerCount}} providers",
   "models.catalog.connectedHint":
-    "Toggle on to add models to the model selection list in conversations",
+    "These models are available in the model selector above after login",
   "models.catalog.loginHint":
     "Models below are available after logging into your Nexu account",
   "models.catalog.modelsCount": "{{count}} models",
@@ -249,13 +256,9 @@ const en = {
   "models.byok.proxyUrl": "API Proxy URL",
   "models.byok.modelList": "Model list",
   "models.byok.modelsTotalCount": "{{count}} models total",
-  "models.byok.enabledSection": "Enabled",
-  "models.byok.enabledHint":
-    "Enabled models will appear in Nexu's model selection list",
-  "models.byok.disabledSection": "Not enabled",
   "models.byok.none": "None",
   "models.byok.updateConfig": "Update configuration",
-  "models.byok.saveAndEnable": "Save & enable",
+  "models.byok.saveAndEnable": "Save",
   "models.byok.remove": "Remove",
   "models.byok.confirmRemove":
     "Are you sure you want to remove this provider configuration?",

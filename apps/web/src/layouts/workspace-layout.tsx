@@ -428,100 +428,102 @@ function WorkspaceLayoutInner() {
         {/* Language toggle */}
         <LanguageToggle collapsed={collapsed} />
 
-        {/* Account */}
-        <div className="relative" ref={logoutRef}>
-          {showLogoutConfirm && (
-            <div
-              className={cn(
-                "absolute z-20",
-                collapsed
-                  ? "bottom-full left-1/2 -translate-x-1/2 mb-2 w-52"
-                  : "bottom-full left-1.5 right-1.5 mb-2",
-              )}
-            >
-              <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
-                <div className="px-3.5 py-3 border-b border-border">
-                  <div className="text-[12px] font-medium text-text-primary truncate">
-                    {userEmail}
+        {/* Account — hidden in desktop client */}
+        {!isDesktopClient && (
+          <div className="relative" ref={logoutRef}>
+            {showLogoutConfirm && (
+              <div
+                className={cn(
+                  "absolute z-20",
+                  collapsed
+                    ? "bottom-full left-1/2 -translate-x-1/2 mb-2 w-52"
+                    : "bottom-full left-1.5 right-1.5 mb-2",
+                )}
+              >
+                <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
+                  <div className="px-3.5 py-3 border-b border-border">
+                    <div className="text-[12px] font-medium text-text-primary truncate">
+                      {userEmail}
+                    </div>
+                  </div>
+                  <div className="p-1.5">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
+                    >
+                      <LogOut size={13} />
+                      {t("layout.signOut")}
+                    </button>
                   </div>
                 </div>
-                <div className="p-1.5">
+              </div>
+            )}
+
+            <div
+              className={cn(
+                "border-t border-border",
+                collapsed ? "px-2 py-2.5" : "px-2 py-2",
+              )}
+            >
+              {collapsed ? (
+                <div className="flex justify-center">
                   <button
                     type="button"
-                    onClick={handleLogout}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
+                    onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
+                    className="group"
+                    title={userName}
                   >
-                    <LogOut size={13} />
-                    {t("layout.signOut")}
+                    {userImage ? (
+                      <img
+                        src={userImage}
+                        alt={userName}
+                        className="w-8 h-8 rounded-lg object-cover ring-1 ring-accent/10 transition-all group-hover:ring-accent/25"
+                      />
+                    ) : (
+                      <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 text-[11px] font-bold text-accent ring-1 ring-accent/10 transition-all group-hover:ring-accent/25">
+                        {userInitial}
+                      </div>
+                    )}
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          <div
-            className={cn(
-              "border-t border-border",
-              collapsed ? "px-2 py-2.5" : "px-2 py-2",
-            )}
-          >
-            {collapsed ? (
-              <div className="flex justify-center">
+              ) : (
                 <button
                   type="button"
                   onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
-                  className="group"
-                  title={userName}
+                  className="flex gap-2.5 items-center w-full px-2 py-2 rounded-lg transition-all hover:bg-surface-3 cursor-pointer"
                 >
                   {userImage ? (
                     <img
                       src={userImage}
                       alt={userName}
-                      className="w-8 h-8 rounded-lg object-cover ring-1 ring-accent/10 transition-all group-hover:ring-accent/25"
+                      className="w-7 h-7 rounded-md object-cover ring-1 ring-accent/10 shrink-0"
                     />
                   ) : (
-                    <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 text-[11px] font-bold text-accent ring-1 ring-accent/10 transition-all group-hover:ring-accent/25">
+                    <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[10px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
                       {userInitial}
                     </div>
                   )}
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
-                className="flex gap-2.5 items-center w-full px-2 py-2 rounded-lg transition-all hover:bg-surface-3 cursor-pointer"
-              >
-                {userImage ? (
-                  <img
-                    src={userImage}
-                    alt={userName}
-                    className="w-7 h-7 rounded-md object-cover ring-1 ring-accent/10 shrink-0"
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="text-[12px] text-text-primary truncate font-medium">
+                      {userName}
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      {userEmail}
+                    </div>
+                  </div>
+                  <ChevronUp
+                    size={12}
+                    className={cn(
+                      "text-text-muted/50 shrink-0 transition-transform duration-150",
+                      showLogoutConfirm ? "rotate-0" : "rotate-180",
+                    )}
                   />
-                ) : (
-                  <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[10px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
-                    {userInitial}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="text-[12px] text-text-primary truncate font-medium">
-                    {userName}
-                  </div>
-                  <div className="text-[10px] text-text-muted truncate">
-                    {userEmail}
-                  </div>
-                </div>
-                <ChevronUp
-                  size={12}
-                  className={cn(
-                    "text-text-muted/50 shrink-0 transition-transform duration-150",
-                    showLogoutConfirm ? "rotate-0" : "rotate-180",
-                  )}
-                />
-              </button>
-            )}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Mobile drawer */}

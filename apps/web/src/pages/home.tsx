@@ -1,16 +1,11 @@
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { ProviderLogo } from "@/components/provider-logo";
-import { cn } from "@/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowRight,
   ArrowUpRight,
-  Check,
   ChevronDown,
   Cpu,
   MessageSquare,
-  Plus,
-  Search,
   Settings,
   Sparkles,
   Unlink,
@@ -27,7 +22,6 @@ import {
   getApiV1Channels,
   getApiV1Models,
   getApiV1Sessions,
-  putApiInternalDesktopDefaultModel,
 } from "../../lib/api/sdk.gen";
 
 function formatModelName(modelId: string | null | undefined): string {
@@ -217,21 +211,6 @@ function getChannelOptions(t: (key: string) => string) {
   ];
 }
 
-// ── Bot manager tabs ──────────────────────────────────────────
-
-type BotManagerTab = "channels" | "models";
-
-function getBotManagerTabs(t: (key: string) => string) {
-  return [
-    {
-      id: "channels" as BotManagerTab,
-      label: t("home.tab.channels"),
-      icon: MessageSquare,
-    },
-    { id: "models" as BotManagerTab, label: t("home.tab.models"), icon: Cpu },
-  ];
-}
-
 function TypingText({ message }: { message: string }) {
   const [displayed, setDisplayed] = useState("");
 
@@ -281,13 +260,6 @@ export function HomePage() {
     "feishu" | "slack" | "discord" | null
   >(null);
   const [showChannelManager, setShowChannelManager] = useState(false);
-  const [botManagerTab, setBotManagerTab] = useState<BotManagerTab>("channels");
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const [modelSearch, setModelSearch] = useState("");
-  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
-    new Set(),
-  );
-  const modelDropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -295,7 +267,6 @@ export function HomePage() {
 
   const CHANNEL_OPTIONS = useMemo(() => getChannelOptions(t), [t]);
   const CHANNEL_SHORT_NAMES = useMemo(() => getChannelShortNames(t), [t]);
-  const BOT_MANAGER_TABS = useMemo(() => getBotManagerTabs(t), [t]);
 
   const handleConnected = async () => {
     await queryClient.refetchQueries({ queryKey: ["channels"] });
@@ -311,20 +282,6 @@ export function HomePage() {
       toast.error(t("home.disconnectFailed"));
     }
   };
-
-  // Close model dropdown on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        modelDropdownRef.current &&
-        !modelDropdownRef.current.contains(e.target as Node)
-      ) {
-        setShowModelDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -400,68 +357,12 @@ export function HomePage() {
       formatModelName(currentModelId))
     : formatModelName(botsData?.bots?.[0]?.modelId);
 
-  // Group models by provider (link/* models → "Nexu Official")
-  const modelsByProvider = useMemo(() => {
-    const map = new Map<string, typeof models>();
-    for (const m of models) {
-      const groupKey = getGroupKey(m);
-      const list = map.get(groupKey) ?? [];
-      list.push(m);
-      map.set(groupKey, list);
-    }
-    const entries = Array.from(map.entries());
-    entries.sort((a, b) => {
-      if (a[0] === "nexu") return -1;
-      if (b[0] === "nexu") return 1;
-      return 0;
-    });
-    return entries.map(([provider, ms]) => ({
-      id: provider,
-      name: PROVIDER_LABELS[provider] ?? provider,
-      models: ms,
-    }));
-  }, [models]);
-
   // Current model's provider group info
   const currentModel = models.find((m) => m.id === currentModelId);
   const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
   const currentProviderLabel = currentGroupKey
     ? (PROVIDER_LABELS[currentGroupKey] ?? currentGroupKey)
     : "";
-
-  // Expand current model's provider on open
-  useEffect(() => {
-    if (showModelDropdown) {
-      const groupKey = currentModel ? getGroupKey(currentModel) : "";
-      setExpandedProviders(
-        new Set(
-          groupKey
-            ? [groupKey]
-            : modelsByProvider.length > 0 && modelsByProvider[0]
-              ? [modelsByProvider[0].id]
-              : [],
-        ),
-      );
-    }
-  }, [showModelDropdown, currentModel, modelsByProvider]);
-
-  const updateModel = useMutation({
-    mutationFn: async (modelId: string) => {
-      const toastId = toast.loading("正在切换模型…");
-      const { error } = await putApiInternalDesktopDefaultModel({
-        body: { modelId },
-      });
-      if (error) {
-        toast.error("模型切换失败", { id: toastId });
-        throw new Error("Failed to update model");
-      }
-      toast.success("模型已切换", { id: toastId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
-      setShowModelDropdown(false);
-    },
-  });
 
   const sessions = sessionsData?.sessions ?? [];
   const { messagesToday, lastActiveAt } = useMemo(() => {
@@ -568,7 +469,7 @@ export function HomePage() {
                 <TypingText message={welcomeMessage} />
                 {/* Actions */}
                 <div className="flex items-center gap-2 mt-4">
-                  {connectedCount > 0 ? (
+                  {connectedCount > 0 && (
                     <a
                       href={chatUrl}
                       target="_blank"
@@ -584,22 +485,6 @@ export function HomePage() {
                       Chat in {chatShortName}
                       <ArrowUpRight size={12} className="opacity-70" />
                     </a>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBotManagerTab("channels");
-                        setShowChannelManager(true);
-                      }}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
-                    >
-                      <Plus size={14} />
-                      {t("home.connectChannel")}
-                      <ChevronDown
-                        size={12}
-                        className={`opacity-70 transition-transform ${showChannelManager ? "rotate-180" : ""}`}
-                      />
-                    </button>
                   )}
                   <button
                     type="button"
@@ -620,300 +505,69 @@ export function HomePage() {
             {/* Channel manager panel */}
             {showChannelManager && (
               <div className="mt-4 pt-4 border-t border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  {BOT_MANAGER_TABS.map((tab) => {
-                    const Icon = tab.icon;
-                    const active = botManagerTab === tab.id;
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {CHANNEL_OPTIONS.map((ch) => {
+                    const isConnected = connectedTypes.has(ch.id);
+                    const connectedChannel = channels.find(
+                      (c) => c.channelType === ch.id,
+                    );
                     return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setBotManagerTab(tab.id)}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-colors",
-                          active
-                            ? "border-accent/20 bg-accent/10 text-accent"
-                            : "border-border text-text-muted hover:text-text-primary hover:bg-surface-2",
-                        )}
+                      <div
+                        key={ch.id}
+                        className={`rounded-xl border px-3 py-3 transition-all ${
+                          isConnected
+                            ? "border-accent/20 bg-accent/5"
+                            : "border-border bg-surface-0"
+                        }`}
                       >
-                        <Icon size={12} />
-                        {tab.label}
-                      </button>
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-white shrink-0">
+                            {ch.smallIcon}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-medium text-text-primary">
+                              {ch.name}
+                            </div>
+                            <div className="mt-0.5 text-[11px] text-text-muted">
+                              {channelsLoading
+                                ? t("home.loading")
+                                : isConnected
+                                  ? t("home.connected")
+                                  : t("home.notConnected")}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          {isConnected && connectedChannel ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDisconnect(connectedChannel.id)
+                              }
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
+                            >
+                              <Unlink size={12} />
+                              {t("home.disconnect")}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowChannelManager(false);
+                                setModalChannel(
+                                  ch.id as "feishu" | "slack" | "discord",
+                                );
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border text-text-secondary hover:bg-surface-2 hover:border-border-hover transition-colors"
+                            >
+                              {t("home.connect")}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-
-                {/* Channels tab */}
-                {botManagerTab === "channels" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {CHANNEL_OPTIONS.map((ch) => {
-                      const isConnected = connectedTypes.has(ch.id);
-                      const connectedChannel = channels.find(
-                        (c) => c.channelType === ch.id,
-                      );
-                      return (
-                        <div
-                          key={ch.id}
-                          className={`rounded-xl border px-3 py-3 transition-all ${
-                            isConnected
-                              ? "border-accent/20 bg-accent/5"
-                              : "border-border bg-surface-0"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2.5">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-white shrink-0">
-                              {ch.smallIcon}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[13px] font-medium text-text-primary">
-                                {ch.name}
-                              </div>
-                              <div className="mt-0.5 text-[11px] text-text-muted">
-                                {channelsLoading
-                                  ? t("home.loading")
-                                  : isConnected
-                                    ? t("home.connected")
-                                    : t("home.notConnected")}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-3 flex justify-end">
-                            {isConnected && connectedChannel ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDisconnect(connectedChannel.id)
-                                }
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
-                              >
-                                <Unlink size={12} />
-                                {t("home.disconnect")}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowChannelManager(false);
-                                  setModalChannel(
-                                    ch.id as "feishu" | "slack" | "discord",
-                                  );
-                                }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border text-text-secondary hover:bg-surface-2 hover:border-border-hover transition-colors"
-                              >
-                                <Plus size={12} />
-                                {t("home.connect")}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Models tab */}
-                {botManagerTab === "models" && (
-                  <div className="space-y-2">
-                    {/* Default model selector */}
-                    <div className="relative" ref={modelDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowModelDropdown(!showModelDropdown)}
-                        className="w-full flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-0 px-3 py-2 transition-colors hover:border-border-hover"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          {currentModelId ? (
-                            <span className="w-4 h-4 shrink-0 flex items-center justify-center">
-                              <ProviderLogo
-                                provider={currentGroupKey || "nexu"}
-                                size={14}
-                              />
-                            </span>
-                          ) : (
-                            <Cpu size={14} className="text-accent shrink-0" />
-                          )}
-                          <span className="text-[12px] font-medium text-text-primary truncate">
-                            {modelName || t("home.notSelected")}
-                          </span>
-                          {currentProviderLabel && (
-                            <span className="text-[10px] text-text-muted/60 shrink-0">
-                              {currentProviderLabel}
-                            </span>
-                          )}
-                        </div>
-                        <ChevronDown
-                          size={12}
-                          className={cn(
-                            "text-text-muted transition-transform shrink-0",
-                            showModelDropdown && "rotate-180",
-                          )}
-                        />
-                      </button>
-
-                      {showModelDropdown &&
-                        (() => {
-                          const query = modelSearch.toLowerCase().trim();
-                          const filteredProviders = modelsByProvider
-                            .map((p) => ({
-                              ...p,
-                              models: p.models.filter(
-                                (m) =>
-                                  !query ||
-                                  m.name.toLowerCase().includes(query) ||
-                                  p.name.toLowerCase().includes(query),
-                              ),
-                            }))
-                            .filter((p) => p.models.length > 0);
-
-                          return (
-                            <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-surface-1 shadow-xl">
-                              {/* Search */}
-                              <div className="px-3 pt-3 pb-2">
-                                <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
-                                  <Search
-                                    size={14}
-                                    className="text-text-muted shrink-0"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={modelSearch}
-                                    onChange={(e) => {
-                                      setModelSearch(e.target.value);
-                                      if (e.target.value.trim()) {
-                                        setExpandedProviders(
-                                          new Set(
-                                            modelsByProvider.map((p) => p.id),
-                                          ),
-                                        );
-                                      }
-                                    }}
-                                    placeholder={t("home.searchModels")}
-                                    className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Provider groups */}
-                              <div className="relative">
-                                <div className="pointer-events-none absolute inset-x-0 top-0 h-4 z-10 bg-gradient-to-b from-surface-1 to-transparent" />
-                                <div
-                                  className="max-h-[360px] overflow-y-auto py-1"
-                                  style={{
-                                    overscrollBehavior: "contain",
-                                    WebkitOverflowScrolling: "touch",
-                                  }}
-                                >
-                                  {filteredProviders.length === 0 ? (
-                                    <div className="px-4 py-8 text-center text-[13px] text-text-muted">
-                                      {t("home.noMatchingModels")}
-                                    </div>
-                                  ) : (
-                                    filteredProviders.map((provider) => {
-                                      const isExpanded =
-                                        expandedProviders.has(provider.id) ||
-                                        !!query;
-                                      return (
-                                        <div key={provider.id}>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (query) return;
-                                              setExpandedProviders((prev) => {
-                                                const next = new Set(prev);
-                                                if (next.has(provider.id))
-                                                  next.delete(provider.id);
-                                                else next.add(provider.id);
-                                                return next;
-                                              });
-                                            }}
-                                            className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-surface-2/50 transition-colors"
-                                          >
-                                            <ChevronDown
-                                              size={11}
-                                              className={cn(
-                                                "text-text-muted/50 transition-transform",
-                                                !isExpanded && "-rotate-90",
-                                              )}
-                                            />
-                                            <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
-                                              <ProviderLogo
-                                                provider={provider.id}
-                                                size={15}
-                                              />
-                                            </span>
-                                            <span className="text-[12px] font-medium text-text-secondary">
-                                              {provider.name}
-                                            </span>
-                                            <span className="text-[11px] text-text-muted/40 ml-auto tabular-nums">
-                                              {provider.models.length}
-                                            </span>
-                                          </button>
-                                          {isExpanded &&
-                                            provider.models.map((model) => (
-                                              <button
-                                                key={model.id}
-                                                type="button"
-                                                onClick={() =>
-                                                  updateModel.mutate(model.id)
-                                                }
-                                                className={cn(
-                                                  "w-full flex items-center gap-2.5 pl-9 pr-3 py-2 text-left transition-colors hover:bg-surface-2",
-                                                  model.id === currentModelId &&
-                                                    "bg-accent/5",
-                                                )}
-                                              >
-                                                {model.id === currentModelId ? (
-                                                  <Check
-                                                    size={13}
-                                                    className="text-accent shrink-0"
-                                                  />
-                                                ) : (
-                                                  <span className="w-[13px] shrink-0" />
-                                                )}
-                                                <span className="text-[13px] font-medium text-text-primary truncate flex-1">
-                                                  {model.name}
-                                                </span>
-                                              </button>
-                                            ))}
-                                        </div>
-                                      );
-                                    })
-                                  )}
-                                </div>
-                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 z-10 bg-gradient-to-t from-surface-1 to-transparent" />
-                              </div>
-
-                              {/* Footer: settings shortcut */}
-                              <div className="border-t border-border px-2 py-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setShowModelDropdown(false);
-                                    navigate(
-                                      "/workspace/settings?tab=providers",
-                                    );
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface-2"
-                                >
-                                  <Settings
-                                    size={13}
-                                    className="text-text-muted"
-                                  />
-                                  <span className="text-[12px] text-text-muted">
-                                    {t("home.configureProviders")}
-                                  </span>
-                                  <ArrowRight
-                                    size={11}
-                                    className="text-text-muted/50 ml-auto"
-                                  />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>

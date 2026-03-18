@@ -100,4 +100,16 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Restore cursor: pointer on interactive elements (Tailwind v4 preflight removed it) */
+  button,
+  [type="button"],
+  [type="reset"],
+  [type="submit"],
+  [role="button"],
+  a,
+  select,
+  summary {
+    cursor: pointer;
+  }
 }
