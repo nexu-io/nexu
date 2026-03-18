@@ -14,6 +14,7 @@ import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
+import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import {
   registerIpcHandlers,
   setCatalogManager,
@@ -98,6 +99,7 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let catalogMgr: CatalogManager | null = null;
+let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
 function sendDesktopCommand(
   surface: DesktopSurface,
@@ -248,27 +250,36 @@ async function waitForApiReadiness(): Promise<void> {
 }
 
 async function runDesktopColdStart(): Promise<void> {
+  diagnosticsReporter?.markColdStartRunning("starting pglite");
   logColdStart("starting pglite");
   await orchestrator.startOne("pglite");
 
+  diagnosticsReporter?.markColdStartRunning("starting api");
   logColdStart("starting api");
   await orchestrator.startOne("api");
 
+  diagnosticsReporter?.markColdStartRunning("waiting for api readiness");
   logColdStart("waiting for api readiness");
   await waitForApiReadiness();
 
+  diagnosticsReporter?.markColdStartRunning(
+    "bootstrapping desktop auth session",
+  );
   logColdStart("bootstrapping desktop auth session");
   await ensureDesktopAuthSession();
   const sessionId = rotateDesktopLogSession();
   logColdStart(`desktop auth session ready sessionId=${sessionId}`);
 
+  diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
 
+  diagnosticsReporter?.markColdStartRunning("starting gateway");
   logColdStart("starting gateway");
   await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
+  diagnosticsReporter?.markColdStartSucceeded();
 }
 
 let authRecoveryPromise: Promise<void> | null = null;
@@ -380,6 +391,11 @@ function createMainWindow(): BrowserWindow {
   window.webContents.on(
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedUrl) => {
+      diagnosticsReporter?.recordRendererDidFailLoad({
+        errorCode,
+        errorDescription,
+        validatedUrl,
+      });
       logRendererEvent({
         source: "renderer:fail-load",
         stream: "stderr",
@@ -391,6 +407,9 @@ function createMainWindow(): BrowserWindow {
   );
 
   window.webContents.on("did-finish-load", () => {
+    diagnosticsReporter?.recordRendererDidFinishLoad(
+      window.webContents.getURL(),
+    );
     logRendererEvent({
       source: "renderer",
       stream: "stdout",
@@ -401,6 +420,10 @@ function createMainWindow(): BrowserWindow {
   });
 
   window.webContents.on("render-process-gone", (_event, details) => {
+    diagnosticsReporter?.recordRendererProcessGone({
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
     logRendererEvent({
       source: "renderer:gone",
       stream: "stderr",
@@ -443,6 +466,8 @@ app.whenReady().then(async () => {
   installApplicationMenu();
   installDesktopAuthRecoveryHooks();
   registerIpcHandlers(orchestrator, runtimeConfig);
+  diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
+  const unsubscribeDiagnostics = diagnosticsReporter.start();
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();
@@ -459,6 +484,9 @@ app.whenReady().then(async () => {
       healthCheck.recordSuccess();
     } catch (error) {
       healthCheck.recordFailure();
+      diagnosticsReporter?.markColdStartFailed(
+        error instanceof Error ? error.message : String(error),
+      );
       writeDesktopMainLog({
         source: "cold-start",
         stream: "stderr",
@@ -495,6 +523,10 @@ app.whenReady().then(async () => {
 
     focusMainWindow();
   });
+
+  app.once("before-quit", () => {
+    unsubscribeDiagnostics();
+  });
 });
 
 app.on("window-all-closed", () => {
@@ -505,6 +537,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   catalogMgr?.dispose();
+  void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();
 });

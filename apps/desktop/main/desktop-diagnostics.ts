@@ -1,0 +1,219 @@
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { app } from "electron";
+import type {
+  RuntimeEventQueryResult,
+  RuntimeLogEntry,
+  RuntimeState,
+} from "../shared/host";
+import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+
+type DesktopColdStartStatus = "idle" | "running" | "succeeded" | "failed";
+
+type DesktopColdStartSnapshot = {
+  status: DesktopColdStartStatus;
+  step: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  error: string | null;
+};
+
+type DesktopRendererSnapshot = {
+  didFinishLoad: boolean;
+  lastUrl: string | null;
+  lastEventAt: string | null;
+  lastError: string | null;
+  processGone: {
+    seen: boolean;
+    reason: string | null;
+    exitCode: number | null;
+    at: string | null;
+  };
+};
+
+type DesktopDiagnosticsSnapshot = {
+  updatedAt: string;
+  isPackaged: boolean;
+  coldStart: DesktopColdStartSnapshot;
+  renderer: DesktopRendererSnapshot;
+  runtime: {
+    state: RuntimeState;
+    recentEvents: RuntimeLogEntry[];
+    nextCursor: number;
+  };
+};
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+export function getDesktopDiagnosticsFilePath(): string {
+  return resolve(app.getPath("logs"), "desktop-diagnostics.json");
+}
+
+export class DesktopDiagnosticsReporter {
+  private readonly filePath = getDesktopDiagnosticsFilePath();
+
+  private readonly coldStart: DesktopColdStartSnapshot = {
+    status: "idle",
+    step: null,
+    startedAt: null,
+    completedAt: null,
+    error: null,
+  };
+
+  private readonly renderer: DesktopRendererSnapshot = {
+    didFinishLoad: false,
+    lastUrl: null,
+    lastEventAt: null,
+    lastError: null,
+    processGone: {
+      seen: false,
+      reason: null,
+      exitCode: null,
+      at: null,
+    },
+  };
+
+  private flushScheduled = false;
+
+  private flushInFlight: Promise<void> | null = null;
+
+  private needsFlush = false;
+
+  constructor(private readonly orchestrator: RuntimeOrchestrator) {}
+
+  start(): () => void {
+    this.scheduleFlush();
+    return this.orchestrator.subscribe(() => {
+      this.scheduleFlush();
+    });
+  }
+
+  markColdStartRunning(step: string): void {
+    const startedAt = this.coldStart.startedAt ?? nowIso();
+    this.coldStart.status = "running";
+    this.coldStart.step = step;
+    this.coldStart.startedAt = startedAt;
+    this.coldStart.completedAt = null;
+    this.coldStart.error = null;
+    this.scheduleFlush();
+  }
+
+  markColdStartSucceeded(): void {
+    this.coldStart.status = "succeeded";
+    this.coldStart.step = null;
+    this.coldStart.completedAt = nowIso();
+    this.coldStart.error = null;
+    this.scheduleFlush();
+  }
+
+  markColdStartFailed(error: string): void {
+    this.coldStart.status = "failed";
+    this.coldStart.error = error;
+    this.coldStart.completedAt = nowIso();
+    this.scheduleFlush();
+  }
+
+  recordRendererDidFinishLoad(url: string): void {
+    this.renderer.didFinishLoad = true;
+    this.renderer.lastUrl = url;
+    this.renderer.lastEventAt = nowIso();
+    this.renderer.lastError = null;
+    this.scheduleFlush();
+  }
+
+  recordRendererDidFailLoad(details: {
+    errorCode: number;
+    errorDescription: string;
+    validatedUrl: string;
+  }): void {
+    this.renderer.lastEventAt = nowIso();
+    this.renderer.lastUrl = details.validatedUrl;
+    this.renderer.lastError = `${details.errorCode} ${details.errorDescription} ${details.validatedUrl}`;
+    this.scheduleFlush();
+  }
+
+  recordRendererProcessGone(details: {
+    reason: string;
+    exitCode: number;
+  }): void {
+    this.renderer.lastEventAt = nowIso();
+    this.renderer.lastError = `reason=${details.reason} exitCode=${details.exitCode}`;
+    this.renderer.processGone = {
+      seen: true,
+      reason: details.reason,
+      exitCode: details.exitCode,
+      at: this.renderer.lastEventAt,
+    };
+    this.scheduleFlush();
+  }
+
+  async flushNow(): Promise<void> {
+    await this.flush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushScheduled) {
+      this.needsFlush = true;
+      return;
+    }
+
+    this.flushScheduled = true;
+    queueMicrotask(() => {
+      this.flushScheduled = false;
+      void this.flush().catch(() => undefined);
+    });
+  }
+
+  private async flush(): Promise<void> {
+    if (this.flushInFlight) {
+      this.needsFlush = true;
+      await this.flushInFlight;
+      return;
+    }
+
+    this.flushInFlight = this.writeSnapshot();
+    try {
+      await this.flushInFlight;
+    } finally {
+      this.flushInFlight = null;
+    }
+
+    if (this.needsFlush) {
+      this.needsFlush = false;
+      await this.flush();
+    }
+  }
+
+  private buildSnapshot(): DesktopDiagnosticsSnapshot {
+    const events: RuntimeEventQueryResult = this.orchestrator.queryEvents({
+      limit: 50,
+    });
+
+    return {
+      updatedAt: nowIso(),
+      isPackaged: app.isPackaged,
+      coldStart: { ...this.coldStart },
+      renderer: {
+        ...this.renderer,
+        processGone: { ...this.renderer.processGone },
+      },
+      runtime: {
+        state: this.orchestrator.getRuntimeState(),
+        recentEvents: events.entries,
+        nextCursor: events.nextCursor,
+      },
+    };
+  }
+
+  private async writeSnapshot(): Promise<void> {
+    const snapshot = this.buildSnapshot();
+    const directoryPath = dirname(this.filePath);
+    const tempPath = `${this.filePath}.tmp`;
+
+    await mkdir(directoryPath, { recursive: true });
+    await writeFile(tempPath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    await rename(tempPath, this.filePath);
+  }
+}
