@@ -6,7 +6,7 @@
 
 连接飞书、Slack 或 Discord 后，Agent 自动同步到手机端 📱——不用装额外 App，在你日常用的聊天工具里就能直接对话。
 
-![nexu 客户端](/assets/discord/step4-connected.png)
+![nexu 客户端](/assets/nexu-home.png)
 
 ## 快速导航
 

@@ -6,7 +6,7 @@ Built on the open-source OpenClaw 🦞 core, nexu bundles **OpenClaw 🦞 Skills
 
 Connect to Feishu, Slack, or Discord—and your AI agent goes mobile 📱. No extra app needed; just chat with your agent wherever you already are.
 
-![nexu client](/assets/discord/step4-connected.png)
+![nexu client](/assets/nexu-home.png)
 
 ## Get started
 
