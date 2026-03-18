@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="site/media/nexu-logo.svg" width="120" alt="Nexu Logo" />
+  <img src="site/media/nexu-logo.svg" width="120" alt="nexu Logo" />
 </p>
 
-<h1 align="center">Nexu</h1>
+<h1 align="center">nexu</h1>
 
 <p align="center">
   <strong>The Simplest OpenClaw Desktop for OPC</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu" alt="Release" /></a>
-  <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nexu-io/nexu" alt="License" /></a>
+  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release" /></a>
+  <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
 </p>
 
 <p align="center">
-  <a href="#概述">概述</a> · <a href="#为什么选择-nexu">为什么选择 Nexu</a> · <a href="#核心特性">核心特性</a> · <a href="#快速开始">快速开始</a> · <a href="#使用场景">使用场景</a> · <a href="#开发">开发</a> · <a href="#贡献">贡献</a> · <a href="#致谢">致谢</a> · <a href="#社区">社区</a> · <a href="#star-history">Star History</a> · <a href="#许可证">许可证</a>
+  <a href="#概述">概述</a> · <a href="#为什么选择-nexu">为什么选择 nexu</a> · <a href="#核心特性">核心特性</a> · <a href="#快速开始">快速开始</a> · <a href="#使用场景">使用场景</a> · <a href="#开发">开发</a> · <a href="#贡献">贡献</a> · <a href="#致谢">致谢</a> · <a href="#社区">社区</a> · <a href="#star-history">Star History</a> · <a href="#许可证">许可证</a>
 </p>
 
 <p align="center">
@@ -25,23 +25,23 @@
 
 ## 概述
 
-**Nexu** 将 OpenClaw 变成一个桌面体验——下载 Mac 客户端，双击安装，几秒钟内你的第一个 AI Agent 就已就绪。
+**nexu** 将 OpenClaw 变成一个桌面体验——下载 Mac 客户端，双击安装，几秒钟内你的第一个 AI Agent 就已就绪。
 
-基于开源 OpenClaw 核心打造，Nexu 预装 **OpenClaw Skills** 与 **完整飞书 Skills**，让 Agent 直接接入你团队已在用的工作流。通过 Nexu 账号即可使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等顶级模型，也可使用自带 API Key，无需登录。
+基于开源 OpenClaw 核心打造，nexu 预装 **OpenClaw Skills** 与 **完整飞书 Skills**，让 Agent 直接接入你团队已在用的工作流。通过 nexu 账号即可使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等顶级模型，也可使用自带 API Key，无需登录。
 
 <!-- TODO: 添加产品 Demo GIF / 截图 -->
 
 ---
 
-## 为什么选择 Nexu
+## 为什么选择 nexu
 
 很多开源 Agent 工具在让用户看到价值之前，先要面对冗长安装和零散配置。我们认为第一体验应该反过来。
 
-| 常见问题 | Nexu |
+| 常见问题 | nexu |
 |----------|------|
 | 复杂的 CLI / 环境配置 | 双击安装，无需终端 |
 | 技能与集成东拼西凑 | 内置 OpenClaw + 完整飞书 Skills，开箱即用 |
-| 模型与 API Key 配置 | Nexu 账号直连顶级模型，或自带 API Key |
+| 模型与 API Key 配置 | nexu 账号直连顶级模型，或自带 API Key |
 | Agent 只能"演示" | 面向真实团队工作流的桌面客户端 |
 | 必须注册才能用 | 自带 API Key 即可使用，零注册零登录 |
 
@@ -53,7 +53,7 @@
 
 ### 🖱 双击安装
 
-下载、双击、开始使用。无需环境变量、无需折腾依赖、无需长文档。Nexu 的首次体验与能力一致——开箱即用。
+下载、双击、开始使用。无需环境变量、无需折腾依赖、无需长文档。nexu 的首次体验与能力一致——开箱即用。
 
 ### 🔗 内置 OpenClaw Skills + 完整飞书 Skills
 
@@ -61,7 +61,7 @@
 
 ### 🧠 顶级模型，开箱即用
 
-通过 Nexu 账号直接使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等模型，无需额外配置。也可随时切换为自带 API Key。
+通过 nexu 账号直接使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等模型，无需额外配置。也可随时切换为自带 API Key。
 
 ### 🔑 支持自带 API Key，无需登录
 
@@ -86,19 +86,19 @@
 
 1. 打开 [官网](https://nexu.io) 或 [Releases](https://github.com/nexu-io/nexu/releases)。
 2. 下载 Mac 安装包。
-3. 启动 Nexu。
+3. 启动 nexu。
 
 > **Windows 与 macOS Intel**：开发中。如需进展可邮件 [support@nexu.ai](mailto:support@nexu.ai)。
 
 ### 首次启动
 
-使用 Nexu 账号登录，立即使用已支持的模型；也可添加自带 API Key，无需账号即可使用。
+使用 nexu 账号登录，立即使用已支持的模型；也可添加自带 API Key，无需账号即可使用。
 
 ---
 
 ## 使用场景
 
-Nexu 面向 **OPC（One Person Company）** 与小团队，让一个人就能拥有一支 AI 团队。
+nexu 面向 **OPC（One Person Company）** 与小团队，让一个人就能拥有一支 AI 团队。
 
 ### 🛒 一人电商 / 跨境电商
 
@@ -148,7 +148,7 @@ nexu/
 │   └── shared/           # 共享库
 ├── openclaw-runtime/     # OpenClaw 核心运行时
 ├── skills/               # 内置 Skills（本地开发 & Bot）
-├── nexu-skills/          # Nexu Skill 定义
+├── nexu-skills/          # nexu Skill 定义
 ├── deploy/               # 部署配置（Helm、K8s、Nginx）
 ├── docs/                 # 文档 & 设计文档
 ├── tests/                # 集成测试 & 契约测试
@@ -160,7 +160,7 @@ nexu/
 
 ```bash
 git clone https://github.com/nexu-io/nexu.git
-cd openclaw
+cd nexu
 pnpm install
 pnpm run dev
 ```
@@ -199,7 +199,7 @@ pnpm test                # 运行测试（Vitest）
 
 ## 致谢
 
-Nexu 基于以下优秀开源项目构建：
+nexu 基于以下优秀开源项目构建：
 
 - [OpenClaw](https://github.com/nexu-io/nexu) — AI Agent 运行时
 - [Electron](https://www.electronjs.org/) — 跨平台桌面框架
@@ -241,4 +241,4 @@ Nexu 基于以下优秀开源项目构建：
 
 ---
 
-<p align="center">Built with ❤️ by the Nexu Team</p>
+<p align="center">Built with ❤️ by the nexu Team</p>

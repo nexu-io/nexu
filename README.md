@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="site/media/nexu-logo.svg" width="120" alt="Nexu Logo" />
+  <img src="site/media/nexu-logo.svg" width="120" alt="nexu Logo" />
 </p>
 
-<h1 align="center">Nexu</h1>
+<h1 align="center">nexu</h1>
 
 <p align="center">
   <strong>The Simplest OpenClaw Desktop for OPC</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu" alt="Release" /></a>
-  <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nexu-io/nexu" alt="License" /></a>
+  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release" /></a>
+  <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
 </p>
 
 <p align="center">
-  <a href="#overview">Overview</a> · <a href="#why-nexu">Why Nexu</a> · <a href="#features">Features</a> · <a href="#getting-started">Getting Started</a> · <a href="#use-cases">Use Cases</a> · <a href="#development">Development</a> · <a href="#contributing">Contributing</a> · <a href="#acknowledgements">Acknowledgements</a> · <a href="#community">Community</a> · <a href="#star-history">Star History</a> · <a href="#license">License</a>
+  <a href="#overview">Overview</a> · <a href="#why-nexu">Why nexu</a> · <a href="#features">Features</a> · <a href="#getting-started">Getting Started</a> · <a href="#use-cases">Use Cases</a> · <a href="#development">Development</a> · <a href="#contributing">Contributing</a> · <a href="#acknowledgements">Acknowledgements</a> · <a href="#community">Community</a> · <a href="#star-history">Star History</a> · <a href="#license">License</a>
 </p>
 
 <p align="center">
@@ -25,23 +25,23 @@
 
 ## Overview
 
-**Nexu** turns OpenClaw into a desktop experience you can start using in seconds. Download the Mac client, double-click to install, and your first AI agent is ready before you finish reading this paragraph.
+**nexu** turns OpenClaw into a desktop experience you can start using in seconds. Download the Mac client, double-click to install, and your first AI agent is ready before you finish reading this paragraph.
 
-Built on the open-source OpenClaw core, Nexu bundles **OpenClaw Skills** and **full Feishu Skills** so agents plug directly into the workflows your team already uses. Access Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more via your Nexu account—or bring your own API Key with no login required.
+Built on the open-source OpenClaw core, nexu bundles **OpenClaw Skills** and **full Feishu Skills** so agents plug directly into the workflows your team already uses. Access Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more via your nexu account—or bring your own API Key with no login required.
 
 <!-- TODO: Add product demo GIF / screenshot here -->
 
 ---
 
-## Why Nexu
+## Why nexu
 
 Open-source agent tools often force users through long install guides and scattered config before they see any value. We believe the first experience should be the opposite.
 
-| Challenge | Nexu |
+| Challenge | nexu |
 |-----------|------|
 | Complex CLI / env setup | One double-click install; no terminal required |
 | Scattered skill integration | Built-in OpenClaw + full Feishu Skills, ready to use |
-| Model and API key juggling | Nexu account for top models, or bring your own API Key |
+| Model and API key juggling | nexu account for top models, or bring your own API Key |
 | "Demo only" agents | A desktop client built for real team workflows |
 | Login walls | Use your own API Key with zero sign-up |
 
@@ -53,7 +53,7 @@ Open-source agent tools often force users through long install guides and scatte
 
 ### 🖱 Double-click install
 
-Download, double-click, start using. No environment variables, no dependency wrestling, no long install docs. Nexu's first run is as capable as it gets—ready out of the box.
+Download, double-click, start using. No environment variables, no dependency wrestling, no long install docs. nexu's first run is as capable as it gets—ready out of the box.
 
 ### 🔗 Built-in OpenClaw Skills + full Feishu Skills
 
@@ -61,7 +61,7 @@ Native OpenClaw Skills and full Feishu Skills ship together. Agents move beyond 
 
 ### 🧠 Top-tier models, out of the box
 
-Use Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more directly via your Nexu account. No extra config. Switch to your own API Key anytime.
+Use Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
 
 ### 🔑 Bring your own API Key, no login
 
@@ -86,19 +86,19 @@ Open-source at the core, with a desktop experience that actually runs. Compatibl
 
 1. Go to the [Releases](https://github.com/nexu-io/nexu/releases) page or the [official site](https://nexu.io).
 2. Download the Mac installer.
-3. Launch Nexu.
+3. Launch nexu.
 
 > **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
 
 ### First launch
 
-Sign in with your Nexu account for instant access to supported models, or add your own API Key and use the client without an account.
+Sign in with your nexu account for instant access to supported models, or add your own API Key and use the client without an account.
 
 ---
 
 ## Use Cases
 
-Nexu is built for **OPC (One Person Company)** and small teams—one person, one AI team.
+nexu is built for **OPC (One Person Company)** and small teams—one person, one AI team.
 
 ### 🛒 Solo e-commerce / cross-border trade
 
@@ -148,7 +148,7 @@ nexu/
 │   └── shared/           # Shared libraries
 ├── openclaw-runtime/     # OpenClaw core runtime
 ├── skills/               # Built-in Skills (local dev & bot)
-├── nexu-skills/          # Nexu skill definitions
+├── nexu-skills/          # nexu skill definitions
 ├── deploy/               # Deployment configs (Helm, K8s, Nginx)
 ├── docs/                 # Documentation & design docs
 ├── tests/                # Integration & contract tests
@@ -160,7 +160,7 @@ nexu/
 
 ```bash
 git clone https://github.com/nexu-io/nexu.git
-cd openclaw
+cd nexu
 pnpm install
 pnpm run dev
 ```
@@ -199,7 +199,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## Acknowledgements
 
-Nexu is built on the shoulders of excellent open-source projects:
+nexu is built on the shoulders of excellent open-source projects:
 
 - [OpenClaw](https://github.com/nexu-io/nexu) — The AI agent runtime
 - [Electron](https://www.electronjs.org/) — Cross-platform desktop framework
@@ -241,4 +241,4 @@ This project is open source under the [MIT License](LICENSE).
 
 ---
 
-<p align="center">Built with ❤️ by the Nexu Team</p>
+<p align="center">Built with ❤️ by the nexu Team</p>
