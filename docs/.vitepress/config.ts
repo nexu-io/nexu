@@ -47,7 +47,7 @@ export default defineConfig({
   lastUpdated: true,
   head: [["meta", { name: "theme-color", content: "#c96f4a" }]],
   themeConfig: {
-    logo: "/mark.svg",
+    logo: "/mark.png",
     socialLinks: [{ icon: "github", link: "https://github.com/refly-ai/nexu" }],
     search: {
       provider: "local",
