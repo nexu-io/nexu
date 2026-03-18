@@ -25,9 +25,9 @@
 
 ## Overview
 
-**nexu** turns OpenClaw into a desktop experience you can start using in seconds. Download the Mac client, double-click to install, and your first AI agent is ready before you finish reading this paragraph.
+**nexu** turns OpenClaw into a desktop experience you can start using in seconds ⚡. Download the Mac client, double-click to install, and your first AI agent is ready before you finish reading this paragraph.
 
-Built on the open-source OpenClaw core, nexu bundles **OpenClaw Skills** and **full Feishu Skills** so agents plug directly into the workflows your team already uses. Access Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more via your nexu account—or bring your own API Key with no login required.
+Built on the open-source OpenClaw core, nexu bundles **OpenClaw Skills** and **full Feishu Skills** so agents plug directly into the workflows your team already uses 🔌. Access Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more via your nexu account—or bring your own API Key with no login required 🔓.
 
 <!-- TODO: Add product demo GIF / screenshot here -->
 
@@ -39,11 +39,11 @@ Open-source agent tools often force users through long install guides and scatte
 
 | Challenge | nexu |
 |-----------|------|
-| Complex CLI / env setup | One double-click install; no terminal required |
-| Scattered skill integration | Built-in OpenClaw + full Feishu Skills, ready to use |
-| Model and API key juggling | nexu account for top models, or bring your own API Key |
-| "Demo only" agents | A desktop client built for real team workflows |
-| Login walls | Use your own API Key with zero sign-up |
+| 😩 Complex CLI / env setup | ✅ One double-click install; no terminal required |
+| 🧩 Scattered skill integration | ✅ Built-in OpenClaw + full Feishu Skills, ready to use |
+| 🔧 Model and API key juggling | ✅ nexu account for top models, or bring your own API Key |
+| 🎭 "Demo only" agents | ✅ A desktop client built for real team workflows |
+| 🚪 Login walls | ✅ Use your own API Key with zero sign-up |
 
 > Open source should not mean harder to use. It should mean more freedom, more trust, and more leverage for every team.
 
@@ -73,26 +73,26 @@ Open-source at the core, with a desktop experience that actually runs. Compatibl
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### System requirements
 
-- **OS**: macOS 12+ (Apple Silicon)
-- **Storage**: ~500 MB
+- 🍎 **OS**: macOS 12+ (Apple Silicon)
+- 💾 **Storage**: ~500 MB
 
 ### Installation
 
 **Pre-built Mac client (recommended)**
 
-1. Go to the [Releases](https://github.com/nexu-io/nexu/releases) page or the [official site](https://nexu.io).
-2. Download the Mac installer.
-3. Launch nexu.
+1. Go to the [Releases](https://github.com/nexu-io/nexu/releases) page or the [official site](https://nexu.io) 📥
+2. Download the Mac installer
+3. Launch nexu 🎉
 
-> **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
+> ⏳ **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
 
 ### First launch
 
-Sign in with your nexu account for instant access to supported models, or add your own API Key and use the client without an account.
+Sign in with your nexu account for instant access to supported models, or add your own API Key and use the client without an account 🔑.
 
 ---
 
@@ -126,7 +126,7 @@ Requirement breakdown, asset search, copywriting, design annotation—free up cr
 
 ---
 
-## Development
+## 🛠 Development
 
 ### Prerequisites
 
@@ -178,15 +178,15 @@ pnpm test                # Run tests (Vitest)
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-1. Fork this repo
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. 🍴 Fork this repo
+2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. 💾 Commit your changes (`git commit -m 'Add amazing feature'`)
+4. 📤 Push to the branch (`git push origin feature/amazing-feature`)
+5. 🔀 Open a Pull Request
 
 ### Guidelines
 
@@ -197,7 +197,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ---
 
-## Acknowledgements
+## 🙏 Acknowledgements
 
 nexu is built on the shoulders of excellent open-source projects:
 
@@ -210,20 +210,20 @@ nexu is built on the shoulders of excellent open-source projects:
 
 ---
 
-## Community
+## 💬 Community
 
 | Feishu Group | Discord |
 |:---:|:---:|
 | <img src="site/media/feishu-qr.png" width="200" /> | <img src="site/media/discord-qr.png" width="200" /> |
 | [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/nexu) |
 
-- [GitHub Discussions](https://github.com/nexu-io/nexu/discussions) — Q&A and discussion
-- [GitHub Issues](https://github.com/nexu-io/nexu/issues) — Bug reports and feature ideas
-- Email: [support@nexu.ai](mailto:support@nexu.ai)
+- 💡 [GitHub Discussions](https://github.com/nexu-io/nexu/discussions) — Q&A and discussion
+- 🐛 [GitHub Issues](https://github.com/nexu-io/nexu/issues) — Bug reports and feature ideas
+- 📧 Email: [support@nexu.ai](mailto:support@nexu.ai)
 
 ---
 
-## Star History
+## ⭐ Star History
 
 <a href="https://star-history.com/#nexu-io/nexu&Date">
  <picture>
@@ -235,7 +235,7 @@ nexu is built on the shoulders of excellent open-source projects:
 
 ---
 
-## License
+## 📄 License
 
 This project is open source under the [MIT License](LICENSE).
 
