@@ -1,6 +1,10 @@
 # 介绍
 
-nexu 是一款开源 AI Agent 桌面应用。连接聊天平台、选择模型、安装技能——几分钟内，你的 AI 助手即刻就绪。
+**nexu**（next to you）将 OpenClaw 🦞 变成一个桌面体验 ⚡——下载 Mac 客户端，双击安装，几秒钟内你的第一个 AI Agent 就已就绪。
+
+基于开源 OpenClaw 🦞 内核，nexu 内置了 **OpenClaw 🦞 Skills** 和**完整的飞书 Skills**，Agent 可以直接嵌入你团队已有的工作流 🔌。通过 nexu 账号即可使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等模型——也支持自带 API Key，无需登录 🔓。
+
+连接飞书、Slack 或 Discord，你的 AI Agent 直接上手机 📱。无需额外应用，在你常用的 IM 中直接对话即可。
 
 ![nexu 客户端](/assets/discord/step4-connected.png)
 
