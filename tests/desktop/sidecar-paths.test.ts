@@ -22,13 +22,23 @@ describe("sidecar-paths bin-only package resolution", () => {
     mkdirSync(resolve(binOnlyPkg, "bin"), { recursive: true });
     writeFileSync(
       resolve(fakePackageRoot, "package.json"),
-      JSON.stringify({ name: "fake-project", dependencies: { "bin-only-tool": "1.0.0" } }),
+      JSON.stringify({
+        name: "fake-project",
+        dependencies: { "bin-only-tool": "1.0.0" },
+      }),
     );
     writeFileSync(
       resolve(binOnlyPkg, "package.json"),
-      JSON.stringify({ name: "bin-only-tool", version: "1.0.0", bin: { "bin-only-tool": "bin/cli.js" } }),
+      JSON.stringify({
+        name: "bin-only-tool",
+        version: "1.0.0",
+        bin: { "bin-only-tool": "bin/cli.js" },
+      }),
     );
-    writeFileSync(resolve(binOnlyPkg, "bin/cli.js"), "#!/usr/bin/env node\nconsole.log('hello');\n");
+    writeFileSync(
+      resolve(binOnlyPkg, "bin/cli.js"),
+      "#!/usr/bin/env node\nconsole.log('hello');\n",
+    );
   });
 
   afterAll(() => {

@@ -92,10 +92,11 @@ describe("desktop skillhub slug validation", () => {
     });
 
     it("works with spaces in skills directory path", () => {
-      const dirWithSpaces = "/Users/test/Library/Application Support/@nexu/desktop/runtime/openclaw/state/skills";
-      expect(
-        resolveSkillPath(dirWithSpaces, "ontology"),
-      ).toBe(`${dirWithSpaces}/ontology`);
+      const dirWithSpaces =
+        "/Users/test/Library/Application Support/@nexu/desktop/runtime/openclaw/state/skills";
+      expect(resolveSkillPath(dirWithSpaces, "ontology")).toBe(
+        `${dirWithSpaces}/ontology`,
+      );
       expect(resolveSkillPath(dirWithSpaces, "../../..")).toBeNull();
     });
   });

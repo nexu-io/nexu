@@ -170,8 +170,10 @@ export class CatalogManager {
         "--dir",
         this.skillsDir,
       ]);
-      if (stdout) this.log("info", `install stdout slug=${slug}: ${stdout.trim()}`);
-      if (stderr) this.log("warn", `install stderr slug=${slug}: ${stderr.trim()}`);
+      if (stdout)
+        this.log("info", `install stdout slug=${slug}: ${stdout.trim()}`);
+      if (stderr)
+        this.log("warn", `install stderr slug=${slug}: ${stderr.trim()}`);
       this.log("info", `install ok slug=${slug}`);
       return { ok: true };
     } catch (error) {

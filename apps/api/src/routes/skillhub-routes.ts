@@ -414,7 +414,10 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     logger.info({ slug, skillsDir }, "skillhub install requested");
 
     if (!skillsDir) {
-      logger.error({ slug }, "skillhub install failed: OPENCLAW_SKILLS_DIR not set");
+      logger.error(
+        { slug },
+        "skillhub install failed: OPENCLAW_SKILLS_DIR not set",
+      );
       return c.json(
         { ok: false, error: "Skills directory not configured" },
         200,
@@ -432,8 +435,10 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
         "--dir",
         skillsDir,
       ]);
-      if (stdout) logger.info({ slug, stdout: stdout.trim() }, "skillhub install stdout");
-      if (stderr) logger.warn({ slug, stderr: stderr.trim() }, "skillhub install stderr");
+      if (stdout)
+        logger.info({ slug, stdout: stdout.trim() }, "skillhub install stdout");
+      if (stderr)
+        logger.warn({ slug, stderr: stderr.trim() }, "skillhub install stderr");
       logger.info({ slug }, "skillhub install ok");
       return c.json({ ok: true }, 200);
     } catch (error) {
@@ -469,7 +474,10 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     logger.info({ slug }, "skillhub uninstall requested");
 
     if (!skillsDir) {
-      logger.error({ slug }, "skillhub uninstall failed: OPENCLAW_SKILLS_DIR not set");
+      logger.error(
+        { slug },
+        "skillhub uninstall failed: OPENCLAW_SKILLS_DIR not set",
+      );
       return c.json(
         { ok: false, error: "Skills directory not configured" },
         200,
