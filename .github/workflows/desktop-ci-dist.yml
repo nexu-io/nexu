@@ -1,4 +1,4 @@
-name: Desktop CI
+name: Desktop CI Dist
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
-      - ".github/workflows/desktop-ci.yml"
+      - ".github/workflows/desktop-ci-dist.yml"
   push:
     branches:
       - main
@@ -30,13 +30,13 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
-      - ".github/workflows/desktop-ci.yml"
+      - ".github/workflows/desktop-ci-dist.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-ci-${{ github.event.pull_request.number || github.ref }}
+  group: desktop-ci-dist-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
