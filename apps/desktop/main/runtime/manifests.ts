@@ -54,6 +54,17 @@ function resolveElectronNodeRunner(): string {
   return process.execPath;
 }
 
+function normalizeNodeCandidate(
+  candidate: string | undefined,
+): string | undefined {
+  const trimmed = candidate?.trim();
+  if (!trimmed || !existsSync(trimmed)) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
 /**
  * Build a PATH prefix that puts a Node.js >= 22 binary first.
  * OpenClaw requires Node 22.12+; in dev mode the system `node` may be
@@ -72,13 +83,84 @@ function buildNode22Path(): string | undefined {
     for (const d of dirs) {
       const binDir = path.resolve(versionsDir, d, "bin");
       if (existsSync(path.resolve(binDir, "node"))) {
-        return `${binDir}:${process.env.PATH ?? ""}`;
+        return `${binDir}${path.delimiter}${process.env.PATH ?? ""}`;
       }
     }
   } catch {
     /* nvm dir not present or unreadable */
   }
   return undefined;
+}
+
+function supportsOpenclawRuntime(
+  nodeBinaryPath: string,
+  openclawSidecarRoot: string,
+): boolean {
+  try {
+    execFileSync(
+      nodeBinaryPath,
+      [
+        "-e",
+        'require(require("node:path").resolve(process.argv[1], "node_modules/@snazzah/davey"))',
+        openclawSidecarRoot,
+      ],
+      {
+        stdio: "ignore",
+        env: {
+          ...process.env,
+          NODE_PATH: "",
+        },
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prefer the current session's Node binary when it can boot OpenClaw.
+ * Fall back to the previous Node 22 heuristic for older dev shells.
+ *
+ * The desktop gateway used to force Node 22 because OpenClaw historically
+ * required 22.12+. Some local sidecars are instead bound to the current
+ * session's Node ABI (for example Node 24), so we should try that first.
+ */
+function buildOpenclawNodePath(
+  openclawSidecarRoot: string,
+): string | undefined {
+  const currentPath = process.env.PATH ?? "";
+  const candidates = [normalizeNodeCandidate(process.env.NODE)];
+
+  try {
+    candidates.push(
+      normalizeNodeCandidate(
+        execFileSync("which", ["node"], { encoding: "utf8" }),
+      ),
+    );
+  } catch {
+    /* current PATH may not expose node */
+  }
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (!supportsOpenclawRuntime(candidate, openclawSidecarRoot)) {
+      continue;
+    }
+
+    const candidateDir = path.dirname(candidate);
+    const currentFirstPath = currentPath.split(path.delimiter)[0] ?? "";
+    if (candidateDir === currentFirstPath) {
+      return undefined;
+    }
+
+    return `${candidateDir}${path.delimiter}${currentPath}`;
+  }
+
+  return buildNode22Path();
 }
 
 function ensurePackagedOpenclawSidecar(
@@ -177,7 +259,7 @@ export function createRuntimeUnitManifests(
   const webUrl = runtimeConfig.urls.web;
   const authUrl = runtimeConfig.urls.auth;
   const electronNodeRunner = resolveElectronNodeRunner();
-  const node22Path = buildNode22Path();
+  const openclawNodePath = buildOpenclawNodePath(openclawSidecarRoot);
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
   // entry points still mirror a few of these defaults directly, so changes here should be treated
@@ -310,9 +392,7 @@ export function createRuntimeUnitManifests(
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
-        // OpenClaw needs Node 22.12+; ensure it's on PATH when gateway
-        // spawns the openclaw binary (which runs `exec node ...`).
-        ...(node22Path ? { PATH: node22Path } : {}),
+        ...(openclawNodePath ? { PATH: openclawNodePath } : {}),
       },
     },
     {

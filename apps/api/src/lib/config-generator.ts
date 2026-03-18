@@ -20,6 +20,7 @@ import {
 } from "../db/schema/index.js";
 import { decrypt } from "./crypto.js";
 import { ServiceError } from "./error.js";
+import { normalizeProviderBaseUrl } from "./provider-base-url.js";
 
 /**
  * Load cloud connection credentials (Link gateway) in desktop mode.
@@ -402,7 +403,7 @@ export async function generatePoolConfig(
                 provider: "openai",
                 model: "google/gemini-embedding-001",
                 remote: {
-                  baseUrl: "https://openrouter.ai/api/v1/",
+                  baseUrl: "https://openrouter.ai/api/v1",
                   apiKey: process.env.OPENROUTER_API_KEY,
                 },
                 sync: {
@@ -560,7 +561,9 @@ export async function generatePoolConfig(
   for (const bp of byokProviders) {
     const providerKey =
       bp.providerId === "custom" ? `custom_${bp.id}` : bp.providerId;
-    const baseUrl = bp.baseUrl ?? byokDefaultBaseUrls[bp.providerId];
+    const baseUrl = normalizeProviderBaseUrl(
+      bp.baseUrl ?? byokDefaultBaseUrls[bp.providerId],
+    );
     if (!baseUrl) continue;
 
     const modelIds: string[] = JSON.parse(bp.modelsJson || "[]");

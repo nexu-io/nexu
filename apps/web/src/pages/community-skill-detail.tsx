@@ -2,6 +2,7 @@ import {
   useInstallSkill,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
+import "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,6 +17,7 @@ import {
 import type React from "react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { getApiV1SkillhubSkillsBySlug } from "../../lib/api/sdk.gen";
 
 type SkillDetail = {
   slug: string;
@@ -290,10 +292,11 @@ export function CommunitySkillDetailPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["skillhub", "detail", slug],
     queryFn: async (): Promise<SkillDetail> => {
-      const res = await fetch(`/api/v1/skillhub/skills/${slug}`);
-      if (res.status === 404) throw new Error("Skill not found");
-      if (!res.ok) throw new Error(`Failed to load skill: ${res.status}`);
-      return res.json();
+      const { data, error } = await getApiV1SkillhubSkillsBySlug({
+        path: { slug: slug as string },
+      });
+      if (error) throw new Error("Failed to load skill");
+      return data as unknown as SkillDetail;
     },
     enabled: !!slug,
   });

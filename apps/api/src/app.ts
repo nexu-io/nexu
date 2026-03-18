@@ -102,11 +102,16 @@ export function createApp() {
     }),
   );
 
-  // Desktop mode: permissive CORS for internal endpoints (localhost-only, safe)
+  // Desktop internal endpoints: always register (for OpenAPI spec), but
+  // guard at runtime so non-desktop deployments reject with 404.
   if (isDesktopMode()) {
     app.use("/api/internal/desktop/*", cors({ origin: "*" }));
-    registerDesktopLocalRoutes(app);
+  } else {
+    app.use("/api/internal/desktop/*", async (c) => {
+      return c.json({ error: "Not available" }, 404);
+    });
   }
+  registerDesktopLocalRoutes(app);
 
   registerDesktopDeviceRoutes(app);
   registerAuthRoutes(app);

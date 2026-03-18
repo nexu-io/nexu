@@ -7,7 +7,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { postApiV1MeAuthSource } from "../../lib/api/sdk.gen";
+import {
+  postApiAuthCheckEmail,
+  postApiV1AuthDesktopAuthorize,
+  postApiV1MeAuthSource,
+} from "../../lib/api/sdk.gen";
 
 function getCapabilityPills(t: (key: string) => string) {
   return [
@@ -118,16 +122,12 @@ export function AuthPage() {
     desktopAuthCalled.current = true;
     setDesktopAuthorizing(true);
     try {
-      const res = await fetch("/api/v1/auth/desktop-authorize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ deviceId }),
+      const { error } = await postApiV1AuthDesktopAuthorize({
+        body: { deviceId },
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: "Unknown error" }));
+      if (error) {
         toast.error(
-          (body as { error?: string }).error ?? "Failed to connect desktop",
+          (error as { error?: string }).error ?? "Failed to connect desktop",
         );
         // Don't reset desktopAuthCalled — prevent infinite retry loop
         setDesktopAuthorizing(false);
@@ -356,15 +356,14 @@ export function AuthPage() {
           const msg = (error.message ?? "").toLowerCase();
           if (msg.includes("already") || msg.includes("exist")) {
             // Check backend to determine verified vs unverified
-            const res = await fetch("/api/auth/check-email", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email }),
+            const { data: check } = await postApiAuthCheckEmail({
+              body: { email },
             });
-            const check = (await res.json()) as {
-              exists: boolean;
-              verified: boolean;
-            };
+            if (!check) {
+              toast.error("Failed to check email status");
+              setLoading(null);
+              return;
+            }
             if (check.exists && !check.verified) {
               // Unverified account — resend OTP
               await authClient.emailOtp.sendVerificationOtp({

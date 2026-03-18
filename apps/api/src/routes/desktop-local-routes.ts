@@ -1,8 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createRoute } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import {
+  cloudConnectResponseSchema,
+  cloudDisconnectResponseSchema,
+  cloudModelsBodySchema,
+  cloudModelsResponseSchema,
+  cloudStatusResponseSchema,
+} from "@nexu/shared";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../db/index.js";
 import { bots, gatewayPools } from "../db/schema/index.js";
 import { encrypt } from "../lib/crypto.js";
@@ -187,15 +196,151 @@ async function pollCloudForAuthorization(
   pollingState = null;
 }
 
+// ── Route Definitions ────────────────────────────────────────────
+
+const cloudStatusRoute = createRoute({
+  method: "get",
+  path: "/api/internal/desktop/cloud-status",
+  tags: ["Desktop"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: cloudStatusResponseSchema },
+      },
+      description: "Cloud connection status",
+    },
+  },
+});
+
+const cloudConnectRoute = createRoute({
+  method: "post",
+  path: "/api/internal/desktop/cloud-connect",
+  tags: ["Desktop"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: cloudConnectResponseSchema },
+      },
+      description: "Connection initiated",
+    },
+  },
+});
+
+const cloudDisconnectRoute = createRoute({
+  method: "post",
+  path: "/api/internal/desktop/cloud-disconnect",
+  tags: ["Desktop"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: cloudDisconnectResponseSchema },
+      },
+      description: "Disconnected",
+    },
+  },
+});
+
+const cloudModelsRoute = createRoute({
+  method: "put",
+  path: "/api/internal/desktop/cloud-models",
+  tags: ["Desktop"],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: cloudModelsBodySchema },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: cloudModelsResponseSchema },
+      },
+      description: "Models updated",
+    },
+  },
+});
+
+const defaultModelBodySchema = z.object({
+  modelId: z.string(),
+});
+
+const defaultModelSetRoute = createRoute({
+  method: "put",
+  path: "/api/internal/desktop/default-model",
+  tags: ["Desktop"],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: defaultModelBodySchema },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ ok: z.boolean(), modelId: z.string() }),
+        },
+      },
+      description: "Default model set",
+    },
+  },
+});
+
+const defaultModelGetRoute = createRoute({
+  method: "get",
+  path: "/api/internal/desktop/default-model",
+  tags: ["Desktop"],
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ modelId: z.string().nullable() }),
+        },
+      },
+      description: "Current default model",
+    },
+  },
+});
+
+const readyRoute = createRoute({
+  method: "get",
+  path: "/api/internal/desktop/ready",
+  tags: ["Desktop"],
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ ready: z.boolean() }),
+        },
+      },
+      description: "Ready",
+    },
+    503: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            ready: z.boolean(),
+            reason: z.string().optional(),
+          }),
+        },
+      },
+      description: "Not ready",
+    },
+  },
+});
+
+// ── Route Registration ───────────────────────────────────────────
+
 /**
  * Desktop-only internal routes for cloud connection management.
  * Only registered when NEXU_DESKTOP_MODE=true.
  * No auth required — localhost-only trust boundary.
  */
 export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
-  // Readiness probe — frontend gates on this before rendering the webview.
-  // Returns 200 when API + DB are responsive and at least one bot is configured.
-  app.get("/api/internal/desktop/ready", async (c) => {
+  // Readiness probe
+  app.openapi(readyRoute, async (c) => {
     try {
       const botRows = await db.select({ id: bots.id }).from(bots).limit(1);
 
@@ -210,14 +355,14 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Initiate cloud connection: generate device ID, register on cloud, start polling
-  app.post("/api/internal/desktop/cloud-connect", async (c) => {
+  app.openapi(cloudConnectRoute, async (c) => {
     // Reject if already polling or connected
     if (pollingState) {
-      return c.json({ error: "Connection attempt already in progress" }, 409);
+      return c.json({ error: "Connection attempt already in progress" });
     }
     const existing = loadCredentials();
     if (existing) {
-      return c.json({ error: "Already connected. Disconnect first." }, 409);
+      return c.json({ error: "Already connected. Disconnect first." });
     }
 
     const cloudApiUrl = getCloudApiUrl();
@@ -236,7 +381,7 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
     if (!res.ok) {
       const body = await res.text();
-      return c.json({ error: `Failed to register device: ${body}` }, 502);
+      return c.json({ error: `Failed to register device: ${body}` });
     }
 
     // Start background polling
@@ -254,7 +399,7 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Query current cloud connection status
-  app.get("/api/internal/desktop/cloud-status", (c) => {
+  app.openapi(cloudStatusRoute, (c) => {
     const creds = loadCredentials();
     if (creds) {
       return c.json({
@@ -278,11 +423,8 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Set default model and trigger config regeneration
-  app.put("/api/internal/desktop/default-model", async (c) => {
-    const body = (await c.req.json()) as { modelId?: string };
-    if (!body.modelId) {
-      return c.json({ error: "modelId is required" }, 400);
-    }
+  app.openapi(defaultModelSetRoute, async (c) => {
+    const body = c.req.valid("json");
 
     // Write to desktop-config.json
     const stateDir =
@@ -302,9 +444,6 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
     fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2));
 
     // Also update all bots in DB so per-agent model is consistent.
-    // The config generator reads bot.modelId first, falling back to
-    // desktop-config.json only when bot.modelId is null.  Without this
-    // update the DB default ("anthropic/claude-sonnet-4") always wins.
     try {
       await db.update(bots).set({ modelId: body.modelId });
     } catch (err) {
@@ -328,7 +467,7 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Get current default model
-  app.get("/api/internal/desktop/default-model", (c) => {
+  app.openapi(defaultModelGetRoute, (c) => {
     const stateDir =
       process.env.OPENCLAW_STATE_DIR ?? path.join(process.cwd(), ".nexu-state");
     const configPath = path.join(stateDir, "desktop-config.json");
@@ -344,17 +483,14 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Update enabled cloud models and trigger config regeneration
-  app.put("/api/internal/desktop/cloud-models", async (c) => {
+  app.openapi(cloudModelsRoute, async (c) => {
     const creds = loadCredentials();
     if (!creds) {
-      return c.json({ error: "Not connected to cloud" }, 400);
+      return c.json({ ok: false });
     }
 
-    const body = (await c.req.json()) as { enabledModelIds?: string[] };
+    const body = c.req.valid("json");
     const enabledIds = body.enabledModelIds;
-    if (!Array.isArray(enabledIds)) {
-      return c.json({ error: "enabledModelIds must be an array" }, 400);
-    }
 
     // Filter cloudModels to only include enabled ones
     const allModels = creds.cloudModels ?? [];
@@ -379,7 +515,7 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Disconnect from cloud: clear credentials, cancel polling
-  app.post("/api/internal/desktop/cloud-disconnect", (c) => {
+  app.openapi(cloudDisconnectRoute, (c) => {
     // Cancel any active polling
     if (pollingState) {
       pollingState.abortController.abort();

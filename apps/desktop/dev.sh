@@ -89,12 +89,13 @@ kill_residual_processes() {
 
 build_runtime() {
   log "building runtime artifacts"
+  local api_port="${NEXU_API_PORT:-50800}"
   local web_port="${NEXU_WEB_PORT:-50810}"
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:pglite-sidecar
   run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/shared build
   run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/api build
   run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/gateway build
-  run_logged env VITE_AUTH_BASE_URL="http://127.0.0.1:${web_port}" pnpm --dir "$ROOT_DIR" --filter @nexu/web build
+  run_logged env VITE_API_BASE_URL="http://127.0.0.1:${api_port}" VITE_AUTH_BASE_URL="http://127.0.0.1:${api_port}" pnpm --dir "$ROOT_DIR" --filter @nexu/web build
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:api-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:gateway-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:openclaw-sidecar

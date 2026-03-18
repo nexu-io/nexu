@@ -6,6 +6,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import { App } from "./app";
+import "./lib/api";
 import { LocaleProvider } from "./hooks/use-locale";
 import "./i18n";
 import "./index.css";
