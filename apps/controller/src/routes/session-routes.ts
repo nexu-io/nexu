@@ -1,5 +1,10 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { sessionListResponseSchema, sessionResponseSchema } from "@nexu/shared";
+import {
+  createSessionSchema,
+  sessionListResponseSchema,
+  sessionResponseSchema,
+  updateSessionSchema,
+} from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
@@ -18,6 +23,63 @@ export function registerSessionRoutes(
   app: OpenAPIHono<ControllerBindings>,
   container: ControllerContainer,
 ): void {
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/sessions",
+      tags: ["Sessions", "Internal"],
+      request: {
+        body: {
+          content: { "application/json": { schema: createSessionSchema } },
+        },
+      },
+      responses: {
+        201: {
+          content: { "application/json": { schema: sessionResponseSchema } },
+          description: "Created or updated session",
+        },
+      },
+    }),
+    async (c) =>
+      c.json(
+        await container.sessionService.createSession(c.req.valid("json")),
+        201,
+      ),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/api/internal/sessions/{id}",
+      tags: ["Sessions", "Internal"],
+      request: {
+        params: sessionIdParamSchema,
+        body: {
+          content: { "application/json": { schema: updateSessionSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: sessionResponseSchema } },
+          description: "Updated session",
+        },
+        404: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Not found",
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const session = await container.sessionService.updateSession(
+        id,
+        c.req.valid("json"),
+      );
+      if (!session) return c.json({ message: "Session not found" }, 404);
+      return c.json(session, 200);
+    },
+  );
+
   app.openapi(
     createRoute({
       method: "get",
@@ -64,6 +126,55 @@ export function registerSessionRoutes(
         return c.json({ message: "Session not found" }, 404);
       }
       return c.json(session, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/sessions/{id}/reset",
+      tags: ["Sessions"],
+      request: { params: sessionIdParamSchema },
+      responses: {
+        200: {
+          content: { "application/json": { schema: sessionResponseSchema } },
+          description: "Reset session",
+        },
+        404: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Not found",
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const session = await container.sessionService.resetSession(id);
+      if (!session) return c.json({ message: "Session not found" }, 404);
+      return c.json(session, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/api/v1/sessions/{id}",
+      tags: ["Sessions"],
+      request: { params: sessionIdParamSchema },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: z.object({ ok: z.boolean() }) },
+          },
+          description: "Delete session",
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      return c.json(
+        { ok: await container.sessionService.deleteSession(id) },
+        200,
+      );
     },
   );
 }

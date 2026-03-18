@@ -6,13 +6,16 @@ import type {
   ConnectFeishuInput,
   ConnectSlackInput,
 } from "@nexu/shared";
-import type {
-  connectIntegrationResponseSchema,
-  connectIntegrationSchema,
-  integrationResponseSchema,
-  providerResponseSchema,
-  refreshIntegrationSchema,
-  upsertProviderBodySchema,
+import {
+  type connectIntegrationResponseSchema,
+  type connectIntegrationSchema,
+  type integrationResponseSchema,
+  type providerResponseSchema,
+  type refreshIntegrationSchema,
+  type updateAuthSourceSchema,
+  type updateUserProfileSchema,
+  type upsertProviderBodySchema,
+  userProfileResponseSchema,
 } from "@nexu/shared";
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
@@ -25,6 +28,69 @@ import {
   nexuConfigSchema,
   type storedProviderResponseSchema,
 } from "./schemas.js";
+
+type ProviderResponse = z.infer<typeof providerResponseSchema>;
+type UpsertProviderBody = z.infer<typeof upsertProviderBodySchema>;
+type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
+type StoredProviderResponse = z.infer<typeof storedProviderResponseSchema>;
+type ConnectIntegrationInput = z.infer<typeof connectIntegrationSchema>;
+type ConnectIntegrationResponse = z.infer<
+  typeof connectIntegrationResponseSchema
+>;
+type RefreshIntegrationInput = z.infer<typeof refreshIntegrationSchema>;
+type UserProfileResponse = z.infer<typeof userProfileResponseSchema>;
+type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
+type UpdateAuthSourceInput = z.infer<typeof updateAuthSourceSchema>;
+
+function defaultLocalProfile(): UserProfileResponse {
+  return {
+    id: "desktop-local-user",
+    email: "desktop@nexu.local",
+    name: "Desktop User",
+    image: null,
+    plan: "local",
+    inviteAccepted: true,
+    onboardingCompleted: true,
+    authSource: "desktop-local",
+  };
+}
+
+function readLocalProfile(config: NexuConfig): UserProfileResponse {
+  const desktop = config.desktop as Record<string, unknown>;
+  const parsed = userProfileResponseSchema.safeParse(desktop.localProfile);
+  return parsed.success ? parsed.data : defaultLocalProfile();
+}
+
+function readDesktopCloud(config: NexuConfig): {
+  connected: boolean;
+  polling: boolean;
+  userName?: string | null;
+  userEmail?: string | null;
+  connectedAt?: string | null;
+  linkUrl?: string;
+  apiKey?: string;
+  models?: Array<{ id: string; name: string; provider?: string }>;
+} {
+  const desktop = config.desktop as Record<string, unknown>;
+  const cloud =
+    typeof desktop.cloud === "object" && desktop.cloud !== null
+      ? (desktop.cloud as Record<string, unknown>)
+      : null;
+
+  return {
+    connected: cloud?.connected === true,
+    polling: cloud?.polling === true,
+    userName: typeof cloud?.userName === "string" ? cloud.userName : null,
+    userEmail: typeof cloud?.userEmail === "string" ? cloud.userEmail : null,
+    connectedAt:
+      typeof cloud?.connectedAt === "string" ? cloud.connectedAt : null,
+    linkUrl: typeof cloud?.linkUrl === "string" ? cloud.linkUrl : undefined,
+    apiKey: typeof cloud?.apiKey === "string" ? cloud.apiKey : undefined,
+    models: Array.isArray(cloud?.models)
+      ? (cloud.models as Array<{ id: string; name: string; provider?: string }>)
+      : [],
+  };
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -245,10 +311,45 @@ export class NexuConfigStore {
     return config.channels;
   }
 
-  async connectSlack(input: ConnectSlackInput): Promise<ChannelResponse> {
+  async getSecret(key: string): Promise<string | null> {
+    const config = await this.getConfig();
+    return config.secrets[key] ?? null;
+  }
+
+  async setSecret(key: string, value: string): Promise<void> {
+    await this.store.update((config) => ({
+      ...config,
+      secrets: {
+        ...config.secrets,
+        [key]: value,
+      },
+    }));
+  }
+
+  async deleteSecretsByPrefix(prefix: string): Promise<void> {
+    await this.store.update((config) => ({
+      ...config,
+      secrets: Object.fromEntries(
+        Object.entries(config.secrets).filter(
+          ([key]) => !key.startsWith(prefix),
+        ),
+      ),
+    }));
+  }
+
+  async getChannel(channelId: string): Promise<ChannelResponse | null> {
+    const config = await this.getConfig();
+    return config.channels.find((channel) => channel.id === channelId) ?? null;
+  }
+
+  async connectSlack(
+    input: ConnectSlackInput & { botUserId?: string | null },
+  ): Promise<ChannelResponse> {
     const bot = await this.getOrCreateDefaultBot();
     const connectedAt = now();
-    const accountId = input.teamId ?? `slack-${crypto.randomUUID()}`;
+    const teamId = input.teamId ?? crypto.randomUUID();
+    const appId = input.appId ?? crypto.randomUUID();
+    const accountId = `slack-${appId}-${teamId}`;
     const channel: ChannelResponse = {
       id: crypto.randomUUID(),
       botId: bot.id,
@@ -256,8 +357,8 @@ export class NexuConfigStore {
       accountId,
       status: "connected",
       teamName: input.teamName ?? null,
-      appId: input.appId ?? null,
-      botUserId: null,
+      appId,
+      botUserId: input.botUserId ?? null,
       createdAt: connectedAt,
       updatedAt: connectedAt,
     };
@@ -284,18 +385,20 @@ export class NexuConfigStore {
     return channel;
   }
 
-  async connectDiscord(input: ConnectDiscordInput): Promise<ChannelResponse> {
+  async connectDiscord(
+    input: ConnectDiscordInput & { botUserId?: string | null },
+  ): Promise<ChannelResponse> {
     const bot = await this.getOrCreateDefaultBot();
     const connectedAt = now();
     const channel: ChannelResponse = {
       id: crypto.randomUUID(),
       botId: bot.id,
       channelType: "discord",
-      accountId: input.appId,
+      accountId: `discord-${input.appId}`,
       status: "connected",
       teamName: input.guildName ?? null,
       appId: input.appId,
-      botUserId: null,
+      botUserId: input.botUserId ?? null,
       createdAt: connectedAt,
       updatedAt: connectedAt,
     };
@@ -352,6 +455,9 @@ export class NexuConfigStore {
       secrets: {
         ...config.secrets,
         [`channel:${channel.id}:appSecret`]: input.appSecret,
+        [`channel:${channel.id}:appId`]: input.appId,
+        [`channel:${channel.id}:connectionMode`]:
+          input.connectionMode ?? "websocket",
         ...(input.verificationToken
           ? {
               [`channel:${channel.id}:verificationToken`]:
@@ -486,6 +592,155 @@ export class NexuConfigStore {
   async listIntegrations(): Promise<IntegrationResponse[]> {
     const config = await this.getConfig();
     return config.integrations;
+  }
+
+  async getLocalProfile(): Promise<UserProfileResponse> {
+    const config = await this.getConfig();
+    return readLocalProfile(config);
+  }
+
+  async updateLocalProfile(
+    input: UpdateUserProfileInput,
+  ): Promise<UserProfileResponse> {
+    let nextProfile = defaultLocalProfile();
+
+    await this.store.update((config) => {
+      const currentProfile = readLocalProfile(config);
+      nextProfile = {
+        ...currentProfile,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.image !== undefined ? { image: input.image } : {}),
+      };
+
+      return {
+        ...config,
+        desktop: {
+          ...config.desktop,
+          localProfile: nextProfile,
+        },
+      };
+    });
+
+    return nextProfile;
+  }
+
+  async updateLocalAuthSource(
+    input: UpdateAuthSourceInput,
+  ): Promise<UserProfileResponse> {
+    let nextProfile = defaultLocalProfile();
+
+    await this.store.update((config) => {
+      const currentProfile = readLocalProfile(config);
+      nextProfile = {
+        ...currentProfile,
+        authSource: input.source,
+      };
+
+      return {
+        ...config,
+        desktop: {
+          ...config.desktop,
+          localProfile: nextProfile,
+        },
+      };
+    });
+
+    return nextProfile;
+  }
+
+  async getDesktopCloudStatus() {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+    return {
+      connected: cloud.connected,
+      polling: cloud.polling,
+      userName: cloud.userName ?? null,
+      userEmail: cloud.userEmail ?? null,
+      connectedAt: cloud.connectedAt ?? null,
+      models: cloud.models ?? [],
+    };
+  }
+
+  async connectDesktopCloud() {
+    const nowValue = now();
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        cloud: {
+          connected: true,
+          polling: false,
+          userName: "Desktop User",
+          userEmail: "desktop@nexu.local",
+          connectedAt: nowValue,
+          linkUrl: "https://link.nexu.local",
+          apiKey: "nexu-local-link-key",
+          models: [
+            {
+              id: "gemini-2.5-flash",
+              name: "Gemini 2.5 Flash",
+              provider: "google",
+            },
+            { id: "gpt-4o", name: "GPT-4o", provider: "openai" },
+            {
+              id: "claude-sonnet-4",
+              name: "Claude Sonnet 4",
+              provider: "anthropic",
+            },
+          ],
+        },
+      },
+    }));
+
+    return {
+      browserUrl: "https://nexu.io/local-login",
+      error: undefined,
+    };
+  }
+
+  async disconnectDesktopCloud() {
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        cloud: {
+          connected: false,
+          polling: false,
+          userName: null,
+          userEmail: null,
+          connectedAt: null,
+          linkUrl: null,
+          apiKey: null,
+          models: [],
+        },
+      },
+    }));
+
+    return { ok: true };
+  }
+
+  async setDesktopCloudModels(enabledModelIds: string[]) {
+    await this.store.update((config) => {
+      const cloud = readDesktopCloud(config);
+      return {
+        ...config,
+        desktop: {
+          ...config.desktop,
+          cloud: {
+            ...cloud,
+            models: (cloud.models ?? []).filter((model) =>
+              enabledModelIds.includes(model.id),
+            ),
+          },
+        },
+      };
+    });
+
+    const next = await this.getDesktopCloudStatus();
+    return {
+      ok: true,
+      models: next.models,
+    };
   }
 
   async connectIntegration(
@@ -767,13 +1022,3 @@ export class NexuConfigStore {
     };
   }
 }
-
-type ProviderResponse = z.infer<typeof providerResponseSchema>;
-type UpsertProviderBody = z.infer<typeof upsertProviderBodySchema>;
-type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
-type StoredProviderResponse = z.infer<typeof storedProviderResponseSchema>;
-type ConnectIntegrationInput = z.infer<typeof connectIntegrationSchema>;
-type ConnectIntegrationResponse = z.infer<
-  typeof connectIntegrationResponseSchema
->;
-type RefreshIntegrationInput = z.infer<typeof refreshIntegrationSchema>;

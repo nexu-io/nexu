@@ -16,14 +16,20 @@ export class LowDbStore<T> {
     }
 
     try {
-      const raw = await readFile(this.filePath, "utf8");
-      this.cache = this.schema.parse(JSON.parse(raw));
+      this.cache = await this.readAndParse(this.filePath);
       return this.cache;
     } catch {
-      const fallback = this.createDefault();
-      this.cache = this.schema.parse(fallback);
-      await this.write(this.cache);
-      return this.cache;
+      const backupPath = `${this.filePath}.bak`;
+      try {
+        this.cache = await this.readAndParse(backupPath);
+        await this.write(this.cache);
+        return this.cache;
+      } catch {
+        const fallback = this.createDefault();
+        this.cache = this.schema.parse(fallback);
+        await this.write(this.cache);
+        return this.cache;
+      }
     }
   }
 
@@ -49,5 +55,10 @@ export class LowDbStore<T> {
     const nextValue = await updater(current);
     await this.write(nextValue);
     return nextValue;
+  }
+
+  private async readAndParse(filePath: string): Promise<T> {
+    const raw = await readFile(filePath, "utf8");
+    return this.schema.parse(JSON.parse(raw));
   }
 }

@@ -229,7 +229,10 @@ function logRendererEvent({
 async function waitForApiReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
+  const probeUrl = new URL(
+    "/api/internal/desktop/ready",
+    runtimeConfig.urls.apiBase,
+  );
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -239,7 +242,7 @@ async function waitForApiReadiness(): Promise<void> {
         },
       });
 
-      if (response.status < 500) {
+      if (response.ok) {
         logColdStart(
           `controller ready via ${probeUrl.pathname} status=${response.status}`,
         );

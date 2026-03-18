@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests"
+    "test": "vitest run tests",
+    "generate-openapi": "NODE_OPTIONS=--conditions=development tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",

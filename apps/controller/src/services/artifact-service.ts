@@ -4,8 +4,17 @@ import type { ArtifactsStore } from "../store/artifacts-store.js";
 export class ArtifactService {
   constructor(private readonly artifactsStore: ArtifactsStore) {}
 
-  async listArtifacts(params: { limit: number; offset: number }) {
-    const artifacts = await this.artifactsStore.listArtifacts();
+  async listArtifacts(params: {
+    limit: number;
+    offset: number;
+    sessionKey?: string;
+  }) {
+    let artifacts = await this.artifactsStore.listArtifacts();
+    if (params.sessionKey) {
+      artifacts = artifacts.filter(
+        (artifact) => artifact.sessionKey === params.sessionKey,
+      );
+    }
     return {
       artifacts: artifacts.slice(params.offset, params.offset + params.limit),
       total: artifacts.length,

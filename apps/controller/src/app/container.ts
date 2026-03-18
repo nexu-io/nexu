@@ -14,7 +14,9 @@ import { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js
 import { AgentService } from "../services/agent-service.js";
 import { ArtifactService } from "../services/artifact-service.js";
 import { ChannelService } from "../services/channel-service.js";
+import { DesktopLocalService } from "../services/desktop-local-service.js";
 import { IntegrationService } from "../services/integration-service.js";
+import { LocalUserService } from "../services/local-user-service.js";
 import { ModelProviderService } from "../services/model-provider-service.js";
 import { OpenClawSyncService } from "../services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../services/runtime-config-service.js";
@@ -38,6 +40,8 @@ export interface ControllerContainer {
   runtimeConfigService: RuntimeConfigService;
   modelProviderService: ModelProviderService;
   integrationService: IntegrationService;
+  localUserService: LocalUserService;
+  desktopLocalService: DesktopLocalService;
   artifactService: ArtifactService;
   templateService: TemplateService;
   openclawSyncService: OpenClawSyncService;
@@ -83,6 +87,8 @@ export function createContainer(): ControllerContainer {
     ),
     modelProviderService: new ModelProviderService(configStore),
     integrationService: new IntegrationService(configStore),
+    localUserService: new LocalUserService(configStore),
+    desktopLocalService: new DesktopLocalService(configStore),
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
     openclawSyncService,

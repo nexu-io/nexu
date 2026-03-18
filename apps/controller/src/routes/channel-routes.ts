@@ -1,5 +1,6 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  botQuotaResponseSchema,
   channelListResponseSchema,
   channelResponseSchema,
   connectDiscordSchema,
@@ -11,6 +12,7 @@ import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
 const channelIdParamSchema = z.object({ channelId: z.string() });
+const errorSchema = z.object({ message: z.string() });
 
 export function registerChannelRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -46,13 +48,13 @@ export function registerChannelRoutes(
               schema: z.object({ redirectUri: z.string() }),
             },
           },
-          description: "Slack redirect URI",
+          description: "Deprecated Slack redirect URI",
         },
       },
     }),
     (c) =>
       c.json(
-        { redirectUri: `${container.env.webUrl}/api/oauth/slack/callback` },
+        { redirectUri: `${container.env.webUrl}/manual-slack-connect` },
         200,
       ),
   );
@@ -70,14 +72,18 @@ export function registerChannelRoutes(
           content: {
             "application/json": { schema: slackOAuthUrlResponseSchema },
           },
-          description: "Slack OAuth URL placeholder",
+          description: "Deprecated Slack OAuth placeholder",
         },
       },
     }),
-    (c) => {
-      const redirectUri = `${container.env.webUrl}/api/oauth/slack/callback`;
-      return c.json({ url: redirectUri, redirectUri }, 200);
-    },
+    (c) =>
+      c.json(
+        {
+          url: `${container.env.webUrl}/manual-slack-connect`,
+          redirectUri: `${container.env.webUrl}/manual-slack-connect`,
+        },
+        200,
+      ),
   );
 
   app.openapi(
@@ -95,13 +101,28 @@ export function registerChannelRoutes(
           content: { "application/json": { schema: channelResponseSchema } },
           description: "Connected slack channel",
         },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
       },
     }),
-    async (c) =>
-      c.json(
-        await container.channelService.connectSlack(c.req.valid("json")),
-        200,
-      ),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectSlack(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "Slack connect failed",
+          },
+          409,
+        );
+      }
+    },
   );
 
   app.openapi(
@@ -119,13 +140,28 @@ export function registerChannelRoutes(
           content: { "application/json": { schema: channelResponseSchema } },
           description: "Connected discord channel",
         },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
       },
     }),
-    async (c) =>
-      c.json(
-        await container.channelService.connectDiscord(c.req.valid("json")),
-        200,
-      ),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectDiscord(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "Discord connect failed",
+          },
+          409,
+        );
+      }
+    },
   );
 
   app.openapi(
@@ -143,13 +179,70 @@ export function registerChannelRoutes(
           content: { "application/json": { schema: channelResponseSchema } },
           description: "Connected feishu channel",
         },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
       },
     }),
-    async (c) =>
-      c.json(
-        await container.channelService.connectFeishu(c.req.valid("json")),
-        200,
-      ),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectFeishu(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "Feishu connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/channels/{channelId}/status",
+      tags: ["Channels"],
+      request: { params: channelIdParamSchema },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Channel status",
+        },
+        404: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Not found",
+        },
+      },
+    }),
+    async (c) => {
+      const { channelId } = c.req.valid("param");
+      const channel = await container.channelService.getChannel(channelId);
+      if (channel === null) {
+        return c.json({ message: "Channel not found" }, 404);
+      }
+      return c.json(channel, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/bot-quota",
+      tags: ["Channels"],
+      responses: {
+        200: {
+          content: { "application/json": { schema: botQuotaResponseSchema } },
+          description: "Bot quota",
+        },
+      },
+    }),
+    async (c) => c.json(await container.channelService.getBotQuota(), 200),
   );
 
   app.openapi(

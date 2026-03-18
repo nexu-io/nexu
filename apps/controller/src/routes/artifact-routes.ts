@@ -12,6 +12,7 @@ import type { ControllerBindings } from "../types.js";
 const querySchema = z.object({
   limit: z.coerce.number().int().positive().default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
+  sessionKey: z.string().optional(),
 });
 
 const artifactIdParamSchema = z.object({ id: z.string() });

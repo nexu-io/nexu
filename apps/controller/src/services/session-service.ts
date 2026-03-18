@@ -1,3 +1,4 @@
+import type { CreateSessionInput, UpdateSessionInput } from "@nexu/shared";
 import type { SessionsRuntime } from "../runtime/sessions-runtime.js";
 
 export class SessionService {
@@ -33,7 +34,22 @@ export class SessionService {
   }
 
   async getSession(id: string) {
-    const sessions = await this.sessionsRuntime.listSessions();
-    return sessions.find((session) => session.id === id) ?? null;
+    return this.sessionsRuntime.getSession(id);
+  }
+
+  async createSession(input: CreateSessionInput) {
+    return this.sessionsRuntime.createOrUpdateSession(input);
+  }
+
+  async updateSession(id: string, input: UpdateSessionInput) {
+    return this.sessionsRuntime.updateSession(id, input);
+  }
+
+  async resetSession(id: string) {
+    return this.sessionsRuntime.resetSession(id);
+  }
+
+  async deleteSession(id: string) {
+    return this.sessionsRuntime.deleteSession(id);
   }
 }

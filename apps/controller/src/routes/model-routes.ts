@@ -160,6 +160,7 @@ export function registerModelRoutes(
         },
       },
     }),
-    async (c) => c.json({ providers: [] }, 200),
+    async (c) =>
+      c.json(await container.desktopLocalService.getLinkCatalog(), 200),
   );
 }

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -42,6 +42,8 @@ describe("NexuConfigStore", () => {
       openclawGatewayToken: undefined,
       manageOpenclawProcess: false,
       gatewayProbeEnabled: false,
+      runtimeSyncIntervalMs: 2000,
+      runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
     };
   });
@@ -70,7 +72,7 @@ describe("NexuConfigStore", () => {
     await store.upsertTemplate({ name: "AGENTS.md", content: "hello" });
 
     expect(bot.slug).toBe("assistant");
-    expect(channel.accountId).toBe("T123");
+    expect(channel.accountId).toBe("slack-A123-T123");
     expect(provider.provider.hasApiKey).toBe(true);
     expect((await store.getSkills()).items["daily-standup"]?.content).toBe(
       "# Standup",
@@ -78,5 +80,39 @@ describe("NexuConfigStore", () => {
     expect(await store.listTemplates()).toHaveLength(1);
     expect(await store.listProviders()).toHaveLength(1);
     expect(await store.listChannels()).toHaveLength(1);
+  });
+
+  it("recovers from a broken primary config using backup-compatible data", async () => {
+    const brokenConfigPath = env.nexuConfigPath;
+    const backupPath = `${brokenConfigPath}.bak`;
+
+    await mkdir(path.dirname(brokenConfigPath), { recursive: true });
+    await writeFile(brokenConfigPath, "{not-json", "utf8");
+    await writeFile(
+      backupPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          bots: [],
+          runtime: {},
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          skills: {},
+          desktop: {},
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const config = await store.getConfig();
+
+    expect(config.schemaVersion).toBe(1);
+    expect(config.$schema).toBe("https://nexu.io/config.json");
   });
 });

@@ -117,7 +117,7 @@ export const controllerArtifactSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const nexuConfigSchema = z.object({
+const nexuConfigObjectSchema = z.object({
   $schema: z.string(),
   schemaVersion: z.number().int().positive(),
   app: z.record(z.unknown()).default({}),
@@ -131,6 +131,52 @@ export const nexuConfigSchema = z.object({
   desktop: z.record(z.unknown()).default({}),
   secrets: z.record(z.string(), z.string()).default({}),
 });
+
+export const nexuConfigSchema = z.preprocess((input) => {
+  if (typeof input !== "object" || input === null) {
+    return input;
+  }
+
+  const candidate = input as Record<string, unknown>;
+  return {
+    $schema:
+      typeof candidate.$schema === "string"
+        ? candidate.$schema
+        : "https://nexu.io/config.json",
+    schemaVersion:
+      typeof candidate.schemaVersion === "number" ? candidate.schemaVersion : 1,
+    app:
+      typeof candidate.app === "object" && candidate.app !== null
+        ? candidate.app
+        : {},
+    bots: Array.isArray(candidate.bots) ? candidate.bots : [],
+    runtime:
+      typeof candidate.runtime === "object" && candidate.runtime !== null
+        ? candidate.runtime
+        : {},
+    providers: Array.isArray(candidate.providers) ? candidate.providers : [],
+    integrations: Array.isArray(candidate.integrations)
+      ? candidate.integrations
+      : [],
+    channels: Array.isArray(candidate.channels) ? candidate.channels : [],
+    templates:
+      typeof candidate.templates === "object" && candidate.templates !== null
+        ? candidate.templates
+        : {},
+    skills:
+      typeof candidate.skills === "object" && candidate.skills !== null
+        ? candidate.skills
+        : {},
+    desktop:
+      typeof candidate.desktop === "object" && candidate.desktop !== null
+        ? candidate.desktop
+        : {},
+    secrets:
+      typeof candidate.secrets === "object" && candidate.secrets !== null
+        ? candidate.secrets
+        : {},
+  };
+}, nexuConfigObjectSchema);
 
 export const artifactsIndexSchema = z.object({
   schemaVersion: z.number().int().positive(),

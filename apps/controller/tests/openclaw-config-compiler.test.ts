@@ -22,11 +22,14 @@ function createEnv(): ControllerEnv {
     openclawGatewayToken: "token-123",
     manageOpenclawProcess: false,
     gatewayProbeEnabled: false,
+    runtimeSyncIntervalMs: 2000,
+    runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
   };
 }
 
 function createConfig(): NexuConfig {
+  const now = new Date().toISOString();
   return {
     $schema: "https://nexu.io/config.json",
     schemaVersion: 1,
@@ -38,10 +41,10 @@ function createConfig(): NexuConfig {
         slug: "assistant",
         poolId: null,
         status: "active",
-        modelId: "openai/gpt-4o",
+        modelId: "anthropic/claude-sonnet-4",
         systemPrompt: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
       },
     ],
     runtime: {
@@ -52,20 +55,55 @@ function createConfig(): NexuConfig {
       },
       defaultModelId: "anthropic/claude-sonnet-4",
     },
-    providers: [],
+    providers: [
+      {
+        id: "provider-1",
+        providerId: "openai",
+        displayName: "OpenAI",
+        enabled: true,
+        baseUrl: null,
+        apiKey: "sk-test",
+        models: ["gpt-4o"],
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "provider-2",
+        providerId: "anthropic",
+        displayName: "Anthropic Proxy",
+        enabled: true,
+        baseUrl: "https://proxy.example.com/v1",
+        apiKey: "proxy-key",
+        models: ["claude-sonnet-4"],
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
     integrations: [],
     channels: [
       {
-        id: "channel-1",
+        id: "slack-channel-1",
         botId: "bot-1",
         channelType: "slack",
-        accountId: "team-1",
+        accountId: "slack-A123-T123",
         status: "connected",
         teamName: "Acme",
         appId: "A123",
         botUserId: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "feishu-channel-1",
+        botId: "bot-1",
+        channelType: "feishu",
+        accountId: "cli_a1b2c3",
+        status: "connected",
+        teamName: null,
+        appId: "cli_a1b2c3",
+        botUserId: null,
+        createdAt: now,
+        updatedAt: now,
       },
     ],
     templates: {},
@@ -77,26 +115,63 @@ function createConfig(): NexuConfig {
       },
       items: {},
     },
-    desktop: {},
-    secrets: {},
+    desktop: {
+      selectedModelId: "gpt-4o",
+      cloud: {
+        linkUrl: "https://link.example.com",
+        apiKey: "link-key",
+        models: [
+          {
+            id: "gemini-2.5-flash",
+            name: "Gemini 2.5 Flash",
+            provider: "google",
+          },
+        ],
+      },
+    },
+    secrets: {
+      "channel:slack-channel-1:botToken": "xoxb-test",
+      "channel:slack-channel-1:signingSecret": "signing-secret",
+      "channel:feishu-channel-1:appId": "cli_a1b2c3",
+      "channel:feishu-channel-1:appSecret": "feishu-secret",
+      "channel:feishu-channel-1:connectionMode": "webhook",
+      "channel:feishu-channel-1:verificationToken": "verify-token",
+    },
   };
 }
 
 describe("compileOpenClawConfig", () => {
-  it("builds OpenClaw config from controller config", () => {
+  it("builds OpenClaw config with provider and channel parity defaults", () => {
     const result = compileOpenClawConfig(createConfig(), createEnv());
 
     expect(result.gateway.auth.mode).toBe("token");
     expect(result.gateway.auth.token).toBe("token-123");
-    expect(result.agents.list).toHaveLength(1);
-    expect(result.bindings).toEqual([
-      {
-        agentId: "bot-1",
-        match: {
-          channel: "slack",
-          accountId: "team-1",
-        },
-      },
-    ]);
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "byok_anthropic/anthropic/claude-sonnet-4",
+    });
+    expect(result.agents.list[0]).toMatchObject({
+      id: "bot-1",
+      workspace: "/tmp/openclaw/agents/bot-1",
+      model: { primary: "byok_anthropic/anthropic/claude-sonnet-4" },
+    });
+    expect(result.models?.providers.openai?.models[0]?.id).toBe("gpt-4o");
+    expect(result.models?.providers.byok_anthropic?.models[0]?.id).toBe(
+      "anthropic/claude-sonnet-4",
+    );
+    expect(result.models?.providers.link?.baseUrl).toBe(
+      "https://link.example.com/v1",
+    );
+    expect(result.channels.slack?.accounts["slack-A123-T123"]).toMatchObject({
+      mode: "http",
+      webhookPath: "/slack/events/slack-A123-T123",
+      botToken: "xoxb-test",
+    });
+    expect(result.channels.feishu?.accounts.cli_a1b2c3).toMatchObject({
+      connectionMode: "webhook",
+      webhookPath: "/feishu/events/cli_a1b2c3",
+      verificationToken: "verify-token",
+    });
+    expect(result.plugins?.entries?.feishu?.enabled).toBe(true);
+    expect(result.skills?.load?.extraDirs).toEqual(["/tmp/openclaw/skills"]);
   });
 });
