@@ -373,11 +373,17 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
       .digest("hex");
 
     // Register device on cloud
-    const res = await fetch(`${cloudApiUrl}/api/auth/device-register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId, deviceSecretHash }),
-    });
+    const registerUrl = `${cloudApiUrl}/api/auth/device-register`;
+    let res: Response;
+    try {
+      res = await fetch(registerUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, deviceSecretHash }),
+      });
+    } catch (err) {
+      return c.json({ error: `Cloud unreachable: ${err instanceof Error ? err.message : String(err)}` });
+    }
 
     if (!res.ok) {
       const body = await res.text();

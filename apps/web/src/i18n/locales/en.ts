@@ -79,6 +79,7 @@ const en = {
   "auth.connected": "Connected!",
   "auth.desktopConnected":
     "Your Nexu Desktop app is now connected to your cloud account. You can close this tab and return to the desktop app.",
+  "auth.autoCloseIn": "Closing in {{seconds}}s",
   "auth.connectingDesktop": "Connecting your desktop app...",
   "auth.heroTitle.line1": "Your digital",
   "auth.heroTitle.line2": "coworker,",

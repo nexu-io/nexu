@@ -77,6 +77,7 @@ const zhCN = {
   "auth.connected": "已连接！",
   "auth.desktopConnected":
     "你的 Nexu 桌面端已连接到云端账号。你可以关闭此标签页，返回桌面端应用。",
+  "auth.autoCloseIn": "{{seconds}} 秒后自动关闭",
   "auth.connectingDesktop": "正在连接桌面端...",
   "auth.heroTitle.line1": "你的数字",
   "auth.heroTitle.line2": "同事，",

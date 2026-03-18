@@ -51,6 +51,12 @@ const orchestrator = new RuntimeOrchestrator(
 
 app.setName("Nexu Desktop");
 
+// Info.plist declares LSUIElement=true so that child processes (spawned with
+// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Restore the main
+// process's Dock icon as early as possible — before whenReady / cold-start —
+// so users see it immediately even during first-launch decompression.
+void app.dock?.show();
+
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
 // causing silent popup blocking.  All popups are already caught by

@@ -114,6 +114,7 @@ export function AuthPage() {
   const [name, setName] = useState("");
   const [desktopConnected, setDesktopConnected] = useState(false);
   const [desktopAuthorizing, setDesktopAuthorizing] = useState(false);
+  const [closeCountdown, setCloseCountdown] = useState(5);
   const desktopAuthCalled = useRef(false);
 
   /** After login, authorize the desktop device and show success screen. */
@@ -153,6 +154,17 @@ export function AuthPage() {
     const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  // Desktop connected: auto-close countdown
+  useEffect(() => {
+    if (!desktopConnected) return;
+    if (closeCountdown <= 0) {
+      window.close();
+      return;
+    }
+    const timer = setTimeout(() => setCloseCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [desktopConnected, closeCountdown]);
 
   const handleResendOtp = useCallback(async () => {
     if (resendCooldown > 0) return;
@@ -422,6 +434,9 @@ export function AuthPage() {
           </h1>
           <p className="text-[14px] text-text-muted leading-relaxed">
             {t("auth.desktopConnected")}
+          </p>
+          <p className="text-[13px] text-text-muted mt-4">
+            {t("auth.autoCloseIn", { seconds: closeCountdown })}
           </p>
         </div>
       </div>
