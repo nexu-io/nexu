@@ -12,6 +12,7 @@ export const assetsDir = path.join(docsDir, "public", "assets");
 const supportedSourceExtensions = new Set([".png", ".jpg", ".jpeg"]);
 const passthroughExtensions = new Set([".webp", ".gif"]);
 const markdownIncludePattern = /\.md$/;
+const maxImageArea = 1200 * 1200;
 
 async function listFiles(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -28,6 +29,10 @@ async function listFiles(dir) {
   );
 
   return files.flat();
+}
+
+function uniquePaths(filePaths) {
+  return [...new Set(filePaths)];
 }
 
 function toPosixPath(value) {
@@ -66,17 +71,53 @@ async function ensureAssetsDirExists() {
   }
 }
 
+function getAreaConstrainedDimensions(metadata) {
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+
+  if (width <= 0 || height <= 0) {
+    throw new Error("Unable to determine image dimensions for normalization");
+  }
+
+  const area = width * height;
+
+  if (area <= maxImageArea) {
+    return null;
+  }
+
+  const scale = Math.sqrt(maxImageArea / area);
+  let resizedWidth = Math.max(1, Math.floor(width * scale));
+  let resizedHeight = Math.max(1, Math.floor(height * scale));
+
+  while (resizedWidth * resizedHeight > maxImageArea) {
+    if (resizedWidth >= resizedHeight) {
+      resizedWidth -= 1;
+    } else {
+      resizedHeight -= 1;
+    }
+  }
+
+  return {
+    width: resizedWidth,
+    height: resizedHeight,
+  };
+}
+
 async function convertAsset(sourcePath, targetPath) {
-  await sharp(sourcePath)
-    .rotate()
-    .resize({
-      width: 1024,
-      height: 1024,
-      fit: "inside",
+  const image = sharp(sourcePath).rotate();
+  const metadata = await image.metadata();
+  const resizeDimensions = getAreaConstrainedDimensions(metadata);
+
+  if (resizeDimensions !== null) {
+    image.resize({
+      width: resizeDimensions.width,
+      height: resizeDimensions.height,
+      fit: "fill",
       withoutEnlargement: true,
-    })
-    .webp({ quality: 82 })
-    .toFile(targetPath);
+    });
+  }
+
+  await image.webp({ quality: 82 }).toFile(targetPath);
 }
 
 function replaceMarkdownReferences(
@@ -116,7 +157,7 @@ export async function normalizeAssets({
   await ensureAssetsDirExists();
 
   const markdownFiles = await loadMarkdownFiles();
-  const assetFiles = await listFiles(assetsDir);
+  const assetFiles = uniquePaths(await listFiles(assetsDir));
   const conversionCandidates = assetFiles.filter((filePath) => {
     const extension = path.extname(filePath).toLowerCase();
     return supportedSourceExtensions.has(extension);
@@ -148,7 +189,7 @@ export async function normalizeAssets({
 
     if (!dryRun) {
       await convertAsset(sourcePath, targetPath);
-      await fs.unlink(sourcePath);
+      await fs.rm(sourcePath, { force: true });
     }
 
     convertedCount += 1;
