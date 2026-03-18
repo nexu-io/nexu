@@ -266,8 +266,6 @@ async function main() {
     notarizeEnv.NEXU_APPLE_TEAM_ID = appleTeamId;
   }
 
-  const webPort = process.env.NEXU_WEB_PORT ?? "50810";
-
   await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
 

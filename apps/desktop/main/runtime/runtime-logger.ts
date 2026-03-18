@@ -27,6 +27,28 @@ function isIgnorableWriteError(error: unknown): boolean {
   return errorCode === "EIO" || errorCode === "EPIPE";
 }
 
+let stdioErrorHandlersAttached = false;
+
+function attachSafeStdioErrorHandlers(): void {
+  if (stdioErrorHandlersAttached) {
+    return;
+  }
+
+  const handleStreamError = (error: Error) => {
+    if (isIgnorableWriteError(error)) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      throw error;
+    });
+  };
+
+  process.stdout.on("error", handleStreamError);
+  process.stderr.on("error", handleStreamError);
+  stdioErrorHandlersAttached = true;
+}
+
 class SafeConsoleStream extends Writable {
   override _write(
     chunk: string | Buffer,
@@ -57,6 +79,8 @@ class SafeConsoleStream extends Writable {
     }
   }
 }
+
+attachSafeStdioErrorHandlers();
 
 const runtimeConsoleLogger = pino(
   {
