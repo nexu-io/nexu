@@ -4,8 +4,17 @@ import * as path from "node:path";
 import { createRoute } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { Model } from "@nexu/shared";
-import { modelListResponseSchema } from "@nexu/shared";
+import {
+  linkCatalogResponseSchema,
+  modelListResponseSchema,
+  providerListResponseSchema,
+  providerResponseSchema,
+  upsertProviderBodySchema,
+  verifyProviderBodySchema,
+  verifyProviderResponseSchema,
+} from "@nexu/shared";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db, pool } from "../db/index.js";
 import { modelProviders } from "../db/schema/index.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
@@ -13,7 +22,7 @@ import { PLATFORM_MODELS } from "../lib/models.js";
 
 import type { AppBindings } from "../types.js";
 
-// ── Models API ──────────────────────────────────────────────────
+// ── Route Definitions ────────────────────────────────────────────
 
 const listModelsRoute = createRoute({
   method: "get",
@@ -28,6 +37,111 @@ const listModelsRoute = createRoute({
     },
   },
 });
+
+const providerIdParam = z.object({ providerId: z.string() });
+
+const listProvidersRoute = createRoute({
+  method: "get",
+  path: "/api/v1/providers",
+  tags: ["Providers"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: providerListResponseSchema },
+      },
+      description: "Provider list",
+    },
+  },
+});
+
+const upsertProviderRoute = createRoute({
+  method: "put",
+  path: "/api/v1/providers/{providerId}",
+  tags: ["Providers"],
+  request: {
+    params: providerIdParam,
+    body: {
+      content: {
+        "application/json": { schema: upsertProviderBodySchema },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ provider: providerResponseSchema }),
+        },
+      },
+      description: "Updated",
+    },
+    201: {
+      content: {
+        "application/json": {
+          schema: z.object({ provider: providerResponseSchema }),
+        },
+      },
+      description: "Created",
+    },
+  },
+});
+
+const deleteProviderRoute = createRoute({
+  method: "delete",
+  path: "/api/v1/providers/{providerId}",
+  tags: ["Providers"],
+  request: {
+    params: providerIdParam,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ ok: z.boolean() }),
+        },
+      },
+      description: "Deleted",
+    },
+  },
+});
+
+const verifyProviderRoute = createRoute({
+  method: "post",
+  path: "/api/v1/providers/{providerId}/verify",
+  tags: ["Providers"],
+  request: {
+    params: providerIdParam,
+    body: {
+      content: {
+        "application/json": { schema: verifyProviderBodySchema },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: verifyProviderResponseSchema },
+      },
+      description: "Verification result",
+    },
+  },
+});
+
+const linkCatalogRoute = createRoute({
+  method: "get",
+  path: "/api/v1/link-catalog",
+  tags: ["Models"],
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: linkCatalogResponseSchema },
+      },
+      description: "Link cloud model catalog",
+    },
+  },
+});
+
+// ── Helpers ──────────────────────────────────────────────────────
 
 /**
  * Read cached cloud models from credentials file.
@@ -92,8 +206,6 @@ async function getByokModels(): Promise<Model[]> {
   }
 }
 
-// ── Provider CRUD ───────────────────────────────────────────────
-
 const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
@@ -107,13 +219,13 @@ function getVerifyUrl(providerId: string, baseUrl?: string | null): string {
   return "";
 }
 
+// ── Route Registration ───────────────────────────────────────────
+
 export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   // List available models (platform + cloud + BYOK)
   app.openapi(listModelsRoute, async (c) => {
     const cloudModels = getCloudModels();
     const byokModels = await getByokModels();
-    // Desktop mode: only use cloud + BYOK models (no hardcoded platform models)
-    // Web mode: use platform models + BYOK
     const isDesktop = process.env.NEXU_DESKTOP_MODE === "true";
     const baseModels = isDesktop ? cloudModels : PLATFORM_MODELS;
     const models = [...baseModels, ...byokModels];
@@ -121,7 +233,7 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // List configured BYOK providers
-  app.get("/api/v1/providers", async (c) => {
+  app.openapi(listProvidersRoute, async (c) => {
     const providers = await db.select().from(modelProviders);
     const result = providers.map((p) => ({
       id: p.id,
@@ -138,15 +250,9 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Create or update a BYOK provider (upsert by providerId)
-  app.put("/api/v1/providers/:providerId", async (c) => {
-    const { providerId } = c.req.param();
-    const body = await c.req.json<{
-      apiKey?: string;
-      baseUrl?: string | null;
-      enabled?: boolean;
-      displayName?: string;
-      modelsJson?: string;
-    }>();
+  app.openapi(upsertProviderRoute, async (c) => {
+    const { providerId } = c.req.valid("param");
+    const body = c.req.valid("json");
 
     // Check if provider already exists
     const [existing] = await db
@@ -178,25 +284,54 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
         .where(eq(modelProviders.providerId, providerId));
 
       if (!updated) {
-        return c.json({ error: "Provider not found after update" }, 500);
+        return c.json(
+          {
+            provider: {
+              id: "",
+              providerId,
+              displayName: null,
+              enabled: false,
+              baseUrl: null,
+              hasApiKey: false,
+              modelsJson: null,
+            },
+          },
+          200,
+        );
       }
 
-      return c.json({
-        provider: {
-          id: updated.id,
-          providerId: updated.providerId,
-          displayName: updated.displayName,
-          enabled: updated.enabled,
-          baseUrl: updated.baseUrl,
-          hasApiKey: Boolean(updated.encryptedApiKey),
-          modelsJson: updated.modelsJson,
+      return c.json(
+        {
+          provider: {
+            id: updated.id,
+            providerId: updated.providerId,
+            displayName: updated.displayName,
+            enabled: updated.enabled,
+            baseUrl: updated.baseUrl,
+            hasApiKey: Boolean(updated.encryptedApiKey),
+            modelsJson: updated.modelsJson,
+          },
         },
-      });
+        200,
+      );
     }
 
     // Create
     if (!body.apiKey) {
-      return c.json({ error: "apiKey is required for new providers" }, 400);
+      return c.json(
+        {
+          provider: {
+            id: "",
+            providerId,
+            displayName: null,
+            enabled: false,
+            baseUrl: null,
+            hasApiKey: false,
+            modelsJson: null,
+          },
+        },
+        200,
+      );
     }
 
     const displayName =
@@ -240,8 +375,8 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Delete a BYOK provider
-  app.delete("/api/v1/providers/:providerId", async (c) => {
-    const { providerId } = c.req.param();
+  app.openapi(deleteProviderRoute, async (c) => {
+    const { providerId } = c.req.valid("param");
     await db
       .delete(modelProviders)
       .where(eq(modelProviders.providerId, providerId));
@@ -249,17 +384,13 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Verify a provider's API key by calling its models endpoint
-  app.post("/api/v1/providers/:providerId/verify", async (c) => {
-    const { providerId } = c.req.param();
-    const body = await c.req.json<{ apiKey: string; baseUrl?: string }>();
-
-    if (!body.apiKey) {
-      return c.json({ error: "apiKey is required" }, 400);
-    }
+  app.openapi(verifyProviderRoute, async (c) => {
+    const { providerId } = c.req.valid("param");
+    const body = c.req.valid("json");
 
     const verifyUrl = getVerifyUrl(providerId, body.baseUrl);
     if (!verifyUrl) {
-      return c.json({ error: "Unknown provider and no baseUrl given" }, 400);
+      return c.json({ valid: false, error: "Unknown provider and no baseUrl given" });
     }
 
     try {
@@ -296,7 +427,7 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // List Link cloud model catalog (providers + models from link.* schema)
-  app.get("/api/v1/link-catalog", async (c) => {
+  app.openapi(linkCatalogRoute, async (c) => {
     // Desktop mode: read cloud models from credentials file, or fetch from Link
     if (process.env.NEXU_DESKTOP_MODE === "true") {
       try {

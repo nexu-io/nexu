@@ -9,6 +9,358 @@
     "parameters": {}
   },
   "paths": {
+    "/api/internal/desktop/ready": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ready"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ready"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-connect": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "browserUrl": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-status": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cloud connection status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "connected"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/default-model": {
+      "put": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "modelId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "modelId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default model set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "modelId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "modelId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current default model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modelId": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "modelId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-models": {
+      "put": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabledModelIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "enabledModelIds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Models updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-disconnect": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/check-email": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "exists": {
+                      "type": "boolean"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "exists",
+                    "verified"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/artifacts/check-domain": {
       "post": {
         "tags": [
@@ -1821,6 +2173,53 @@
         }
       }
     },
+    "/api/v1/auth/desktop-authorize": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "deviceId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authorization result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -3532,6 +3931,421 @@
                   },
                   "required": [
                     "models"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers": {
+      "get": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "providerId": {
+                            "type": "string"
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "baseUrl": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "hasApiKey": {
+                            "type": "boolean"
+                          },
+                          "modelsJson": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "providerId",
+                          "displayName",
+                          "enabled",
+                          "baseUrl",
+                          "hasApiKey",
+                          "modelsJson"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "providers"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}": {
+      "put": {
+        "tags": [
+          "Providers"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "modelsJson": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "baseUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "hasApiKey": {
+                          "type": "boolean"
+                        },
+                        "modelsJson": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "providerId",
+                        "displayName",
+                        "enabled",
+                        "baseUrl",
+                        "hasApiKey",
+                        "modelsJson"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "baseUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "hasApiKey": {
+                          "type": "boolean"
+                        },
+                        "modelsJson": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "providerId",
+                        "displayName",
+                        "enabled",
+                        "baseUrl",
+                        "hasApiKey",
+                        "modelsJson"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Providers"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/verify": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "baseUrl": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/link-catalog": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "responses": {
+          "200": {
+            "description": "Link cloud model catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "externalName": {
+                                  "type": "string"
+                                },
+                                "inputPrice": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "outputPrice": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "externalName",
+                                "inputPrice",
+                                "outputPrice"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "models"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "providers"
                   ]
                 }
               }
@@ -8428,14 +9242,14 @@
         }
       }
     },
-    "/api/v1/skills": {
+    "/api/v1/skillhub/catalog": {
       "get": {
         "tags": [
-          "Skills"
+          "SkillHub"
         ],
         "responses": {
           "200": {
-            "description": "List of available skills",
+            "description": "SkillHub community skill catalog",
             "content": {
               "application/json": {
                 "schema": {
@@ -8455,133 +9269,68 @@
                           "description": {
                             "type": "string"
                           },
-                          "longDescription": {
-                            "type": "string"
+                          "downloads": {
+                            "type": "number"
                           },
-                          "iconName": {
-                            "type": "string"
+                          "stars": {
+                            "type": "number"
                           },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "examples": {
+                          "tags": {
                             "type": "array",
                             "items": {
                               "type": "string"
                             }
                           },
-                          "tag": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "source": {
-                            "type": "string",
-                            "enum": [
-                              "official",
-                              "custom",
-                              "community"
-                            ]
-                          },
-                          "tools": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "slug": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "provider": {
-                                  "type": "string"
-                                },
-                                "iconUrl": {
-                                  "type": "string"
-                                },
-                                "fallbackIconUrl": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "slug",
-                                "name",
-                                "provider",
-                                "iconUrl",
-                                "fallbackIconUrl"
-                              ]
-                            }
-                          },
-                          "githubUrl": {
+                          "version": {
                             "type": "string"
                           },
-                          "installed": {
-                            "type": "boolean"
-                          },
-                          "updatable": {
-                            "type": "boolean"
+                          "updatedAt": {
+                            "type": "string"
                           }
                         },
                         "required": [
                           "slug",
                           "name",
                           "description",
-                          "iconName",
-                          "prompt",
-                          "tag",
-                          "source"
+                          "downloads",
+                          "stars",
+                          "tags",
+                          "version",
+                          "updatedAt"
                         ]
                       }
                     },
-                    "tags": {
+                    "installedSlugs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "count": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "label",
-                          "count"
-                        ]
+                        "type": "string"
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "version": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "skillCount": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "updatedAt",
+                        "skillCount"
+                      ]
                     }
                   },
                   "required": [
                     "skills",
-                    "tags"
+                    "installedSlugs",
+                    "meta"
                   ]
                 }
               }
@@ -8590,15 +9339,146 @@
         }
       }
     },
-    "/api/v1/skills/{slug}": {
+    "/api/v1/skillhub/install": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Install result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/refresh": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "responses": {
+          "200": {
+            "description": "Refresh result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "skillCount": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "skillCount"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/uninstall": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  }
+                },
+                "required": [
+                  "slug"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Uninstall result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/skills/{slug}": {
       "get": {
         "tags": [
-          "Skills"
+          "SkillHub"
         ],
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
             },
             "required": true,
             "name": "slug",
@@ -8607,7 +9487,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Skill detail with tool auth status",
+            "description": "Skill detail with SKILL.md content",
             "content": {
               "application/json": {
                 "schema": {
@@ -8622,201 +9502,38 @@
                     "description": {
                       "type": "string"
                     },
-                    "longDescription": {
-                      "type": "string"
+                    "downloads": {
+                      "type": "number"
                     },
-                    "iconName": {
-                      "type": "string"
+                    "stars": {
+                      "type": "number"
                     },
-                    "iconUrl": {
-                      "type": "string"
-                    },
-                    "fallbackIconUrl": {
-                      "type": "string"
-                    },
-                    "prompt": {
-                      "type": "string"
-                    },
-                    "examples": {
+                    "tags": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
-                    "tag": {
-                      "type": "string",
-                      "enum": [
-                        "office-collab",
-                        "file-knowledge",
-                        "creative-design",
-                        "biz-analysis",
-                        "av-generation",
-                        "info-content",
-                        "dev-tools"
-                      ]
-                    },
-                    "source": {
-                      "type": "string",
-                      "enum": [
-                        "official",
-                        "custom",
-                        "community"
-                      ]
-                    },
-                    "tools": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "provider": {
-                            "type": "string"
-                          },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "authScheme": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "connected",
-                              "not_connected",
-                              "initiated",
-                              "expired"
-                            ]
-                          },
-                          "integrationId": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "provider",
-                          "iconUrl",
-                          "fallbackIconUrl",
-                          "authScheme",
-                          "status"
-                        ]
-                      }
-                    },
-                    "githubUrl": {
+                    "version": {
                       "type": "string"
                     },
-                    "relatedSkills": {
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "homepage": {
+                      "type": "string"
+                    },
+                    "installed": {
+                      "type": "boolean"
+                    },
+                    "skillContent": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "files": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "type": "string"
-                          },
-                          "longDescription": {
-                            "type": "string"
-                          },
-                          "iconName": {
-                            "type": "string"
-                          },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "examples": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "tag": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "source": {
-                            "type": "string",
-                            "enum": [
-                              "official",
-                              "custom",
-                              "community"
-                            ]
-                          },
-                          "tools": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "slug": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "provider": {
-                                  "type": "string"
-                                },
-                                "iconUrl": {
-                                  "type": "string"
-                                },
-                                "fallbackIconUrl": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "slug",
-                                "name",
-                                "provider",
-                                "iconUrl",
-                                "fallbackIconUrl"
-                              ]
-                            }
-                          },
-                          "githubUrl": {
-                            "type": "string"
-                          },
-                          "installed": {
-                            "type": "boolean"
-                          },
-                          "updatable": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "description",
-                          "iconName",
-                          "prompt",
-                          "tag",
-                          "source"
-                        ]
+                        "type": "string"
                       }
                     }
                   },
@@ -8824,10 +9541,15 @@
                     "slug",
                     "name",
                     "description",
-                    "iconName",
-                    "prompt",
-                    "tag",
-                    "source"
+                    "downloads",
+                    "stars",
+                    "tags",
+                    "version",
+                    "updatedAt",
+                    "homepage",
+                    "installed",
+                    "skillContent",
+                    "files"
                   ]
                 }
               }
@@ -8835,186 +9557,6 @@
           },
           "404": {
             "description": "Skill not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/skills/filesystem": {
-      "get": {
-        "tags": [
-          "Skills"
-        ],
-        "responses": {
-          "200": {
-            "description": "Merged list of catalog and locally installed skills",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "skills": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "type": "string"
-                          },
-                          "longDescription": {
-                            "type": "string"
-                          },
-                          "iconName": {
-                            "type": "string"
-                          },
-                          "iconUrl": {
-                            "type": "string"
-                          },
-                          "fallbackIconUrl": {
-                            "type": "string"
-                          },
-                          "prompt": {
-                            "type": "string"
-                          },
-                          "examples": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "tag": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "source": {
-                            "type": "string",
-                            "enum": [
-                              "official",
-                              "custom",
-                              "community"
-                            ]
-                          },
-                          "tools": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "slug": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "provider": {
-                                  "type": "string"
-                                },
-                                "iconUrl": {
-                                  "type": "string"
-                                },
-                                "fallbackIconUrl": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "slug",
-                                "name",
-                                "provider",
-                                "iconUrl",
-                                "fallbackIconUrl"
-                              ]
-                            }
-                          },
-                          "githubUrl": {
-                            "type": "string"
-                          },
-                          "installed": {
-                            "type": "boolean"
-                          },
-                          "updatable": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "slug",
-                          "name",
-                          "description",
-                          "iconName",
-                          "prompt",
-                          "tag",
-                          "source"
-                        ]
-                      }
-                    },
-                    "tags": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "enum": [
-                              "office-collab",
-                              "file-knowledge",
-                              "creative-design",
-                              "biz-analysis",
-                              "av-generation",
-                              "info-content",
-                              "dev-tools"
-                            ]
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "count": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "label",
-                          "count"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "skills",
-                    "tags"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {

@@ -1,4 +1,8 @@
 import fs from "node:fs";
+
+// Include desktop routes in the OpenAPI spec
+process.env.NEXU_DESKTOP_MODE = "true";
+
 import { createApp } from "../src/app.js";
 
 const app = createApp();

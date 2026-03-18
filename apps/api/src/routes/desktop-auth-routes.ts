@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
+import { createRoute } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { createId } from "@paralleldrive/cuid2";
+import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { eq, lt } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -132,19 +134,40 @@ export function registerDesktopDeviceRoutes(app: OpenAPIHono<AppBindings>) {
   });
 }
 
+const desktopAuthorizeRoute = createRoute({
+  method: "post",
+  path: "/api/v1/auth/desktop-authorize",
+  tags: ["Auth"],
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ deviceId: z.string() }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({ ok: z.boolean(), error: z.string().optional() }),
+        },
+      },
+      description: "Authorization result",
+    },
+  },
+});
+
 /**
  * Session-protected endpoint for authorizing a desktop device.
  * Registered AFTER authMiddleware.
  */
 export function registerDesktopAuthorizeRoute(app: OpenAPIHono<AppBindings>) {
   // Step 2: After browser login, frontend calls this to bind the device.
-  app.post("/api/v1/auth/desktop-authorize", async (c) => {
+  app.openapi(desktopAuthorizeRoute, async (c) => {
     const authUserId = c.get("userId");
-    const body = await c.req.json<{ deviceId?: string }>();
-
-    if (!body.deviceId) {
-      return c.json({ error: "deviceId is required" }, 400);
-    }
+    const body = c.req.valid("json");
 
     // Find the device authorization (any status)
     const [row] = await db

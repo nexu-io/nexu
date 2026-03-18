@@ -22,10 +22,12 @@ import { toast } from "sonner";
 import "@/lib/api";
 import {
   deleteApiV1ChannelsByChannelId,
+  getApiInternalDesktopDefaultModel,
   getApiV1Bots,
   getApiV1Channels,
   getApiV1Models,
   getApiV1Sessions,
+  putApiInternalDesktopDefaultModel,
 } from "../../lib/api/sdk.gen";
 
 function formatModelName(modelId: string | null | undefined): string {
@@ -364,8 +366,8 @@ export function HomePage() {
   const { data: defaultModelData } = useQuery({
     queryKey: ["desktop-default-model"],
     queryFn: async () => {
-      const res = await fetch("/api/internal/desktop/default-model");
-      return (await res.json()) as { modelId: string | null };
+      const { data } = await getApiInternalDesktopDefaultModel();
+      return data as { modelId: string | null } | undefined;
     },
   });
 
@@ -435,12 +437,10 @@ export function HomePage() {
   const updateModel = useMutation({
     mutationFn: async (modelId: string) => {
       const toastId = toast.loading("正在切换模型…");
-      const res = await fetch("/api/internal/desktop/default-model", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelId }),
+      const { error } = await putApiInternalDesktopDefaultModel({
+        body: { modelId },
       });
-      if (!res.ok) {
+      if (error) {
         toast.error("模型切换失败", { id: toastId });
         throw new Error("Failed to update model");
       }
