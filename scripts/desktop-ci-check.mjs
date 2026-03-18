@@ -250,19 +250,19 @@ async function firstExistingPath(paths) {
   return paths[0] ?? null;
 }
 
-async function resolveLogTargets(context) {
-  const logs = Object.fromEntries(
-    await Promise.all(
-      Object.entries(context.logs).map(async ([unit, paths]) => [
-        unit,
-        await firstExistingPath(paths),
-      ]),
-    ),
-  );
-
+async function readFirstExistingLog(paths) {
+  const filePath = await firstExistingPath(paths);
   return {
-    diagnosticsFile: await firstExistingPath(context.diagnosticsFiles),
-    logs,
+    filePath,
+    content: filePath ? await readLogIfExists(filePath) : null,
+  };
+}
+
+async function readFirstExistingJson(paths) {
+  const filePath = await firstExistingPath(paths);
+  return {
+    filePath,
+    content: filePath ? await readJsonIfExists(filePath) : null,
   };
 }
 
@@ -413,11 +413,26 @@ function diagnosticsChecksPassed(diagnostics) {
   }
 
   const gatewayUnit = getDiagnosticsUnit(diagnostics, "gateway");
+  const embeddedContents = Array.isArray(diagnostics.embeddedContents)
+    ? diagnostics.embeddedContents.filter(
+        (entry) =>
+          isRecord(entry) &&
+          entry.type === "webview" &&
+          (typeof entry.lastUrl === "string" || entry.lastUrl === null),
+      )
+    : [];
+  const workspaceWebview = embeddedContents.find(
+    (entry) =>
+      typeof entry.lastUrl === "string" && entry.lastUrl.includes("/workspace"),
+  );
 
   return (
     diagnostics.coldStart?.status === "succeeded" &&
     diagnostics.renderer?.didFinishLoad === true &&
     diagnostics.renderer?.processGone?.seen !== true &&
+    workspaceWebview?.didFinishLoad === true &&
+    workspaceWebview?.processGone?.seen !== true &&
+    workspaceWebview?.lastError === null &&
     gatewayUnit?.phase === "running" &&
     gatewayUnit.lastError === null
   );
@@ -497,6 +512,18 @@ function collectDiagnosticsFailures(diagnostics) {
   }
 
   const gatewayUnit = getDiagnosticsUnit(diagnostics, "gateway");
+  const embeddedContents = Array.isArray(diagnostics.embeddedContents)
+    ? diagnostics.embeddedContents.filter(
+        (entry) =>
+          isRecord(entry) &&
+          entry.type === "webview" &&
+          (typeof entry.lastUrl === "string" || entry.lastUrl === null),
+      )
+    : [];
+  const workspaceWebview = embeddedContents.find(
+    (entry) =>
+      typeof entry.lastUrl === "string" && entry.lastUrl.includes("/workspace"),
+  );
   if (!gatewayUnit) {
     failures.push("gateway runtime unit is missing from diagnostics");
   } else {
@@ -505,6 +532,24 @@ function collectDiagnosticsFailures(diagnostics) {
     }
     if (gatewayUnit.lastError) {
       failures.push(`gateway lastError=${gatewayUnit.lastError}`);
+    }
+  }
+
+  if (!workspaceWebview) {
+    failures.push("workspace webview diagnostics are missing");
+  } else {
+    if (workspaceWebview.didFinishLoad !== true) {
+      failures.push("workspace webview did not finish load");
+    }
+    if (workspaceWebview.processGone?.seen === true) {
+      failures.push(
+        `workspace webview process gone: ${String(workspaceWebview.processGone.reason ?? "unknown")}`,
+      );
+    }
+    if (typeof workspaceWebview.lastError === "string") {
+      failures.push(
+        `workspace webview lastError=${workspaceWebview.lastError}`,
+      );
     }
   }
 
@@ -556,6 +601,30 @@ function formatDiagnosticsSnapshot(diagnostics) {
     }
 
     lines.push(`renderer: ${rendererParts.join(", ")}`);
+  }
+
+  if (Array.isArray(diagnostics.embeddedContents)) {
+    const embeddedSummary = diagnostics.embeddedContents
+      .filter(isRecord)
+      .map((entry) => {
+        const parts = [
+          `${typeof entry.type === "string" ? entry.type : "unknown"}`,
+          `didFinishLoad=${String(entry.didFinishLoad === true)}`,
+          typeof entry.lastUrl === "string" ? `lastUrl=${entry.lastUrl}` : null,
+          typeof entry.lastError === "string"
+            ? `lastError=${entry.lastError}`
+            : null,
+          isRecord(entry.processGone) && entry.processGone.seen === true
+            ? `processGone=${String(entry.processGone.reason ?? "unknown")}/${String(entry.processGone.exitCode ?? "null")}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(",");
+        return `${String(entry.id ?? "unknown")}:${parts}`;
+      })
+      .join(" | ");
+
+    lines.push(`embedded: ${embeddedSummary || "none"}`);
   }
 
   if (Array.isArray(units)) {
@@ -774,9 +843,6 @@ async function captureLogs(context, captureDir) {
 }
 
 async function verifyRuntime(context) {
-  const resolvedTargets = await resolveLogTargets(context);
-  const { logs, diagnosticsFile } = resolvedTargets;
-
   if (context.statusCommand) {
     await runCommand(context.statusCommand[0], context.statusCommand[1]);
   }
@@ -785,9 +851,10 @@ async function verifyRuntime(context) {
     console.log(`Runtime health attempt ${attempt}/${maxHealthAttempts}`);
 
     const probeResults = await collectProbeResults(context);
-    const diagnostics = diagnosticsFile
-      ? await readJsonIfExists(diagnosticsFile)
-      : null;
+    const diagnosticsResult = await readFirstExistingJson(
+      context.diagnosticsFiles,
+    );
+    const diagnostics = diagnosticsResult.content;
 
     if (probesPassed(probeResults, diagnostics)) {
       break;
@@ -796,18 +863,21 @@ async function verifyRuntime(context) {
     await sleep(2000);
   }
 
-  const contents = {
-    coldStart: await readLogIfExists(logs.coldStart),
-    desktopMain: await readLogIfExists(logs.desktopMain),
-    pglite: await readLogIfExists(logs.pglite),
-    api: await readLogIfExists(logs.api),
-    web: await readLogIfExists(logs.web),
-    gateway: await readLogIfExists(logs.gateway),
-    openclaw: await readLogIfExists(logs.openclaw),
-  };
-  const diagnostics = diagnosticsFile
-    ? await readJsonIfExists(diagnosticsFile)
-    : null;
+  const logResults = Object.fromEntries(
+    await Promise.all(
+      Object.entries(context.logs).map(async ([unit, paths]) => [
+        unit,
+        await readFirstExistingLog(paths),
+      ]),
+    ),
+  );
+  const contents = Object.fromEntries(
+    Object.entries(logResults).map(([unit, result]) => [unit, result.content]),
+  );
+  const diagnosticsResult = await readFirstExistingJson(
+    context.diagnosticsFiles,
+  );
+  const diagnostics = diagnosticsResult.content;
   const probeResults = await collectProbeResults(context);
 
   const missingChecks = [];
@@ -874,13 +944,13 @@ async function verifyRuntime(context) {
     `${context.mode === "dev" ? "Desktop" : "Packaged"} runtime health verification failed. Missing checks:\n${buildMissingCheckSummary(missingChecks)}`,
   );
   console.error("\nPersistent log files checked:");
-  for (const filePath of Object.values(logs)) {
+  for (const { filePath } of Object.values(logResults)) {
     if (filePath) {
       console.error(` - ${filePath}`);
     }
   }
-  if (diagnosticsFile) {
-    console.error(` - ${diagnosticsFile}`);
+  if (diagnosticsResult.filePath) {
+    console.error(` - ${diagnosticsResult.filePath}`);
   }
 
   console.error("\n--- diagnostics snapshot ---");
@@ -906,7 +976,9 @@ async function verifyRuntime(context) {
       continue;
     }
 
-    console.error(`\n--- ${logs[unit]} (warn/error entries) ---`);
+    console.error(
+      `\n--- ${logResults[unit].filePath} (warn/error entries) ---`,
+    );
     for (const issue of readableIssues) {
       console.error(issue);
     }
