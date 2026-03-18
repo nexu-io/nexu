@@ -12,23 +12,24 @@ const enSidebar = [
   {
     text: "Configuration",
     items: [
-      { text: "Channel Configuration", link: "/guide/channels" },
+      {
+        text: "Channel Configuration",
+        link: "/guide/channels",
+        items: [
+          { text: "Feishu", link: "/guide/channels/feishu" },
+          { text: "Slack", link: "/guide/channels/slack" },
+          { text: "Discord", link: "/guide/channels/discord" },
+        ],
+      },
       { text: "Model Configuration", link: "/guide/models" },
       { text: "Skill Installation", link: "/guide/skills" },
-    ],
-  },
-  {
-    text: "Channel Guides",
-    items: [
-      { text: "Feishu", link: "/guide/channels/feishu" },
-      { text: "Slack", link: "/guide/channels/slack" },
-      { text: "Discord", link: "/guide/channels/discord" },
     ],
   },
   {
     text: "Community",
     items: [
       { text: "Contributing", link: "/guide/contributing" },
+      { text: "Contact Us", link: "/guide/contact" },
     ],
   },
 ];
@@ -45,23 +46,24 @@ const zhSidebar = [
   {
     text: "配置指南",
     items: [
-      { text: "渠道配置", link: "/zh/guide/channels" },
+      {
+        text: "渠道配置",
+        link: "/zh/guide/channels",
+        items: [
+          { text: "飞书", link: "/zh/guide/channels/feishu" },
+          { text: "Slack", link: "/zh/guide/channels/slack" },
+          { text: "Discord", link: "/zh/guide/channels/discord" },
+        ],
+      },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
-    ],
-  },
-  {
-    text: "渠道指南",
-    items: [
-      { text: "飞书", link: "/zh/guide/channels/feishu" },
-      { text: "Slack", link: "/zh/guide/channels/slack" },
-      { text: "Discord", link: "/zh/guide/channels/discord" },
     ],
   },
   {
     text: "社区",
     items: [
       { text: "参与贡献", link: "/zh/guide/contributing" },
+      { text: "联系我们", link: "/zh/guide/contact" },
     ],
   },
 ];
