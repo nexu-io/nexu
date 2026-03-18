@@ -36,15 +36,3 @@ Skills are the Agent's extensibility layer. Each Skill is a self-contained modul
 nexu provides a skill catalog for one-click installation, and also supports local development of custom skills to meet specialized needs.
 
 See [Skill Installation](/guide/skills) for details.
-
-## Deployments
-
-nexu uses a local desktop deployment model. Launch the client, connect your channels, and the Agent is immediately operational — ready to receive and process messages.
-
-No servers to purchase, no container orchestration to configure. All runtime management is handled automatically by the desktop client.
-
-## Workspace
-
-The Workspace is the top-level organizational unit in nexu, binding together the Agent, channels, models, and skills. One Workspace equals one complete runtime environment.
-
-Every action you take in the nexu client — connecting channels, configuring models, installing skills — applies to the current Workspace.
