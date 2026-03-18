@@ -1,8 +1,8 @@
 # 介绍
 
-**nexu**（next to you）让你用最简单的方式拥有一个 AI Agent ⚡——下载 Mac 客户端，双击安装，几秒后你的第一个 Agent 就能开始工作。
+**nexu**（next to you）让你用最简单的方式拥有一个 OpenClaw 🦞——下载 Mac 客户端，双击安装，几秒后你的 OpenClaw 🦞 就能开始工作。
 
-基于开源 OpenClaw 🦞 打造，nexu 预装了 **OpenClaw 🦞 Skills** 和**完整的飞书 Skills**，Agent 开箱即可接入你团队现有的工作流 🔌。内置 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等主流模型，也支持自带 API Key，无需注册即可使用 🔓。
+nexu 基于开源 OpenClaw 🦞 打造，预装了关键的 Skills（例如飞书 Skills、find skills），Agent 开箱即可接入你团队现有的工作流 🔌。内置 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等主流模型，也支持自带 API Key，无需注册即可使用 🔓。
 
 连接飞书、Slack 或 Discord 后，Agent 自动同步到手机端 📱——不用装额外 App，在你日常用的聊天工具里就能直接对话。
 
