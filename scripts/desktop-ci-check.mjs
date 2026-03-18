@@ -35,6 +35,10 @@ function sleep(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
+function compactPaths(paths) {
+  return [...new Set(paths.filter(Boolean))];
+}
+
 function createCheckContext(mode) {
   if (mode === "dev") {
     const desktopLogsDir = resolve(repoRoot, ".tmp/desktop/electron/logs");
@@ -54,15 +58,15 @@ function createCheckContext(mode) {
         webSurface: "http://127.0.0.1:50810/",
         openclawHealth: "http://127.0.0.1:18789/health",
       },
-      diagnosticsFile: resolve(desktopLogsDir, "desktop-diagnostics.json"),
+      diagnosticsFiles: [resolve(desktopLogsDir, "desktop-diagnostics.json")],
       logs: {
-        coldStart: resolve(desktopLogsDir, "cold-start.log"),
-        desktopMain: resolve(desktopLogsDir, "desktop-main.log"),
-        pglite: resolve(runtimeUnitLogsDir, "pglite.log"),
-        api: resolve(runtimeUnitLogsDir, "api.log"),
-        web: resolve(runtimeUnitLogsDir, "web.log"),
-        gateway: resolve(runtimeUnitLogsDir, "gateway.log"),
-        openclaw: resolve(runtimeUnitLogsDir, "openclaw.log"),
+        coldStart: [resolve(desktopLogsDir, "cold-start.log")],
+        desktopMain: [resolve(desktopLogsDir, "desktop-main.log")],
+        pglite: [resolve(runtimeUnitLogsDir, "pglite.log")],
+        api: [resolve(runtimeUnitLogsDir, "api.log")],
+        web: [resolve(runtimeUnitLogsDir, "web.log")],
+        gateway: [resolve(runtimeUnitLogsDir, "gateway.log")],
+        openclaw: [resolve(runtimeUnitLogsDir, "openclaw.log")],
       },
       capturePaths: [
         { source: resolve(repoRoot, ".tmp/logs"), target: "repo-logs" },
@@ -94,15 +98,55 @@ function createCheckContext(mode) {
       webSurface: "http://127.0.0.1:50810/",
       openclawHealth: "http://127.0.0.1:18789/health",
     },
-    diagnosticsFile: resolve(packagedLogsDir, "desktop-diagnostics.json"),
+    diagnosticsFiles: compactPaths([
+      resolve(packagedLogsDir, "desktop-diagnostics.json"),
+      process.env.DEFAULT_LOGS_DIR
+        ? resolve(process.env.DEFAULT_LOGS_DIR, "desktop-diagnostics.json")
+        : null,
+    ]),
     logs: {
-      coldStart: resolve(packagedLogsDir, "cold-start.log"),
-      desktopMain: resolve(packagedLogsDir, "desktop-main.log"),
-      pglite: resolve(packagedRuntimeLogsDir, "pglite.log"),
-      api: resolve(packagedRuntimeLogsDir, "api.log"),
-      web: resolve(packagedRuntimeLogsDir, "web.log"),
-      gateway: resolve(packagedRuntimeLogsDir, "gateway.log"),
-      openclaw: resolve(packagedRuntimeLogsDir, "openclaw.log"),
+      coldStart: compactPaths([
+        resolve(packagedLogsDir, "cold-start.log"),
+        process.env.DEFAULT_LOGS_DIR
+          ? resolve(process.env.DEFAULT_LOGS_DIR, "cold-start.log")
+          : null,
+      ]),
+      desktopMain: compactPaths([
+        resolve(packagedLogsDir, "desktop-main.log"),
+        process.env.DEFAULT_LOGS_DIR
+          ? resolve(process.env.DEFAULT_LOGS_DIR, "desktop-main.log")
+          : null,
+      ]),
+      pglite: compactPaths([
+        resolve(packagedRuntimeLogsDir, "pglite.log"),
+        process.env.DEFAULT_RUNTIME_LOGS_DIR
+          ? resolve(process.env.DEFAULT_RUNTIME_LOGS_DIR, "pglite.log")
+          : null,
+      ]),
+      api: compactPaths([
+        resolve(packagedRuntimeLogsDir, "api.log"),
+        process.env.DEFAULT_RUNTIME_LOGS_DIR
+          ? resolve(process.env.DEFAULT_RUNTIME_LOGS_DIR, "api.log")
+          : null,
+      ]),
+      web: compactPaths([
+        resolve(packagedRuntimeLogsDir, "web.log"),
+        process.env.DEFAULT_RUNTIME_LOGS_DIR
+          ? resolve(process.env.DEFAULT_RUNTIME_LOGS_DIR, "web.log")
+          : null,
+      ]),
+      gateway: compactPaths([
+        resolve(packagedRuntimeLogsDir, "gateway.log"),
+        process.env.DEFAULT_RUNTIME_LOGS_DIR
+          ? resolve(process.env.DEFAULT_RUNTIME_LOGS_DIR, "gateway.log")
+          : null,
+      ]),
+      openclaw: compactPaths([
+        resolve(packagedRuntimeLogsDir, "openclaw.log"),
+        process.env.DEFAULT_RUNTIME_LOGS_DIR
+          ? resolve(process.env.DEFAULT_RUNTIME_LOGS_DIR, "openclaw.log")
+          : null,
+      ]),
     },
     capturePaths: [
       { source: packagedLogsDir, target: "packaged-logs" },
@@ -161,6 +205,10 @@ async function fileExists(filePath) {
 }
 
 async function readLogIfExists(filePath) {
+  if (!filePath) {
+    return null;
+  }
+
   if (!(await fileExists(filePath))) {
     return null;
   }
@@ -169,6 +217,10 @@ async function readLogIfExists(filePath) {
 }
 
 async function readJsonIfExists(filePath) {
+  if (!filePath) {
+    return null;
+  }
+
   if (!(await fileExists(filePath))) {
     return null;
   }
@@ -179,6 +231,32 @@ async function readJsonIfExists(filePath) {
   } catch {
     return null;
   }
+}
+
+async function firstExistingPath(paths) {
+  for (const filePath of paths) {
+    if (await fileExists(filePath)) {
+      return filePath;
+    }
+  }
+
+  return paths[0] ?? null;
+}
+
+async function resolveLogTargets(context) {
+  const logs = Object.fromEntries(
+    await Promise.all(
+      Object.entries(context.logs).map(async ([unit, paths]) => [
+        unit,
+        await firstExistingPath(paths),
+      ]),
+    ),
+  );
+
+  return {
+    diagnosticsFile: await firstExistingPath(context.diagnosticsFiles),
+    logs,
+  };
 }
 
 async function isPortListening(port) {
@@ -555,7 +633,8 @@ async function captureLogs(context, captureDir) {
 }
 
 async function verifyRuntime(context) {
-  const { logs } = context;
+  const resolvedTargets = await resolveLogTargets(context);
+  const { logs, diagnosticsFile } = resolvedTargets;
 
   if (context.statusCommand) {
     await runCommand(context.statusCommand[0], context.statusCommand[1]);
@@ -582,7 +661,9 @@ async function verifyRuntime(context) {
     gateway: await readLogIfExists(logs.gateway),
     openclaw: await readLogIfExists(logs.openclaw),
   };
-  const diagnostics = await readJsonIfExists(context.diagnosticsFile);
+  const diagnostics = diagnosticsFile
+    ? await readJsonIfExists(diagnosticsFile)
+    : null;
   const probeResults = await collectProbeResults(context);
 
   const missingChecks = [];
@@ -635,9 +716,13 @@ async function verifyRuntime(context) {
   );
   console.error("\nPersistent log files checked:");
   for (const filePath of Object.values(logs)) {
-    console.error(` - ${filePath}`);
+    if (filePath) {
+      console.error(` - ${filePath}`);
+    }
   }
-  console.error(` - ${context.diagnosticsFile}`);
+  if (diagnosticsFile) {
+    console.error(` - ${diagnosticsFile}`);
+  }
 
   console.error("\n--- diagnostics snapshot ---");
   for (const line of formatDiagnosticsSnapshot(diagnostics)) {

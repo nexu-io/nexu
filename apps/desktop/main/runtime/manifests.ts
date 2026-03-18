@@ -304,6 +304,7 @@ export function createRuntimeUnitManifests(
           openclawPackageRoot,
           "extensions",
         ),
+        OPENCLAW_DISABLE_BONJOUR: "1",
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
