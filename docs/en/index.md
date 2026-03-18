@@ -1,18 +1,14 @@
 # Introduction
 
-Welcome to the Nexu docs.
+nexu is an open-source AI Agent desktop app. Connect your chat platforms, choose a model, install skills — your AI assistant is ready in minutes.
 
-## What is covered
+![nexu client](/assets/discord/step4-connected.png)
 
-- Channel onboarding for Feishu, Slack, and Discord
-- Model provider setup for managed and BYOK flows
-- Skill installation and update workflow for local and desktop runtimes
+## Get started
 
-## How to use this site
-
-- Open [Contributing](/guide/contributing) if you want to edit docs or submit updates
-- Start with [Channel Configuration](/guide/channels) if you are connecting chat platforms first
-- Go to [Model Configuration](/guide/models) if you are setting up providers and API keys
-- Open [Skill Installation](/guide/skills) if you are managing runtime capabilities
-
-Use the sidebar to move through the docs directly.
+| | |
+| :--- | :--- |
+| **[Quick Start](/guide/quickstart)** | Get your first Agent running in 30 minutes |
+| **[Key Concepts](/guide/concepts)** | Agent, Channels, Models, Skills explained |
+| **[Channel Configuration](/guide/channels)** | Connect Feishu, Slack, or Discord |
+| **[Contact Us](/guide/contact)** | Join the community on Feishu or Discord |

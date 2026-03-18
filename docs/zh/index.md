@@ -1,18 +1,14 @@
 # 介绍
 
-欢迎使用 Nexu 文档。
+nexu 是一款开源 AI Agent 桌面应用。连接聊天平台、选择模型、安装技能——几分钟内，你的 AI 助手即刻就绪。
 
-## 文档范围
+![nexu 客户端](/assets/discord/step4-connected.png)
 
-- 飞书、Slack、Discord 渠道接入
-- 托管模型与自带密钥模型配置
-- 本地和桌面运行时的技能安装与更新
+## 快速导航
 
-## 如何使用
-
-- 如果你要编辑文档或提交更新，请先看 [参与贡献](/zh/guide/contributing)
-- 如果你先接入聊天平台，请从 [渠道配置](/zh/guide/channels) 开始
-- 如果你要配置模型供应商和密钥，请查看 [模型配置](/zh/guide/models)
-- 如果你要管理运行时能力，请查看 [技能安装](/zh/guide/skills)
-
-使用左侧边栏即可直接浏览文档。
+| | |
+| :--- | :--- |
+| **[快速上手](/zh/guide/quickstart)** | 30 分钟内让你的第一个 Agent 跑起来 |
+| **[核心概念](/zh/guide/concepts)** | 了解 Agent、渠道、模型、技能 |
+| **[渠道配置](/zh/guide/channels)** | 接入飞书、Slack 或 Discord |
+| **[联系我们](/zh/guide/contact)** | 加入飞书群或 Discord 社区 |

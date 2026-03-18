@@ -14,8 +14,6 @@ Channels are where the Agent interacts with users. nexu currently supports three
 - [Slack](/guide/channels/slack) — widely used by international teams, supports one-click app creation via manifest
 - [Discord](/guide/channels/discord) — common in developer communities, connects via Bot Token
 
-A single Agent can serve multiple channels simultaneously, with messages handled independently per platform. Messages sent in Feishu won't appear in Discord, and vice versa.
-
 See [Channel Configuration](/guide/channels) for details.
 
 ## Models
