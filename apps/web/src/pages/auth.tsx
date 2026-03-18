@@ -600,9 +600,7 @@ export function AuthPage() {
                   {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
                 </h2>
                 <p className="mt-1.5 text-[13px] text-text-muted">
-                  {isLogin
-                    ? t("auth.loginToContinue")
-                    : t("auth.chooseMethod")}
+                  {isLogin ? t("auth.loginToContinue") : t("auth.chooseMethod")}
                 </p>
               </div>
 
@@ -680,7 +678,6 @@ export function AuthPage() {
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder={t("auth.emailPlaceholder")}
                         required
-                        autoFocus
                         className="w-full h-11 px-3.5 rounded-lg border border-border bg-surface-0 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-text-tertiary focus:ring-1 focus:ring-text-muted/20 transition-colors"
                       />
                       <input
@@ -724,9 +721,7 @@ export function AuthPage() {
                   >
                     <Mail size={15} />
                     <span>
-                      {isLogin
-                        ? t("auth.emailLogin")
-                        : t("auth.emailRegister")}
+                      {isLogin ? t("auth.emailLogin") : t("auth.emailRegister")}
                     </span>
                   </button>
                 )}
