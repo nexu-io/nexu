@@ -6,9 +6,7 @@ We'd love to hear from you! Reach out through any of the following channels.
 
 ### Feishu
 
-Scan the QR code below to join our Feishu community group:
-
-![Feishu QR Code](/assets/feishu-qr.png)
+👉 [Join nexu Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913)
 
 ### Discord
 

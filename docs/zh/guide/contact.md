@@ -6,9 +6,7 @@
 
 ### 飞书
 
-扫描下方二维码加入飞书社区群：
-
-![飞书社区二维码](/assets/feishu-qr.png)
+👉 [加入 nexu 飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913)
 
 ### Discord
 

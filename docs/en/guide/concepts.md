@@ -1,40 +1,38 @@
 # Key Concepts
 
-A quick two-minute overview of the building blocks in nexu.
-
 ## Agent
 
-Your AI assistant. It understands what you say, gets things done, and can show up in multiple chat apps at the same time.
+The Agent is the core runtime unit in nexu — a persistent AI assistant that connects to multiple chat platforms, understands context, and executes tasks.
 
-Think of it as a smart teammate that's always online.
+Each workspace runs a single Agent instance.
 
 ## Channels
 
-Where your Agent lives. Feishu, Slack, and Discord are all channels.
+Channels are where the Agent interacts with users. nexu supports Feishu, Slack, and Discord. Enter the required credentials and the connection is live.
 
-Just fill in a few credentials and your Agent can send and receive messages on that platform. One Agent can connect to multiple channels.
+A single Agent can serve multiple channels simultaneously, with messages handled independently per platform.
 
 ## Models
 
-How smart your Agent is depends on the model behind it.
+Models determine the Agent's reasoning capability. nexu offers two integration paths:
 
-- Want to get started fast? Use **nexu Official** models — ready out of the box
-- Prefer your own API key? We support Anthropic, OpenAI, Google AI, and more
+- **nexu Official** — ready to use, zero configuration
+- **BYOK** — connect your own Anthropic, OpenAI, Google AI, or compatible provider
 
-You can switch models anytime in the client.
+Switch models at any time without disrupting existing conversations.
 
 ## Skills
 
-Chat is just the beginning — Skills let your Agent do much more.
+Skills are the Agent's extensibility layer. Each Skill is a self-contained module that grants the Agent specific capabilities — data queries, document generation, third-party service calls, and more.
 
-Query a database, write a weekly report, work with Feishu spreadsheets… these are all Skills. Install them from the catalog with one click, or build your own.
+Install from the catalog in one click, or develop locally.
 
 ## Deployments
 
-Open nexu, connect a channel, and your Agent is live.
+nexu uses a local desktop deployment model. Launch the client, connect your channels, and the Agent is immediately operational.
 
-No servers to buy, no Docker to configure — the desktop app handles everything.
+No additional servers or container orchestration required.
 
 ## Workspace
 
-Your "home" in nexu. Your Agent, channels, models, and skills all belong to the same Workspace.
+The Workspace is the top-level organizational unit in nexu, binding together the Agent, channels, models, and skills. One Workspace equals one complete runtime environment.
