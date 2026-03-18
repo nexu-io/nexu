@@ -19,6 +19,10 @@ import { db, pool } from "../db/index.js";
 import { modelProviders } from "../db/schema/index.js";
 import { decrypt, encrypt } from "../lib/crypto.js";
 import { PLATFORM_MODELS } from "../lib/models.js";
+import {
+  buildProviderUrl,
+  normalizeProviderBaseUrl,
+} from "../lib/provider-base-url.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -213,9 +217,10 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
 };
 
 function getVerifyUrl(providerId: string, baseUrl?: string | null): string {
-  if (baseUrl) return `${baseUrl}/models`;
+  const customVerifyUrl = buildProviderUrl(baseUrl, "/models");
+  if (customVerifyUrl) return customVerifyUrl;
   const base = PROVIDER_BASE_URLS[providerId];
-  if (base) return `${base}/models`;
+  if (base) return buildProviderUrl(base, "/models") ?? "";
   return "";
 }
 
@@ -267,7 +272,9 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
       const updates: Record<string, unknown> = { updatedAt: now };
       if (body.apiKey !== undefined)
         updates.encryptedApiKey = encrypt(body.apiKey);
-      if (body.baseUrl !== undefined) updates.baseUrl = body.baseUrl;
+      if (body.baseUrl !== undefined) {
+        updates.baseUrl = normalizeProviderBaseUrl(body.baseUrl);
+      }
       if (body.enabled !== undefined) updates.enabled = body.enabled;
       if (body.displayName !== undefined)
         updates.displayName = body.displayName;
@@ -349,7 +356,7 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
       providerId,
       displayName,
       encryptedApiKey: encrypt(body.apiKey),
-      baseUrl: body.baseUrl ?? null,
+      baseUrl: normalizeProviderBaseUrl(body.baseUrl),
       enabled: body.enabled ?? true,
       modelsJson: body.modelsJson ?? "[]",
       createdAt: now,
