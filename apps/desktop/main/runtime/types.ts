@@ -26,6 +26,8 @@ export type RuntimeUnitManifest = {
   autoStart: boolean;
   env?: NodeJS.ProcessEnv;
   logFilePath?: string;
+  /** Units that depend on this one and should be restarted when this unit restarts. */
+  dependents?: RuntimeUnitId[];
 };
 
 export type RuntimeUnitRecord = {

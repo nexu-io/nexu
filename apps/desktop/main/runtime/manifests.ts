@@ -225,6 +225,8 @@ export function createRuntimeUnitManifests(
       startupTimeoutMs: 10_000,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_PGLITE", true),
       logFilePath: path.resolve(logsDir, "pglite.log"),
+      // API depends on PGlite - restart API when PGlite restarts
+      dependents: ["api"],
       env: {
         PGLITE_DATA_DIR: pgliteDataPath,
         PGLITE_HOST: "127.0.0.1",

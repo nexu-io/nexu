@@ -152,7 +152,35 @@ export class RuntimeOrchestrator {
   }
 
   async stopOne(id: string): Promise<RuntimeState> {
+    const record = this.requireRecord(id);
+    // Stop dependents first (units that depend on this one)
+    const dependents = record.manifest.dependents ?? [];
+    for (const depId of dependents) {
+      if (this.units.has(depId)) {
+        await this.stopUnit(depId);
+      }
+    }
     await this.stopUnit(id);
+    return this.getRuntimeState();
+  }
+
+  async restartOne(id: string): Promise<RuntimeState> {
+    const record = this.requireRecord(id);
+    const dependents = record.manifest.dependents ?? [];
+    // Stop dependents first, then this unit
+    for (const depId of dependents) {
+      if (this.units.has(depId)) {
+        await this.stopUnit(depId);
+      }
+    }
+    await this.stopUnit(id);
+    // Start this unit, then dependents
+    await this.startUnit(id);
+    for (const depId of dependents) {
+      if (this.units.has(depId)) {
+        await this.startUnit(depId);
+      }
+    }
     return this.getRuntimeState();
   }
 
