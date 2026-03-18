@@ -241,7 +241,7 @@ async function waitForApiReadiness(): Promise<void> {
 
       if (response.status < 500) {
         logColdStart(
-          `api ready via ${probeUrl.pathname} status=${response.status}`,
+          `controller ready via ${probeUrl.pathname} status=${response.status}`,
         );
         return;
       }
@@ -252,7 +252,9 @@ async function waitForApiReadiness(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  throw new Error(`API readiness probe timed out for ${probeUrl.toString()}`);
+  throw new Error(
+    `Controller readiness probe timed out for ${probeUrl.toString()}`,
+  );
 }
 
 async function runDesktopColdStart(): Promise<void> {
@@ -260,12 +262,12 @@ async function runDesktopColdStart(): Promise<void> {
   logColdStart("starting pglite");
   await orchestrator.startOne("pglite");
 
-  diagnosticsReporter?.markColdStartRunning("starting api");
-  logColdStart("starting api");
-  await orchestrator.startOne("api");
+  diagnosticsReporter?.markColdStartRunning("starting controller");
+  logColdStart("starting controller");
+  await orchestrator.startOne("controller");
 
-  diagnosticsReporter?.markColdStartRunning("waiting for api readiness");
-  logColdStart("waiting for api readiness");
+  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
+  logColdStart("waiting for controller readiness");
   await waitForApiReadiness();
 
   diagnosticsReporter?.markColdStartRunning(
@@ -279,10 +281,6 @@ async function runDesktopColdStart(): Promise<void> {
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
-
-  diagnosticsReporter?.markColdStartRunning("starting gateway");
-  logColdStart("starting gateway");
-  await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();

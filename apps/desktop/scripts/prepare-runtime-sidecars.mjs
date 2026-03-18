@@ -47,8 +47,7 @@ async function main() {
   }
 
   const scripts = [
-    "prepare:api-sidecar",
-    "prepare:gateway-sidecar",
+    "prepare:controller-sidecar",
     "prepare:openclaw-sidecar",
     "prepare:pglite-sidecar",
     "prepare:web-sidecar",

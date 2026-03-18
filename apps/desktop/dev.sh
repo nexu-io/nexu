@@ -72,8 +72,7 @@ kill_residual_processes() {
     [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
   done < <(pgrep -f "$ROOT_DIR/node_modules/.pnpm/electron@.*/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron \\.$" 2>/dev/null || true)
   pkill -9 -f "PGliteSocketServer" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/api/dist/index.js" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/gateway/dist/index.js" 2>/dev/null || true
+  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/controller/dist/index.js" 2>/dev/null || true
   pkill -9 -f "$ELECTRON_DIR/node_modules/openclaw/openclaw.mjs" 2>/dev/null || true
   pkill -9 -f "openclaw-gateway" 2>/dev/null || true
   pkill -9 -f "$ROOT_DIR/.tmp/sidecars/openclaw/bin/openclaw" 2>/dev/null || true
@@ -93,11 +92,9 @@ build_runtime() {
   local web_port="${NEXU_WEB_PORT:-50810}"
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:pglite-sidecar
   run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/shared build
-  run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/api build
-  run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/gateway build
+  run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/controller build
   run_logged env VITE_API_BASE_URL="http://127.0.0.1:${api_port}" VITE_AUTH_BASE_URL="http://127.0.0.1:${api_port}" pnpm --dir "$ROOT_DIR" --filter @nexu/web build
-  run_logged pnpm --dir "$ELECTRON_DIR" prepare:api-sidecar
-  run_logged pnpm --dir "$ELECTRON_DIR" prepare:gateway-sidecar
+  run_logged pnpm --dir "$ELECTRON_DIR" prepare:controller-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:openclaw-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:web-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" build

@@ -1,6 +1,6 @@
 # Architecture
 
-Nexu is an OpenClaw multi-tenant SaaS platform. One Gateway process serves many users' bots through config-driven routing.
+Nexu is transitioning from a multi-tenant SaaS control plane to a controller-first local runtime model. In desktop/local mode, a single `apps/controller` process owns Nexu config, compiles OpenClaw config, materializes skills/templates, and orchestrates the OpenClaw runtime.
 
 ## System diagram
 
@@ -42,10 +42,12 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 ## Monorepo layout
 
-- **`apps/api/`** — Hono backend. Routes in `src/routes/`, DB schema in `src/db/schema/index.ts`, config generator in `src/lib/config-generator.ts`, auth in `src/auth.ts`.
+- **`apps/api/`** — Legacy Hono backend for the old multi-tenant SaaS path.
+- **`apps/controller/`** — Single-user controller service. Routes in `src/routes/`, local config store in `src/store/`, OpenClaw runtime integration in `src/runtime/`, compiler logic in `src/lib/openclaw-config-compiler.ts`.
 - **`apps/web/`** — React frontend. Pages in `src/pages/`, generated SDK in `lib/api/`, auth client in `src/lib/auth-client.ts`.
 - **`apps/chat/`** — Next.js session-chat surface for local OpenClaw probing.
 - **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator.
+- **`apps/gateway/`** — Legacy gateway sidecar package from the SaaS runtime path.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.
 - **`nexu-skills/`** — Public skill repository. Each skill is a directory with `SKILL.md` frontmatter. `skills.json` is the built catalog index.
 - **`deploy/k8s/`** — Kubernetes manifests.
@@ -53,7 +55,7 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 ## Key data flows
 
-**Config generation:** API queries DB for active bots in a pool → decrypts channel credentials → assembles OpenClaw config JSON (agents, channels, bindings, models) → Gateway hot-reloads.
+**Desktop/local config generation:** Controller reads `~/.nexu/config.json` → compiles OpenClaw config JSON (agents, channels, bindings, models) → writes `OPENCLAW_CONFIG_PATH` and managed skills/templates → OpenClaw hot-reloads.
 
 **Slack OAuth:** Frontend requests OAuth URL → user authorizes in Slack → callback exchanges code for token → credentials encrypted (AES-256-GCM) → stored in DB → webhook route created → pool config version bumped → Gateway reloads.
 

@@ -185,8 +185,7 @@ export type RuntimeUnitId =
   | "web"
   | "control-plane"
   | "pglite"
-  | "api"
-  | "gateway"
+  | "controller"
   | "openclaw";
 
 export type RuntimeUnitKind = "surface" | "service" | "runtime";

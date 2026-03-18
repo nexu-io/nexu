@@ -6,6 +6,7 @@
     "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names api,web,landing --prefix-colors blue,green,yellow \"pnpm --filter @nexu/api dev\" \"pnpm --filter @nexu/web dev\" \"pnpm --filter @nexu/landing dev\"",
     "dev:landing": "pnpm --filter @nexu/landing dev",
     "dev:sidecar": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
+    "dev:controller": "pnpm --filter @nexu/controller dev",
     "dev:desktop": "pnpm --filter @nexu/desktop dev",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",

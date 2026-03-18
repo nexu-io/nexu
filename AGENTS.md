@@ -8,6 +8,7 @@ Nexu is an OpenClaw multi-tenant platform. Users create AI bots, connect them to
 
 - Monorepo: pnpm workspaces
 - `apps/api` — Hono + Drizzle + Zod OpenAPI (Node ESM)
+- `apps/controller` — Single-user local control plane for Nexu config, OpenClaw sync, and runtime orchestration
 - `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
 - `apps/gateway` — Nexu gateway sidecar for config/skills sync, runtime probing, and optional OpenClaw process management
 - `apps/web` — React + Ant Design + Vite
@@ -26,6 +27,7 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 ```bash
 pnpm install                          # Install
 pnpm dev                              # All apps (API :3000, Web :5173)
+pnpm dev:controller                   # Controller only
 pnpm desktop:start                    # Build and launch the desktop local runtime stack
 pnpm desktop:stop                     # Stop the desktop local runtime stack
 pnpm desktop:restart                  # Restart the desktop local runtime stack

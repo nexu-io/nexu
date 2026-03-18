@@ -241,10 +241,14 @@ export function createRuntimeUnitManifests(
     openclawSidecarRoot,
     "node_modules/openclaw",
   );
-  const apiSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "api");
-  const apiModulePath = path.resolve(apiSidecarRoot, "dist/index.js");
-  const gatewaySidecarRoot = path.resolve(runtimeSidecarBaseRoot, "gateway");
-  const gatewayModulePath = path.resolve(gatewaySidecarRoot, "dist/index.js");
+  const controllerSidecarRoot = path.resolve(
+    runtimeSidecarBaseRoot,
+    "controller",
+  );
+  const controllerModulePath = path.resolve(
+    controllerSidecarRoot,
+    "dist/index.js",
+  );
   const pgliteSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "pglite");
   const pgliteModulePath = path.resolve(pgliteSidecarRoot, "index.js");
   const migrationsDir = path.resolve(pgliteSidecarRoot, "migrations");
@@ -253,11 +257,7 @@ export function createRuntimeUnitManifests(
   const apiPort = runtimeConfig.ports.api;
   const pglitePort = runtimeConfig.ports.pglite;
   const webPort = runtimeConfig.ports.web;
-  const internalApiToken = runtimeConfig.tokens.internalApi;
-  const skillApiToken = runtimeConfig.tokens.skill;
-  const gatewayPoolId = runtimeConfig.gateway.poolId;
   const webUrl = runtimeConfig.urls.web;
-  const authUrl = runtimeConfig.urls.auth;
   const electronNodeRunner = resolveElectronNodeRunner();
   const openclawNodePath = buildOpenclawNodePath(openclawSidecarRoot);
 
@@ -307,8 +307,7 @@ export function createRuntimeUnitManifests(
       startupTimeoutMs: 10_000,
       autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_PGLITE", true),
       logFilePath: path.resolve(logsDir, "pglite.log"),
-      // API depends on PGlite - restart API when PGlite restarts
-      dependents: ["api"],
+      dependents: [],
       env: {
         PGLITE_DATA_DIR: pgliteDataPath,
         PGLITE_HOST: "127.0.0.1",
@@ -317,8 +316,8 @@ export function createRuntimeUnitManifests(
       },
     },
     {
-      id: "api",
-      label: "Nexu API",
+      id: "controller",
+      label: "Nexu Controller",
       kind: "service",
       launchStrategy: "managed",
       // Use spawn instead of utility-process due to Electron bugs:
@@ -328,70 +327,27 @@ export function createRuntimeUnitManifests(
       //   Utility process uses hidden network context, not session.defaultSession
       runner: "spawn",
       command: electronNodeRunner,
-      args: [apiModulePath],
-      cwd: apiSidecarRoot,
+      args: [controllerModulePath],
+      cwd: controllerSidecarRoot,
       port: apiPort,
       startupTimeoutMs: 20_000,
-      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_API", true),
-      logFilePath: path.resolve(logsDir, "api.log"),
+      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_CONTROLLER", true),
+      logFilePath: path.resolve(logsDir, "controller.log"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
         FORCE_COLOR: "1",
         PORT: String(apiPort),
-        DATABASE_URL: runtimeConfig.database.pgliteUrl,
-        BETTER_AUTH_URL: authUrl,
         WEB_URL: webUrl,
-        INTERNAL_API_TOKEN: internalApiToken,
-        SKILL_API_TOKEN: skillApiToken,
-        ENCRYPTION_KEY: ensureEncryptionKey(runtimeRoot),
-        NEXU_DESKTOP_MODE: "true",
-        NEXU_CLOUD_URL: runtimeConfig.urls.nexuCloud,
-        ...(runtimeConfig.urls.nexuLink
-          ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
-          : {}),
-        OPENCLAW_STATE_DIR: openclawStateDir,
-        SKILLHUB_CACHE_DIR: path.resolve(runtimeRoot, "skillhub-cache"),
-        OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
-      },
-    },
-    {
-      id: "gateway",
-      label: "Nexu Gateway",
-      kind: "service",
-      launchStrategy: "managed",
-      // Use spawn instead of utility-process due to Electron bugs:
-      // - https://github.com/electron/electron/issues/43186
-      //   Network requests fail with ECONNRESET after event loop blocking
-      // - https://github.com/electron/electron/issues/44727
-      //   Utility process uses hidden network context, not session.defaultSession
-      runner: "spawn",
-      command: electronNodeRunner,
-      args: [gatewayModulePath],
-      cwd: gatewaySidecarRoot,
-      port: null,
-      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_GATEWAY", true),
-      logFilePath: path.resolve(logsDir, "gateway.log"),
-      env: {
-        ELECTRON_RUN_AS_NODE: "1",
-        FORCE_COLOR: "1",
-        NODE_ENV: "development",
-        RUNTIME_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
-        RUNTIME_POOL_ID: gatewayPoolId,
-        INTERNAL_API_TOKEN: internalApiToken,
-        SKILL_API_TOKEN: skillApiToken,
+        HOST: "127.0.0.1",
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
+        NODE_ENV: "development",
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
-        OPENCLAW_ELECTRON_EXECUTABLE: electronNodeRunner,
-        OPENCLAW_EXTENSIONS_DIR: path.resolve(
-          openclawPackageRoot,
-          "extensions",
-        ),
-        OPENCLAW_DISABLE_BONJOUR: "1",
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
+        DEFAULT_MODEL_ID: "anthropic/claude-sonnet-4",
         ...(openclawNodePath ? { PATH: openclawNodePath } : {}),
       },
     },

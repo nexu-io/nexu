@@ -273,12 +273,13 @@ async function main() {
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], {
     env,
   });
-  await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/api", "build"], {
-    env,
-  });
-  await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/gateway", "build"], {
-    env,
-  });
+  await run(
+    "pnpm",
+    ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
+    {
+      env,
+    },
+  );
   await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
     env,
   });
