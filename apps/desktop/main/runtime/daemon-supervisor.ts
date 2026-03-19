@@ -313,7 +313,10 @@ export class RuntimeOrchestrator {
       if (record.stoppedByUser) return;
 
       record.autoRestartAttempts += 1;
-      const delayMs = Math.min(2000 * 2 ** (record.autoRestartAttempts - 1), MAX_BACKOFF_MS);
+      const delayMs = Math.min(
+        2000 * 2 ** (record.autoRestartAttempts - 1),
+        MAX_BACKOFF_MS,
+      );
       this.logStateChange(record, {
         kind: "lifecycle",
         actionId: ensureActionId(record, "auto-restart"),

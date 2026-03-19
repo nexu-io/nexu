@@ -1022,6 +1022,46 @@ export type PostApiV1SessionsByIdResetResponses = {
 
 export type PostApiV1SessionsByIdResetResponse = PostApiV1SessionsByIdResetResponses[keyof PostApiV1SessionsByIdResetResponses];
 
+export type GetApiV1SessionsByIdMessagesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        limit?: number;
+    };
+    url: '/api/v1/sessions/{id}/messages';
+};
+
+export type GetApiV1SessionsByIdMessagesErrors = {
+    /**
+     * Session not found
+     */
+    404: {
+        message: string;
+    };
+};
+
+export type GetApiV1SessionsByIdMessagesError = GetApiV1SessionsByIdMessagesErrors[keyof GetApiV1SessionsByIdMessagesErrors];
+
+export type GetApiV1SessionsByIdMessagesResponses = {
+    /**
+     * Chat messages for the session
+     */
+    200: {
+        messages: Array<{
+            id: string;
+            role: 'user' | 'assistant';
+            content?: unknown;
+            timestamp: number;
+            createdAt: string;
+        }>;
+        sessionKey: string;
+    };
+};
+
+export type GetApiV1SessionsByIdMessagesResponse = GetApiV1SessionsByIdMessagesResponses[keyof GetApiV1SessionsByIdMessagesResponses];
+
 export type GetApiV1ModelsData = {
     body?: never;
     path?: never;

@@ -167,7 +167,8 @@ const en = {
   "home.channel.gatewayStarting": "Gateway starting...",
   "home.channel.connecting": "Bot connecting...",
   "home.channel.ready": "Channel ready, bot can respond normally",
-  "home.channel.readinessTimeout": "Connection timed out, please check channel status later",
+  "home.channel.readinessTimeout":
+    "Connection timed out, please check channel status later",
   "home.connect": "Connect",
   "home.connectChannel": "Connect channel",
   "home.changeConfig": "Change config",
@@ -410,6 +411,13 @@ const en = {
   "sessions.minutesAgo": "{{count}}m ago",
   "sessions.hoursAgo": "{{count}}h ago",
   "sessions.daysAgo": "{{count}}d ago",
+  "sessions.chat.messages": "{{count}} messages",
+  "sessions.chat.lastActive": "Last active {{time}}",
+  "sessions.chat.empty": "No messages yet",
+  "sessions.chat.emptyDesc": "Messages will appear once a conversation starts.",
+  "sessions.chat.unavailable": "Runtime unavailable",
+  "sessions.chat.unavailableDesc": "Cannot connect to the chat runtime.",
+  "sessions.chat.loading": "Loading messages...",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "Integrations",

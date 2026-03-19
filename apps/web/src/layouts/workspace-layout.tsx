@@ -29,6 +29,31 @@ import {
 import "@/lib/api";
 import { getApiV1Me, getApiV1Sessions } from "../../lib/api/sdk.gen";
 
+interface SidebarSession {
+  id: string;
+  title: string;
+  channelType: string;
+  lastTime: string | null;
+  status: string;
+}
+
+function mapDbSession(s: {
+  id: string;
+  title: string;
+  channelType?: string | null;
+  lastMessageAt?: string | null;
+  updatedAt?: string;
+  status?: string | null;
+}): SidebarSession {
+  return {
+    id: s.id,
+    title: s.title,
+    channelType: s.channelType ?? "web",
+    lastTime: s.lastMessageAt ?? s.updatedAt ?? null,
+    status: s.status ?? "",
+  };
+}
+
 type Platform = "slack" | "discord" | "whatsapp" | "telegram" | "web";
 
 const PLATFORM_ICON_CONFIG: Record<Platform, { bg: string; emoji: string }> = {
@@ -188,14 +213,12 @@ function WorkspaceLayoutInner() {
   }, [mobileDrawerOpen]);
 
   const { data: sessionsData } = useQuery({
-    queryKey: ["sessions"],
-    queryFn: async () => {
-      const { data } = await getApiV1Sessions({
-        query: { limit: 100 },
-      });
-      return data;
+    queryKey: ["sidebar-sessions"],
+    queryFn: async (): Promise<SidebarSession[]> => {
+      const { data } = await getApiV1Sessions({ query: { limit: 100 } });
+      return (data?.sessions ?? []).map(mapDbSession);
     },
-    refetchInterval: 5000,
+    refetchInterval: 10_000,
   });
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -205,7 +228,7 @@ function WorkspaceLayoutInner() {
     },
   });
 
-  const sessions = sessionsData?.sessions ?? [];
+  const sessions = sessionsData ?? [];
 
   const sessionMatch = location.pathname.match(/\/workspace\/sessions\/(.+)/);
   const selectedSessionId = sessionMatch?.[1] ?? null;
@@ -252,7 +275,7 @@ function WorkspaceLayoutInner() {
       : isModelsPage
         ? t("layout.mobile.settingsSubtitle")
         : selectedSession
-          ? `${selectedSession.channelType ?? "web"} · ${formatTime(selectedSession.lastMessageAt || selectedSession.updatedAt)}`
+          ? `${selectedSession.channelType} · ${formatTime(selectedSession.lastTime)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
@@ -378,11 +401,11 @@ function WorkspaceLayoutInner() {
                     key={s.id}
                     onClick={() => {
                       track("workspace_channel_click", {
-                        channel_type: s.channelType ?? "web",
+                        channel_type: s.channelType,
                       });
                       navigate(`/workspace/sessions/${s.id}`);
                     }}
-                    title={collapsed ? (s.title ?? undefined) : undefined}
+                    title={collapsed ? s.title : undefined}
                     className={cn(
                       "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer",
                       collapsed
@@ -394,18 +417,16 @@ function WorkspaceLayoutInner() {
                     )}
                   >
                     {collapsed ? (
-                      <SidebarPlatformIcon platform={s.channelType ?? "web"} />
+                      <SidebarPlatformIcon platform={s.channelType} />
                     ) : (
                       <>
-                        <SidebarPlatformIcon
-                          platform={s.channelType ?? "web"}
-                        />
+                        <SidebarPlatformIcon platform={s.channelType} />
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] truncate font-medium">
                             {s.title}
                           </div>
                           <div className="text-[10px] text-text-muted truncate">
-                            {formatTime(s.lastMessageAt || s.updatedAt)}
+                            {formatTime(s.lastTime)}
                             {s.channelType && ` · ${s.channelType}`}
                           </div>
                         </div>
@@ -635,7 +656,7 @@ function WorkspaceLayoutInner() {
                           key={s.id}
                           onClick={() => {
                             track("workspace_channel_click", {
-                              channel_type: s.channelType ?? "web",
+                              channel_type: s.channelType,
                             });
                             setMobileDrawerOpen(false);
                             navigate(`/workspace/sessions/${s.id}`);
@@ -647,15 +668,13 @@ function WorkspaceLayoutInner() {
                               : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
                           )}
                         >
-                          <SidebarPlatformIcon
-                            platform={s.channelType ?? "web"}
-                          />
+                          <SidebarPlatformIcon platform={s.channelType} />
                           <div className="flex-1 min-w-0">
                             <div className="text-[13px] truncate font-medium">
                               {s.title}
                             </div>
                             <div className="text-[10px] text-text-muted truncate">
-                              {formatTime(s.lastMessageAt || s.updatedAt)}
+                              {formatTime(s.lastTime)}
                               {s.channelType && ` · ${s.channelType}`}
                             </div>
                           </div>

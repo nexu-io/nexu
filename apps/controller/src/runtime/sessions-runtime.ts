@@ -16,6 +16,14 @@ import type {
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: unknown;
+  timestamp: number | null;
+  createdAt: string | null;
+};
+
 type SessionMetadata = {
   title?: string;
   channelType?: string | null;
@@ -180,6 +188,65 @@ export class SessionsRuntime {
     await rm(filePath, { force: true });
     await rm(sessionMetadataPath(filePath), { force: true });
     return true;
+  }
+
+  async getChatHistory(
+    id: string,
+    limit?: number,
+  ): Promise<{ messages: ChatMessage[]; sessionKey: string | null }> {
+    const session = await this.getSession(id);
+    if (!session) {
+      return { messages: [], sessionKey: null };
+    }
+    const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
+    return {
+      messages: await this.readMessages(filePath, limit ?? 200),
+      sessionKey: session.sessionKey,
+    };
+  }
+
+  private async readMessages(
+    filePath: string,
+    limit: number,
+  ): Promise<ChatMessage[]> {
+    let raw: string;
+    try {
+      raw = await readFile(filePath, "utf8");
+    } catch {
+      return [];
+    }
+
+    const messages: ChatMessage[] = [];
+    for (const line of raw.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line) as {
+          type?: string;
+          id?: string;
+          timestamp?: string;
+          message?: {
+            role?: string;
+            content?: unknown;
+            timestamp?: number;
+          };
+        };
+        if (entry.type !== "message" || !entry.message) continue;
+        const role = entry.message.role;
+        if (role !== "user" && role !== "assistant") continue;
+        messages.push({
+          id: entry.id ?? "",
+          role,
+          content: entry.message.content,
+          timestamp: entry.message.timestamp ?? null,
+          createdAt: entry.timestamp ?? null,
+        });
+      } catch {
+        // skip malformed lines
+      }
+    }
+
+    // Return last N messages
+    return messages.slice(-limit);
   }
 
   async getSession(id: string): Promise<SessionResponse | null> {

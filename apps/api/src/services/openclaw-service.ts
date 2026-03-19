@@ -167,10 +167,7 @@ export class OpenClawWsClient {
    * Send a JSON-RPC request and wait for the matching response.
    * Rejects if the gateway is not connected or the request times out.
    */
-  async request<T = unknown>(
-    method: string,
-    params?: unknown,
-  ): Promise<T> {
+  async request<T = unknown>(method: string, params?: unknown): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this._connected) {
       throw new Error("openclaw gateway not connected");
     }
@@ -180,7 +177,11 @@ export class OpenClawWsClient {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`openclaw request "${method}" timed out after ${REQUEST_TIMEOUT_MS}ms`));
+        reject(
+          new Error(
+            `openclaw request "${method}" timed out after ${REQUEST_TIMEOUT_MS}ms`,
+          ),
+        );
       }, REQUEST_TIMEOUT_MS);
 
       this.pending.set(id, {
@@ -189,7 +190,7 @@ export class OpenClawWsClient {
         timer,
       });
 
-      this.ws!.send(JSON.stringify(frame));
+      this.ws?.send(JSON.stringify(frame));
     });
   }
 
@@ -320,16 +321,19 @@ export class OpenClawWsClient {
     if (this.tickTimer) {
       clearInterval(this.tickTimer);
     }
-    this.tickTimer = setInterval(() => {
-      if (this.closed || !this.lastTick) {
-        return;
-      }
-      const gap = Date.now() - this.lastTick;
-      if (gap > this.tickIntervalMs * 2) {
-        logger.warn({ message: "openclaw_ws_tick_timeout", gapMs: gap });
-        this.ws?.close(4000, "tick timeout");
-      }
-    }, Math.max(this.tickIntervalMs, 1000));
+    this.tickTimer = setInterval(
+      () => {
+        if (this.closed || !this.lastTick) {
+          return;
+        }
+        const gap = Date.now() - this.lastTick;
+        if (gap > this.tickIntervalMs * 2) {
+          logger.warn({ message: "openclaw_ws_tick_timeout", gapMs: gap });
+          this.ws?.close(4000, "tick timeout");
+        }
+      },
+      Math.max(this.tickIntervalMs, 1000),
+    );
   }
 
   private cleanup(): void {
@@ -381,8 +385,7 @@ let instance: OpenClawWsClient | null = null;
 export function getOpenClawClient(): OpenClawWsClient {
   if (!instance) {
     const url = process.env.OPENCLAW_WS_URL ?? "ws://127.0.0.1:18789";
-    const token =
-      process.env.GATEWAY_TOKEN ?? "gw-secret-token";
+    const token = process.env.GATEWAY_TOKEN ?? "gw-secret-token";
     instance = new OpenClawWsClient(url, token);
     instance.connect();
   }
@@ -418,7 +421,10 @@ export function initOpenClawService(
       try {
         const config = await loadConfig();
         if (!config) {
-          logger.info({ message: "openclaw_init_push_skipped", reason: "no config available" });
+          logger.info({
+            message: "openclaw_init_push_skipped",
+            reason: "no config available",
+          });
           return;
         }
         await pushConfig(config);
@@ -470,6 +476,52 @@ export async function getChannelsStatus(): Promise<ChannelsStatusResult> {
   return client.request<ChannelsStatusResult>("channels.status", {
     probe: true,
     timeoutMs: 8000,
+  });
+}
+
+/**
+ * 查询运行时会话列表。
+ *
+ * 调用 `sessions.list` RPC，返回 OpenClaw 当前活跃的会话快照。
+ *
+ * @throws 如果 WS 未连接或 RPC 失败
+ */
+export async function getRuntimeSessions(params: {
+  limit?: number;
+  includeDerivedTitles?: boolean;
+  includeLastMessage?: boolean;
+  search?: string;
+}): Promise<unknown> {
+  const client = getOpenClawClient();
+  if (!client.isConnected()) {
+    throw new Error("OpenClaw WS not connected");
+  }
+  return client.request("sessions.list", {
+    limit: params.limit ?? 50,
+    includeDerivedTitles: params.includeDerivedTitles ?? true,
+    includeLastMessage: params.includeLastMessage ?? true,
+    ...(params.search ? { search: params.search } : {}),
+  });
+}
+
+/**
+ * 查询会话聊天历史。
+ *
+ * 调用 `chat.history` RPC，返回指定会话的消息列表。
+ *
+ * @throws 如果 WS 未连接或 RPC 失败
+ */
+export async function getRuntimeChatHistory(params: {
+  sessionKey: string;
+  limit?: number;
+}): Promise<unknown> {
+  const client = getOpenClawClient();
+  if (!client.isConnected()) {
+    throw new Error("OpenClaw WS not connected");
+  }
+  return client.request("chat.history", {
+    sessionKey: params.sessionKey,
+    ...(params.limit ? { limit: params.limit } : {}),
   });
 }
 

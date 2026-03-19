@@ -41,6 +41,7 @@ import { registerIntegrationRoutes } from "./routes/integration-routes.js";
 import { registerInviteRoutes } from "./routes/invite-routes.js";
 import { registerModelRoutes } from "./routes/model-routes.js";
 import { registerPoolRoutes } from "./routes/pool-routes.js";
+import { registerRuntimeSessionRoutes } from "./routes/runtime-session-routes.js";
 import { registerSecretRoutes } from "./routes/secret-routes.js";
 import {
   registerSessionInternalRoutes,
@@ -164,6 +165,7 @@ export function createApp() {
   registerFeishuOAuthRoutes(app);
   registerIntegrationRoutes(app);
   registerSkillhubRoutes(app);
+  registerRuntimeSessionRoutes(app);
 
   app.doc("/openapi.json", {
     openapi: "3.1.0",

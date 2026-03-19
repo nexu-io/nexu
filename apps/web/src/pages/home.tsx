@@ -18,8 +18,8 @@ import { toast } from "sonner";
 import "@/lib/api";
 import {
   deleteApiV1ChannelsByChannelId,
-  getApiV1ChannelsByChannelIdReadiness,
   getApiV1Channels,
+  getApiV1ChannelsByChannelIdStatus,
   getApiV1Sessions,
 } from "../../lib/api/sdk.gen";
 
@@ -276,29 +276,27 @@ export function HomePage() {
       const timer = setInterval(async () => {
         attempts++;
         try {
-          const { data } = await getApiV1ChannelsByChannelIdReadiness({
+          const { data } = await getApiV1ChannelsByChannelIdStatus({
             path: { channelId },
           });
 
-          if (!data?.gatewayConnected) {
-            toast.loading(t("home.channel.gatewayStarting"), { id: toastId });
-          } else if (data?.ready) {
+          if (data?.status === "connected") {
             clearInterval(timer);
             readinessPollingRef.current = null;
             toast.success(t("home.channel.ready"), { id: toastId });
             return;
-          } else if (data?.configured) {
+          }
+
+          if (data?.status === "pending") {
             toast.loading(t("home.channel.connecting"), { id: toastId });
           }
 
           if (attempts >= 15) {
             clearInterval(timer);
             readinessPollingRef.current = null;
-            if (!data?.ready) {
-              toast.warning(t("home.channel.readinessTimeout"), {
-                id: toastId,
-              });
-            }
+            toast.warning(t("home.channel.readinessTimeout"), {
+              id: toastId,
+            });
           }
         } catch {
           // Ignore single poll failures, keep trying

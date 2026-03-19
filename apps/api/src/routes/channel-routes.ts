@@ -27,8 +27,8 @@ import { BaseError, ServiceError } from "../lib/error.js";
 import { getFeishuTenantToken } from "../lib/feishu-webhook.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
-import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 import { getChannelReadiness } from "../services/openclaw-service.js";
+import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 
 import type { AppBindings } from "../types.js";
 

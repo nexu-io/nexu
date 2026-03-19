@@ -3,9 +3,9 @@ import type { OpenClawConfig } from "@nexu/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Database } from "../../db/index.js";
-import { logger } from "../../lib/logger.js";
 import { gatewayPools, poolConfigSnapshots } from "../../db/schema/index.js";
 import { generatePoolConfig } from "../../lib/config-generator.js";
+import { logger } from "../../lib/logger.js";
 import { pushConfig } from "../openclaw-service.js";
 
 interface SnapshotRecord {
