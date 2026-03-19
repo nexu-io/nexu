@@ -818,6 +818,21 @@ export class NexuConfigStore {
     };
   }
 
+  async setDefaultModel(modelId: string): Promise<void> {
+    await this.store.update((config) => ({
+      ...config,
+      runtime: {
+        ...config.runtime,
+        defaultModelId: modelId,
+      },
+      bots: config.bots.map((bot) => ({
+        ...bot,
+        modelId,
+        updatedAt: now(),
+      })),
+    }));
+  }
+
   private async fetchDesktopCloudModels(
     linkUrl: string,
     apiKey: string,
