@@ -91,14 +91,49 @@ const byokDefaultBaseUrls: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  siliconflow: "https://api.siliconflow.com/v1",
+  ppio: "https://api.ppinfra.com/v3/openai",
+  openrouter: "https://openrouter.ai/api/v1",
+  minimax: "https://api.minimaxi.com/anthropic",
+  kimi: "https://api.moonshot.cn/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  moonshot: "https://api.moonshot.cn/v1",
+  zai: "https://open.bigmodel.cn/api/paas/v4",
 };
+
+function resolveOpenClawProviderId(providerId: string): string {
+  switch (providerId) {
+    case "kimi":
+      return "moonshot";
+    case "glm":
+      return "zai";
+    default:
+      return providerId;
+  }
+}
+
+function resolveOpenClawProviderApi(providerId: string): string {
+  switch (resolveOpenClawProviderId(providerId)) {
+    case "minimax":
+      return "anthropic-messages";
+    default:
+      return "openai-completions";
+  }
+}
+
+function resolveOpenClawProviderAuthHeader(
+  providerId: string,
+): boolean | undefined {
+  return resolveOpenClawProviderId(providerId) === "minimax" ? true : undefined;
+}
 
 function isByokProviderProxied(
   providerId: string,
   baseUrl: string | null,
 ): boolean {
+  const openclawProviderId = resolveOpenClawProviderId(providerId);
   const defaultBaseUrl = normalizeProviderBaseUrl(
-    byokDefaultBaseUrls[providerId],
+    byokDefaultBaseUrls[openclawProviderId],
   );
   const normalizedBaseUrl = normalizeProviderBaseUrl(baseUrl);
 
@@ -112,13 +147,14 @@ function getByokProviderKey(input: {
   providerId: string;
   baseUrl: string | null;
 }): string {
+  const openclawProviderId = resolveOpenClawProviderId(input.providerId);
   if (input.providerId === "custom") {
     return `custom_${input.id}`;
   }
 
   return isByokProviderProxied(input.providerId, input.baseUrl)
-    ? `byok_${input.providerId}`
-    : input.providerId;
+    ? `byok_${openclawProviderId}`
+    : openclawProviderId;
 }
 
 function getByokProviderModelId(
@@ -126,8 +162,9 @@ function getByokProviderModelId(
   providerId: string,
   modelId: string,
 ): string {
-  return providerKey === `byok_${providerId}`
-    ? `${providerId}/${modelId}`
+  const openclawProviderId = resolveOpenClawProviderId(providerId);
+  return providerKey === `byok_${openclawProviderId}`
+    ? `${openclawProviderId}/${modelId}`
     : modelId;
 }
 
@@ -221,13 +258,16 @@ export async function generatePoolConfig(
   // Map provider ID prefix (e.g. "anthropic") → OpenClaw provider key
   // For proxied providers the key is "byok_anthropic", for direct it's "anthropic"
   const byokPrefixToKey = new Map<string, string>();
+  const byokPrefixToProvider = new Map<string, string>();
   for (const bp of byokProviders) {
+    const openclawProviderId = resolveOpenClawProviderId(bp.providerId);
     const key = getByokProviderKey({
       id: bp.id,
       providerId: bp.providerId,
       baseUrl: bp.baseUrl,
     });
     byokPrefixToKey.set(bp.providerId, key);
+    byokPrefixToProvider.set(bp.providerId, openclawProviderId);
   }
 
   // Prefix model ID with provider namespace for routing.
@@ -241,16 +281,19 @@ export async function generatePoolConfig(
     const slashIdx = rawModelId.indexOf("/");
     if (slashIdx > 0) {
       const prefix = rawModelId.substring(0, slashIdx);
+      const suffix = rawModelId.substring(slashIdx + 1);
       const byokKey = byokPrefixToKey.get(prefix);
-      if (byokKey) {
+      const openclawProviderId = byokPrefixToProvider.get(prefix);
+      if (byokKey && openclawProviderId) {
         if (prefix === "custom") {
           const upstreamModelId = rawModelId.substring("custom/".length);
           return `${byokKey}/${upstreamModelId}`;
         }
 
-        // Proxied: "anthropic/claude-sonnet-4" → "byok_anthropic/anthropic/claude-sonnet-4"
-        // Direct:  "anthropic/claude-sonnet-4" → "anthropic/claude-sonnet-4" (unchanged)
-        return byokKey === prefix ? rawModelId : `${byokKey}/${rawModelId}`;
+        const providerScopedModelId = `${openclawProviderId}/${suffix}`;
+        return byokKey === openclawProviderId
+          ? providerScopedModelId
+          : `${byokKey}/${providerScopedModelId}`;
       }
     }
     if (hasLitellm) return `litellm/${rawModelId}`;
@@ -614,8 +657,9 @@ export async function generatePoolConfig(
 
   // Add BYOK (user-provided) providers (already loaded above for resolveModelId)
   for (const bp of byokProviders) {
+    const openclawProviderId = resolveOpenClawProviderId(bp.providerId);
     const baseUrl = normalizeProviderBaseUrl(
-      bp.baseUrl ?? byokDefaultBaseUrls[bp.providerId],
+      bp.baseUrl ?? byokDefaultBaseUrls[openclawProviderId],
     );
     const providerKey = getByokProviderKey({
       id: bp.id,
@@ -628,7 +672,10 @@ export async function generatePoolConfig(
     const byokProvider = {
       baseUrl,
       apiKey: decrypt(bp.encryptedApiKey),
-      api: "openai-completions",
+      api: resolveOpenClawProviderApi(bp.providerId),
+      ...(resolveOpenClawProviderAuthHeader(bp.providerId)
+        ? { authHeader: true }
+        : {}),
       models: modelIds.map((id) => ({
         id: getByokProviderModelId(providerKey, bp.providerId, id),
         name: id,

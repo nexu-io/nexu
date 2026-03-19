@@ -226,6 +226,8 @@ const zhCN = {
   "models.provider.anthropic.description": "Claude 系列 AI 模型",
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
+  "models.provider.openaiCompatible.description":
+    "兼容 OpenAI 协议的模型服务商",
   "models.provider.custom.name": "自定义服务商",
   "models.provider.custom.description": "任何兼容 OpenAI 的 API 端点",
   "models.managed.connected": "已连接",

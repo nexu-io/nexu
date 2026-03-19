@@ -234,6 +234,8 @@ const en = {
   "models.provider.anthropic.description": "Claude series AI models",
   "models.provider.openai.description": "GPT series AI models",
   "models.provider.google.description": "Gemini series AI models",
+  "models.provider.openaiCompatible.description":
+    "OpenAI-compatible API provider",
   "models.provider.custom.name": "Custom Provider",
   "models.provider.custom.description":
     "Any endpoint compatible with OpenAI API",

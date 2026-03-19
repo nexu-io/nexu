@@ -82,6 +82,8 @@ For local desktop/runtime work, prefer the controller-first path and treat `apps
 - Use `actionId`, `reasonCode`, and `cursor` / `nextCursor` as the primary correlation and incremental-fetch primitives for desktop runtime debugging.
 - To fully clear local desktop runtime state, use `./apps/desktop/dev.sh reset-state`.
 - Desktop runtime guide: `specs/guides/desktop-runtime-guide.md`.
+- The controller sidecar is packaged by `apps/desktop/scripts/prepare-controller-sidecar.mjs` which deep-copies all controller `dependencies` and their transitive deps into `.dist-runtime/controller/node_modules/`. Keep controller deps minimal to avoid bloating the desktop distributable.
+- SkillHub (catalog, install, uninstall) runs in the controller via HTTP — not in the Electron main process via IPC. The web app always uses HTTP SDK for skill operations.
 
 ## DB schema change workflow
 
@@ -116,6 +118,8 @@ When changing DB structure, follow this workflow.
 - Whenever you add a new environment variable, update `deploy/helm/nexu/values.yaml` in the same change.
 - Gateway sidecar: never derive state paths from `OPENCLAW_CONFIG_PATH`. Use `env.OPENCLAW_STATE_DIR` for state-related files (sessions, skills, nexu-context.json). See `specs/guides/gateway-environment-guide.md`.
 - Desktop packaged app: never use `npx`, `npm`, `pnpm`, or any shell command that relies on the user's PATH. The packaged Electron app has no shell profile — resolve bin paths programmatically via `require.resolve()` and execute with `process.execPath`. The app must be fully self-contained.
+- Controller sidecar packaging: every dependency in `apps/controller/package.json` is recursively deep-copied into the desktop distributable via `prepare-controller-sidecar` → `copyRuntimeDependencyClosure`. **Never add heavy transitive-dependency packages (e.g. `npm`, `yarn`) to the controller.** If the controller needs to shell out to a CLI tool, use PATH-based `execFile("npm", ...)` instead of bundling it as a dependency. Each MB added to controller deps adds ~1 MB to the final DMG/ZIP.
+- Native Node.js addons (e.g. `better-sqlite3`) must live in the controller, NOT in the desktop Electron main process. Electron's built-in Node.js has a different ABI version (NODE_MODULE_VERSION) from system Node.js, requiring `electron-rebuild` to recompile native modules. The controller runs as a regular Node.js process (`ELECTRON_RUN_AS_NODE=1`), so native addons work without recompilation.
 
 ## Observability conventions
 
@@ -181,7 +185,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | E2E gateway testing | `skills/localdev/nexu-e2e-test/SKILL.md` |
 | Production operations | `skills/localdev/prod-ops/SKILL.md` |
 | Nano Banana (image gen) | `skills/nexubot/nano-banana/SKILL.md` |
-| Skill repo & catalog | `nexu-skills/`, `apps/api/src/services/runtime/skill-catalog.ts` |
+| Skill repo & catalog | `nexu-skills/`, `apps/controller/src/services/skillhub/` |
 | File-based skills design | `specs/plans/2026-03-15-skill-repo-design.md` |
 | Feishu channel setup | `apps/web/src/components/channel-setup/feishu-setup-view.tsx` |
 

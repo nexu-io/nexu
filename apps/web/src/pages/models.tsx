@@ -107,6 +107,63 @@ const PROVIDER_META: Record<
     apiKeyPlaceholder: "AIza...",
     defaultProxyUrl: "https://generativelanguage.googleapis.com/v1beta",
   },
+  siliconflow: {
+    name: "SiliconFlow",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://cloud.siliconflow.cn/account/ak",
+    apiKeyPlaceholder: "sk-...",
+    defaultProxyUrl: "https://api.siliconflow.com/v1",
+  },
+  ppio: {
+    name: "PPIO",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://www.ppinfra.com/",
+    apiKeyPlaceholder: "sk-...",
+    defaultProxyUrl: "https://api.ppinfra.com/v3/openai",
+  },
+  openrouter: {
+    name: "OpenRouter",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://openrouter.ai/settings/keys",
+    apiKeyPlaceholder: "sk-or-...",
+    defaultProxyUrl: "https://openrouter.ai/api/v1",
+  },
+  minimax: {
+    name: "MiniMax",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl:
+      "https://platform.minimaxi.com/user-center/basic-information/interface-key",
+    apiKeyPlaceholder: "sk-...",
+    defaultProxyUrl: "https://api.minimaxi.com/anthropic",
+  },
+  kimi: {
+    name: "Kimi",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://platform.moonshot.cn/console/api-keys",
+    apiKeyPlaceholder: "sk-...",
+    defaultProxyUrl: "https://api.moonshot.cn/v1",
+  },
+  glm: {
+    name: "GLM",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
+    apiKeyPlaceholder: "eyJ...",
+    defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
+  },
+  moonshot: {
+    name: "Kimi",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://platform.moonshot.cn/console/api-keys",
+    apiKeyPlaceholder: "sk-...",
+    defaultProxyUrl: "https://api.moonshot.cn/v1",
+  },
+  zai: {
+    name: "GLM",
+    descriptionKey: "models.provider.openaiCompatible.description",
+    apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
+    apiKeyPlaceholder: "eyJ...",
+    defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
+  },
   custom: {
     name: "Custom",
     descriptionKey: "models.provider.custom.description",
@@ -117,12 +174,36 @@ const PROVIDER_META: Record<
 // Well-known models per provider (shown when no verify result yet)
 const DEFAULT_MODELS: Record<string, string[]> = {
   anthropic: [
+    "claude-opus-4-1-20250805",
     "claude-opus-4-20250514",
     "claude-sonnet-4-20250514",
-    "claude-haiku-4-5-20251001",
+    "claude-3-5-haiku-20241022",
   ],
-  openai: ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
-  google: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
+  openai: ["gpt-5.1", "gpt-5-mini", "gpt-5-nano", "o4-mini"],
+  google: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+  siliconflow: [
+    "deepseek-ai/DeepSeek-R1",
+    "deepseek-ai/DeepSeek-V3",
+    "Qwen/Qwen3-14B",
+    "moonshotai/Kimi-K2-Instruct",
+  ],
+  ppio: [
+    "deepseek/deepseek-v3-turbo",
+    "deepseek/deepseek-v3/community",
+    "deepseek/deepseek-r1-0528",
+    "deepseek/deepseek-r1/community",
+  ],
+  openrouter: ["auto", "openrouter/hunter-alpha", "openrouter/healer-alpha"],
+  minimax: [
+    "MiniMax-M2.7",
+    "MiniMax-M2.7-highspeed",
+    "MiniMax-M2.5",
+    "MiniMax-VL-01",
+  ],
+  kimi: ["kimi-k2.5"],
+  glm: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flash"],
+  moonshot: ["kimi-k2.5"],
+  zai: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flashx"],
 };
 
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
@@ -212,7 +293,18 @@ async function verifyApiKey(
 // ── BYOK provider sidebar entries ─────────────────────────────
 // Always show these four as configurable, even if no key set yet
 
-const BYOK_PROVIDER_IDS = ["anthropic", "openai", "google", "custom"] as const;
+const BYOK_PROVIDER_IDS = [
+  "anthropic",
+  "openai",
+  "google",
+  "siliconflow",
+  "ppio",
+  "openrouter",
+  "minimax",
+  "kimi",
+  "glm",
+  "custom",
+] as const;
 
 // ── Model grouping helpers (same as home.tsx) ─────────────────
 
@@ -225,11 +317,19 @@ const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   google: "Google AI",
+  siliconflow: "SiliconFlow",
+  ppio: "PPIO",
+  openrouter: "OpenRouter",
+  minimax: "MiniMax",
+  kimi: "Kimi",
+  glm: "GLM",
+  moonshot: "Kimi",
+  zai: "GLM",
 };
 
 // ── Component ──────────────────────────────────────────────────
 
-function GeneralSettings() {
+function _GeneralSettings() {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -499,7 +599,7 @@ function GeneralSettings() {
 
 // ── Current Model Selector ────────────────────────────────────
 
-function CurrentModelSelector({
+function _CurrentModelSelector({
   models,
   currentModelId,
   onSelectModel,
@@ -764,7 +864,7 @@ export function ModelsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const tabParam = searchParams.get("tab");
-  const settingsTab = isSettingsTab(tabParam)
+  const _settingsTab = isSettingsTab(tabParam)
     ? tabParam
     : isSetupMode
       ? "providers"
@@ -893,7 +993,7 @@ export function ModelsPage() {
     }
   }, [isSetupMode, searchParams, setSearchParams]);
 
-  const changeSettingsTab = useCallback(
+  const _changeSettingsTab = useCallback(
     (tab: SettingsTab) => {
       const next = new URLSearchParams(searchParams);
       next.set("tab", tab);

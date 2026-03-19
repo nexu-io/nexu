@@ -12,7 +12,41 @@ const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  siliconflow: "https://api.siliconflow.com/v1",
+  ppio: "https://api.ppinfra.com/v3/openai",
+  openrouter: "https://openrouter.ai/api/v1",
+  minimax: "https://api.minimaxi.com/anthropic",
+  kimi: "https://api.moonshot.cn/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  moonshot: "https://api.moonshot.cn/v1",
+  zai: "https://open.bigmodel.cn/api/paas/v4",
 };
+
+function resolveOpenClawProviderId(providerId: string): string {
+  switch (providerId) {
+    case "kimi":
+      return "moonshot";
+    case "glm":
+      return "zai";
+    default:
+      return providerId;
+  }
+}
+
+function resolveOpenClawProviderApi(providerId: string): string {
+  switch (resolveOpenClawProviderId(providerId)) {
+    case "minimax":
+      return "anthropic-messages";
+    default:
+      return "openai-completions";
+  }
+}
+
+function resolveOpenClawProviderAuthHeader(
+  providerId: string,
+): boolean | undefined {
+  return resolveOpenClawProviderId(providerId) === "minimax" ? true : undefined;
+}
 
 function isDesktopCloudConfig(value: unknown): value is {
   linkUrl: string;
@@ -42,8 +76,9 @@ function isByokProviderProxied(
   providerId: string,
   baseUrl: string | null,
 ): boolean {
+  const openclawProviderId = resolveOpenClawProviderId(providerId);
   const defaultBaseUrl = normalizeProviderBaseUrl(
-    BYOK_DEFAULT_BASE_URLS[providerId],
+    BYOK_DEFAULT_BASE_URLS[openclawProviderId],
   );
   const normalizedBaseUrl = normalizeProviderBaseUrl(baseUrl);
 
@@ -57,13 +92,14 @@ function getByokProviderKey(input: {
   providerId: string;
   baseUrl: string | null;
 }): string {
+  const openclawProviderId = resolveOpenClawProviderId(input.providerId);
   if (input.providerId === "custom") {
     return `custom_${input.id}`;
   }
 
   return isByokProviderProxied(input.providerId, input.baseUrl)
-    ? `byok_${input.providerId}`
-    : input.providerId;
+    ? `byok_${openclawProviderId}`
+    : openclawProviderId;
 }
 
 function getByokProviderModelId(
@@ -71,8 +107,9 @@ function getByokProviderModelId(
   providerId: string,
   modelId: string,
 ): string {
-  return providerKey === `byok_${providerId}`
-    ? `${providerId}/${modelId}`
+  const openclawProviderId = resolveOpenClawProviderId(providerId);
+  return providerKey === `byok_${openclawProviderId}`
+    ? `${openclawProviderId}/${modelId}`
     : modelId;
 }
 
@@ -107,9 +144,10 @@ function compileModelsConfig(config: NexuConfig): OpenClawConfig["models"] {
       providerId: provider.providerId,
       baseUrl: provider.baseUrl,
     });
+    const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
     const baseUrl =
       normalizeProviderBaseUrl(
-        provider.baseUrl ?? BYOK_DEFAULT_BASE_URLS[provider.providerId],
+        provider.baseUrl ?? BYOK_DEFAULT_BASE_URLS[openclawProviderId],
       ) ?? normalizeProviderBaseUrl(BYOK_DEFAULT_BASE_URLS.openai);
 
     if (baseUrl === null) {
@@ -119,7 +157,10 @@ function compileModelsConfig(config: NexuConfig): OpenClawConfig["models"] {
     providers[providerKey] = {
       baseUrl,
       apiKey: provider.apiKey ?? "",
-      api: "openai-completions",
+      api: resolveOpenClawProviderApi(provider.providerId),
+      ...(resolveOpenClawProviderAuthHeader(provider.providerId)
+        ? { authHeader: true }
+        : {}),
       models: provider.models.map((modelId) =>
         buildModelEntry(
           getByokProviderModelId(providerKey, provider.providerId, modelId),
@@ -157,7 +198,9 @@ function resolveModelId(config: NexuConfig, rawModelId: string): string {
   }
 
   const byokPrefixToKey = new Map<string, string>();
+  const byokPrefixToProvider = new Map<string, string>();
   for (const provider of config.providers.filter((item) => item.enabled)) {
+    const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
     byokPrefixToKey.set(
       provider.providerId,
       getByokProviderKey({
@@ -166,14 +209,20 @@ function resolveModelId(config: NexuConfig, rawModelId: string): string {
         baseUrl: provider.baseUrl,
       }),
     );
+    byokPrefixToProvider.set(provider.providerId, openclawProviderId);
   }
 
   const slashIndex = rawModelId.indexOf("/");
   if (slashIndex > 0) {
     const prefix = rawModelId.slice(0, slashIndex);
+    const modelSuffix = rawModelId.slice(slashIndex + 1);
     const byokKey = byokPrefixToKey.get(prefix);
-    if (byokKey) {
-      return byokKey === prefix ? rawModelId : `${byokKey}/${rawModelId}`;
+    const openclawProviderId = byokPrefixToProvider.get(prefix);
+    if (byokKey && openclawProviderId) {
+      const providerScopedModelId = `${openclawProviderId}/${modelSuffix}`;
+      return byokKey === openclawProviderId
+        ? providerScopedModelId
+        : `${byokKey}/${providerScopedModelId}`;
     }
   }
 

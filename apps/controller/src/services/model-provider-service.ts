@@ -10,20 +10,27 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  siliconflow: "https://api.siliconflow.com/v1",
+  ppio: "https://api.ppinfra.com/v3/openai",
+  openrouter: "https://openrouter.ai/api/v1",
+  minimax: "https://api.minimaxi.com/anthropic",
+  kimi: "https://api.moonshot.cn/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  moonshot: "https://api.moonshot.cn/v1",
+  zai: "https://open.bigmodel.cn/api/paas/v4",
 };
 
 function buildProviderUrl(
   baseUrl: string | null | undefined,
-  pathname: string,
+  path: string,
 ): string | null {
   if (!baseUrl || baseUrl.trim().length === 0) {
     return null;
   }
 
-  return new URL(
-    pathname,
-    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
-  ).toString();
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
 type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
