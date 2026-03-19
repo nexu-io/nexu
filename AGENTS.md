@@ -7,9 +7,10 @@ This file is for agentic coding tools. It's a map — read linked docs for depth
 Nexu is an OpenClaw multi-tenant platform. Users create AI bots, connect them to Slack, and the system generates OpenClaw config that hot-loads into shared Gateway processes.
 
 - Monorepo: pnpm workspaces
-- `apps/api` — Hono + Drizzle + Zod OpenAPI (Node ESM)
+- `apps/api` — Legacy Hono + Drizzle + Zod OpenAPI package retained for SaaS/db workflows during migration
+- `apps/controller` — Single-user local control plane for Nexu config, OpenClaw sync, and runtime orchestration
 - `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
-- `apps/gateway` — Nexu gateway sidecar for config/skills sync, runtime probing, and optional OpenClaw process management
+- `apps/gateway` — Legacy gateway sidecar package retained for SaaS/runtime deploy workflows during migration
 - `apps/web` — React + Ant Design + Vite
 - `openclaw-runtime` — Repo-local packaged OpenClaw runtime for local dev and desktop packaging; replaces global `openclaw` CLI
 - `packages/shared` — Shared Zod schemas
@@ -25,14 +26,19 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 
 ```bash
 pnpm install                          # Install
-pnpm dev                              # All apps (API :3000, Web :5173)
+pnpm dev                              # Local controller-first web stack (Controller + Web)
+pnpm dev:legacy                       # Legacy API + Web local stack
+pnpm dev:legacy:gateway               # Legacy gateway sidecar only
+pnpm dev:controller                   # Controller only
 pnpm desktop:start                    # Build and launch the desktop local runtime stack
 pnpm desktop:stop                     # Stop the desktop local runtime stack
 pnpm desktop:restart                  # Restart the desktop local runtime stack
 pnpm desktop:status                   # Show desktop local runtime status
 pnpm desktop:dist:mac                 # Build signed macOS desktop distributables
 pnpm desktop:dist:mac:unsigned        # Build unsigned macOS desktop distributables
-pnpm --filter @nexu/api dev           # API only
+pnpm probe:slack prepare              # Launch Chrome Canary with the dedicated Slack probe profile
+pnpm probe:slack run                  # Run the local Slack reply smoke probe against an authenticated DM
+pnpm --filter @nexu/api dev           # Legacy API only
 pnpm --filter @nexu/web dev           # Web only
 pnpm build                            # Build all
 pnpm check:esm-imports                # Scan built dist for extensionless relative ESM specifiers
@@ -40,7 +46,7 @@ pnpm typecheck                        # Typecheck all
 pnpm lint                             # Biome lint
 pnpm format                           # Biome format
 pnpm test                             # Vitest
-pnpm --filter @nexu/api test          # API tests only
+pnpm --filter @nexu/api test          # Legacy API tests only
 pnpm db:generate                      # Generate Drizzle migration files
 pnpm db:generate --name <change-name> # Generate Drizzle migration files with a semantic name
 pnpm --filter @nexu/api db:push       # Drizzle schema push
@@ -48,6 +54,8 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
+
+For local desktop/runtime work, prefer the controller-first path and treat `apps/api` / `apps/gateway` as legacy unless you are intentionally working on the SaaS/db or legacy deploy path.
 
 ## Branch model
 
@@ -59,8 +67,12 @@ After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 ## Desktop local development
 
 - Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
+- The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
+- The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
 - The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
 - Treat `pnpm desktop:start` as the canonical cold-start entrypoint for the full local desktop runtime.
+- The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
+- Desktop local runtime should not depend on PostgreSQL; controller-owned local state lives under `~/.nexu/`, while desktop dev runtime state remains repo-scoped under `.tmp/desktop/`.
 - `tmux` is required for the desktop local-dev workflow.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
 - For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
@@ -128,7 +140,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/api/src/lib/config-generator.ts` builds OpenClaw config from DB
 - Runtime topology: `apps/gateway` acts as the Nexu sidecar that syncs config/skills, probes runtime health, and can manage the OpenClaw process
-- Local runtime flow: `apps/api` produces config data -> `apps/gateway` syncs config/skills and coordinates runtime -> `openclaw-runtime` runs the actual OpenClaw Gateway process
+- Local runtime flow: `apps/controller` owns Nexu config/state, writes OpenClaw config/skills/templates, and manages `openclaw-runtime` directly; desktop wraps that controller-first stack with Electron + web sidecars
 - Key data flows: Slack OAuth, Slack/Feishu event routing, config hot-reload, file-based skill catalog
 
 ## Code style (quick reference)
@@ -155,6 +167,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Gateway environment (dev vs prod) | `specs/guides/gateway-environment-guide.md` |
 | Workspace templates | `specs/guides/workspace-templates.md` |
 | Local Slack testing | `specs/references/local-slack-testing.md` |
+| Local Slack smoke probe | `scripts/probe/README.md`, `scripts/probe/slack-reply-probe.mjs` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
 | Security posture | `specs/SECURITY.md` |
@@ -251,8 +264,10 @@ This note should track:
 
 - DB (default local): `postgresql://nexu:nexu@localhost:5433/nexu_dev`
 - API env path: `apps/api/.env`
+- Controller env path: `apps/controller/.env`
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
+- Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
 - Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
-- When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/gateway` to avoid launching a second OpenClaw process
-- If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by running gateway processes.
+- When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/controller` to avoid launching a second OpenClaw process
+- If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by the running controller process.

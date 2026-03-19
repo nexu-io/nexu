@@ -1,30 +1,32 @@
 # Architecture
 
-Nexu is an OpenClaw multi-tenant SaaS platform. One Gateway process serves many users' bots through config-driven routing.
+Nexu uses a controller-first local runtime model. In desktop/local mode, a single `apps/controller` process owns Nexu config, compiles OpenClaw config, materializes skills/templates, and orchestrates the OpenClaw runtime.
 
 ## System diagram
 
 ```
-Browser → Web (React + Ant Design + Vite)
-            ↓
-      API (Hono + Drizzle + Zod + better-auth)  ←→  PostgreSQL
-            ↓
-      Webhook Router → Gateway Pool Pods (OpenClaw) → Slack / Discord / Feishu API
+Desktop Shell / Browser
+        ↓
+Web (React + Ant Design + Vite)
+        ↓
+Controller (Hono + Zod OpenAPI + lowdb-backed local store)
+        ↓
+OpenClaw Runtime → Slack / Discord / Feishu API
 ```
 
 ## Tech stack
 
-| Layer | Technology |
-|-------|-----------|
-| API framework | Hono + @hono/zod-openapi |
-| Database | Drizzle ORM + PostgreSQL (no FK) |
-| Validation | Zod (single source of truth) |
-| Auth | better-auth (email/password + sessions) |
-| Frontend | React + Ant Design + Vite |
-| Frontend SDK | @hey-api/openapi-ts (auto-generated) |
-| State | React Query (@tanstack/react-query) |
-| Lint/Format | Biome |
-| Package manager | pnpm workspaces |
+| Layer                    | Technology                                  |
+| ------------------------ | ------------------------------------------- |
+| Local control plane      | Hono + @hono/zod-openapi                    |
+| Local persistence        | lowdb + JSON config under `~/.nexu/`        |
+| Validation               | Zod (single source of truth)                |
+| Local auth compatibility | Controller-managed local auth/session shims |
+| Frontend                 | React + Ant Design + Vite                   |
+| Frontend SDK             | @hey-api/openapi-ts (auto-generated)        |
+| State                    | React Query (@tanstack/react-query)         |
+| Lint/Format              | Biome                                       |
+| Package manager          | pnpm workspaces                             |
 
 ## Type safety chain
 
@@ -35,17 +37,18 @@ Zod Schema (define once)
   → API route validation (@hono/zod-openapi)
   → OpenAPI spec (auto-generated)
   → Frontend SDK types (@hey-api/openapi-ts)
-  → DB query types (Drizzle inference)
+  → local store/runtime types
 ```
 
 Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 ## Monorepo layout
 
-- **`apps/api/`** — Hono backend. Routes in `src/routes/`, DB schema in `src/db/schema/index.ts`, config generator in `src/lib/config-generator.ts`, auth in `src/auth.ts`.
+- **`apps/api/`** — Legacy Hono backend for the old multi-tenant SaaS path. Still retained for DB/migration workflows and legacy deploy assets.
+- **`apps/controller/`** — Single-user controller service. Routes in `src/routes/`, local config store in `src/store/`, OpenClaw runtime integration in `src/runtime/`, compiler logic in `src/lib/openclaw-config-compiler.ts`.
 - **`apps/web/`** — React frontend. Pages in `src/pages/`, generated SDK in `lib/api/`, auth client in `src/lib/auth-client.ts`.
-- **`apps/chat/`** — Next.js session-chat surface for local OpenClaw probing.
-- **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator.
+- **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator. The active local path launches `controller + web + openclaw` sidecars only.
+- **`apps/gateway/`** — Legacy gateway sidecar package from the SaaS runtime path. Still retained for legacy deploy/runtime assets.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.
 - **`nexu-skills/`** — Public skill repository. Each skill is a directory with `SKILL.md` frontmatter. `skills.json` is the built catalog index.
 - **`deploy/k8s/`** — Kubernetes manifests.
@@ -53,7 +56,9 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 ## Key data flows
 
-**Config generation:** API queries DB for active bots in a pool → decrypts channel credentials → assembles OpenClaw config JSON (agents, channels, bindings, models) → Gateway hot-reloads.
+**Desktop/local config generation:** Controller reads `~/.nexu/config.json` → compiles OpenClaw config JSON (agents, channels, bindings, models) → writes `OPENCLAW_CONFIG_PATH` and managed skills/templates → OpenClaw hot-reloads.
+
+**Desktop runtime boot:** Electron desktop starts the controller sidecar, waits for controller readiness/auth bootstrap, starts the web sidecar, and delegates OpenClaw process management to `apps/controller`.
 
 **Slack OAuth:** Frontend requests OAuth URL → user authorizes in Slack → callback exchanges code for token → credentials encrypted (AES-256-GCM) → stored in DB → webhook route created → pool config version bumped → Gateway reloads.
 
@@ -63,19 +68,20 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 **Skill catalog:** Skills are file-based. The API scans `nexu-skills/skills/` for `SKILL.md` frontmatter and merges with a remote GitHub catalog (`skills.json`). Skills can be installed/uninstalled via filesystem routes. The Gateway watches the skills directory for hot-reload.
 
-## Database
+## Persistence
 
-PostgreSQL with Drizzle ORM. No foreign keys — application-level joins only. All tables in `apps/api/src/db/schema/index.ts`.
+The active local/controller path persists Nexu-owned state under `~/.nexu/` via controller store modules, with `config.json` as the main source of truth and OpenClaw runtime files living under `OPENCLAW_STATE_DIR`.
 
-Key tables: `bots`, `bot_channels`, `channel_credentials`, `gateway_pools`, `gateway_assignments`, `webhook_routes`, `oauth_states`, `invite_codes`, `users`, `usage_metrics`, `pool_config_snapshots`, `skills`, `skills_snapshots`, `artifacts`, `pool_secrets`, `sessions`, `supported_toolkits`, `user_integrations`, `integration_credentials`, `supported_skills`.
-
-Public IDs via cuid2. Internal `pk` (serial auto-increment) never exposed to API.
+Legacy SaaS paths in `apps/api` still use PostgreSQL + Drizzle, but desktop/local runtime should not depend on that database. `apps/api` and `apps/gateway` are no longer part of the active local controller-first path, but they cannot be deleted until remaining deploy/workflow dependencies are migrated.
 
 ## Config generator
 
-`apps/api/src/lib/config-generator.ts` — Core module that builds OpenClaw config from DB state.
+`apps/controller/src/lib/openclaw-config-compiler.ts` — Active controller-first module that builds OpenClaw config from Nexu local state.
+
+`apps/api/src/lib/config-generator.ts` — Legacy SaaS-path config generator retained during migration.
 
 Critical constraints:
+
 - `bindings[].agentId` must match `agents.list[].id`
 - `bindings[].match.accountId` must match `channels.{slack|feishu}.accounts` key
 - Slack HTTP mode requires `signingSecret`; `groupPolicy` must be `"open"`

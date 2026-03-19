@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { app } from "electron";
+import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
 
 function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   if (stream.destroyed || !stream.writable) {
@@ -26,13 +27,13 @@ function loadDesktopDevEnv(): void {
     return;
   }
 
-  const apiEnvPath = resolve(workspaceRoot, "apps/api/.env");
+  const controllerEnvPath = resolve(workspaceRoot, "apps/controller/.env");
 
-  if (!existsSync(apiEnvPath)) {
+  if (!existsSync(controllerEnvPath)) {
     return;
   }
 
-  process.loadEnvFile(apiEnvPath);
+  process.loadEnvFile(controllerEnvPath);
 }
 
 function configureLocalDevPaths(): void {
@@ -46,10 +47,14 @@ function configureLocalDevPaths(): void {
   const userDataPath = resolve(electronRoot, "user-data");
   const sessionDataPath = resolve(electronRoot, "session-data");
   const logsPath = resolve(electronRoot, "logs");
+  const nexuHomePath = getDesktopNexuHomeDir(userDataPath);
 
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(sessionDataPath, { recursive: true });
   mkdirSync(logsPath, { recursive: true });
+  mkdirSync(nexuHomePath, { recursive: true });
+
+  process.env.NEXU_HOME = nexuHomePath;
 
   app.setPath("userData", userDataPath);
   app.setPath("sessionData", sessionDataPath);
@@ -57,7 +62,7 @@ function configureLocalDevPaths(): void {
 
   safeWrite(
     process.stdout,
-    `[desktop:paths] runtimeRoot=${runtimeRoot} userData=${userDataPath} sessionData=${sessionDataPath} logs=${logsPath}\n`,
+    `[desktop:paths] runtimeRoot=${runtimeRoot} userData=${userDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
   );
 }
 

@@ -35,6 +35,16 @@ import { UpdateManager } from "./updater/update-manager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Set display name early (matches productName in package.json).
+app.setName("Nexu");
+
+// Info.plist declares LSUIElement=true so that child processes (spawned with
+// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
+// BEFORE any blocking initialization (tar extraction, directory creation, etc.)
+// so users see it immediately on first launch.
+void app.dock?.show();
+
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
@@ -49,14 +59,6 @@ const orchestrator = new RuntimeOrchestrator(
     app.isPackaged,
   ),
 );
-
-app.setName("Nexu Desktop");
-
-// Info.plist declares LSUIElement=true so that child processes (spawned with
-// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Restore the main
-// process's Dock icon as early as possible — before whenReady / cold-start —
-// so users see it immediately even during first-launch decompression.
-void app.dock?.show();
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
@@ -227,10 +229,13 @@ function logRendererEvent({
   });
 }
 
-async function waitForApiReadiness(): Promise<void> {
+async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
+  const probeUrl = new URL(
+    "/api/auth/get-session",
+    runtimeConfig.urls.controllerBase,
+  );
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -242,32 +247,30 @@ async function waitForApiReadiness(): Promise<void> {
 
       if (response.status < 500) {
         logColdStart(
-          `api ready via ${probeUrl.pathname} status=${response.status}`,
+          `controller ready via ${probeUrl.pathname} status=${response.status}`,
         );
         return;
       }
     } catch {
-      // Ignore transient startup failures while the socket and DB warm up.
+      // Ignore transient startup failures while the controller starts.
     }
 
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  throw new Error(`API readiness probe timed out for ${probeUrl.toString()}`);
+  throw new Error(
+    `Controller readiness probe timed out for ${probeUrl.toString()}`,
+  );
 }
 
 async function runDesktopColdStart(): Promise<void> {
-  diagnosticsReporter?.markColdStartRunning("starting pglite");
-  logColdStart("starting pglite");
-  await orchestrator.startOne("pglite");
+  diagnosticsReporter?.markColdStartRunning("starting controller");
+  logColdStart("starting controller");
+  await orchestrator.startOne("controller");
 
-  diagnosticsReporter?.markColdStartRunning("starting api");
-  logColdStart("starting api");
-  await orchestrator.startOne("api");
-
-  diagnosticsReporter?.markColdStartRunning("waiting for api readiness");
-  logColdStart("waiting for api readiness");
-  await waitForApiReadiness();
+  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
+  logColdStart("waiting for controller readiness");
+  await waitForControllerReadiness();
 
   diagnosticsReporter?.markColdStartRunning(
     "bootstrapping desktop auth session",
@@ -280,10 +283,6 @@ async function runDesktopColdStart(): Promise<void> {
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
-
-  diagnosticsReporter?.markColdStartRunning("starting gateway");
-  logColdStart("starting gateway");
-  await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
@@ -321,7 +320,7 @@ function triggerDesktopAuthRecovery(reason: string): void {
 function installDesktopAuthRecoveryHooks(): void {
   session.defaultSession.webRequest.onCompleted(
     {
-      urls: [`${runtimeConfig.urls.apiBase}/api/auth/*`],
+      urls: [`${runtimeConfig.urls.controllerBase}/api/auth/*`],
     },
     (details) => {
       if (
@@ -364,7 +363,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 1120,
     minHeight: 760,
     backgroundColor: "#0B1020",
-    title: "Nexu Desktop",
+    title: "Nexu",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false,
@@ -562,9 +561,17 @@ app.whenReady().then(async () => {
       });
     }
 
-    catalogMgr = new CatalogManager(
-      app.getPath("userData"),
-      (level, message) => {
+    // Resolve static bundled-skills dir: packaged app has it in resources/,
+    // dev mode has it relative to the repo root.
+    // Resolve static bundled-skills dir: packaged app has it in resources/,
+    // dev mode has it relative to the app root.
+    const staticSkillsDir = app.isPackaged
+      ? resolve(process.resourcesPath ?? "", "static/bundled-skills")
+      : resolve(app.getAppPath(), "static/bundled-skills");
+
+    catalogMgr = new CatalogManager(app.getPath("userData"), {
+      staticSkillsDir,
+      log: (level, message) => {
         writeDesktopMainLog({
           source: "skillhub",
           stream: level === "error" ? "stderr" : "stdout",
@@ -573,9 +580,22 @@ app.whenReady().then(async () => {
           logFilePath: getDesktopLogFilePath("desktop-main.log"),
         });
       },
-    );
+    });
     setCatalogManager(catalogMgr);
     catalogMgr.start();
+
+    // Install curated skills on first launch (or re-install missing ones on update).
+    // Runs in background — does not block window creation.
+    void catalogMgr.installCuratedSkills().catch((err) => {
+      // Best-effort — curated skills are not critical for app startup.
+      writeDesktopMainLog({
+        source: "skillhub",
+        stream: "stderr",
+        kind: "app",
+        message: `curated skill install failed: ${err instanceof Error ? err.message : String(err)}`,
+        logFilePath: getDesktopLogFilePath("desktop-main.log"),
+      });
+    });
 
     const win = createMainWindow();
 

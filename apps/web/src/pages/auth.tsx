@@ -533,7 +533,7 @@ export function AuthPage() {
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
           >
             <a
-              href="/terms"
+              href="https://nexu.io/terms"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
@@ -542,7 +542,7 @@ export function AuthPage() {
             </a>
             <span className="text-border">&middot;</span>
             <a
-              href="/privacy"
+              href="https://nexu.io/privacy"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
@@ -755,7 +755,7 @@ export function AuthPage() {
             {/* Footer */}
             <div className="flex items-center justify-center gap-4 mt-6 text-[12px] text-text-muted">
               <a
-                href="/terms"
+                href="https://nexu.io/terms"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-text-secondary transition-colors"
@@ -764,7 +764,7 @@ export function AuthPage() {
               </a>
               <span className="text-border select-none">&middot;</span>
               <a
-                href="/privacy"
+                href="https://nexu.io/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-text-secondary transition-colors"
@@ -773,6 +773,32 @@ export function AuthPage() {
               </a>
             </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="flex items-center justify-center gap-3 px-4 sm:px-6 pt-3 pb-4 text-[11px] text-text-muted"
+          style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+        >
+          <a
+            href="https://nexu.io/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-secondary transition-colors"
+          >
+            Terms of Service
+          </a>
+          <span className="text-border">&middot;</span>
+          <a
+            href="https://nexu.io/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-text-secondary transition-colors"
+          >
+            Privacy Policy
+          </a>
+          <span className="text-border">&middot;</span>
+          <span>{t("auth.copyright")}</span>
         </div>
       </div>
     </div>

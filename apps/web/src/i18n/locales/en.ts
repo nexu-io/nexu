@@ -45,6 +45,11 @@ const en = {
   "welcome.cancel": "Cancel",
   "welcome.connectFailed": "Connection failed, please try again",
   "welcome.cloudConnectError": "Unable to connect to Nexu cloud service",
+  "welcome.cloudConnectInProgress":
+    "Browser sign-in is already in progress. Please finish it in your browser.",
+  "welcome.browserOpened":
+    "Browser sign-in opened. Finish it in your browser to continue.",
+  "welcome.connectCancelled": "Browser sign-in cancelled.",
 
   // ── Auth ──
   "auth.terms": "Terms of Service",
@@ -254,7 +259,10 @@ const en = {
   "models.catalog.loginToUse": "Login required",
   "models.byok.getApiKey": "Get API Key",
   "models.byok.apiKey": "API Key",
-  "models.byok.apiKeySaved": "(saved)",
+  "models.byok.apiKeySaved": "API key saved",
+  "models.byok.apiKeySavedHint":
+    "For security, the saved key is not shown. Enter a new key only if you want to replace it.",
+  "models.byok.changeApiKey": "Replace key",
   "models.byok.verify": "Check",
   "models.byok.keyValid": "Key valid — {{count}} models detected",
   "models.byok.keyInvalid": "Key invalid: {{error}}",
@@ -262,6 +270,9 @@ const en = {
   "models.byok.proxyUrl": "API Proxy URL",
   "models.byok.modelList": "Model list",
   "models.byok.modelsTotalCount": "{{count}} models total",
+  "models.byok.enabledSection": "Enabled models",
+  "models.byok.enabledHint": "These models will appear in the selector",
+  "models.byok.disabledSection": "Disabled models",
   "models.byok.none": "None",
   "models.byok.updateConfig": "Update configuration",
   "models.byok.saveAndEnable": "Save",

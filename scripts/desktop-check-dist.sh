@@ -7,10 +7,10 @@ release_dir="${PACKAGED_RELEASE_DIR:-${NEXU_DESKTOP_RELEASE_DIR:-apps/desktop/re
 capture_dir="${NEXU_DESKTOP_CHECK_CAPTURE_DIR:-.tmp/desktop-ci-test}"
 tmp_dir="${NEXU_DESKTOP_CHECK_TMPDIR:-${TMPDIR:-/tmp}/desktop-tmp}"
 packaged_home="${PACKAGED_HOME:-.tmp/desktop-dist-home}"
-packaged_logs_dir="${PACKAGED_LOGS_DIR:-$packaged_home/Library/Logs/Nexu Desktop}"
-packaged_user_data_dir="${PACKAGED_USER_DATA_DIR:-$packaged_home/Library/Application Support/Nexu Desktop}"
+packaged_logs_dir="${PACKAGED_LOGS_DIR:-$packaged_home/Library/Logs/Nexu}"
+packaged_user_data_dir="${PACKAGED_USER_DATA_DIR:-$packaged_home/Library/Application Support/Nexu}"
 packaged_runtime_logs_dir="${PACKAGED_RUNTIME_LOGS_DIR:-$packaged_home/Library/Application Support/logs/runtime-units}"
-default_logs_dir="${DEFAULT_LOGS_DIR:-$HOME/Library/Logs/Nexu Desktop}"
+default_logs_dir="${DEFAULT_LOGS_DIR:-$HOME/Library/Logs/Nexu}"
 default_user_data_dir="${DEFAULT_USER_DATA_DIR:-$HOME/Library/Application Support/@nexu/desktop}"
 default_runtime_logs_dir="${DEFAULT_RUNTIME_LOGS_DIR:-$HOME/Library/Application Support/logs/runtime-units}"
 

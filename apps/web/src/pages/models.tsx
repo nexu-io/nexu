@@ -125,7 +125,7 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   google: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
 };
 
-const GITHUB_URL = "https://github.com/refly-ai/nexu";
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
 
 function buildProviders(
   apiModels: Array<{
@@ -1487,6 +1487,9 @@ function ByokProviderDetail({
   const [baseUrl, setBaseUrl] = useState(
     dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
   );
+  const [isEditingApiKey, setIsEditingApiKey] = useState(
+    !dbProvider?.hasApiKey,
+  );
 
   // Available models from verification
   const [verifiedModels, setVerifiedModels] = useState<string[] | null>(null);
@@ -1495,6 +1498,7 @@ function ByokProviderDetail({
   useEffect(() => {
     setApiKey("");
     setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
+    setIsEditingApiKey(!dbProvider?.hasApiKey);
     setVerifiedModels(null);
   }, [dbProvider, meta.defaultProxyUrl]);
 
@@ -1522,6 +1526,7 @@ function ByokProviderDetail({
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
       setApiKey("");
+      setIsEditingApiKey(false);
       markSetupComplete();
       // Auto-select first model if no model is currently selected
       const firstModel = displayModels[0];
@@ -1539,6 +1544,7 @@ function ByokProviderDetail({
       queryClient.invalidateQueries({ queryKey: ["models"] });
       setApiKey("");
       setBaseUrl(meta.defaultProxyUrl ?? "");
+      setIsEditingApiKey(true);
       setVerifiedModels(null);
     },
   });
@@ -1590,42 +1596,57 @@ function ByokProviderDetail({
             htmlFor={`apikey-${providerId}`}
             className="block text-[12px] font-medium text-text-secondary mb-1.5"
           >
-            API Key
-            {dbProvider?.hasApiKey && (
-              <span className="ml-2 text-emerald-600 font-normal text-[10px]">
-                {t("models.byok.apiKeySaved")}
-              </span>
-            )}
+            {t("models.byok.apiKey")}
           </label>
-          <div className="flex gap-2">
-            <input
-              id={`apikey-${providerId}`}
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={meta.apiKeyPlaceholder}
-              className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/30"
-            />
-            <button
-              type="button"
-              disabled={!apiKey || verifyMutation.isPending}
-              onClick={() => verifyMutation.mutate()}
-              className={cn(
-                "px-3 py-2 rounded-lg border border-border text-[11px] font-medium transition-colors",
-                apiKey
-                  ? "text-text-secondary hover:bg-surface-2"
-                  : "text-text-muted cursor-not-allowed",
-              )}
-            >
-              {verifyMutation.isPending ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : verifyMutation.isSuccess && verifyMutation.data?.valid ? (
-                <Check size={12} className="text-emerald-600" />
-              ) : (
-                t("models.byok.verify")
-              )}
-            </button>
-          </div>
+          {dbProvider?.hasApiKey && !isEditingApiKey ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="text-[12px] font-medium text-text-primary">
+                  {t("models.byok.apiKeySaved")}
+                </div>
+                <div className="text-[10px] text-text-muted">
+                  {t("models.byok.apiKeySavedHint")}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingApiKey(true)}
+                className="shrink-0 rounded-lg border border-border px-3 py-2 text-[11px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
+              >
+                {t("models.byok.changeApiKey")}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                id={`apikey-${providerId}`}
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={meta.apiKeyPlaceholder}
+                className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/30"
+              />
+              <button
+                type="button"
+                disabled={!apiKey || verifyMutation.isPending}
+                onClick={() => verifyMutation.mutate()}
+                className={cn(
+                  "px-3 py-2 rounded-lg border border-border text-[11px] font-medium transition-colors",
+                  apiKey
+                    ? "text-text-secondary hover:bg-surface-2"
+                    : "text-text-muted cursor-not-allowed",
+                )}
+              >
+                {verifyMutation.isPending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : verifyMutation.isSuccess && verifyMutation.data?.valid ? (
+                  <Check size={12} className="text-emerald-600" />
+                ) : (
+                  t("models.byok.verify")
+                )}
+              </button>
+            </div>
+          )}
           {verifyMutation.isSuccess && (
             <div
               className={cn(

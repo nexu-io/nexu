@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { useGitHubStars } from "../hooks/use-github-stars";
 import { useLocale } from "../hooks/use-locale";
 
-const GITHUB_URL = "https://github.com/refly-ai/nexu";
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
 
 function GitHubIcon({ size = 20 }: { size?: number }) {
   return (

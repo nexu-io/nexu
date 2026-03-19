@@ -43,6 +43,10 @@ const zhCN = {
   "welcome.cancel": "取消",
   "welcome.connectFailed": "连接失败，请稍后重试",
   "welcome.cloudConnectError": "无法连接到 Nexu 云端服务",
+  "welcome.cloudConnectInProgress":
+    "浏览器登录已在进行中，请到浏览器完成授权。",
+  "welcome.browserOpened": "已打开浏览器登录，请在浏览器中完成授权。",
+  "welcome.connectCancelled": "已取消浏览器登录。",
 
   // ── Auth ──
   "auth.terms": "服务条款",
@@ -243,7 +247,10 @@ const zhCN = {
   "models.catalog.loginToUse": "登录后可用",
   "models.byok.getApiKey": "获取 API Key",
   "models.byok.apiKey": "API Key",
-  "models.byok.apiKeySaved": "（已保存）",
+  "models.byok.apiKeySaved": "API Key 已保存",
+  "models.byok.apiKeySavedHint":
+    "出于安全原因，不会回显已保存的密钥。只有在你想替换时才需要重新输入。",
+  "models.byok.changeApiKey": "更换密钥",
   "models.byok.verify": "检查",
   "models.byok.keyValid": "密钥有效 — 检测到 {{count}} 个模型",
   "models.byok.keyInvalid": "密钥无效: {{error}}",
@@ -251,6 +258,9 @@ const zhCN = {
   "models.byok.proxyUrl": "API 代理地址",
   "models.byok.modelList": "模型列表",
   "models.byok.modelsTotalCount": "共 {{count}} 个模型",
+  "models.byok.enabledSection": "已启用模型",
+  "models.byok.enabledHint": "这些模型会出现在模型选择器中",
+  "models.byok.disabledSection": "未启用模型",
   "models.byok.none": "暂无",
   "models.byok.updateConfig": "更新配置",
   "models.byok.saveAndEnable": "保存",

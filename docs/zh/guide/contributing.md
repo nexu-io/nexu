@@ -9,7 +9,7 @@
 3. 进入 `docs/` 后安装文档依赖。
 
 ```bash
-git clone https://github.com/refly-ai/nexu.git
+git clone https://github.com/nexu-io/nexu.git
 cd nexu/docs
 pnpm install
 ```

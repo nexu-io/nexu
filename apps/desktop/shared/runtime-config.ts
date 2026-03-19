@@ -1,15 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export const DEFAULT_API_PORT = 50_800;
+export const DEFAULT_CONTROLLER_PORT = 50_800;
 export const DEFAULT_WEB_PORT = 50_810;
-export const DEFAULT_PGLITE_PORT = 50_832;
 export const DEFAULT_OPENCLAW_BASE_URL = "http://127.0.0.1:18789";
 export const DEFAULT_GATEWAY_TOKEN = "gw-secret-token";
-export const DEFAULT_SKILL_TOKEN = "skill-secret-token";
-export const DEFAULT_GATEWAY_POOL_ID = "desktop-local-pool";
-export const DEFAULT_PGLITE_DATABASE_URL = (port: number) =>
-  `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
+export const DEFAULT_NEXU_HOME = "~/.nexu";
 
 // Cloud connection defaults (production)
 export const DEFAULT_NEXU_CLOUD_URL = "https://nexu.io";
@@ -20,6 +16,7 @@ export const DEFAULT_NEXU_LINK_URL: string | null = null;
  * This allows CI to inject environment-specific values at build time.
  */
 type BuildConfig = {
+  NEXU_HOME?: string;
   NEXU_CLOUD_URL?: string;
   NEXU_LINK_URL?: string | null;
   NEXU_UPDATE_FEED_URL?: string;
@@ -127,14 +124,12 @@ function normalizeBuildSource(value: string | undefined): DesktopBuildSource {
 export type DesktopRuntimeConfig = {
   buildInfo: DesktopBuildInfo;
   ports: {
-    api: number;
+    controller: number;
     web: number;
-    pglite: number;
   };
   urls: {
-    apiBase: string;
+    controllerBase: string;
     web: string;
-    auth: string;
     openclawBase: string;
     nexuCloud: string;
     nexuLink: string | null;
@@ -142,24 +137,15 @@ export type DesktopRuntimeConfig = {
   };
   tokens: {
     gateway: string;
-    internalApi: string;
-    skill: string;
-  };
-  database: {
-    pgliteUrl: string;
-  };
-  gateway: {
-    poolId: string;
   };
   paths: {
+    nexuHome: string;
     openclawBin: string;
   };
   desktopAuth: {
     name: string;
     email: string;
     password: string;
-    appUserId: string;
-    onboardingRole: string;
   };
   sentryDsn: string | null;
 };
@@ -175,25 +161,23 @@ export function getDesktopRuntimeConfig(
   // Load build-time config (for packaged apps)
   const buildConfig = loadBuildConfig(defaults?.resourcesPath);
   const ports = {
-    api: Number.parseInt(env.NEXU_API_PORT ?? String(DEFAULT_API_PORT), 10),
-    web: Number.parseInt(env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT), 10),
-    pglite: Number.parseInt(
-      env.NEXU_PGLITE_PORT ?? String(DEFAULT_PGLITE_PORT),
+    controller: Number.parseInt(
+      env.NEXU_CONTROLLER_PORT ??
+        env.NEXU_API_PORT ??
+        String(DEFAULT_CONTROLLER_PORT),
       10,
     ),
+    web: Number.parseInt(env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT), 10),
   };
 
   const urls = {
-    apiBase:
+    controllerBase:
+      env.NEXU_CONTROLLER_URL ??
+      env.NEXU_CONTROLLER_BASE_URL ??
       env.NEXU_API_URL ??
       env.NEXU_API_BASE_URL ??
-      `http://127.0.0.1:${ports.api}`,
+      `http://127.0.0.1:${ports.controller}`,
     web: env.NEXU_WEB_URL ?? `http://127.0.0.1:${ports.web}`,
-    auth:
-      env.NEXU_AUTH_URL ??
-      env.NEXU_API_URL ??
-      env.NEXU_API_BASE_URL ??
-      `http://127.0.0.1:${ports.api}`,
     openclawBase: env.NEXU_OPENCLAW_BASE_URL ?? DEFAULT_OPENCLAW_BASE_URL,
     nexuCloud:
       env.NEXU_CLOUD_URL ??
@@ -227,21 +211,10 @@ export function getDesktopRuntimeConfig(
     ports,
     urls,
     tokens: {
-      gateway:
-        env.NEXU_OPENCLAW_GATEWAY_TOKEN ??
-        env.NEXU_INTERNAL_API_TOKEN ??
-        DEFAULT_GATEWAY_TOKEN,
-      internalApi: env.NEXU_INTERNAL_API_TOKEN ?? DEFAULT_GATEWAY_TOKEN,
-      skill: env.NEXU_SKILL_API_TOKEN ?? DEFAULT_SKILL_TOKEN,
-    },
-    database: {
-      pgliteUrl:
-        env.NEXU_DATABASE_URL ?? DEFAULT_PGLITE_DATABASE_URL(ports.pglite),
-    },
-    gateway: {
-      poolId: env.NEXU_GATEWAY_POOL_ID ?? DEFAULT_GATEWAY_POOL_ID,
+      gateway: env.NEXU_OPENCLAW_GATEWAY_TOKEN ?? DEFAULT_GATEWAY_TOKEN,
     },
     paths: {
+      nexuHome: env.NEXU_HOME ?? buildConfig.NEXU_HOME ?? DEFAULT_NEXU_HOME,
       openclawBin:
         env.NEXU_OPENCLAW_BIN ??
         defaults?.openclawBinPath ??
@@ -251,8 +224,6 @@ export function getDesktopRuntimeConfig(
       name: "NexU Desktop",
       email: "desktop@nexu.local",
       password: "desktop-local-password",
-      appUserId: "desktop-local-user",
-      onboardingRole: "Founder / Manager",
     },
     sentryDsn:
       env.NEXU_DESKTOP_SENTRY_DSN ??

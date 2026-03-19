@@ -8,7 +8,7 @@ export const hostInvokeChannels = [
   "diagnostics:get-info",
   "diagnostics:crash-main",
   "diagnostics:crash-renderer",
-  "env:get-api-base-url",
+  "env:get-controller-base-url",
   "env:get-runtime-config",
   "runtime:get-state",
   "runtime:start-unit",
@@ -53,7 +53,7 @@ export type HostInvokePayloadMap = {
   "diagnostics:get-info": undefined;
   "diagnostics:crash-main": undefined;
   "diagnostics:crash-renderer": undefined;
-  "env:get-api-base-url": undefined;
+  "env:get-controller-base-url": undefined;
   "env:get-runtime-config": undefined;
   "runtime:get-state": undefined;
   "runtime:start-unit": {
@@ -93,8 +93,8 @@ export type HostInvokeResultMap = {
   "diagnostics:get-info": DiagnosticsInfo;
   "diagnostics:crash-main": undefined;
   "diagnostics:crash-renderer": undefined;
-  "env:get-api-base-url": {
-    apiBaseUrl: string;
+  "env:get-controller-base-url": {
+    controllerBaseUrl: string;
   };
   "env:get-runtime-config": DesktopRuntimeConfig;
   "runtime:get-state": RuntimeState;
@@ -181,13 +181,7 @@ export type RuntimeEvent =
       entry: RuntimeLogEntry;
     };
 
-export type RuntimeUnitId =
-  | "web"
-  | "control-plane"
-  | "pglite"
-  | "api"
-  | "gateway"
-  | "openclaw";
+export type RuntimeUnitId = "web" | "control-plane" | "controller" | "openclaw";
 
 export type RuntimeUnitKind = "surface" | "service" | "runtime";
 

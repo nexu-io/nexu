@@ -14,6 +14,7 @@ import { promisify } from "node:util";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { logger } from "../lib/logger.js";
+import { scanInstalledSkills } from "../lib/skill-scanner.js";
 import type { AppBindings } from "../types.js";
 import {
   resolveSkillhubPath,
@@ -49,6 +50,13 @@ const minimalSkillSchema = z.object({
   updatedAt: z.string(),
 });
 
+const installedSkillSchema = z.object({
+  slug: z.string(),
+  source: z.enum(["curated", "managed"]),
+  name: z.string(),
+  description: z.string(),
+});
+
 const catalogMetaSchema = z.object({
   version: z.string(),
   updatedAt: z.string(),
@@ -58,6 +66,7 @@ const catalogMetaSchema = z.object({
 const skillhubCatalogResponseSchema = z.object({
   skills: z.array(minimalSkillSchema),
   installedSlugs: z.array(z.string()),
+  installedSkills: z.array(installedSkillSchema),
   meta: catalogMetaSchema.nullable(),
 });
 
@@ -192,6 +201,19 @@ function getCacheDir(): string | undefined {
   return process.env.SKILLHUB_CACHE_DIR;
 }
 
+function getCuratedSkillsDir(): string | undefined {
+  return process.env.OPENCLAW_CURATED_SKILLS_DIR;
+}
+
+type CuratedState = {
+  removedByUser: string[];
+  lastInstalledVersion: string[];
+};
+
+function getCuratedStatePath(curatedDir: string): string {
+  return resolve(curatedDir, ".curated-state.json");
+}
+
 function readJsonFile<T>(path: string): T | null {
   if (!existsSync(path)) {
     return null;
@@ -201,20 +223,6 @@ function readJsonFile<T>(path: string): T | null {
     return JSON.parse(readFileSync(path, "utf8")) as T;
   } catch {
     return null;
-  }
-}
-
-function getInstalledSlugs(skillsDir: string | undefined): string[] {
-  if (!skillsDir || !existsSync(skillsDir)) return [];
-  try {
-    return readdirSync(skillsDir, { withFileTypes: true })
-      .filter(
-        (e) =>
-          e.isDirectory() && existsSync(resolve(skillsDir, e.name, "SKILL.md")),
-      )
-      .map((e) => e.name);
-  } catch {
-    return [];
   }
 }
 
@@ -230,6 +238,34 @@ function readMeta(cacheDir: string): z.infer<typeof catalogMetaSchema> | null {
   return readJsonFile<z.infer<typeof catalogMetaSchema>>(
     resolve(cacheDir, "meta.json"),
   );
+}
+
+function readCuratedState(curatedDir: string): CuratedState {
+  return (
+    readJsonFile<CuratedState>(getCuratedStatePath(curatedDir)) ?? {
+      removedByUser: [],
+      lastInstalledVersion: [],
+    }
+  );
+}
+
+function writeCuratedState(curatedDir: string, state: CuratedState): void {
+  writeFileSync(
+    getCuratedStatePath(curatedDir),
+    JSON.stringify(state, null, 2),
+    "utf8",
+  );
+}
+
+function recordCuratedRemoval(curatedDir: string, slug: string): void {
+  const state = readCuratedState(curatedDir);
+  if (state.removedByUser.includes(slug)) {
+    return;
+  }
+  writeCuratedState(curatedDir, {
+    ...state,
+    removedByUser: [...state.removedByUser, slug],
+  });
 }
 
 function findIndexFile(dir: string): string | null {
@@ -397,14 +433,21 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     const cacheDir = getCacheDir();
 
     if (!cacheDir) {
-      return c.json({ skills: [], installedSlugs: [], meta: null }, 200);
+      return c.json(
+        { skills: [], installedSlugs: [], installedSkills: [], meta: null },
+        200,
+      );
     }
 
     const skills = readCatalog(cacheDir);
     const meta = readMeta(cacheDir);
-    const installedSlugs = getInstalledSlugs(getSkillsDir());
+    const installedSkills = scanInstalledSkills({
+      curatedDir: getCuratedSkillsDir(),
+      managedDir: getSkillsDir(),
+    });
+    const installedSlugs = installedSkills.map((s) => s.slug);
 
-    return c.json({ skills, installedSlugs, meta }, 200);
+    return c.json({ skills, installedSlugs, installedSkills, meta }, 200);
   });
 
   app.openapi(skillhubInstallRoute, async (c) => {
@@ -429,11 +472,13 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
       logger.info({ slug, clawHubBin }, "skillhub install resolving clawhub");
       const { stdout, stderr } = await execFileAsync(process.execPath, [
         clawHubBin,
+        "--workdir",
+        skillsDir,
+        "--dir",
+        ".",
         "install",
         slug,
         "--force",
-        "--dir",
-        skillsDir,
       ]);
       if (stdout)
         logger.info({ slug, stdout: stdout.trim() }, "skillhub install stdout");
@@ -470,13 +515,14 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
   app.openapi(skillhubUninstallRoute, async (c) => {
     const { slug } = c.req.valid("json");
     const skillsDir = getSkillsDir();
+    const curatedDir = getCuratedSkillsDir();
 
     logger.info({ slug }, "skillhub uninstall requested");
 
-    if (!skillsDir) {
+    if (!skillsDir && !curatedDir) {
       logger.error(
         { slug },
-        "skillhub uninstall failed: OPENCLAW_SKILLS_DIR not set",
+        "skillhub uninstall failed: no skills dirs configured",
       );
       return c.json(
         { ok: false, error: "Skills directory not configured" },
@@ -485,20 +531,26 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     try {
-      const skillDir = resolveSkillhubPath(skillsDir, slug);
-
-      if (!skillDir) {
-        logger.warn({ slug }, "skillhub uninstall skipped: invalid slug");
-        return c.json({ ok: false, error: "Invalid skill slug" }, 200);
+      const managedPath = skillsDir
+        ? resolveSkillhubPath(skillsDir, slug)
+        : null;
+      if (managedPath && existsSync(managedPath)) {
+        rmSync(managedPath, { recursive: true, force: true });
+        logger.info({ slug }, "skillhub uninstall ok (managed)");
+        return c.json({ ok: true }, 200);
       }
 
-      if (existsSync(skillDir)) {
-        rmSync(skillDir, { recursive: true, force: true });
-        logger.info({ slug }, "skillhub uninstall ok");
-      } else {
-        logger.warn({ slug }, "skillhub uninstall skipped: dir not found");
+      const curatedPath = curatedDir
+        ? resolveSkillhubPath(curatedDir, slug)
+        : null;
+      if (curatedDir && curatedPath && existsSync(curatedPath)) {
+        rmSync(curatedPath, { recursive: true, force: true });
+        recordCuratedRemoval(curatedDir, slug);
+        logger.info({ slug }, "skillhub uninstall ok (curated)");
+        return c.json({ ok: true }, 200);
       }
 
+      logger.warn({ slug }, "skillhub uninstall skipped: dir not found");
       return c.json({ ok: true }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -510,7 +562,6 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
   app.openapi(skillhubDetailRoute, async (c) => {
     const { slug } = c.req.valid("param");
     const cacheDir = getCacheDir();
-    const skillsDir = getSkillsDir();
 
     // Find catalog entry
     let catalogEntry: Record<string, unknown> | null = null;
@@ -521,12 +572,17 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
       catalogEntry = all?.find((s) => s.slug === slug) ?? null;
     }
 
-    // Read SKILL.md if installed
+    // Read SKILL.md if installed — check managed dir first, then curated dir
     let skillContent: string | null = null;
     let installed = false;
     let files: string[] = [];
-    if (skillsDir) {
-      const skillDir = resolveSkillhubPath(skillsDir, slug);
+
+    const dirsToCheck = [getSkillsDir(), getCuratedSkillsDir()].filter(
+      Boolean,
+    ) as string[];
+
+    for (const dir of dirsToCheck) {
+      const skillDir = resolveSkillhubPath(dir, slug);
       const skillMdPath = skillDir ? resolve(skillDir, "SKILL.md") : null;
       if (skillDir && skillMdPath && existsSync(skillMdPath)) {
         installed = true;
@@ -538,6 +594,7 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
         } catch {
           // Ignore
         }
+        break;
       }
     }
 
@@ -552,11 +609,26 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
         ? (catalogEntry.stats as Record<string, unknown>)
         : {};
 
+    // Parse frontmatter for name/description if no catalog entry
+    let diskName = slug;
+    let diskDescription = "";
+    if (skillContent) {
+      const fmMatch = skillContent.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch?.[1]) {
+        const nameMatch = fmMatch[1].match(/^name:\s*['"]?(.+?)['"]?\s*$/m);
+        const descMatch = fmMatch[1].match(
+          /^description:\s*['"]?(.+?)['"]?\s*$/m,
+        );
+        if (nameMatch?.[1]) diskName = nameMatch[1].trim();
+        if (descMatch?.[1]) diskDescription = descMatch[1].trim();
+      }
+    }
+
     return c.json(
       {
         slug,
-        name: String(catalogEntry?.name ?? slug),
-        description: String(catalogEntry?.description ?? ""),
+        name: String(catalogEntry?.name ?? diskName),
+        description: String(catalogEntry?.description ?? diskDescription),
         downloads: Number(stats.downloads ?? catalogEntry?.downloads ?? 0),
         stars: Number(stats.stars ?? catalogEntry?.stars ?? 0),
         tags: Array.isArray(catalogEntry?.tags) ? catalogEntry.tags : [],

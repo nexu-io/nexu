@@ -36,12 +36,12 @@ export async function triggerRendererProcessCrash(): Promise<void> {
   await getHostBridge().invoke("diagnostics:crash-renderer", undefined);
 }
 
-export async function getApiBaseUrl(): Promise<string> {
+export async function getControllerBaseUrl(): Promise<string> {
   const result = await getHostBridge().invoke(
-    "env:get-api-base-url",
+    "env:get-controller-base-url",
     undefined,
   );
-  return result.apiBaseUrl;
+  return result.controllerBaseUrl;
 }
 
 export async function getRuntimeConfig(): Promise<DesktopRuntimeConfig> {

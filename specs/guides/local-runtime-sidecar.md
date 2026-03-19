@@ -1,5 +1,9 @@
 # 本地 Runtime Sidecar 开发与使用指南（对接本地 OpenClaw）
 
+> Deprecated: 本文描述的是旧的 `apps/api` + `apps/gateway` 本地联调路径。
+> 当前本地/桌面主路径已切换为 controller-first，请优先使用 `pnpm desktop:start` 和 `specs/guides/desktop-runtime-guide.md`。
+> 仅在排查遗留 SaaS / sidecar 行为时参考本文。
+
 本文说明如何在本机启动并联调以下组件：
 
 - `apps/api`（控制面）

@@ -1,6 +1,6 @@
 {
   "name": "@nexu/desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "main": "dist-electron/main/bootstrap.js",
@@ -10,10 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "start:electron": "node -e \"console.error('Use pnpm desktop:start from the nexu project root.'); process.exit(1)\"",
-    "prepare:api-sidecar": "node ./scripts/prepare-api-sidecar.mjs",
-    "prepare:gateway-sidecar": "node ./scripts/prepare-gateway-sidecar.mjs",
+    "prepare:controller-sidecar": "node ./scripts/prepare-controller-sidecar.mjs",
     "prepare:openclaw-sidecar": "node ./scripts/prepare-openclaw-sidecar.mjs",
-    "prepare:pglite-sidecar": "node ./scripts/prepare-pglite-sidecar.mjs",
     "prepare:runtime-sidecars": "node ./scripts/prepare-runtime-sidecars.mjs",
     "prepare:web-sidecar": "node ./scripts/prepare-web-sidecar.mjs",
     "package:sidecars": "node ./scripts/prepare-runtime-sidecars.mjs --release",
@@ -23,8 +21,6 @@
   },
   "dependencies": {
     "@amplitude/unified": "1.0.0-beta.38",
-    "@electric-sql/pglite": "^0.3.16",
-    "@electric-sql/pglite-socket": "^0.0.22",
     "@hey-api/client-fetch": "^0.8.4",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-label": "^2.1.2",
@@ -34,17 +30,17 @@
     "@radix-ui/react-tabs": "^1.1.3",
     "@sentry/electron": "^7.10.0",
     "@tanstack/react-query": "^5.66.9",
-    "better-auth": "^1.4.19",
     "class-variance-authority": "^0.7.1",
     "clawhub": "0.8.0",
     "clsx": "^2.1.1",
     "electron-updater": "^6.3.9",
     "lucide-react": "^0.474.0",
-    "pg": "^8.13.1",
+    "npm": "^11",
     "pino": "^10.3.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.6.0",
+    "sharp": "0.34.5",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.1"
   },
@@ -83,6 +79,18 @@
         "to": "runtime"
       },
       {
+        "from": "static/bundled-skills",
+        "to": "static/bundled-skills"
+      },
+      {
+        "from": "node_modules/sharp",
+        "to": "bundled-node-modules/sharp"
+      },
+      {
+        "from": "node_modules/@img",
+        "to": "bundled-node-modules/@img"
+      },
+      {
         "from": "build-config.json",
         "to": "build-config.json",
         "filter": ["**/*"]
@@ -94,7 +102,7 @@
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
       "target": ["dmg", "zip"],
-      "artifactName": "${productName}-${arch}.${ext}",
+      "artifactName": "nexu-simplest-openclaw-desktop-${version}-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

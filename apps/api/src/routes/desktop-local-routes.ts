@@ -372,12 +372,26 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // Initiate cloud connection: generate device ID, register on cloud, start polling
   app.openapi(cloudConnectRoute, async (c) => {
+    logger.info({
+      message: "desktop_cloud_connect_requested",
+      polling_in_progress: pollingState !== null,
+      already_connected: Boolean(loadCredentials()),
+    });
     // Reject if already polling or connected
     if (pollingState) {
+      logger.info({
+        message: "desktop_cloud_connect_rejected",
+        reason: "already_in_progress",
+      });
       return c.json({ error: "Connection attempt already in progress" });
     }
     const existing = loadCredentials();
     if (existing) {
+      logger.info({
+        message: "desktop_cloud_connect_rejected",
+        reason: "already_connected",
+        user_id: existing.userId,
+      });
       return c.json({ error: "Already connected. Disconnect first." });
     }
 
@@ -405,6 +419,11 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
     if (!res.ok) {
       const body = await res.text();
+      logger.warn({
+        message: "desktop_cloud_connect_register_failed",
+        status: res.status,
+        body,
+      });
       return c.json({ error: `Failed to register device: ${body}` });
     }
 
@@ -419,6 +438,10 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
     );
 
     const browserUrl = `${cloudApiUrl}/auth?desktop=1&device_id=${deviceId}`;
+    logger.info({
+      message: "desktop_cloud_connect_started",
+      device_id: deviceId,
+    });
     return c.json({ browserUrl });
   });
 
@@ -426,6 +449,12 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   app.openapi(cloudStatusRoute, (c) => {
     const creds = loadCredentials();
     if (creds) {
+      logger.info({
+        message: "desktop_cloud_status_checked",
+        connected: true,
+        polling: false,
+        user_id: creds.userId,
+      });
       return c.json({
         connected: true,
         polling: false,
@@ -436,6 +465,11 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
       });
     }
 
+    logger.info({
+      message: "desktop_cloud_status_checked",
+      connected: false,
+      polling: pollingState !== null,
+    });
     return c.json({
       connected: false,
       polling: pollingState !== null,
@@ -540,6 +574,11 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // Disconnect from cloud: clear credentials, cancel polling
   app.openapi(cloudDisconnectRoute, async (c) => {
+    logger.info({
+      message: "desktop_cloud_disconnect_requested",
+      polling_in_progress: pollingState !== null,
+      had_credentials: Boolean(loadCredentials()),
+    });
     // Cancel any active polling
     if (pollingState) {
       pollingState.abortController.abort();

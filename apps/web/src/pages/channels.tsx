@@ -229,7 +229,13 @@ function ConfiguredView({
       const { error } = await deleteApiV1ChannelsByChannelId({
         path: { channelId: channel.id },
       });
-      if (error) throw new Error(error.message);
+      if (error) {
+        const errorMessage =
+          typeof error === "object" && error !== null && "message" in error
+            ? String(error.message)
+            : "Disconnect failed";
+        throw new Error(errorMessage);
+      }
     },
     onSuccess: () => {
       setShowResetConfirm(false);

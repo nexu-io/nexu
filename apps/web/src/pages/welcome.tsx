@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   getApiInternalDesktopCloudStatus,
   postApiInternalDesktopCloudConnect,
@@ -123,6 +124,44 @@ function ProviderLogo({
 
 type Mode = "choose" | "byok";
 
+type HostInvokeBridge = {
+  invoke: (
+    channel: "shell:open-external",
+    payload: { url: string },
+  ) => Promise<{ ok: boolean }>;
+};
+
+function getHostInvokeBridge(): HostInvokeBridge | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const candidate = (window as Window & { nexuHost?: unknown }).nexuHost;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const invoke = Reflect.get(candidate, "invoke");
+  if (typeof invoke !== "function") {
+    return null;
+  }
+
+  return {
+    invoke: (channel, payload) =>
+      invoke.call(candidate, channel, payload) as Promise<{ ok: boolean }>,
+  };
+}
+
+async function openExternalUrl(url: string): Promise<void> {
+  const hostBridge = getHostInvokeBridge();
+  if (hostBridge) {
+    await hostBridge.invoke("shell:open-external", { url });
+    return;
+  }
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export function WelcomePage() {
   const { t } = useLocale();
   usePageTitle(t("welcome.pageTitle"));
@@ -143,13 +182,50 @@ export function WelcomePage() {
   const [verified, setVerified] = useState(false);
   const [cloudConnecting, setCloudConnecting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState({
+    connected: false,
+    polling: false,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreCloudStatus = async () => {
+      try {
+        const { data } = await getApiInternalDesktopCloudStatus();
+        if (cancelled) return;
+
+        setCloudStatus({
+          connected: Boolean(data?.connected),
+          polling: Boolean(data?.polling),
+        });
+
+        if (data?.connected) {
+          markSetupComplete();
+          navigate("/workspace", { replace: true });
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    void restoreCloudStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   // Poll cloud-status while waiting for browser login
   useEffect(() => {
-    if (!cloudConnecting) return;
+    if (!cloudConnecting && !cloudStatus.polling) return;
     const interval = setInterval(async () => {
       try {
         const { data } = await getApiInternalDesktopCloudStatus();
+        setCloudStatus({
+          connected: Boolean(data?.connected),
+          polling: Boolean(data?.polling),
+        });
         if (data?.connected) {
           setCloudConnecting(false);
           setLoginError(null);
@@ -161,7 +237,7 @@ export function WelcomePage() {
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [cloudConnecting, navigate]);
+  }, [cloudConnecting, cloudStatus.polling, navigate]);
 
   const activePreset =
     PROVIDER_OPTIONS.find((p) => p.id === selectedProvider) ??
@@ -206,7 +282,19 @@ export function WelcomePage() {
     setLoginError(null);
     try {
       let { data } = await postApiInternalDesktopCloudConnect();
-      // If a stale polling session exists (error), disconnect and retry once
+      // If a stale polling session exists, disconnect and retry once. But if
+      // the desktop runtime is already polling, keep the current waiting state
+      // instead of resetting the browser auth flow.
+      if (data?.error === "Connection attempt already in progress") {
+        toast.info(t("welcome.cloudConnectInProgress"));
+        return;
+      }
+      if (data?.error === "Already connected. Disconnect first.") {
+        setLoginError(null);
+        markSetupComplete();
+        navigate("/workspace", { replace: true });
+        return;
+      }
       if (data?.error) {
         await postApiInternalDesktopCloudDisconnect().catch(() => {});
         ({ data } = await postApiInternalDesktopCloudConnect());
@@ -214,15 +302,18 @@ export function WelcomePage() {
       if (data?.error) {
         setLoginError(data.error ?? t("welcome.connectFailed"));
         setCloudConnecting(false);
+        toast.error(data.error ?? t("welcome.connectFailed"));
         return;
       }
       if (data?.browserUrl) {
-        window.open(data.browserUrl, "_blank", "noopener,noreferrer");
+        await openExternalUrl(data.browserUrl);
+        toast.info(t("welcome.browserOpened"));
       }
       // Keep cloudConnecting=true — polling effect will detect completion.
-    } catch {
+    } catch (_error) {
       setLoginError(t("welcome.cloudConnectError"));
       setCloudConnecting(false);
+      toast.error(t("welcome.cloudConnectError"));
     }
   };
 
@@ -234,6 +325,7 @@ export function WelcomePage() {
     }
     setCloudConnecting(false);
     setLoginError(null);
+    toast.info(t("welcome.connectCancelled"));
   };
 
   const handleVerifyKey = () => {
@@ -304,7 +396,7 @@ export function WelcomePage() {
                       <FadeIn key={option.id} delay={180 + index * 90}>
                         {/* Login card: show waiting overlay when polling */}
                         {option.id === "login" && cloudConnecting ? (
-                          <div className="relative w-full rounded-[28px] border border-black/12 bg-[linear-gradient(135deg,#18181b_0%,#232327_100%)] p-5 text-white">
+                          <div className="relative w-full rounded-[28px] border border-black/12 bg-[linear-gradient(135deg,#7c2d12_0%,#c2410c_100%)] p-5 text-white">
                             <div className="flex flex-col items-center gap-4 py-4">
                               <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
                               <div className="text-center">
@@ -446,21 +538,23 @@ export function WelcomePage() {
 
                   <FadeIn delay={380}>
                     <div className="mt-5 flex items-center justify-center gap-4 border-t border-black/8 pt-5 text-[12px] text-text-muted">
-                      <button
-                        type="button"
-                        onClick={() => navigate("/terms")}
+                      <a
+                        href="https://nexu.io/terms"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="cursor-pointer transition-colors hover:text-text-secondary"
                       >
                         {t("auth.terms")}
-                      </button>
+                      </a>
                       <span className="select-none text-border-hover">·</span>
-                      <button
-                        type="button"
-                        onClick={() => navigate("/privacy")}
+                      <a
+                        href="https://nexu.io/privacy"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="cursor-pointer transition-colors hover:text-text-secondary"
                       >
                         {t("auth.privacy")}
-                      </button>
+                      </a>
                     </div>
                   </FadeIn>
                 </div>

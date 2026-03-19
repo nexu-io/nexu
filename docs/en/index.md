@@ -6,7 +6,7 @@ Built on the open-source OpenClaw 🦞, pre-loaded with essential Skills like Fe
 
 Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — chat with it right inside the tools you already use.
 
-![nexu client](/assets/nexu-home.png)
+![nexu client](/assets/nexu-home.webp)
 
 ## Get started
 

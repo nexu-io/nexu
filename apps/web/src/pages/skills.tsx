@@ -4,7 +4,7 @@ import {
   useRefreshCatalog,
 } from "@/hooks/use-community-catalog";
 import { cn } from "@/lib/utils";
-import type { MinimalSkill } from "@/types/desktop";
+import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
 import { Loader2, RefreshCw, Search, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -272,22 +272,47 @@ function CommunityTab() {
   );
 }
 
+const SOURCE_LABELS: Record<string, { label: string; description: string }> = {
+  curated: {
+    label: "Recommended",
+    description: "Pre-installed skills recommended by Nexu",
+  },
+  managed: {
+    label: "Installed",
+    description: "Community skills you installed",
+  },
+};
+
+const SOURCE_ORDER = ["curated", "managed"] as const;
+
 function InstalledTab() {
-  const { data, isLoading } = useCommunitySkills();
+  // Poll every 3s for up to 30s after mount to catch background curated installs.
+  const [pollUntil] = useState(() => Date.now() + 30_000);
+  const shouldPoll = Date.now() < pollUntil;
+  const { data, isLoading } = useCommunitySkills({
+    refetchInterval: shouldPoll ? 3_000 : undefined,
+  });
 
-  const installedSlugs = data?.installedSlugs ?? [];
-  const allSkills = data?.skills ?? [];
+  const installedSkills: InstalledSkill[] = data?.installedSkills ?? [];
+  const allCatalogSkills = data?.skills ?? [];
 
-  const installedSkills = useMemo(() => {
-    const slugSet = new Set(installedSlugs);
-    return allSkills.filter((s) => slugSet.has(s.slug));
-  }, [allSkills, installedSlugs]);
+  const grouped = useMemo(() => {
+    const groups = new Map<string, InstalledSkill[]>();
+    for (const skill of installedSkills) {
+      const existing = groups.get(skill.source) ?? [];
+      existing.push(skill);
+      groups.set(skill.source, existing);
+    }
+    return groups;
+  }, [installedSkills]);
 
-  // Skills installed but not in catalog (show slug-only cards)
-  const unknownSlugs = useMemo(() => {
-    const catalogSlugs = new Set(allSkills.map((s) => s.slug));
-    return installedSlugs.filter((slug) => !catalogSlugs.has(slug));
-  }, [allSkills, installedSlugs]);
+  const catalogMap = useMemo(() => {
+    const map = new Map<string, MinimalSkill>();
+    for (const s of allCatalogSkills) {
+      map.set(s.slug, s);
+    }
+    return map;
+  }, [allCatalogSkills]);
 
   if (isLoading) {
     return (
@@ -297,37 +322,67 @@ function InstalledTab() {
     );
   }
 
-  if (installedSkills.length === 0 && unknownSlugs.length === 0) {
+  if (installedSkills.length === 0) {
     return (
       <div className="text-center py-16">
         <div className="flex justify-center items-center mx-auto mb-3 w-12 h-12 rounded-xl bg-accent/10">
           <Zap size={20} className="text-accent" />
         </div>
-        <p className="text-[13px] text-text-muted">
-          No community skills installed yet
-        </p>
+        <p className="text-[13px] text-text-muted">No skills installed</p>
       </div>
     );
   }
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {installedSkills.map((skill) => (
-        <CommunitySkillCard key={skill.slug} skill={skill} isInstalled />
-      ))}
-      {unknownSlugs.map((slug) => {
-        const placeholder: MinimalSkill = {
-          slug,
-          name: slug,
-          description: "Installed skill (not in catalog)",
-          downloads: 0,
-          stars: 0,
-          tags: [],
-          version: "",
-          updatedAt: "",
+    <div className="space-y-8">
+      {SOURCE_ORDER.map((source) => {
+        const skills = grouped.get(source);
+        if (!skills || skills.length === 0) return null;
+
+        const meta = SOURCE_LABELS[source] ?? {
+          label: source,
+          description: "",
         };
+        const canUninstall = true;
+
         return (
-          <CommunitySkillCard key={slug} skill={placeholder} isInstalled />
+          <div key={source}>
+            <div className="mb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-[13px] font-semibold text-text-primary">
+                  {meta.label}
+                </h3>
+                <span className="text-[11px] text-text-muted tabular-nums">
+                  {skills.length}
+                </span>
+              </div>
+              <p className="text-[11px] text-text-muted mt-0.5">
+                {meta.description}
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {skills.map((skill) => {
+                const catalogEntry = catalogMap.get(skill.slug);
+                const displaySkill: MinimalSkill = catalogEntry ?? {
+                  slug: skill.slug,
+                  name: skill.name || skill.slug,
+                  description: skill.description || `${meta.label} skill`,
+                  downloads: 0,
+                  stars: 0,
+                  tags: [],
+                  version: "",
+                  updatedAt: "",
+                };
+                return (
+                  <CommunitySkillCard
+                    key={skill.slug}
+                    skill={displaySkill}
+                    isInstalled={canUninstall}
+                  />
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </div>
@@ -337,7 +392,8 @@ function InstalledTab() {
 function DesktopSkillsContent() {
   const [desktopTab, setDesktopTab] = useState<DesktopTab>("community");
   const { data } = useCommunitySkills();
-  const installedCount = data?.installedSlugs?.length ?? 0;
+  const installedCount =
+    data?.installedSkills?.length ?? data?.installedSlugs?.length ?? 0;
 
   const desktopTabs: { id: DesktopTab; label: string }[] = [
     { id: "community", label: "Community" },

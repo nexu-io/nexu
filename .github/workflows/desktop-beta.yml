@@ -1,0 +1,28 @@
+name: Desktop Beta
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 18 * * *"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: desktop-beta
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/desktop-build.yml
+    with:
+      environment: nexu-prod
+      cloud_url: "https://nexu.io"
+      link_url: "https://link.nexu.io"
+      update_feed_url: "https://desktop-releases.nexu.io/beta"
+      build_source: "beta"
+      release_tag: desktop-beta
+      release_name: "Nexu Desktop Beta"
+      channel: "beta"
+    secrets: inherit

@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$APP_DIR/../.." && pwd)"
 TMP_DIR="$ROOT_DIR/.tmp"
+DEFAULT_NEXU_CLOUD_URL="http://localhost:5173"
 export NEXU_WORKSPACE_ROOT="$ROOT_DIR"
 export NEXU_DESKTOP_APP_ROOT="$APP_DIR"
 export NEXU_DESKTOP_RUNTIME_ROOT="$TMP_DIR/desktop"
@@ -71,16 +72,13 @@ kill_residual_processes() {
   while IFS= read -r pid; do
     [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
   done < <(pgrep -f "$ROOT_DIR/node_modules/.pnpm/electron@.*/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron \\.$" 2>/dev/null || true)
-  pkill -9 -f "PGliteSocketServer" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/api/dist/index.js" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/gateway/dist/index.js" 2>/dev/null || true
+  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/controller/dist/index.js" 2>/dev/null || true
   pkill -9 -f "$ELECTRON_DIR/node_modules/openclaw/openclaw.mjs" 2>/dev/null || true
   pkill -9 -f "openclaw-gateway" 2>/dev/null || true
   pkill -9 -f "$ROOT_DIR/.tmp/sidecars/openclaw/bin/openclaw" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/pglite/index.js" 2>/dev/null || true
   pkill -9 -f "$ROOT_DIR/.tmp/sidecars/web/index.js" 2>/dev/null || true
 
-  for port in 18789 50800 50810 50832; do
+  for port in 18789 50800 50810; do
     while IFS= read -r pid; do
       [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
     done < <(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
@@ -89,15 +87,12 @@ kill_residual_processes() {
 
 build_runtime() {
   log "building runtime artifacts"
-  local api_port="${NEXU_API_PORT:-50800}"
+  local controller_port="${NEXU_CONTROLLER_PORT:-${NEXU_API_PORT:-50800}}"
   local web_port="${NEXU_WEB_PORT:-50810}"
-  run_logged pnpm --dir "$ELECTRON_DIR" prepare:pglite-sidecar
   run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/shared build
-  run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/api build
-  run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/gateway build
-  run_logged env VITE_API_BASE_URL="http://127.0.0.1:${api_port}" VITE_AUTH_BASE_URL="http://127.0.0.1:${api_port}" pnpm --dir "$ROOT_DIR" --filter @nexu/web build
-  run_logged pnpm --dir "$ELECTRON_DIR" prepare:api-sidecar
-  run_logged pnpm --dir "$ELECTRON_DIR" prepare:gateway-sidecar
+  run_logged pnpm --dir "$ROOT_DIR" --filter @nexu/controller build
+  run_logged env VITE_API_BASE_URL="http://127.0.0.1:${controller_port}" VITE_AUTH_BASE_URL="http://127.0.0.1:${controller_port}" pnpm --dir "$ROOT_DIR" --filter @nexu/web build
+  run_logged pnpm --dir "$ELECTRON_DIR" prepare:controller-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:openclaw-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:web-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" build
@@ -111,7 +106,7 @@ start_session() {
   run_logged pnpm --dir "$ROOT_DIR" exec electron --version
   log "starting tmux session '$SESSION_NAME'"
   tmux new-session -d -s "$SESSION_NAME" \
-    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
+    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_CLOUD_URL=\"${NEXU_CLOUD_URL:-$DEFAULT_NEXU_CLOUD_URL}\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
 }
 
 start() {

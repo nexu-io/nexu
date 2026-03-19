@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-commit hook: auto-format staged files with Biome before committing.
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Or:      git config core.hooksPath scripts
+
+# Only check files that are staged for commit
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|js|jsx|json)$')
+
+if [ -z "$STAGED_FILES" ]; then
+  exit 0
+fi
+
+# Run Biome format on staged files
+echo "$STAGED_FILES" | xargs pnpm exec biome check --write 2>/dev/null
+
+# Re-stage any files that were reformatted
+echo "$STAGED_FILES" | xargs git add
+
+exit 0
