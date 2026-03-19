@@ -130,6 +130,18 @@ function parseModelsJson(modelsJson: string | undefined): string[] {
   }
 }
 
+function readDesktopSelectedModelId(config: NexuConfig): string | null {
+  const selectedModelId =
+    config.desktop &&
+    typeof config.desktop === "object" &&
+    "selectedModelId" in config.desktop
+      ? (config.desktop.selectedModelId as unknown)
+      : null;
+  return typeof selectedModelId === "string" && selectedModelId.length > 0
+    ? selectedModelId
+    : null;
+}
+
 function serializeProvider(
   provider: ControllerProvider,
 ): StoredProviderResponse {
@@ -862,20 +874,37 @@ export class NexuConfigStore {
   }
 
   async disconnectDesktopCloud() {
+    const config = await this.getConfig();
+    const cloudModelIds = new Set(
+      (readDesktopCloud(config).models ?? []).map((model) => model.id),
+    );
+
     if (this.pollingState) {
       this.pollingState.abortController.abort();
       this.pollingState = null;
     }
 
-    await this.setDesktopCloudState({
-      connected: false,
-      polling: false,
-      userName: null,
-      userEmail: null,
-      connectedAt: null,
-      linkUrl: null,
-      apiKey: null,
-      models: [],
+    await this.store.update((currentConfig) => {
+      const selectedModelId = readDesktopSelectedModelId(currentConfig);
+      return {
+        ...currentConfig,
+        desktop: {
+          ...currentConfig.desktop,
+          ...(selectedModelId !== null && cloudModelIds.has(selectedModelId)
+            ? { selectedModelId: null }
+            : {}),
+          cloud: {
+            connected: false,
+            polling: false,
+            userName: null,
+            userEmail: null,
+            connectedAt: null,
+            linkUrl: null,
+            apiKey: null,
+            models: [],
+          },
+        },
+      };
     });
 
     return { ok: true };
@@ -1031,6 +1060,24 @@ export class NexuConfigStore {
   async getRuntimeConfig(): Promise<ControllerRuntimeConfig> {
     const config = await this.getConfig();
     return config.runtime;
+  }
+
+  async getDesktopSelectedModelId(): Promise<string | null> {
+    const config = await this.getConfig();
+    return readDesktopSelectedModelId(config);
+  }
+
+  async setDesktopSelectedModelId(
+    modelId: string | null,
+  ): Promise<string | null> {
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        selectedModelId: modelId,
+      },
+    }));
+    return modelId;
   }
 
   async setRuntimeConfig(

@@ -260,4 +260,64 @@ describe("controller route compatibility", () => {
     );
     expect(latestTemplates.status).toBe(200);
   });
+
+  it("uses the desktop-selected model for compatibility model routes", async () => {
+    const app = createApp(container);
+
+    const setModel = await app.request("/api/internal/desktop/default-model", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ modelId: "gpt-4o" }),
+    });
+    expect(setModel.status).toBe(200);
+
+    const getModel = await app.request("/api/internal/desktop/default-model");
+    expect(getModel.status).toBe(200);
+    await expect(getModel.json()).resolves.toEqual({ modelId: "gpt-4o" });
+  });
+
+  it("lists connected official cloud models alongside BYOK models", async () => {
+    const configStore = (
+      container as unknown as { modelProviderService: { configStore: unknown } }
+    ).modelProviderService.configStore as {
+      setDesktopCloudState(input: {
+        connected: boolean;
+        polling: boolean;
+        models?: Array<{ id: string; name: string; provider?: string }>;
+      }): Promise<void>;
+      upsertProvider(
+        providerId: string,
+        input: { apiKey?: string; modelsJson?: string; enabled?: boolean },
+      ): Promise<unknown>;
+    };
+
+    await configStore.setDesktopCloudState({
+      connected: true,
+      polling: false,
+      models: [{ id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5" }],
+    });
+    await configStore.upsertProvider("openai", {
+      apiKey: "sk-test",
+      enabled: true,
+      modelsJson: JSON.stringify(["gpt-4o"]),
+    });
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/models");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      models: [
+        {
+          id: "claude-sonnet-4-5",
+          name: "Claude Sonnet 4.5",
+          provider: "nexu",
+        },
+        {
+          id: "openai/gpt-4o",
+          name: "gpt-4o",
+          provider: "openai",
+        },
+      ],
+    });
+  });
 });

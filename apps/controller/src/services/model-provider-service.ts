@@ -33,7 +33,26 @@ export class ModelProviderService {
 
   async listModels() {
     const config = await this.configStore.getConfig();
+    const cloud =
+      config.desktop &&
+      typeof config.desktop === "object" &&
+      "cloud" in config.desktop &&
+      typeof config.desktop.cloud === "object" &&
+      config.desktop.cloud !== null
+        ? (config.desktop.cloud as {
+            connected?: boolean;
+            models?: Array<{ id: string; name: string; provider?: string }>;
+          })
+        : null;
     const providers = config.providers.filter((provider) => provider.enabled);
+    const cloudModels =
+      cloud?.connected === true && Array.isArray(cloud.models)
+        ? cloud.models.map((model) => ({
+            id: model.id,
+            name: model.name,
+            provider: model.provider ?? "nexu",
+          }))
+        : [];
     const models = providers.flatMap((provider) =>
       provider.models.map((modelId) => ({
         id: `${provider.providerId}/${modelId}`,
@@ -43,7 +62,7 @@ export class ModelProviderService {
     );
 
     return {
-      models,
+      models: [...cloudModels, ...models],
     };
   }
 
@@ -62,6 +81,14 @@ export class ModelProviderService {
 
   async deleteProvider(providerId: string) {
     return this.configStore.deleteProvider(providerId);
+  }
+
+  async getSelectedModelId() {
+    return this.configStore.getDesktopSelectedModelId();
+  }
+
+  async setSelectedModelId(modelId: string | null) {
+    return this.configStore.setDesktopSelectedModelId(modelId);
   }
 
   async verifyProvider(

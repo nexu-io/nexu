@@ -625,8 +625,7 @@ function CurrentModelSelector({
               <Cpu size={16} className="text-accent shrink-0" />
             )}
             <span className="text-[13px] font-medium text-text-primary truncate">
-              {currentModel?.name ??
-                (currentModelId || t("models.noModelConfigured"))}
+              {currentModel?.name ?? t("models.noModelConfigured")}
             </span>
             {currentGroupKey && (
               <span className="text-[10px] text-text-muted/60 shrink-0">
@@ -1255,6 +1254,11 @@ function ManagedProviderDetail({
                 onClick={async () => {
                   await postApiInternalDesktopCloudDisconnect().catch(() => {});
                   setCloudConnected(false);
+                  queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
+                  queryClient.invalidateQueries({ queryKey: ["models"] });
+                  queryClient.invalidateQueries({
+                    queryKey: ["desktop-default-model"],
+                  });
                 }}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-red-500/70 hover:text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
               >
@@ -1305,7 +1309,7 @@ function ManagedProviderDetail({
       )}
 
       {/* Connected cloud models (from API) — read-only */}
-      {provider.models.length > 0 && (
+      {cloudConnected && provider.models.length > 0 && (
         <div className="mb-6">
           <div className="text-[13px] font-semibold text-text-primary mb-3">
             {t("models.managed.availableModels")}
@@ -1352,12 +1356,12 @@ function ManagedProviderDetail({
       )}
 
       {/* Link provider catalog */}
-      {catalogLoading ? (
+      {cloudConnected && catalogLoading ? (
         <div className="flex items-center gap-2 text-[12px] text-text-muted py-4">
           <Loader2 size={14} className="animate-spin" />
           {t("models.managed.loadingCatalog")}
         </div>
-      ) : linkProviders.length > 0 ? (
+      ) : cloudConnected && linkProviders.length > 0 ? (
         <LinkModelCatalog
           linkProviders={linkProviders}
           totalModels={totalModels}

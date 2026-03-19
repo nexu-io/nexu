@@ -115,4 +115,46 @@ describe("NexuConfigStore", () => {
     expect(config.schemaVersion).toBe(1);
     expect(config.$schema).toBe("https://nexu.io/config.json");
   });
+
+  it("clears the selected official model when cloud is disconnected", async () => {
+    const store = new NexuConfigStore(env);
+    const internals = store as unknown as {
+      setDesktopCloudState(input: {
+        connected: boolean;
+        polling: boolean;
+        userName?: string | null;
+        userEmail?: string | null;
+        connectedAt?: string | null;
+        linkUrl?: string | null;
+        apiKey?: string | null;
+        models?: Array<{ id: string; name: string; provider?: string }>;
+      }): Promise<void>;
+    };
+
+    await store.setDesktopSelectedModelId("claude-sonnet-4-5");
+    await internals.setDesktopCloudState({
+      connected: true,
+      polling: false,
+      userName: "Desktop User",
+      userEmail: "desktop@nexu.local",
+      connectedAt: new Date().toISOString(),
+      linkUrl: "https://nexu.test",
+      apiKey: "cloud-key",
+      models: [
+        {
+          id: "claude-sonnet-4-5",
+          name: "claude-sonnet-4-5",
+          provider: "nexu",
+        },
+      ],
+    });
+
+    await store.disconnectDesktopCloud();
+
+    expect(await store.getDesktopSelectedModelId()).toBeNull();
+    await expect(store.getDesktopCloudStatus()).resolves.toMatchObject({
+      connected: false,
+      models: [],
+    });
+  });
 });
