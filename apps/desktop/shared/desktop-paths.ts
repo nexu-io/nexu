@@ -1,5 +1,9 @@
 import { resolve } from "node:path";
 
+export function getDesktopNexuHomeDir(userDataPath: string): string {
+  return resolve(userDataPath, ".nexu");
+}
+
 export function getOpenclawSkillsDir(userDataPath: string): string {
   return resolve(userDataPath, "runtime/openclaw/state/skills");
 }

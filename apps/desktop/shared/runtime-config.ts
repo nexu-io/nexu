@@ -8,6 +8,7 @@ export const DEFAULT_OPENCLAW_BASE_URL = "http://127.0.0.1:18789";
 export const DEFAULT_GATEWAY_TOKEN = "gw-secret-token";
 export const DEFAULT_SKILL_TOKEN = "skill-secret-token";
 export const DEFAULT_GATEWAY_POOL_ID = "desktop-local-pool";
+export const DEFAULT_NEXU_HOME = "~/.nexu";
 export const DEFAULT_PGLITE_DATABASE_URL = (port: number) =>
   `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
 
@@ -59,6 +60,7 @@ export type DesktopRuntimeConfig = {
     poolId: string;
   };
   paths: {
+    nexuHome: string;
     openclawBin: string;
   };
   desktopAuth: {
@@ -130,6 +132,7 @@ export function getDesktopRuntimeConfig(
       poolId: env.NEXU_GATEWAY_POOL_ID ?? DEFAULT_GATEWAY_POOL_ID,
     },
     paths: {
+      nexuHome: env.NEXU_HOME ?? buildConfig.NEXU_HOME ?? DEFAULT_NEXU_HOME,
       openclawBin:
         env.NEXU_OPENCLAW_BIN ??
         defaults?.openclawBinPath ??

@@ -766,7 +766,11 @@ function DiagnosticsActionCard({
   );
 }
 
-function DiagnosticsPage() {
+function DiagnosticsPage({
+  runtimeConfig,
+}: {
+  runtimeConfig: DesktopRuntimeConfig | null;
+}) {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [diagnosticsInfo, setDiagnosticsInfo] =
     useState<DiagnosticsInfo | null>(null);
@@ -876,6 +880,11 @@ function DiagnosticsPage() {
                 : "local-only"
               : "-"
           }
+        />
+        <SummaryCard
+          label="Nexu Home"
+          className="diagnostics-summary-wide"
+          value={runtimeConfig?.paths.nexuHome ?? "-"}
         />
         <SummaryCard
           label="Crash dumps"
@@ -1114,7 +1123,7 @@ function DesktopShell() {
             display: activeSurface === "diagnostics" ? "contents" : "none",
           }}
         >
-          <DiagnosticsPage />
+          <DiagnosticsPage runtimeConfig={runtimeConfig} />
         </div>
       </main>
 

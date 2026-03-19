@@ -10,7 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import * as path from "node:path";
-import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
+import {
+  getDesktopNexuHomeDir,
+  getOpenclawSkillsDir,
+} from "../../shared/desktop-paths";
 import {
   type DesktopRuntimeConfig,
   getDesktopRuntimeConfig,
@@ -225,6 +228,7 @@ export function createRuntimeUnitManifests(
   const logsDir = ensureDir(
     path.resolve(userDataPath, "../logs/runtime-units"),
   );
+  const nexuHomeDir = ensureDir(getDesktopNexuHomeDir(userDataPath));
   const pgliteDataPath = ensureDir(path.resolve(runtimeRoot, "pglite"));
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(
@@ -339,6 +343,7 @@ export function createRuntimeUnitManifests(
         PORT: String(apiPort),
         WEB_URL: webUrl,
         HOST: "127.0.0.1",
+        NEXU_HOME: nexuHomeDir,
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
