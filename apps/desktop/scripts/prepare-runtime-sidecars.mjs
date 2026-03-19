@@ -49,7 +49,6 @@ async function main() {
   const scripts = [
     "prepare:controller-sidecar",
     "prepare:openclaw-sidecar",
-    "prepare:pglite-sidecar",
     "prepare:web-sidecar",
   ];
 

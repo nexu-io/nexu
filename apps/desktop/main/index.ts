@@ -227,10 +227,13 @@ function logRendererEvent({
   });
 }
 
-async function waitForApiReadiness(): Promise<void> {
+async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
+  const probeUrl = new URL(
+    "/api/auth/get-session",
+    runtimeConfig.urls.controllerBase,
+  );
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -242,32 +245,30 @@ async function waitForApiReadiness(): Promise<void> {
 
       if (response.status < 500) {
         logColdStart(
-          `api ready via ${probeUrl.pathname} status=${response.status}`,
+          `controller ready via ${probeUrl.pathname} status=${response.status}`,
         );
         return;
       }
     } catch {
-      // Ignore transient startup failures while the socket and DB warm up.
+      // Ignore transient startup failures while the controller starts.
     }
 
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  throw new Error(`API readiness probe timed out for ${probeUrl.toString()}`);
+  throw new Error(
+    `Controller readiness probe timed out for ${probeUrl.toString()}`,
+  );
 }
 
 async function runDesktopColdStart(): Promise<void> {
-  diagnosticsReporter?.markColdStartRunning("starting pglite");
-  logColdStart("starting pglite");
-  await orchestrator.startOne("pglite");
+  diagnosticsReporter?.markColdStartRunning("starting controller");
+  logColdStart("starting controller");
+  await orchestrator.startOne("controller");
 
-  diagnosticsReporter?.markColdStartRunning("starting api");
-  logColdStart("starting api");
-  await orchestrator.startOne("api");
-
-  diagnosticsReporter?.markColdStartRunning("waiting for api readiness");
-  logColdStart("waiting for api readiness");
-  await waitForApiReadiness();
+  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
+  logColdStart("waiting for controller readiness");
+  await waitForControllerReadiness();
 
   diagnosticsReporter?.markColdStartRunning(
     "bootstrapping desktop auth session",
@@ -280,10 +281,6 @@ async function runDesktopColdStart(): Promise<void> {
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
-
-  diagnosticsReporter?.markColdStartRunning("starting gateway");
-  logColdStart("starting gateway");
-  await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
@@ -321,7 +318,7 @@ function triggerDesktopAuthRecovery(reason: string): void {
 function installDesktopAuthRecoveryHooks(): void {
   session.defaultSession.webRequest.onCompleted(
     {
-      urls: [`${runtimeConfig.urls.apiBase}/api/auth/*`],
+      urls: [`${runtimeConfig.urls.controllerBase}/api/auth/*`],
     },
     (details) => {
       if (

@@ -121,14 +121,14 @@ export function registerIpcHandlers(
           return undefined;
         }
 
-        case "env:get-api-base-url": {
-          const apiBaseUrl = getDesktopRuntimeConfig(process.env, {
+        case "env:get-controller-base-url": {
+          const controllerBaseUrl = getDesktopRuntimeConfig(process.env, {
             appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
-          }).urls.apiBase;
+          }).urls.controllerBase;
 
-          const result: HostInvokeResultMap["env:get-api-base-url"] = {
-            apiBaseUrl,
+          const result: HostInvokeResultMap["env:get-controller-base-url"] = {
+            controllerBaseUrl,
           };
 
           return result;

@@ -2,20 +2,14 @@ import { app, session } from "electron";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { parseSetCookieHeader } from "./cookies";
 
-type PgPoolConstructor = typeof import("pg").Pool;
-
 const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
 });
 
-export const desktopApiUrl = runtimeConfig.urls.apiBase;
+export const desktopControllerUrl = runtimeConfig.urls.controllerBase;
 export const desktopWebUrl = runtimeConfig.urls.web;
 
 let ensureSessionPromise: Promise<void> | null = null;
-
-function getDatabaseUrl(): string {
-  return runtimeConfig.database.pgliteUrl;
-}
 
 function getAuthHeaders(): Record<string, string> {
   return {
@@ -45,14 +39,17 @@ async function hasValidDesktopAuthSession(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${desktopApiUrl}/api/auth/get-session`, {
-      headers: {
-        Accept: "application/json",
-        Cookie: cookieHeader,
-        Origin: desktopWebUrl,
-        Referer: `${desktopWebUrl}/`,
+    const response = await fetch(
+      `${desktopControllerUrl}/api/auth/get-session`,
+      {
+        headers: {
+          Accept: "application/json",
+          Cookie: cookieHeader,
+          Origin: desktopWebUrl,
+          Referer: `${desktopWebUrl}/`,
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       return false;
@@ -71,7 +68,7 @@ async function hasValidDesktopAuthSession(): Promise<boolean> {
 }
 
 async function ensureDesktopBootstrapUser(): Promise<void> {
-  await fetch(`${desktopApiUrl}/api/auth/sign-up/email`, {
+  await fetch(`${desktopControllerUrl}/api/auth/sign-up/email`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -80,20 +77,6 @@ async function ensureDesktopBootstrapUser(): Promise<void> {
       password: runtimeConfig.desktopAuth.password,
     }),
   }).catch(() => null);
-
-  const { Pool } = (await import("pg")) as { Pool: PgPoolConstructor };
-  const pool = new Pool({
-    connectionString: getDatabaseUrl(),
-  });
-
-  try {
-    await pool.query(
-      'update "user" set "emailVerified" = true where email = $1',
-      [runtimeConfig.desktopAuth.email],
-    );
-  } finally {
-    await pool.end();
-  }
 }
 
 async function signInDesktopBootstrapUser(): Promise<{
@@ -101,7 +84,7 @@ async function signInDesktopBootstrapUser(): Promise<{
   setCookieHeader: string;
 }> {
   const signInResponse = await fetch(
-    `${desktopApiUrl}/api/auth/sign-in/email`,
+    `${desktopControllerUrl}/api/auth/sign-in/email`,
     {
       method: "POST",
       headers: getAuthHeaders(),
@@ -145,120 +128,6 @@ async function signInDesktopBootstrapUser(): Promise<{
   };
 }
 
-async function ensureDesktopAppUser(authUserId: string): Promise<void> {
-  const { Pool } = (await import("pg")) as { Pool: PgPoolConstructor };
-  const pool = new Pool({
-    connectionString: getDatabaseUrl(),
-  });
-
-  try {
-    const now = new Date().toISOString();
-    await pool.query(
-      `insert into users (
-        id,
-        auth_user_id,
-        plan,
-        invite_accepted_at,
-        onboarding_role,
-        onboarding_company,
-        onboarding_use_cases,
-        onboarding_referral_source,
-        onboarding_referral_detail,
-        onboarding_channel_votes,
-        onboarding_avatar,
-        onboarding_avatar_votes,
-        onboarding_completed_at,
-        created_at,
-        updated_at
-      ) values (
-        $1, $2, 'free', $3, $4, '', '[]', 'desktop-bootstrap', '', '[]', 'builder', '[]', $5, $6, $7
-      )
-      on conflict (auth_user_id) do update set
-        invite_accepted_at = excluded.invite_accepted_at,
-        onboarding_role = excluded.onboarding_role,
-        onboarding_company = excluded.onboarding_company,
-        onboarding_use_cases = excluded.onboarding_use_cases,
-        onboarding_referral_source = excluded.onboarding_referral_source,
-        onboarding_referral_detail = excluded.onboarding_referral_detail,
-        onboarding_channel_votes = excluded.onboarding_channel_votes,
-        onboarding_avatar = excluded.onboarding_avatar,
-        onboarding_avatar_votes = excluded.onboarding_avatar_votes,
-        onboarding_completed_at = excluded.onboarding_completed_at,
-        updated_at = excluded.updated_at`,
-      [
-        runtimeConfig.desktopAuth.appUserId,
-        authUserId,
-        now,
-        runtimeConfig.desktopAuth.onboardingRole,
-        now,
-        now,
-        now,
-      ],
-    );
-
-    // Ensure a gateway pool exists for local desktop runtime.
-    // The pool ID must match the gateway's RUNTIME_POOL_ID (defaults to "desktop-local-pool"
-    // in manifests.ts) so that generatePoolConfig() can find bots assigned to this pool.
-    const gatewayPoolId =
-      process.env.NEXU_GATEWAY_POOL_ID ?? "desktop-local-pool";
-    await pool.query(
-      `INSERT INTO gateway_pools (id, pool_name, pool_type, max_bots, status, pod_ip, created_at)
-       VALUES ($2, 'desktop-local', 'shared', 50, 'active', '127.0.0.1', $1)
-       ON CONFLICT (id) DO UPDATE SET pod_ip = '127.0.0.1', status = 'active'`,
-      [now, gatewayPoolId],
-    );
-
-    // Migrate bots & assignments from the legacy pool ID ("pool_local_01") to the
-    // current gateway pool ID so that generatePoolConfig() picks them up.
-    const legacyPoolId = "pool_local_01";
-    if (gatewayPoolId !== legacyPoolId) {
-      await pool.query(
-        "UPDATE bots SET pool_id = $1, updated_at = $2 WHERE pool_id = $3",
-        [gatewayPoolId, now, legacyPoolId],
-      );
-      await pool.query(
-        "UPDATE gateway_assignments SET pool_id = $1 WHERE pool_id = $2",
-        [gatewayPoolId, legacyPoolId],
-      );
-      // Clean up the legacy pool row
-      await pool.query("DELETE FROM gateway_pools WHERE id = $1", [
-        legacyPoolId,
-      ]);
-    }
-
-    // Ensure at least one bot exists so the /api/internal/desktop/ready
-    // endpoint returns 200 and the webview can mount.
-    const botResult = (await pool.query(
-      "SELECT id FROM bots WHERE user_id = $1 LIMIT 1",
-      [runtimeConfig.desktopAuth.appUserId],
-    )) as { rows: Array<{ id: string }> };
-    if (botResult.rows.length === 0) {
-      const botId = `bot_desktop_${Date.now()}`;
-      await pool.query(
-        `INSERT INTO bots (id, user_id, name, slug, model_id, pool_id, created_at, updated_at)
-         VALUES ($1, $2, 'My Bot', 'my-bot', $3, $4, $5, $6)
-         ON CONFLICT DO NOTHING`,
-        [
-          botId,
-          runtimeConfig.desktopAuth.appUserId,
-          process.env.DEFAULT_MODEL_ID ?? "link/claude-sonnet-4-5",
-          gatewayPoolId,
-          now,
-          now,
-        ],
-      );
-      await pool.query(
-        `INSERT INTO gateway_assignments (id, bot_id, pool_id, assigned_at)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT DO NOTHING`,
-        [`ga_desktop_${Date.now()}`, botId, gatewayPoolId, now],
-      );
-    }
-  } finally {
-    await pool.end();
-  }
-}
-
 async function persistDesktopSessionCookies(
   setCookieHeader: string,
 ): Promise<void> {
@@ -298,7 +167,6 @@ async function runEnsureDesktopAuthSession(force: boolean): Promise<void> {
 
   await ensureDesktopBootstrapUser();
   const { authUserId, setCookieHeader } = await signInDesktopBootstrapUser();
-  await ensureDesktopAppUser(authUserId);
   await persistDesktopSessionCookies(setCookieHeader);
 
   if (!(await hasValidDesktopAuthSession())) {

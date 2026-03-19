@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -21,62 +20,9 @@ import {
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
 
-/**
- * Returns a stable 32-byte hex encryption key for the desktop API sidecar.
- * Generated once and persisted to disk so encrypted data survives restarts.
- */
-function ensureEncryptionKey(runtimeRoot: string): string {
-  const keyPath = path.resolve(runtimeRoot, ".encryption-key");
-  try {
-    const existing = readFileSync(keyPath, "utf8").trim();
-    if (/^[0-9a-f]{64}$/i.test(existing)) return existing;
-  } catch {
-    // Generate new key
-  }
-  const key = randomBytes(32).toString("hex");
-  writeFileSync(keyPath, key, { mode: 0o600 });
-  return key;
-}
-
 function ensureDir(path: string): string {
   mkdirSync(path, { recursive: true });
   return path;
-}
-
-function resetDir(path: string): string {
-  rmSync(path, { recursive: true, force: true });
-  mkdirSync(path, { recursive: true });
-  return path;
-}
-
-const PGLITE_STATE_VERSION = "0.4.0";
-
-function readPgliteStateVersion(runtimeRoot: string): string | null {
-  const versionPath = path.resolve(runtimeRoot, "pglite-version.txt");
-
-  try {
-    return readFileSync(versionPath, "utf8").trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-function writePgliteStateVersion(runtimeRoot: string, version: string): void {
-  const versionPath = path.resolve(runtimeRoot, "pglite-version.txt");
-  writeFileSync(versionPath, `${version}\n`);
-}
-
-function ensurePgliteDataDir(runtimeRoot: string): string {
-  const pgliteDataPath = path.resolve(runtimeRoot, "pglite");
-  const existingVersion = readPgliteStateVersion(runtimeRoot);
-
-  if (existingVersion !== PGLITE_STATE_VERSION) {
-    resetDir(pgliteDataPath);
-    writePgliteStateVersion(runtimeRoot, PGLITE_STATE_VERSION);
-    return pgliteDataPath;
-  }
-
-  return ensureDir(pgliteDataPath);
 }
 
 function getBooleanEnv(name: string, fallback: boolean): boolean {
@@ -264,7 +210,6 @@ export function createRuntimeUnitManifests(
   const logsDir = ensureDir(
     path.resolve(userDataPath, "../logs/runtime-units"),
   );
-  const pgliteDataPath = ensurePgliteDataDir(runtimeRoot);
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(
     path.resolve(openclawRuntimeRoot, "config"),
@@ -281,23 +226,19 @@ export function createRuntimeUnitManifests(
     openclawSidecarRoot,
     "node_modules/openclaw",
   );
-  const apiSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "api");
-  const apiModulePath = path.resolve(apiSidecarRoot, "dist/index.js");
-  const gatewaySidecarRoot = path.resolve(runtimeSidecarBaseRoot, "gateway");
-  const gatewayModulePath = path.resolve(gatewaySidecarRoot, "dist/index.js");
-  const pgliteSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "pglite");
-  const pgliteModulePath = path.resolve(pgliteSidecarRoot, "index.js");
-  const migrationsDir = path.resolve(pgliteSidecarRoot, "migrations");
+  const controllerSidecarRoot = path.resolve(
+    runtimeSidecarBaseRoot,
+    "controller",
+  );
+  const controllerModulePath = path.resolve(
+    controllerSidecarRoot,
+    "dist/index.js",
+  );
   const webSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "web");
   const webModulePath = path.resolve(webSidecarRoot, "index.js");
-  const apiPort = runtimeConfig.ports.api;
-  const pglitePort = runtimeConfig.ports.pglite;
+  const controllerPort = runtimeConfig.ports.controller;
   const webPort = runtimeConfig.ports.web;
-  const internalApiToken = runtimeConfig.tokens.internalApi;
-  const skillApiToken = runtimeConfig.tokens.skill;
-  const gatewayPoolId = runtimeConfig.gateway.poolId;
   const webUrl = runtimeConfig.urls.web;
-  const authUrl = runtimeConfig.urls.auth;
   const electronNodeRunner = resolveElectronNodeRunner();
   const openclawNodePath = buildOpenclawNodePath(openclawSidecarRoot);
 
@@ -323,7 +264,7 @@ export function createRuntimeUnitManifests(
         ELECTRON_RUN_AS_NODE: "1",
         WEB_HOST: "127.0.0.1",
         WEB_PORT: String(webPort),
-        WEB_API_ORIGIN: runtimeConfig.urls.apiBase,
+        WEB_API_ORIGIN: runtimeConfig.urls.controllerBase,
       },
     },
     {
@@ -336,29 +277,8 @@ export function createRuntimeUnitManifests(
       logFilePath: path.resolve(logsDir, "control-plane.log"),
     },
     {
-      id: "pglite",
-      label: "PGlite Socket",
-      kind: "service",
-      launchStrategy: "managed",
-      runner: "utility-process",
-      modulePath: pgliteModulePath,
-      cwd: pgliteSidecarRoot,
-      port: pglitePort,
-      startupTimeoutMs: 10_000,
-      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_PGLITE", true),
-      logFilePath: path.resolve(logsDir, "pglite.log"),
-      // API depends on PGlite - restart API when PGlite restarts
-      dependents: ["api"],
-      env: {
-        PGLITE_DATA_DIR: pgliteDataPath,
-        PGLITE_HOST: "127.0.0.1",
-        PGLITE_PORT: String(pglitePort),
-        PGLITE_MIGRATIONS_DIR: migrationsDir,
-      },
-    },
-    {
-      id: "api",
-      label: "Nexu API",
+      id: "controller",
+      label: "Nexu Controller",
       kind: "service",
       launchStrategy: "managed",
       // Use spawn instead of utility-process due to Electron bugs:
@@ -368,69 +288,34 @@ export function createRuntimeUnitManifests(
       //   Utility process uses hidden network context, not session.defaultSession
       runner: "spawn",
       command: electronNodeRunner,
-      args: [apiModulePath],
-      cwd: apiSidecarRoot,
-      port: apiPort,
+      args: [controllerModulePath],
+      cwd: controllerSidecarRoot,
+      port: controllerPort,
       startupTimeoutMs: 20_000,
-      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_API", true),
-      logFilePath: path.resolve(logsDir, "api.log"),
+      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_CONTROLLER", true),
+      logFilePath: path.resolve(logsDir, "controller.log"),
       env: {
         ELECTRON_RUN_AS_NODE: "1",
         FORCE_COLOR: "1",
-        PORT: String(apiPort),
-        DATABASE_URL: runtimeConfig.database.pgliteUrl,
-        BETTER_AUTH_URL: authUrl,
+        PORT: String(controllerPort),
+        HOST: "127.0.0.1",
         WEB_URL: webUrl,
-        INTERNAL_API_TOKEN: internalApiToken,
-        SKILL_API_TOKEN: skillApiToken,
-        ENCRYPTION_KEY: ensureEncryptionKey(runtimeRoot),
-        NEXU_DESKTOP_MODE: "true",
+        NEXU_HOME: runtimeConfig.paths.nexuHome,
         NEXU_CLOUD_URL: runtimeConfig.urls.nexuCloud,
         ...(runtimeConfig.urls.nexuLink
           ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
           : {}),
         OPENCLAW_STATE_DIR: openclawStateDir,
-        SKILLHUB_CACHE_DIR: path.resolve(runtimeRoot, "skillhub-cache"),
-        OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
-        OPENCLAW_CURATED_SKILLS_DIR: getOpenclawCuratedSkillsDir(userDataPath),
-      },
-    },
-    {
-      id: "gateway",
-      label: "Nexu Gateway",
-      kind: "service",
-      launchStrategy: "managed",
-      // Use spawn instead of utility-process due to Electron bugs:
-      // - https://github.com/electron/electron/issues/43186
-      //   Network requests fail with ECONNRESET after event loop blocking
-      // - https://github.com/electron/electron/issues/44727
-      //   Utility process uses hidden network context, not session.defaultSession
-      runner: "spawn",
-      command: electronNodeRunner,
-      args: [gatewayModulePath],
-      cwd: gatewaySidecarRoot,
-      port: null,
-      autoStart: getBooleanEnv("NEXU_DESKTOP_AUTOSTART_GATEWAY", true),
-      logFilePath: path.resolve(logsDir, "gateway.log"),
-      env: {
-        ELECTRON_RUN_AS_NODE: "1",
-        FORCE_COLOR: "1",
-        NODE_ENV: "development",
-        RUNTIME_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
-        RUNTIME_POOL_ID: gatewayPoolId,
-        INTERNAL_API_TOKEN: internalApiToken,
-        SKILL_API_TOKEN: skillApiToken,
-        OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
-        OPENCLAW_CURATED_SKILLS_DIR: getOpenclawCuratedSkillsDir(userDataPath),
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
-        OPENCLAW_ELECTRON_EXECUTABLE: electronNodeRunner,
         OPENCLAW_EXTENSIONS_DIR: path.resolve(
           openclawPackageRoot,
           "extensions",
         ),
-        OPENCLAW_DISABLE_BONJOUR: "1",
+        OPENCLAW_GATEWAY_PORT: String(
+          new URL(runtimeConfig.urls.openclawBase).port || 18789,
+        ),
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
