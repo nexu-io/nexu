@@ -1,5 +1,5 @@
 import { GatewayClient } from "../runtime/gateway-client.js";
-import { startHealthLoop, startSyncLoop } from "../runtime/loops.js";
+import { startHealthLoop } from "../runtime/loops.js";
 import { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../runtime/openclaw-process.js";
 import { OpenClawSkillsWriter } from "../runtime/openclaw-skills-writer.js";
@@ -114,11 +114,6 @@ export function createContainer(): ControllerContainer {
     gatewayService,
     runtimeState,
     startBackgroundLoops: () => {
-      const stopSyncLoop = startSyncLoop({
-        env,
-        state: runtimeState,
-        syncService: openclawSyncService,
-      });
       const stopHealthLoop = startHealthLoop({
         env,
         state: runtimeState,
@@ -128,7 +123,6 @@ export function createContainer(): ControllerContainer {
       skillhubService.start();
 
       return () => {
-        stopSyncLoop();
         stopHealthLoop();
         skillhubService.dispose();
         wsClient.stop();

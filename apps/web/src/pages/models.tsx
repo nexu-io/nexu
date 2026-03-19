@@ -1644,14 +1644,28 @@ function ByokProviderDetail({
 
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
-    mutationFn: () =>
-      saveProvider(providerId, {
+    mutationFn: async () => {
+      // Auto-fetch models if none available (e.g. custom provider without verify)
+      let models = displayModels;
+      if (models.length === 0 && apiKey) {
+        const result = await verifyApiKey(
+          providerId,
+          apiKey,
+          baseUrl || undefined,
+        );
+        if (result.valid && result.models && result.models.length > 0) {
+          models = result.models;
+          setVerifiedModels(result.models);
+        }
+      }
+      return saveProvider(providerId, {
         apiKey: apiKey || undefined,
         baseUrl: baseUrl || null,
         displayName: meta.name,
         enabled: true,
-        modelsJson: JSON.stringify(displayModels),
-      }),
+        modelsJson: JSON.stringify(models),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });

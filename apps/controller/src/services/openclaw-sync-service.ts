@@ -1,4 +1,5 @@
 import type { ControllerEnv } from "../app/env.js";
+import { logger } from "../lib/logger.js";
 import { compileOpenClawConfig } from "../lib/openclaw-config-compiler.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import type { OpenClawSkillsWriter } from "../runtime/openclaw-skills-writer.js";
@@ -8,14 +9,18 @@ import type { CompiledOpenClawStore } from "../store/compiled-openclaw-store.js"
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 
-const logger = {
-  warn: (obj: Record<string, unknown>) => console.warn(JSON.stringify(obj)),
-};
-
 export class OpenClawSyncService {
   private pendingSync: Promise<{ configPushed: boolean }> | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private static readonly DEBOUNCE_MS = 500;
+  private settling = false;
+  private settlingDirty = false;
+  private settlingResolvers: Array<{
+    resolve: (v: { configPushed: boolean }) => void;
+    reject: (e: unknown) => void;
+  }> = [];
+  private static readonly DEBOUNCE_MS = 100;
+  private static readonly SETTLING_MS = 3000;
+  private syncCounter = 0;
 
   constructor(
     private readonly env: ControllerEnv,
@@ -36,10 +41,58 @@ export class OpenClawSyncService {
   }
 
   /**
-   * Debounced sync: coalesces rapid calls within 500ms into a single
-   * execution, preventing OpenClaw from restart-looping during setup.
+   * Enter settling mode after bootstrap. All syncAll() calls during
+   * this period are deferred. After SETTLING_MS, one final sync fires.
+   * This prevents OpenClaw restart-looping during initial setup
+   * (cloud connect, model selection, bot creation, etc.).
+   */
+  beginSettling(): void {
+    this.settling = true;
+    this.settlingDirty = false;
+    logger.info(
+      {},
+      `sync settling started (${OpenClawSyncService.SETTLING_MS}ms)`,
+    );
+    setTimeout(() => this.endSettling(), OpenClawSyncService.SETTLING_MS);
+  }
+
+  private endSettling(): void {
+    this.settling = false;
+    const resolvers = [...this.settlingResolvers];
+    this.settlingResolvers = [];
+
+    if (this.settlingDirty) {
+      this.settlingDirty = false;
+      logger.info({}, "sync settling ended — flushing deferred sync");
+      const p = this.doSync();
+      p.then(
+        (result) => {
+          for (const r of resolvers) r.resolve(result);
+        },
+        (err) => {
+          for (const r of resolvers) r.reject(err);
+        },
+      );
+    } else {
+      logger.info({}, "sync settling ended — no deferred changes");
+      for (const r of resolvers) r.resolve({ configPushed: false });
+    }
+  }
+
+  /**
+   * Debounced sync: coalesces rapid calls within 100ms into a single
+   * execution. During settling mode (startup), calls are deferred
+   * entirely and flushed once at the end.
    */
   async syncAll(): Promise<{ configPushed: boolean }> {
+    if (this.settling) {
+      this.settlingDirty = true;
+      logger.debug({}, "syncAll deferred (settling mode)");
+      return new Promise((resolve, reject) => {
+        this.settlingResolvers.push({ resolve, reject });
+      });
+    }
+
     // If a sync is already in flight, wait for it and schedule another after
     if (this.pendingSync) {
       await this.pendingSync.catch(() => {});
@@ -61,16 +114,27 @@ export class OpenClawSyncService {
   }
 
   /**
-   * Immediate sync bypassing debounce. Used during bootstrap where
-   * we need the config written before OpenClaw starts.
+   * Immediate sync bypassing debounce and settling.
+   * Used during bootstrap where we need the config written before OpenClaw starts.
    */
   async syncAllImmediate(): Promise<{ configPushed: boolean }> {
     return this.doSync();
   }
 
   private async doSync(): Promise<{ configPushed: boolean }> {
+    const seq = ++this.syncCounter;
     const config = await this.configStore.getConfig();
     const compiled = compileOpenClawConfig(config, this.env);
+
+    logger.info(
+      {
+        seq,
+        modelProviders: Object.keys(compiled.models?.providers ?? {}),
+        channels: Object.keys(compiled.channels ?? {}),
+        wsConnected: this.gatewayService.isConnected(),
+      },
+      "doSync: pushing config to OpenClaw",
+    );
 
     // 1. Try WS push first (instant effect)
     let configPushed = false;
@@ -78,10 +142,10 @@ export class OpenClawSyncService {
       try {
         configPushed = await this.gatewayService.pushConfig(compiled);
       } catch (err) {
-        logger.warn({
-          message: "openclaw_ws_push_failed",
-          error: err instanceof Error ? err.message : String(err),
-        });
+        logger.warn(
+          { error: err instanceof Error ? err.message : String(err) },
+          "openclaw WS push failed",
+        );
       }
     }
 
@@ -96,6 +160,7 @@ export class OpenClawSyncService {
       await this.watchTrigger.touchConfig();
     }
 
+    logger.info({ seq, configPushed }, "doSync: complete");
     return { configPushed };
   }
 }

@@ -19,6 +19,11 @@ export async function bootstrapController(
     await container.openclawSyncService.compileCurrentConfig(),
   );
 
+  // Enter settling mode: all syncAll() calls during the next 3s are
+  // deferred and flushed once at the end, preventing multiple config.apply
+  // restarts from async setup (cloud connect, model selection, bot creation).
+  container.openclawSyncService.beginSettling();
+
   container.openclawProcess.enableAutoRestart();
   container.openclawProcess.start();
 
