@@ -1,28 +1,28 @@
-name: Desktop Nightly (Prod)
+name: Desktop Nightly
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 17 * * *"
+    - cron: "0 0 * * *"
 
 permissions:
   contents: write
   actions: write
 
 concurrency:
-  group: desktop-nightly-prod
+  group: desktop-nightly
   cancel-in-progress: false
 
 jobs:
   build:
     uses: ./.github/workflows/desktop-build.yml
     with:
-      environment: prod
-      cloud_url: "https://nexu.io"
-      link_url: "https://link.nexu.io"
+      environment: nexu-test
+      cloud_url: "https://nexu.powerformer.net"
+      link_url: "https://nexu-link.powerformer.net"
       update_feed_url: "https://desktop-releases.nexu.io/nightly"
-      build_source: "nightly-prod"
+      build_source: "nightly"
       release_tag: desktop-nightly
       release_name: "Nexu Desktop Nightly"
-      artifact_suffix: ""
+      channel: "nightly"
     secrets: inherit

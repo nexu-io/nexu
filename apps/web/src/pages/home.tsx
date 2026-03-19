@@ -50,7 +50,7 @@ function formatRelativeTime(
   return t("home.daysAgo", { count: days });
 }
 
-const GITHUB_URL = "https://github.com/refly-ai/nexu";
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
 
 /** Resolve provider group key for a model (link/* → "nexu", others → provider) */
 function getGroupKey(m: { id: string; provider: string }): string {

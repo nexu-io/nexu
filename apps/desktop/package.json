@@ -40,6 +40,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.6.0",
+    "sharp": "0.34.5",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.1"
   },
@@ -82,6 +83,14 @@
         "to": "static/bundled-skills"
       },
       {
+        "from": "node_modules/sharp",
+        "to": "bundled-node-modules/sharp"
+      },
+      {
+        "from": "node_modules/@img",
+        "to": "bundled-node-modules/@img"
+      },
+      {
         "from": "build-config.json",
         "to": "build-config.json",
         "filter": ["**/*"]
@@ -93,7 +102,7 @@
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
       "target": ["dmg", "zip"],
-      "artifactName": "${productName}-${arch}.${ext}",
+      "artifactName": "nexu-simplest-openclaw-desktop-${version}-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",

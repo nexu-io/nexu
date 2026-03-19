@@ -125,7 +125,7 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   google: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
 };
 
-const GITHUB_URL = "https://github.com/refly-ai/nexu";
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
 
 function buildProviders(
   apiModels: Array<{

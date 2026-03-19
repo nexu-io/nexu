@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const REPO = "refly-ai/nexu";
+const REPO = "nexu-io/nexu";
 const CACHE_KEY = "nexu_github_stars";
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 

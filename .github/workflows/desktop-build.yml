@@ -29,11 +29,10 @@ on:
         required: false
         type: string
         default: ""
-      artifact_suffix:
-        description: "Suffix for artifact names (e.g. '-test' or empty)"
-        required: false
+      channel:
+        description: "Release channel (stable, beta, nightly)"
+        required: true
         type: string
-        default: ""
       build_source:
         description: "Build source label embedded in desktop metadata"
         required: true
@@ -69,15 +68,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); process.stdout.write(pkg.version);')
+          base_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); process.stdout.write(pkg.version);')
           build_date=$(date +"%Y%m%d")
           short_sha="${GITHUB_SHA::7}"
+          channel="${{ inputs.channel }}"
+
+          # For non-stable channels, inject date suffix into version for auto-update
+          # e.g. 0.1.1 → 0.1.1-nightly.20260319 (only in build artifact, not committed to git)
+          if [ "$channel" != "stable" ]; then
+            desktop_version="${base_version}-${channel}.${build_date}"
+            node -e "
+              const fs = require('node:fs');
+              const path = 'apps/desktop/package.json';
+              const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+              pkg.version = '${desktop_version}';
+              fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+            "
+            echo "[meta] Patched version: ${base_version} → ${desktop_version}"
+          else
+            desktop_version="$base_version"
+          fi
 
           {
             echo "desktop_version=$desktop_version"
             echo "build_date=$build_date"
             echo "short_sha=$short_sha"
-            echo "artifact_name=desktop-nightly${{ inputs.artifact_suffix }}-${build_date}-${short_sha}"
+            echo "channel=$channel"
+            echo "artifact_name=desktop-${channel}-${build_date}-${short_sha}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Prepare Apple signing certificate
@@ -122,8 +139,8 @@ jobs:
           export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
             const sentryDsnByEnvironment = {
-              test: process.env.SENTRY_DSN_TEST,
-              prod: process.env.SENTRY_DSN_PROD,
+              "nexu-test": process.env.SENTRY_DSN_TEST,
+              "nexu-prod": process.env.SENTRY_DSN_PROD,
             };
             const sentryDsn = sentryDsnByEnvironment[process.env.TARGET_ENVIRONMENT] ?? "";
             const config = {
@@ -160,13 +177,14 @@ jobs:
         id: artifacts
         shell: bash
         env:
-          SUFFIX: ${{ inputs.artifact_suffix }}
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ steps.meta.outputs.desktop_version }}
         run: |
           set -euo pipefail
           shopt -s nullglob
 
-          mkdir -p apps/desktop/nightly-artifacts
-          rm -f apps/desktop/nightly-artifacts/*
+          mkdir -p apps/desktop/channel-artifacts
+          rm -f apps/desktop/channel-artifacts/*
 
           dmg_files=(apps/desktop/release/*.dmg)
           zip_files=(apps/desktop/release/*.zip)
@@ -176,20 +194,27 @@ jobs:
             exit 1
           fi
 
-          dmg_basename=$(basename "${dmg_files[0]}")
-          zip_basename=$(basename "${zip_files[0]}")
+          # New naming: nexu-simplest-openclaw-desktop-{version}-{channel}-{arch}.{ext}
+          versioned_dmg="nexu-simplest-openclaw-desktop-${VERSION}-${CHANNEL}-arm64.dmg"
+          versioned_zip="nexu-simplest-openclaw-desktop-${VERSION}-${CHANNEL}-arm64.zip"
+          latest_dmg="nexu-simplest-openclaw-desktop-latest-${CHANNEL}-arm64.dmg"
+          latest_zip="nexu-simplest-openclaw-desktop-latest-${CHANNEL}-arm64.zip"
 
-          cp "${dmg_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.dmg"
-          cp "${zip_files[0]}" "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.zip"
+          cp "${dmg_files[0]}" "apps/desktop/channel-artifacts/${versioned_dmg}"
+          cp "${zip_files[0]}" "apps/desktop/channel-artifacts/${versioned_zip}"
+          cp "${dmg_files[0]}" "apps/desktop/channel-artifacts/${latest_dmg}"
+          cp "${zip_files[0]}" "apps/desktop/channel-artifacts/${latest_zip}"
 
           shasum -a 256 \
-            "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.dmg" \
-            "apps/desktop/nightly-artifacts/Nexu-nightly${SUFFIX}-arm64.zip" \
-            > apps/desktop/nightly-artifacts/desktop-sha256.txt
+            "apps/desktop/channel-artifacts/${versioned_dmg}" \
+            "apps/desktop/channel-artifacts/${versioned_zip}" \
+            > apps/desktop/channel-artifacts/desktop-sha256.txt
 
           {
-            echo "dmg_basename=$dmg_basename"
-            echo "zip_basename=$zip_basename"
+            echo "versioned_dmg=$versioned_dmg"
+            echo "versioned_zip=$versioned_zip"
+            echo "latest_dmg=$latest_dmg"
+            echo "latest_zip=$latest_zip"
           } >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifacts
@@ -197,9 +222,9 @@ jobs:
         with:
           name: ${{ steps.meta.outputs.artifact_name }}
           path: |
-            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.dmg
-            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.zip
-            apps/desktop/nightly-artifacts/desktop-sha256.txt
+            apps/desktop/channel-artifacts/${{ steps.artifacts.outputs.versioned_dmg }}
+            apps/desktop/channel-artifacts/${{ steps.artifacts.outputs.versioned_zip }}
+            apps/desktop/channel-artifacts/desktop-sha256.txt
           retention-days: 7
           if-no-files-found: error
 
@@ -217,6 +242,7 @@ jobs:
             Automated desktop build.
 
             - Version: `${{ steps.meta.outputs.desktop_version }}`
+            - Channel: `${{ inputs.channel }}`
             - Environment: `${{ inputs.environment }}`
             - Commit: `${{ github.sha }}`
             - Built: `${{ steps.meta.outputs.build_date }}`
@@ -225,9 +251,43 @@ jobs:
 
             This build is intended for testing and may be unstable.
           files: |
-            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.dmg
-            apps/desktop/nightly-artifacts/Nexu-nightly${{ inputs.artifact_suffix }}-arm64.zip
-            apps/desktop/nightly-artifacts/desktop-sha256.txt
+            apps/desktop/channel-artifacts/${{ steps.artifacts.outputs.versioned_dmg }}
+            apps/desktop/channel-artifacts/${{ steps.artifacts.outputs.versioned_zip }}
+            apps/desktop/channel-artifacts/desktop-sha256.txt
+
+      - name: Patch latest-mac.yml for channel naming
+        if: inputs.update_feed_url != ''
+        env:
+          VERSION: ${{ steps.meta.outputs.desktop_version }}
+          CHANNEL: ${{ inputs.channel }}
+          VERSIONED_DMG: ${{ steps.artifacts.outputs.versioned_dmg }}
+          VERSIONED_ZIP: ${{ steps.artifacts.outputs.versioned_zip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "apps/desktop/release/latest-mac.yml" ]; then
+            echo "latest-mac.yml not found, skipping patch"
+            exit 0
+          fi
+
+          # electron-builder generates filenames without channel, we need to patch them
+          # Original: nexu-simplest-openclaw-desktop-0.1.3-arm64.dmg
+          # Target:   nexu-simplest-openclaw-desktop-0.1.3-nightly-arm64.dmg
+          original_dmg="nexu-simplest-openclaw-desktop-${VERSION}-arm64.dmg"
+          original_zip="nexu-simplest-openclaw-desktop-${VERSION}-arm64.zip"
+
+          echo "Patching latest-mac.yml:"
+          echo "  ${original_dmg} → ${VERSIONED_DMG}"
+          echo "  ${original_zip} → ${VERSIONED_ZIP}"
+
+          sed -i.bak \
+            -e "s|${original_dmg}|${VERSIONED_DMG}|g" \
+            -e "s|${original_zip}|${VERSIONED_ZIP}|g" \
+            apps/desktop/release/latest-mac.yml
+
+          echo "Patched latest-mac.yml:"
+          cat apps/desktop/release/latest-mac.yml
 
       - name: Upload to Cloudflare R2
         if: inputs.update_feed_url != ''
@@ -235,6 +295,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
+          CHANNEL: ${{ inputs.channel }}
+          VERSIONED_DMG: ${{ steps.artifacts.outputs.versioned_dmg }}
+          VERSIONED_ZIP: ${{ steps.artifacts.outputs.versioned_zip }}
+          LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
+          LATEST_ZIP: ${{ steps.artifacts.outputs.latest_zip }}
         shell: bash
         run: |
           set -euo pipefail
@@ -244,38 +309,65 @@ jobs:
 
           echo "[r2] uploading to prefix: ${r2_prefix}/"
 
-          for file in apps/desktop/release/latest-mac.yml apps/desktop/release/*.dmg apps/desktop/release/*.zip; do
-            [ -f "$file" ] || continue
-            key="${r2_prefix}/$(basename "$file")"
-            echo "Uploading $file → $key"
-            npx wrangler r2 object put "nexu-desktop-releases/${key}" --file "$file" --remote
-          done
+          # Upload patched latest-mac.yml for auto-update
+          if [ -f "apps/desktop/release/latest-mac.yml" ]; then
+            echo "Uploading latest-mac.yml → ${r2_prefix}/latest-mac.yml"
+            npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+          fi
+
+          # Upload versioned artifacts
+          echo "Uploading ${VERSIONED_DMG} → ${r2_prefix}/${VERSIONED_DMG}"
+          npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/${VERSIONED_DMG}" --file "apps/desktop/channel-artifacts/${VERSIONED_DMG}" --remote
+
+          echo "Uploading ${VERSIONED_ZIP} → ${r2_prefix}/${VERSIONED_ZIP}"
+          npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/${VERSIONED_ZIP}" --file "apps/desktop/channel-artifacts/${VERSIONED_ZIP}" --remote
+
+          # Upload latest artifacts (overwrite each time)
+          echo "Uploading ${LATEST_DMG} → ${r2_prefix}/${LATEST_DMG}"
+          npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/${LATEST_DMG}" --file "apps/desktop/channel-artifacts/${LATEST_DMG}" --remote
+
+          echo "Uploading ${LATEST_ZIP} → ${r2_prefix}/${LATEST_ZIP}"
+          npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/${LATEST_ZIP}" --file "apps/desktop/channel-artifacts/${LATEST_ZIP}" --remote
+
+          # Upload checksum
+          echo "Uploading desktop-sha256.txt → ${r2_prefix}/desktop-sha256.txt"
+          npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/desktop-sha256.txt" --file "apps/desktop/channel-artifacts/desktop-sha256.txt" --remote
 
       - name: Publish Cloudflare download links
         if: inputs.update_feed_url != ''
         env:
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
-          DMG_BASENAME: ${{ steps.artifacts.outputs.dmg_basename }}
-          ZIP_BASENAME: ${{ steps.artifacts.outputs.zip_basename }}
+          VERSIONED_DMG: ${{ steps.artifacts.outputs.versioned_dmg }}
+          VERSIONED_ZIP: ${{ steps.artifacts.outputs.versioned_zip }}
+          LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
+          LATEST_ZIP: ${{ steps.artifacts.outputs.latest_zip }}
         shell: bash
         run: |
           set -euo pipefail
 
           base_url="${UPDATE_FEED_URL%/}"
           latest_yml_url="${base_url}/latest-mac.yml"
-          dmg_url="${base_url}/${DMG_BASENAME}"
-          zip_url="${base_url}/${ZIP_BASENAME}"
+          versioned_dmg_url="${base_url}/${VERSIONED_DMG}"
+          versioned_zip_url="${base_url}/${VERSIONED_ZIP}"
+          latest_dmg_url="${base_url}/${LATEST_DMG}"
+          latest_zip_url="${base_url}/${LATEST_ZIP}"
 
           {
             echo "## Cloudflare Downloads"
             echo
-            echo "- DMG: ${dmg_url}"
-            echo "- ZIP: ${zip_url}"
+            echo "### Versioned"
+            echo "- DMG: ${versioned_dmg_url}"
+            echo "- ZIP: ${versioned_zip_url}"
+            echo
+            echo "### Latest (always current)"
+            echo "- DMG: ${latest_dmg_url}"
+            echo "- ZIP: ${latest_zip_url}"
+            echo
             echo "- Update feed: ${latest_yml_url}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "Cloudflare DMG: ${dmg_url}"
-          echo "Cloudflare ZIP: ${zip_url}"
+          echo "Cloudflare Versioned DMG: ${versioned_dmg_url}"
+          echo "Cloudflare Latest DMG: ${latest_dmg_url}"
           echo "Cloudflare update feed: ${latest_yml_url}"
 
   cleanup-artifacts:
@@ -287,7 +379,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PREFIX: desktop-nightly${{ inputs.artifact_suffix }}
+          PREFIX: desktop-${{ inputs.channel }}
         run: |
           set -euo pipefail
 

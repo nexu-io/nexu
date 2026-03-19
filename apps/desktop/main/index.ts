@@ -36,11 +36,13 @@ import { UpdateManager } from "./updater/update-manager";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Set display name early (matches productName in package.json).
+app.setName("Nexu");
+
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
 // BEFORE any blocking initialization (tar extraction, directory creation, etc.)
 // so users see it immediately on first launch.
-app.setName("Nexu Desktop");
 void app.dock?.show();
 
 const electronRoot = app.isPackaged
@@ -361,7 +363,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 1120,
     minHeight: 760,
     backgroundColor: "#0B1020",
-    title: "Nexu Desktop",
+    title: "Nexu",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     show: false,
