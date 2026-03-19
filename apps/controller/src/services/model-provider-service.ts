@@ -21,16 +21,15 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
 
 function buildProviderUrl(
   baseUrl: string | null | undefined,
-  pathname: string,
+  path: string,
 ): string | null {
   if (!baseUrl || baseUrl.trim().length === 0) {
     return null;
   }
 
-  return new URL(
-    pathname,
-    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
-  ).toString();
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
 type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
