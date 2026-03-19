@@ -7,10 +7,10 @@ This file is for agentic coding tools. It's a map — read linked docs for depth
 Nexu is an OpenClaw multi-tenant platform. Users create AI bots, connect them to Slack, and the system generates OpenClaw config that hot-loads into shared Gateway processes.
 
 - Monorepo: pnpm workspaces
-- `apps/api` — Hono + Drizzle + Zod OpenAPI (Node ESM)
+- `apps/api` — Legacy Hono + Drizzle + Zod OpenAPI package retained for SaaS/db workflows during migration
 - `apps/controller` — Single-user local control plane for Nexu config, OpenClaw sync, and runtime orchestration
 - `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
-- `apps/gateway` — Nexu gateway sidecar for config/skills sync, runtime probing, and optional OpenClaw process management
+- `apps/gateway` — Legacy gateway sidecar package retained for SaaS/runtime deploy workflows during migration
 - `apps/web` — React + Ant Design + Vite
 - `openclaw-runtime` — Repo-local packaged OpenClaw runtime for local dev and desktop packaging; replaces global `openclaw` CLI
 - `packages/shared` — Shared Zod schemas
@@ -26,7 +26,9 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 
 ```bash
 pnpm install                          # Install
-pnpm dev                              # All apps (API :3000, Web :5173)
+pnpm dev                              # Local controller-first web stack (Controller + Web)
+pnpm dev:legacy                       # Legacy API + Web local stack
+pnpm dev:legacy:gateway               # Legacy gateway sidecar only
 pnpm dev:controller                   # Controller only
 pnpm desktop:start                    # Build and launch the desktop local runtime stack
 pnpm desktop:stop                     # Stop the desktop local runtime stack
@@ -34,7 +36,7 @@ pnpm desktop:restart                  # Restart the desktop local runtime stack
 pnpm desktop:status                   # Show desktop local runtime status
 pnpm desktop:dist:mac                 # Build signed macOS desktop distributables
 pnpm desktop:dist:mac:unsigned        # Build unsigned macOS desktop distributables
-pnpm --filter @nexu/api dev           # API only
+pnpm --filter @nexu/api dev           # Legacy API only
 pnpm --filter @nexu/web dev           # Web only
 pnpm build                            # Build all
 pnpm check:esm-imports                # Scan built dist for extensionless relative ESM specifiers
@@ -42,7 +44,7 @@ pnpm typecheck                        # Typecheck all
 pnpm lint                             # Biome lint
 pnpm format                           # Biome format
 pnpm test                             # Vitest
-pnpm --filter @nexu/api test          # API tests only
+pnpm --filter @nexu/api test          # Legacy API tests only
 pnpm db:generate                      # Generate Drizzle migration files
 pnpm db:generate --name <change-name> # Generate Drizzle migration files with a semantic name
 pnpm --filter @nexu/api db:push       # Drizzle schema push
@@ -50,6 +52,8 @@ pnpm generate-types                   # OpenAPI spec → frontend SDK
 ```
 
 After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
+
+For local desktop/runtime work, prefer the controller-first path and treat `apps/api` / `apps/gateway` as legacy unless you are intentionally working on the SaaS/db or legacy deploy path.
 
 ## Branch model
 

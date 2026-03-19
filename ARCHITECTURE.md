@@ -44,11 +44,11 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 ## Monorepo layout
 
-- **`apps/api/`** — Legacy Hono backend for the old multi-tenant SaaS path.
+- **`apps/api/`** — Legacy Hono backend for the old multi-tenant SaaS path. Still retained for DB/migration workflows and legacy deploy assets.
 - **`apps/controller/`** — Single-user controller service. Routes in `src/routes/`, local config store in `src/store/`, OpenClaw runtime integration in `src/runtime/`, compiler logic in `src/lib/openclaw-config-compiler.ts`.
 - **`apps/web/`** — React frontend. Pages in `src/pages/`, generated SDK in `lib/api/`, auth client in `src/lib/auth-client.ts`.
 - **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator. The active local path launches `controller + web + openclaw` sidecars only.
-- **`apps/gateway/`** — Legacy gateway sidecar package from the SaaS runtime path.
+- **`apps/gateway/`** — Legacy gateway sidecar package from the SaaS runtime path. Still retained for legacy deploy/runtime assets.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.
 - **`nexu-skills/`** — Public skill repository. Each skill is a directory with `SKILL.md` frontmatter. `skills.json` is the built catalog index.
 - **`deploy/k8s/`** — Kubernetes manifests.
@@ -72,7 +72,7 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 The active local/controller path persists Nexu-owned state under `~/.nexu/` via controller store modules, with `config.json` as the main source of truth and OpenClaw runtime files living under `OPENCLAW_STATE_DIR`.
 
-Legacy SaaS paths in `apps/api` still use PostgreSQL + Drizzle, but desktop/local runtime should not depend on that database.
+Legacy SaaS paths in `apps/api` still use PostgreSQL + Drizzle, but desktop/local runtime should not depend on that database. `apps/api` and `apps/gateway` are no longer part of the active local controller-first path, but they cannot be deleted until remaining deploy/workflow dependencies are migrated.
 
 ## Config generator
 

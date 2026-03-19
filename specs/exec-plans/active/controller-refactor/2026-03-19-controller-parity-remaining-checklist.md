@@ -27,6 +27,8 @@ Track the remaining work required for `apps/controller` to fully replace the old
 - 2026-03-19: for controller parity tracking, compiler/channel/runtime validation is now judged against the current local controller-first desktop path rather than obsolete SaaS-only branches from `apps/api`.
 - 2026-03-19: local-only scope does not currently require extra secret-storage hardening beyond filesystem persistence under the user-owned home directory.
 - 2026-03-19: desktop cold-start/dev diagnostics, controller route tests, and sync/writer integration tests now cover the accepted local verification scope for controller parity.
+- 2026-03-19: root local dev docs/scripts now point at the controller-first path by default, desktop CI path filters no longer treat `apps/api` / `apps/gateway` changes as desktop-runtime triggers, and the old local sidecar guide is explicitly marked deprecated.
+- 2026-03-19: repo audit still shows `apps/api` / `apps/gateway` are required by legacy DB scripts, deploy manifests, Helm templates, and other SaaS/runtime assets, so package deletion remains blocked even though local desktop parity is complete.
 
 ## P0 - Runtime correctness and migration blockers
 
@@ -86,9 +88,9 @@ Track the remaining work required for `apps/controller` to fully replace the old
 
 ## P2 - Cleanup and repo-level migration finish
 
-- [ ] Mark the old local runtime path in `apps/api` and `apps/gateway` as deprecated in docs.
+- [x] Mark the old local runtime path in `apps/api` and `apps/gateway` as deprecated in docs.
 - [ ] Remove or isolate legacy code paths only after controller-based desktop/local flow is proven stable.
-- [ ] Update architecture and execution-plan docs so they describe the controller-first path as the active implementation.
+- [x] Update architecture and execution-plan docs so they describe the controller-first path as the active implementation.
 - [ ] Sync any important migration findings into project memory and cross-project knowledge if needed.
 
 ## Suggested execution order

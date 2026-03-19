@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names api,web --prefix-colors blue,green \"pnpm --filter @nexu/api dev\" \"pnpm --filter @nexu/web dev\"",
-    "dev:sidecar": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
+    "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names controller,web --prefix-colors blue,green \"pnpm --filter @nexu/controller dev\" \"pnpm --filter @nexu/web dev\"",
+    "dev:legacy": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names api,web --prefix-colors blue,green \"pnpm --filter @nexu/api dev\" \"pnpm --filter @nexu/web dev\"",
+    "dev:legacy:gateway": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
     "dev:controller": "pnpm --filter @nexu/controller dev",
     "dev:desktop": "pnpm --filter @nexu/desktop dev",
     "build": "pnpm -r build",
