@@ -133,8 +133,10 @@ function serializeProvider(
 
 export class NexuConfigStore {
   private readonly store: LowDbStore<NexuConfig>;
+  private readonly nexuCloudUrl: string;
 
   constructor(env: ControllerEnv) {
+    this.nexuCloudUrl = env.nexuCloudUrl;
     this.store = new LowDbStore<NexuConfig>(
       env.nexuConfigPath,
       nexuConfigSchema,
@@ -693,7 +695,7 @@ export class NexuConfigStore {
     }));
 
     return {
-      browserUrl: "https://nexu.io/local-login",
+      browserUrl: `${this.nexuCloudUrl}/local-login`,
       error: undefined,
     };
   }
