@@ -1,18 +1,30 @@
 # 介绍
 
-欢迎使用 Nexu 文档。
+**nexu**（next to you）让你用最简单的方式拥有一个 OpenClaw 🦞——下载、双击、开始工作。
 
-## 文档范围
+基于开源 OpenClaw 🦞 打造，预装飞书 Skills 等关键能力，内置 Claude、ChatGPT、Minimax、GLM、Kimi 等主流模型，也支持自带 API Key 🔌。
 
-- 飞书、Slack、Discord 渠道接入
-- 托管模型与自带密钥模型配置
-- 本地和桌面运行时的技能安装与更新
+连接飞书、Slack 或 Discord，Agent 直达手机端 📱——在你日常用的聊天工具里直接对话。
 
-## 如何使用
+![nexu 客户端](/assets/nexu-home.webp)
 
-- 如果你要编辑文档或提交更新，请先看 [参与贡献](/zh/guide/contributing)
-- 如果你先接入聊天平台，请从 [渠道配置](/zh/guide/channels) 开始
-- 如果你要配置模型供应商和密钥，请查看 [模型配置](/zh/guide/models)
-- 如果你要管理运行时能力，请查看 [技能安装](/zh/guide/skills)
+## 快速导航
 
-使用左侧边栏即可直接浏览文档。
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px;">
+  <a href="/zh/guide/quickstart" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">⚡ 快速上手</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">一分钟内让你的 AI Agent 跑起来</p>
+  </a>
+  <a href="/zh/guide/concepts" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">💡 核心概念</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">了解 Agent、渠道、模型、技能</p>
+  </a>
+  <a href="/zh/guide/channels" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">🔗 渠道配置</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">接入飞书、Slack 或 Discord</p>
+  </a>
+  <a href="/zh/guide/contact" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">💬 联系我们</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">加入飞书群或 Discord 社区</p>
+  </a>
+</div>

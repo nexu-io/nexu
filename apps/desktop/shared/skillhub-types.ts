@@ -15,8 +15,18 @@ export type CatalogMeta = {
   skillCount: number;
 };
 
+export type SkillSource = "curated" | "managed";
+
+export type InstalledSkill = {
+  slug: string;
+  source: SkillSource;
+  name: string;
+  description: string;
+};
+
 export type SkillhubCatalogData = {
   skills: MinimalSkill[];
   installedSlugs: string[];
+  installedSkills: InstalledSkill[];
   meta: CatalogMeta | null;
 };

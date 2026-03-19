@@ -10,7 +10,7 @@ import {
 const CATALOG_QUERY_KEY = ["skillhub", "catalog"] as const;
 const DETAIL_QUERY_KEY = ["skillhub", "detail"] as const;
 
-export function useCommunitySkills() {
+export function useCommunitySkills(opts?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: CATALOG_QUERY_KEY,
     queryFn: async (): Promise<SkillhubCatalogData> => {
@@ -19,6 +19,7 @@ export function useCommunitySkills() {
       return data as unknown as SkillhubCatalogData;
     },
     staleTime: 5 * 60 * 1000,
+    refetchInterval: opts?.refetchInterval,
   });
 }
 

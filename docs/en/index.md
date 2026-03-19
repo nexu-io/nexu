@@ -1,18 +1,30 @@
 # Introduction
 
-Welcome to the Nexu docs.
+**nexu** (next to you) gives you the simplest way to own an OpenClaw 🦞 — download, double-click, start working.
 
-## What is covered
+Built on the open-source OpenClaw 🦞, pre-loaded with essential Skills like Feishu Skills, plus Claude, ChatGPT, Minimax, GLM, Kimi, and more — or bring your own API Key 🔌.
 
-- Channel onboarding for Feishu, Slack, and Discord
-- Model provider setup for managed and BYOK flows
-- Skill installation and update workflow for local and desktop runtimes
+Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — chat with it right inside the tools you already use.
 
-## How to use this site
+![nexu client](/assets/nexu-home.webp)
 
-- Open [Contributing](/guide/contributing) if you want to edit docs or submit updates
-- Start with [Channel Configuration](/guide/channels) if you are connecting chat platforms first
-- Go to [Model Configuration](/guide/models) if you are setting up providers and API keys
-- Open [Skill Installation](/guide/skills) if you are managing runtime capabilities
+## Get started
 
-Use the sidebar to move through the docs directly.
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px;">
+  <a href="/guide/quickstart" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">⚡ Quick Start</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Get your AI Agent running in one minute</p>
+  </a>
+  <a href="/guide/concepts" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">💡 Key Concepts</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Agent, Channels, Models, Skills explained</p>
+  </a>
+  <a href="/guide/channels" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">🔗 Channel Configuration</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Connect Feishu, Slack, or Discord</p>
+  </a>
+  <a href="/guide/contact" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">💬 Contact Us</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Join the community on Feishu or Discord</p>
+  </a>
+</div>

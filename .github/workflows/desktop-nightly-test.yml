@@ -21,6 +21,7 @@ jobs:
       cloud_url: "https://nexu.powerformer.net"
       link_url: "https://nexu-link.powerformer.net"
       update_feed_url: "https://desktop-releases.nexu.io/test"
+      build_source: "nightly-test"
       release_tag: desktop-nightly-test
       release_name: "Nexu Desktop Nightly (Test)"
       artifact_suffix: "-test"

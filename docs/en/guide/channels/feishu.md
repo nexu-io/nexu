@@ -1,63 +1,54 @@
 # Feishu
 
-This guide combines the OpenClaw channel model with Nexu's Feishu integration patterns.
+All you need is an App ID and App Secret to connect your Feishu bot to nexu.
 
-## What you need
+## Step 1: Create a Feishu app
 
-- A Feishu or Lark tenant
-- A Feishu app with Bot capability enabled
-- `App ID` and `App Secret`
-- The gateway running before you finalize event subscription
+1. Go to the [Feishu Open Platform](https://open.feishu.cn/app), sign in, and click "Create Custom App".
 
-## Setup flow
+![Feishu Open Platform app list](/assets/feishu/step1-app-list.webp)
 
-1. Create an enterprise app in the Feishu Open Platform.
-2. Enable the bot capability and grant message permissions.
-3. Choose a transport mode:
-   - `websocket` for a user-managed bot with no public webhook URL
-   - `webhook` for the official Nexu-style inbound HTTP flow
-4. Add the app credentials to Nexu.
-5. Start the gateway.
-6. Send a DM to receive a pairing code, then approve it.
+2. Fill in the app name, description, choose an icon, and click "Create".
 
-## Example config
+![Create Custom App](/assets/feishu/step1-create-app.webp)
 
-```json5
-{
-  channels: {
-    feishu: {
-      enabled: true,
-      dmPolicy: "pairing",
-      accounts: {
-        main: {
-          appId: "cli_xxx",
-          appSecret: "xxx",
-          botName: "Nexu Assistant",
-        },
-      },
-    },
-  },
-}
-```
+3. On the "Credentials & Basic Info" page, copy these two values:
+   - **App ID**
+   - **App Secret**
 
-## Group behavior
+![Get App ID and App Secret](/assets/feishu/step1-credentials.webp)
 
-- Default group behavior is open with `requireMention: true`
-- Use `groupPolicy: "allowlist"` when you want to restrict specific group chats
-- Use `groups.<chat_id>.allowFrom` when only selected senders should be processed in a group
+## Step 2: Add credentials to nexu
 
-## Nexu-specific notes
+Open the nexu client, enter the App ID and App Secret in the Feishu channel settings, and click "Connect".
 
-- User-managed bots normally connect through WebSocket, so no public callback URL is required.
-- The official Nexu bot path uses webhook mode and performs a claim check before forwarding messages.
-- For Lark tenants, set `domain: "lark"`.
+![Add credentials in nexu](/assets/feishu/step3-nexu-connect.webp)
 
-## Verify
+## Step 3: Publish and test
 
-```bash
-openclaw gateway status
-openclaw logs --follow
-openclaw pairing list feishu
-```
+1. Go back to the Feishu Open Platform, navigate to "Version Management & Release".
 
-For deeper upstream reference, see the OpenClaw Feishu docs: <https://docs.openclaw.ai/channels/feishu>
+![Version Management & Release](/assets/feishu/step4-version-manage.webp)
+
+2. Click "Create Version", fill in the version number and release notes, then click "Save".
+
+![Create Version](/assets/feishu/step4-create-version.webp)
+
+3. Click "Publish" and wait for approval.
+
+![Publish](/assets/feishu/step4-publish.webp)
+
+4. Once approved, click "Chat" in the nexu client to jump to Feishu and chat with your bot 🎉
+
+![Feishu connected](/assets/feishu/step3-connected.webp)
+
+## FAQ
+
+**Q: Do I need a public server?**
+
+No. nexu uses Feishu's long-connection (WebSocket) mode — no public IP or callback URL required.
+
+**Q: Do I need to configure permissions manually?**
+
+No. nexu handles all required permissions automatically. Just provide the App ID and App Secret.
+

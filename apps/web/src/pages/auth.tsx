@@ -1,8 +1,9 @@
-import { BrandMark } from "@/components/brand-mark";
 import { authClient } from "@/lib/auth-client";
 import { identify, setUserId, track } from "@/lib/tracking";
 import "@/lib/api";
-import { Loader2 } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
+import { BrandRail } from "@/components/brand-rail";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -12,16 +13,6 @@ import {
   postApiV1AuthDesktopAuthorize,
   postApiV1MeAuthSource,
 } from "../../lib/api/sdk.gen";
-
-function getCapabilityPills(t: (key: string) => string) {
-  return [
-    { emoji: "\u{1F4BB}", label: t("auth.capability.code") },
-    { emoji: "\u{1F4CA}", label: t("auth.capability.data") },
-    { emoji: "\u270D\uFE0F", label: t("auth.capability.content") },
-    { emoji: "\u{1F50D}", label: t("auth.capability.research") },
-    { emoji: "\u2699\uFE0F", label: t("auth.capability.automation") },
-  ];
-}
 
 const OTP_LENGTH = 6;
 const OTP_SLOTS = Array.from({ length: OTP_LENGTH }, (_, i) => ({
@@ -98,7 +89,6 @@ export function AuthPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
-  const CAPABILITY_PILLS = getCapabilityPills(t);
   const isLogin = searchParams.get("mode") !== "signup";
   const isDesktopAuth = searchParams.get("desktop") === "1";
   const deviceId = searchParams.get("device_id");
@@ -109,6 +99,7 @@ export function AuthPage() {
       : "/workspace";
   const authSourceParam = searchParams.get("source");
   const [loading, setLoading] = useState<string | null>(null);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -461,39 +452,7 @@ export function AuthPage() {
   if (pendingVerification) {
     return (
       <div className="flex min-h-screen">
-        {/* Left panel — dark */}
-        <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
-          <div className="flex items-center gap-2.5">
-            <BrandMark className="w-7 h-7 shrink-0" />
-            <span className="text-[14px] font-semibold text-white/90">
-              Nexu
-            </span>
-          </div>
-          <div>
-            <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
-              {t("auth.heroTitle.line1")}
-              <br />
-              {t("auth.heroTitle.line2")}
-              <br />
-              {t("auth.heroTitle.line3")}
-            </h2>
-            <p className="text-[13px] text-white/45 leading-relaxed mb-6 max-w-[280px]">
-              {t("auth.heroBody")}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {CAPABILITY_PILLS.map((p) => (
-                <span
-                  key={p.label}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-white/[0.07] text-white/60 border border-white/[0.06]"
-                >
-                  <span className="text-[11px]">{p.emoji}</span>
-                  {p.label}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
-        </div>
+        <BrandRail onLogoClick={() => navigate("/")} />
 
         {/* Right panel — OTP form */}
         <div className="flex-1 flex flex-col bg-surface-0">
@@ -574,7 +533,7 @@ export function AuthPage() {
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
           >
             <a
-              href="/terms"
+              href="https://nexu.io/terms"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
@@ -583,7 +542,7 @@ export function AuthPage() {
             </a>
             <span className="text-border">&middot;</span>
             <a
-              href="/privacy"
+              href="https://nexu.io/privacy"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-text-secondary transition-colors"
@@ -599,222 +558,219 @@ export function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left panel — dark */}
-      <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <BrandMark className="w-7 h-7 shrink-0" />
-          <span className="text-[14px] font-semibold text-white/90">Nexu</span>
-        </div>
-
-        {/* Main copy */}
-        <div>
-          <h2 className="text-[32px] font-bold text-white leading-[1.15] mb-4">
-            Your digital
-            <br />
-            coworker,
-            <br />
-            always on.
-          </h2>
-          <p className="text-[13px] text-white/45 leading-relaxed mb-6 max-w-[280px]">
-            AI avatars that live in Slack — not just chatting, but delivering
-            real results. Build apps, analyze data, write content, run
-            automations.
-          </p>
-
-          {/* Capability pills */}
-          <div className="flex flex-wrap gap-2">
-            {CAPABILITY_PILLS.map((p) => (
-              <span
-                key={p.label}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-white/[0.07] text-white/60 border border-white/[0.06]"
-              >
-                <span className="text-[11px]">{p.emoji}</span>
-                {p.label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="text-[11px] text-white/20">{t("auth.copyright")}</div>
-      </div>
+    <div className="min-h-screen flex">
+      <BrandRail onLogoClick={() => navigate("/")} />
 
       {/* Right panel — form */}
-      <div className="flex-1 flex flex-col bg-surface-0">
+      <div className="flex-1 flex flex-col bg-surface-0 relative overflow-hidden">
+        {/* Subtle grid bg */}
+        <div
+          className="absolute inset-0 opacity-[0.06] pointer-events-none"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+
         {/* Mobile-only nav */}
-        <nav className="border-b border-border lg:hidden">
-          <div className="flex items-center px-4 sm:px-6 h-14">
-            <Link to="/" className="flex items-center gap-2.5">
-              <BrandMark className="w-7 h-7 shrink-0" />
-              <span className="text-sm font-semibold tracking-tight text-text-primary">
-                Nexu
-              </span>
-            </Link>
-          </div>
+        <nav className="lg:hidden relative z-10 flex items-center px-6 sm:px-10 h-14 shrink-0">
+          <Link to="/" className="flex items-center gap-2.5">
+            <BrandMark className="w-7 h-7 shrink-0" />
+            <span className="text-sm font-semibold tracking-tight text-text-primary">
+              Nexu
+            </span>
+          </Link>
         </nav>
 
-        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
-          <div className="w-full max-w-[360px]">
-            {/* Header */}
-            <div className="mb-8">
-              {isDesktopAuth && (
-                <div className="mb-4 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20">
-                  <p className="text-[13px] text-accent font-medium">
-                    {t("auth.desktopConnectPrompt")}
-                  </p>
-                </div>
-              )}
-              <h1 className="text-[22px] font-bold text-text-primary mb-1.5">
-                {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
-              </h1>
-              <p className="text-[14px] text-text-muted">
-                {isLogin ? t("auth.loginSubtitle") : t("auth.signupSubtitle")}
-              </p>
-            </div>
+        {/* Center card */}
+        <div className="relative z-10 flex-1 flex items-center justify-center px-5 py-8">
+          <div className="w-full max-w-[380px]">
+            <div className="bg-surface-1 border border-border rounded-2xl p-7 sm:p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              {/* Header */}
+              <div className="text-center mb-7">
+                {isDesktopAuth && (
+                  <div className="mb-4 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20">
+                    <p className="text-[13px] text-accent font-medium">
+                      {t("auth.desktopConnectPrompt")}
+                    </p>
+                  </div>
+                )}
+                <h2 className="text-[18px] font-semibold text-text-primary tracking-tight">
+                  {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
+                </h2>
+                <p className="mt-1.5 text-[13px] text-text-muted">
+                  {isLogin ? t("auth.loginToContinue") : t("auth.chooseMethod")}
+                </p>
+              </div>
 
-            {/* OAuth buttons */}
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => handleOAuth("google")}
-                disabled={loading !== null}
-                className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg text-[14px] font-medium bg-[#111111] text-white hover:bg-[#222222] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loading === "google" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
+              {/* Auth buttons */}
+              <div className="space-y-2.5">
+                {/* Google */}
+                <button
+                  type="button"
+                  onClick={() => handleOAuth("google")}
+                  disabled={loading !== null}
+                  className="group flex items-center justify-center gap-2 w-full h-11 rounded-lg text-[14px] font-medium border border-border bg-surface-0 text-text-primary hover:bg-surface-2 hover:border-border-hover active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {loading === "google" ? (
+                    <div className="w-4 h-4 border-2 border-text-muted/30 border-t-text-secondary rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        className="shrink-0"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
+                      <span>{t("auth.continueGoogle")}</span>
+                      <ArrowRight
+                        size={14}
+                        className="opacity-0 -ml-1 group-hover:opacity-60 group-hover:ml-0 transition-all"
+                      />
+                    </>
+                  )}
+                </button>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 border-t border-border" />
+                  <span className="text-[11px] text-text-muted uppercase tracking-wider select-none">
+                    {t("auth.or")}
+                  </span>
+                  <div className="flex-1 border-t border-border" />
+                </div>
+
+                {/* Email — collapsible */}
+                {showEmailForm ? (
+                  <div>
+                    <form onSubmit={handleEmailAuth} className="space-y-2.5">
+                      {!isLogin && (
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder={t("auth.namePlaceholder")}
+                          className="w-full h-11 px-3.5 rounded-lg border border-border bg-surface-0 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-text-tertiary focus:ring-1 focus:ring-text-muted/20 transition-colors"
+                        />
+                      )}
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder={t("auth.emailPlaceholder")}
+                        required
+                        className="w-full h-11 px-3.5 rounded-lg border border-border bg-surface-0 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-text-tertiary focus:ring-1 focus:ring-text-muted/20 transition-colors"
+                      />
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder={t("auth.passwordPlaceholder")}
+                        required
+                        minLength={8}
+                        className="w-full h-11 px-3.5 rounded-lg border border-border bg-surface-0 text-[14px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-text-tertiary focus:ring-1 focus:ring-text-muted/20 transition-colors"
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading !== null}
+                        className="flex items-center justify-center w-full h-11 rounded-lg text-[14px] font-medium bg-[#111] text-white hover:bg-[#222] active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer"
+                      >
+                        {loading === "email" ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <span>
+                            {isLogin
+                              ? t("auth.loginButton")
+                              : t("auth.createAccountButton")}
+                          </span>
+                        )}
+                      </button>
+                    </form>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailForm(false)}
+                      className="w-full mt-3 text-[12px] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
                     >
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      />
-                    </svg>
-                    {t("auth.continueGoogle")}
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-[12px]">
-                <span className="bg-surface-0 px-3 text-text-muted">
-                  {t("auth.or")}
-                </span>
-              </div>
-            </div>
-
-            {/* Email form */}
-            <form onSubmit={handleEmailAuth} className="space-y-3">
-              {!isLogin && (
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="auth-name"
-                    className="text-[12px] text-text-secondary font-medium"
+                      {t("auth.otherMethods")}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailForm(true)}
+                    className="flex items-center justify-center gap-2 w-full h-11 rounded-lg text-[14px] font-medium border border-border bg-surface-0 text-text-primary hover:bg-surface-2 hover:border-border-hover active:scale-[0.98] transition-all cursor-pointer"
                   >
-                    {t("auth.nameLabel")}
-                  </label>
-                  <input
-                    id="auth-name"
-                    type="text"
-                    placeholder={t("auth.namePlaceholder")}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2.5 text-[13px] rounded-lg border border-border bg-surface-1 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/10 transition-all"
-                  />
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="auth-email"
-                  className="text-[12px] text-text-secondary font-medium"
-                >
-                  {t("auth.emailLabel")}
-                </label>
-                <input
-                  id="auth-email"
-                  type="email"
-                  placeholder={t("auth.emailPlaceholder")}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 text-[13px] rounded-lg border border-border bg-surface-1 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/10 transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="auth-password"
-                  className="text-[12px] text-text-secondary font-medium"
-                >
-                  {t("auth.passwordLabel")}
-                </label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  placeholder={t("auth.passwordPlaceholder")}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  className="w-full px-3 py-2.5 text-[13px] rounded-lg border border-border bg-surface-1 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/10 transition-all"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading !== null}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-[14px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loading === "email" && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                    <Mail size={15} />
+                    <span>
+                      {isLogin ? t("auth.emailLogin") : t("auth.emailRegister")}
+                    </span>
+                  </button>
                 )}
-                {isLogin
-                  ? t("auth.loginButton")
-                  : t("auth.createAccountButton")}
-              </button>
-            </form>
+              </div>
 
-            {/* Toggle mode */}
-            <div className="text-center mt-6">
-              <span className="text-[13px] text-text-muted">
-                {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}
-              </span>
-              <Link
-                to={(() => {
-                  const p = new URLSearchParams(searchParams);
-                  if (isLogin) {
-                    p.set("mode", "signup");
-                  } else {
-                    p.delete("mode");
-                  }
-                  return `/auth?${p.toString()}`;
-                })()}
-                className="text-[13px] text-accent font-medium ml-1 hover:underline underline-offset-2"
+              {/* Toggle login/register */}
+              <div className="flex items-center justify-center gap-1.5 mt-6 pt-5 border-t border-border">
+                <span className="text-[13px] text-text-muted">
+                  {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}
+                </span>
+                <Link
+                  to={(() => {
+                    const p = new URLSearchParams(searchParams);
+                    if (isLogin) {
+                      p.set("mode", "signup");
+                    } else {
+                      p.delete("mode");
+                    }
+                    return `/auth?${p.toString()}`;
+                  })()}
+                  onClick={() => {
+                    setShowEmailForm(false);
+                  }}
+                  className="text-[13px] text-text-primary font-medium hover:underline underline-offset-2"
+                >
+                  {isLogin ? t("auth.signUp") : t("auth.logIn")}
+                </Link>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-center gap-4 mt-6 text-[12px] text-text-muted">
+              <a
+                href="https://nexu.io/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-text-secondary transition-colors"
               >
-                {isLogin ? t("auth.signUp") : t("auth.logIn")}
-              </Link>
+                {t("auth.terms")}
+              </a>
+              <span className="text-border select-none">&middot;</span>
+              <a
+                href="https://nexu.io/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-text-secondary transition-colors"
+              >
+                {t("auth.privacy")}
+              </a>
             </div>
           </div>
         </div>
@@ -825,7 +781,7 @@ export function AuthPage() {
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         >
           <a
-            href="/terms"
+            href="https://nexu.io/terms"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-text-secondary transition-colors"
@@ -834,7 +790,7 @@ export function AuthPage() {
           </a>
           <span className="text-border">&middot;</span>
           <a
-            href="/privacy"
+            href="https://nexu.io/privacy"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-text-secondary transition-colors"

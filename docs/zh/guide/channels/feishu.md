@@ -1,63 +1,54 @@
 # 飞书
 
-本页结合 OpenClaw 的渠道能力和 Nexu 当前的飞书接入方式进行说明。
+只需获取 App ID 和 App Secret，即可将飞书机器人接入 nexu。
 
-## 你需要准备
+## 第一步：创建飞书应用
 
-- 一个飞书或 Lark 租户
-- 一个已开启 Bot 能力的飞书应用
-- `App ID` 与 `App Secret`
-- 在配置事件订阅前先确保 gateway 已启动
+1. 打开 [飞书开放平台](https://open.feishu.cn/app)，登录你的飞书账号，点击「创建企业自建应用」。
 
-## 接入流程
+![飞书开放平台应用列表](/assets/feishu/step1-app-list.webp)
 
-1. 在飞书开放平台创建企业自建应用。
-2. 开启 Bot 能力并授予消息相关权限。
-3. 选择接入模式：
-   - `websocket`：用户自管机器人，不需要公网回调地址
-   - `webhook`：适合 Nexu 官方机器人这类入站 HTTP 流程
-4. 将应用凭证录入 Nexu。
-5. 启动 gateway。
-6. 先发私聊拿到 pairing code，再完成审批。
+2. 填写应用名称、描述，选择图标，点击「创建」。
 
-## 配置示例
+![创建企业自建应用](/assets/feishu/step1-create-app.webp)
 
-```json5
-{
-  channels: {
-    feishu: {
-      enabled: true,
-      dmPolicy: "pairing",
-      accounts: {
-        main: {
-          appId: "cli_xxx",
-          appSecret: "xxx",
-          botName: "Nexu Assistant",
-        },
-      },
-    },
-  },
-}
-```
+3. 进入「凭证与基础信息」页面，复制以下两个参数：
+   - **App ID**
+   - **App Secret**
 
-## 群组行为
+![获取 App ID 和 App Secret](/assets/feishu/step1-credentials.webp)
 
-- 默认群组策略通常为开放，但要求 `@mention`
-- 如果只允许指定群组，使用 `groupPolicy: "allowlist"`
-- 如果只允许群里部分成员触发消息，使用 `groups.<chat_id>.allowFrom`
+## 第二步：在 nexu 中填入凭证
 
-## Nexu 特有说明
+打开 nexu 客户端，在飞书渠道配置中填入 App ID 和 App Secret，点击「Connect」。
 
-- 用户自管飞书机器人通常通过 WebSocket 连接，不需要公网 webhook。
-- Nexu 官方飞书机器人链路采用 webhook，并在转发前做 claim check。
-- 如果使用国际版 Lark，请设置 `domain: "lark"`。
+![在 nexu 中填入凭证](/assets/feishu/step3-nexu-connect.webp)
 
-## 验证命令
+## 第三步：发布应用并测试
 
-```bash
-openclaw gateway status
-openclaw logs --follow
-openclaw pairing list feishu
-```
+1. 回到飞书开放平台，进入「版本管理与发布」。
 
-上游参考：<https://docs.openclaw.ai/channels/feishu>
+![版本管理与发布](/assets/feishu/step4-version-manage.webp)
+
+2. 点击「创建版本」，填写版本号和更新说明，点击「保存」。
+
+![创建版本](/assets/feishu/step4-create-version.webp)
+
+3. 点击「确认发布」，等待审核通过。
+
+![确认发布](/assets/feishu/step4-publish.webp)
+
+4. 等待审核通过后，在 nexu 客户端点击「Chat」即可跳转到飞书与机器人对话 🎉
+
+![飞书已连接](/assets/feishu/step3-connected.webp)
+
+## 常见问题
+
+**Q: 需要公网服务器吗？**
+
+不需要。nexu 使用飞书长连接（WebSocket）模式，无需公网 IP 或回调地址。
+
+**Q: 需要手动配置权限吗？**
+
+不需要。nexu 会自动处理所需权限，你只需提供 App ID 和 App Secret。
+

@@ -20,20 +20,114 @@ export const DEFAULT_NEXU_LINK_URL: string | null = null;
  * Read build-time configuration from bundled config file.
  * This allows CI to inject environment-specific values at build time.
  */
-function loadBuildConfig(resourcesPath?: string): Record<string, string> {
+type BuildConfig = {
+  NEXU_HOME?: string;
+  NEXU_CLOUD_URL?: string;
+  NEXU_LINK_URL?: string | null;
+  NEXU_UPDATE_FEED_URL?: string;
+  NEXU_DESKTOP_SENTRY_DSN?: string;
+  NEXU_DESKTOP_BUILD_SOURCE?: string;
+  NEXU_DESKTOP_BUILD_BRANCH?: string;
+  NEXU_DESKTOP_BUILD_COMMIT?: string;
+  NEXU_DESKTOP_BUILD_TIME?: string;
+};
+
+function readBuildConfigString(
+  input: Record<string, unknown>,
+  key: keyof BuildConfig,
+): string | undefined {
+  const value = input[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readBuildConfigNullableString(
+  input: Record<string, unknown>,
+  key: keyof BuildConfig,
+): string | null | undefined {
+  const value = input[key];
+  if (value === null) {
+    return null;
+  }
+
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function loadBuildConfig(resourcesPath?: string): BuildConfig {
   if (!resourcesPath) return {};
 
   const configPath = resolve(resourcesPath, "build-config.json");
   if (!existsSync(configPath)) return {};
 
   try {
-    return JSON.parse(readFileSync(configPath, "utf8"));
+    const parsed = JSON.parse(readFileSync(configPath, "utf8")) as unknown;
+
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+
+    const record = parsed as Record<string, unknown>;
+    return {
+      NEXU_CLOUD_URL: readBuildConfigString(record, "NEXU_CLOUD_URL"),
+      NEXU_LINK_URL: readBuildConfigNullableString(record, "NEXU_LINK_URL"),
+      NEXU_UPDATE_FEED_URL: readBuildConfigString(
+        record,
+        "NEXU_UPDATE_FEED_URL",
+      ),
+      NEXU_DESKTOP_SENTRY_DSN: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_SENTRY_DSN",
+      ),
+      NEXU_DESKTOP_BUILD_SOURCE: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_BUILD_SOURCE",
+      ),
+      NEXU_DESKTOP_BUILD_BRANCH: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_BUILD_BRANCH",
+      ),
+      NEXU_DESKTOP_BUILD_COMMIT: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_BUILD_COMMIT",
+      ),
+      NEXU_DESKTOP_BUILD_TIME: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_BUILD_TIME",
+      ),
+    };
   } catch {
     return {};
   }
 }
 
+export type DesktopBuildSource =
+  | "local-dev"
+  | "local-dist"
+  | "nightly-test"
+  | "nightly-prod"
+  | "unknown";
+
+export type DesktopBuildInfo = {
+  version: string;
+  source: DesktopBuildSource;
+  branch: string | null;
+  commit: string | null;
+  builtAt: string | null;
+};
+
+function normalizeBuildSource(value: string | undefined): DesktopBuildSource {
+  switch (value) {
+    case "local-dev":
+    case "local-dist":
+    case "nightly-test":
+    case "nightly-prod":
+      return value;
+    default:
+      return "unknown";
+  }
+}
+
 export type DesktopRuntimeConfig = {
+  buildInfo: DesktopBuildInfo;
   ports: {
     api: number;
     web: number;
@@ -76,6 +170,7 @@ export type DesktopRuntimeConfig = {
 export function getDesktopRuntimeConfig(
   env: Record<string, string | undefined>,
   defaults?: {
+    appVersion?: string;
     openclawBinPath?: string;
     resourcesPath?: string;
   },
@@ -114,6 +209,24 @@ export function getDesktopRuntimeConfig(
   };
 
   return {
+    buildInfo: {
+      version: defaults?.appVersion ?? env.npm_package_version ?? "0.0.0",
+      source: normalizeBuildSource(
+        env.NEXU_DESKTOP_BUILD_SOURCE ?? buildConfig.NEXU_DESKTOP_BUILD_SOURCE,
+      ),
+      branch:
+        env.NEXU_DESKTOP_BUILD_BRANCH ??
+        buildConfig.NEXU_DESKTOP_BUILD_BRANCH ??
+        null,
+      commit:
+        env.NEXU_DESKTOP_BUILD_COMMIT ??
+        buildConfig.NEXU_DESKTOP_BUILD_COMMIT ??
+        null,
+      builtAt:
+        env.NEXU_DESKTOP_BUILD_TIME ??
+        buildConfig.NEXU_DESKTOP_BUILD_TIME ??
+        null,
+    },
     ports,
     urls,
     tokens: {

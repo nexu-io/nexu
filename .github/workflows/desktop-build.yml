@@ -34,6 +34,10 @@ on:
         required: false
         type: string
         default: ""
+      build_source:
+        description: "Build source label embedded in desktop metadata"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -108,10 +112,14 @@ jobs:
           CLOUD_URL: ${{ inputs.cloud_url }}
           LINK_URL: ${{ inputs.link_url }}
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
+          BUILD_SOURCE: ${{ inputs.build_source }}
+          BUILD_BRANCH: ${{ github.ref_name }}
+          BUILD_COMMIT: ${{ github.sha }}
           SENTRY_DSN_TEST: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_TEST }}
           SENTRY_DSN_PROD: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_PROD }}
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
+          export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
             const sentryDsnByEnvironment = {
               test: process.env.SENTRY_DSN_TEST,
@@ -121,6 +129,10 @@ jobs:
             const config = {
               NEXU_CLOUD_URL: process.env.CLOUD_URL,
               NEXU_LINK_URL: process.env.LINK_URL === "null" ? null : process.env.LINK_URL,
+              NEXU_DESKTOP_BUILD_SOURCE: process.env.BUILD_SOURCE,
+              NEXU_DESKTOP_BUILD_BRANCH: process.env.BUILD_BRANCH,
+              NEXU_DESKTOP_BUILD_COMMIT: process.env.BUILD_COMMIT,
+              NEXU_DESKTOP_BUILD_TIME: process.env.BUILT_AT,
             };
             if (process.env.UPDATE_FEED_URL) {
               config.NEXU_UPDATE_FEED_URL = process.env.UPDATE_FEED_URL;

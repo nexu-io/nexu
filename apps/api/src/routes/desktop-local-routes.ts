@@ -14,7 +14,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { bots, gatewayPools } from "../db/schema/index.js";
-import { encrypt } from "../lib/crypto.js";
+import { decrypt, encrypt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
 import type { AppBindings } from "../types.js";
@@ -177,6 +177,22 @@ async function pollCloudForAuthorization(
           linkGatewayUrl: linkUrl ?? undefined,
           cloudModels,
         });
+
+        // Push config snapshot so gateway picks up the new link provider
+        try {
+          const [pool] = await db
+            .select({ id: gatewayPools.id })
+            .from(gatewayPools)
+            .where(eq(gatewayPools.poolName, "default"));
+          if (pool) {
+            await publishPoolConfigSnapshot(db, pool.id);
+          }
+        } catch (err) {
+          logger.error({
+            message: "cloud_reconnect_snapshot_failed",
+            error: err,
+          });
+        }
 
         pollingState = null;
         return;
@@ -356,12 +372,26 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
   // Initiate cloud connection: generate device ID, register on cloud, start polling
   app.openapi(cloudConnectRoute, async (c) => {
+    logger.info({
+      message: "desktop_cloud_connect_requested",
+      polling_in_progress: pollingState !== null,
+      already_connected: Boolean(loadCredentials()),
+    });
     // Reject if already polling or connected
     if (pollingState) {
+      logger.info({
+        message: "desktop_cloud_connect_rejected",
+        reason: "already_in_progress",
+      });
       return c.json({ error: "Connection attempt already in progress" });
     }
     const existing = loadCredentials();
     if (existing) {
+      logger.info({
+        message: "desktop_cloud_connect_rejected",
+        reason: "already_connected",
+        user_id: existing.userId,
+      });
       return c.json({ error: "Already connected. Disconnect first." });
     }
 
@@ -389,6 +419,11 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
     if (!res.ok) {
       const body = await res.text();
+      logger.warn({
+        message: "desktop_cloud_connect_register_failed",
+        status: res.status,
+        body,
+      });
       return c.json({ error: `Failed to register device: ${body}` });
     }
 
@@ -403,6 +438,10 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
     );
 
     const browserUrl = `${cloudApiUrl}/auth?desktop=1&device_id=${deviceId}`;
+    logger.info({
+      message: "desktop_cloud_connect_started",
+      device_id: deviceId,
+    });
     return c.json({ browserUrl });
   });
 
@@ -410,6 +449,12 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   app.openapi(cloudStatusRoute, (c) => {
     const creds = loadCredentials();
     if (creds) {
+      logger.info({
+        message: "desktop_cloud_status_checked",
+        connected: true,
+        polling: false,
+        user_id: creds.userId,
+      });
       return c.json({
         connected: true,
         polling: false,
@@ -420,6 +465,11 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
       });
     }
 
+    logger.info({
+      message: "desktop_cloud_status_checked",
+      connected: false,
+      polling: pollingState !== null,
+    });
     return c.json({
       connected: false,
       polling: pollingState !== null,
@@ -523,7 +573,12 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
   });
 
   // Disconnect from cloud: clear credentials, cancel polling
-  app.openapi(cloudDisconnectRoute, (c) => {
+  app.openapi(cloudDisconnectRoute, async (c) => {
+    logger.info({
+      message: "desktop_cloud_disconnect_requested",
+      polling_in_progress: pollingState !== null,
+      had_credentials: Boolean(loadCredentials()),
+    });
     // Cancel any active polling
     if (pollingState) {
       pollingState.abortController.abort();
@@ -532,6 +587,68 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
 
     clearCredentials();
 
+    // Push config snapshot so gateway removes the link provider
+    try {
+      const [pool] = await db
+        .select({ id: gatewayPools.id })
+        .from(gatewayPools)
+        .where(eq(gatewayPools.poolName, "default"));
+      if (pool) {
+        await publishPoolConfigSnapshot(db, pool.id);
+      }
+    } catch (err) {
+      logger.error({ message: "cloud_disconnect_snapshot_failed", error: err });
+    }
+
     return c.json({ ok: true });
   });
+}
+
+/**
+ * Refresh cloud models from the Link gateway on startup.
+ * Compares with cached models and updates credentials + gateway config if changed.
+ * Fire-and-forget — errors are logged but never thrown.
+ */
+export async function refreshCloudModelsOnStartup(): Promise<void> {
+  if (process.env.NEXU_DESKTOP_MODE !== "true") return;
+
+  const creds = loadCredentials();
+  if (!creds?.encryptedApiKey) return;
+
+  const linkUrl = creds.linkGatewayUrl ?? getLinkGatewayUrl();
+  if (!linkUrl) return;
+
+  try {
+    const apiKey = decrypt(creds.encryptedApiKey);
+    const freshModels = await fetchCloudModels(linkUrl, apiKey);
+    if (!freshModels || freshModels.length === 0) return;
+
+    // Compare with cached models
+    const cachedIds = new Set((creds.cloudModels ?? []).map((m) => m.id));
+    const freshIds = new Set(freshModels.map((m) => m.id));
+    const same =
+      cachedIds.size === freshIds.size &&
+      [...cachedIds].every((id) => freshIds.has(id));
+    if (same) return;
+
+    logger.info({
+      message: "cloud_models_refreshed",
+      added: freshModels.filter((m) => !cachedIds.has(m.id)).map((m) => m.id),
+      removed: [...cachedIds].filter((id) => !freshIds.has(id)),
+    });
+
+    creds.cloudModels = freshModels;
+    saveCredentials(creds);
+
+    // Push updated config to gateway
+    const [pool] = await db
+      .select({ id: gatewayPools.id })
+      .from(gatewayPools)
+      .where(eq(gatewayPools.poolName, "default"));
+    if (pool) {
+      await publishPoolConfigSnapshot(db, pool.id);
+    }
+  } catch (err) {
+    logger.error({ message: "cloud_models_refresh_failed", error: err });
+  }
 }

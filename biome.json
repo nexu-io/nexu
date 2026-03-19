@@ -46,8 +46,10 @@
   ],
   "files": {
     "ignore": [
-      ".claude",
-      "specs/cowork",
+      ".claude/**",
+      ".cursor/**",
+      ".opencode/**",
+      "specs/**",
       "apps/web/lib/api",
       "apps/api/migrations/meta/*.json",
       "*.gen.ts",

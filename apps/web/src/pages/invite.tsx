@@ -275,7 +275,7 @@ export function InvitePage() {
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         >
           <a
-            href="/terms"
+            href="https://nexu.io/terms"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-text-secondary transition-colors"
@@ -284,7 +284,7 @@ export function InvitePage() {
           </a>
           <span className="text-border">&middot;</span>
           <a
-            href="/privacy"
+            href="https://nexu.io/privacy"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-text-secondary transition-colors"

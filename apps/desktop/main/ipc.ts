@@ -123,6 +123,7 @@ export function registerIpcHandlers(
 
         case "env:get-api-base-url": {
           const apiBaseUrl = getDesktopRuntimeConfig(process.env, {
+            appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
           }).urls.apiBase;
 
@@ -135,6 +136,7 @@ export function registerIpcHandlers(
 
         case "env:get-runtime-config": {
           return getDesktopRuntimeConfig(process.env, {
+            appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
           });
         }
@@ -287,7 +289,12 @@ export function registerIpcHandlers(
 
         case "skillhub:get-catalog": {
           if (!catalogManager) {
-            return { skills: [], installedSlugs: [], meta: null };
+            return {
+              skills: [],
+              installedSlugs: [],
+              installedSkills: [],
+              meta: null,
+            };
           }
           return catalogManager.getCatalog();
         }

@@ -35,10 +35,19 @@ import { UpdateManager } from "./updater/update-manager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Info.plist declares LSUIElement=true so that child processes (spawned with
+// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
+// BEFORE any blocking initialization (tar extraction, directory creation, etc.)
+// so users see it immediately on first launch.
+app.setName("Nexu Desktop");
+void app.dock?.show();
+
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
 const runtimeConfig = getDesktopRuntimeConfig(process.env, {
+  appVersion: app.getVersion(),
   resourcesPath: electronRoot,
 });
 const orchestrator = new RuntimeOrchestrator(
@@ -48,14 +57,6 @@ const orchestrator = new RuntimeOrchestrator(
     app.isPackaged,
   ),
 );
-
-app.setName("Nexu Desktop");
-
-// Info.plist declares LSUIElement=true so that child processes (spawned with
-// ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Restore the main
-// process's Dock icon as early as possible — before whenReady / cold-start —
-// so users see it immediately even during first-launch decompression.
-void app.dock?.show();
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
@@ -229,10 +230,7 @@ function logRendererEvent({
 async function waitForApiReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL(
-    "/api/internal/desktop/ready",
-    runtimeConfig.urls.apiBase,
-  );
+  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -242,9 +240,9 @@ async function waitForApiReadiness(): Promise<void> {
         },
       });
 
-      if (response.ok) {
+      if (response.status < 500) {
         logColdStart(
-          `controller ready via ${probeUrl.pathname} status=${response.status}`,
+          `api ready via ${probeUrl.pathname} status=${response.status}`,
         );
         return;
       }
@@ -255,9 +253,7 @@ async function waitForApiReadiness(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  throw new Error(
-    `Controller readiness probe timed out for ${probeUrl.toString()}`,
-  );
+  throw new Error(`API readiness probe timed out for ${probeUrl.toString()}`);
 }
 
 async function runDesktopColdStart(): Promise<void> {
@@ -265,12 +261,12 @@ async function runDesktopColdStart(): Promise<void> {
   logColdStart("starting pglite");
   await orchestrator.startOne("pglite");
 
-  diagnosticsReporter?.markColdStartRunning("starting controller");
-  logColdStart("starting controller");
-  await orchestrator.startOne("controller");
+  diagnosticsReporter?.markColdStartRunning("starting api");
+  logColdStart("starting api");
+  await orchestrator.startOne("api");
 
-  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
-  logColdStart("waiting for controller readiness");
+  diagnosticsReporter?.markColdStartRunning("waiting for api readiness");
+  logColdStart("waiting for api readiness");
   await waitForApiReadiness();
 
   diagnosticsReporter?.markColdStartRunning(
@@ -284,6 +280,10 @@ async function runDesktopColdStart(): Promise<void> {
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
+
+  diagnosticsReporter?.markColdStartRunning("starting gateway");
+  logColdStart("starting gateway");
+  await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
@@ -562,9 +562,17 @@ app.whenReady().then(async () => {
       });
     }
 
-    catalogMgr = new CatalogManager(
-      app.getPath("userData"),
-      (level, message) => {
+    // Resolve static bundled-skills dir: packaged app has it in resources/,
+    // dev mode has it relative to the repo root.
+    // Resolve static bundled-skills dir: packaged app has it in resources/,
+    // dev mode has it relative to the app root.
+    const staticSkillsDir = app.isPackaged
+      ? resolve(process.resourcesPath ?? "", "static/bundled-skills")
+      : resolve(app.getAppPath(), "static/bundled-skills");
+
+    catalogMgr = new CatalogManager(app.getPath("userData"), {
+      staticSkillsDir,
+      log: (level, message) => {
         writeDesktopMainLog({
           source: "skillhub",
           stream: level === "error" ? "stderr" : "stdout",
@@ -573,9 +581,22 @@ app.whenReady().then(async () => {
           logFilePath: getDesktopLogFilePath("desktop-main.log"),
         });
       },
-    );
+    });
     setCatalogManager(catalogMgr);
     catalogMgr.start();
+
+    // Install curated skills on first launch (or re-install missing ones on update).
+    // Runs in background — does not block window creation.
+    void catalogMgr.installCuratedSkills().catch((err) => {
+      // Best-effort — curated skills are not critical for app startup.
+      writeDesktopMainLog({
+        source: "skillhub",
+        stream: "stderr",
+        kind: "app",
+        message: `curated skill install failed: ${err instanceof Error ? err.message : String(err)}`,
+        logFilePath: getDesktopLogFilePath("desktop-main.log"),
+      });
+    });
 
     const win = createMainWindow();
 

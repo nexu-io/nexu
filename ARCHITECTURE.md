@@ -45,7 +45,6 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 - **`apps/api/`** — Legacy Hono backend for the old multi-tenant SaaS path.
 - **`apps/controller/`** — Single-user controller service. Routes in `src/routes/`, local config store in `src/store/`, OpenClaw runtime integration in `src/runtime/`, compiler logic in `src/lib/openclaw-config-compiler.ts`.
 - **`apps/web/`** — React frontend. Pages in `src/pages/`, generated SDK in `lib/api/`, auth client in `src/lib/auth-client.ts`.
-- **`apps/chat/`** — Next.js session-chat surface for local OpenClaw probing.
 - **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator.
 - **`apps/gateway/`** — Legacy gateway sidecar package from the SaaS runtime path.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.

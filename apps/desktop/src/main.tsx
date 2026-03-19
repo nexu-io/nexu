@@ -79,6 +79,44 @@ function maskSentryDsn(dsn: string | null | undefined): string {
   return `${protocol}${maskedKey}@${hostAndPath}`;
 }
 
+function formatBuildTimestamp(value: string | null | undefined): string {
+  if (!value) {
+    return "(unknown)";
+  }
+
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  const date = new Date(timestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const timezoneOffsetMinutes = -date.getTimezoneOffset();
+  const offsetSign = timezoneOffsetMinutes >= 0 ? "+" : "-";
+  const offsetHours = String(
+    Math.floor(Math.abs(timezoneOffsetMinutes) / 60),
+  ).padStart(2, "0");
+  const offsetMinutes = String(Math.abs(timezoneOffsetMinutes) % 60).padStart(
+    2,
+    "0",
+  );
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetSign}${offsetHours}:${offsetMinutes}`;
+}
+
+function formatBuildCommit(value: string | null | undefined): string {
+  if (!value) {
+    return "(unknown)";
+  }
+
+  return value.slice(0, 7);
+}
+
 if (amplitudeApiKey) {
   amplitude.initAll(amplitudeApiKey, {
     analytics: { autocapture: true },
@@ -1076,8 +1114,30 @@ function DesktopShell() {
 
         {runtimeConfig ? (
           <div className="desktop-sidebar-config">
-            <span className="desktop-shell-eyebrow">Build Config</span>
+            <span className="desktop-shell-eyebrow">Build Info</span>
             <dl className="desktop-config-list">
+              <div>
+                <dt>Source</dt>
+                <dd>{runtimeConfig.buildInfo.source}</dd>
+              </div>
+              <div>
+                <dt>Version</dt>
+                <dd>{runtimeConfig.buildInfo.version}</dd>
+              </div>
+              <div>
+                <dt>Branch</dt>
+                <dd>{runtimeConfig.buildInfo.branch ?? "(unknown)"}</dd>
+              </div>
+              <div>
+                <dt>Commit</dt>
+                <dd title={runtimeConfig.buildInfo.commit ?? undefined}>
+                  {formatBuildCommit(runtimeConfig.buildInfo.commit)}
+                </dd>
+              </div>
+              <div>
+                <dt>Built At</dt>
+                <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
+              </div>
               <div>
                 <dt>Cloud</dt>
                 <dd>{runtimeConfig.urls.nexuCloud}</dd>

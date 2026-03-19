@@ -185,6 +185,8 @@ export type RuntimeUnitId =
   | "web"
   | "control-plane"
   | "pglite"
+  | "api"
+  | "gateway"
   | "controller"
   | "openclaw";
 

@@ -515,4 +515,29 @@ describe("Config Generator", () => {
     );
     expect(config.models?.providers.openai?.models[0]?.id).toBe("gpt-4.1-mini");
   });
+
+  it("should keep custom provider model ids namespaced consistently", async () => {
+    await seedData();
+    await db
+      .update(schema.bots)
+      .set({ modelId: "custom/anthropic/claude-sonnet-4.6" })
+      .where(eq(schema.bots.id, "bot-1"));
+
+    await insertByokProvider({
+      id: "mp-custom",
+      providerId: "custom",
+      displayName: "Custom",
+      baseUrl: "https://litellm.example.com/v1",
+      modelsJson: JSON.stringify(["anthropic/claude-sonnet-4.6"]),
+    });
+
+    const config = await generatePoolConfig(db, "pool-1");
+    const customProvider = config.models?.providers["custom_mp-custom"];
+
+    expect(config.agents.list[0]?.model).toEqual({
+      primary: "custom_mp-custom/anthropic/claude-sonnet-4.6",
+    });
+    expect(customProvider).toBeDefined();
+    expect(customProvider?.models[0]?.id).toBe("anthropic/claude-sonnet-4.6");
+  });
 });

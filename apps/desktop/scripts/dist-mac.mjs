@@ -1,6 +1,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +9,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
 const repoRoot =
   process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const require = createRequire(import.meta.url);
 const isUnsigned =
   process.argv.includes("--unsigned") ||
   process.env.NEXU_DESKTOP_MAC_UNSIGNED === "1" ||
@@ -59,6 +61,18 @@ function parseEnvFile(content) {
   return values;
 }
 
+function getGitValue(args) {
+  try {
+    return execFileSync("git", args, {
+      cwd: repoRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
 async function loadDesktopEnv() {
   const envPath = resolve(electronRoot, ".env");
 
@@ -99,13 +113,16 @@ function shellEscape(value) {
 }
 
 async function runElectronBuilder(args, options = {}) {
+  const electronBuilderCli = require.resolve("electron-builder/cli.js", {
+    paths: [electronRoot, repoRoot],
+  });
   const targetOpenFiles = process.env.NEXU_DESKTOP_MAX_OPEN_FILES ?? "8192";
   const command = [
     `target=${shellEscape(targetOpenFiles)}`,
     'hard_limit=$(ulimit -Hn 2>/dev/null || printf %s "$target")',
     'if [ "$hard_limit" != "unlimited" ] && [ "$hard_limit" -lt "$target" ]; then target="$hard_limit"; fi',
     'ulimit -n "$target" 2>/dev/null || true',
-    `exec pnpm exec electron-builder ${args.map(shellEscape).join(" ")}`,
+    `exec ${shellEscape(process.execPath)} ${shellEscape(electronBuilderCli)} ${args.map(shellEscape).join(" ")}`,
   ].join("; ");
 
   await run("bash", ["-lc", command], options);
@@ -196,20 +213,19 @@ async function stapleNotarizedAppBundles() {
 
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
+  let existingConfig = {};
 
   try {
     const existing = await readFile(configPath, "utf8");
+    existingConfig = JSON.parse(existing);
     console.log(
-      "[dist:mac] using pre-generated build-config.json:",
+      "[dist:mac] loaded existing build-config.json:",
       existing.trim(),
     );
-    return;
   } catch {
-    // Generate from env when no pre-generated config is present.
+    // build-config.json is optional for local dist builds.
   }
 
-  // Generate build-config.json from environment variables / .env file
-  // so that secrets (cloud/link URLs) are never committed to the repo.
   const envPath = resolve(electronRoot, ".env");
   let fileEnv = {};
   try {
@@ -218,16 +234,62 @@ async function ensureBuildConfig() {
     // .env is optional
   }
   const merged = { ...fileEnv, ...process.env };
+  const gitBranch = getGitValue(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const gitCommit = getGitValue(["rev-parse", "HEAD"]);
+
+  const defaultMetadata = {
+    NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
+    NEXU_DESKTOP_BUILD_BRANCH:
+      merged.NEXU_DESKTOP_BUILD_BRANCH ?? (gitBranch || undefined),
+    NEXU_DESKTOP_BUILD_COMMIT:
+      merged.NEXU_DESKTOP_BUILD_COMMIT ?? (gitCommit || undefined),
+    NEXU_DESKTOP_BUILD_TIME:
+      merged.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
+  };
 
   const config = {
-    NEXU_CLOUD_URL: merged.NEXU_CLOUD_URL ?? "https://nexu.io",
-    NEXU_LINK_URL: merged.NEXU_LINK_URL ?? null,
-    ...(merged.NEXU_DESKTOP_SENTRY_DSN
-      ? { NEXU_DESKTOP_SENTRY_DSN: merged.NEXU_DESKTOP_SENTRY_DSN }
+    ...existingConfig,
+    NEXU_CLOUD_URL:
+      existingConfig.NEXU_CLOUD_URL ??
+      merged.NEXU_CLOUD_URL ??
+      "https://nexu.io",
+    NEXU_LINK_URL: existingConfig.NEXU_LINK_URL ?? merged.NEXU_LINK_URL ?? null,
+    ...((existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
+    merged.NEXU_DESKTOP_SENTRY_DSN)
+      ? {
+          NEXU_DESKTOP_SENTRY_DSN:
+            existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
+            merged.NEXU_DESKTOP_SENTRY_DSN,
+        }
       : {}),
-    ...(merged.NEXU_UPDATE_FEED_URL
-      ? { NEXU_UPDATE_FEED_URL: merged.NEXU_UPDATE_FEED_URL }
+    ...((existingConfig.NEXU_UPDATE_FEED_URL ?? merged.NEXU_UPDATE_FEED_URL)
+      ? {
+          NEXU_UPDATE_FEED_URL:
+            existingConfig.NEXU_UPDATE_FEED_URL ?? merged.NEXU_UPDATE_FEED_URL,
+        }
       : {}),
+    NEXU_DESKTOP_BUILD_SOURCE:
+      existingConfig.NEXU_DESKTOP_BUILD_SOURCE ??
+      defaultMetadata.NEXU_DESKTOP_BUILD_SOURCE,
+    ...((existingConfig.NEXU_DESKTOP_BUILD_BRANCH ??
+    defaultMetadata.NEXU_DESKTOP_BUILD_BRANCH)
+      ? {
+          NEXU_DESKTOP_BUILD_BRANCH:
+            existingConfig.NEXU_DESKTOP_BUILD_BRANCH ??
+            defaultMetadata.NEXU_DESKTOP_BUILD_BRANCH,
+        }
+      : {}),
+    ...((existingConfig.NEXU_DESKTOP_BUILD_COMMIT ??
+    defaultMetadata.NEXU_DESKTOP_BUILD_COMMIT)
+      ? {
+          NEXU_DESKTOP_BUILD_COMMIT:
+            existingConfig.NEXU_DESKTOP_BUILD_COMMIT ??
+            defaultMetadata.NEXU_DESKTOP_BUILD_COMMIT,
+        }
+      : {}),
+    NEXU_DESKTOP_BUILD_TIME:
+      existingConfig.NEXU_DESKTOP_BUILD_TIME ??
+      defaultMetadata.NEXU_DESKTOP_BUILD_TIME,
   };
 
   await writeFile(configPath, JSON.stringify(config, null, 2));
@@ -235,6 +297,23 @@ async function ensureBuildConfig() {
     "[dist:mac] generated build-config.json from env:",
     JSON.stringify(config),
   );
+}
+
+async function getElectronVersion() {
+  const electronPackageJsonPath = require.resolve("electron/package.json", {
+    paths: [electronRoot, repoRoot],
+  });
+  const electronPackageJson = JSON.parse(
+    await readFile(electronPackageJsonPath, "utf8"),
+  );
+
+  if (typeof electronPackageJson.version !== "string") {
+    throw new Error(
+      `Unable to determine Electron version from ${electronPackageJsonPath}.`,
+    );
+  }
+
+  return electronPackageJson.version;
 }
 
 async function main() {
@@ -306,6 +385,7 @@ async function main() {
   // Use git short SHA as CFBundleVersion (shown in parentheses in About dialog).
   // Falls back to "dev" for local builds outside a git repo.
   let buildVersion = "dev";
+  const electronVersion = await getElectronVersion();
   try {
     buildVersion = execFileSync("git", ["rev-parse", "--short=7", "HEAD"], {
       encoding: "utf8",
@@ -319,6 +399,7 @@ async function main() {
       "--mac",
       "--publish",
       "never",
+      `--config.electronVersion=${electronVersion}`,
       `--config.buildVersion=${buildVersion}`,
       ...(isUnsigned
         ? ["--config.mac.identity=null", "--config.mac.hardenedRuntime=false"]

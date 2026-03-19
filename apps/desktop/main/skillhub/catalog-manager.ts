@@ -11,12 +11,24 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 import { promisify } from "node:util";
-import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
+import {
+  getOpenclawCuratedSkillsDir,
+  getOpenclawSkillsDir,
+} from "../../shared/desktop-paths";
 import type {
   CatalogMeta,
+  InstalledSkill,
   MinimalSkill,
+  SkillSource,
   SkillhubCatalogData,
 } from "../../shared/skillhub-types";
+import {
+  type CuratedInstallResult,
+  copyStaticSkills,
+  recordCuratedInstallation,
+  recordCuratedRemoval,
+  resolveCuratedSkillsToInstall,
+} from "./curated-skills";
 
 const execFileAsync = promisify(execFile);
 
@@ -29,6 +41,11 @@ function resolveClawHubBin(): string {
   };
   const binRel = pkg.bin?.clawhub ?? pkg.bin?.clawdhub ?? "bin/clawdhub.js";
   return resolve(dirname(pkgPath), binRel);
+}
+
+function resolveNpmBin(): string {
+  const pkgPath = nodeRequire.resolve("npm/package.json");
+  return resolve(dirname(pkgPath), "bin/npm-cli.js");
 }
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
@@ -66,19 +83,31 @@ const DAILY_MS = 24 * 60 * 60 * 1000;
 export class CatalogManager {
   private readonly cacheDir: string;
   private readonly skillsDir: string;
+  private readonly curatedSkillsDir: string;
+  private readonly curatedStatePath: string;
+  private readonly staticSkillsDir: string;
   private readonly metaPath: string;
   private readonly catalogPath: string;
   private readonly tempCatalogPath: string;
   private readonly log: SkillhubLogFn;
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
-  constructor(userDataPath: string, log?: SkillhubLogFn) {
+  constructor(
+    userDataPath: string,
+    opts?: { staticSkillsDir?: string; log?: SkillhubLogFn },
+  ) {
     this.cacheDir = resolve(userDataPath, "runtime/skillhub-cache");
     this.skillsDir = getOpenclawSkillsDir(userDataPath);
+    this.curatedSkillsDir = getOpenclawCuratedSkillsDir(userDataPath);
+    this.curatedStatePath = resolve(
+      this.curatedSkillsDir,
+      ".curated-state.json",
+    );
+    this.staticSkillsDir = opts?.staticSkillsDir ?? "";
     this.metaPath = resolve(this.cacheDir, "meta.json");
     this.catalogPath = resolve(this.cacheDir, "catalog.json");
     this.tempCatalogPath = resolve(this.cacheDir, ".catalog-next.json");
-    this.log = log ?? noopLog;
+    this.log = opts?.log ?? noopLog;
     mkdirSync(this.cacheDir, { recursive: true });
   }
 
@@ -146,10 +175,11 @@ export class CatalogManager {
 
   getCatalog(): SkillhubCatalogData {
     const skills = this.readCachedSkills();
-    const installedSlugs = this.getInstalledSlugs();
+    const installedSkills = this.scanAllSources();
+    const installedSlugs = installedSkills.map((s) => s.slug);
     const meta = this.readMeta();
 
-    return { skills, installedSlugs, meta };
+    return { skills, installedSlugs, installedSkills, meta };
   }
 
   async installSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
@@ -162,19 +192,26 @@ export class CatalogManager {
     try {
       const clawHubBin = resolveClawHubBin();
       this.log("info", `install resolved clawhub=${clawHubBin}`);
-      const { stdout, stderr } = await execFileAsync(process.execPath, [
-        clawHubBin,
-        "install",
-        slug,
-        "--force",
-        "--dir",
-        this.skillsDir,
-      ]);
+      const { stdout, stderr } = await execFileAsync(
+        process.execPath,
+        [
+          clawHubBin,
+          "--workdir",
+          this.skillsDir,
+          "--dir",
+          ".",
+          "install",
+          slug,
+          "--force",
+        ],
+        { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
+      );
       if (stdout)
         this.log("info", `install stdout slug=${slug}: ${stdout.trim()}`);
       if (stderr)
         this.log("warn", `install stderr slug=${slug}: ${stderr.trim()}`);
       this.log("info", `install ok slug=${slug}`);
+      await this.installSkillDeps(resolve(this.skillsDir, slug), slug);
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -191,17 +228,25 @@ export class CatalogManager {
 
     this.log("info", `uninstalling skill slug=${slug}`);
     try {
-      const skillDir = resolveSkillPath(this.skillsDir, slug);
+      const managedPath = resolveSkillPath(this.skillsDir, slug);
+      const curatedPath = resolveSkillPath(this.curatedSkillsDir, slug);
 
-      if (!skillDir) {
-        this.log("warn", `uninstall rejected slug=${slug} — path traversal`);
-        return { ok: false, error: "Invalid skill slug" };
+      let removed = false;
+
+      if (managedPath && existsSync(managedPath)) {
+        rmSync(managedPath, { recursive: true, force: true });
+        removed = true;
+        this.log("info", `uninstall ok (managed) slug=${slug}`);
       }
 
-      if (existsSync(skillDir)) {
-        rmSync(skillDir, { recursive: true, force: true });
-        this.log("info", `uninstall ok slug=${slug}`);
-      } else {
+      if (curatedPath && existsSync(curatedPath)) {
+        rmSync(curatedPath, { recursive: true, force: true });
+        removed = true;
+        this.log("info", `uninstall ok (curated) slug=${slug}`);
+        recordCuratedRemoval({ slug, statePath: this.curatedStatePath });
+      }
+
+      if (!removed) {
         this.log("warn", `uninstall skip slug=${slug} — dir not found`);
       }
 
@@ -213,6 +258,106 @@ export class CatalogManager {
     }
   }
 
+  async installCuratedSkills(): Promise<CuratedInstallResult> {
+    // Step 1: Copy static skills (not on ClawHub) from app bundle
+    if (this.staticSkillsDir) {
+      const { copied } = copyStaticSkills({
+        staticDir: this.staticSkillsDir,
+        curatedDir: this.curatedSkillsDir,
+        statePath: this.curatedStatePath,
+      });
+      if (copied.length > 0) {
+        this.log("info", `curated static skills copied: ${copied.join(", ")}`);
+      }
+    }
+
+    // Step 2: Install remaining from ClawHub
+    const { toInstall, toSkip } = resolveCuratedSkillsToInstall({
+      curatedDir: this.curatedSkillsDir,
+      statePath: this.curatedStatePath,
+    });
+
+    if (toInstall.length === 0) {
+      this.log(
+        "info",
+        `curated skills: nothing to install (${toSkip.length} skipped)`,
+      );
+      return { installed: [], skipped: toSkip, failed: [] };
+    }
+
+    this.log("info", `curated skills: installing ${toInstall.length} skills`);
+
+    const clawHubBin = resolveClawHubBin();
+    const CONCURRENCY = 5;
+
+    const installOne = async (
+      slug: string,
+    ): Promise<{ slug: string; ok: boolean }> => {
+      try {
+        this.log(
+          "info",
+          `curated installing: ${slug} -> ${this.curatedSkillsDir}`,
+        );
+        const { stdout, stderr } = await execFileAsync(
+          process.execPath,
+          [
+            clawHubBin,
+            "--workdir",
+            this.curatedSkillsDir,
+            "--dir",
+            ".",
+            "install",
+            slug,
+            "--force",
+          ],
+          { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
+        );
+        if (stdout) this.log("info", `curated stdout: ${stdout.trim()}`);
+        if (stderr) this.log("warn", `curated stderr: ${stderr.trim()}`);
+        this.log("info", `curated install ok: ${slug}`);
+        return { slug, ok: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.log("error", `curated install failed: ${slug} — ${message}`);
+        return { slug, ok: false };
+      }
+    };
+
+    // Download & extract in parallel batches
+    const installed: string[] = [];
+    const failed: string[] = [];
+
+    for (let i = 0; i < toInstall.length; i += CONCURRENCY) {
+      const batch = toInstall.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(batch.map(installOne));
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value.ok) {
+          installed.push(result.value.slug);
+        } else {
+          const slug =
+            result.status === "fulfilled" ? result.value.slug : "unknown";
+          failed.push(slug);
+        }
+      }
+    }
+
+    // Install npm deps in parallel for skills that have package.json
+    if (installed.length > 0) {
+      await Promise.allSettled(
+        installed.map((slug) =>
+          this.installSkillDeps(resolve(this.curatedSkillsDir, slug), slug),
+        ),
+      );
+    }
+
+    recordCuratedInstallation({
+      statePath: this.curatedStatePath,
+      installed,
+    });
+
+    return { installed, skipped: toSkip, failed };
+  }
+
   dispose(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -220,22 +365,91 @@ export class CatalogManager {
     }
   }
 
-  private getInstalledSlugs(): string[] {
-    if (!existsSync(this.skillsDir)) {
-      return [];
+  private async installSkillDeps(
+    skillDir: string,
+    slug: string,
+  ): Promise<void> {
+    if (!existsSync(resolve(skillDir, "package.json"))) return;
+
+    this.log("info", `installing npm deps: ${slug}`);
+    try {
+      const npmBin = resolveNpmBin();
+      await execFileAsync(
+        process.execPath,
+        [npmBin, "install", "--production", "--no-audit", "--no-fund"],
+        {
+          cwd: skillDir,
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+        },
+      );
+      this.log("info", `npm deps installed: ${slug}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log("warn", `npm deps failed for ${slug}: ${message}`);
+    }
+  }
+
+  private scanAllSources(): InstalledSkill[] {
+    const merged = new Map<string, InstalledSkill>();
+
+    for (const skill of this.scanDirWithMeta(
+      this.curatedSkillsDir,
+      "curated",
+    )) {
+      merged.set(skill.slug, skill);
     }
 
+    for (const skill of this.scanDirWithMeta(this.skillsDir, "managed")) {
+      merged.set(skill.slug, skill);
+    }
+
+    return Array.from(merged.values());
+  }
+
+  private scanDirWithMeta(dir: string, source: SkillSource): InstalledSkill[] {
+    if (!dir || !existsSync(dir)) return [];
     try {
-      const entries = readdirSync(this.skillsDir, { withFileTypes: true });
-      return entries
+      return readdirSync(dir, { withFileTypes: true })
         .filter(
           (entry) =>
             entry.isDirectory() &&
-            existsSync(resolve(this.skillsDir, entry.name, "SKILL.md")),
+            existsSync(resolve(dir, entry.name, "SKILL.md")),
         )
-        .map((entry) => entry.name);
+        .map((entry) => {
+          const { name, description } = this.parseFrontmatter(
+            resolve(dir, entry.name, "SKILL.md"),
+          );
+          return {
+            slug: entry.name,
+            source,
+            name: name || entry.name,
+            description: description || "",
+          };
+        });
     } catch {
       return [];
+    }
+  }
+
+  private parseFrontmatter(filePath: string): {
+    name: string;
+    description: string;
+  } {
+    try {
+      const content = readFileSync(filePath, "utf8");
+      const match = content.match(/^---\n([\s\S]*?)\n---/);
+      if (!match?.[1]) return { name: "", description: "" };
+      const frontmatter = match[1];
+      const nameMatch = frontmatter.match(/^name:\s*['"]?(.+?)['"]?\s*$/m);
+      const descMatch = frontmatter.match(
+        /^description:\s*['"]?(.+?)['"]?\s*$/m,
+      );
+      return {
+        name: nameMatch?.[1]?.trim() ?? "",
+        description: descMatch?.[1]?.trim() ?? "",
+      };
+    } catch {
+      return { name: "", description: "" };
     }
   }
 

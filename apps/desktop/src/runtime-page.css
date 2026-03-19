@@ -27,7 +27,7 @@ body,
 
 .desktop-sidebar {
   display: flex;
-  width: 240px;
+  width: 272px;
   flex-direction: column;
   gap: 24px;
   padding: 48px 18px 20px;

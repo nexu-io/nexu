@@ -16,7 +16,7 @@ config:
   BETTER_AUTH_URL: "https://api.nexu.example.com"
   NEXU_DESKTOP_SENTRY_DSN: ""
   VITE_WHATSAPP_WA_ME_URL: "https://wa.me/15551846745?text=Hello%20Nexu"
-  DEFAULT_MODEL_ID: "anthropic/claude-sonnet-4"
+  DEFAULT_MODEL_ID: "link/claude-sonnet-4-5"
   RUNTIME_MANAGE_OPENCLAW_PROCESS: "true"
   EMAIL_SENDER: "Nexu <noreply@nexu.io>"
   COOKIE_DOMAIN: ""
