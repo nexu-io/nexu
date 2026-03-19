@@ -30,6 +30,7 @@ const enSidebar = [
     items: [
       { text: "Contributing", link: "/guide/contributing" },
       { text: "Contact Us", link: "/guide/contact" },
+      { text: "Changelog", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
@@ -64,6 +65,7 @@ const zhSidebar = [
     items: [
       { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "联系我们", link: "/zh/guide/contact" },
+      { text: "更新日志", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
