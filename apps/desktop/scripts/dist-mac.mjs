@@ -252,10 +252,10 @@ async function ensureBuildConfig() {
   const config = {
     ...existingConfig,
     NEXU_CLOUD_URL:
-      existingConfig.NEXU_CLOUD_URL ??
       merged.NEXU_CLOUD_URL ??
+      existingConfig.NEXU_CLOUD_URL ??
       "https://nexu.io",
-    NEXU_LINK_URL: existingConfig.NEXU_LINK_URL ?? merged.NEXU_LINK_URL ?? null,
+    NEXU_LINK_URL: merged.NEXU_LINK_URL ?? existingConfig.NEXU_LINK_URL ?? null,
     ...((existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
     merged.NEXU_DESKTOP_SENTRY_DSN)
       ? {

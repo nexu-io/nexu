@@ -258,9 +258,7 @@ export function createRuntimeUnitManifests(
       resourcesPath: isPackaged ? electronRoot : undefined,
     },
   );
-  const logsDir = ensureDir(
-    path.resolve(userDataPath, "../logs/runtime-units"),
-  );
+  const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));
   const pgliteDataPath = ensurePgliteDataDir(runtimeRoot);
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(

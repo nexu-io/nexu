@@ -175,7 +175,7 @@ function installApplicationMenu(): void {
 }
 
 function getDesktopLogFilePath(name: string): string {
-  return resolve(app.getPath("logs"), name);
+  return resolve(app.getPath("userData"), "logs", name);
 }
 
 function getMainWindowId(): number | null {
