@@ -50,6 +50,13 @@ type CloudPollingState = {
   abortController: AbortController;
 };
 
+function buildLinkModelsUrl(baseUrl: string): string {
+  return new URL(
+    "v1/models",
+    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
+  ).toString();
+}
+
 type CloudPollResponse = {
   status: string;
   apiKey?: string;
@@ -151,10 +158,12 @@ function serializeProvider(
 export class NexuConfigStore {
   private readonly store: LowDbStore<NexuConfig>;
   private readonly nexuCloudUrl: string;
+  private readonly nexuLinkUrl: string | null;
   private pollingState: CloudPollingState | null = null;
 
   constructor(env: ControllerEnv) {
     this.nexuCloudUrl = env.nexuCloudUrl;
+    this.nexuLinkUrl = env.nexuLinkUrl;
     this.store = new LowDbStore<NexuConfig>(
       env.nexuConfigPath,
       nexuConfigSchema,
@@ -265,6 +274,13 @@ export class NexuConfigStore {
         const data = (await res.json()) as CloudPollResponse;
 
         if (data.status === "completed" && data.apiKey) {
+          const linkUrl =
+            data.linkGatewayUrl ?? this.nexuLinkUrl ?? this.nexuCloudUrl;
+          const models =
+            data.cloudModels && data.cloudModels.length > 0
+              ? data.cloudModels
+              : await this.fetchDesktopCloudModels(linkUrl, data.apiKey);
+
           this.pollingState = null;
           await this.setDesktopCloudState({
             connected: true,
@@ -272,9 +288,9 @@ export class NexuConfigStore {
             userName: data.userName ?? null,
             userEmail: data.userEmail ?? null,
             connectedAt: now(),
-            linkUrl: data.linkGatewayUrl ?? this.nexuCloudUrl,
+            linkUrl,
             apiKey: data.apiKey,
-            models: data.cloudModels ?? [],
+            models,
           });
           return;
         }
@@ -789,6 +805,7 @@ export class NexuConfigStore {
   }
 
   async getDesktopCloudStatus() {
+    await this.hydrateDesktopCloudModels();
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
     return {
@@ -799,6 +816,77 @@ export class NexuConfigStore {
       connectedAt: cloud.connectedAt ?? null,
       models: cloud.models ?? [],
     };
+  }
+
+  async setDefaultModel(modelId: string): Promise<void> {
+    await this.store.update((config) => ({
+      ...config,
+      runtime: {
+        ...config.runtime,
+        defaultModelId: modelId,
+      },
+      bots: config.bots.map((bot) => ({
+        ...bot,
+        modelId,
+        updatedAt: now(),
+      })),
+    }));
+  }
+
+  private async fetchDesktopCloudModels(
+    linkUrl: string,
+    apiKey: string,
+  ): Promise<CloudModel[]> {
+    try {
+      const res = await fetch(buildLinkModelsUrl(linkUrl), {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) {
+        return [];
+      }
+
+      const data = (await res.json()) as {
+        data?: Array<{ id: string; owned_by?: string }>;
+      };
+      if (!Array.isArray(data.data)) {
+        return [];
+      }
+
+      return data.data.map((model) => ({
+        id: model.id,
+        name: model.id,
+        provider: model.owned_by,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  private async hydrateDesktopCloudModels(): Promise<void> {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+
+    if (!cloud.connected || !cloud.apiKey || (cloud.models?.length ?? 0) > 0) {
+      return;
+    }
+
+    const linkUrl = this.nexuLinkUrl ?? cloud.linkUrl ?? this.nexuCloudUrl;
+    const models = await this.fetchDesktopCloudModels(linkUrl, cloud.apiKey);
+    if (models.length === 0) {
+      return;
+    }
+
+    await this.setDesktopCloudState({
+      connected: cloud.connected,
+      polling: cloud.polling,
+      userName: cloud.userName ?? null,
+      userEmail: cloud.userEmail ?? null,
+      connectedAt: cloud.connectedAt ?? null,
+      linkUrl,
+      apiKey: cloud.apiKey,
+      models,
+    });
   }
 
   async connectDesktopCloud() {

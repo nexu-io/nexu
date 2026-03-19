@@ -145,12 +145,10 @@ export function registerDesktopCompatRoutes(
     }),
     async (c) => {
       const body = c.req.valid("json");
-      const runtime = await container.runtimeConfigService.getRuntimeConfig();
-      await container.runtimeConfigService.setRuntimeConfig({
-        ...runtime,
-        defaultModelId: body.modelId,
-      });
-      return c.json({ ok: true, modelId: body.modelId }, 200);
+      return c.json(
+        await container.desktopLocalService.setDefaultModel(body.modelId),
+        200,
+      );
     },
   );
 }

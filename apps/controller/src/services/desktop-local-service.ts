@@ -19,6 +19,11 @@ export class DesktopLocalService {
     return this.configStore.setDesktopCloudModels(enabledModelIds);
   }
 
+  async setDefaultModel(modelId: string) {
+    await this.configStore.setDefaultModel(modelId);
+    return { ok: true, modelId };
+  }
+
   async getLinkCatalog() {
     const status = await this.configStore.getDesktopCloudStatus();
     const grouped = new Map<
