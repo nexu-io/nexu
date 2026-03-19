@@ -19,6 +19,7 @@
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
     "preinstall": "npm --prefix ./openclaw-runtime run clean",
     "postinstall": "npm --prefix ./openclaw-runtime run install:pruned",
+    "prepare": "cp scripts/pre-commit .git/hooks/pre-commit 2>/dev/null; chmod +x .git/hooks/pre-commit 2>/dev/null; true",
     "seed": "pnpm --filter @nexu/api db:seed",
     "db:generate": "pnpm --filter @nexu/api db:generate",
     "db:migrate": "pnpm --filter @nexu/api db:migrate",

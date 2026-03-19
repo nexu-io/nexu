@@ -3277,6 +3277,12 @@ export type GetApiV1SkillhubCatalogResponses = {
             updatedAt: string;
         }>;
         installedSlugs: Array<string>;
+        installedSkills: Array<{
+            slug: string;
+            source: 'curated' | 'managed';
+            name: string;
+            description: string;
+        }>;
         meta: {
             version: string;
             updatedAt: string;

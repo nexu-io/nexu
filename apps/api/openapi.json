@@ -9348,6 +9348,36 @@
                         "type": "string"
                       }
                     },
+                    "installedSkills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "curated",
+                              "managed"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "source",
+                          "name",
+                          "description"
+                        ]
+                      }
+                    },
                     "meta": {
                       "type": "object",
                       "nullable": true,
@@ -9372,6 +9402,7 @@
                   "required": [
                     "skills",
                     "installedSlugs",
+                    "installedSkills",
                     "meta"
                   ]
                 }

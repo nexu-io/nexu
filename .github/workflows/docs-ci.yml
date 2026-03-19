@@ -2,9 +2,6 @@ name: Docs CI
 
 on:
   pull_request:
-    paths:
-      - "docs/**"
-      - ".github/workflows/docs-ci.yml"
   push:
     branches:
       - main
@@ -26,13 +23,43 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs changes
+        id: changes
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_SHA" "${{ github.sha }}" | grep -E '^(docs/|\.github/workflows/docs-ci\.yml$)' >/dev/null; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip docs build when unchanged
+        if: steps.changes.outputs.should_build != 'true'
+        run: |
+          echo "No docs changes detected; skipping docs build."
 
       - name: Setup pnpm
+        if: steps.changes.outputs.should_build == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10.26.0
 
       - name: Setup Node.js
+        if: steps.changes.outputs.should_build == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -40,7 +67,9 @@ jobs:
           cache-dependency-path: docs/pnpm-lock.yaml
 
       - name: Install docs dependencies
+        if: steps.changes.outputs.should_build == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build docs
+        if: steps.changes.outputs.should_build == 'true'
         run: pnpm build

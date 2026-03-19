@@ -289,7 +289,12 @@ export function registerIpcHandlers(
 
         case "skillhub:get-catalog": {
           if (!catalogManager) {
-            return { skills: [], installedSlugs: [], meta: null };
+            return {
+              skills: [],
+              installedSlugs: [],
+              installedSkills: [],
+              meta: null,
+            };
           }
           return catalogManager.getCatalog();
         }

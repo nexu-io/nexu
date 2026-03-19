@@ -85,10 +85,10 @@ jobs:
 
           runner_home="$HOME"
           packaged_home="$RUNNER_TEMP/desktop-home"
-          packaged_logs_dir="$packaged_home/Library/Logs/Nexu Desktop"
-          packaged_user_data_dir="$packaged_home/Library/Application Support/Nexu Desktop"
+          packaged_logs_dir="$packaged_home/Library/Logs/Nexu"
+          packaged_user_data_dir="$packaged_home/Library/Application Support/Nexu"
           packaged_runtime_logs_dir="$packaged_home/Library/Application Support/logs/runtime-units"
-          default_logs_dir="$runner_home/Library/Logs/Nexu Desktop"
+          default_logs_dir="$runner_home/Library/Logs/Nexu"
           default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
           default_runtime_logs_dir="$runner_home/Library/Application Support/logs/runtime-units"
           packaged_app="apps/desktop/release/mac-arm64/Nexu.app"

@@ -7,3 +7,7 @@ export function getOpenclawSkillsDir(userDataPath: string): string {
 export function getSkillhubCacheDir(userDataPath: string): string {
   return resolve(userDataPath, "runtime/skillhub-cache");
 }
+
+export function getOpenclawCuratedSkillsDir(userDataPath: string): string {
+  return resolve(userDataPath, "runtime/openclaw/state/bundled-skills");
+}

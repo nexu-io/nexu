@@ -125,7 +125,7 @@ export default defineConfig({
       dark: "/favicon/favicon-dark.svg",
       alt: "Nexu",
     },
-    socialLinks: [{ icon: "github", link: "https://github.com/refly-ai/nexu" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/nexu-io/nexu" }],
     langMenuLabel: "Language",
     search: {
       provider: "local",
