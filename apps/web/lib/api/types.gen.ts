@@ -1787,9 +1787,14 @@ export type GetApiV1SkillhubCatalogResponses = {
             tags: Array<string>;
             version: string;
             updatedAt: string;
-            homepage: string;
         }>;
         installedSlugs: Array<string>;
+        installedSkills: Array<{
+            slug: string;
+            source: 'curated' | 'managed';
+            name: string;
+            description: string;
+        }>;
         meta: {
             version: string;
             updatedAt: string;
@@ -1895,7 +1900,6 @@ export type GetApiV1SkillhubSkillsBySlugResponses = {
         tags: Array<string>;
         version: string;
         updatedAt: string;
-        homepage: string;
         installed: boolean;
         skillContent: string;
         files: Array<string>;

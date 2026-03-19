@@ -399,9 +399,10 @@ export function HomePage() {
                       channel.accountId,
                     );
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={channel.id}
-                        className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 cursor-pointer transition-all hover:bg-surface-1"
+                        className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 cursor-pointer transition-all hover:bg-surface-1 text-left w-full"
                         onClick={() =>
                           window.open(
                             channelChatUrl,
@@ -409,17 +410,6 @@ export function HomePage() {
                             "noopener,noreferrer",
                           )
                         }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            window.open(
-                              channelChatUrl,
-                              "_blank",
-                              "noopener,noreferrer",
-                            );
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
                       >
                         <div className="w-8 h-8 rounded-[10px] flex items-center justify-center border border-border bg-white shrink-0">
                           {chOption?.icon}
@@ -444,7 +434,7 @@ export function HomePage() {
                           Chat
                           <ArrowUpRight size={12} className="-mt-px" />
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

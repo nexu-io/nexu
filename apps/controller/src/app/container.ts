@@ -22,6 +22,7 @@ import { OpenClawSyncService } from "../services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../services/runtime-config-service.js";
 import { SessionService } from "../services/session-service.js";
 import { SkillService } from "../services/skill-service.js";
+import { SkillhubService } from "../services/skillhub-service.js";
 import { TemplateService } from "../services/template-service.js";
 import { ArtifactsStore } from "../store/artifacts-store.js";
 import { CompiledOpenClawStore } from "../store/compiled-openclaw-store.js";
@@ -44,6 +45,7 @@ export interface ControllerContainer {
   desktopLocalService: DesktopLocalService;
   artifactService: ArtifactService;
   templateService: TemplateService;
+  skillhubService: SkillhubService;
   openclawSyncService: OpenClawSyncService;
   runtimeState: ControllerRuntimeState;
   startBackgroundLoops: () => () => void;
@@ -71,6 +73,7 @@ export function createContainer(): ControllerContainer {
     templateWriter,
     watchTrigger,
   );
+  const skillhubService = new SkillhubService(env);
 
   return {
     env,
@@ -91,6 +94,7 @@ export function createContainer(): ControllerContainer {
     desktopLocalService: new DesktopLocalService(configStore),
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
+    skillhubService,
     openclawSyncService,
     runtimeState,
     startBackgroundLoops: () => {
@@ -105,10 +109,12 @@ export function createContainer(): ControllerContainer {
         runtimeHealth,
         processManager: openclawProcess,
       });
+      skillhubService.start();
 
       return () => {
         stopSyncLoop();
         stopHealthLoop();
+        skillhubService.dispose();
       };
     },
   };

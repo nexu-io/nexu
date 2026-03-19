@@ -16,6 +16,7 @@ export default defineConfig({
       "#gateway": path.resolve(import.meta.dirname, "apps/gateway/src"),
       "#web": path.resolve(import.meta.dirname, "apps/web/src"),
       "#desktop": path.resolve(import.meta.dirname, "apps/desktop"),
+      "#controller": path.resolve(import.meta.dirname, "apps/controller/src"),
       "@": path.resolve(import.meta.dirname, "apps/web/src"),
       "@web-gen": path.resolve(import.meta.dirname, "apps/web/lib"),
     },

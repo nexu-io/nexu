@@ -4744,9 +4744,6 @@
                           },
                           "updatedAt": {
                             "type": "string"
-                          },
-                          "homepage": {
-                            "type": "string"
                           }
                         },
                         "required": [
@@ -4757,8 +4754,7 @@
                           "stars",
                           "tags",
                           "version",
-                          "updatedAt",
-                          "homepage"
+                          "updatedAt"
                         ]
                       }
                     },
@@ -4766,6 +4762,36 @@
                       "type": "array",
                       "items": {
                         "type": "string"
+                      }
+                    },
+                    "installedSkills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "curated",
+                              "managed"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "source",
+                          "name",
+                          "description"
+                        ]
                       }
                     },
                     "meta": {
@@ -4792,6 +4818,7 @@
                   "required": [
                     "skills",
                     "installedSlugs",
+                    "installedSkills",
                     "meta"
                   ]
                 }
@@ -4982,9 +5009,6 @@
                     "updatedAt": {
                       "type": "string"
                     },
-                    "homepage": {
-                      "type": "string"
-                    },
                     "installed": {
                       "type": "boolean"
                     },
@@ -5008,7 +5032,6 @@
                     "tags",
                     "version",
                     "updatedAt",
-                    "homepage",
                     "installed",
                     "skillContent",
                     "files"

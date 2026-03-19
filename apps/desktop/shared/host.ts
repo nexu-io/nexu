@@ -1,7 +1,5 @@
 import type { DesktopBuildInfo, DesktopRuntimeConfig } from "./runtime-config";
 export type { DesktopBuildInfo, DesktopRuntimeConfig } from "./runtime-config";
-import type { SkillhubCatalogData } from "./skillhub-types";
-export type { SkillhubCatalogData } from "./skillhub-types";
 
 export const hostInvokeChannels = [
   "app:get-info",
@@ -27,10 +25,6 @@ export const hostInvokeChannels = [
   "update:set-source",
   "component:check",
   "component:install",
-  "skillhub:get-catalog",
-  "skillhub:install",
-  "skillhub:uninstall",
-  "skillhub:refresh-catalog",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -82,10 +76,6 @@ export type HostInvokePayloadMap = {
   "update:set-source": { source: UpdateSource };
   "component:check": undefined;
   "component:install": { id: string };
-  "skillhub:get-catalog": undefined;
-  "skillhub:install": { slug: string };
-  "skillhub:uninstall": { slug: string };
-  "skillhub:refresh-catalog": undefined;
 };
 
 export type HostInvokeResultMap = {
@@ -127,10 +117,6 @@ export type HostInvokeResultMap = {
     }>;
   };
   "component:install": { ok: boolean };
-  "skillhub:get-catalog": SkillhubCatalogData;
-  "skillhub:install": { ok: boolean; error?: string };
-  "skillhub:uninstall": { ok: boolean; error?: string };
-  "skillhub:refresh-catalog": { ok: boolean; skillCount: number };
 };
 
 export type AppInfo = {

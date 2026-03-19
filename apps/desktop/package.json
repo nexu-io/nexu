@@ -32,11 +32,9 @@
     "@sentry/electron": "^7.10.0",
     "@tanstack/react-query": "^5.66.9",
     "class-variance-authority": "^0.7.1",
-    "clawhub": "0.8.0",
     "clsx": "^2.1.1",
     "electron-updater": "^6.3.9",
     "lucide-react": "^0.474.0",
-    "npm": "^11",
     "pino": "^10.3.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -72,7 +70,11 @@
       "dist-electron/**/*",
       "package.json",
       "!node_modules/openclaw",
-      "!node_modules/openclaw/**/*"
+      "!node_modules/openclaw/**/*",
+      "!node_modules/sharp",
+      "!node_modules/sharp/**/*",
+      "!node_modules/@img",
+      "!node_modules/@img/**/*"
     ],
     "extraResources": [
       {

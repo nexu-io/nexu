@@ -11,7 +11,6 @@ import {
 } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
-import type { CatalogManager } from "./skillhub/catalog-manager";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
 
@@ -19,7 +18,6 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
-let catalogManager: CatalogManager | null = null;
 
 const nativeCrashTestTitles = {
   main: "desktop.main.crash",
@@ -48,10 +46,6 @@ export function setUpdateManager(manager: UpdateManager): void {
 
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
-}
-
-export function setCatalogManager(manager: CatalogManager): void {
-  catalogManager = manager;
 }
 
 function assertValidChannel(
@@ -285,43 +279,6 @@ export function registerIpcHandlers(
           }
           await componentUpdater.installUpdate(update);
           return { ok: true };
-        }
-
-        case "skillhub:get-catalog": {
-          if (!catalogManager) {
-            return {
-              skills: [],
-              installedSlugs: [],
-              installedSkills: [],
-              meta: null,
-            };
-          }
-          return catalogManager.getCatalog();
-        }
-
-        case "skillhub:install": {
-          if (!catalogManager) {
-            return { ok: false, error: "Catalog manager not initialized" };
-          }
-          const typedPayload =
-            payload as HostInvokePayloadMap["skillhub:install"];
-          return catalogManager.installSkill(typedPayload.slug);
-        }
-
-        case "skillhub:uninstall": {
-          if (!catalogManager) {
-            return { ok: false, error: "Catalog manager not initialized" };
-          }
-          const typedPayload =
-            payload as HostInvokePayloadMap["skillhub:uninstall"];
-          return catalogManager.uninstallSkill(typedPayload.slug);
-        }
-
-        case "skillhub:refresh-catalog": {
-          if (!catalogManager) {
-            return { ok: false, skillCount: 0 };
-          }
-          return catalogManager.refreshCatalog();
         }
 
         default:

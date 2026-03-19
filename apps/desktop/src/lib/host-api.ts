@@ -11,7 +11,6 @@ import type {
   UpdateChannelName,
   UpdateSource,
 } from "@shared/host";
-
 function getHostBridge() {
   if (typeof window === "undefined" || !window.nexuHost) {
     throw new Error("Nexu host bridge is unavailable.");
