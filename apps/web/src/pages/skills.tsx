@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
 import { Loader2, RefreshCw, Search, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type CommunitySort = "downloads" | "stars" | "newest";
 type DesktopTab = "installed" | "community";
@@ -24,16 +25,21 @@ function useDebounce<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-function formatTimeAgo(isoDate: string): string {
-  const ms = Date.now() - new Date(isoDate).getTime();
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+function useFormatTimeAgo() {
+  const { t } = useTranslation();
+  return (isoDate: string): string => {
+    const ms = Date.now() - new Date(isoDate).getTime();
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    if (hours < 1) return t("skills.timeJustNow");
+    if (hours < 24) return t("skills.timeHoursAgo", { count: hours });
+    const days = Math.floor(hours / 24);
+    return t("skills.timeDaysAgo", { count: days });
+  };
 }
 
 function CommunityTab() {
+  const { t } = useTranslation();
+  const formatTimeAgo = useFormatTimeAgo();
   const { data, isLoading, isError } = useCommunitySkills();
   const refreshMutation = useRefreshCatalog();
   const [query, setQuery] = useState("");
@@ -132,7 +138,7 @@ function CommunityTab() {
       <div className="flex flex-col items-center justify-center py-16 gap-2">
         <Loader2 size={24} className="animate-spin text-text-muted" />
         <p className="text-[13px] text-text-muted">
-          Downloading skill catalog...
+          {t("skills.downloadingCatalog")}
         </p>
       </div>
     );
@@ -144,14 +150,18 @@ function CommunityTab() {
         <div className="flex justify-center items-center mx-auto mb-3 w-12 h-12 rounded-xl bg-red-500/10">
           <Zap size={20} className="text-red-500" />
         </div>
-        <p className="text-[13px] text-text-muted mb-2">Catalog unavailable</p>
+        <p className="text-[13px] text-text-muted mb-2">
+          {t("skills.catalogUnavailable")}
+        </p>
         <button
           type="button"
           onClick={() => refreshMutation.mutate()}
           disabled={refreshMutation.isPending}
           className="text-[12px] text-accent hover:underline"
         >
-          {refreshMutation.isPending ? "Retrying..." : "Try again"}
+          {refreshMutation.isPending
+            ? t("skills.retrying")
+            : t("skills.tryAgain")}
         </button>
       </div>
     );
@@ -169,7 +179,7 @@ function CommunityTab() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search community skills..."
+            placeholder={t("skills.searchPlaceholder")}
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border bg-surface-1 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30"
           />
         </div>
@@ -178,16 +188,16 @@ function CommunityTab() {
           onChange={(e) => setSort(e.target.value as CommunitySort)}
           className="px-2.5 py-2.5 rounded-lg border border-border bg-surface-1 text-[12px] text-text-primary focus:outline-none focus:border-accent"
         >
-          <option value="downloads">Downloads</option>
-          <option value="stars">Stars</option>
-          <option value="newest">Newest</option>
+          <option value="downloads">{t("skills.sort.downloads")}</option>
+          <option value="stars">{t("skills.sort.stars")}</option>
+          <option value="newest">{t("skills.sort.newest")}</option>
         </select>
         <button
           type="button"
           onClick={() => refreshMutation.mutate()}
           disabled={refreshMutation.isPending}
           className="p-2.5 rounded-lg border border-border bg-surface-1 text-text-muted hover:text-text-primary transition-colors"
-          title="Refresh catalog"
+          title={t("skills.refreshCatalog")}
         >
           <RefreshCw
             size={14}
@@ -199,8 +209,8 @@ function CommunityTab() {
       {/* Freshness indicator */}
       {meta?.updatedAt && (
         <p className="text-[11px] text-text-muted mb-3">
-          Last updated: {formatTimeAgo(meta.updatedAt)} &middot;{" "}
-          {meta.skillCount.toLocaleString()} skills
+          {t("skills.lastUpdated", { time: formatTimeAgo(meta.updatedAt) })}{" "}
+          &middot; {t("skills.skillsCount", { count: meta.skillCount })}
         </p>
       )}
 
@@ -217,7 +227,7 @@ function CommunityTab() {
                 : "text-text-muted hover:text-text-secondary font-normal",
             )}
           >
-            All
+            {t("skills.all")}
           </button>
           {topTags.map((tag) => (
             <button
@@ -263,8 +273,8 @@ function CommunityTab() {
           </div>
           <p className="text-[13px] text-text-muted">
             {debouncedQuery.trim()
-              ? "No skills match your search"
-              : "No community skills available"}
+              ? t("skills.noMatchSearch")
+              : t("skills.noAvailable")}
           </p>
         </div>
       )}
@@ -272,20 +282,28 @@ function CommunityTab() {
   );
 }
 
-const SOURCE_LABELS: Record<string, { label: string; description: string }> = {
-  curated: {
-    label: "Recommended",
-    description: "Pre-installed skills recommended by Nexu",
-  },
-  managed: {
-    label: "Installed",
-    description: "Community skills you installed",
-  },
-};
-
 const SOURCE_ORDER = ["curated", "managed"] as const;
 
+function useSourceLabels(): Record<
+  string,
+  { label: string; description: string }
+> {
+  const { t } = useTranslation();
+  return {
+    curated: {
+      label: t("skills.source.curated"),
+      description: t("skills.source.curatedDesc"),
+    },
+    managed: {
+      label: t("skills.source.managed"),
+      description: t("skills.source.managedDesc"),
+    },
+  };
+}
+
 function InstalledTab() {
+  const { t } = useTranslation();
+  const sourceLabels = useSourceLabels();
   // Poll every 3s for up to 30s after mount to catch background curated installs.
   const [pollUntil] = useState(() => Date.now() + 30_000);
   const shouldPoll = Date.now() < pollUntil;
@@ -328,7 +346,7 @@ function InstalledTab() {
         <div className="flex justify-center items-center mx-auto mb-3 w-12 h-12 rounded-xl bg-accent/10">
           <Zap size={20} className="text-accent" />
         </div>
-        <p className="text-[13px] text-text-muted">No skills installed</p>
+        <p className="text-[13px] text-text-muted">{t("skills.noInstalled")}</p>
       </div>
     );
   }
@@ -339,7 +357,7 @@ function InstalledTab() {
         const skills = grouped.get(source);
         if (!skills || skills.length === 0) return null;
 
-        const meta = SOURCE_LABELS[source] ?? {
+        const meta = sourceLabels[source] ?? {
           label: source,
           description: "",
         };
@@ -390,14 +408,15 @@ function InstalledTab() {
 }
 
 function DesktopSkillsContent() {
+  const { t } = useTranslation();
   const [desktopTab, setDesktopTab] = useState<DesktopTab>("community");
   const { data } = useCommunitySkills();
   const installedCount =
     data?.installedSkills?.length ?? data?.installedSlugs?.length ?? 0;
 
   const desktopTabs: { id: DesktopTab; label: string }[] = [
-    { id: "community", label: "Community" },
-    { id: "installed", label: "Installed" },
+    { id: "community", label: t("skills.tab.community") },
+    { id: "installed", label: t("skills.tab.installed") },
   ];
 
   return (
@@ -442,6 +461,7 @@ function DesktopSkillsContent() {
 }
 
 export function SkillsPage() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-full bg-surface-0">
       {/* Sticky header */}
@@ -452,7 +472,7 @@ export function SkillsPage() {
               <Zap size={16} className="text-accent" />
             </div>
             <div className="text-[14px] font-semibold text-text-primary">
-              Skills
+              {t("skills.pageTitle")}
             </div>
           </div>
         </div>

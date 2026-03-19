@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { getApiV1SkillhubSkillsBySlug } from "../../lib/api/sdk.gen";
 
@@ -282,6 +283,7 @@ function SkillMdPreview({ content }: { content: string }) {
 }
 
 export function CommunitySkillDetailPage() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
@@ -295,7 +297,7 @@ export function CommunitySkillDetailPage() {
       const { data, error } = await getApiV1SkillhubSkillsBySlug({
         path: { slug: slug as string },
       });
-      if (error) throw new Error("Failed to load skill");
+      if (error) throw new Error(t("skillDetail.failedToLoad"));
       return data as unknown as SkillDetail;
     },
     enabled: !!slug,
@@ -340,9 +342,11 @@ export function CommunitySkillDetailPage() {
             className="inline-flex items-center gap-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors mb-6"
           >
             <ArrowLeft size={14} />
-            Back to Skills
+            {t("skillDetail.backToSkills")}
           </Link>
-          <p className="text-[14px] text-text-muted">Skill not found</p>
+          <p className="text-[14px] text-text-muted">
+            {t("skillDetail.notFound")}
+          </p>
         </div>
       </div>
     );
@@ -397,7 +401,9 @@ export function CommunitySkillDetailPage() {
               ) : (
                 <Trash2 size={14} />
               )}
-              {pendingAction === "uninstall" ? "Removing..." : "Uninstall"}
+              {pendingAction === "uninstall"
+                ? t("skills.removing")
+                : t("skills.uninstall")}
             </button>
           ) : (
             <button
@@ -416,7 +422,9 @@ export function CommunitySkillDetailPage() {
               ) : (
                 <Download size={14} />
               )}
-              {pendingAction === "install" ? "Installing..." : "Install"}
+              {pendingAction === "install"
+                ? t("skills.installing")
+                : t("skills.install")}
             </button>
           )}
         </div>
@@ -425,12 +433,12 @@ export function CommunitySkillDetailPage() {
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-border">
           <span className="flex items-center gap-1 text-[12px] text-text-muted">
             <Download size={12} />
-            {formatCount(data.downloads)} downloads
+            {t("skillDetail.downloads", { value: formatCount(data.downloads) })}
           </span>
           {data.stars > 0 && (
             <span className="flex items-center gap-1 text-[12px] text-text-muted">
               <Star size={12} />
-              {formatCount(data.stars)} stars
+              {t("skillDetail.stars", { value: formatCount(data.stars) })}
             </span>
           )}
           {data.homepage && (
@@ -441,7 +449,7 @@ export function CommunitySkillDetailPage() {
               className="flex items-center gap-1 text-[12px] text-accent hover:underline"
             >
               <ExternalLink size={12} />
-              Homepage
+              {t("skillDetail.homepage")}
             </a>
           )}
           {data.tags.length > 0 && (
@@ -469,7 +477,7 @@ export function CommunitySkillDetailPage() {
         {data.files.length > 0 && (
           <div className="mb-6">
             <h3 className="text-[13px] font-semibold text-text-primary mb-2">
-              Files
+              {t("skillDetail.files")}
             </h3>
             <div className="rounded-lg bg-surface-1 border border-border p-3 space-y-1">
               {data.files.map((file) => (

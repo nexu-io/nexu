@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { MinimalSkill } from "@/types/desktop";
 import { Download, Loader2, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 function formatDownloads(count: number): string {
@@ -21,6 +22,7 @@ export function CommunitySkillCard({
   skill: MinimalSkill;
   isInstalled: boolean;
 }) {
+  const { t } = useTranslation();
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
   const [pendingAction, setPendingAction] = useState<
@@ -82,7 +84,9 @@ export function CommunitySkillCard({
             ) : (
               <Trash2 size={10} />
             )}
-            {pendingAction === "uninstall" ? "Removing..." : "Uninstall"}
+            {pendingAction === "uninstall"
+              ? t("skills.removing")
+              : t("skills.uninstall")}
           </button>
         ) : (
           <button
@@ -105,7 +109,9 @@ export function CommunitySkillCard({
             ) : (
               <Download size={10} />
             )}
-            {pendingAction === "install" ? "Installing..." : "Install"}
+            {pendingAction === "install"
+              ? t("skills.installing")
+              : t("skills.install")}
           </button>
         )}
       </div>
