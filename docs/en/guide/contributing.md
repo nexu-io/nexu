@@ -9,7 +9,7 @@ This guide helps you clone the repo, pick a code editor, and contribute updates 
 3. Install the docs dependencies from inside `docs/`.
 
 ```bash
-git clone https://github.com/refly-ai/nexu.git
+git clone https://github.com/nexu-io/nexu.git
 cd nexu/docs
 pnpm install
 ```
