@@ -36,10 +36,12 @@
     "desktop:logs": "./apps/desktop/dev.sh logs",
     "desktop:check:dev": "./scripts/desktop-check-dev.sh",
     "desktop:check:dist": "./scripts/desktop-check-dist.sh",
+    "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
     "desktop:dist:mac": "pnpm --filter @nexu/desktop dist:mac",
     "desktop:dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^25.3.1",
     "@vitejs/plugin-react": "^4.3.4",
