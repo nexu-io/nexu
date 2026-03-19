@@ -36,6 +36,8 @@ pnpm desktop:restart                  # Restart the desktop local runtime stack
 pnpm desktop:status                   # Show desktop local runtime status
 pnpm desktop:dist:mac                 # Build signed macOS desktop distributables
 pnpm desktop:dist:mac:unsigned        # Build unsigned macOS desktop distributables
+pnpm probe:slack prepare              # Launch Chrome Canary with the dedicated Slack probe profile
+pnpm probe:slack run                  # Run the local Slack reply smoke probe against an authenticated DM
 pnpm --filter @nexu/api dev           # Legacy API only
 pnpm --filter @nexu/web dev           # Web only
 pnpm build                            # Build all
@@ -65,6 +67,8 @@ For local desktop/runtime work, prefer the controller-first path and treat `apps
 ## Desktop local development
 
 - Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
+- The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
+- The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
 - The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
 - Treat `pnpm desktop:start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
@@ -163,6 +167,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Gateway environment (dev vs prod) | `specs/guides/gateway-environment-guide.md` |
 | Workspace templates | `specs/guides/workspace-templates.md` |
 | Local Slack testing | `specs/references/local-slack-testing.md` |
+| Local Slack smoke probe | `scripts/probe/README.md`, `scripts/probe/slack-reply-probe.mjs` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
 | Security posture | `specs/SECURITY.md` |
@@ -261,6 +266,7 @@ This note should track:
 - API env path: `apps/api/.env`
 - Controller env path: `apps/controller/.env`
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
+- Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
 - Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
 - When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/controller` to avoid launching a second OpenClaw process
