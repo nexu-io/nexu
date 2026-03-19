@@ -29,7 +29,7 @@ const browserChannel = process.env.SLACK_PROBE_BROWSER_CHANNEL ?? "chrome";
 
 function parseArgs(argv) {
   const options = {
-    mode: "open",
+    mode: "send",
     profileDir: defaultProfileDir,
     slackUrl: defaultSlackUrl,
     prepareUrl: defaultPrepareUrl,
@@ -127,7 +127,7 @@ function printUsage() {
       "Slack Reply Probe",
       "",
       "Usage:",
-      "  pnpm probe:slack",
+      "  pnpm probe:slack                    # send one probe message and wait for reply",
       "  pnpm probe:slack -- session",
       "  pnpm probe:slack -- inspect",
       "  pnpm probe:slack -- send",
@@ -140,7 +140,7 @@ function printUsage() {
       "  inspect           Print Slack DM composer and message-list selector diagnostics",
       "  send              Send one probe message and wait for a new reply",
       "  prepare           Open Slack sign-in and wait for a reusable logged-in session",
-      "  open              Open the target Slack page with the persistent profile (default)",
+      "  open              Open the target Slack page with the persistent profile",
       "  --profile-dir     Override the persistent browser profile directory",
       "  --url             Override the Slack DM URL",
       "  --prepare-url     Override the initial sign-in URL used by prepare mode",
@@ -484,9 +484,7 @@ async function openBrowserTarget(options) {
 
     return {
       page,
-      close: async () => {
-        await browser.close();
-      },
+      close: async () => {},
     };
   }
 
@@ -596,6 +594,7 @@ async function main() {
       console.log(
         "[probe] login state is not ready. Run `pnpm probe:slack -- prepare`, complete Slack login in the opened browser, and wait for the session-ready message.",
       );
+      console.log("[probe] result=not-ready");
       process.exitCode = 2;
       return;
     }
@@ -643,8 +642,9 @@ async function main() {
       );
       console.log(`[probe] messageCountAfter=${reply.afterCount}`);
       console.log(`[probe] latestMessage=${reply.text}`);
+      console.log("[probe] result=pass");
       console.log(
-        "[probe] observed a new Slack message after sending the probe.",
+        "[probe] observed a new Slack reply after sending the probe.",
       );
       return;
     }
@@ -659,12 +659,17 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("[probe] failed to launch Slack probe");
-  if (error instanceof Error) {
-    console.error(error.message);
-  } else {
-    console.error(String(error));
-  }
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    process.exit(process.exitCode ?? 0);
+  })
+  .catch((error) => {
+    console.error("[probe] failed to launch Slack probe");
+    if (error instanceof Error) {
+      console.error(error.message);
+    } else {
+      console.error(String(error));
+    }
+    console.error("[probe] result=fail");
+    process.exit(1);
+  });
