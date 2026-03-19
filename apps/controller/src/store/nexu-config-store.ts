@@ -42,6 +42,23 @@ type UserProfileResponse = z.infer<typeof userProfileResponseSchema>;
 type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
 type UpdateAuthSourceInput = z.infer<typeof updateAuthSourceSchema>;
 
+type CloudModel = { id: string; name: string; provider?: string };
+
+type CloudPollingState = {
+  deviceId: string;
+  deviceSecret: string;
+  abortController: AbortController;
+};
+
+type CloudPollResponse = {
+  status: string;
+  apiKey?: string;
+  userName?: string;
+  userEmail?: string;
+  cloudModels?: CloudModel[];
+  linkGatewayUrl?: string;
+};
+
 function defaultLocalProfile(): UserProfileResponse {
   return {
     id: "desktop-local-user",
@@ -134,6 +151,7 @@ function serializeProvider(
 export class NexuConfigStore {
   private readonly store: LowDbStore<NexuConfig>;
   private readonly nexuCloudUrl: string;
+  private pollingState: CloudPollingState | null = null;
 
   constructor(env: ControllerEnv) {
     this.nexuCloudUrl = env.nexuCloudUrl;
@@ -173,6 +191,126 @@ export class NexuConfigStore {
 
   async getConfig(): Promise<NexuConfig> {
     return this.store.read();
+  }
+
+  private async setDesktopCloudState(input: {
+    connected: boolean;
+    polling: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    linkUrl?: string | null;
+    apiKey?: string | null;
+    models?: CloudModel[];
+  }): Promise<void> {
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        cloud: {
+          connected: input.connected,
+          polling: input.polling,
+          userName: input.userName ?? null,
+          userEmail: input.userEmail ?? null,
+          connectedAt: input.connectedAt ?? null,
+          linkUrl: input.linkUrl ?? null,
+          apiKey: input.apiKey ?? null,
+          models: input.models ?? [],
+        },
+      },
+    }));
+  }
+
+  private async sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new Error("aborted"));
+      });
+    });
+  }
+
+  private async pollDesktopCloudAuthorization(
+    cloudApiUrl: string,
+    deviceId: string,
+    deviceSecret: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const maxAttempts = 100;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        await this.sleep(3000, signal);
+      } catch {
+        return;
+      }
+
+      if (signal.aborted) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${cloudApiUrl}/api/auth/device-poll`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId, deviceSecret }),
+          signal,
+        });
+
+        if (!res.ok) {
+          continue;
+        }
+
+        const data = (await res.json()) as CloudPollResponse;
+
+        if (data.status === "completed" && data.apiKey) {
+          this.pollingState = null;
+          await this.setDesktopCloudState({
+            connected: true,
+            polling: false,
+            userName: data.userName ?? null,
+            userEmail: data.userEmail ?? null,
+            connectedAt: now(),
+            linkUrl: data.linkGatewayUrl ?? this.nexuCloudUrl,
+            apiKey: data.apiKey,
+            models: data.cloudModels ?? [],
+          });
+          return;
+        }
+
+        if (data.status === "expired") {
+          this.pollingState = null;
+          await this.setDesktopCloudState({
+            connected: false,
+            polling: false,
+            userName: null,
+            userEmail: null,
+            connectedAt: null,
+            linkUrl: null,
+            apiKey: null,
+            models: [],
+          });
+          return;
+        }
+      } catch {
+        if (signal.aborted) {
+          return;
+        }
+      }
+    }
+
+    this.pollingState = null;
+    await this.setDesktopCloudState({
+      connected: false,
+      polling: false,
+      userName: null,
+      userEmail: null,
+      connectedAt: null,
+      linkUrl: null,
+      apiKey: null,
+      models: [],
+    });
   }
 
   async listBots(): Promise<BotResponse[]> {
@@ -664,59 +802,81 @@ export class NexuConfigStore {
   }
 
   async connectDesktopCloud() {
-    const nowValue = now();
-    await this.store.update((config) => ({
-      ...config,
-      desktop: {
-        ...config.desktop,
-        cloud: {
-          connected: true,
-          polling: false,
-          userName: "Desktop User",
-          userEmail: "desktop@nexu.local",
-          connectedAt: nowValue,
-          linkUrl: "https://link.nexu.local",
-          apiKey: "nexu-local-link-key",
-          models: [
-            {
-              id: "gemini-2.5-flash",
-              name: "Gemini 2.5 Flash",
-              provider: "google",
-            },
-            { id: "gpt-4o", name: "GPT-4o", provider: "openai" },
-            {
-              id: "claude-sonnet-4",
-              name: "Claude Sonnet 4",
-              provider: "anthropic",
-            },
-          ],
-        },
-      },
-    }));
+    const current = readDesktopCloud(await this.getConfig());
+    if (this.pollingState || current.polling) {
+      return { error: "Connection attempt already in progress" };
+    }
+    if (current.connected && current.apiKey) {
+      return { error: "Already connected. Disconnect first." };
+    }
+
+    const deviceId = crypto.randomUUID();
+    const deviceSecret = crypto.randomUUID();
+    const deviceSecretHash = crypto
+      .createHash("sha256")
+      .update(deviceSecret)
+      .digest("hex");
+
+    let res: Response;
+    try {
+      res = await fetch(`${this.nexuCloudUrl}/api/auth/device-register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, deviceSecretHash }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (error) {
+      return {
+        error: `Cloud unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+
+    if (!res.ok) {
+      return { error: `Failed to register device: ${await res.text()}` };
+    }
+
+    await this.setDesktopCloudState({
+      connected: false,
+      polling: true,
+      userName: null,
+      userEmail: null,
+      connectedAt: null,
+      linkUrl: null,
+      apiKey: null,
+      models: [],
+    });
+
+    const abortController = new AbortController();
+    this.pollingState = { deviceId, deviceSecret, abortController };
+    void this.pollDesktopCloudAuthorization(
+      this.nexuCloudUrl,
+      deviceId,
+      deviceSecret,
+      abortController.signal,
+    );
 
     return {
-      browserUrl: `${this.nexuCloudUrl}/local-login`,
+      browserUrl: `${this.nexuCloudUrl}/auth?desktop=1&device_id=${encodeURIComponent(deviceId)}`,
       error: undefined,
     };
   }
 
   async disconnectDesktopCloud() {
-    await this.store.update((config) => ({
-      ...config,
-      desktop: {
-        ...config.desktop,
-        cloud: {
-          connected: false,
-          polling: false,
-          userName: null,
-          userEmail: null,
-          connectedAt: null,
-          linkUrl: null,
-          apiKey: null,
-          models: [],
-        },
-      },
-    }));
+    if (this.pollingState) {
+      this.pollingState.abortController.abort();
+      this.pollingState = null;
+    }
+
+    await this.setDesktopCloudState({
+      connected: false,
+      polling: false,
+      userName: null,
+      userEmail: null,
+      connectedAt: null,
+      linkUrl: null,
+      apiKey: null,
+      models: [],
+    });
 
     return { ok: true };
   }
