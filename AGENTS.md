@@ -63,6 +63,8 @@ After API route/schema changes: `pnpm generate-types` then `pnpm typecheck`.
 - Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
 - The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
 - Treat `pnpm desktop:start` as the canonical cold-start entrypoint for the full local desktop runtime.
+- The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
+- Desktop local runtime should not depend on PostgreSQL; controller-owned local state lives under `~/.nexu/`, while desktop dev runtime state remains repo-scoped under `.tmp/desktop/`.
 - `tmux` is required for the desktop local-dev workflow.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
 - For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
@@ -130,7 +132,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/api/src/lib/config-generator.ts` builds OpenClaw config from DB
 - Runtime topology: `apps/gateway` acts as the Nexu sidecar that syncs config/skills, probes runtime health, and can manage the OpenClaw process
-- Local runtime flow: `apps/api` produces config data -> `apps/gateway` syncs config/skills and coordinates runtime -> `openclaw-runtime` runs the actual OpenClaw Gateway process
+- Local runtime flow: `apps/controller` owns Nexu config/state, writes OpenClaw config/skills/templates, and manages `openclaw-runtime` directly; desktop wraps that controller-first stack with Electron + web sidecars
 - Key data flows: Slack OAuth, Slack/Feishu event routing, config hot-reload, file-based skill catalog
 
 ## Code style (quick reference)
@@ -253,8 +255,9 @@ This note should track:
 
 - DB (default local): `postgresql://nexu:nexu@localhost:5433/nexu_dev`
 - API env path: `apps/api/.env`
+- Controller env path: `apps/controller/.env`
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
 - Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
-- When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/gateway` to avoid launching a second OpenClaw process
-- If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by running gateway processes.
+- When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/controller` to avoid launching a second OpenClaw process
+- If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by the running controller process.
