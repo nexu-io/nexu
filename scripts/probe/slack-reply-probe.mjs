@@ -11,7 +11,7 @@ const defaultProfileDir = path.join(
   repoRoot,
   ".tmp",
   "slack-reply-probe",
-  "chrome-profile-manual",
+  "chrome-canary-profile",
 );
 const defaultPrepareUrl = process.env.SLACK_PROBE_PREPARE_URL ?? null;
 const defaultConnectUrl = process.env.SLACK_PROBE_CONNECT_URL ?? null;
@@ -22,7 +22,8 @@ const defaultPrepareTimeoutMs = Number(
 const defaultReplyTimeoutMs = Number(
   process.env.SLACK_PROBE_REPLY_TIMEOUT_MS ?? "90000",
 );
-const browserChannel = process.env.SLACK_PROBE_BROWSER_CHANNEL ?? "chrome";
+const browserChannel =
+  process.env.SLACK_PROBE_BROWSER_CHANNEL ?? "chrome-canary";
 
 function parseArgs(argv) {
   const options = {

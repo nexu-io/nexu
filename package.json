@@ -35,6 +35,7 @@
     "desktop:logs": "./apps/desktop/dev.sh logs",
     "desktop:check:dev": "./scripts/desktop-check-dev.sh",
     "desktop:check:dist": "./scripts/desktop-check-dist.sh",
+    "probe:slack:browser": "node scripts/probe/slack-probe-browser.mjs",
     "probe:slack": "pnpm --filter @nexu/web exec node ../../scripts/probe/slack-reply-probe.mjs",
     "desktop:dist:mac": "pnpm --filter @nexu/desktop dist:mac",
     "desktop:dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
