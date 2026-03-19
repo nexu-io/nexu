@@ -106,7 +106,7 @@ start_session() {
   run_logged pnpm --dir "$ROOT_DIR" exec electron --version
   log "starting tmux session '$SESSION_NAME'"
   tmux new-session -d -s "$SESSION_NAME" \
-    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_CLOUD_URL=\"${NEXU_CLOUD_URL:-$DEFAULT_NEXU_CLOUD_URL}\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
+    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_CLOUD_URL=\"${NEXU_CLOUD_URL:-$DEFAULT_NEXU_CLOUD_URL}\" NEXU_LINK_URL=\"${NEXU_LINK_URL:-}\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
 }
 
 start() {
