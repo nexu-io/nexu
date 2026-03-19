@@ -19,6 +19,7 @@
     "package:sidecars": "node ./scripts/prepare-runtime-sidecars.mjs --release",
     "dist:mac": "node ./scripts/dist-mac.mjs",
     "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
+    "upload:sourcemaps": "node ./scripts/upload-sourcemaps.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

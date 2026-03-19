@@ -1,5 +1,5 @@
-import type { DesktopRuntimeConfig } from "./runtime-config";
-export type { DesktopRuntimeConfig } from "./runtime-config";
+import type { DesktopBuildInfo, DesktopRuntimeConfig } from "./runtime-config";
+export type { DesktopBuildInfo, DesktopRuntimeConfig } from "./runtime-config";
 import type { SkillhubCatalogData } from "./skillhub-types";
 export type { SkillhubCatalogData } from "./skillhub-types";
 
@@ -269,6 +269,7 @@ export type HostBridge = {
 };
 
 export type HostBootstrap = {
+  buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
   isPackaged: boolean;
 };
