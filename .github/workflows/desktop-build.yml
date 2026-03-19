@@ -139,8 +139,8 @@ jobs:
           export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
             const sentryDsnByEnvironment = {
-              test: process.env.SENTRY_DSN_TEST,
-              prod: process.env.SENTRY_DSN_PROD,
+              "nexu-test": process.env.SENTRY_DSN_TEST,
+              "nexu-prod": process.env.SENTRY_DSN_PROD,
             };
             const sentryDsn = sentryDsnByEnvironment[process.env.TARGET_ENVIRONMENT] ?? "";
             const config = {
@@ -328,6 +328,10 @@ jobs:
 
           echo "Uploading ${LATEST_ZIP} → ${r2_prefix}/${LATEST_ZIP}"
           npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/${LATEST_ZIP}" --file "apps/desktop/channel-artifacts/${LATEST_ZIP}" --remote
+
+          # Upload checksum
+          echo "Uploading desktop-sha256.txt → ${r2_prefix}/desktop-sha256.txt"
+          npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/desktop-sha256.txt" --file "apps/desktop/channel-artifacts/desktop-sha256.txt" --remote
 
       - name: Publish Cloudflare download links
         if: inputs.update_feed_url != ''

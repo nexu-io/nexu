@@ -3,7 +3,7 @@ name: Desktop Beta
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 17 * * *"
+    - cron: "0 18 * * *"
 
 permissions:
   contents: write
