@@ -6,7 +6,6 @@ import {
   runFeishuSessionSyncLoop,
   runGatewayHealthLoops,
   runHeartbeatLoop,
-  runPollLoop,
   runSkillsPollLoop,
   runSlackTokenHealthLoop,
   runWorkspaceTemplatesPollLoop,
@@ -40,7 +39,10 @@ async function main(): Promise<void> {
   void runSkillsPollLoop(state);
   void runSlackTokenHealthLoop();
   void runWorkspaceTemplatesPollLoop(state);
-  await runPollLoop(state);
+
+  // Config is now pushed via WS from API → OpenClaw directly.
+  // Keep the process alive since other loops still run.
+  await new Promise(() => {});
 }
 
 main().catch((error: unknown) => {

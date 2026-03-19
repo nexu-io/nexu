@@ -260,7 +260,8 @@ function WorkspaceLayoutInner() {
       {/* Desktop sidebar */}
       <div
         className={cn(
-          "hidden md:flex flex-col shrink-0 border-r border-border bg-surface-1 transition-all duration-200",
+          "hidden md:flex flex-col shrink-0 border-r border-border transition-all duration-200",
+          "sidebar-vibrancy",
           collapsed ? "w-14" : "w-56",
         )}
       >
@@ -538,7 +539,7 @@ function WorkspaceLayoutInner() {
               setShowLogoutConfirm(false);
             }}
           />
-          <div className="absolute inset-y-0 left-0 w-[84%] max-w-[320px] bg-surface-1 border-r border-border shadow-xl">
+          <div className="absolute inset-y-0 left-0 w-[84%] max-w-[320px] sidebar-vibrancy border-r border-border shadow-xl">
             <div className="flex h-full flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-2.5 min-w-0">

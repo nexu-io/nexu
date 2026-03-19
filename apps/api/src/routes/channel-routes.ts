@@ -28,6 +28,7 @@ import { getFeishuTenantToken } from "../lib/feishu-webhook.js";
 import { logger } from "../lib/logger.js";
 import { Span } from "../lib/trace-decorator.js";
 import { publishPoolConfigSnapshot } from "../services/runtime/pool-config-service.js";
+import { getChannelReadiness } from "../services/openclaw-service.js";
 
 import type { AppBindings } from "../types.js";
 
@@ -126,7 +127,12 @@ function formatChannel(
         typeof ch.channelConfig === "string"
           ? JSON.parse(ch.channelConfig)
           : (ch.channelConfig as Record<string, unknown>);
-    } catch {
+    } catch (error) {
+      logger.warn({
+        message: "channel_config_parse_failed",
+        channel_id: ch.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       config = {};
     }
   }
@@ -151,13 +157,14 @@ function formatChannel(
 async function publishSnapshotSafely(
   poolId: string | null | undefined,
   botId: string,
-): Promise<void> {
+): Promise<{ configSyncFailed?: boolean }> {
   if (!poolId) {
-    return;
+    return {};
   }
 
   try {
-    await channelSpanHandler.publishSnapshot(poolId);
+    await publishPoolConfigSnapshot(db, poolId, { force: true });
+    return {};
   } catch (error) {
     const unknownError = BaseError.from(error);
     logger.error({
@@ -167,6 +174,7 @@ async function publishSnapshotSafely(
       bot_id: botId,
       ...unknownError.toJSON(),
     });
+    return { configSyncFailed: true };
   }
 }
 
@@ -353,6 +361,36 @@ const channelStatusRoute = createRoute({
   },
 });
 
+const channelReadinessResponseSchema = z.object({
+  ready: z.boolean(),
+  connected: z.boolean(),
+  running: z.boolean(),
+  configured: z.boolean(),
+  lastError: z.string().nullable(),
+  gatewayConnected: z.boolean(),
+});
+
+const channelReadinessRoute = createRoute({
+  method: "get",
+  path: "/api/v1/channels/{channelId}/readiness",
+  tags: ["Channels"],
+  request: {
+    params: channelIdParam,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: channelReadinessResponseSchema },
+      },
+      description: "Channel readiness status from OpenClaw gateway",
+    },
+    404: {
+      content: { "application/json": { schema: errorResponseSchema } },
+      description: "Not found",
+    },
+  },
+});
+
 const botQuotaRoute = createRoute({
   method: "get",
   path: "/api/v1/bot-quota",
@@ -510,7 +548,6 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     const now = new Date().toISOString();
-    let channelId: string;
 
     // Clean up any stale Slack channels for this bot (e.g. old records with wrong accountId)
     const existingChannels = await db
@@ -524,85 +561,89 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       (ch) => ch.accountId === accountId || ch.accountId === oldAccountId,
     );
 
-    if (existingChannel || globalExisting) {
-      // Reconnection — reuse existing channel or the one referenced by the webhook route
-      channelId = (existingChannel?.id ??
-        globalExisting?.botChannelId) as string;
+    const channelId = await db.transaction(async (tx) => {
+      if (existingChannel || globalExisting) {
+        // Reconnection — reuse existing channel or the one referenced by the webhook route
+        const chId = (existingChannel?.id ??
+          globalExisting?.botChannelId) as string;
 
-      await db
-        .update(botChannels)
-        .set({
-          status: "connected",
-          accountId,
-          channelConfig: JSON.stringify({
-            teamId,
-            teamName: teamName ?? null,
-            appId,
-            botUserId: botUserId ?? null,
-          }),
-          updatedAt: now,
-        })
-        .where(eq(botChannels.id, channelId));
-
-      // Replace credentials
-      await db
-        .delete(channelCredentials)
-        .where(eq(channelCredentials.botChannelId, channelId));
-
-      await db.insert(channelCredentials).values([
-        {
-          id: createId(),
-          botChannelId: channelId,
-          credentialType: "botToken",
-          encryptedValue: encrypt(input.botToken),
-          createdAt: now,
-        },
-        {
-          id: createId(),
-          botChannelId: channelId,
-          credentialType: "signingSecret",
-          encryptedValue: encrypt(input.signingSecret),
-          createdAt: now,
-        },
-      ]);
-
-      // Update or create webhook route with correct externalId
-      if (globalExisting) {
-        await db
-          .update(webhookRoutes)
+        await tx
+          .update(botChannels)
           .set({
+            status: "connected",
+            accountId,
+            channelConfig: JSON.stringify({
+              teamId,
+              teamName: teamName ?? null,
+              appId,
+              botUserId: botUserId ?? null,
+            }),
+            updatedAt: now,
+          })
+          .where(eq(botChannels.id, chId));
+
+        // Replace credentials
+        await tx
+          .delete(channelCredentials)
+          .where(eq(channelCredentials.botChannelId, chId));
+
+        await tx.insert(channelCredentials).values([
+          {
+            id: createId(),
+            botChannelId: chId,
+            credentialType: "botToken",
+            encryptedValue: encrypt(input.botToken),
+            createdAt: now,
+          },
+          {
+            id: createId(),
+            botChannelId: chId,
+            credentialType: "signingSecret",
+            encryptedValue: encrypt(input.signingSecret),
+            createdAt: now,
+          },
+        ]);
+
+        // Update or create webhook route with correct externalId
+        if (globalExisting) {
+          await tx
+            .update(webhookRoutes)
+            .set({
+              externalId: slackExternalId,
+              poolId: bot.poolId ?? globalExisting.poolId,
+              botChannelId: chId,
+              botId,
+              accountId,
+              updatedAt: now,
+            })
+            .where(eq(webhookRoutes.id, globalExisting.id));
+        } else if (bot.poolId) {
+          // Delete any old webhook routes for this channel, then create correct one
+          await tx
+            .delete(webhookRoutes)
+            .where(eq(webhookRoutes.botChannelId, chId));
+
+          await tx.insert(webhookRoutes).values({
+            id: createId(),
+            channelType: "slack",
             externalId: slackExternalId,
-            poolId: bot.poolId ?? globalExisting.poolId,
-            botChannelId: channelId,
+            poolId: bot.poolId,
+            botChannelId: chId,
             botId,
             accountId,
             updatedAt: now,
-          })
-          .where(eq(webhookRoutes.id, globalExisting.id));
-      } else if (bot.poolId) {
-        // Delete any old webhook routes for this channel, then create correct one
-        await db
-          .delete(webhookRoutes)
-          .where(eq(webhookRoutes.botChannelId, channelId));
+            createdAt: now,
+          });
+        }
 
-        await db.insert(webhookRoutes).values({
-          id: createId(),
-          channelType: "slack",
-          externalId: slackExternalId,
-          poolId: bot.poolId,
-          botChannelId: channelId,
-          botId,
-          accountId,
-          updatedAt: now,
-          createdAt: now,
-        });
+        return chId;
       }
-    } else {
-      // New connection
-      channelId = createId();
 
-      await db.insert(botChannels).values({
-        id: channelId,
+      // New connection
+      const chId = createId();
+
+      await tx.insert(botChannels).values({
+        id: chId,
         botId,
         channelType: "slack",
         accountId,
@@ -617,17 +658,17 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
         updatedAt: now,
       });
 
-      await db.insert(channelCredentials).values([
+      await tx.insert(channelCredentials).values([
         {
           id: createId(),
-          botChannelId: channelId,
+          botChannelId: chId,
           credentialType: "botToken",
           encryptedValue: encrypt(input.botToken),
           createdAt: now,
         },
         {
           id: createId(),
-          botChannelId: channelId,
+          botChannelId: chId,
           credentialType: "signingSecret",
           encryptedValue: encrypt(input.signingSecret),
           createdAt: now,
@@ -635,19 +676,21 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       ]);
 
       if (bot.poolId) {
-        await db.insert(webhookRoutes).values({
+        await tx.insert(webhookRoutes).values({
           id: createId(),
           channelType: "slack",
           externalId: slackExternalId,
           poolId: bot.poolId,
-          botChannelId: channelId,
+          botChannelId: chId,
           botId,
           accountId,
           updatedAt: now,
           createdAt: now,
         });
       }
-    }
+
+      return chId;
+    });
 
     await publishSnapshotSafely(bot.poolId, bot.id);
 
@@ -725,7 +768,9 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const botId = bot.id;
 
     const accountId = `discord-${input.appId}`;
+    const now = new Date().toISOString();
 
+    // Find any existing discord channel for this bot
     const [existing] = await db
       .select()
       .from(botChannels)
@@ -733,38 +778,71 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
         and(
           eq(botChannels.botId, botId),
           eq(botChannels.channelType, "discord"),
-          eq(botChannels.accountId, accountId),
         ),
       );
 
-    if (existing) {
-      return c.json({ message: "Discord channel already connected" }, 409);
-    }
+    const channelId = await db.transaction(async (tx) => {
+      if (existing) {
+        // Reconnect / update credentials on existing channel
+        const chId = existing.id;
 
-    const channelId = createId();
-    const now = new Date().toISOString();
+        await tx
+          .update(botChannels)
+          .set({
+            accountId,
+            status: "connected",
+            channelConfig: JSON.stringify({
+              appId: input.appId,
+              guildId: input.guildId ?? null,
+              guildName: input.guildName ?? null,
+            }),
+            updatedAt: now,
+          })
+          .where(eq(botChannels.id, chId));
 
-    await db.insert(botChannels).values({
-      id: channelId,
-      botId,
-      channelType: "discord",
-      accountId,
-      status: "connected",
-      channelConfig: JSON.stringify({
-        appId: input.appId,
-        guildId: input.guildId ?? null,
-        guildName: input.guildName ?? null,
-      }),
-      createdAt: now,
-      updatedAt: now,
-    });
+        // Replace credentials
+        await tx
+          .delete(channelCredentials)
+          .where(eq(channelCredentials.botChannelId, chId));
 
-    await db.insert(channelCredentials).values({
-      id: createId(),
-      botChannelId: channelId,
-      credentialType: "botToken",
-      encryptedValue: encrypt(input.botToken),
-      createdAt: now,
+        await tx.insert(channelCredentials).values({
+          id: createId(),
+          botChannelId: chId,
+          credentialType: "botToken",
+          encryptedValue: encrypt(input.botToken),
+          createdAt: now,
+        });
+
+        return chId;
+      }
+
+      // New connection
+      const chId = createId();
+
+      await tx.insert(botChannels).values({
+        id: chId,
+        botId,
+        channelType: "discord",
+        accountId,
+        status: "connected",
+        channelConfig: JSON.stringify({
+          appId: input.appId,
+          guildId: input.guildId ?? null,
+          guildName: input.guildName ?? null,
+        }),
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await tx.insert(channelCredentials).values({
+        id: createId(),
+        botChannelId: chId,
+        credentialType: "botToken",
+        encryptedValue: encrypt(input.botToken),
+        createdAt: now,
+      });
+
+      return chId;
     });
 
     await publishSnapshotSafely(bot.poolId, bot.id);
@@ -808,7 +886,10 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     const botId = bot.id;
 
     const accountId = `feishu-${input.appId}`;
+    const now = new Date().toISOString();
+    const connectionMode = input.connectionMode ?? "websocket";
 
+    // Find any existing feishu channel for this bot (same or different appId)
     const [existing] = await db
       .select()
       .from(botChannels)
@@ -816,74 +897,141 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
         and(
           eq(botChannels.botId, botId),
           eq(botChannels.channelType, "feishu"),
-          eq(botChannels.accountId, accountId),
         ),
       );
 
-    if (existing) {
-      return c.json({ message: "Feishu channel already connected" }, 409);
-    }
+    const channelId = await db.transaction(async (tx) => {
+      if (existing) {
+        // Reconnect / update credentials on existing channel
+        const chId = existing.id;
 
-    const channelId = createId();
-    const now = new Date().toISOString();
+        await tx
+          .update(botChannels)
+          .set({
+            accountId,
+            connectionMode,
+            status: "connected",
+            channelConfig: JSON.stringify({ appId: input.appId }),
+            updatedAt: now,
+          })
+          .where(eq(botChannels.id, chId));
 
-    const connectionMode = input.connectionMode ?? "websocket";
+        // Replace all credentials
+        await tx
+          .delete(channelCredentials)
+          .where(eq(channelCredentials.botChannelId, chId));
 
-    await db.insert(botChannels).values({
-      id: channelId,
-      botId,
-      channelType: "feishu",
-      accountId,
-      connectionMode,
-      status: "connected",
-      channelConfig: JSON.stringify({ appId: input.appId }),
-      createdAt: now,
-      updatedAt: now,
-    });
+        const credentialsToInsert = [
+          {
+            id: createId(),
+            botChannelId: chId,
+            credentialType: "appId",
+            encryptedValue: encrypt(input.appId),
+            createdAt: now,
+          },
+          {
+            id: createId(),
+            botChannelId: chId,
+            credentialType: "appSecret",
+            encryptedValue: encrypt(input.appSecret),
+            createdAt: now,
+          },
+        ];
 
-    const credentialsToInsert = [
-      {
-        id: createId(),
-        botChannelId: channelId,
-        credentialType: "appId",
-        encryptedValue: encrypt(input.appId),
-        createdAt: now,
-      },
-      {
-        id: createId(),
-        botChannelId: channelId,
-        credentialType: "appSecret",
-        encryptedValue: encrypt(input.appSecret),
-        createdAt: now,
-      },
-    ];
+        if (connectionMode === "webhook" && input.verificationToken) {
+          credentialsToInsert.push({
+            id: createId(),
+            botChannelId: chId,
+            credentialType: "verificationToken",
+            encryptedValue: encrypt(input.verificationToken),
+            createdAt: now,
+          });
+        }
 
-    if (connectionMode === "webhook" && input.verificationToken) {
-      credentialsToInsert.push({
-        id: createId(),
-        botChannelId: channelId,
-        credentialType: "verificationToken",
-        encryptedValue: encrypt(input.verificationToken),
-        createdAt: now,
-      });
-    }
+        await tx.insert(channelCredentials).values(credentialsToInsert);
 
-    await db.insert(channelCredentials).values(credentialsToInsert);
+        // Update or create webhook route
+        await tx
+          .delete(webhookRoutes)
+          .where(eq(webhookRoutes.botChannelId, chId));
 
-    // Create webhook route for webhook-mode feishu bots
-    if (connectionMode === "webhook" && bot.poolId) {
-      await db.insert(webhookRoutes).values({
-        id: createId(),
-        channelType: "feishu",
-        externalId: input.appId,
-        poolId: bot.poolId,
-        botChannelId: channelId,
+        if (connectionMode === "webhook" && bot.poolId) {
+          await tx.insert(webhookRoutes).values({
+            id: createId(),
+            channelType: "feishu",
+            externalId: input.appId,
+            poolId: bot.poolId,
+            botChannelId: chId,
+            botId,
+            accountId,
+            updatedAt: now,
+            createdAt: now,
+          });
+        }
+
+        return chId;
+      }
+
+      // New connection
+      const chId = createId();
+
+      const credentialsToInsert = [
+        {
+          id: createId(),
+          botChannelId: chId,
+          credentialType: "appId",
+          encryptedValue: encrypt(input.appId),
+          createdAt: now,
+        },
+        {
+          id: createId(),
+          botChannelId: chId,
+          credentialType: "appSecret",
+          encryptedValue: encrypt(input.appSecret),
+          createdAt: now,
+        },
+      ];
+
+      if (connectionMode === "webhook" && input.verificationToken) {
+        credentialsToInsert.push({
+          id: createId(),
+          botChannelId: chId,
+          credentialType: "verificationToken",
+          encryptedValue: encrypt(input.verificationToken),
+          createdAt: now,
+        });
+      }
+
+      await tx.insert(botChannels).values({
+        id: chId,
         botId,
+        channelType: "feishu",
         accountId,
-        updatedAt: now,
+        connectionMode,
+        status: "connected",
+        channelConfig: JSON.stringify({ appId: input.appId }),
         createdAt: now,
+        updatedAt: now,
       });
-    }
+
+      await tx.insert(channelCredentials).values(credentialsToInsert);
+
+      if (connectionMode === "webhook" && bot.poolId) {
+        await tx.insert(webhookRoutes).values({
+          id: createId(),
+          channelType: "feishu",
+          externalId: input.appId,
+          poolId: bot.poolId,
+          botChannelId: chId,
+          botId,
+          accountId,
+          updatedAt: now,
+          createdAt: now,
+        });
+      }
+
+      return chId;
+    });
 
     await publishSnapshotSafely(bot.poolId, bot.id);
 
@@ -1020,15 +1168,17 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
       return c.json({ message: `Channel ${channelId} not found` }, 404);
     }
 
-    await db
-      .delete(webhookRoutes)
-      .where(eq(webhookRoutes.botChannelId, channelId));
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(webhookRoutes)
+        .where(eq(webhookRoutes.botChannelId, channelId));
 
-    await db
-      .delete(channelCredentials)
-      .where(eq(channelCredentials.botChannelId, channelId));
+      await tx
+        .delete(channelCredentials)
+        .where(eq(channelCredentials.botChannelId, channelId));
 
-    await db.delete(botChannels).where(eq(botChannels.id, channelId));
+      await tx.delete(botChannels).where(eq(botChannels.id, channelId));
+    });
 
     const ownerBot = userBots.find((b) => b.id === channel.botId);
     if (ownerBot?.poolId) {
@@ -1068,6 +1218,41 @@ export function registerChannelRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     return c.json(formatChannel(channel), 200);
+  });
+
+  // -- Channel readiness (live status from OpenClaw gateway) --
+  app.openapi(channelReadinessRoute, async (c) => {
+    const { channelId } = c.req.valid("param");
+    const userId = c.get("userId");
+
+    const [bot] = await db
+      .select()
+      .from(bots)
+      .where(
+        and(
+          eq(bots.userId, userId),
+          or(eq(bots.status, "active"), eq(bots.status, "paused")),
+        ),
+      );
+
+    if (!bot) {
+      return c.json({ message: "Channel not found" }, 404);
+    }
+
+    const [channel] = await db
+      .select()
+      .from(botChannels)
+      .where(and(eq(botChannels.id, channelId), eq(botChannels.botId, bot.id)));
+
+    if (!channel) {
+      return c.json({ message: `Channel ${channelId} not found` }, 404);
+    }
+
+    const readiness = await getChannelReadiness(
+      channel.channelType,
+      channel.accountId,
+    );
+    return c.json(readiness, 200);
   });
 }
 

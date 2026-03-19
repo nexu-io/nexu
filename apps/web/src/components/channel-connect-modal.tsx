@@ -15,6 +15,7 @@ interface ChannelConnectModalProps {
   channelType: ChannelType;
   onClose: () => void;
   onConnected: () => void | Promise<void>;
+  onStartReadinessPolling?: (channelId: string) => void;
 }
 
 const SlackIcon = () => (
@@ -133,6 +134,7 @@ export function ChannelConnectModal({
   channelType,
   onClose,
   onConnected,
+  onStartReadinessPolling,
 }: ChannelConnectModalProps) {
   const { t } = useTranslation();
   const CHANNEL_CONFIGS = useMemo(() => getChannelConfigs(t), [t]);
@@ -170,25 +172,26 @@ export function ChannelConnectModal({
     setLoading(true);
 
     try {
+      let data: { id?: string } | undefined;
       let error: { message?: string } | undefined;
       let response: Response | undefined;
 
       if (channelType === "feishu") {
-        ({ error, response } = await postApiV1ChannelsFeishuConnect({
+        ({ data, error, response } = await postApiV1ChannelsFeishuConnect({
           body: {
             appId: fieldValues.appId ?? "",
             appSecret: fieldValues.appSecret ?? "",
           },
         }));
       } else if (channelType === "slack") {
-        ({ error, response } = await postApiV1ChannelsSlackConnect({
+        ({ data, error, response } = await postApiV1ChannelsSlackConnect({
           body: {
             botToken: fieldValues.botToken ?? "",
             signingSecret: fieldValues.signingSecret ?? "",
           },
         }));
       } else if (channelType === "discord") {
-        ({ error, response } = await postApiV1ChannelsDiscordConnect({
+        ({ data, error, response } = await postApiV1ChannelsDiscordConnect({
           body: {
             botToken: fieldValues.botToken ?? "",
             appId: fieldValues.appId ?? "",
@@ -204,17 +207,21 @@ export function ChannelConnectModal({
           return;
         }
       } else {
-        toast.success(t("modal.connectSuccess", { name: config.name }));
         track("channel_ready", { channel: channelType });
         identify({ [`${channelType}_connected`]: true });
       }
 
-      // Close modal immediately, then refresh list in the background
+      // Refresh data first, then close modal
+      await Promise.resolve(onConnected()).catch(() => {});
       onClose();
-      Promise.resolve(onConnected()).catch(() => {});
+
+      // Start polling for channel readiness after modal closes
+      const channelId = data?.id;
+      if (channelId) {
+        onStartReadinessPolling?.(channelId);
+      }
     } catch {
       toast.error(t("modal.connectRetryFailed"));
-      onClose();
     } finally {
       setLoading(false);
     }

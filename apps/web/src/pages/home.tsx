@@ -1,39 +1,27 @@
+import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
-import { ProviderLogo } from "@/components/provider-logo";
+import { InlineModelSelector } from "@/components/inline-model-selector";
+import { useActiveChannel } from "@/hooks/use-active-channel";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   ChevronDown,
-  Cpu,
   MessageSquare,
   Settings,
   Sparkles,
   Unlink,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import "@/lib/api";
 import {
   deleteApiV1ChannelsByChannelId,
-  getApiInternalDesktopDefaultModel,
-  getApiV1Bots,
+  getApiV1ChannelsByChannelIdReadiness,
   getApiV1Channels,
-  getApiV1Models,
   getApiV1Sessions,
 } from "../../lib/api/sdk.gen";
-
-function formatModelName(modelId: string | null | undefined): string {
-  if (!modelId) return "Claude Sonnet 4.5";
-  const withoutProvider = modelId.includes("/")
-    ? modelId.split("/").slice(1).join("/")
-    : modelId;
-  return withoutProvider
-    .split(/[-_]/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
 
 function formatRelativeTime(
   date: string | null | undefined,
@@ -51,18 +39,6 @@ function formatRelativeTime(
 }
 
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
-
-/** Resolve provider group key for a model (link/* → "nexu", others → provider) */
-function getGroupKey(m: { id: string; provider: string }): string {
-  return m.id.startsWith("link/") ? "nexu" : m.provider;
-}
-
-const PROVIDER_LABELS: Record<string, string> = {
-  nexu: "Nexu Official",
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google AI",
-};
 
 function getChatUrl(
   channelType: string,
@@ -270,7 +246,6 @@ export function HomePage() {
 
   const handleConnected = async () => {
     await queryClient.refetchQueries({ queryKey: ["channels"] });
-    setModalChannel(null);
   };
 
   const handleDisconnect = async (channelId: string) => {
@@ -282,6 +257,66 @@ export function HomePage() {
       toast.error(t("home.disconnectFailed"));
     }
   };
+
+  // -- Channel readiness polling --
+  const readinessPollingRef = useRef<{
+    channelId: string;
+    timer: ReturnType<typeof setInterval>;
+  } | null>(null);
+
+  const startReadinessPolling = useCallback(
+    (channelId: string) => {
+      if (readinessPollingRef.current) {
+        clearInterval(readinessPollingRef.current.timer);
+      }
+
+      const toastId = toast.loading(t("home.channel.syncing"));
+      let attempts = 0;
+
+      const timer = setInterval(async () => {
+        attempts++;
+        try {
+          const { data } = await getApiV1ChannelsByChannelIdReadiness({
+            path: { channelId },
+          });
+
+          if (!data?.gatewayConnected) {
+            toast.loading(t("home.channel.gatewayStarting"), { id: toastId });
+          } else if (data?.ready) {
+            clearInterval(timer);
+            readinessPollingRef.current = null;
+            toast.success(t("home.channel.ready"), { id: toastId });
+            return;
+          } else if (data?.configured) {
+            toast.loading(t("home.channel.connecting"), { id: toastId });
+          }
+
+          if (attempts >= 15) {
+            clearInterval(timer);
+            readinessPollingRef.current = null;
+            if (!data?.ready) {
+              toast.warning(t("home.channel.readinessTimeout"), {
+                id: toastId,
+              });
+            }
+          }
+        } catch {
+          // Ignore single poll failures, keep trying
+        }
+      }, 2000);
+
+      readinessPollingRef.current = { channelId, timer };
+    },
+    [t],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (readinessPollingRef.current) {
+        clearInterval(readinessPollingRef.current.timer);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -324,46 +359,6 @@ export function HomePage() {
     },
   });
 
-  const { data: botsData } = useQuery({
-    queryKey: ["bots"],
-    queryFn: async () => {
-      const { data } = await getApiV1Bots();
-      return data;
-    },
-  });
-
-  const { data: defaultModelData } = useQuery({
-    queryKey: ["desktop-default-model"],
-    queryFn: async () => {
-      const { data } = await getApiInternalDesktopDefaultModel();
-      return data as { modelId: string | null } | undefined;
-    },
-  });
-
-  const { data: modelsData } = useQuery({
-    queryKey: ["models"],
-    queryFn: async () => {
-      const { data } = await getApiV1Models();
-      return data;
-    },
-  });
-
-  const models = modelsData?.models ?? [];
-  const currentModelId = defaultModelData?.modelId ?? "";
-
-  // Use desktop-default-model real model name when available, fall back to formatModelName from bots
-  const modelName = currentModelId
-    ? (models.find((m) => m.id === currentModelId)?.name ??
-      formatModelName(currentModelId))
-    : formatModelName(botsData?.bots?.[0]?.modelId);
-
-  // Current model's provider group info
-  const currentModel = models.find((m) => m.id === currentModelId);
-  const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
-  const currentProviderLabel = currentGroupKey
-    ? (PROVIDER_LABELS[currentGroupKey] ?? currentGroupKey)
-    : "";
-
   const sessions = sessionsData?.sessions ?? [];
   const { messagesToday, lastActiveAt } = useMemo(() => {
     const start = new Date();
@@ -383,15 +378,25 @@ export function HomePage() {
   const channels = channelsData?.channels ?? [];
   const connectedCount = channels.length;
   const connectedTypes = new Set<string>(channels.map((c) => c.channelType));
-  const firstChannel = channels[0];
-  const firstChannelType = firstChannel?.channelType ?? "feishu";
+  const connectedChannelIds = useMemo(
+    () => channels.map((c) => c.id),
+    [channels],
+  );
+
+  // Active channel state (persisted in localStorage)
+  const [activeChannelId, setActiveChannelId] =
+    useActiveChannel(connectedChannelIds);
+
+  // Derive active channel info for CTA
+  const activeChannel = channels.find((c) => c.id === activeChannelId);
+  const activeChannelType = activeChannel?.channelType ?? "feishu";
   const chatShortName =
-    CHANNEL_SHORT_NAMES[firstChannelType] ?? firstChannelType;
+    CHANNEL_SHORT_NAMES[activeChannelType] ?? activeChannelType;
   const chatUrl = getChatUrl(
-    firstChannelType,
-    firstChannel?.appId,
-    firstChannel?.botUserId,
-    firstChannel?.accountId,
+    activeChannelType,
+    activeChannel?.appId,
+    activeChannel?.botUserId,
+    activeChannel?.accountId,
   );
 
   /* ── Always show full dashboard ── */
@@ -442,19 +447,7 @@ export function HomePage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-text-muted mb-3">
-                  <span className="flex items-center gap-1">
-                    {currentGroupKey ? (
-                      <ProviderLogo provider={currentGroupKey} size={10} />
-                    ) : (
-                      <Cpu size={10} />
-                    )}
-                    {modelName}
-                    {currentProviderLabel && (
-                      <span className="text-text-muted/50">
-                        ({currentProviderLabel})
-                      </span>
-                    )}
-                  </span>
+                  <InlineModelSelector />
                   <span className="text-border">&middot;</span>
                   <span>
                     {sessionsData
@@ -476,10 +469,10 @@ export function HomePage() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
                     >
-                      {firstChannelType === "feishu" ? (
+                      {activeChannelType === "feishu" ? (
                         <FeishuIconChat size={14} />
                       ) : (
-                        CHANNEL_OPTIONS.find((c) => c.id === firstChannelType)
+                        CHANNEL_OPTIONS.find((c) => c.id === activeChannelType)
                           ?.smallIcon
                       )}
                       Chat in {chatShortName}
@@ -511,13 +504,21 @@ export function HomePage() {
                     const connectedChannel = channels.find(
                       (c) => c.channelType === ch.id,
                     );
+                    const isActive =
+                      isConnected && connectedChannel?.id === activeChannelId;
+                    const showBreathe =
+                      !isConnected && connectedCount === 0 && ch.recommended;
                     return (
                       <div
                         key={ch.id}
                         className={`rounded-xl border px-3 py-3 transition-all ${
-                          isConnected
-                            ? "border-accent/20 bg-accent/5"
-                            : "border-border bg-surface-0"
+                          isActive
+                            ? "border-accent bg-accent/8 ring-1 ring-accent/20"
+                            : isConnected
+                              ? "border-accent/20 bg-accent/5"
+                              : showBreathe
+                                ? "border-border bg-surface-0 animate-breathe"
+                                : "border-border bg-surface-0"
                         }`}
                       >
                         <div className="flex items-start gap-2.5">
@@ -525,8 +526,15 @@ export function HomePage() {
                             {ch.smallIcon}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-medium text-text-primary">
-                              {ch.name}
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[13px] font-medium text-text-primary">
+                                {ch.name}
+                              </span>
+                              {isActive && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent font-medium">
+                                  {t("home.active")}
+                                </span>
+                              )}
                             </div>
                             <div className="mt-0.5 text-[11px] text-text-muted">
                               {channelsLoading
@@ -537,18 +545,31 @@ export function HomePage() {
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3 flex justify-end">
+                        <div className="mt-3 flex justify-end gap-2">
                           {isConnected && connectedChannel ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleDisconnect(connectedChannel.id)
-                              }
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
-                            >
-                              <Unlink size={12} />
-                              {t("home.disconnect")}
-                            </button>
+                            <>
+                              {!isActive && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveChannelId(connectedChannel.id)
+                                  }
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-accent/30 text-accent hover:bg-accent/5 transition-colors"
+                                >
+                                  {t("home.setActive")}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDisconnect(connectedChannel.id)
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
+                              >
+                                <Unlink size={12} />
+                                {t("home.disconnect")}
+                              </button>
+                            </>
                           ) : (
                             <button
                               type="button"
@@ -648,6 +669,9 @@ export function HomePage() {
             </div>
           </a>
         </div>
+
+        {/* Activity Feed */}
+        <ActivityFeed />
       </div>
 
       {modalChannel && (
@@ -655,6 +679,7 @@ export function HomePage() {
           channelType={modalChannel}
           onClose={() => setModalChannel(null)}
           onConnected={handleConnected}
+          onStartReadinessPolling={startReadinessPolling}
         />
       )}
     </div>

@@ -95,6 +95,8 @@ export class RuntimeOrchestrator {
             : [],
         stdoutRemainder: "",
         stderrRemainder: "",
+        autoRestartAttempts: 0,
+        stoppedByUser: false,
       };
 
       this.units.set(manifest.id, record);
@@ -302,6 +304,27 @@ export class RuntimeOrchestrator {
       (entry) => this.emitUnitLog(record, entry),
       this.rememberEntry.bind(this),
     );
+
+    // Auto-restart on unexpected exit with exponential backoff (cap 30s)
+    const MAX_BACKOFF_MS = 30_000;
+    onManagedExit(child, (code) => {
+      if (code === 0) return;
+      if (record.manifest.autoRestart === false) return;
+      if (record.stoppedByUser) return;
+
+      record.autoRestartAttempts += 1;
+      const delayMs = Math.min(2000 * 2 ** (record.autoRestartAttempts - 1), MAX_BACKOFF_MS);
+      this.logStateChange(record, {
+        kind: "lifecycle",
+        actionId: ensureActionId(record, "auto-restart"),
+        reasonCode: "auto_restart_scheduled",
+        message: `auto-restart #${record.autoRestartAttempts} in ${delayMs}ms`,
+      });
+
+      setTimeout(() => {
+        this.startUnit(id).catch(() => {});
+      }, delayMs);
+    });
   }
 
   private async startUnit(id: string): Promise<void> {
@@ -335,6 +358,7 @@ export class RuntimeOrchestrator {
     record.exitedAt = null;
     record.stdoutRemainder = "";
     record.stderrRemainder = "";
+    record.stoppedByUser = false;
 
     this.logStateChange(record, {
       kind: "lifecycle",
@@ -389,6 +413,7 @@ export class RuntimeOrchestrator {
 
       if (this.children.has(id)) {
         setRecordPhase(record, "running");
+        record.autoRestartAttempts = 0;
         this.logStateChange(record, {
           kind: "lifecycle",
           actionId,
@@ -434,6 +459,7 @@ export class RuntimeOrchestrator {
       return;
     }
 
+    record.stoppedByUser = true;
     setRecordPhase(record, "stopping");
     this.logStateChange(record, {
       kind: "lifecycle",

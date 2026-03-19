@@ -55,6 +55,36 @@
   /* Status */
   --color-success: #16a34a;
   --color-danger: #dc2626;
+
+  /* Brand color — 10% rule (use sparingly for CTAs and highlights) */
+  --color-brand-primary: #3db9ce;
+  --color-brand-subtle: rgba(61, 185, 206, 0.08);
+
+  /* Toggle (macOS style — exclusive, do not reuse for other components) */
+  --color-toggle-on: #007aff;
+
+  /* Functional colors */
+  --color-error: #f8672f;
+  --color-warning: #edc337;
+  --color-info: #2657bb;
+  --color-link: #2657bb;
+
+  /* Radius tokens */
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+  --radius-16: 16px;
+  --radius-20: 20px;
+  --radius-24: 24px;
+  --radius-pill: 100px;
+
+  /* Shadow tokens */
+  --shadow-rest: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 4px 8px 0 rgba(0, 0, 0, 0.08);
+  --shadow-refine: 0 10px 20px -5px rgba(0, 0, 0, 0.06);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-elevated: 0 18px 60px rgba(0, 0, 0, 0.08);
 }
 
 @keyframes fade-in-up {
@@ -70,6 +100,138 @@
 
 .animate-fade-in-up {
   animation: fade-in-up 0.5s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Breathe Animation — Guide user attention to recommended/primary card
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes breathe {
+  0%,
+  100% {
+    border-color: rgba(61, 185, 206, 0.12);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 0 rgba(61, 185, 206, 0);
+    transform: translateY(0);
+  }
+  50% {
+    border-color: rgba(61, 185, 206, 0.35);
+    box-shadow: 0 4px 16px rgba(61, 185, 206, 0.1), 0 0 0 1px
+      rgba(61, 185, 206, 0.08);
+    transform: translateY(-1px);
+  }
+}
+
+.animate-breathe {
+  animation: breathe 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-color: rgba(61, 185, 206, 0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Card Component — Reusable card container with hover effects
+   ═══════════════════════════════════════════════════════════════════ */
+
+.card {
+  border-radius: var(--radius-16);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-rest);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Only apply hover effects to non-static cards */
+.card:hover:not(.card-static) {
+  box-shadow: var(--shadow-refine);
+  transform: translateY(-1px);
+}
+
+/* Static cards (Control Panel, Activity Feed) — no hover effects */
+.card-static {
+  /* Marker class — no additional styles needed */
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Sidebar Vibrancy — macOS-style glass blur effect
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sidebar-vibrancy {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(20px)) {
+  .sidebar-vibrancy {
+    background: var(--color-surface-1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Panel Variants — Dark / Warm theme panels
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Dark Panel — For high-contrast sections or overlays */
+.panel-dark {
+  --panel-bg: #1a1a1a;
+  --panel-bg-subtle: #242424;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-text: #ffffff;
+  --panel-text-muted: rgba(255, 255, 255, 0.6);
+
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  border-color: var(--panel-border);
+}
+
+.panel-dark .text-text-primary {
+  color: var(--panel-text);
+}
+
+.panel-dark .text-text-muted {
+  color: var(--panel-text-muted);
+}
+
+.panel-dark .bg-surface-1 {
+  background: var(--panel-bg-subtle);
+}
+
+.panel-dark .border-border {
+  border-color: var(--panel-border);
+}
+
+/* Warm Panel — Cozy, softer tones */
+.panel-warm {
+  --panel-bg: #faf8f5;
+  --panel-bg-subtle: #f5f2ed;
+  --panel-border: #e8e4dc;
+  --panel-text: #3d3929;
+  --panel-text-muted: #8a846f;
+  --panel-accent: #d4a574;
+
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  border-color: var(--panel-border);
+}
+
+.panel-warm .text-text-primary {
+  color: var(--panel-text);
+}
+
+.panel-warm .text-text-muted {
+  color: var(--panel-text-muted);
+}
+
+.panel-warm .bg-surface-1 {
+  background: var(--panel-bg-subtle);
+}
+
+.panel-warm .border-border {
+  border-color: var(--panel-border);
+}
+
+.panel-warm .text-accent,
+.panel-warm .bg-accent {
+  color: var(--panel-accent);
 }
 
 @layer base {

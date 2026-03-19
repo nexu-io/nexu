@@ -7,10 +7,16 @@ import dotenv from "dotenv";
 import { sql } from "drizzle-orm";
 import { createApp } from "./app.js";
 import { db, pool } from "./db/index.js";
+import { gatewayPools } from "./db/schema/index.js";
+import { generatePoolConfig } from "./lib/config-generator.js";
 import { BaseError } from "./lib/error.js";
 import { logger } from "./lib/logger.js";
 import { warmupDesktopAuth } from "./middleware/desktop-auth.js";
 import { refreshCloudModelsOnStartup } from "./routes/desktop-local-routes.js";
+import {
+  initOpenClawService,
+  stopOpenClawClient,
+} from "./services/openclaw-service.js";
 import {
   startPoolHealthMonitor,
   stopPoolHealthMonitor,
@@ -102,10 +108,21 @@ async function main() {
 
   startPoolHealthMonitor(db);
 
+  // Initialize OpenClaw WS connection with config push on (re)connect
+  initOpenClawService(async () => {
+    const [pool_] = await db
+      .select({ id: gatewayPools.id })
+      .from(gatewayPools)
+      .limit(1);
+    if (!pool_) return null;
+    return generatePoolConfig(db, pool_.id);
+  });
+
   // Refresh cloud models from Link gateway (best-effort, non-blocking)
   refreshCloudModelsOnStartup();
 
   const shutdown = () => {
+    stopOpenClawClient();
     stopPoolHealthMonitor();
     server.close();
     pool.end().finally(() => process.exit(0));

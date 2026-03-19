@@ -3,8 +3,10 @@ import type { OpenClawConfig } from "@nexu/shared";
 import { createId } from "@paralleldrive/cuid2";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { Database } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 import { gatewayPools, poolConfigSnapshots } from "../../db/schema/index.js";
 import { generatePoolConfig } from "../../lib/config-generator.js";
+import { pushConfig } from "../openclaw-service.js";
 
 interface SnapshotRecord {
   id: string;
@@ -36,6 +38,7 @@ function parseSnapshot(
 export async function publishPoolConfigSnapshot(
   db: Database,
   poolId: string,
+  options?: { force?: boolean },
 ): Promise<SnapshotRecord> {
   const config = await generatePoolConfig(db, poolId);
   const configHash = toHash(config);
@@ -48,7 +51,8 @@ export async function publishPoolConfigSnapshot(
     .limit(1);
 
   // Skip if the latest snapshot already has the same hash (true no-op)
-  if (latest) {
+  // When force is true, always publish a new snapshot regardless of hash
+  if (latest && !options?.force) {
     const [latestFull] = await db
       .select()
       .from(poolConfigSnapshots)
@@ -83,6 +87,18 @@ export async function publishPoolConfigSnapshot(
     .update(gatewayPools)
     .set({ configVersion: sql`${gatewayPools.configVersion} + 1` })
     .where(eq(gatewayPools.id, poolId));
+
+  // Push config to OpenClaw via WS (best-effort, failure doesn't affect DB)
+  try {
+    await pushConfig(config);
+  } catch (err) {
+    logger.warn({
+      message: "openclaw_push_config_failed",
+      poolId,
+      version: nextVersion,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   return {
     id: snapshotId,
