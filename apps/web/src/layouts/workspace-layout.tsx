@@ -316,14 +316,12 @@ function WorkspaceLayoutInner() {
               title={collapsed ? t("layout.nav.home") : undefined}
               onClick={() => track("workspace_home_click")}
               className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
-                isHomePage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                isHomePage && "nav-item-active",
               )}
             >
-              <Home size={14} />
+              <Home size={16} />
               {!collapsed && t("layout.nav.home")}
             </Link>
             <Link
@@ -331,40 +329,52 @@ function WorkspaceLayoutInner() {
               title={collapsed ? t("layout.nav.skills") : undefined}
               onClick={() => track("workspace_skills_click")}
               className={cn(
-                "flex items-center justify-between w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
-                isSkillsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                isSkillsPage && "nav-item-active",
               )}
             >
-              <span className="flex items-center gap-2">
-                <Sparkles size={14} />
-                {!collapsed && t("layout.nav.skills")}
-              </span>
+              <Sparkles size={16} />
+              {!collapsed && t("layout.nav.skills")}
+              {!collapsed && sessions.length > 0 && (
+                <span className="ml-auto text-[10px] text-text-tertiary font-normal tabular-nums">
+                  {sessions.length}
+                </span>
+              )}
             </Link>
             <Link
               to="/workspace/settings"
               title={collapsed ? t("layout.nav.settings") : undefined}
               onClick={() => track("workspace_settings_click")}
               className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
                 collapsed ? "justify-center p-2" : "px-3 py-2",
-                isModelsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                isModelsPage && "nav-item-active",
               )}
             >
-              <Settings size={14} />
+              <Settings size={16} />
               {!collapsed && t("layout.nav.settings")}
+            </Link>
+            <Link
+              to="/workspace/sessions"
+              title={collapsed ? t("layout.conversations") : undefined}
+              onClick={() => track("workspace_conversations_click")}
+              className={cn(
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5",
+                collapsed ? "justify-center p-2" : "px-3 py-2",
+                location.pathname === "/workspace/sessions" &&
+                  "nav-item-active",
+              )}
+            >
+              <MessageSquare size={16} />
+              {!collapsed && t("layout.conversations")}
             </Link>
           </div>
 
           {/* Conversations section */}
-          <div className={cn(collapsed ? "px-2" : "px-3", "pt-2")}>
-            <div className="border-t border-border pt-2 mb-1.5" />
+          <div className={cn(collapsed ? "px-2" : "px-3", "pt-4")}>
             {!collapsed && (
-              <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
+              <div className="sidebar-section-label">
                 {t("layout.conversations")}
               </div>
             )}
@@ -383,40 +393,14 @@ function WorkspaceLayoutInner() {
                     }}
                     title={collapsed ? (s.title ?? undefined) : undefined}
                     className={cn(
-                      "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer",
-                      collapsed
-                        ? "justify-center p-2"
-                        : "px-2.5 py-2 text-left",
-                      isActive
-                        ? "bg-accent/10 text-accent"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
+                      "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer",
+                      collapsed ? "justify-center p-2" : "px-3 py-1.5",
+                      isActive && "nav-item-active",
                     )}
                   >
-                    {collapsed ? (
-                      <SidebarPlatformIcon platform={s.channelType ?? "web"} />
-                    ) : (
-                      <>
-                        <SidebarPlatformIcon
-                          platform={s.channelType ?? "web"}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] truncate font-medium">
-                            {s.title}
-                          </div>
-                          <div className="text-[10px] text-text-muted truncate">
-                            {formatTime(s.lastMessageAt || s.updatedAt)}
-                            {s.channelType && ` · ${s.channelType}`}
-                          </div>
-                        </div>
-                        <div
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full shrink-0",
-                            s.status === "active"
-                              ? "bg-emerald-500"
-                              : "bg-text-muted/30",
-                          )}
-                        />
-                      </>
+                    <SidebarPlatformIcon platform={s.channelType ?? "web"} />
+                    {!collapsed && (
+                      <span className="truncate text-[12px]">{s.title}</span>
                     )}
                   </button>
                 );

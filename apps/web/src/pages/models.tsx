@@ -1007,12 +1007,8 @@ export function ModelsPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <h2 className="text-[18px] font-semibold text-text-primary mb-1">
-          {t("models.pageTitle")}
-        </h2>
-        <p className="text-[12px] text-text-muted mb-5">
-          {t("settings.pageSubtitle")}
-        </p>
+        <h2 className="heading-page">{t("models.pageTitle")}</h2>
+        <p className="heading-page-desc mb-8">{t("settings.pageSubtitle")}</p>
         <div className="mb-6 flex items-center gap-5 border-b border-border">
           {[
             { id: "general", label: t("settings.tabGeneral") },

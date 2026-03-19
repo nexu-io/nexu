@@ -6,18 +6,12 @@ import {
   ArrowUpRight,
   MessageSquare,
   Sparkles,
-  Unlink,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import "@/lib/api";
-import {
-  deleteApiV1ChannelsByChannelId,
-  getApiV1Channels,
-  getApiV1Sessions,
-} from "../../lib/api/sdk.gen";
+import { getApiV1Channels, getApiV1Sessions } from "../../lib/api/sdk.gen";
 
 function formatRelativeTime(
   date: string | null | undefined,
@@ -199,16 +193,6 @@ export function HomePage() {
   const handleConnected = async () => {
     await queryClient.refetchQueries({ queryKey: ["channels"] });
     setModalChannel(null);
-  };
-
-  const handleDisconnect = async (channelId: string) => {
-    try {
-      await deleteApiV1ChannelsByChannelId({ path: { channelId } });
-      queryClient.invalidateQueries({ queryKey: ["channels"] });
-      toast.success(t("home.disconnected"));
-    } catch {
-      toast.error(t("home.disconnectFailed"));
-    }
   };
 
   const { data: channelsData, isLoading: channelsLoading } = useQuery({
@@ -456,14 +440,11 @@ export function HomePage() {
           </div>
         </div>
 
-        {/* ═══ MIDDLE: Connected channels panel ═══ */}
+        {/* ═══ MIDDLE: Channels panel ═══ */}
         <div className="card card-static">
-          <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+          <div className="px-5 pt-4 pb-3">
             <span className="text-[12px] font-medium text-text-primary">
-              Connected Channels
-            </span>
-            <span className="text-[10px] text-text-muted tabular-nums">
-              {connectedCount} connected
+              Channels
             </span>
           </div>
           <div className="px-5 pb-5">
@@ -473,14 +454,18 @@ export function HomePage() {
                 const connectedChannel = channels.find(
                   (c) => c.channelType === ch.id,
                 );
+                const channelChatUrl = connectedChannel
+                  ? getChatUrl(
+                      ch.id,
+                      connectedChannel.appId,
+                      connectedChannel.botUserId,
+                      connectedChannel.accountId,
+                    )
+                  : "";
                 return (
                   <div
                     key={ch.id}
-                    className={`rounded-xl border px-3 py-3 transition-all ${
-                      isConnected
-                        ? "border-accent/20 bg-accent/5"
-                        : "border-border bg-surface-0"
-                    }`}
+                    className="rounded-xl border border-border bg-surface-0 px-3 py-3"
                   >
                     <div className="flex items-start gap-2.5">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-white shrink-0">
@@ -495,32 +480,22 @@ export function HomePage() {
                             ? t("home.loading")
                             : isConnected
                               ? t("home.connected")
-                              : t("home.notConnected")}
+                              : ""}
                         </div>
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end">
                       {isConnected && connectedChannel ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDisconnect(connectedChannel.id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-red-500 hover:bg-red-500/5 border border-red-500/20 hover:border-red-500/30 transition-colors"
+                        <a
+                          href={channelChatUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
                         >
-                          <Unlink size={12} />
-                          {t("home.disconnect")}
-                        </button>
+                          Chat
+                        </a>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setModalChannel(
-                              ch.id as "feishu" | "slack" | "discord",
-                            )
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border text-text-secondary hover:bg-surface-2 hover:border-border-hover transition-colors"
-                        >
-                          {t("home.connect")}
-                        </button>
+                        <span className="h-[30px]" />
                       )}
                     </div>
                   </div>
