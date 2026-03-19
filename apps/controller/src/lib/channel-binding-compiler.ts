@@ -84,9 +84,8 @@ export function compileChannelsConfig(params: {
     }
 
     if (channel.channelType === "feishu") {
-      const rawConnectionMode = secret("connectionMode");
       const connectionMode =
-        rawConnectionMode === "webhook" ? "webhook" : "websocket";
+        secret("connectionMode") === "webhook" ? "webhook" : "websocket";
       feishuAccounts[channel.accountId] = {
         enabled: true,
         appId: secret("appId") || channel.appId || channel.accountId,
