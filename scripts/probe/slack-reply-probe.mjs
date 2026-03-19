@@ -13,9 +13,6 @@ const defaultProfileDir = path.join(
   "slack-reply-probe",
   "chrome-profile-manual",
 );
-const defaultSlackUrl =
-  process.env.SLACK_PROBE_URL ??
-  "https://app.slack.com/client/T09CNAG1BP0/D0ALH4UB3FE";
 const defaultPrepareUrl = process.env.SLACK_PROBE_PREPARE_URL ?? null;
 const defaultConnectUrl = process.env.SLACK_PROBE_CONNECT_URL ?? null;
 const defaultTimeoutMs = Number(process.env.SLACK_PROBE_TIMEOUT_MS ?? "15000");
@@ -31,7 +28,7 @@ function parseArgs(argv) {
   const options = {
     mode: "send",
     profileDir: defaultProfileDir,
-    slackUrl: defaultSlackUrl,
+    slackUrl: null,
     prepareUrl: defaultPrepareUrl,
     connectUrl: defaultConnectUrl,
     headless: false,
@@ -127,7 +124,7 @@ function printUsage() {
       "Slack Reply Probe",
       "",
       "Usage:",
-      "  pnpm probe:slack                    # send one probe message and wait for reply",
+      "  pnpm probe:slack --url <slack-dm-url>                    # send one probe message and wait for reply",
       "  pnpm probe:slack -- session",
       "  pnpm probe:slack -- inspect",
       "  pnpm probe:slack -- send",
@@ -142,7 +139,7 @@ function printUsage() {
       "  prepare           Open Slack sign-in and wait for a reusable logged-in session",
       "  open              Open the target Slack page with the persistent profile",
       "  --profile-dir     Override the persistent browser profile directory",
-      "  --url             Override the Slack DM URL",
+      "  --url             Slack DM URL to probe (required)",
       "  --prepare-url     Override the initial sign-in URL used by prepare mode",
       "  --connect-url     Reuse an already running Chrome instance over CDP",
       "  --timeout-ms      Override page wait timeout in milliseconds",
@@ -505,12 +502,17 @@ async function openBrowserTarget(options) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const prepareUrl = options.prepareUrl ?? buildPrepareUrl(options.slackUrl);
 
   if (options.mode === "help") {
     printUsage();
     return;
   }
+
+  if (!options.slackUrl) {
+    throw new Error("missing required --url <slack-dm-url>");
+  }
+
+  const prepareUrl = options.prepareUrl ?? buildPrepareUrl(options.slackUrl);
 
   await ensureProfileDirectory(options.profileDir, options.resetProfile);
 
