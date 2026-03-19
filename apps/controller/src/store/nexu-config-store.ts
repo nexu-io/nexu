@@ -377,10 +377,11 @@ export class NexuConfigStore {
       }
     }
 
+    const config = await this.getConfig();
     return this.createBot({
       name: "Nexu Assistant",
       slug: "nexu-assistant",
-      modelId: "anthropic/claude-sonnet-4",
+      modelId: config.runtime.defaultModelId,
     });
   }
 
@@ -398,7 +399,7 @@ export class NexuConfigStore {
       slug: input.slug,
       poolId: input.poolId ?? null,
       status: "active",
-      modelId: input.modelId ?? "anthropic/claude-sonnet-4",
+      modelId: input.modelId ?? (await this.getConfig()).runtime.defaultModelId,
       systemPrompt: input.systemPrompt ?? null,
       createdAt,
       updatedAt: createdAt,
