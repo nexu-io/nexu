@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import {
   mkdir,
+  open,
   readFile,
   readdir,
   rm,
@@ -72,13 +73,29 @@ export class SessionsRuntime {
           const metadata = await stat(filePath);
           const extra = await this.readSessionMetadata(filePath);
           const sessionKey = file.name.replace(/\.jsonl$/, "");
+
+          // When .meta.json lacks title or channelType, try to infer from
+          // the JSONL content (first user message's sender metadata block).
+          let { title, channelType } = extra;
+          if (!title || !channelType) {
+            const hints = await this.inferSessionHints(filePath);
+            if (!channelType && hints.channelType) {
+              channelType = hints.channelType;
+            }
+            if (!title && hints.senderName) {
+              title = channelType
+                ? `${hints.senderName} · ${channelType}`
+                : hints.senderName;
+            }
+          }
+
           sessions.push({
             id: file.name,
             botId: agentEntry.name,
             sessionKey,
-            channelType: extra.channelType ?? null,
+            channelType: channelType ?? null,
             channelId: extra.channelId ?? null,
-            title: extra.title ?? sessionKey,
+            title: title ?? sessionKey,
             status: extra.status ?? "active",
             messageCount: extra.messageCount ?? 0,
             lastMessageAt: extra.lastMessageAt ?? metadata.mtime.toISOString(),
@@ -286,6 +303,113 @@ export class SessionsRuntime {
     } catch {
       return {};
     }
+  }
+
+  /**
+   * Read the first few KB of a JSONL file and extract sender name and
+   * channel type from the first user message's "Sender (untrusted metadata)"
+   * block. This avoids reading the entire (potentially large) session file.
+   */
+  private async inferSessionHints(
+    filePath: string,
+  ): Promise<{ senderName?: string; channelType?: string }> {
+    const READ_BYTES = 16_384; // 16 KB is enough for the first ~20 lines
+    let chunk: string;
+    try {
+      const fh = await open(filePath, "r");
+      try {
+        const buf = Buffer.alloc(READ_BYTES);
+        const { bytesRead } = await fh.read(buf, 0, READ_BYTES, 0);
+        chunk = buf.toString("utf8", 0, bytesRead);
+      } finally {
+        await fh.close();
+      }
+    } catch {
+      return {};
+    }
+
+    for (const line of chunk.split("\n")) {
+      if (!line.trim()) continue;
+      let entry: {
+        type?: string;
+        message?: { role?: string; content?: unknown };
+      };
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (entry.type !== "message" || entry.message?.role !== "user") continue;
+
+      const content = entry.message.content;
+      const text = this.extractTextFromContent(content);
+      if (!text) continue;
+
+      return this.parseSenderHints(text);
+    }
+    return {};
+  }
+
+  private extractTextFromContent(content: unknown): string | undefined {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      for (const part of content) {
+        if (
+          typeof part === "object" &&
+          part !== null &&
+          "type" in part &&
+          (part as { type: string }).type === "text" &&
+          "text" in part
+        ) {
+          return (part as { text: string }).text;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Parse sender name and channel type from the text of a user message.
+   *
+   * OpenClaw injects a "Sender (untrusted metadata)" JSON block at the top
+   * of each user message. The block has `label`, `id`, and optionally `name`.
+   * For Feishu messages the `name` field contains the real user display name,
+   * while `label` typically includes "feishu" for Feishu-originated messages.
+   * For Slack messages `label` typically includes "slack".
+   */
+  private parseSenderHints(text: string): {
+    senderName?: string;
+    channelType?: string;
+  } {
+    // Match the JSON block after "Sender (untrusted metadata):"
+    const match = text.match(
+      /Sender\s+\(untrusted metadata\):\s*```json\s*\n([\s\S]*?)```/,
+    );
+    const jsonBlock = match?.[1];
+    if (!jsonBlock) return {};
+
+    let meta: { label?: string; id?: string; name?: string };
+    try {
+      meta = JSON.parse(jsonBlock);
+    } catch {
+      return {};
+    }
+
+    const senderName = meta.name || meta.label || undefined;
+
+    // Infer channel type from label / id / surrounding text
+    let channelType: string | undefined;
+    const combined =
+      `${meta.label ?? ""} ${meta.id ?? ""} ${text}`.toLowerCase();
+    if (combined.includes("feishu")) {
+      channelType = "feishu";
+    } else if (combined.includes("slack")) {
+      channelType = "slack";
+    } else if (combined.includes("discord")) {
+      channelType = "discord";
+    }
+
+    return { senderName, channelType };
   }
 
   private async writeSessionMetadata(

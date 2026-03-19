@@ -15,20 +15,54 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Strip OpenClaw-injected metadata blocks from user message text.
+ *
+ * OpenClaw prepends each user message with "Conversation info (untrusted
+ * metadata)" and "Sender (untrusted metadata)" JSON blocks followed by a
+ * `[message_id: ...]` line and `senderName: actualMessage`. We extract
+ * only the real user text after the last metadata marker.
+ */
+function stripMetadata(raw: string): string {
+  // Pattern 1 (Feishu/Slack): [message_id: ...]\nsenderName: actualMessage
+  const markerMatch = raw.match(
+    /\[message_id:\s*[^\]]+\]\n(.+?):\s*([\s\S]*)$/,
+  );
+  if (markerMatch?.[2] != null) {
+    return markerMatch[2].trim();
+  }
+  // Pattern 2 (webchat): [Thu 2026-03-19 21:05 GMT+8] actualMessage
+  const tsMatch = raw.match(
+    /^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[+-]\d+\]\s*([\s\S]*)$/,
+  );
+  if (tsMatch?.[1] != null) {
+    return tsMatch[1].trim();
+  }
+  // Fallback: if there's a Sender metadata block, take everything after it
+  const senderBlockEnd = raw.lastIndexOf("```\n\n");
+  if (senderBlockEnd !== -1 && raw.includes("Sender (untrusted metadata)")) {
+    return raw.slice(senderBlockEnd + 5).trim();
+  }
+  return raw;
+}
+
 /** Extract display text from various message content formats. */
 function extractText(msg: Record<string, unknown>): string {
+  let raw = "";
   // Format 1: msg.text (shorthand)
-  if (typeof msg.text === "string") return msg.text;
-  // Format 2: msg.content (string)
-  if (typeof msg.content === "string") return msg.content;
-  // Format 3: msg.content (array of blocks)
-  if (Array.isArray(msg.content)) {
-    return (msg.content as Record<string, unknown>[])
+  if (typeof msg.text === "string") {
+    raw = msg.text;
+  } else if (typeof msg.content === "string") {
+    // Format 2: msg.content (string)
+    raw = msg.content;
+  } else if (Array.isArray(msg.content)) {
+    // Format 3: msg.content (array of blocks)
+    raw = (msg.content as Record<string, unknown>[])
       .filter((b) => b?.type === "text")
       .map((b) => String(b?.text ?? ""))
       .join("\n");
   }
-  return "";
+  return stripMetadata(raw);
 }
 
 /** Millisecond timestamp → HH:mm */
