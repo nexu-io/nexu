@@ -8,6 +8,8 @@ import {
   app,
   crashReporter,
   nativeTheme,
+  powerMonitor,
+  powerSaveBlocker,
   session,
   shell,
 } from "electron";
@@ -30,6 +32,7 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
@@ -188,6 +191,7 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+let sleepGuard: SleepGuard | null = null;
 
 function sendDesktopCommand(
   surface: DesktopSurface,
@@ -334,6 +338,17 @@ function logRendererEvent({
     message,
     logFilePath: getDesktopLogFilePath("desktop-main.log"),
     windowId,
+  });
+}
+
+function logSleepGuard(entry: SleepGuardLogEntry): void {
+  writeDesktopMainLog({
+    source: "sleep-guard",
+    stream: entry.stream,
+    kind: entry.kind,
+    message: entry.message,
+    logFilePath: getDesktopLogFilePath("desktop-main.log"),
+    windowId: getMainWindowId(),
   });
 }
 
@@ -678,7 +693,16 @@ app.whenReady().then(async () => {
   registerIpcHandlers(orchestrator, runtimeConfig);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();
+  sleepGuard = new SleepGuard({
+    powerMonitor,
+    powerSaveBlocker,
+    log: logSleepGuard,
+    onSnapshot: (snapshot) => {
+      diagnosticsReporter?.setSleepGuardSnapshot(snapshot);
+    },
+  });
   const win = createMainWindow();
+  sleepGuard.start("desktop-runtime-active");
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();
@@ -743,6 +767,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  sleepGuard?.dispose("app-before-quit");
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();
