@@ -10,6 +10,7 @@ import type {
   DesktopChromeMode,
   DesktopRuntimeConfig,
   DesktopSurface,
+  DiagnosticsExportResult,
   DiagnosticsInfo,
   RuntimeEvent,
   RuntimeLogEntry,
@@ -24,6 +25,7 @@ import { UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
+  exportDiagnostics,
   getAppInfo,
   getDiagnosticsInfo,
   getRuntimeConfig,
@@ -787,7 +789,8 @@ function EmbeddedControlPlane() {
 type DiagnosticsActionId =
   | "renderer-exception"
   | "renderer-crash"
-  | "main-crash";
+  | "main-crash"
+  | "export";
 
 function DiagnosticsActionCard({
   description,
@@ -828,6 +831,8 @@ function DiagnosticsPage({
   const [lastAction, setLastAction] = useState<string>(
     "Ready for diagnostics.",
   );
+  const [exportResult, setExportResult] =
+    useState<DiagnosticsExportResult | null>(null);
 
   useEffect(() => {
     void Promise.all([getAppInfo(), getDiagnosticsInfo()])
@@ -891,6 +896,21 @@ function DiagnosticsPage({
 
     void runAction("main-crash", async () => {
       await triggerMainProcessCrash();
+    });
+  }, [runAction]);
+
+  const triggerExport = useCallback(() => {
+    setExportResult(null);
+    void runAction("export", async () => {
+      const result = await exportDiagnostics("diagnostics-page");
+      setExportResult(result);
+      if (result.status === "success") {
+        setLastAction(
+          `Diagnostics exported at ${new Date().toLocaleTimeString()}.`,
+        );
+      } else if (result.status === "failed") {
+        setLastAction(`Export failed at ${new Date().toLocaleTimeString()}.`);
+      }
     });
   }, [runAction]);
 
@@ -976,7 +996,22 @@ function DiagnosticsPage({
           label="Test Main Crash"
           onClick={triggerMainCrash}
         />
+        <DiagnosticsActionCard
+          description="Packages logs, diagnostics snapshot, and OpenClaw config into a ZIP file for sharing with the team. Sensitive fields are redacted before export."
+          disabled={busyAction !== null}
+          label={busyAction === "export" ? "Exporting…" : "Export Diagnostics"}
+          onClick={triggerExport}
+        />
       </section>
+
+      {exportResult?.status === "success" ? (
+        <p className="runtime-note diagnostics-note">
+          Exported to: {exportResult.outputPath}
+          {exportResult.warnings && exportResult.warnings.length > 0
+            ? ` (${exportResult.warnings.join("; ")})`
+            : null}
+        </p>
+      ) : null}
 
       <section className="diagnostics-status-card">
         <div>

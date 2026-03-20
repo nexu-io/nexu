@@ -10,6 +10,7 @@ import {
   getDesktopRuntimeConfig,
 } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
+import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
@@ -138,6 +139,16 @@ export function registerIpcHandlers(
             clearNativeCrashAnnotations();
           }, 5000);
           return undefined;
+        }
+
+        case "diagnostics:export": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["diagnostics:export"];
+          return exportDiagnostics({
+            orchestrator,
+            runtimeConfig,
+            source: typedPayload.source,
+          });
         }
 
         case "env:get-controller-base-url": {

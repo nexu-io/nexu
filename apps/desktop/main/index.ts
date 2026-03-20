@@ -16,6 +16,7 @@ import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
+import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
   setComponentUpdater,
@@ -230,6 +231,22 @@ function installApplicationMenu(): void {
     ],
   };
 
+  const helpMenu: MenuItemConstructorOptions = {
+    role: "help",
+    submenu: [
+      {
+        label: "Export Diagnostics…",
+        click: () => {
+          void exportDiagnostics({
+            orchestrator,
+            runtimeConfig,
+            source: "help-menu",
+          }).catch(() => undefined);
+        },
+      },
+    ],
+  };
+
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === "darwin"
       ? ([{ role: "appMenu" }] satisfies MenuItemConstructorOptions[])
@@ -239,6 +256,7 @@ function installApplicationMenu(): void {
     { role: "viewMenu" },
     developMenu,
     { role: "windowMenu" },
+    helpMenu,
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
