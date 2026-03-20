@@ -1,6 +1,0 @@
-apiVersion: v2
-name: nexu
-description: Helm chart for Nexu web, api, and gateway.
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

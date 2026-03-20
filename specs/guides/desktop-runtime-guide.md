@@ -7,9 +7,9 @@ This guide covers desktop-specific working rules, structure, and troubleshooting
 - Optimize first for agent/debugging efficiency, not human-facing control panel UX.
 - Prefer changes inside `apps/desktop/main/`, `apps/desktop/src/`, and `apps/desktop/shared/` when improving local runtime observability.
 - Desktop-internal observability changes may be relatively aggressive when they improve structured diagnostics, event correlation, runtime state introspection, or local log transport reliability.
-- Keep the boundary strict for `apps/web`, `apps/api`, and `apps/gateway`: default to no changes.
-- If touching `apps/web`, `apps/api`, or `apps/gateway` is unavoidable for desktop observability work, limit the change to logging only: log fields, log level, stable reason codes, or propagation of desktop correlation ids.
-- Do not use desktop observability work as a reason to refactor behavior, state models, or interfaces in `apps/web`, `apps/api`, or `apps/gateway`.
+- Keep the boundary strict for `apps/web` and `apps/controller`: default to no changes.
+- If touching `apps/web` or `apps/controller` is unavoidable for desktop observability work, limit the change to logging only: log fields, log level, stable reason codes, or propagation of desktop correlation ids.
+- Do not use desktop observability work as a reason to refactor behavior, state models, or interfaces in `apps/web` or `apps/controller`.
 - Prefer machine-queryable diagnostics over presentation-oriented additions: structured events, reason codes, action ids, session/boot correlation ids, and incremental event streams.
 
 ## Directory structure

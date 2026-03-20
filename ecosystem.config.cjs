@@ -27,18 +27,5 @@ module.exports = {
         OPENCLAW_STATE_DIR: openclawStateDir,
       },
     },
-    {
-      name: "nexu-gateway",
-      cwd: repoRoot,
-      script: "pnpm",
-      args: ["--filter", "@nexu/gateway", "dev"],
-      interpreter: "none",
-      watch: false,
-      autorestart: true,
-      env: {
-        OPENCLAW_STATE_DIR: openclawStateDir,
-        RUNTIME_MANAGE_OPENCLAW_PROCESS: "false",
-      },
-    },
   ],
 };

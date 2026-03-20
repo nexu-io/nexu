@@ -4,7 +4,7 @@
 
 - All channel credentials (bot tokens, signing secrets) encrypted at rest with AES-256-GCM
 - Encryption key: 32-byte hex from `ENCRYPTION_KEY` env var
-- Implementation: `apps/api/src/lib/crypto.ts`
+- Implementation lives in the active controller-side secret and crypto helpers
 - Credentials decrypted only when needed (config generation, signature verification)
 - **Credentials must never appear in logs, error messages, or API responses**
 
@@ -14,14 +14,14 @@
 - Signing secret retrieved from encrypted `channel_credentials`
 - 5-minute timestamp window enforced
 - Timing-safe comparison (`crypto.timingSafeEqual`)
-- Implementation: `apps/api/src/routes/slack-events.ts`
+- Implementation follows the active controller/runtime event handling path
 
 ## Authentication
 
 - better-auth with email/password registration
 - HTTP-only session cookies
 - `authMiddleware` validates session for all `/v1/*` routes
-- Configured in `apps/api/src/auth.ts`
+- Configured in the active controller auth stack
 
 ### Internal API — Two-token model
 
@@ -29,14 +29,14 @@ Internal endpoints (`/api/internal/*`) use a two-tier token system:
 
 | Token | Env var | Purpose | Who holds it |
 |-------|---------|---------|-------------|
-| Internal token | `INTERNAL_API_TOKEN` | Privileged operations (config, secrets mgmt, skill sync) | Gateway sidecar only |
+| Internal token | `INTERNAL_API_TOKEN` | Privileged operations (config, secrets mgmt, skill sync) | Controller-managed local runtime only |
 | Skill token | `SKILL_API_TOKEN` | Skill-facing operations (fetch scoped secrets, record artifacts) | OpenClaw child process (via env) |
 
 **Middleware:**
 - `requireInternalToken(c)` — accepts only `INTERNAL_API_TOKEN`
 - `requireSkillToken(c)` — accepts `SKILL_API_TOKEN` or `INTERNAL_API_TOKEN` (superset)
 - Both use `crypto.timingSafeEqual` for constant-time comparison
-- Implementation: `apps/api/src/middleware/internal-auth.ts`
+- Implementation follows the active controller internal-auth middleware
 
 **Endpoint mapping:**
 
@@ -98,4 +98,3 @@ The gateway strips privileged env vars before spawning the OpenClaw child proces
 - [ ] Encrypted storage for any new secret material
 - [ ] Slack signature verification for any new webhook endpoint
 - [ ] No `ENCRYPTION_KEY` or tokens in committed code
-- [ ] New env vars added to `deploy/helm/nexu/values.yaml`

@@ -70,7 +70,6 @@ created: "2026-03-17"
 - `apps/desktop/preload/index.ts` - preload bootstrap data for renderer Sentry
 - `apps/desktop/shared/host.ts` - shared bridge contracts for diagnostics/bootstrap data
 - `apps/desktop/.env.example` - desktop Sentry env example
-- `deploy/helm/nexu/values.yaml` - desktop Sentry env placeholder
 
 ### Verification summary
 

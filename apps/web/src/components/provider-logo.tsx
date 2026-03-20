@@ -1,52 +1,18 @@
-import Anthropic from "@lobehub/icons/es/Anthropic";
-import Gemini from "@lobehub/icons/es/Gemini";
-import Kimi from "@lobehub/icons/es/Kimi";
-import Minimax from "@lobehub/icons/es/Minimax";
-import OpenAI from "@lobehub/icons/es/OpenAI";
-import OpenRouter from "@lobehub/icons/es/OpenRouter";
-import PPIO from "@lobehub/icons/es/PPIO";
-import SiliconCloud from "@lobehub/icons/es/SiliconCloud";
-import ZAI from "@lobehub/icons/es/ZAI";
-import Zhipu from "@lobehub/icons/es/Zhipu";
-import type { CSSProperties, ComponentType } from "react";
+import { Bot, Brain, type LucideIcon, Orbit, Sparkles } from "lucide-react";
 
-type LobeIconProps = {
-  size?: number | string;
-  style?: CSSProperties;
-  className?: string;
+const PROVIDER_ICONS: Record<string, LucideIcon> = {
+  anthropic: Brain,
+  glm: Sparkles,
+  google: Orbit,
+  kimi: Sparkles,
+  minimax: Bot,
+  moonshot: Sparkles,
+  openai: Bot,
+  openrouter: Orbit,
+  ppio: Sparkles,
+  siliconflow: Orbit,
+  zai: Sparkles,
 };
-
-type LobeIconModule = {
-  default?: unknown;
-  Avatar?: unknown;
-  Color?: unknown;
-};
-
-const LOBE_PROVIDER_ICONS: Record<string, LobeIconModule> = {
-  anthropic: Anthropic as unknown as LobeIconModule,
-  glm: Zhipu as unknown as LobeIconModule,
-  google: Gemini as unknown as LobeIconModule,
-  kimi: Kimi as unknown as LobeIconModule,
-  minimax: Minimax as unknown as LobeIconModule,
-  moonshot: Kimi as unknown as LobeIconModule,
-  openai: OpenAI as unknown as LobeIconModule,
-  openrouter: OpenRouter as unknown as LobeIconModule,
-  ppio: PPIO as unknown as LobeIconModule,
-  siliconflow: SiliconCloud as unknown as LobeIconModule,
-  zai: ZAI as unknown as LobeIconModule,
-};
-
-function asIconComponent(value: unknown): ComponentType<LobeIconProps> | null {
-  if (typeof value === "function") {
-    return value as ComponentType<LobeIconProps>;
-  }
-
-  if (typeof value === "object" && value !== null) {
-    return value as ComponentType<LobeIconProps>;
-  }
-
-  return null;
-}
 
 export function ProviderLogo({
   provider,
@@ -56,18 +22,10 @@ export function ProviderLogo({
   size?: number;
 }) {
   const style = { width: size, height: size };
-  const LobeIcon = LOBE_PROVIDER_ICONS[provider];
+  const ProviderIcon = PROVIDER_ICONS[provider];
 
-  if (LobeIcon) {
-    const PreferredIcon =
-      asIconComponent(LobeIcon.Color) ??
-      asIconComponent(LobeIcon.Avatar) ??
-      asIconComponent(LobeIcon.default) ??
-      asIconComponent(LobeIcon);
-
-    if (PreferredIcon) {
-      return <PreferredIcon size={size} style={{ flex: "none" }} />;
-    }
+  if (ProviderIcon) {
+    return <ProviderIcon size={size} style={{ flex: "none" }} />;
   }
 
   if (provider === "nexu") {

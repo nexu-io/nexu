@@ -24,7 +24,7 @@ The Nexu desktop client (Electron) currently runs fully offline with a local PGl
 └──────────────────────────┬──────────────────────────────────────┘
                            │ HTTP (direct fetch, no IPC relay)
 ┌──────────────────────────▼──────────────────────────────────────┐
-│  Local API — Control Plane (apps/api, desktop mode)             │
+│  Local controller — Control Plane (desktop mode)                │
 │  - Generates deviceId / deviceSecret                            │
 │  - Registers device on cloud                                    │
 │  - Polls cloud for authorization result                         │
@@ -158,7 +158,7 @@ ui -> user : Show "Connected as john@example.com"
 ### 3.1 New table: `desktop_device_authorizations`
 
 ```typescript
-// apps/api/src/db/schema/index.ts
+// cloud backend schema source
 export const desktopDeviceAuthorizations = pgTable("desktop_device_authorizations", {
   pk: serial("pk").primaryKey(),
   id: text("id").notNull().unique(),
@@ -258,7 +258,7 @@ Returns available models and LiteLLM proxy config for the user's plan.
 ### 3.6 New `apiKeyMiddleware`
 
 ```typescript
-// apps/api/src/middleware/api-key-auth.ts
+// cloud backend API key middleware
 export const apiKeyMiddleware = createMiddleware(async (c, next) => {
   const authHeader = c.req.header("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -290,7 +290,7 @@ export const apiKeyMiddleware = createMiddleware(async (c, next) => {
 ### 3.7 Route registration
 
 ```typescript
-// apps/api/src/app.ts
+// cloud backend app registration
 
 // Public (no session required)
 registerDesktopDeviceRoutes(app);   // POST /api/auth/desktop-device-register
@@ -426,7 +426,7 @@ await fetch(`${API_BASE}/api/internal/desktop/cloud-disconnect`, { method: "POST
 The local API must allow CORS from the Electron renderer origin. In desktop mode, add permissive CORS for `localhost` origins:
 
 ```typescript
-// apps/api — desktop mode only
+// apps/controller — desktop mode only
 app.use("/api/internal/desktop/*", cors({ origin: "*" }));
 ```
 
@@ -510,7 +510,7 @@ The local API polls the cloud API directly. No localhost redirect, no new web ro
 
 ## 8. File changelist
 
-### Cloud API (apps/api)
+### Cloud API (external backend)
 
 | File | Action | Description |
 |------|--------|-------------|
@@ -520,7 +520,7 @@ The local API polls the cloud API directly. No localhost redirect, no new web ro
 | `src/middleware/api-key-auth.ts` | New | API key auth middleware |
 | `src/app.ts` | Modify | Register new routes |
 
-### Local API (apps/api, desktop mode)
+### Local controller API (desktop mode)
 
 | File | Action | Description |
 |------|--------|-------------|
@@ -550,7 +550,7 @@ Note: No changes to `shared/host.ts` or `main/ipc.ts` — cloud features use dir
 | `NEXU_CLOUD_URL` | `https://nexu.io` | Desktop | Cloud web + API URL |
 | `NEXU_DESKTOP_MODE` | `false` | Desktop | Enables desktop-only local API routes |
 
-No changes to `deploy/helm/nexu/values.yaml` — these are desktop-only variables.
+No container deploy manifest updates are required — these are desktop-only variables.
 
 ## 10. Edge cases
 
