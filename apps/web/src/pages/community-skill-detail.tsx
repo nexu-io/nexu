@@ -2,7 +2,9 @@ import {
   useInstallSkill,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
+import { useLocale } from "@/hooks/use-locale";
 import "@/lib/api";
+import { getTagLabel } from "@/lib/skill-translations";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -283,6 +285,7 @@ function SkillMdPreview({ content }: { content: string }) {
 
 export function CommunitySkillDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const { t, locale } = useLocale();
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
   const [pendingAction, setPendingAction] = useState<
@@ -340,9 +343,11 @@ export function CommunitySkillDetailPage() {
             className="inline-flex items-center gap-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors mb-6"
           >
             <ArrowLeft size={14} />
-            Back to Skills
+            {t("skillDetail.backToSkills")}
           </Link>
-          <p className="text-[14px] text-text-muted">Skill not found</p>
+          <p className="text-[14px] text-text-muted">
+            {t("skillDetail.notFound")}
+          </p>
         </div>
       </div>
     );
@@ -357,7 +362,7 @@ export function CommunitySkillDetailPage() {
           className="inline-flex items-center gap-1.5 text-[13px] text-text-muted hover:text-text-primary transition-colors mb-6"
         >
           <ArrowLeft size={14} />
-          Back to Skills
+          {t("skillDetail.backToSkills")}
         </Link>
 
         {/* Header */}
@@ -397,7 +402,9 @@ export function CommunitySkillDetailPage() {
               ) : (
                 <Trash2 size={14} />
               )}
-              {pendingAction === "uninstall" ? "Removing..." : "Uninstall"}
+              {pendingAction === "uninstall"
+                ? t("skillDetail.removing")
+                : t("skillDetail.uninstall")}
             </button>
           ) : (
             <button
@@ -416,7 +423,9 @@ export function CommunitySkillDetailPage() {
               ) : (
                 <Download size={14} />
               )}
-              {pendingAction === "install" ? "Installing..." : "Install"}
+              {pendingAction === "install"
+                ? t("skillDetail.installing")
+                : t("skillDetail.install")}
             </button>
           )}
         </div>
@@ -425,12 +434,12 @@ export function CommunitySkillDetailPage() {
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-border">
           <span className="flex items-center gap-1 text-[12px] text-text-muted">
             <Download size={12} />
-            {formatCount(data.downloads)} downloads
+            {formatCount(data.downloads)} {t("skillDetail.downloads")}
           </span>
           {data.stars > 0 && (
             <span className="flex items-center gap-1 text-[12px] text-text-muted">
               <Star size={12} />
-              {formatCount(data.stars)} stars
+              {formatCount(data.stars)} {t("skillDetail.stars")}
             </span>
           )}
           {data.homepage && (
@@ -441,7 +450,7 @@ export function CommunitySkillDetailPage() {
               className="flex items-center gap-1 text-[12px] text-accent hover:underline"
             >
               <ExternalLink size={12} />
-              Homepage
+              {t("skillDetail.homepage")}
             </a>
           )}
           {data.tags.length > 0 && (
@@ -451,7 +460,7 @@ export function CommunitySkillDetailPage() {
                   key={tag}
                   className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium"
                 >
-                  {tag}
+                  {getTagLabel(tag, locale)}
                 </span>
               ))}
             </div>
@@ -469,7 +478,7 @@ export function CommunitySkillDetailPage() {
         {data.files.length > 0 && (
           <div className="mb-6">
             <h3 className="text-[13px] font-semibold text-text-primary mb-2">
-              Files
+              {t("skillDetail.files")}
             </h3>
             <div className="rounded-lg bg-surface-1 border border-border p-3 space-y-1">
               {data.files.map((file) => (

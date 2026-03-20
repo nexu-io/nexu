@@ -1,3 +1,4 @@
+import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { InlineModelSelector } from "@/components/inline-model-selector";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -799,6 +800,9 @@ export function HomePage() {
             )}
           </div>
         </div>
+
+        {/* Activity Feed */}
+        <ActivityFeed />
       </div>
 
       {modalChannel && (

@@ -337,6 +337,91 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Sidebar Vibrancy — macOS-style glass blur effect
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sidebar-vibrancy {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(20px)) {
+  .sidebar-vibrancy {
+    background: var(--color-surface-1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Panel Variants — Dark / Warm theme panels
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Dark Panel — For high-contrast sections or overlays */
+.panel-dark {
+  --panel-bg: #1a1a1a;
+  --panel-bg-subtle: #242424;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-text: #ffffff;
+  --panel-text-muted: rgba(255, 255, 255, 0.6);
+
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  border-color: var(--panel-border);
+}
+
+.panel-dark .text-text-primary {
+  color: var(--panel-text);
+}
+
+.panel-dark .text-text-muted {
+  color: var(--panel-text-muted);
+}
+
+.panel-dark .bg-surface-1 {
+  background: var(--panel-bg-subtle);
+}
+
+.panel-dark .border-border {
+  border-color: var(--panel-border);
+}
+
+/* Warm Panel — Cozy, softer tones */
+.panel-warm {
+  --panel-bg: #faf8f5;
+  --panel-bg-subtle: #f5f2ed;
+  --panel-border: #e8e4dc;
+  --panel-text: #3d3929;
+  --panel-text-muted: #8a846f;
+  --panel-accent: #d4a574;
+
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  border-color: var(--panel-border);
+}
+
+.panel-warm .text-text-primary {
+  color: var(--panel-text);
+}
+
+.panel-warm .text-text-muted {
+  color: var(--panel-text-muted);
+}
+
+.panel-warm .bg-surface-1 {
+  background: var(--panel-bg-subtle);
+}
+
+.panel-warm .border-border {
+  border-color: var(--panel-border);
+}
+
+.panel-warm .text-accent,
+.panel-warm .bg-accent {
+  color: var(--panel-accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Global resets
    ═══════════════════════════════════════════════════════════════════ */
 

@@ -15,6 +15,7 @@ interface ChannelConnectModalProps {
   channelType: ChannelType;
   onClose: () => void;
   onConnected: () => void | Promise<void>;
+  onStartReadinessPolling?: (channelId: string) => void;
   onConnectedChannelCreated?: (channelId: string) => void;
 }
 
@@ -134,6 +135,7 @@ export function ChannelConnectModal({
   channelType,
   onClose,
   onConnected,
+  onStartReadinessPolling,
   onConnectedChannelCreated,
 }: ChannelConnectModalProps) {
   const { t } = useTranslation();
@@ -215,8 +217,10 @@ export function ChannelConnectModal({
       await Promise.resolve(onConnected()).catch(() => {});
       onClose();
 
+      // Start polling for channel readiness after modal closes
       const channelId = data?.id;
       if (channelId) {
+        onStartReadinessPolling?.(channelId);
         onConnectedChannelCreated?.(channelId);
       }
     } catch {

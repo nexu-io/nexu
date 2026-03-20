@@ -51,6 +51,7 @@
       ".opencode/**",
       "specs/**",
       "apps/web/lib/api",
+      "apps/web/public/skill-translations-zh.json",
       "apps/api/migrations/meta/*.json",
       "*.gen.ts",
       "*.d.ts",

@@ -27,13 +27,18 @@ function loadDesktopDevEnv(): void {
     return;
   }
 
-  const controllerEnvPath = resolve(workspaceRoot, "apps/controller/.env");
+  const envPaths = [
+    resolve(workspaceRoot, "apps/controller/.env"),
+    resolve(workspaceRoot, "apps/desktop/.env"),
+  ];
 
-  if (!existsSync(controllerEnvPath)) {
-    return;
+  for (const envPath of envPaths) {
+    if (!existsSync(envPath)) {
+      continue;
+    }
+
+    process.loadEnvFile(envPath);
   }
-
-  process.loadEnvFile(controllerEnvPath);
 }
 
 function configureLocalDevPaths(): void {

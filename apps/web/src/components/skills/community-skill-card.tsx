@@ -3,6 +3,7 @@ import {
   useInstallSkill,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
+import { getTagLabel } from "@/lib/skill-translations";
 import type { MinimalSkill } from "@/types/desktop";
 import { Download, Star } from "lucide-react";
 import { useState } from "react";
@@ -17,9 +18,11 @@ function formatDownloads(count: number): string {
 export function CommunitySkillCard({
   skill,
   isInstalled,
+  locale = "en",
 }: {
   skill: MinimalSkill;
   isInstalled: boolean;
+  locale?: string;
 }) {
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
@@ -96,7 +99,7 @@ export function CommunitySkillCard({
               key={tag}
               className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium truncate"
             >
-              {tag}
+              {getTagLabel(tag, locale)}
             </span>
           ))}
         </div>

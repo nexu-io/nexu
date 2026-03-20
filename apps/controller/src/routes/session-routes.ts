@@ -156,6 +156,54 @@ export function registerSessionRoutes(
 
   app.openapi(
     createRoute({
+      method: "get",
+      path: "/api/v1/sessions/{id}/messages",
+      tags: ["Sessions"],
+      request: {
+        params: sessionIdParamSchema,
+        query: z.object({
+          limit: z.coerce.number().int().min(1).max(500).optional(),
+        }),
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: z.object({
+                messages: z.array(
+                  z.object({
+                    id: z.string(),
+                    role: z.enum(["user", "assistant"]),
+                    content: z.unknown(),
+                    timestamp: z.number().nullable(),
+                    createdAt: z.string().nullable(),
+                  }),
+                ),
+                sessionKey: z.string().nullable(),
+              }),
+            },
+          },
+          description: "Chat messages for the session",
+        },
+        404: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Session not found",
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const { limit } = c.req.valid("query");
+      const result = await container.sessionService.getChatHistory(id, limit);
+      if (result.sessionKey === null) {
+        return c.json({ message: "Session not found" }, 404);
+      }
+      return c.json(result, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/api/v1/sessions/{id}",
       tags: ["Sessions"],

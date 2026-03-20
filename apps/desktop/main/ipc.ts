@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/electron/main";
-import { BrowserWindow, app, ipcMain, shell } from "electron";
+import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -10,6 +10,7 @@ import {
   getDesktopRuntimeConfig,
 } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
+import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
@@ -24,17 +25,39 @@ const nativeCrashTestTitles = {
   renderer: "desktop.renderer.crash",
 } as const;
 
+const nativeCrashAnnotationKeys = {
+  title: "nexu.crash_title",
+  kind: "nexu.crash_kind",
+} as const;
+
+function setNativeCrashAnnotations(
+  title: (typeof nativeCrashTestTitles)[keyof typeof nativeCrashTestTitles],
+): void {
+  crashReporter.addExtraParameter(nativeCrashAnnotationKeys.title, title);
+  crashReporter.addExtraParameter(
+    nativeCrashAnnotationKeys.kind,
+    "native_crash",
+  );
+}
+
+function clearNativeCrashAnnotations(): void {
+  crashReporter.removeExtraParameter(nativeCrashAnnotationKeys.title);
+  crashReporter.removeExtraParameter(nativeCrashAnnotationKeys.kind);
+}
+
 async function prepareNativeCrashScope(
   title: (typeof nativeCrashTestTitles)[keyof typeof nativeCrashTestTitles],
 ): Promise<void> {
+  setNativeCrashAnnotations(title);
+
   if (!Sentry.isInitialized()) {
     return;
   }
 
   const scope = Sentry.getCurrentScope();
-  scope.setTag("nexu.test_title", title);
-  scope.setTag("nexu.test_kind", "native_crash");
-  scope.setExtra("nexu.test_title", title);
+  scope.setTag("nexu.crash_title", title);
+  scope.setTag("nexu.crash_kind", "native_crash");
+  scope.setExtra("nexu.crash_title", title);
   scope.setFingerprint([title]);
 
   await new Promise((resolve) => setTimeout(resolve, 50));
@@ -112,13 +135,27 @@ export function registerIpcHandlers(
 
           await prepareNativeCrashScope(nativeCrashTestTitles.renderer);
           browserWindow.webContents.forcefullyCrashRenderer();
+          setTimeout(() => {
+            clearNativeCrashAnnotations();
+          }, 5000);
           return undefined;
+        }
+
+        case "diagnostics:export": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["diagnostics:export"];
+          return exportDiagnostics({
+            orchestrator,
+            runtimeConfig,
+            source: typedPayload.source,
+          });
         }
 
         case "env:get-controller-base-url": {
           const controllerBaseUrl = getDesktopRuntimeConfig(process.env, {
             appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
+            useBuildConfig: app.isPackaged,
           }).urls.controllerBase;
 
           const result: HostInvokeResultMap["env:get-controller-base-url"] = {
@@ -132,6 +169,7 @@ export function registerIpcHandlers(
           return getDesktopRuntimeConfig(process.env, {
             appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
+            useBuildConfig: app.isPackaged,
           });
         }
 

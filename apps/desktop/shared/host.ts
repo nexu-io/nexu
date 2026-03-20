@@ -6,6 +6,7 @@ export const hostInvokeChannels = [
   "diagnostics:get-info",
   "diagnostics:crash-main",
   "diagnostics:crash-renderer",
+  "diagnostics:export",
   "env:get-controller-base-url",
   "env:get-runtime-config",
   "runtime:get-state",
@@ -42,11 +43,19 @@ export type RuntimeEventQueryResult = {
   nextCursor: number;
 };
 
+export type DiagnosticsExportResult = {
+  status: "success" | "cancelled" | "failed";
+  outputPath?: string;
+  warnings?: string[];
+  errorMessage?: string;
+};
+
 export type HostInvokePayloadMap = {
   "app:get-info": undefined;
   "diagnostics:get-info": undefined;
   "diagnostics:crash-main": undefined;
   "diagnostics:crash-renderer": undefined;
+  "diagnostics:export": { source: "diagnostics-page" | "help-menu" };
   "env:get-controller-base-url": undefined;
   "env:get-runtime-config": undefined;
   "runtime:get-state": undefined;
@@ -83,6 +92,7 @@ export type HostInvokeResultMap = {
   "diagnostics:get-info": DiagnosticsInfo;
   "diagnostics:crash-main": undefined;
   "diagnostics:crash-renderer": undefined;
+  "diagnostics:export": DiagnosticsExportResult;
   "env:get-controller-base-url": {
     controllerBaseUrl: string;
   };

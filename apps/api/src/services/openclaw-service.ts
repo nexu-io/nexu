@@ -505,6 +505,52 @@ export async function getChannelsStatus(): Promise<ChannelsStatusResult> {
 }
 
 /**
+ * Query runtime session list.
+ *
+ * Calls the `sessions.list` RPC, returning OpenClaw's current active session snapshots.
+ *
+ * @throws If the WS is not connected or the RPC fails
+ */
+export async function getRuntimeSessions(params: {
+  limit?: number;
+  includeDerivedTitles?: boolean;
+  includeLastMessage?: boolean;
+  search?: string;
+}): Promise<unknown> {
+  const client = getOpenClawClient();
+  if (!client.isConnected()) {
+    throw new Error("OpenClaw WS not connected");
+  }
+  return client.request("sessions.list", {
+    limit: params.limit ?? 50,
+    includeDerivedTitles: params.includeDerivedTitles ?? true,
+    includeLastMessage: params.includeLastMessage ?? true,
+    ...(params.search ? { search: params.search } : {}),
+  });
+}
+
+/**
+ * Query session chat history.
+ *
+ * Calls the `chat.history` RPC, returning the message list for a given session.
+ *
+ * @throws If the WS is not connected or the RPC fails
+ */
+export async function getRuntimeChatHistory(params: {
+  sessionKey: string;
+  limit?: number;
+}): Promise<unknown> {
+  const client = getOpenClawClient();
+  if (!client.isConnected()) {
+    throw new Error("OpenClaw WS not connected");
+  }
+  return client.request("chat.history", {
+    sessionKey: params.sessionKey,
+    ...(params.limit ? { limit: params.limit } : {}),
+  });
+}
+
+/**
  * Query the readiness state of a single channel.
  *
  * Internally calls getChannelsStatus() and looks up the matching snapshot

@@ -222,6 +222,7 @@ export function createRuntimeUnitManifests(
     {
       openclawBinPath: path.resolve(openclawSidecarRoot, "bin/openclaw"),
       resourcesPath: isPackaged ? electronRoot : undefined,
+      useBuildConfig: isPackaged,
     },
   );
   const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));

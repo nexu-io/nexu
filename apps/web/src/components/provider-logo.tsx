@@ -1,22 +1,51 @@
-const S = { width: 16, height: 16 };
+import Anthropic from "@lobehub/icons/es/Anthropic";
+import Gemini from "@lobehub/icons/es/Gemini";
+import Kimi from "@lobehub/icons/es/Kimi";
+import Minimax from "@lobehub/icons/es/Minimax";
+import OpenAI from "@lobehub/icons/es/OpenAI";
+import OpenRouter from "@lobehub/icons/es/OpenRouter";
+import PPIO from "@lobehub/icons/es/PPIO";
+import SiliconCloud from "@lobehub/icons/es/SiliconCloud";
+import ZAI from "@lobehub/icons/es/ZAI";
+import Zhipu from "@lobehub/icons/es/Zhipu";
+import type { CSSProperties, ComponentType } from "react";
 
-function ImageLogo({
-  alt,
-  size,
-  src,
-}: {
-  alt: string;
-  size: number;
-  src: string;
-}) {
-  return (
-    <img
-      alt={alt}
-      src={src}
-      style={{ width: size, height: size }}
-      className="object-contain"
-    />
-  );
+type LobeIconProps = {
+  size?: number | string;
+  style?: CSSProperties;
+  className?: string;
+};
+
+type LobeIconModule = {
+  default?: unknown;
+  Avatar?: unknown;
+  Color?: unknown;
+};
+
+const LOBE_PROVIDER_ICONS: Record<string, LobeIconModule> = {
+  anthropic: Anthropic as unknown as LobeIconModule,
+  glm: Zhipu as unknown as LobeIconModule,
+  google: Gemini as unknown as LobeIconModule,
+  kimi: Kimi as unknown as LobeIconModule,
+  minimax: Minimax as unknown as LobeIconModule,
+  moonshot: Kimi as unknown as LobeIconModule,
+  openai: OpenAI as unknown as LobeIconModule,
+  openrouter: OpenRouter as unknown as LobeIconModule,
+  ppio: PPIO as unknown as LobeIconModule,
+  siliconflow: SiliconCloud as unknown as LobeIconModule,
+  zai: ZAI as unknown as LobeIconModule,
+};
+
+function asIconComponent(value: unknown): ComponentType<LobeIconProps> | null {
+  if (typeof value === "function") {
+    return value as ComponentType<LobeIconProps>;
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return value as ComponentType<LobeIconProps>;
+  }
+
+  return null;
 }
 
 export function ProviderLogo({
@@ -26,114 +55,44 @@ export function ProviderLogo({
   provider: string;
   size?: number;
 }) {
-  const s = { width: size, height: size };
-  switch (provider) {
-    case "anthropic":
-      return (
-        <svg
-          style={s}
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          role="img"
-          aria-label="Anthropic"
-        >
-          <path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.258 0h3.767L16.906 20.48h-3.674l-1.476-3.914H5.036l-1.466 3.914H0L6.569 3.52zm.658 10.418h4.543L9.548 7.04l-2.32 6.898z" />
-        </svg>
-      );
-    case "openai":
-      return (
-        <svg
-          style={s}
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          role="img"
-          aria-label="OpenAI"
-        >
-          <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.998 5.998 0 0 0-3.998 2.9 6.042 6.042 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z" />
-        </svg>
-      );
-    case "google":
-      return (
-        <svg style={s} viewBox="0 0 24 24" role="img" aria-label="Google">
-          <path
-            fill="#4285F4"
-            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-          />
-          <path
-            fill="#34A853"
-            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-          />
-          <path
-            fill="#FBBC05"
-            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-          />
-          <path
-            fill="#EA4335"
-            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-          />
-        </svg>
-      );
-    case "siliconflow":
-      return (
-        <ImageLogo
-          alt="SiliconFlow"
-          size={size}
-          src="/provider-logos/siliconflow.png"
-        />
-      );
-    case "ppio":
-      return (
-        <ImageLogo alt="PPIO" size={size} src="/provider-logos/ppio.png" />
-      );
-    case "openrouter":
-      return (
-        <ImageLogo
-          alt="OpenRouter"
-          size={size}
-          src="/provider-logos/openrouter.png"
-        />
-      );
-    case "minimax":
-      return (
-        <ImageLogo
-          alt="MiniMax"
-          size={size}
-          src="/provider-logos/minimax.png"
-        />
-      );
-    case "kimi":
-    case "moonshot":
-      return (
-        <ImageLogo alt="Kimi" size={size} src="/provider-logos/moonshot.webp" />
-      );
-    case "glm":
-    case "zai":
-      return (
-        <ImageLogo alt="GLM" size={size} src="/provider-logos/zhipu.png" />
-      );
-    case "nexu":
-      return (
-        <svg
-          style={s}
-          viewBox="0 0 800 800"
-          fill="currentColor"
-          role="img"
-          aria-label="Nexu"
-        >
-          <path d="M193.435 0C300.266 0 386.869 86.6036 386.869 193.435V345.42C386.869 368.312 368.311 386.87 345.419 386.87H41.4502C18.5579 386.87 0 368.311 0 345.419V193.435C0 86.6036 86.6036 0 193.435 0ZM180.539 206.328V386.867H206.331V206.328H180.539Z" />
-          <path d="M606.095 799.53C499.264 799.53 412.661 712.926 412.661 606.095L412.661 454.11C412.661 431.217 431.219 412.659 454.111 412.659L758.08 412.659C780.972 412.659 799.53 431.218 799.53 454.111L799.53 606.095C799.53 712.926 712.926 799.53 606.095 799.53ZM618.991 593.2L618.991 412.661L593.2 412.661L593.2 593.2L618.991 593.2Z" />
-          <path d="M799.531 193.447C799.531 193.551 799.53 193.655 799.53 193.759L799.53 193.134C799.53 193.238 799.531 193.343 799.531 193.447ZM412.662 193.447C412.662 86.6158 499.265 0.0122032 606.096 0.0121986C708.589 0.0121941 792.462 79.725 799.105 180.537L618.991 180.537L618.991 206.329L799.107 206.329C792.478 307.154 708.598 386.881 606.096 386.881C499.265 386.881 412.662 300.278 412.662 193.447Z" />
-          <path d="M-8.45487e-06 606.105C-1.0587e-05 557.327 18.0554 512.768 47.8447 478.741L148.407 579.303L166.645 561.066L66.082 460.504C100.109 430.715 144.667 412.66 193.444 412.66C240.179 412.66 283.043 429.237 316.478 456.83L212.225 561.084L230.462 579.322L335.244 474.538C367.28 509.055 386.869 555.285 386.869 606.09C386.869 654.866 368.812 699.424 339.022 733.45L227.657 622.084L209.42 640.322L320.784 751.688C286.758 781.475 242.203 799.53 193.43 799.53C142.628 799.53 96.4006 779.944 61.8848 747.913L169.45 640.348L151.213 622.111L44.1758 729.148C16.5783 695.712 1.56674e-05 652.844 -8.45487e-06 606.105Z" />
-        </svg>
-      );
-    default:
-      return (
-        <span
-          className="flex items-center justify-center rounded text-[9px] font-bold bg-surface-3 text-text-muted"
-          style={S}
-        >
-          {(provider[0] ?? "?").toUpperCase()}
-        </span>
-      );
+  const style = { width: size, height: size };
+  const LobeIcon = LOBE_PROVIDER_ICONS[provider];
+
+  if (LobeIcon) {
+    const PreferredIcon =
+      asIconComponent(LobeIcon.Color) ??
+      asIconComponent(LobeIcon.Avatar) ??
+      asIconComponent(LobeIcon.default) ??
+      asIconComponent(LobeIcon);
+
+    if (PreferredIcon) {
+      return <PreferredIcon size={size} style={{ flex: "none" }} />;
+    }
   }
+
+  if (provider === "nexu") {
+    return (
+      <svg
+        style={style}
+        viewBox="0 0 800 800"
+        fill="currentColor"
+        role="img"
+        aria-label="Nexu"
+      >
+        <path d="M193.435 0C300.266 0 386.869 86.6036 386.869 193.435V345.42C386.869 368.312 368.311 386.87 345.419 386.87H41.4502C18.5579 386.87 0 368.311 0 345.419V193.435C0 86.6036 86.6036 0 193.435 0ZM180.539 206.328V386.867H206.331V206.328H180.539Z" />
+        <path d="M606.095 799.53C499.264 799.53 412.661 712.926 412.661 606.095L412.661 454.11C412.661 431.217 431.219 412.659 454.111 412.659L758.08 412.659C780.972 412.659 799.53 431.218 799.53 454.111L799.53 606.095C799.53 712.926 712.926 799.53 606.095 799.53ZM618.991 593.2L618.991 412.661L593.2 412.661L593.2 593.2L618.991 593.2Z" />
+        <path d="M799.531 193.447C799.531 193.551 799.53 193.655 799.53 193.759L799.53 193.134C799.53 193.238 799.531 193.343 799.531 193.447ZM412.662 193.447C412.662 86.6158 499.265 0.0122032 606.096 0.0121986C708.589 0.0121941 792.462 79.725 799.105 180.537L618.991 180.537L618.991 206.329L799.107 206.329C792.478 307.154 708.598 386.881 606.096 386.881C499.265 386.881 412.662 300.278 412.662 193.447Z" />
+        <path d="M-8.45487e-06 606.105C-1.0587e-05 557.327 18.0554 512.768 47.8447 478.741L148.407 579.303L166.645 561.066L66.082 460.504C100.109 430.715 144.667 412.66 193.444 412.66C240.179 412.66 283.043 429.237 316.478 456.83L212.225 561.084L230.462 579.322L335.244 474.538C367.28 509.055 386.869 555.285 386.869 606.09C386.869 654.866 368.812 699.424 339.022 733.45L227.657 622.084L209.42 640.322L320.784 751.688C286.758 781.475 242.203 799.53 193.43 799.53C142.628 799.53 96.4006 779.944 61.8848 747.913L169.45 640.348L151.213 622.111L44.1758 729.148C16.5783 695.712 1.56674e-05 652.844 -8.45487e-06 606.105Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <span
+      className="flex items-center justify-center rounded text-[9px] font-bold bg-surface-3 text-text-muted"
+      style={style}
+    >
+      {(provider[0] ?? "?").toUpperCase()}
+    </span>
+  );
 }

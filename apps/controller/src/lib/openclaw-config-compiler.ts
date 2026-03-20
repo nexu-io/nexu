@@ -133,8 +133,38 @@ function buildModelEntry(id: string, name?: string) {
   };
 }
 
-function compileModelsConfig(config: NexuConfig): OpenClawConfig["models"] {
+function collectLitellmModelIds(config: NexuConfig): string[] {
+  const selectedModelId = getDesktopSelectedModel(config);
+  const candidateIds = [
+    ...config.bots.map((bot) => bot.modelId),
+    config.runtime.defaultModelId,
+    selectedModelId,
+  ];
+
+  return [...new Set(candidateIds)]
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    )
+    .map((value) => value.replace(/^litellm\//, ""))
+    .filter((value) => !value.startsWith("link/"));
+}
+
+function compileModelsConfig(
+  config: NexuConfig,
+  env: ControllerEnv,
+): OpenClawConfig["models"] {
   const providers: NonNullable<OpenClawConfig["models"]>["providers"] = {};
+
+  if (env.litellmBaseUrl && env.litellmApiKey) {
+    providers.litellm = {
+      baseUrl: env.litellmBaseUrl,
+      apiKey: env.litellmApiKey,
+      api: "openai-completions",
+      models: collectLitellmModelIds(config).map((modelId) =>
+        buildModelEntry(modelId),
+      ),
+    };
+  }
 
   for (const provider of config.providers.filter(
     (item) => item.enabled && item.apiKey !== null,
@@ -192,7 +222,11 @@ function compileModelsConfig(config: NexuConfig): OpenClawConfig["models"] {
     : undefined;
 }
 
-function resolveModelId(config: NexuConfig, rawModelId: string): string {
+function resolveModelId(
+  config: NexuConfig,
+  env: ControllerEnv,
+  rawModelId: string,
+): string {
   if (rawModelId.startsWith("litellm/") || rawModelId.startsWith("link/")) {
     return rawModelId;
   }
@@ -242,6 +276,10 @@ function resolveModelId(config: NexuConfig, rawModelId: string): string {
     }
   }
 
+  if (env.litellmBaseUrl && env.litellmApiKey) {
+    return `litellm/${rawModelId}`;
+  }
+
   return rawModelId;
 }
 
@@ -258,7 +296,7 @@ function compileAgentList(
       workspace: `${env.openclawStateDir}/agents/${bot.id}`,
       default: index === 0,
       model: bot.modelId
-        ? { primary: resolveModelId(config, bot.modelId) }
+        ? { primary: resolveModelId(config, env, bot.modelId) }
         : undefined,
     }));
 }
@@ -288,6 +326,7 @@ export function compileOpenClawConfig(
   const firstBotModel = activeBots[0]?.modelId ?? null;
   const defaultModelId = resolveModelId(
     config,
+    env,
     firstBotModel ??
       getDesktopSelectedModel(config) ??
       config.runtime.defaultModelId,
@@ -368,7 +407,7 @@ export function compileOpenClawConfig(
       ackReactionScope: "group-mentions",
       removeAckAfterReply: true,
     },
-    models: compileModelsConfig(config),
+    models: compileModelsConfig(config, env),
     channels: compileChannelsConfig({
       channels: config.channels,
       secrets: config.secrets,

@@ -5,6 +5,8 @@ import {
   useRefreshCatalog,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
+import { useLocale } from "@/hooks/use-locale";
+import { getTagLabel } from "@/lib/skill-translations";
 import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
 import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
@@ -166,6 +168,7 @@ function SkillCard({
 
 export function SkillsPage() {
   const { t } = useTranslation();
+  const { locale } = useLocale();
   const { data, isLoading, isError } = useCommunitySkills();
   const refreshMutation = useRefreshCatalog();
 
@@ -260,11 +263,8 @@ export function SkillsPage() {
 
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q) ||
-          s.slug.toLowerCase().includes(q),
+      list = list.filter((s) =>
+        [s.slug, s.name, s.description].join("\n").toLowerCase().includes(q),
       );
     }
 
@@ -307,8 +307,8 @@ export function SkillsPage() {
   const categoryTabs = useMemo(() => {
     const base =
       topTab === "explore"
-        ? [{ id: "all", label: "All", count: exploreSkills.length }]
-        : [{ id: "all", label: "All", count: yourSkillsList.length }];
+        ? [{ id: "all", label: t("skills.all"), count: exploreSkills.length }]
+        : [{ id: "all", label: t("skills.all"), count: yourSkillsList.length }];
 
     const tagTabs = topTags
       .filter((t) => {
@@ -319,13 +319,13 @@ export function SkillsPage() {
         const skills = topTab === "explore" ? exploreSkills : yourSkillsList;
         return {
           id: t.tag,
-          label: t.tag,
+          label: getTagLabel(t.tag, locale),
           count: skills.filter((s) => s.tags.includes(t.tag)).length,
         };
       });
 
     return [...base, ...tagTabs];
-  }, [topTab, exploreSkills, yourSkillsList, topTags]);
+  }, [topTab, exploreSkills, yourSkillsList, topTags, locale, t]);
 
   // Yours sub-tab counts
   const recommendedCount = yourSkillsList.filter((s) =>
@@ -569,7 +569,9 @@ export function SkillsPage() {
                 key={skill.slug}
                 skill={skill}
                 isInstalled={installedSlugs.has(skill.slug)}
-                categoryLabel={firstTag}
+                categoryLabel={
+                  firstTag ? getTagLabel(firstTag, locale) : undefined
+                }
               />
             );
           })}

@@ -52,4 +52,8 @@ export class SessionService {
   async deleteSession(id: string) {
     return this.sessionsRuntime.deleteSession(id);
   }
+
+  async getChatHistory(id: string, limit?: number) {
+    return this.sessionsRuntime.getChatHistory(id, limit);
+  }
 }

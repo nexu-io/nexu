@@ -213,10 +213,13 @@ export function getDesktopRuntimeConfig(
     appVersion?: string;
     openclawBinPath?: string;
     resourcesPath?: string;
+    useBuildConfig?: boolean;
   },
 ): DesktopRuntimeConfig {
-  // Load build-time config (for packaged apps)
-  const buildConfig = loadBuildConfig(defaults?.resourcesPath);
+  const buildConfig =
+    defaults?.useBuildConfig === false
+      ? {}
+      : loadBuildConfig(defaults?.resourcesPath);
   const buildSource = normalizeBuildSource(
     env.NEXU_DESKTOP_BUILD_SOURCE ?? buildConfig.NEXU_DESKTOP_BUILD_SOURCE,
   );
