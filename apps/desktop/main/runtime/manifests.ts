@@ -225,9 +225,7 @@ export function createRuntimeUnitManifests(
       useBuildConfig: isPackaged,
     },
   );
-  const logsDir = ensureDir(
-    path.resolve(userDataPath, "../logs/runtime-units"),
-  );
+  const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(
     path.resolve(openclawRuntimeRoot, "config"),

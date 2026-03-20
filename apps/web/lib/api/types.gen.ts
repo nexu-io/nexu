@@ -1797,49 +1797,6 @@ export type GetApiV1ArtifactsByIdResponses = {
 
 export type GetApiV1ArtifactsByIdResponse = GetApiV1ArtifactsByIdResponses[keyof GetApiV1ArtifactsByIdResponses];
 
-export type GetApiV1SkillsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/skills';
-};
-
-export type GetApiV1SkillsResponses = {
-    /**
-     * Skills catalog
-     */
-    200: {
-        skills: {
-            version?: number;
-            defaults?: {
-                enabled?: boolean;
-                source?: 'inline' | 'local-path';
-            };
-            items?: {
-                [key: string]: {
-                    name: string;
-                    enabled?: boolean;
-                    source?: 'inline' | 'local-path';
-                    content?: string;
-                    localPath?: string;
-                    files?: {
-                        [key: string]: string;
-                    };
-                    metadata?: {
-                        title?: string;
-                        description?: string;
-                        owner?: string;
-                        tags?: Array<string>;
-                        category?: string;
-                    };
-                };
-            };
-        };
-    };
-};
-
-export type GetApiV1SkillsResponse = GetApiV1SkillsResponses[keyof GetApiV1SkillsResponses];
-
 export type GetApiInternalSkillsLatestData = {
     body?: never;
     path?: never;

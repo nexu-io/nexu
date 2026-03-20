@@ -189,7 +189,9 @@ async function stapleNotarizedAppBundles() {
     return;
   }
 
-  const releaseRoot = resolve(electronRoot, "release");
+  const releaseRoot = process.env.NEXU_DESKTOP_RELEASE_DIR
+    ? resolve(process.env.NEXU_DESKTOP_RELEASE_DIR)
+    : resolve(electronRoot, "release");
   const releaseEntries = await readdir(releaseRoot, { withFileTypes: true });
   const appBundleDirs = releaseEntries.filter(
     (entry) => entry.isDirectory() && entry.name.startsWith("mac-"),
@@ -254,10 +256,10 @@ async function ensureBuildConfig() {
   const config = {
     ...existingConfig,
     NEXU_CLOUD_URL:
-      existingConfig.NEXU_CLOUD_URL ??
       merged.NEXU_CLOUD_URL ??
+      existingConfig.NEXU_CLOUD_URL ??
       "https://nexu.io",
-    NEXU_LINK_URL: existingConfig.NEXU_LINK_URL ?? merged.NEXU_LINK_URL ?? null,
+    NEXU_LINK_URL: merged.NEXU_LINK_URL ?? existingConfig.NEXU_LINK_URL ?? null,
     NEXU_DESKTOP_APP_VERSION:
       existingConfig.NEXU_DESKTOP_APP_VERSION ??
       merged.NEXU_DESKTOP_APP_VERSION ??
@@ -278,6 +280,14 @@ async function ensureBuildConfig() {
       ? {
           NEXU_UPDATE_FEED_URL:
             existingConfig.NEXU_UPDATE_FEED_URL ?? merged.NEXU_UPDATE_FEED_URL,
+        }
+      : {}),
+    ...((existingConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
+    merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED)
+      ? {
+          NEXU_DESKTOP_AUTO_UPDATE_ENABLED:
+            existingConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
+            merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
         }
       : {}),
     NEXU_DESKTOP_BUILD_SOURCE:
@@ -337,6 +347,9 @@ async function main() {
     ...desktopEnv,
     NEXU_WORKSPACE_ROOT: repoRoot,
   };
+  const releaseRoot = env.NEXU_DESKTOP_RELEASE_DIR
+    ? resolve(env.NEXU_DESKTOP_RELEASE_DIR)
+    : resolve(electronRoot, "release");
   const {
     APPLE_ID: appleId,
     APPLE_APP_SPECIFIC_PASSWORD: appleAppSpecificPassword,
@@ -359,7 +372,7 @@ async function main() {
   const controllerPort =
     process.env.NEXU_CONTROLLER_PORT ?? process.env.NEXU_API_PORT ?? "50800";
 
-  await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
+  await rm(releaseRoot, rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
 
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], {
@@ -418,6 +431,7 @@ async function main() {
       "never",
       `--config.electronVersion=${electronVersion}`,
       `--config.buildVersion=${buildVersion}`,
+      `--config.directories.output=${releaseRoot}`,
       ...(isUnsigned
         ? ["--config.mac.identity=null", "--config.mac.hardenedRuntime=false"]
         : []),

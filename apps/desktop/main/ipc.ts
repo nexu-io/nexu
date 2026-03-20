@@ -63,7 +63,7 @@ async function prepareNativeCrashScope(
   await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
-export function setUpdateManager(manager: UpdateManager): void {
+export function setUpdateManager(manager: UpdateManager | null): void {
   updateManager = manager;
 }
 

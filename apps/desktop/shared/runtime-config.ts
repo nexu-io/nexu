@@ -21,6 +21,7 @@ type BuildConfig = {
   NEXU_CLOUD_URL?: string;
   NEXU_LINK_URL?: string | null;
   NEXU_UPDATE_FEED_URL?: string;
+  NEXU_DESKTOP_AUTO_UPDATE_ENABLED?: string;
   NEXU_DESKTOP_APP_VERSION?: string;
   NEXU_DESKTOP_SENTRY_DSN?: string;
   NEXU_DESKTOP_BUILD_SOURCE?: string;
@@ -73,6 +74,10 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
       NEXU_DESKTOP_APP_VERSION: readBuildConfigString(
         record,
         "NEXU_DESKTOP_APP_VERSION",
+      ),
+      NEXU_DESKTOP_AUTO_UPDATE_ENABLED: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_AUTO_UPDATE_ENABLED",
       ),
       NEXU_DESKTOP_SENTRY_DSN: readBuildConfigString(
         record,
@@ -163,8 +168,18 @@ function normalizeBuildSource(value: string | undefined): DesktopBuildSource {
   }
 }
 
+function parseEnvBoolean(value: string | undefined): boolean | null {
+  if (value === undefined) return null;
+  if (value === "1" || value.toLowerCase() === "true") return true;
+  if (value === "0" || value.toLowerCase() === "false") return false;
+  return null;
+}
+
 export type DesktopRuntimeConfig = {
   buildInfo: DesktopBuildInfo;
+  updates: {
+    autoUpdateEnabled: boolean;
+  };
   ports: {
     controller: number;
     web: number;
@@ -205,6 +220,14 @@ export function getDesktopRuntimeConfig(
     defaults?.useBuildConfig === false
       ? {}
       : loadBuildConfig(defaults?.resourcesPath);
+  const buildSource = normalizeBuildSource(
+    env.NEXU_DESKTOP_BUILD_SOURCE ?? buildConfig.NEXU_DESKTOP_BUILD_SOURCE,
+  );
+  const autoUpdateEnabled =
+    parseEnvBoolean(
+      env.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
+        buildConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
+    ) ?? true;
   const fallbackPackageVersion =
     readPackagedAppVersion(defaults?.resourcesPath) ??
     readDesktopPackageVersion();
@@ -246,9 +269,7 @@ export function getDesktopRuntimeConfig(
         env.npm_package_version ??
         fallbackPackageVersion ??
         "0.0.0",
-      source: normalizeBuildSource(
-        env.NEXU_DESKTOP_BUILD_SOURCE ?? buildConfig.NEXU_DESKTOP_BUILD_SOURCE,
-      ),
+      source: buildSource,
       branch:
         env.NEXU_DESKTOP_BUILD_BRANCH ??
         buildConfig.NEXU_DESKTOP_BUILD_BRANCH ??
@@ -261,6 +282,9 @@ export function getDesktopRuntimeConfig(
         env.NEXU_DESKTOP_BUILD_TIME ??
         buildConfig.NEXU_DESKTOP_BUILD_TIME ??
         null,
+    },
+    updates: {
+      autoUpdateEnabled,
     },
     ports,
     urls,

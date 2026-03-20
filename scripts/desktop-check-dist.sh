@@ -7,12 +7,12 @@ release_dir="${PACKAGED_RELEASE_DIR:-${NEXU_DESKTOP_RELEASE_DIR:-apps/desktop/re
 capture_dir="${NEXU_DESKTOP_CHECK_CAPTURE_DIR:-.tmp/desktop-ci-test}"
 tmp_dir="${NEXU_DESKTOP_CHECK_TMPDIR:-${TMPDIR:-/tmp}/desktop-tmp}"
 packaged_home="${PACKAGED_HOME:-.tmp/desktop-dist-home}"
-packaged_logs_dir="${PACKAGED_LOGS_DIR:-$packaged_home/Library/Logs/Nexu}"
-packaged_user_data_dir="${PACKAGED_USER_DATA_DIR:-$packaged_home/Library/Application Support/Nexu}"
-packaged_runtime_logs_dir="${PACKAGED_RUNTIME_LOGS_DIR:-$packaged_home/Library/Application Support/logs/runtime-units}"
-default_logs_dir="${DEFAULT_LOGS_DIR:-$HOME/Library/Logs/Nexu}"
+packaged_user_data_dir="${PACKAGED_USER_DATA_DIR:-$packaged_home/Library/Application Support/@nexu/desktop}"
+packaged_logs_dir="${PACKAGED_LOGS_DIR:-$packaged_user_data_dir/logs}"
+packaged_runtime_logs_dir="${PACKAGED_RUNTIME_LOGS_DIR:-$packaged_logs_dir/runtime-units}"
+default_logs_dir="${DEFAULT_LOGS_DIR:-$HOME/Library/Application Support/@nexu/desktop/logs}"
 default_user_data_dir="${DEFAULT_USER_DATA_DIR:-$HOME/Library/Application Support/@nexu/desktop}"
-default_runtime_logs_dir="${DEFAULT_RUNTIME_LOGS_DIR:-$HOME/Library/Application Support/logs/runtime-units}"
+default_runtime_logs_dir="${DEFAULT_RUNTIME_LOGS_DIR:-$default_logs_dir/runtime-units}"
 
 if [ -n "${PACKAGED_APP:-}" ]; then
   packaged_app="$PACKAGED_APP"
@@ -37,6 +37,20 @@ packaged_log_path="$capture_dir/packaged-app.log"
 pid_path="$capture_dir/packaged-app.pid"
 app_pid=""
 exit_code=0
+
+absolutize_path() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) printf '%s\n' "$PWD/$1" ;;
+  esac
+}
+
+capture_dir="$(absolutize_path "$capture_dir")"
+tmp_dir="$(absolutize_path "$tmp_dir")"
+packaged_home="$(absolutize_path "$packaged_home")"
+packaged_user_data_dir="$(absolutize_path "$packaged_user_data_dir")"
+packaged_logs_dir="$(absolutize_path "$packaged_logs_dir")"
+packaged_runtime_logs_dir="$(absolutize_path "$packaged_runtime_logs_dir")"
 
 if [ ! -x "$packaged_executable" ]; then
   echo "Packaged executable is missing or not executable: $packaged_executable" >&2
@@ -74,6 +88,7 @@ export DEFAULT_LOGS_DIR="$default_logs_dir"
 export DEFAULT_USER_DATA_DIR="$default_user_data_dir"
 export DEFAULT_RUNTIME_LOGS_DIR="$default_runtime_logs_dir"
 export NEXU_DESKTOP_PACKAGED_PID_PATH="$pid_path"
+export NEXU_DESKTOP_USER_DATA_ROOT="$packaged_user_data_dir"
 
 HOME="$packaged_home" TMPDIR="$tmp_dir" "$packaged_executable" \
   > "$packaged_log_path" 2>&1 &

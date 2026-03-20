@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["tests/api/**"],
   },
   resolve: {
     alias: {

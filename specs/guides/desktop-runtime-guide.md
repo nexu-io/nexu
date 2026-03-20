@@ -42,6 +42,13 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 
 ## Common troubleshooting
 
+- `a locally packaged app needs build-time overrides`
+  - Put local-only packaged-app settings in `apps/desktop/.env` and keep that file untracked.
+  - Start from `apps/desktop/.env.example`.
+  - `apps/desktop/scripts/dist-mac.mjs` reads `apps/desktop/.env` during packaging and bakes those values into `apps/desktop/build-config.json` for the packaged app to read at runtime.
+  - Use this for packaged-app-only flags such as `NEXU_DESKTOP_AUTO_UPDATE_ENABLED=false` when you want a local build to skip update checks.
+  - Use `NEXU_DESKTOP_RELEASE_DIR=/absolute/output/path` when you want packaged artifacts written somewhere other than `apps/desktop/release`.
+
 - `desktop won't cold start`
   - Start with `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.

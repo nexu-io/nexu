@@ -1,10 +1,7 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { runtimeSkillsResponseSchema } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
-import {
-  controllerSkillUpsertBodySchema,
-  controllerSkillsSchema,
-} from "../store/schemas.js";
+import { controllerSkillUpsertBodySchema } from "../store/schemas.js";
 import type { ControllerBindings } from "../types.js";
 
 const skillNameParamSchema = z.object({ name: z.string() });
@@ -13,26 +10,6 @@ export function registerSkillRoutes(
   app: OpenAPIHono<ControllerBindings>,
   container: ControllerContainer,
 ): void {
-  app.openapi(
-    createRoute({
-      method: "get",
-      path: "/api/v1/skills",
-      tags: ["Skills"],
-      responses: {
-        200: {
-          content: {
-            "application/json": {
-              schema: z.object({ skills: controllerSkillsSchema }),
-            },
-          },
-          description: "Skills catalog",
-        },
-      },
-    }),
-    async (c) =>
-      c.json({ skills: await container.skillService.getSkills() }, 200),
-  );
-
   app.openapi(
     createRoute({
       method: "get",
