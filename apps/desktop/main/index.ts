@@ -7,6 +7,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  nativeTheme,
   session,
   shell,
 } from "electron";
@@ -38,6 +39,7 @@ const __dirname = dirname(__filename);
 
 // Set display name early (matches productName in package.json).
 app.setName("Nexu");
+nativeTheme.themeSource = "light";
 
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
@@ -478,7 +480,7 @@ function createMainWindow(): BrowserWindow {
       ? {
           transparent: true,
           vibrancy: "sidebar" as const,
-          visualEffectState: "active" as const,
+          visualEffectState: "followWindow" as const,
         }
       : {}),
     show: false,

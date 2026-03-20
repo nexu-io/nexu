@@ -339,7 +339,7 @@ function WorkspaceLayoutInner() {
         : selectedSession
           ? `${selectedSession.channelType} · ${formatTime(selectedSession.lastTime)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
-  const desktopGlassTint = "rgba(255, 255, 255, 0.7)";
+  const desktopGlassTint = "rgba(255, 255, 255, 0.08)";
 
   return (
     <div className="flex h-screen relative">
