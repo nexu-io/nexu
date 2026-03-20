@@ -117,7 +117,7 @@ async function convertAsset(sourcePath, targetPath) {
     });
   }
 
-  await image.webp({ quality: 82 }).toFile(targetPath);
+  await image.webp({ quality: 92, effort: 6 }).toFile(targetPath);
 }
 
 function replaceMarkdownReferences(

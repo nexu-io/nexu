@@ -4,25 +4,29 @@
 
 ## 第一步：打开技能页面
 
-在 nexu 客户端左侧导航栏点击 **Skills**。
+在 nexu 客户端左侧导航栏点击 **Skills**，进入技能中心。
 
-页面分为两个标签：**Community**（公共技能目录）和 **Installed**（已安装的技能）。
+**Explore** 标签展示所有可安装的公共技能，支持按分类筛选（Office & Collaboration、Files & Knowledge、Creative & Design、Business Analysis、Audio & Video 等）或直接搜索关键词。
 
-<img src="/assets/nexu-skills.png" alt="Nexu 技能目录" class="doc-img" />
+![Nexu 技能目录](/assets/nexu-skills.webp)
 
-## 第二步：找到目标技能
+## 第二步：找到并安装技能
 
-通过分类标签快速筛选——`automation`、`ai`、`finance`、`api` 等——或直接在搜索框输入技能名称或关键词。
+浏览或搜索目标技能，点击卡片上的 **Install** 按钮。技能支持热加载，安装后无需重启 Agent 即可立即生效。
 
-每张技能卡片显示技能名称、简短描述、下载量和星级，方便快速评估。
+![搜索并安装技能](/assets/nexu-skills-search.webp)
 
-## 第三步：安装
+## 第三步：确认安装
 
-点击技能卡片上的 **Install** 按钮，技能会自动下载并加载到 Agent 中，无需重启。
+切换到 **Yours** 标签，查看已安装的技能列表，并可通过开关随时启用或禁用单个技能。
 
-## 第四步：确认已安装
+![已安装的技能](/assets/nexu-skills-installed.webp)
 
-切换到 **Installed** 标签，确认技能已激活。之后在与 Agent 的对话中，直接描述相关需求即可调用该技能。
+## 第四步：在对话中使用
+
+技能安装后，直接在渠道对话中描述需求即可，Agent 会自动选择合适的技能完成任务。
+
+![技能在对话中的使用效果](/assets/nexu-skills-chat.webp)
 
 ## 常见问题
 
@@ -30,10 +34,10 @@
 
 不需要。技能支持热加载，Agent 会立即识别并启用新安装的技能。
 
-**Q: 可以安装社区目录以外的技能吗？**
+**Q: 可以安装目录以外的技能吗？**
 
-可以。nexu 支持本地自定义技能，满足个性化需求。详见开发者文档。
+可以。nexu 支持本地自定义技能开发，满足个性化需求。详见开发者文档。
 
 **Q: 如何卸载技能？**
 
-进入 **Installed** 标签，点击对应技能旁边的 **Uninstall** 即可。
+进入 **Yours** 标签，点击对应技能旁的 **Uninstall** 即可。

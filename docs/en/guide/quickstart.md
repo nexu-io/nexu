@@ -4,7 +4,7 @@
 
 Download the [nexu client](https://nexu.io/download), install it, and double-click to open.
 
-<img src="/assets/nexu-install.png" alt="Nexu installer" class="doc-img" />
+<img src="/assets/nexu-install.webp" alt="Nexu installer" class="doc-img" />
 
 ## Step 2: Choose your mode
 
@@ -13,7 +13,7 @@ nexu offers two modes:
 - **Sign in** — use nexu's official pre-configured models, ready out of the box
 - **BYOK mode** — enter your own API Key to use custom models
 
-<img src="/assets/nexu-choose-mode.png" alt="Nexu choose how to start" class="doc-img" />
+<img src="/assets/nexu-choose-mode.webp" alt="Nexu choose how to start" class="doc-img" />
 
 ## Step 3: Configure a channel
 
@@ -25,4 +25,4 @@ Pick one channel and complete the setup:
 
 Once configured, click "Chat" to start talking to your Agent 🎉
 
-<img src="/assets/nexu-channels.png" alt="Nexu channels" class="doc-img" />
+<img src="/assets/nexu-channels.webp" alt="Nexu channels" class="doc-img" />
