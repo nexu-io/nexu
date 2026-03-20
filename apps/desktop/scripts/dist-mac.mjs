@@ -9,6 +9,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
 const repoRoot =
   process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const require = createRequire(import.meta.url);
 const isUnsigned =
   process.argv.includes("--unsigned") ||
@@ -214,6 +215,9 @@ async function stapleNotarizedAppBundles() {
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
   let existingConfig = {};
+  const desktopPackage = JSON.parse(
+    await readFile(desktopPackageJsonPath, "utf8"),
+  );
 
   try {
     const existing = await readFile(configPath, "utf8");
@@ -254,6 +258,14 @@ async function ensureBuildConfig() {
       merged.NEXU_CLOUD_URL ??
       "https://nexu.io",
     NEXU_LINK_URL: existingConfig.NEXU_LINK_URL ?? merged.NEXU_LINK_URL ?? null,
+    NEXU_DESKTOP_APP_VERSION:
+      existingConfig.NEXU_DESKTOP_APP_VERSION ??
+      merged.NEXU_DESKTOP_APP_VERSION ??
+      (typeof desktopPackage.version === "string"
+        ? desktopPackage.version
+        : undefined) ??
+      merged.npm_package_version ??
+      undefined,
     ...((existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
     merged.NEXU_DESKTOP_SENTRY_DSN)
       ? {
@@ -344,7 +356,8 @@ async function main() {
     notarizeEnv.NEXU_APPLE_TEAM_ID = appleTeamId;
   }
 
-  const apiPort = process.env.NEXU_API_PORT ?? "50800";
+  const controllerPort =
+    process.env.NEXU_CONTROLLER_PORT ?? process.env.NEXU_API_PORT ?? "50800";
 
   await rm(resolve(electronRoot, "release"), rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
@@ -352,23 +365,28 @@ async function main() {
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], {
     env,
   });
-  await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/api", "build"], {
-    env,
-  });
-  await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/gateway", "build"], {
-    env,
-  });
+  await run(
+    "pnpm",
+    ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
+    {
+      env,
+    },
+  );
   await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
     env,
   });
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
     env: {
       ...env,
-      VITE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
-      VITE_AUTH_BASE_URL: `http://127.0.0.1:${apiPort}`,
+      VITE_API_BASE_URL: `http://127.0.0.1:${controllerPort}`,
+      VITE_AUTH_BASE_URL: `http://127.0.0.1:${controllerPort}`,
     },
   });
   await run("pnpm", ["run", "build"], { cwd: electronRoot, env });
+  await run("node", [resolve(scriptDir, "upload-sourcemaps.mjs")], {
+    cwd: electronRoot,
+    env,
+  });
   await run(
     "node",
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],

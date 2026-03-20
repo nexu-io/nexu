@@ -12,12 +12,13 @@ import {
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
+import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
-  setCatalogManager,
   setComponentUpdater,
   setUpdateManager,
 } from "./ipc";
@@ -28,7 +29,6 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
-import { CatalogManager } from "./skillhub/catalog-manager";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
@@ -50,7 +50,8 @@ const electronRoot = app.isPackaged
   : getDesktopAppRoot();
 const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   appVersion: app.getVersion(),
-  resourcesPath: electronRoot,
+  resourcesPath: app.isPackaged ? electronRoot : undefined,
+  useBuildConfig: app.isPackaged,
 });
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
@@ -68,30 +69,99 @@ app.commandLine.appendSwitch("disable-popup-blocking");
 
 const sentryDsn = runtimeConfig.sentryDsn;
 
+function readNativeCrashTestTitle(event: Sentry.Event): string | null {
+  const taggedTitle =
+    typeof event.tags?.["nexu.crash_title"] === "string"
+      ? event.tags["nexu.crash_title"]
+      : typeof event.extra?.["nexu.crash_title"] === "string"
+        ? event.extra["nexu.crash_title"]
+        : null;
+
+  if (taggedTitle) {
+    return taggedTitle;
+  }
+
+  const electronContext = event.contexts?.electron as
+    | Record<string, unknown>
+    | undefined;
+  const crashpadTitle = electronContext?.["crashpad.nexu.crash_title"];
+
+  return typeof crashpadTitle === "string" ? crashpadTitle : null;
+}
+
+function readNativeCrashTestKind(event: Sentry.Event): string | null {
+  const taggedKind =
+    typeof event.tags?.["nexu.crash_kind"] === "string"
+      ? event.tags["nexu.crash_kind"]
+      : null;
+
+  if (taggedKind) {
+    return taggedKind;
+  }
+
+  const electronContext = event.contexts?.electron as
+    | Record<string, unknown>
+    | undefined;
+  const crashpadKind = electronContext?.["crashpad.nexu.crash_kind"];
+
+  return typeof crashpadKind === "string" ? crashpadKind : null;
+}
+
 if (sentryDsn) {
+  const sentryBuildMetadata = getDesktopSentryBuildMetadata(
+    runtimeConfig.buildInfo,
+  );
+
   Sentry.init({
     dsn: sentryDsn,
     environment: app.isPackaged ? "production" : "development",
-    release: `@nexu/desktop@${app.getVersion()}`,
+    release: sentryBuildMetadata.release,
+    ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
     beforeSend(event) {
-      const testTitle =
-        typeof event.tags?.["nexu.test_title"] === "string"
-          ? event.tags["nexu.test_title"]
-          : typeof event.extra?.["nexu.test_title"] === "string"
-            ? event.extra["nexu.test_title"]
-            : null;
+      const testTitle = readNativeCrashTestTitle(event);
 
       if (!testTitle) {
         return event;
       }
 
+      const testKind = readNativeCrashTestKind(event);
+      const firstException = event.exception?.values?.[0];
+      const updatedException = event.exception?.values
+        ? {
+            ...event.exception,
+            values: [
+              {
+                ...firstException,
+                type: "Error",
+                value: testTitle,
+              },
+              ...event.exception.values.slice(1),
+            ],
+          }
+        : {
+            values: [
+              {
+                type: "Error",
+                value: testTitle,
+              },
+            ],
+          };
+
       return {
         ...event,
         message: testTitle,
+        exception: updatedException,
         fingerprint: [testTitle],
+        tags: {
+          ...event.tags,
+          "nexu.crash_title": testTitle,
+          ...(testKind ? { "nexu.crash_kind": testKind } : {}),
+        },
       };
     },
   });
+
+  Sentry.setContext("build", sentryBuildMetadata.buildContext);
 } else {
   crashReporter.start({
     companyName: "Nexu",
@@ -107,7 +177,6 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let catalogMgr: CatalogManager | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
 function sendDesktopCommand(
@@ -162,6 +231,22 @@ function installApplicationMenu(): void {
     ],
   };
 
+  const helpMenu: MenuItemConstructorOptions = {
+    role: "help",
+    submenu: [
+      {
+        label: "Export Diagnostics…",
+        click: () => {
+          void exportDiagnostics({
+            orchestrator,
+            runtimeConfig,
+            source: "help-menu",
+          }).catch(() => undefined);
+        },
+      },
+    ],
+  };
+
   const template: MenuItemConstructorOptions[] = [
     ...(process.platform === "darwin"
       ? ([{ role: "appMenu" }] satisfies MenuItemConstructorOptions[])
@@ -171,6 +256,7 @@ function installApplicationMenu(): void {
     { role: "viewMenu" },
     developMenu,
     { role: "windowMenu" },
+    helpMenu,
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -229,10 +315,13 @@ function logRendererEvent({
   });
 }
 
-async function waitForApiReadiness(): Promise<void> {
+async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL("/api/auth/get-session", runtimeConfig.urls.apiBase);
+  const probeUrl = new URL(
+    "/api/auth/get-session",
+    runtimeConfig.urls.controllerBase,
+  );
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -244,32 +333,30 @@ async function waitForApiReadiness(): Promise<void> {
 
       if (response.status < 500) {
         logColdStart(
-          `api ready via ${probeUrl.pathname} status=${response.status}`,
+          `controller ready via ${probeUrl.pathname} status=${response.status}`,
         );
         return;
       }
     } catch {
-      // Ignore transient startup failures while the socket and DB warm up.
+      // Ignore transient startup failures while the controller starts.
     }
 
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  throw new Error(`API readiness probe timed out for ${probeUrl.toString()}`);
+  throw new Error(
+    `Controller readiness probe timed out for ${probeUrl.toString()}`,
+  );
 }
 
 async function runDesktopColdStart(): Promise<void> {
-  diagnosticsReporter?.markColdStartRunning("starting pglite");
-  logColdStart("starting pglite");
-  await orchestrator.startOne("pglite");
+  diagnosticsReporter?.markColdStartRunning("starting controller");
+  logColdStart("starting controller");
+  await orchestrator.startOne("controller");
 
-  diagnosticsReporter?.markColdStartRunning("starting api");
-  logColdStart("starting api");
-  await orchestrator.startOne("api");
-
-  diagnosticsReporter?.markColdStartRunning("waiting for api readiness");
-  logColdStart("waiting for api readiness");
-  await waitForApiReadiness();
+  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
+  logColdStart("waiting for controller readiness");
+  await waitForControllerReadiness();
 
   diagnosticsReporter?.markColdStartRunning(
     "bootstrapping desktop auth session",
@@ -282,10 +369,6 @@ async function runDesktopColdStart(): Promise<void> {
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
-
-  diagnosticsReporter?.markColdStartRunning("starting gateway");
-  logColdStart("starting gateway");
-  await orchestrator.startOne("gateway");
 
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
@@ -323,7 +406,7 @@ function triggerDesktopAuthRecovery(reason: string): void {
 function installDesktopAuthRecoveryHooks(): void {
   session.defaultSession.webRequest.onCompleted(
     {
-      urls: [`${runtimeConfig.urls.apiBase}/api/auth/*`],
+      urls: [`${runtimeConfig.urls.controllerBase}/api/auth/*`],
     },
     (details) => {
       if (
@@ -564,42 +647,6 @@ app.whenReady().then(async () => {
       });
     }
 
-    // Resolve static bundled-skills dir: packaged app has it in resources/,
-    // dev mode has it relative to the repo root.
-    // Resolve static bundled-skills dir: packaged app has it in resources/,
-    // dev mode has it relative to the app root.
-    const staticSkillsDir = app.isPackaged
-      ? resolve(process.resourcesPath ?? "", "static/bundled-skills")
-      : resolve(app.getAppPath(), "static/bundled-skills");
-
-    catalogMgr = new CatalogManager(app.getPath("userData"), {
-      staticSkillsDir,
-      log: (level, message) => {
-        writeDesktopMainLog({
-          source: "skillhub",
-          stream: level === "error" ? "stderr" : "stdout",
-          kind: "app",
-          message,
-          logFilePath: getDesktopLogFilePath("desktop-main.log"),
-        });
-      },
-    });
-    setCatalogManager(catalogMgr);
-    catalogMgr.start();
-
-    // Install curated skills on first launch (or re-install missing ones on update).
-    // Runs in background — does not block window creation.
-    void catalogMgr.installCuratedSkills().catch((err) => {
-      // Best-effort — curated skills are not critical for app startup.
-      writeDesktopMainLog({
-        source: "skillhub",
-        stream: "stderr",
-        kind: "app",
-        message: `curated skill install failed: ${err instanceof Error ? err.message : String(err)}`,
-        logFilePath: getDesktopLogFilePath("desktop-main.log"),
-      });
-    });
-
     const win = createMainWindow();
 
     if (app.isPackaged) {
@@ -635,7 +682,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  catalogMgr?.dispose();
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();

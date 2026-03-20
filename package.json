@@ -3,8 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names api,web --prefix-colors blue,green \"pnpm --filter @nexu/api dev\" \"pnpm --filter @nexu/web dev\"",
-    "dev:sidecar": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
+    "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names controller,web --prefix-colors blue,green \"pnpm --filter @nexu/controller dev\" \"pnpm --filter @nexu/web dev\"",
+    "dev:legacy": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names api,web --prefix-colors blue,green \"pnpm --filter @nexu/api dev\" \"pnpm --filter @nexu/web dev\"",
+    "dev:legacy:gateway": "concurrently --kill-others --names gateway --prefix-colors cyan \"pnpm --filter @nexu/gateway dev\"",
+    "dev:controller": "pnpm --filter @nexu/controller dev",
     "dev:desktop": "pnpm --filter @nexu/desktop dev",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
@@ -13,7 +15,7 @@
     "lint:fix": "biome check --write --unsafe . && pnpm -r typecheck",
     "format": "biome check --write .",
     "test": "vitest run",
-    "generate-types": "pnpm --filter @nexu/api generate-openapi && pnpm --filter @nexu/web generate-sdk",
+    "generate-types": "pnpm --filter @nexu/controller generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:pruned",
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
@@ -36,10 +38,12 @@
     "desktop:logs": "./apps/desktop/dev.sh logs",
     "desktop:check:dev": "./scripts/desktop-check-dev.sh",
     "desktop:check:dist": "./scripts/desktop-check-dist.sh",
+    "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
     "desktop:dist:mac": "pnpm --filter @nexu/desktop dist:mac",
     "desktop:dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^25.3.1",
     "@vitejs/plugin-react": "^4.3.4",
@@ -52,7 +56,12 @@
   },
   "packageManager": "pnpm@10.26.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["@biomejs/biome", "electron", "esbuild"],
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "better-sqlite3",
+      "electron",
+      "esbuild"
+    ],
     "overrides": {
       "react": "^19.2.4",
       "react-dom": "^19.2.4"

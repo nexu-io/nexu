@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   DesktopRuntimeConfig,
+  DiagnosticsExportResult,
   DiagnosticsInfo,
   HostDesktopCommand,
   RuntimeEvent,
@@ -11,7 +12,6 @@ import type {
   UpdateChannelName,
   UpdateSource,
 } from "@shared/host";
-
 function getHostBridge() {
   if (typeof window === "undefined" || !window.nexuHost) {
     throw new Error("Nexu host bridge is unavailable.");
@@ -28,6 +28,12 @@ export async function getDiagnosticsInfo(): Promise<DiagnosticsInfo> {
   return getHostBridge().invoke("diagnostics:get-info", undefined);
 }
 
+export async function exportDiagnostics(
+  source: "diagnostics-page" | "help-menu" = "diagnostics-page",
+): Promise<DiagnosticsExportResult> {
+  return getHostBridge().invoke("diagnostics:export", { source });
+}
+
 export async function triggerMainProcessCrash(): Promise<void> {
   await getHostBridge().invoke("diagnostics:crash-main", undefined);
 }
@@ -36,12 +42,12 @@ export async function triggerRendererProcessCrash(): Promise<void> {
   await getHostBridge().invoke("diagnostics:crash-renderer", undefined);
 }
 
-export async function getApiBaseUrl(): Promise<string> {
+export async function getControllerBaseUrl(): Promise<string> {
   const result = await getHostBridge().invoke(
-    "env:get-api-base-url",
+    "env:get-controller-base-url",
     undefined,
   );
-  return result.apiBaseUrl;
+  return result.controllerBaseUrl;
 }
 
 export async function getRuntimeConfig(): Promise<DesktopRuntimeConfig> {

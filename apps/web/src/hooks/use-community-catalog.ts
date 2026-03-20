@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getApiV1SkillhubCatalog,
   postApiV1SkillhubInstall,
+  postApiV1SkillhubRefresh,
   postApiV1SkillhubUninstall,
 } from "../../lib/api/sdk.gen";
 
@@ -36,11 +37,11 @@ export function useInstallSkill() {
       if (!result.ok) {
         throw new Error(result.error ?? "Install failed");
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: DETAIL_QUERY_KEY }),
+      ]);
       return result;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: DETAIL_QUERY_KEY });
     },
   });
 }
@@ -58,11 +59,11 @@ export function useUninstallSkill() {
       if (!result.ok) {
         throw new Error(result.error ?? "Uninstall failed");
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: DETAIL_QUERY_KEY }),
+      ]);
       return result;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: DETAIL_QUERY_KEY });
     },
   });
 }
@@ -72,7 +73,9 @@ export function useRefreshCatalog() {
 
   return useMutation({
     mutationFn: async () => {
-      return { ok: true, skillCount: 0 };
+      const { data, error } = await postApiV1SkillhubRefresh();
+      if (error) throw new Error("Refresh request failed");
+      return data as { ok: boolean; skillCount: number };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });

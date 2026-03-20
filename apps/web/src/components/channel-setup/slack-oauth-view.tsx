@@ -185,7 +185,11 @@ export function SlackOAuthView({
         query: oauthReturnTo ? { returnTo: oauthReturnTo } : undefined,
       });
       if (error) {
-        toast.error(error.message ?? t("slackSetup.oauthUrlFailed"));
+        const errorMessage =
+          typeof error === "object" && error !== null && "message" in error
+            ? String(error.message)
+            : t("slackSetup.oauthUrlFailed");
+        toast.error(errorMessage);
         setPhase("install");
         return;
       }

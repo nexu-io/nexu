@@ -1,15 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { getDesktopAppRoot } from "./workspace-paths";
 
-export const DEFAULT_API_PORT = 50_800;
+export const DEFAULT_CONTROLLER_PORT = 50_800;
 export const DEFAULT_WEB_PORT = 50_810;
-export const DEFAULT_PGLITE_PORT = 50_832;
 export const DEFAULT_OPENCLAW_BASE_URL = "http://127.0.0.1:18789";
 export const DEFAULT_GATEWAY_TOKEN = "gw-secret-token";
-export const DEFAULT_SKILL_TOKEN = "skill-secret-token";
-export const DEFAULT_GATEWAY_POOL_ID = "desktop-local-pool";
-export const DEFAULT_PGLITE_DATABASE_URL = (port: number) =>
-  `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
+export const DEFAULT_NEXU_HOME = "~/.nexu";
 
 // Cloud connection defaults (production)
 export const DEFAULT_NEXU_CLOUD_URL = "https://nexu.io";
@@ -20,9 +17,11 @@ export const DEFAULT_NEXU_LINK_URL: string | null = null;
  * This allows CI to inject environment-specific values at build time.
  */
 type BuildConfig = {
+  NEXU_HOME?: string;
   NEXU_CLOUD_URL?: string;
   NEXU_LINK_URL?: string | null;
   NEXU_UPDATE_FEED_URL?: string;
+  NEXU_DESKTOP_APP_VERSION?: string;
   NEXU_DESKTOP_SENTRY_DSN?: string;
   NEXU_DESKTOP_BUILD_SOURCE?: string;
   NEXU_DESKTOP_BUILD_BRANCH?: string;
@@ -71,6 +70,10 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
         record,
         "NEXU_UPDATE_FEED_URL",
       ),
+      NEXU_DESKTOP_APP_VERSION: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_APP_VERSION",
+      ),
       NEXU_DESKTOP_SENTRY_DSN: readBuildConfigString(
         record,
         "NEXU_DESKTOP_SENTRY_DSN",
@@ -95,6 +98,42 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
   } catch {
     return {};
   }
+}
+
+function readJsonVersion(filePath: string): string | undefined {
+  if (!existsSync(filePath)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
+
+    if (!parsed || typeof parsed !== "object") {
+      return undefined;
+    }
+
+    const version = (parsed as { version?: unknown }).version;
+    return typeof version === "string" && version.length > 0
+      ? version
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readPackagedAppVersion(resourcesPath?: string): string | undefined {
+  if (!resourcesPath) {
+    return undefined;
+  }
+
+  return (
+    readJsonVersion(resolve(resourcesPath, "app.asar", "package.json")) ??
+    readJsonVersion(resolve(resourcesPath, "app", "package.json"))
+  );
+}
+
+function readDesktopPackageVersion(): string | undefined {
+  return readJsonVersion(resolve(getDesktopAppRoot(), "package.json"));
 }
 
 export type DesktopBuildSource =
@@ -127,14 +166,12 @@ function normalizeBuildSource(value: string | undefined): DesktopBuildSource {
 export type DesktopRuntimeConfig = {
   buildInfo: DesktopBuildInfo;
   ports: {
-    api: number;
+    controller: number;
     web: number;
-    pglite: number;
   };
   urls: {
-    apiBase: string;
+    controllerBase: string;
     web: string;
-    auth: string;
     openclawBase: string;
     nexuCloud: string;
     nexuLink: string | null;
@@ -142,24 +179,15 @@ export type DesktopRuntimeConfig = {
   };
   tokens: {
     gateway: string;
-    internalApi: string;
-    skill: string;
-  };
-  database: {
-    pgliteUrl: string;
-  };
-  gateway: {
-    poolId: string;
   };
   paths: {
+    nexuHome: string;
     openclawBin: string;
   };
   desktopAuth: {
     name: string;
     email: string;
     password: string;
-    appUserId: string;
-    onboardingRole: string;
   };
   sentryDsn: string | null;
 };
@@ -170,30 +198,34 @@ export function getDesktopRuntimeConfig(
     appVersion?: string;
     openclawBinPath?: string;
     resourcesPath?: string;
+    useBuildConfig?: boolean;
   },
 ): DesktopRuntimeConfig {
-  // Load build-time config (for packaged apps)
-  const buildConfig = loadBuildConfig(defaults?.resourcesPath);
+  const buildConfig =
+    defaults?.useBuildConfig === false
+      ? {}
+      : loadBuildConfig(defaults?.resourcesPath);
+  const fallbackPackageVersion =
+    readPackagedAppVersion(defaults?.resourcesPath) ??
+    readDesktopPackageVersion();
   const ports = {
-    api: Number.parseInt(env.NEXU_API_PORT ?? String(DEFAULT_API_PORT), 10),
-    web: Number.parseInt(env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT), 10),
-    pglite: Number.parseInt(
-      env.NEXU_PGLITE_PORT ?? String(DEFAULT_PGLITE_PORT),
+    controller: Number.parseInt(
+      env.NEXU_CONTROLLER_PORT ??
+        env.NEXU_API_PORT ??
+        String(DEFAULT_CONTROLLER_PORT),
       10,
     ),
+    web: Number.parseInt(env.NEXU_WEB_PORT ?? String(DEFAULT_WEB_PORT), 10),
   };
 
   const urls = {
-    apiBase:
+    controllerBase:
+      env.NEXU_CONTROLLER_URL ??
+      env.NEXU_CONTROLLER_BASE_URL ??
       env.NEXU_API_URL ??
       env.NEXU_API_BASE_URL ??
-      `http://127.0.0.1:${ports.api}`,
+      `http://127.0.0.1:${ports.controller}`,
     web: env.NEXU_WEB_URL ?? `http://127.0.0.1:${ports.web}`,
-    auth:
-      env.NEXU_AUTH_URL ??
-      env.NEXU_API_URL ??
-      env.NEXU_API_BASE_URL ??
-      `http://127.0.0.1:${ports.api}`,
     openclawBase: env.NEXU_OPENCLAW_BASE_URL ?? DEFAULT_OPENCLAW_BASE_URL,
     nexuCloud:
       env.NEXU_CLOUD_URL ??
@@ -207,7 +239,13 @@ export function getDesktopRuntimeConfig(
 
   return {
     buildInfo: {
-      version: defaults?.appVersion ?? env.npm_package_version ?? "0.0.0",
+      version:
+        defaults?.appVersion ??
+        env.NEXU_DESKTOP_APP_VERSION ??
+        buildConfig.NEXU_DESKTOP_APP_VERSION ??
+        env.npm_package_version ??
+        fallbackPackageVersion ??
+        "0.0.0",
       source: normalizeBuildSource(
         env.NEXU_DESKTOP_BUILD_SOURCE ?? buildConfig.NEXU_DESKTOP_BUILD_SOURCE,
       ),
@@ -227,21 +265,10 @@ export function getDesktopRuntimeConfig(
     ports,
     urls,
     tokens: {
-      gateway:
-        env.NEXU_OPENCLAW_GATEWAY_TOKEN ??
-        env.NEXU_INTERNAL_API_TOKEN ??
-        DEFAULT_GATEWAY_TOKEN,
-      internalApi: env.NEXU_INTERNAL_API_TOKEN ?? DEFAULT_GATEWAY_TOKEN,
-      skill: env.NEXU_SKILL_API_TOKEN ?? DEFAULT_SKILL_TOKEN,
-    },
-    database: {
-      pgliteUrl:
-        env.NEXU_DATABASE_URL ?? DEFAULT_PGLITE_DATABASE_URL(ports.pglite),
-    },
-    gateway: {
-      poolId: env.NEXU_GATEWAY_POOL_ID ?? DEFAULT_GATEWAY_POOL_ID,
+      gateway: env.NEXU_OPENCLAW_GATEWAY_TOKEN ?? DEFAULT_GATEWAY_TOKEN,
     },
     paths: {
+      nexuHome: env.NEXU_HOME ?? buildConfig.NEXU_HOME ?? DEFAULT_NEXU_HOME,
       openclawBin:
         env.NEXU_OPENCLAW_BIN ??
         defaults?.openclawBinPath ??
@@ -251,8 +278,6 @@ export function getDesktopRuntimeConfig(
       name: "NexU Desktop",
       email: "desktop@nexu.local",
       password: "desktop-local-password",
-      appUserId: "desktop-local-user",
-      onboardingRole: "Founder / Manager",
     },
     sentryDsn:
       env.NEXU_DESKTOP_SENTRY_DSN ??

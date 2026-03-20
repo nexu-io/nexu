@@ -68,37 +68,41 @@ export async function findOrCreateDefaultBot(
     }
   }
 
-  // Create a default bot
+  // Create a default bot inside a transaction
   const poolId = await findDefaultPool();
   const botId = createId();
   const now = new Date().toISOString();
 
-  await db.insert(bots).values({
-    id: botId,
-    userId,
-    name: "My Bot",
-    slug: "my-bot",
-    modelId: process.env.DEFAULT_MODEL_ID ?? "link/claude-sonnet-4-5",
-    poolId,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  await db.insert(gatewayAssignments).values({
-    id: createId(),
-    botId,
-    poolId,
-    assignedAt: now,
-  });
-
-  const [bot] = await db.select().from(bots).where(eq(bots.id, botId));
-  if (!bot) {
-    throw ServiceError.from("bot-helpers", {
-      code: "default_bot_create_failed",
-      bot_id: botId,
-      user_id: userId,
+  const bot = await db.transaction(async (tx) => {
+    await tx.insert(bots).values({
+      id: botId,
+      userId,
+      name: "My Bot",
+      slug: "my-bot",
+      modelId: process.env.DEFAULT_MODEL_ID ?? "link/claude-sonnet-4-5",
+      poolId,
+      createdAt: now,
+      updatedAt: now,
     });
-  }
+
+    await tx.insert(gatewayAssignments).values({
+      id: createId(),
+      botId,
+      poolId,
+      assignedAt: now,
+    });
+
+    const [created] = await tx.select().from(bots).where(eq(bots.id, botId));
+    if (!created) {
+      throw ServiceError.from("bot-helpers", {
+        code: "default_bot_create_failed",
+        bot_id: botId,
+        user_id: userId,
+      });
+    }
+
+    return created;
+  });
 
   return bot;
 }

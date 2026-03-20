@@ -10,6 +10,7 @@ import type {
   DesktopChromeMode,
   DesktopRuntimeConfig,
   DesktopSurface,
+  DiagnosticsExportResult,
   DiagnosticsInfo,
   RuntimeEvent,
   RuntimeLogEntry,
@@ -19,10 +20,12 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
+  exportDiagnostics,
   getAppInfo,
   getDiagnosticsInfo,
   getRuntimeConfig,
@@ -49,10 +52,18 @@ function initializeRendererSentry(dsn: string): void {
     return;
   }
 
+  const sentryBuildMetadata = getDesktopSentryBuildMetadata(
+    window.nexuHost.bootstrap.buildInfo,
+  );
+
   Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
+    release: sentryBuildMetadata.release,
+    ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
   });
+
+  Sentry.setContext("build", sentryBuildMetadata.buildContext);
 
   rendererSentryInitialized = true;
 }
@@ -778,7 +789,8 @@ function EmbeddedControlPlane() {
 type DiagnosticsActionId =
   | "renderer-exception"
   | "renderer-crash"
-  | "main-crash";
+  | "main-crash"
+  | "export";
 
 function DiagnosticsActionCard({
   description,
@@ -804,7 +816,11 @@ function DiagnosticsActionCard({
   );
 }
 
-function DiagnosticsPage() {
+function DiagnosticsPage({
+  runtimeConfig,
+}: {
+  runtimeConfig: DesktopRuntimeConfig | null;
+}) {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [diagnosticsInfo, setDiagnosticsInfo] =
     useState<DiagnosticsInfo | null>(null);
@@ -815,6 +831,8 @@ function DiagnosticsPage() {
   const [lastAction, setLastAction] = useState<string>(
     "Ready for diagnostics.",
   );
+  const [exportResult, setExportResult] =
+    useState<DiagnosticsExportResult | null>(null);
 
   useEffect(() => {
     void Promise.all([getAppInfo(), getDiagnosticsInfo()])
@@ -881,6 +899,21 @@ function DiagnosticsPage() {
     });
   }, [runAction]);
 
+  const triggerExport = useCallback(() => {
+    setExportResult(null);
+    void runAction("export", async () => {
+      const result = await exportDiagnostics("diagnostics-page");
+      setExportResult(result);
+      if (result.status === "success") {
+        setLastAction(
+          `Diagnostics exported at ${new Date().toLocaleTimeString()}.`,
+        );
+      } else if (result.status === "failed") {
+        setLastAction(`Export failed at ${new Date().toLocaleTimeString()}.`);
+      }
+    });
+  }, [runAction]);
+
   return (
     <div className="runtime-page diagnostics-page">
       <header className="runtime-header diagnostics-header">
@@ -914,6 +947,11 @@ function DiagnosticsPage() {
                 : "local-only"
               : "-"
           }
+        />
+        <SummaryCard
+          label="Nexu Home"
+          className="diagnostics-summary-wide"
+          value={runtimeConfig?.paths.nexuHome ?? "-"}
         />
         <SummaryCard
           label="Crash dumps"
@@ -958,7 +996,22 @@ function DiagnosticsPage() {
           label="Test Main Crash"
           onClick={triggerMainCrash}
         />
+        <DiagnosticsActionCard
+          description="Packages logs, diagnostics snapshot, and OpenClaw config into a ZIP file for sharing with the team. Sensitive fields are redacted before export."
+          disabled={busyAction !== null}
+          label={busyAction === "export" ? "Exporting…" : "Export Diagnostics"}
+          onClick={triggerExport}
+        />
       </section>
+
+      {exportResult?.status === "success" ? (
+        <p className="runtime-note diagnostics-note">
+          Exported to: {exportResult.outputPath}
+          {exportResult.warnings && exportResult.warnings.length > 0
+            ? ` (${exportResult.warnings.join("; ")})`
+            : null}
+        </p>
+      ) : null}
 
       <section className="diagnostics-status-card">
         <div>
@@ -1007,12 +1060,12 @@ function DesktopShell() {
     });
   }, []);
 
-  // Poll the API ready endpoint through the web sidecar proxy before mounting the webview.
-  const [apiReady, setApiReady] = useState(false);
+  // Poll the controller ready endpoint through the web sidecar proxy before mounting the webview.
+  const [controllerReady, setControllerReady] = useState(false);
 
   useEffect(() => {
     if (!runtimeConfig) return;
-    if (apiReady) return;
+    if (controllerReady) return;
 
     let cancelled = false;
     const readyUrl = new URL(
@@ -1029,12 +1082,12 @@ function DesktopShell() {
           if (res.ok) {
             const data = await res.json();
             if (data.ready) {
-              if (!cancelled) setApiReady(true);
+              if (!cancelled) setControllerReady(true);
               return;
             }
           }
         } catch {
-          // API or web sidecar not ready yet — keep polling
+          // Controller or web sidecar not ready yet — keep polling
         }
         await new Promise((r) => setTimeout(r, 1000));
       }
@@ -1044,10 +1097,10 @@ function DesktopShell() {
     return () => {
       cancelled = true;
     };
-  }, [runtimeConfig, apiReady]);
+  }, [runtimeConfig, controllerReady]);
 
   const desktopWebUrl =
-    runtimeConfig && apiReady
+    runtimeConfig && controllerReady
       ? new URL("/workspace", runtimeConfig.urls.web).toString()
       : null;
   const desktopOpenClawUrl = runtimeConfig
@@ -1174,7 +1227,7 @@ function DesktopShell() {
             display: activeSurface === "diagnostics" ? "contents" : "none",
           }}
         >
-          <DiagnosticsPage />
+          <DiagnosticsPage runtimeConfig={runtimeConfig} />
         </div>
       </main>
 

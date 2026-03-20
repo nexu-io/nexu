@@ -1,0 +1,451 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexu.io/config.schema.json",
+  "title": "Nexu Config",
+  "description": "Draft schema for the lowdb-managed ~/.nexu/config.json in single-user mode.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "app",
+    "bots",
+    "runtime",
+    "providers",
+    "integrations",
+    "channels",
+    "templates",
+    "skills",
+    "desktop",
+    "secrets"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://nexu.io/config.json"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "app": {
+      "$ref": "#/$defs/appConfig"
+    },
+    "bots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/botConfig"
+      },
+      "default": []
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtimeConfig"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/providerConfig"
+      },
+      "default": []
+    },
+    "integrations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/integrationConfig"
+      },
+      "default": []
+    },
+    "channels": {
+      "$ref": "#/$defs/channelsConfig"
+    },
+    "templates": {
+      "$ref": "#/$defs/templatesConfig"
+    },
+    "skills": {
+      "$ref": "#/$defs/skillsConfig"
+    },
+    "desktop": {
+      "$ref": "#/$defs/desktopConfig"
+    },
+    "secrets": {
+      "$ref": "#/$defs/secretsConfig"
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "secretRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "appConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "instanceName": { "type": "string" },
+        "defaultBot": { "$ref": "#/$defs/slug" },
+        "cloudEnabled": { "type": "boolean", "default": false },
+        "lastMigratedAt": { "$ref": "#/$defs/timestamp" }
+      },
+      "default": {}
+    },
+    "botConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "slug", "enabled"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "$ref": "#/$defs/slug" },
+        "enabled": { "type": "boolean", "default": true },
+        "default": { "type": "boolean", "default": false },
+        "systemPrompt": { "type": "string" },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "primary": { "type": "string" },
+            "fallback": { "type": "string" }
+          }
+        },
+        "workspace": { "type": "string" },
+        "tools": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "runtimeConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "tokenSecretRef": { "$ref": "#/$defs/secretRef" }
+          },
+          "default": {}
+        },
+        "sandbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "image": { "type": "string" }
+          },
+          "default": {}
+        },
+        "logging": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": ["trace", "debug", "info", "warn", "error"]
+            }
+          },
+          "default": {}
+        }
+      },
+      "default": {}
+    },
+    "providerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "providerId", "enabled"],
+      "properties": {
+        "id": { "type": "string" },
+        "providerId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "baseUrl": { "type": "string" },
+        "enabled": { "type": "boolean", "default": true },
+        "apiKeySecretRef": { "$ref": "#/$defs/secretRef" },
+        "models": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    },
+    "integrationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "toolkitSlug", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "toolkitSlug": { "$ref": "#/$defs/slug" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "connected", "disconnected", "error"]
+        },
+        "connectedAt": { "$ref": "#/$defs/timestamp" },
+        "credentialRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/secretRef" },
+          "default": []
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "channelBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bot", "accountId", "enabled"],
+      "properties": {
+        "bot": { "$ref": "#/$defs/slug" },
+        "accountId": { "type": "string" },
+        "enabled": { "type": "boolean", "default": true },
+        "connectionMode": {
+          "type": "string",
+          "enum": ["http", "socket", "webhook", "polling"]
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "channelAccountConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "credentials": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/secretRef"
+          },
+          "default": {}
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      }
+    },
+    "channelsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slack": {
+          "$ref": "#/$defs/channelPlatformConfig"
+        },
+        "discord": {
+          "$ref": "#/$defs/channelPlatformConfig"
+        },
+        "telegram": {
+          "$ref": "#/$defs/channelPlatformConfig"
+        },
+        "feishu": {
+          "$ref": "#/$defs/channelPlatformConfig"
+        }
+      },
+      "default": {}
+    },
+    "channelPlatformConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accounts": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/slug" },
+          "additionalProperties": { "$ref": "#/$defs/channelAccountConfig" },
+          "default": {}
+        },
+        "bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/channelBinding" },
+          "default": []
+        }
+      },
+      "default": {}
+    },
+    "templatesConfig": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["content", "writeMode"],
+        "properties": {
+          "content": { "type": "string" },
+          "writeMode": {
+            "type": "string",
+            "enum": ["seed", "inject"]
+          }
+        }
+      },
+      "default": {}
+    },
+    "skillsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "defaults", "items"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "source": {
+              "type": "string",
+              "enum": ["inline", "local-path"],
+              "default": "inline"
+            }
+          },
+          "default": {
+            "enabled": true,
+            "source": "inline"
+          }
+        },
+        "items": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/slug" },
+          "additionalProperties": {
+            "$ref": "#/$defs/skillConfig"
+          },
+          "default": {}
+        }
+      },
+      "default": {
+        "version": 1,
+        "defaults": {
+          "enabled": true,
+          "source": "inline"
+        },
+        "items": {}
+      }
+    },
+    "skillConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "enabled", "source", "metadata"],
+      "properties": {
+        "name": { "$ref": "#/$defs/slug" },
+        "enabled": { "type": "boolean" },
+        "source": {
+          "type": "string",
+          "enum": ["inline", "local-path"]
+        },
+        "content": { "type": "string" },
+        "localPath": { "type": "string" },
+        "files": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*\\.\\.)(?!.*//).+$"
+          },
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "description", "owner", "tags", "category"],
+          "properties": {
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "owner": { "type": "string" },
+            "tags": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/slug" },
+              "default": []
+            },
+            "category": { "$ref": "#/$defs/slug" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source": { "const": "inline" } },
+            "required": ["source"]
+          },
+          "then": {
+            "required": ["content"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "source": { "const": "local-path" } },
+            "required": ["source"]
+          },
+          "then": {
+            "required": ["localPath"]
+          }
+        }
+      ]
+    },
+    "desktopConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cloud": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "connected": { "type": "boolean", "default": false },
+            "lastConnectedAt": { "$ref": "#/$defs/timestamp" }
+          },
+          "default": {}
+        }
+      },
+      "default": {}
+    },
+    "secretsConfig": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["value"],
+        "properties": {
+          "value": { "type": "string" },
+          "encrypted": { "type": "boolean", "default": true },
+          "updatedAt": { "$ref": "#/$defs/timestamp" }
+        }
+      },
+      "default": {}
+    }
+  }
+}

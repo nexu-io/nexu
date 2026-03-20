@@ -1,14 +1,13 @@
-import type { DesktopRuntimeConfig } from "./runtime-config";
-export type { DesktopRuntimeConfig } from "./runtime-config";
-import type { SkillhubCatalogData } from "./skillhub-types";
-export type { SkillhubCatalogData } from "./skillhub-types";
+import type { DesktopBuildInfo, DesktopRuntimeConfig } from "./runtime-config";
+export type { DesktopBuildInfo, DesktopRuntimeConfig } from "./runtime-config";
 
 export const hostInvokeChannels = [
   "app:get-info",
   "diagnostics:get-info",
   "diagnostics:crash-main",
   "diagnostics:crash-renderer",
-  "env:get-api-base-url",
+  "diagnostics:export",
+  "env:get-controller-base-url",
   "env:get-runtime-config",
   "runtime:get-state",
   "runtime:start-unit",
@@ -27,10 +26,6 @@ export const hostInvokeChannels = [
   "update:set-source",
   "component:check",
   "component:install",
-  "skillhub:get-catalog",
-  "skillhub:install",
-  "skillhub:uninstall",
-  "skillhub:refresh-catalog",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -48,12 +43,20 @@ export type RuntimeEventQueryResult = {
   nextCursor: number;
 };
 
+export type DiagnosticsExportResult = {
+  status: "success" | "cancelled" | "failed";
+  outputPath?: string;
+  warnings?: string[];
+  errorMessage?: string;
+};
+
 export type HostInvokePayloadMap = {
   "app:get-info": undefined;
   "diagnostics:get-info": undefined;
   "diagnostics:crash-main": undefined;
   "diagnostics:crash-renderer": undefined;
-  "env:get-api-base-url": undefined;
+  "diagnostics:export": { source: "diagnostics-page" | "help-menu" };
+  "env:get-controller-base-url": undefined;
   "env:get-runtime-config": undefined;
   "runtime:get-state": undefined;
   "runtime:start-unit": {
@@ -82,10 +85,6 @@ export type HostInvokePayloadMap = {
   "update:set-source": { source: UpdateSource };
   "component:check": undefined;
   "component:install": { id: string };
-  "skillhub:get-catalog": undefined;
-  "skillhub:install": { slug: string };
-  "skillhub:uninstall": { slug: string };
-  "skillhub:refresh-catalog": undefined;
 };
 
 export type HostInvokeResultMap = {
@@ -93,8 +92,9 @@ export type HostInvokeResultMap = {
   "diagnostics:get-info": DiagnosticsInfo;
   "diagnostics:crash-main": undefined;
   "diagnostics:crash-renderer": undefined;
-  "env:get-api-base-url": {
-    apiBaseUrl: string;
+  "diagnostics:export": DiagnosticsExportResult;
+  "env:get-controller-base-url": {
+    controllerBaseUrl: string;
   };
   "env:get-runtime-config": DesktopRuntimeConfig;
   "runtime:get-state": RuntimeState;
@@ -127,10 +127,6 @@ export type HostInvokeResultMap = {
     }>;
   };
   "component:install": { ok: boolean };
-  "skillhub:get-catalog": SkillhubCatalogData;
-  "skillhub:install": { ok: boolean; error?: string };
-  "skillhub:uninstall": { ok: boolean; error?: string };
-  "skillhub:refresh-catalog": { ok: boolean; skillCount: number };
 };
 
 export type AppInfo = {
@@ -181,13 +177,7 @@ export type RuntimeEvent =
       entry: RuntimeLogEntry;
     };
 
-export type RuntimeUnitId =
-  | "web"
-  | "control-plane"
-  | "pglite"
-  | "api"
-  | "gateway"
-  | "openclaw";
+export type RuntimeUnitId = "web" | "control-plane" | "controller" | "openclaw";
 
 export type RuntimeUnitKind = "surface" | "service" | "runtime";
 
@@ -217,7 +207,8 @@ export type RuntimeReasonCode =
   | "delegated_process_detected"
   | "delegated_process_missing"
   | "stdout_line"
-  | "stderr_line";
+  | "stderr_line"
+  | "auto_restart_scheduled";
 
 export type RuntimeLogEntry = {
   id: string;
@@ -269,6 +260,7 @@ export type HostBridge = {
 };
 
 export type HostBootstrap = {
+  buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
   isPackaged: boolean;
 };

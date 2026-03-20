@@ -4,8 +4,6 @@ on:
   pull_request:
     paths:
       - "apps/desktop/**"
-      - "apps/api/**"
-      - "apps/gateway/**"
       - "apps/web/**"
       - "packages/shared/**"
       - "openclaw-runtime/**"
@@ -23,8 +21,6 @@ on:
       - main
     paths:
       - "apps/desktop/**"
-      - "apps/api/**"
-      - "apps/gateway/**"
       - "apps/web/**"
       - "packages/shared/**"
       - "openclaw-runtime/**"

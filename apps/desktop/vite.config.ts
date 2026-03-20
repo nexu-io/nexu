@@ -36,6 +36,7 @@ export default defineConfig({
         },
         vite: {
           build: {
+            sourcemap: true,
             outDir: "dist-electron/preload",
             rollupOptions: {
               external: ["electron"],
@@ -53,6 +54,7 @@ export default defineConfig({
         },
         vite: {
           build: {
+            sourcemap: true,
             outDir: "dist-electron/preload",
             rollupOptions: {
               external: ["electron"],
@@ -87,5 +89,6 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    sourcemap: true,
   },
 });

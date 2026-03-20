@@ -15,16 +15,16 @@ export const PLATFORM_MODELS: Model[] = [
     description: "Most capable - ideal for complex tasks",
   },
   {
-    id: "openai/gpt-4o",
-    name: "GPT-4o",
+    id: "openai/gpt-5.1",
+    name: "GPT-5.1",
     provider: "openai",
-    description: "OpenAI flagship model",
+    description: "OpenAI flagship model for coding and agentic tasks",
   },
   {
-    id: "openai/gpt-4o-mini",
-    name: "GPT-4o Mini",
+    id: "openai/gpt-5-mini",
+    name: "GPT-5 mini",
     provider: "openai",
-    description: "Lightweight and fast for simple tasks",
+    description: "Faster, lower-cost GPT-5 model for well-defined tasks",
   },
 ];
 
