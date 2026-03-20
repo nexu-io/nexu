@@ -307,8 +307,8 @@ export function SkillsPage() {
   const categoryTabs = useMemo(() => {
     const base =
       topTab === "explore"
-        ? [{ id: "all", label: "All", count: exploreSkills.length }]
-        : [{ id: "all", label: "All", count: yourSkillsList.length }];
+        ? [{ id: "all", label: t("skills.all"), count: exploreSkills.length }]
+        : [{ id: "all", label: t("skills.all"), count: yourSkillsList.length }];
 
     const tagTabs = topTags
       .filter((t) => {
@@ -325,7 +325,7 @@ export function SkillsPage() {
       });
 
     return [...base, ...tagTabs];
-  }, [topTab, exploreSkills, yourSkillsList, topTags, locale]);
+  }, [topTab, exploreSkills, yourSkillsList, topTags, locale, t]);
 
   // Yours sub-tab counts
   const recommendedCount = yourSkillsList.filter((s) =>
