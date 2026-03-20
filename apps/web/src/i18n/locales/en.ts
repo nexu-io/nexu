@@ -292,7 +292,7 @@ const en = {
   "models.managed.loginDescription":
     "Sign in with your Nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
   "models.managed.waitingLogin": "Waiting for browser login...",
-  "models.managed.loginButton": "Log in to Nexu",
+  "models.managed.loginButton": "Sign in to Nexu",
   "models.managed.availableModels": "Available models",
   "models.managed.totalCount": "{{count}} total",
   "models.managed.loadingCatalog": "Loading model catalog...",

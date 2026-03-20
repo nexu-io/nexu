@@ -614,7 +614,6 @@ function _CurrentModelSelector({
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -630,7 +629,6 @@ function _CurrentModelSelector({
   const currentModel = models.find((m) => m.id === currentModelId);
   const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
 
-  // Group models by provider
   const modelsByProvider = useMemo(() => {
     const map = new Map<string, typeof models>();
     for (const m of models) {
@@ -656,7 +654,6 @@ function _CurrentModelSelector({
     () => new Set(currentGroupKey ? [currentGroupKey] : []),
   );
 
-  // Expand current model's provider when opened
   useEffect(() => {
     if (open) {
       const groupKey = currentModel ? getGroupKey(currentModel) : "";
@@ -672,7 +669,6 @@ function _CurrentModelSelector({
     }
   }, [open, currentModel, modelsByProvider]);
 
-  // Empty state
   if (models.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface-0 px-4 py-4 mb-5">
@@ -747,7 +743,6 @@ function _CurrentModelSelector({
 
       {open && (
         <div className="absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border border-border bg-surface-0 shadow-lg overflow-hidden">
-          {/* Search */}
           <div className="px-3 pt-3 pb-2">
             <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
               <Search size={14} className="text-text-muted shrink-0" />
@@ -768,7 +763,6 @@ function _CurrentModelSelector({
             </div>
           </div>
 
-          {/* Provider groups */}
           <div className="max-h-[320px] overflow-y-auto">
             {filteredProviders.length === 0 ? (
               <div className="px-4 py-8 text-center text-[13px] text-text-muted">
@@ -1035,7 +1029,6 @@ export function ModelsPage() {
           </div>
         </div>
 
-        {/* Nexu Bot Model selector */}
         {models.length > 0 && (
           <_CurrentModelSelector
             models={models}
