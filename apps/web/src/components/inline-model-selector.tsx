@@ -1,4 +1,4 @@
-import { ProviderLogo } from "@/components/provider-logo";
+import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, Cpu, Search, Settings } from "lucide-react";
@@ -201,7 +201,7 @@ export function InlineModelSelector() {
       >
         <span className="w-4 h-4 shrink-0 flex items-center justify-center">
           {currentGroupKey ? (
-            <ProviderLogo provider={currentGroupKey} size={14} />
+            <ModelLogo model={modelName} provider={currentGroupKey} size={14} />
           ) : (
             <Cpu size={13} className="text-text-muted" />
           )}
@@ -315,6 +315,13 @@ export function InlineModelSelector() {
                             ) : (
                               <span className="w-[12px] shrink-0" />
                             )}
+                            <span className="w-[14px] h-[14px] shrink-0 flex items-center justify-center">
+                              <ModelLogo
+                                model={model.name}
+                                provider={provider.id}
+                                size={13}
+                              />
+                            </span>
                             <span className="text-[12px] font-medium text-text-primary truncate flex-1">
                               {model.name}
                             </span>

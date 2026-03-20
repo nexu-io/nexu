@@ -1,6 +1,6 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { ProviderLogo } from "@/components/provider-logo";
+import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { cn } from "@/lib/utils";
@@ -661,7 +661,11 @@ function _CurrentModelSelector({
             {currentModel ? (
               <>
                 <span className="w-4 h-4 shrink-0 flex items-center justify-center">
-                  <ProviderLogo provider={currentGroupKey} size={14} />
+                  <ModelLogo
+                    model={currentModel.name}
+                    provider={currentGroupKey}
+                    size={14}
+                  />
                 </span>
                 {currentModel.name}
               </>
@@ -729,7 +733,11 @@ function _CurrentModelSelector({
                             )}
                           >
                             <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                              <ProviderLogo provider={provider.id} size={14} />
+                              <ModelLogo
+                                model={model.name}
+                                provider={provider.id}
+                                size={14}
+                              />
                             </span>
                             <div className="flex-1 min-w-0">
                               <div
@@ -1334,7 +1342,11 @@ function ManagedProviderDetail({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                      <ProviderLogo provider={provider.id} size={16} />
+                      <ModelLogo
+                        model={model.name}
+                        provider={provider.id}
+                        size={16}
+                      />
                     </span>
                     <div className="min-w-0">
                       <div className="text-[12px] font-medium text-text-primary truncate">
@@ -1682,7 +1694,11 @@ function ByokProviderDetail({
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                    <ProviderLogo provider={providerId} size={16} />
+                    <ModelLogo
+                      model={modelId}
+                      provider={providerId}
+                      size={16}
+                    />
                   </span>
                   <div className="min-w-0">
                     <div className="text-[12px] font-medium text-text-primary truncate">
