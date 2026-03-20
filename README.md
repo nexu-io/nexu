@@ -27,9 +27,13 @@
 
 ---
 
+> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude Opus 4.6, GPT 5.4, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
+
+---
+
 ## 📋 Overview
 
-**nexu** (next to you) is an open-source desktop client (Electron) that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
+**nexu** (next to you) is an open-source desktop client that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
 
 It offers graphical setup, built-in Feishu Skills, multi-model support, and BYOK.
 
