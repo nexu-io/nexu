@@ -27,7 +27,7 @@
 
 ---
 
-> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude Opus 4.6, GPT 5.4, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
+> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude, GPT, Gemini, Kimi, GLM, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
 
 ---
 

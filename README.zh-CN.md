@@ -27,13 +27,13 @@
 
 ---
 
-> 🎉 **内测福利**：内测期间，Claude Opus 4.6、GPT 5.4 等顶级模型 **全部免费、无限量使用**。[立即下载体验 →](https://nexu.io)
+> 🎉 **内测福利**：内测期间，Claude、GPT、Gemini、Kimi、GLM 等顶级模型 **全部免费、无限量使用**。[立即下载体验 →](https://nexu.io)
 
 ---
 
 ## 📋 概述
 
-**nexu**（next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在飞书、Slack、Discord 等 IM 中。
+**nexu**（奈苏，next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在飞书、Slack、Discord 等 IM 中。
 
 下载即用，图形化配置，内置飞书 Skills，支持 Claude / GPT / Gemini 等多模型与自带 API Key。
 
