@@ -379,7 +379,7 @@ function WorkspaceLayoutInner() {
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="fixed top-[6px] left-[80px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
+          className="fixed top-[10px] left-[80px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           title={
             collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
