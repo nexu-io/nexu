@@ -64,7 +64,7 @@ function nowIso(): string {
 }
 
 export function getDesktopDiagnosticsFilePath(): string {
-  return resolve(app.getPath("logs"), "desktop-diagnostics.json");
+  return resolve(app.getPath("userData"), "logs", "desktop-diagnostics.json");
 }
 
 export class DesktopDiagnosticsReporter {

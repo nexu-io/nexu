@@ -43,7 +43,8 @@ function compactPaths(paths) {
 
 function createCheckContext(mode) {
   if (mode === "dev") {
-    const desktopLogsDir = resolve(repoRoot, ".tmp/desktop/electron/logs");
+    const desktopRoot = resolve(repoRoot, ".tmp/desktop/electron");
+    const desktopLogsDir = resolve(desktopRoot, "logs");
     const runtimeUnitLogsDir = resolve(desktopLogsDir, "runtime-units");
 
     return {

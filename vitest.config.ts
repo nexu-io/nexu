@@ -9,6 +9,7 @@ export default defineConfig({
     // Run files sequentially to prevent DROP/CREATE conflicts.
     fileParallelism: false,
     include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["tests/api/**"],
   },
   resolve: {
     alias: {

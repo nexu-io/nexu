@@ -515,6 +515,7 @@ export function HomePage() {
                 poster="/nexu-alpha-poster.jpg"
                 preload="auto"
                 autoPlay
+                loop
                 muted
                 playsInline
                 className="w-full h-full object-contain"
@@ -627,6 +628,7 @@ export function HomePage() {
               poster="/nexu-alpha-poster.jpg"
               preload="auto"
               autoPlay
+              loop
               muted
               playsInline
               className="w-full h-full object-contain"
