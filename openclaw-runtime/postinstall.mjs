@@ -1,23 +1,15 @@
 import { spawn } from "node:child_process";
-import { access, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeFingerprint } from "./postinstall-cache.mjs";
+import { exists } from "./utils.mjs";
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const nodeModulesDir = path.join(runtimeDir, "node_modules");
 const cacheFileName = ".postinstall-cache.json";
 const cacheFilePath = path.join(runtimeDir, cacheFileName);
 const lockfilePath = path.join(runtimeDir, "package-lock.json");
-
-async function exists(targetPath) {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function readCachedFingerprint() {
   if (!(await exists(cacheFilePath))) {
@@ -60,49 +52,63 @@ async function installRuntime() {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
   if (await exists(lockfilePath)) {
-    await run(npmCommand, ["ci", "--no-audit", "--no-fund"]);
-    return;
+    try {
+      await run(npmCommand, ["ci", "--no-audit", "--no-fund"]);
+      return;
+    } catch (error) {
+      console.warn(
+        "openclaw-runtime npm ci failed, falling back to npm install --prefer-offline.",
+      );
+      console.warn(error instanceof Error ? error.message : String(error));
+    }
   }
 
   await run(npmCommand, [
     "install",
-    "--no-package-lock",
     "--no-audit",
     "--no-fund",
+    "--prefer-offline",
   ]);
 }
 
-const fingerprint = await computeFingerprint(runtimeDir);
-const cachedFingerprint = await readCachedFingerprint();
-const hasNodeModules = await exists(nodeModulesDir);
+try {
+  const fingerprint = await computeFingerprint(runtimeDir);
+  const cachedFingerprint = await readCachedFingerprint();
+  const hasNodeModules = await exists(nodeModulesDir);
 
-if (hasNodeModules && cachedFingerprint === fingerprint) {
-  console.log("openclaw-runtime unchanged, skipping install:pruned.");
-  process.exit(0);
+  if (hasNodeModules && cachedFingerprint === fingerprint) {
+    console.log("openclaw-runtime unchanged, skipping install:pruned.");
+    process.exit(0);
+  }
+
+  if (!hasNodeModules) {
+    console.log(
+      "openclaw-runtime node_modules missing, running install:pruned.",
+    );
+  } else if (cachedFingerprint === null) {
+    console.log("openclaw-runtime cache missing, running install:pruned.");
+  } else {
+    console.log("openclaw-runtime inputs changed, running install:pruned.");
+  }
+
+  await installRuntime();
+  await run(process.execPath, ["./prune-runtime.mjs"]);
+
+  await writeFile(
+    cacheFilePath,
+    `${JSON.stringify(
+      {
+        fingerprint,
+        updatedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+
+  console.log("openclaw-runtime cache updated.");
+} catch (error) {
+  console.error("openclaw-runtime postinstall failed.");
+  throw error;
 }
-
-if (!hasNodeModules) {
-  console.log("openclaw-runtime node_modules missing, running install:pruned.");
-} else if (cachedFingerprint === null) {
-  console.log("openclaw-runtime cache missing, running install:pruned.");
-} else {
-  console.log("openclaw-runtime inputs changed, running install:pruned.");
-}
-
-await installRuntime();
-await run(process.execPath, ["./prune-runtime.mjs"]);
-
-await writeFile(
-  cacheFilePath,
-  `${JSON.stringify(
-    {
-      fingerprint,
-      updatedAt: new Date().toISOString(),
-    },
-    null,
-    2,
-  )}\n`,
-  "utf8",
-);
-
-console.log("openclaw-runtime cache updated.");

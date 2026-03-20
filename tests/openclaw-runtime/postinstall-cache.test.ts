@@ -57,4 +57,14 @@ describe("openclaw-runtime postinstall cache fingerprint", () => {
     const after = await computeFingerprint(runtimeDir);
     expect(after).not.toBe(before);
   });
+
+  it("changes when a tracked file goes missing", async () => {
+    const runtimeDir = await createRuntimeFixture();
+    const before = await computeFingerprint(runtimeDir);
+
+    await rm(path.join(runtimeDir, "postinstall.mjs"), { force: true });
+
+    const after = await computeFingerprint(runtimeDir);
+    expect(after).not.toBe(before);
+  });
 });

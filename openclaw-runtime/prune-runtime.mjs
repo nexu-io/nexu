@@ -22,6 +22,8 @@ if (pruneTargets.length === 0) {
 
 let removedCount = 0;
 
+// Keep pruneTargets free of overlapping parent/child paths. This parallel removal
+// is safe for the current list because each target is independent.
 const pruneResults = await Promise.all(
   pruneTargets.map(async (relativePath) => {
     const absolutePath = path.resolve(runtimeDir, relativePath);

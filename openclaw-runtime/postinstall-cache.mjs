@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { exists } from "./utils.mjs";
 
 export const cacheInputs = [
   "package.json",
@@ -10,19 +11,13 @@ export const cacheInputs = [
   "postinstall-cache.mjs",
   "prune-runtime.mjs",
   "prune-runtime-paths.mjs",
+  "utils.mjs",
 ];
-
-async function exists(targetPath) {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function computeFingerprint(runtimeDir) {
   const hash = createHash("sha256");
+  hash.update(process.version);
+  hash.update("\0");
 
   for (const relativePath of cacheInputs) {
     const absolutePath = path.join(runtimeDir, relativePath);
