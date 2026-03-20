@@ -23,7 +23,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -60,11 +60,18 @@ function mapDbSession(s: {
   };
 }
 
-type Platform = "slack" | "discord" | "whatsapp" | "telegram" | "web";
+type Platform =
+  | "slack"
+  | "discord"
+  | "whatsapp"
+  | "telegram"
+  | "feishu"
+  | "web";
 
 const PLATFORM_ICON_CONFIG: Record<Platform, { bg: string; emoji: string }> = {
   discord: { bg: "bg-indigo-500/15", emoji: "🎮" },
   slack: { bg: "bg-purple-500/15", emoji: "#" },
+  feishu: { bg: "bg-blue-500/15", emoji: "🐦" },
   whatsapp: { bg: "bg-emerald-500/15", emoji: "💬" },
   telegram: { bg: "bg-blue-500/15", emoji: "✈️" },
   web: { bg: "bg-gray-500/15", emoji: "🌐" },
@@ -206,6 +213,57 @@ function WorkspaceLayoutInner() {
     update.phase === "ready";
   const updating = update.phase === "downloading";
   const downloadProgress = Math.round(update.percent);
+  const SIDEBAR_MIN = 160;
+  const SIDEBAR_MAX = 320;
+  const SIDEBAR_DEFAULT = 192;
+  const MAIN_MIN = 480;
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem("nexu_sidebar_width");
+    return saved
+      ? Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Number(saved)))
+      : SIDEBAR_DEFAULT;
+  });
+  const isResizing = useRef(false);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      const startX = e.clientX;
+      const startW = sidebarWidth;
+
+      const onMove = (ev: MouseEvent) => {
+        if (!isResizing.current) return;
+        const containerWidth = window.innerWidth;
+        const newW = Math.max(
+          SIDEBAR_MIN,
+          Math.min(SIDEBAR_MAX, startW + (ev.clientX - startX)),
+        );
+        if (containerWidth - newW >= MAIN_MIN) {
+          setSidebarWidth(newW);
+        }
+      };
+
+      const onUp = () => {
+        isResizing.current = false;
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        setSidebarWidth((w) => {
+          localStorage.setItem("nexu_sidebar_width", String(w));
+          return w;
+        });
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [sidebarWidth],
+  );
+
   const logoutRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
@@ -322,10 +380,8 @@ function WorkspaceLayoutInner() {
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="fixed top-[13px] left-[76px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center"
-          style={
-            { WebkitAppRegion: "no-drag", zIndex: 10000 } as React.CSSProperties
-          }
+          className="fixed top-[6px] left-[80px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           title={
             collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
           }
@@ -338,21 +394,28 @@ function WorkspaceLayoutInner() {
         </button>
       )}
 
-      {/* Desktop sidebar — transparent bg, no border (matches prototype) */}
+      {/* Desktop sidebar — transparent bg, no border (matches design-system) */}
       <div
-        className="hidden md:flex flex-col shrink-0 overflow-hidden"
-        style={{
-          width: collapsed ? 0 : 224,
-          transition: "width 200ms ease",
-        }}
+        className={`hidden md:flex flex-col shrink-0 overflow-hidden ${collapsed ? "w-0" : ""}`}
+        style={
+          {
+            ...(!collapsed ? { width: sidebarWidth } : {}),
+            transition: isResizing.current ? "none" : "width 200ms",
+            WebkitAppRegion: "drag",
+            background: "transparent",
+          } as React.CSSProperties
+        }
       >
+        {/* Traffic light clearance (desktop client) */}
+        {isDesktopClient && <div className="h-14 shrink-0" />}
+
         {/* Header / Brand */}
         <div
           className={cn(
             "flex items-center justify-between px-3 pb-2 shrink-0",
-            isDesktopClient && "pt-14",
             !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
           )}
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
           {isDesktopClient ? (
             <>
@@ -395,7 +458,10 @@ function WorkspaceLayoutInner() {
         </div>
 
         {/* Main nav + conversations */}
-        <div className="flex-1 overflow-y-auto">
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
           {/* Nav items */}
           <div className="px-2 pt-3 pb-1">
             <Link
@@ -457,14 +523,28 @@ function WorkspaceLayoutInner() {
                       navigate(`/workspace/sessions/${s.id}`);
                     }}
                     className={cn(
-                      "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer px-3 py-1.5",
+                      "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] transition-colors cursor-pointer px-3 py-1.5",
                       isActive && "nav-item-active",
                     )}
                   >
                     <SidebarPlatformIcon platform={s.channelType ?? "web"} />
-                    <span className="truncate text-[12px] whitespace-nowrap">
-                      {s.title}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={cn(
+                          "text-[13px] font-medium truncate whitespace-nowrap",
+                          !isActive && "text-text-primary",
+                        )}
+                      >
+                        {s.title}
+                      </div>
+                      <div className="text-[10px] text-text-muted truncate whitespace-nowrap">
+                        {formatTime(s.lastTime)}
+                        {s.channelType && ` · ${s.channelType}`}
+                      </div>
+                    </div>
+                    {s.status === "active" && (
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    )}
                   </button>
                 );
               })}
@@ -474,7 +554,10 @@ function WorkspaceLayoutInner() {
 
         {/* Update banner */}
         {hasUpdate && !updateDismissed && (
-          <div className="mx-3 mb-2 px-3 py-2.5 rounded-[10px] border border-border bg-surface-0/80 backdrop-blur-sm shrink-0 animate-float">
+          <div
+            className="mx-3 mb-2 px-3 py-2.5 rounded-[10px] border border-border bg-surface-0/80 backdrop-blur-sm shrink-0 animate-float"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2 shrink-0">
@@ -549,7 +632,10 @@ function WorkspaceLayoutInner() {
         )}
 
         {/* Icon row — Help & GitHub */}
-        <div className="px-3 pb-1.5 flex items-center gap-1 shrink-0">
+        <div
+          className="px-3 pb-1.5 flex items-center gap-1 shrink-0"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
           <div className="relative" ref={helpRef}>
             {showHelpMenu && (
               <div className="absolute z-20 bottom-full left-0 mb-2 w-44">
@@ -877,8 +963,19 @@ function WorkspaceLayoutInner() {
         </div>
       )}
 
+      {/* Resize handle */}
+      {!collapsed && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="hidden md:block w-[3px] shrink-0 cursor-col-resize group relative z-10"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          <div className="absolute inset-y-0 -left-[2px] -right-[2px]" />
+        </div>
+      )}
+
       {/* Main content — elevated surface with rounded left edge */}
-      <div className="flex-1 min-w-0 bg-surface-1 rounded-l-[12px] flex flex-col">
+      <div className="flex-1 min-w-0 bg-surface-1 rounded-l-[12px] flex flex-col md:pt-8">
         <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
           <div className="flex items-center justify-between gap-3">
             <button
