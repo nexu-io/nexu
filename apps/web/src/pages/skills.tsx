@@ -1,3 +1,4 @@
+import { GitHubStarCta } from "@/components/github-star-cta";
 import { Switch } from "@/components/ui/switch";
 import {
   useCommunitySkills,
@@ -5,19 +6,12 @@ import {
   useRefreshCatalog,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
+import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
 import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
-import {
-  Compass,
-  Loader2,
-  Plus,
-  Search,
-  Settings2,
-  Star,
-  Zap,
-} from "lucide-react";
+import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -25,7 +19,6 @@ import { Link } from "react-router-dom";
 type TopTab = "explore" | "yours";
 type YoursSubTab = "all" | "recommended" | "installed";
 
-const GITHUB_URL = "https://github.com/nexu-io/nexu";
 const PAGE_SIZE = 50;
 
 function useDebounce<T>(value: T, delayMs: number): T {
@@ -177,6 +170,7 @@ function SkillCard({
 
 export function SkillsPage() {
   const { t } = useTranslation();
+  const { stars } = useGitHubStars();
   const { locale } = useLocale();
   const { data, isLoading, isError } = useCommunitySkills();
   const refreshMutation = useRefreshCatalog();
@@ -394,18 +388,11 @@ export function SkillsPage() {
             <p className="heading-page-desc">{t("skills.pageSubtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-1 hover:border-border-hover transition-all text-[12px] font-medium text-text-secondary hover:text-text-primary"
-            >
-              <Star
-                size={13}
-                className="text-amber-400 group-hover:fill-amber-400 transition-colors"
-              />
-              Star
-            </a>
+            <GitHubStarCta
+              label={t("home.starGithub")}
+              stars={stars}
+              variant="button"
+            />
             <div className="relative">
               <Search
                 size={14}

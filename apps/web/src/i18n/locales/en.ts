@@ -213,8 +213,10 @@ const en = {
   "home.viewConversationsDesc": "Threads and channel activity",
   "home.manageSkills": "Manage skills",
   "home.manageSkillsDesc": "Tools and capabilities",
-  "home.starGithub": "Star us on GitHub",
-  "home.starGithubDesc": "Follow updates, code, and releases",
+  "home.starGithub": "Star on GitHub",
+  "home.starNexu": "Star nexu on GitHub",
+  "home.starCta":
+    "Help us grow the open-source community — your star makes a difference",
   "home.recentActivity": "Recent Activity",
   "home.noRecentActivity": "No recent conversations",
 
@@ -244,7 +246,7 @@ const en = {
   "settings.general.nameRequired": "Full name is required",
   "settings.general.avatarTooLarge": "Avatar must be 1MB or smaller",
   "settings.general.avatarReadFailed": "Failed to read avatar file",
-  "settings.general.githubTitle": "Star us on GitHub",
+  "settings.general.githubTitle": "Star on GitHub",
   "settings.general.githubBody":
     "Follow releases and support the project in public.",
   "settings.general.githubBadge": "GitHub",

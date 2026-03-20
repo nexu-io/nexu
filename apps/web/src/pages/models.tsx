@@ -1,5 +1,7 @@
+import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ProviderLogo } from "@/components/provider-logo";
+import { useGitHubStars } from "@/hooks/use-github-stars";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -14,7 +16,6 @@ import {
   Pencil,
   RefreshCw,
   Search,
-  Star,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -338,9 +339,6 @@ function _GeneralSettings() {
   const [draftName, setDraftName] = useState("");
   const [draftImage, setDraftImage] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [hasStarred, setHasStarred] = useState(
-    () => localStorage.getItem("nexu_starred") === "1",
-  );
 
   const { data: profile } = useQuery({
     queryKey: ["me"],
@@ -426,70 +424,6 @@ function _GeneralSettings() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <button
-        type="button"
-        onClick={() => {
-          localStorage.setItem("nexu_starred", "1");
-          setHasStarred(true);
-          window.open(GITHUB_URL, "_blank", "noopener,noreferrer");
-        }}
-        className="group relative w-full overflow-hidden rounded-2xl text-left transition-transform hover:scale-[1.005]"
-        style={{
-          background:
-            "linear-gradient(135deg, #0d0d10 0%, #1a1a2e 40%, #16213e 70%, #0d0d10 100%)",
-          minHeight: 120,
-        }}
-      >
-        <div className="absolute inset-0 opacity-40 [background:radial-gradient(ellipse_at_30%_50%,rgba(61,185,206,0.15)_0%,transparent_60%)]" />
-        <div className="absolute inset-0 opacity-30 [background:radial-gradient(ellipse_at_70%_30%,rgba(61,185,206,0.1)_0%,transparent_50%)]" />
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 select-none text-[48px] font-bold tracking-[0.2em] text-white/[0.03]">
-          {"> <"}
-        </div>
-        <div className="absolute right-3 top-3 flex gap-1 opacity-20">
-          {[0, 1, 2, 3, 4, 5].map((dot) => (
-            <div key={dot} className="h-1 w-1 rounded-full bg-white" />
-          ))}
-        </div>
-        <div className="absolute bottom-3 left-3 flex gap-1 opacity-10">
-          {[0, 1, 2, 3].map((dot) => (
-            <div key={dot} className="h-1 w-1 rounded-full bg-white" />
-          ))}
-        </div>
-        <div className="relative flex items-center gap-4 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.06] text-white/80">
-            <Star
-              size={20}
-              className={cn(
-                hasStarred ? "fill-amber-400 text-amber-400" : "text-white/70",
-              )}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold text-white">
-              {hasStarred
-                ? t("settings.general.githubStarred")
-                : t("settings.general.githubTitle")}
-            </div>
-            <div className="text-[12px] text-white/55">
-              {hasStarred
-                ? t("settings.general.githubStarredBody")
-                : t("settings.general.githubBody")}
-            </div>
-          </div>
-          {hasStarred ? (
-            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[12px] font-medium text-amber-400">
-              <Star size={12} className="fill-amber-400" />
-              {t("settings.general.githubStarredBadge")}
-            </div>
-          ) : (
-            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/90 backdrop-blur-sm transition-all group-hover:bg-white group-hover:text-text-primary">
-              <Star size={12} className="text-amber-400" />
-              {t("settings.general.githubBadge")}
-            </div>
-          )}
-        </div>
-      </button>
-
       <div className="overflow-visible rounded-2xl border border-border bg-surface-1">
         <div className="px-5 pb-1 pt-4">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
@@ -834,6 +768,7 @@ function _CurrentModelSelector({
 
 export function ModelsPage() {
   const { t } = useTranslation();
+  const { stars } = useGitHubStars();
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const tabParam = searchParams.get("tab");
@@ -1003,18 +938,11 @@ export function ModelsPage() {
             <p className="heading-page-desc">{t("models.pageSubtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-1 hover:border-border-hover transition-all text-[12px] font-medium text-text-secondary hover:text-text-primary"
-            >
-              <Star
-                size={13}
-                className="text-amber-400 group-hover:fill-amber-400 transition-colors"
-              />
-              Star
-            </a>
+            <GitHubStarCta
+              label={t("home.starGithub")}
+              stars={stars}
+              variant="button"
+            />
             <button
               type="button"
               onClick={() =>
