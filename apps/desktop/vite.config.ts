@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { type PluginOption, defineConfig } from "vite";
 import electron from "vite-plugin-electron";
 import renderer from "vite-plugin-electron-renderer";
 
@@ -65,8 +65,8 @@ export default defineConfig({
           },
         },
       },
-    ]),
-    renderer(),
+    ]) as PluginOption,
+    renderer() as PluginOption,
   ],
   resolve: {
     alias: {

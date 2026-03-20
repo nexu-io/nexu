@@ -238,7 +238,7 @@ export function InvitePage() {
                 {/* Discord */}
                 <div className="mt-10 pt-8 border-t border-border">
                   <a
-                    href="https://discord.gg/nexu"
+                    href="https://discord.gg/Q6AxCUuMNU"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 rounded-xl border border-border bg-surface-1 hover:border-border-hover transition-all group"

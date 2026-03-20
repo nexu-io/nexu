@@ -1,5 +1,8 @@
-import { access, readFile, stat, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import type { Dirent } from "node:fs";
+import { access, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { homedir, hostname } from "node:os";
+import { basename, resolve } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { app, dialog } from "electron";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
@@ -49,6 +52,13 @@ type ZipFileEntry = {
   name: string;
   data: Buffer;
   modTime?: Date;
+};
+
+type CollectedFileMetadata = {
+  sourcePath: string;
+  archivePath: string;
+  sizeBytes: number;
+  modifiedAt: string;
 };
 
 function toDosDateTime(date: Date): { dosTime: number; dosDate: number } {
@@ -209,6 +219,64 @@ async function tryReadFile(
   }
 }
 
+async function listFilesInDirectory(directoryPath: string): Promise<string[]> {
+  try {
+    const entries = await readdir(directoryPath, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => resolve(directoryPath, entry.name));
+  } catch {
+    return [];
+  }
+}
+
+async function listFilesRecursive(directoryPath: string): Promise<string[]> {
+  const output: string[] = [];
+
+  async function walk(currentPath: string): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = await readdir(currentPath, {
+        withFileTypes: true,
+        encoding: "utf8",
+      });
+    } catch {
+      return;
+    }
+
+    await Promise.all(
+      entries.map(async (entry) => {
+        const nextPath = resolve(currentPath, entry.name);
+        if (entry.isDirectory()) {
+          await walk(nextPath);
+          return;
+        }
+        if (entry.isFile()) {
+          output.push(nextPath);
+        }
+      }),
+    );
+  }
+
+  await walk(directoryPath);
+  return output;
+}
+
+function readMacOsProductVersion(): string | null {
+  if (process.platform !== "darwin") {
+    return null;
+  }
+
+  try {
+    const output = execFileSync("sw_vers", ["-productVersion"], {
+      encoding: "utf8",
+    }).trim();
+    return output.length > 0 ? output : null;
+  } catch {
+    return null;
+  }
+}
+
 function getTimestampSlug(): string {
   const now = new Date();
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
@@ -224,11 +292,20 @@ function getTimestampSlug(): string {
 async function collectArtifacts(
   orchestrator: RuntimeOrchestrator,
   runtimeConfig: DesktopRuntimeConfig,
+  archiveRoot: string,
 ): Promise<{ entries: ZipFileEntry[]; warnings: string[] }> {
   const entries: ZipFileEntry[] = [];
   const included: string[] = [];
   const missing: string[] = [];
   const warnings: string[] = [];
+
+  const additionalArtifacts = {
+    startupHealth: null as CollectedFileMetadata | null,
+    openclawLogs: [] as CollectedFileMetadata[],
+    sentryFiles: [] as CollectedFileMetadata[],
+    crashReports: [] as CollectedFileMetadata[],
+    sentrySkippedNonJson: [] as string[],
+  };
 
   async function addFile(
     zipPath: string,
@@ -237,17 +314,27 @@ async function collectArtifacts(
       redact = false,
       scrubLog = false,
     }: { redact?: boolean; scrubLog?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<CollectedFileMetadata | null> {
     const result = await tryReadFile(filePath);
     if (result === null) {
       missing.push(zipPath);
-      return;
+      return null;
     }
     let { data } = result;
     if (redact) data = redactJsonBuffer(data);
     if (scrubLog) data = scrubTextBuffer(data);
-    entries.push({ name: zipPath, data, modTime: result.mtime });
+    entries.push({
+      name: `${archiveRoot}/${zipPath}`,
+      data,
+      modTime: result.mtime,
+    });
     included.push(zipPath);
+    return {
+      sourcePath: filePath,
+      archivePath: zipPath,
+      sizeBytes: data.length,
+      modifiedAt: result.mtime.toISOString(),
+    };
   }
 
   // Desktop diagnostics snapshot
@@ -260,7 +347,7 @@ async function collectArtifacts(
   );
 
   // Main process logs
-  const logsDir = app.getPath("logs");
+  const logsDir = resolve(app.getPath("userData"), "logs");
   await addFile("logs/cold-start.log", resolve(logsDir, "cold-start.log"), {
     scrubLog: true,
   });
@@ -285,15 +372,131 @@ async function collectArtifacts(
   );
   await addFile("config/openclaw.json", openclawConfigPath, { redact: true });
 
+  // Startup health state (updater rollback diagnostics)
+  additionalArtifacts.startupHealth = await addFile(
+    "diagnostics/startup-health.json",
+    resolve(app.getPath("userData"), "startup-health.json"),
+    {
+      redact: true,
+    },
+  );
+
+  // OpenClaw runtime logs from /tmp/openclaw
+  const openclawLogsDir = "/tmp/openclaw";
+  const openclawLogFiles = (await listFilesInDirectory(openclawLogsDir))
+    .filter((filePath) => /^openclaw-.*\.log$/i.test(basename(filePath)))
+    .sort();
+
+  for (const openclawLogPath of openclawLogFiles) {
+    const metadata = await addFile(
+      `logs/openclaw/${basename(openclawLogPath)}`,
+      openclawLogPath,
+      {
+        scrubLog: true,
+      },
+    );
+    if (metadata) {
+      additionalArtifacts.openclawLogs.push(metadata);
+    }
+  }
+
+  // Sentry local data under userData/sentry (JSON files only)
+  const sentryDir = resolve(app.getPath("userData"), "sentry");
+  const sentryFiles = (await listFilesRecursive(sentryDir)).sort();
+
+  for (const sentryFilePath of sentryFiles) {
+    const fileName = sentryFilePath.slice(sentryDir.length + 1);
+    const isJsonLike = /\.(json|jsonl)$/i.test(fileName);
+
+    if (!isJsonLike) {
+      additionalArtifacts.sentrySkippedNonJson.push(fileName);
+      continue;
+    }
+
+    const metadata = await addFile(
+      `diagnostics/sentry/${fileName}`,
+      sentryFilePath,
+      {
+        redact: true,
+      },
+    );
+    if (metadata) {
+      additionalArtifacts.sentryFiles.push(metadata);
+    }
+  }
+
+  // Crash reports (last 7 days, file name contains "exu")
+  const crashReportsDir = resolve(homedir(), "Library/Logs/DiagnosticReports");
+  const crashCandidateFiles = (
+    await listFilesInDirectory(crashReportsDir)
+  ).sort();
+  const crashCutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  for (const crashFilePath of crashCandidateFiles) {
+    const reportName = basename(crashFilePath);
+    if (!reportName.toLowerCase().includes("exu")) {
+      continue;
+    }
+
+    const crashStat = await stat(crashFilePath).catch(() => null);
+    if (crashStat === null || crashStat.mtimeMs < crashCutoffMs) {
+      continue;
+    }
+
+    const crashFile = await tryReadFile(crashFilePath);
+    if (crashFile === null) {
+      continue;
+    }
+
+    const crashJson = {
+      sourcePath: crashFilePath,
+      fileName: reportName,
+      modifiedAt: crashStat.mtime.toISOString(),
+      sizeBytes: crashStat.size,
+      content: scrubTextBuffer(crashFile.data).toString("utf8"),
+    };
+
+    const archivePath = `diagnostics/crashes/${reportName}.json`;
+    entries.push({
+      name: `${archiveRoot}/${archivePath}`,
+      data: Buffer.from(`${JSON.stringify(crashJson, null, 2)}\n`, "utf8"),
+      modTime: crashStat.mtime,
+    });
+    included.push(archivePath);
+    additionalArtifacts.crashReports.push({
+      sourcePath: crashFilePath,
+      archivePath,
+      sizeBytes: crashStat.size,
+      modifiedAt: crashStat.mtime.toISOString(),
+    });
+  }
+
   // Environment summary (safe metadata only)
   const envSummary = buildEnvironmentSummary(runtimeConfig);
   const now = new Date();
   entries.push({
-    name: "summary/environment-summary.json",
+    name: `${archiveRoot}/summary/environment-summary.json`,
     data: Buffer.from(`${JSON.stringify(envSummary, null, 2)}\n`, "utf8"),
     modTime: now,
   });
   included.push("summary/environment-summary.json");
+
+  const extraArtifactsSummary = {
+    startupHealth: additionalArtifacts.startupHealth,
+    openclawLogs: additionalArtifacts.openclawLogs,
+    sentryFiles: additionalArtifacts.sentryFiles,
+    sentrySkippedNonJson: additionalArtifacts.sentrySkippedNonJson,
+    crashReports: additionalArtifacts.crashReports,
+  };
+  entries.push({
+    name: `${archiveRoot}/summary/additional-artifacts.json`,
+    data: Buffer.from(
+      `${JSON.stringify(extraArtifactsSummary, null, 2)}\n`,
+      "utf8",
+    ),
+    modTime: now,
+  });
+  included.push("summary/additional-artifacts.json");
 
   // Manifest
   const manifest = {
@@ -307,7 +510,7 @@ async function collectArtifacts(
       "Log and JSON string values have had URL-embedded tokens (e.g. #token=, ?token=) scrubbed.",
   };
   entries.push({
-    name: "summary/manifest.json",
+    name: `${archiveRoot}/summary/manifest.json`,
     data: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8"),
     modTime: now,
   });
@@ -324,6 +527,8 @@ function buildEnvironmentSummary(runtimeConfig: DesktopRuntimeConfig): object {
     buildInfo: runtimeConfig.buildInfo,
     platform: process.platform,
     arch: process.arch,
+    hostName: hostname(),
+    osVersion: readMacOsProductVersion(),
     nodeVersion: process.versions.node,
     electronVersion: process.versions.electron,
     isPackaged: app.isPackaged,
@@ -357,6 +562,7 @@ export async function exportDiagnostics({
   source: "diagnostics-page" | "help-menu";
 }): Promise<DiagnosticsExportResult> {
   const defaultFilename = `nexu-diagnostics-${getTimestampSlug()}.zip`;
+  const defaultArchiveRoot = defaultFilename.replace(/\.zip$/i, "");
 
   let filePath: string | undefined;
   try {
@@ -380,9 +586,15 @@ export async function exportDiagnostics({
   }
 
   try {
+    const archiveRoot =
+      filePath
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.zip$/i, "") || defaultArchiveRoot;
     const { entries, warnings } = await collectArtifacts(
       orchestrator,
       runtimeConfig,
+      archiveRoot,
     );
 
     await writeZip(entries, filePath);

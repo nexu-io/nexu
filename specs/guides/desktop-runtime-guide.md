@@ -7,9 +7,9 @@ This guide covers desktop-specific working rules, structure, and troubleshooting
 - Optimize first for agent/debugging efficiency, not human-facing control panel UX.
 - Prefer changes inside `apps/desktop/main/`, `apps/desktop/src/`, and `apps/desktop/shared/` when improving local runtime observability.
 - Desktop-internal observability changes may be relatively aggressive when they improve structured diagnostics, event correlation, runtime state introspection, or local log transport reliability.
-- Keep the boundary strict for `apps/web`, `apps/api`, and `apps/gateway`: default to no changes.
-- If touching `apps/web`, `apps/api`, or `apps/gateway` is unavoidable for desktop observability work, limit the change to logging only: log fields, log level, stable reason codes, or propagation of desktop correlation ids.
-- Do not use desktop observability work as a reason to refactor behavior, state models, or interfaces in `apps/web`, `apps/api`, or `apps/gateway`.
+- Keep the boundary strict for `apps/web` and `apps/controller`: default to no changes.
+- If touching `apps/web` or `apps/controller` is unavoidable for desktop observability work, limit the change to logging only: log fields, log level, stable reason codes, or propagation of desktop correlation ids.
+- Do not use desktop observability work as a reason to refactor behavior, state models, or interfaces in `apps/web` or `apps/controller`.
 - Prefer machine-queryable diagnostics over presentation-oriented additions: structured events, reason codes, action ids, session/boot correlation ids, and incremental event streams.
 
 ## Directory structure
@@ -50,11 +50,11 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
   - Use `NEXU_DESKTOP_RELEASE_DIR=/absolute/output/path` when you want packaged artifacts written somewhere other than `apps/desktop/release`.
 
 - `desktop won't cold start`
-  - Start with `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
+  - Start with `pnpm logs` and `./apps/desktop/dev.sh devlog`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
   - If `tmux session 'nexu-desktop' is not running` immediately after start, verify `pnpm -C apps/desktop exec electron --version` succeeds.
-  - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm desktop:start` path.
+  - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm start` path.
 
 - `a runtime unit looks running but behavior is broken`
   - Check the unit's structured lifecycle/probe logs in `apps/desktop/main/runtime/` outputs before changing UI.

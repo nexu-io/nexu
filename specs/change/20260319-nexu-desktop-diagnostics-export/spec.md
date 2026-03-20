@@ -261,7 +261,7 @@ Notes:
 
 - `pnpm --filter @nexu/desktop typecheck` — passes cleanly.
 - `pnpm lint` — passes cleanly after format fix.
-- Manual testing requires a running desktop runtime (`pnpm desktop:start`); exercise from the Diagnostics page export button and from `Help -> Export Diagnostics…`.
+- Manual testing requires a running desktop runtime (`pnpm start`); exercise from the Diagnostics page export button and from `Help -> Export Diagnostics…`.
 - Known V1 limitations: large log files are exported as-is (no truncation).
 
 - V1 intentionally favors a small export flow over a deeper layered architecture.

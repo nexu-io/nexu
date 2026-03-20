@@ -1,6 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
-import Database from "better-sqlite3";
+import initSqlJs, { type Database } from "sql.js";
 import type { SkillSource } from "./types.js";
 
 export type SkillRecord = {
@@ -24,92 +30,153 @@ CREATE TABLE IF NOT EXISTS skills (
 )`;
 
 export class SkillDb {
-  private readonly db: Database.Database;
+  private readonly db: Database;
+  private readonly dbPath: string;
 
-  constructor(dbPath: string, legacyCuratedDir?: string) {
+  private constructor(db: Database, dbPath: string) {
+    this.db = db;
+    this.dbPath = dbPath;
+  }
+
+  static async create(
+    dbPath: string,
+    legacyCuratedDir?: string,
+  ): Promise<SkillDb> {
     mkdirSync(dirname(dbPath), { recursive: true });
-    this.db = new Database(dbPath);
-    this.db.pragma("journal_mode = WAL");
-    this.db.pragma("busy_timeout = 5000");
-    this.db.exec(CREATE_TABLE);
-    if (legacyCuratedDir) {
-      this.migrateFromJson(legacyCuratedDir);
+
+    const SQL = await initSqlJs();
+
+    let db: Database;
+    if (existsSync(dbPath)) {
+      const buffer = readFileSync(dbPath);
+      db = new SQL.Database(buffer);
+    } else {
+      db = new SQL.Database();
     }
+
+    db.run(CREATE_TABLE);
+
+    const instance = new SkillDb(db, dbPath);
+    instance.persist();
+
+    if (legacyCuratedDir) {
+      instance.migrateFromJson(legacyCuratedDir);
+    }
+
+    return instance;
   }
 
   getAllInstalled(): readonly SkillRecord[] {
-    const rows = this.db
-      .prepare(
-        "SELECT slug, source, status, version, installed_at, uninstalled_at FROM skills WHERE status = 'installed'",
-      )
-      .all() as Array<{
-      slug: string;
-      source: SkillSource;
-      status: "installed";
-      version: string | null;
-      installed_at: string | null;
-      uninstalled_at: string | null;
-    }>;
-    return rows.map((r) => ({
-      slug: r.slug,
-      source: r.source,
-      status: r.status,
-      version: r.version,
-      installedAt: r.installed_at,
-      uninstalledAt: r.uninstalled_at,
+    const results = this.db.exec(
+      "SELECT slug, source, status, version, installed_at, uninstalled_at FROM skills WHERE status = 'installed'",
+    );
+    if (results.length === 0) return [];
+
+    const rows = results[0]?.values ?? [];
+    return rows.map((row) => ({
+      slug: String(row[0]),
+      source: String(row[1]) as SkillSource,
+      status: "installed" as const,
+      version: row[3] != null ? String(row[3]) : null,
+      installedAt: row[4] != null ? String(row[4]) : null,
+      uninstalledAt: row[5] != null ? String(row[5]) : null,
     }));
   }
 
   recordInstall(slug: string, source: SkillSource, version?: string): void {
-    this.db
-      .prepare(
-        `INSERT INTO skills (slug, source, status, version, installed_at, uninstalled_at)
-         VALUES (?, ?, 'installed', ?, datetime('now'), NULL)
-         ON CONFLICT(slug, source) DO UPDATE SET
-           status = 'installed',
-           version = COALESCE(excluded.version, version),
-           installed_at = datetime('now'),
-           uninstalled_at = NULL`,
-      )
-      .run(slug, source, version ?? null);
+    this.db.run(
+      `INSERT INTO skills (slug, source, status, version, installed_at, uninstalled_at)
+       VALUES (?, ?, 'installed', ?, datetime('now'), NULL)
+       ON CONFLICT(slug, source) DO UPDATE SET
+         status = 'installed',
+         version = COALESCE(excluded.version, version),
+         installed_at = datetime('now'),
+         uninstalled_at = NULL`,
+      [slug, source, version ?? null],
+    );
+    this.persist();
   }
 
   recordUninstall(slug: string, source: SkillSource): void {
-    this.db
-      .prepare(
-        `INSERT INTO skills (slug, source, status, uninstalled_at)
-         VALUES (?, ?, 'uninstalled', datetime('now'))
-         ON CONFLICT(slug, source) DO UPDATE SET
-           status = 'uninstalled',
-           uninstalled_at = datetime('now')`,
-      )
-      .run(slug, source);
+    this.db.run(
+      `INSERT INTO skills (slug, source, status, uninstalled_at)
+       VALUES (?, ?, 'uninstalled', datetime('now'))
+       ON CONFLICT(slug, source) DO UPDATE SET
+         status = 'uninstalled',
+         uninstalled_at = datetime('now')`,
+      [slug, source],
+    );
+    this.persist();
   }
 
   isRemovedByUser(slug: string): boolean {
-    const row = this.db
-      .prepare(
-        "SELECT 1 FROM skills WHERE slug = ? AND source = 'curated' AND status = 'uninstalled'",
-      )
-      .get(slug);
-    return row !== undefined;
+    const results = this.db.exec(
+      "SELECT 1 FROM skills WHERE slug = ? AND source = 'curated' AND status = 'uninstalled'",
+      [slug],
+    );
+    return (results[0]?.values.length ?? 0) > 0;
+  }
+
+  isInstalled(slug: string, source: SkillSource): boolean {
+    const results = this.db.exec(
+      "SELECT 1 FROM skills WHERE slug = ? AND source = ? AND status = 'installed'",
+      [slug, source],
+    );
+    return (results[0]?.values.length ?? 0) > 0;
   }
 
   recordBulkInstall(slugs: readonly string[], source: SkillSource): void {
-    const insert = this.db.prepare(
-      `INSERT INTO skills (slug, source, status, installed_at)
-       VALUES (?, ?, 'installed', datetime('now'))
-       ON CONFLICT(slug, source) DO UPDATE SET
-         status = 'installed',
-         installed_at = datetime('now'),
-         uninstalled_at = NULL`,
-    );
-    const tx = this.db.transaction((items: readonly string[]) => {
-      for (const slug of items) {
-        insert.run(slug, source);
+    this.db.run("BEGIN TRANSACTION");
+    try {
+      for (const slug of slugs) {
+        this.db.run(
+          `INSERT INTO skills (slug, source, status, installed_at)
+           VALUES (?, ?, 'installed', datetime('now'))
+           ON CONFLICT(slug, source) DO UPDATE SET
+             status = 'installed',
+             installed_at = datetime('now'),
+             uninstalled_at = NULL`,
+          [slug, source],
+        );
       }
-    });
-    tx(slugs);
+      this.db.run("COMMIT");
+    } catch (err) {
+      this.db.run("ROLLBACK");
+      throw err;
+    }
+    this.persist();
+  }
+
+  markUninstalledBySlugs(slugs: readonly string[], source: SkillSource): void {
+    if (slugs.length === 0) return;
+    this.db.run("BEGIN TRANSACTION");
+    try {
+      for (const slug of slugs) {
+        this.db.run(
+          `UPDATE skills SET status = 'uninstalled', uninstalled_at = datetime('now')
+           WHERE slug = ? AND source = ? AND status = 'installed'`,
+          [slug, source],
+        );
+      }
+      this.db.run("COMMIT");
+    } catch (err) {
+      this.db.run("ROLLBACK");
+      throw err;
+    }
+    this.persist();
+  }
+
+  close(): void {
+    this.persist();
+    this.db.close();
+  }
+
+  private persist(): void {
+    const data = this.db.export();
+    const buffer = Buffer.from(data);
+    const tmpPath = `${this.dbPath}.tmp`;
+    writeFileSync(tmpPath, buffer);
+    renameSync(tmpPath, this.dbPath);
   }
 
   private migrateFromJson(curatedDir: string): void {
@@ -122,17 +189,22 @@ export class SkillDb {
       };
       const removed = raw.removedByUser ?? [];
       if (removed.length > 0) {
-        const insert = this.db.prepare(
-          `INSERT INTO skills (slug, source, status, uninstalled_at)
-           VALUES (?, 'curated', 'uninstalled', datetime('now'))
-           ON CONFLICT(slug, source) DO NOTHING`,
-        );
-        const tx = this.db.transaction((slugs: string[]) => {
-          for (const slug of slugs) {
-            insert.run(slug);
+        this.db.run("BEGIN TRANSACTION");
+        try {
+          for (const slug of removed) {
+            this.db.run(
+              `INSERT INTO skills (slug, source, status, uninstalled_at)
+               VALUES (?, 'curated', 'uninstalled', datetime('now'))
+               ON CONFLICT(slug, source) DO NOTHING`,
+              [slug],
+            );
           }
-        });
-        tx(removed);
+          this.db.run("COMMIT");
+        } catch (err) {
+          this.db.run("ROLLBACK");
+          throw err;
+        }
+        this.persist();
       }
       renameSync(
         statePath,
@@ -141,9 +213,5 @@ export class SkillDb {
     } catch {
       // Best-effort migration — don't block startup
     }
-  }
-
-  close(): void {
-    this.db.close();
   }
 }

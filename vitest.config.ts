@@ -5,21 +5,38 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   test: {
-    // Tests share a single postgres test DB and manage tables themselves.
-    // Run files sequentially to prevent DROP/CREATE conflicts.
     fileParallelism: false,
     include: ["tests/**/*.test.{ts,tsx}"],
     exclude: ["tests/api/**"],
   },
   resolve: {
     alias: {
-      "#api": path.resolve(import.meta.dirname, "apps/api/src"),
-      "#gateway": path.resolve(import.meta.dirname, "apps/gateway/src"),
       "#web": path.resolve(import.meta.dirname, "apps/web/src"),
       "#desktop": path.resolve(import.meta.dirname, "apps/desktop"),
       "#controller": path.resolve(import.meta.dirname, "apps/controller/src"),
       "@": path.resolve(import.meta.dirname, "apps/web/src"),
       "@web-gen": path.resolve(import.meta.dirname, "apps/web/lib"),
+      react: path.resolve(import.meta.dirname, "apps/web/node_modules/react"),
+      "react/jsx-runtime": path.resolve(
+        import.meta.dirname,
+        "apps/web/node_modules/react/jsx-runtime.js",
+      ),
+      "react/jsx-dev-runtime": path.resolve(
+        import.meta.dirname,
+        "apps/web/node_modules/react/jsx-dev-runtime.js",
+      ),
+      "react-dom": path.resolve(
+        import.meta.dirname,
+        "apps/web/node_modules/react-dom",
+      ),
+      "react-router-dom": path.resolve(
+        import.meta.dirname,
+        "apps/web/node_modules/react-router-dom",
+      ),
+      "@tanstack/react-query": path.resolve(
+        import.meta.dirname,
+        "apps/web/node_modules/@tanstack/react-query",
+      ),
     },
     dedupe: ["react", "react-dom"],
   },

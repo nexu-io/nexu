@@ -18,8 +18,8 @@ Measurable quality signals for Nexu.
 ## Testing
 
 - Framework: Vitest
-- Config generator integration tests: `apps/api/src/lib/__tests__/config-generator.test.ts`
-- Run: `pnpm test` (all) or `pnpm --filter @nexu/api test` (API only)
+- Desktop and controller behavior is covered by repo-level Vitest suites
+- Run: `pnpm test`
 
 ## API contract safety
 

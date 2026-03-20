@@ -12,7 +12,7 @@ We'd love to hear from you! Reach out through any of the following channels.
 
 Join our Discord server to chat with the team and other users:
 
-👉 [Join nexu Discord](https://discord.gg/Ynv8dFMRRN)
+👉 [Join nexu Discord](https://discord.gg/Q6AxCUuMNU)
 
 ### X (Twitter)
 

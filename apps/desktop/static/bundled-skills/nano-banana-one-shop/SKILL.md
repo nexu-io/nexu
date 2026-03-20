@@ -1,5 +1,5 @@
 ---
-name: nano-banana-one-shop
+name: Nano Banana One Shop
 description: All-in-one image generation with Gemini models. Supports Nano Banana (3.1 Flash), Nano Banana Pro (3 Pro), and Nano Banana 2 (2.5 Flash). Triggers on "generate image", "image generation", "nano banana", "edit image".
 homepage: https://ai.google.dev/
 metadata:

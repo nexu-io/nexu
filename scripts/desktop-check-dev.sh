@@ -6,7 +6,7 @@ set -o pipefail
 capture_dir="${NEXU_DESKTOP_CHECK_CAPTURE_DIR:-.tmp/desktop-ci-test}"
 exit_code=0
 
-pnpm desktop:start
+pnpm start
 exit_code=$?
 
 if [ "$exit_code" -eq 0 ]; then
@@ -14,7 +14,7 @@ if [ "$exit_code" -eq 0 ]; then
   exit_code=$?
 fi
 
-pnpm desktop:stop
+pnpm stop
 stop_code=$?
 
 if [ "$exit_code" -eq 0 ] && [ "$stop_code" -ne 0 ]; then

@@ -78,7 +78,7 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const catalog = container.skillhubService.catalog.getCatalog();
+      const catalog = container.skillhubService.getCatalog();
       return c.json(catalog, 200);
     },
   );
@@ -109,7 +109,7 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
-      const result = await container.skillhubService.catalog.installSkill(slug);
+      const result = await container.skillhubService.installSkill(slug);
       return c.json(result, 200);
     },
   );
@@ -140,8 +140,7 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
-      const result =
-        await container.skillhubService.catalog.uninstallSkill(slug);
+      const result = await container.skillhubService.uninstallSkill(slug);
       return c.json(result, 200);
     },
   );
@@ -162,7 +161,7 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const result = await container.skillhubService.catalog.refreshCatalog();
+      const result = await container.skillhubService.refreshCatalog();
       return c.json(result, 200);
     },
   );
@@ -191,7 +190,7 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("param");
-      const catalog = container.skillhubService.catalog.getCatalog();
+      const catalog = container.skillhubService.getCatalog();
       const catalogSkill = catalog.skills.find((s) => s.slug === slug);
       const installed = catalog.installedSlugs.includes(slug);
       const installedSkill = catalog.installedSkills.find(

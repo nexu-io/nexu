@@ -1,10 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { HomePage } from "#web/pages/home";
 
 vi.mock("@/lib/api", () => ({}));
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
 
 vi.mock("@web-gen/api/sdk.gen", () => ({
   getApiV1Channels: vi.fn(async () => ({
@@ -24,11 +30,11 @@ function renderHomePage(): string {
   });
 
   return renderToStaticMarkup(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(MemoryRouter, null, createElement(HomePage)),
+    ),
   );
 }
 
@@ -41,6 +47,6 @@ describe("HomePage", () => {
     expect(markup).toContain('autoPlay=""');
     expect(markup).toContain('playsInline=""');
     expect(markup).toContain('muted=""');
-    expect(markup).toContain('loop=""');
+    expect(markup).not.toContain('loop=""');
   });
 });

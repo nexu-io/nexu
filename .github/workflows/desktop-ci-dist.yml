@@ -72,7 +72,7 @@ jobs:
           pnpm exec electron --version
 
       - name: Build unsigned macOS desktop bundle
-        run: pnpm desktop:dist:mac:unsigned
+        run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths
         shell: bash
@@ -134,7 +134,7 @@ jobs:
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
           NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
-        run: pnpm desktop:check:dist
+        run: pnpm check:dist
 
       - name: Capture desktop logs
         if: always()

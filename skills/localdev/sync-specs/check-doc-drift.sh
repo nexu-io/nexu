@@ -8,13 +8,12 @@ changed=$(git diff --name-only "$merge_base"...HEAD 2>/dev/null; git diff --name
 
 # Check for code areas that affect docs
 affected=()
-echo "$changed" | grep -q "apps/api/src/db/schema/" && affected+=("specs/generated/db-schema.md")
-echo "$changed" | grep -q "apps/api/src/routes/" && affected+=("specs/references/api-patterns.md")
+echo "$changed" | grep -q "apps/controller/src/routes/" && affected+=("specs/references/api-patterns.md")
 echo "$changed" | grep -q "apps/web/src/" && affected+=("specs/FRONTEND.md")
-echo "$changed" | grep -q "apps/gateway/src/" && affected+=("specs/RELIABILITY.md, ARCHITECTURE.md")
+echo "$changed" | grep -q "apps/controller/src/runtime/" && affected+=("specs/RELIABILITY.md, ARCHITECTURE.md")
 echo "$changed" | grep -q "package.json" && affected+=("CLAUDE.md + AGENTS.md Commands")
-echo "$changed" | grep -q "apps/api/src/lib/config-generator" && affected+=("specs/references/openclaw-config-schema.md")
-echo "$changed" | grep -q "apps/api/src/auth" && affected+=("specs/SECURITY.md")
+echo "$changed" | grep -q "apps/controller/src/lib/openclaw-config-compiler" && affected+=("specs/references/openclaw-config-schema.md")
+echo "$changed" | grep -q "apps/controller/src/auth\|apps/controller/src/routes" && affected+=("specs/SECURITY.md")
 
 [ ${#affected[@]} -eq 0 ] && exit 0
 

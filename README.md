@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="site/media/nexu-logo.svg" width="120" alt="nexu Logo" />
+  <img src="site/media/readme-hero.png" width="100%" alt="nexu" />
 </p>
 
 <h1 align="center">nexu</h1>
 
 <p align="center">
-  <strong>The Simplest OpenClaw 🦞 Desktop for One Person Company</strong>
+  <strong>The simplest open-source OpenClaw 🦞 desktop client for Feishu</strong>
 </p>
 
 <p align="center">
@@ -15,10 +15,9 @@
 
 <p align="center">
   <a href="https://nexu.io" target="_blank" rel="noopener"><strong>🌐 Website</strong></a> &nbsp;·&nbsp;
-  <a href="https://github.com/nexu-io/nexu/releases/latest" target="_blank" rel="noopener"><strong>⬇️ Download</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 Docs</strong></a> &nbsp;·&nbsp;
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 Feishu</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/nexu" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://discord.gg/Q6AxCUuMNU" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
   <a href="https://x.com/Nexu06" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
@@ -28,32 +27,30 @@
 
 ---
 
-## Overview
+## 📋 Overview
 
-**nexu** (next to you) gives you the simplest way to own an OpenClaw 🦞 — download, double-click, start working.
+**nexu** (next to you) is an open-source desktop client (Electron) that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
 
-Built on the open-source OpenClaw 🦞, pre-loaded with essential Skills like Feishu Skills, plus Claude, ChatGPT, Minimax, GLM, Kimi, and more — or bring your own API Key 🔌.
+It offers graphical setup, built-in Feishu Skills, multi-model support, and BYOK.
 
-Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — chat with it right inside the tools you already use.
+Configuration and runtime state stay primarily on your machine.
 
-<!-- TODO: Add product demo GIF / screenshot here -->
+<p align="center">
+  <img src="site/media/readme-screenshot.png" width="660" alt="nexu screenshot" />
+</p>
 
 ---
 
-## Why nexu
+## 📊 Difference from other solutions
 
-Open-source agent tools often force users through long install guides and scattered config before they see any value. We believe the first experience should be the opposite.
-
-| Challenge | nexu |
-|-----------|------|
-| 😩 Complex CLI / env setup | ✅ One double-click install; no terminal required |
-| 🧩 Scattered skill integration | ✅ Built-in OpenClaw 🦞 + full Feishu Skills, ready to use |
-| 🔧 Model and API key juggling | ✅ nexu account for top models, or bring your own API Key |
-| 🎭 "Demo only" agents | ✅ A desktop client built for real team workflows |
-| 🚪 Login walls | ✅ Use your own API Key with zero sign-up |
-| 📵 Desktop-only, no mobile access | ✅ Connect IM channels, use your agent on mobile instantly |
-
-> Open source should not mean harder to use. It should mean more freedom, more trust, and more leverage for every team.
+| | OpenClaw (official) | Typical hosted Feishu + agent stacks | **nexu** ✅ |
+|---|---|---|---|
+| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Claude / GPT / Gemini, etc. — one-click switch in GUI** ✅ |
+| **📡 Data path** | Local | Routed through vendor servers, data out of your control ❌ | **Local-first; we don't host your business data** ✅ |
+| **💰 Cost** | Free, but self-deploy required ⚠️ | Subscription / per-seat pricing ❌ | **Client is free; pay providers via your own API keys** ✅ |
+| **📜 Source** | Open source | Closed source, no audit possible ❌ | **MIT — fork and audit** ✅ |
+| **🔗 Channels** | DIY integration required ⚠️ | Varies by vendor, often limited ❌ | **Built-in Feishu, Slack, Discord — works out of the box** ✅ |
+| **🖥 Interface** | CLI, requires technical skills ❌ | Varies by vendor | **Pure GUI, no CLI needed, double-click to start** ✅ |
 
 ---
 
@@ -85,30 +82,7 @@ Open-source at the core, with a desktop experience that actually runs. Compatibl
 
 ---
 
-## 🚀 Getting Started
-
-### System requirements
-
-- 🍎 **OS**: macOS 12+ (Apple Silicon)
-- 💾 **Storage**: ~500 MB
-
-### Installation
-
-**Pre-built Mac client (recommended)**
-
-1. Go to the [Releases](https://github.com/nexu-io/nexu/releases) page or the [official site](https://nexu.io) 📥
-2. Download the Mac installer
-3. Launch nexu 🎉
-
-> ⏳ **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
-
-### First launch
-
-Sign in with your nexu account for instant access to supported models, or add your own API Key and use the client without an account 🔑.
-
----
-
-## Use Cases
+## Use cases
 
 nexu is built for **One Person Company** and small teams—one person, one AI team.
 
@@ -150,54 +124,59 @@ Requirement breakdown, asset search, copywriting, design annotation—free up cr
 
 ---
 
+## 🚀 Getting started
+
+### System requirements
+
+- 🍎 **OS**: macOS 12+ (Apple Silicon)
+- 💾 **Storage**: ~500 MB
+
+### Installation
+
+**Pre-built Mac client (recommended)**
+
+1. Go to the [official site](https://nexu.io) or [Releases](https://github.com/nexu-io/nexu/releases) 📥
+2. Download the Mac installer
+3. Launch nexu 🎉
+
+> ⏳ **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
+
+### First launch
+
+Sign in with your nexu account for instant access to supported models, or add your own API Key and use the client without an account 🔑.
+
+---
+
 ## 🛠 Development
 
 ### Prerequisites
 
 - **Node.js** 22+ (LTS recommended)
-- **Package manager**: pnpm 10+
+- **pnpm** 10+
 
-### Project structure
+### Repository layout (excerpt)
 
 ```
 nexu/
 ├── apps/
-│   ├── api/              # Backend API server
+│   ├── api/              # Backend API
 │   ├── web/              # Web frontend
-│   ├── landing/          # Landing page
-│   ├── desktop/          # Mac desktop client (Electron)
-│   ├── gateway/          # Gateway service
-│   └── router/           # Router service
-├── packages/
-│   └── shared/           # Shared libraries
-├── openclaw-runtime/     # OpenClaw core runtime
-├── skills/               # Built-in Skills (local dev & bot)
-├── nexu-skills/          # nexu skill definitions
-├── deploy/               # Deployment configs (Helm, K8s, Nginx)
-├── docs/                 # Documentation & design docs
-├── tests/                # Integration & contract tests
-├── experiments/          # Experimental scripts
-└── specs/                # Specifications
+│   ├── desktop/          # Desktop client (Electron)
+│   └── controller/       # Controller service
+├── packages/shared/      # Shared libraries
+├── docs/
+├── tests/
+└── specs/
 ```
 
-### Quick start (from source)
+### Commands
 
 ```bash
-git clone https://github.com/nexu-io/nexu.git
-cd nexu
-pnpm install
-pnpm run dev
-```
-
-### Available commands
-
-```bash
-pnpm run dev             # Start API + Web + Landing with hot reload
-pnpm run dev:desktop     # Start desktop client
-pnpm run dev:sidecar     # Start gateway sidecar
-pnpm run build           # Production build (all packages)
-pnpm run lint            # Run linter (Biome + typecheck)
-pnpm test                # Run tests (Vitest)
+pnpm run dev             # Dev stack with hot reload
+pnpm run dev:desktop     # Desktop client
+pnpm run build           # Production build
+pnpm run lint
+pnpm test
 ```
 
 ---
@@ -221,27 +200,16 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ---
 
-## 🙏 Acknowledgements
-
-nexu is built on the shoulders of excellent open-source projects:
-
-- [OpenClaw 🦞](https://github.com/nexu-io/nexu) — The AI agent runtime
-- [Electron](https://www.electronjs.org/) — Cross-platform desktop framework
-- [React](https://react.dev/) — UI component library
-- [Tailwind CSS](https://tailwindcss.com/) — Utility-first CSS framework
-
----
-
 ## 💬 Community
 
 | Feishu Group | Discord |
 |:---:|:---:|
 | <img src="site/media/feishu-qr.png" width="200" /> | <img src="site/media/discord-qr.png" width="200" /> |
-| [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/nexu) |
+| [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/Q6AxCUuMNU) |
 
-- 💡 [GitHub Discussions](https://github.com/nexu-io/nexu/discussions) — Q&A and discussion
-- 🐛 [GitHub Issues](https://github.com/nexu-io/nexu/issues) — Bug reports and feature ideas
-- 📧 Email: [support@nexu.ai](mailto:support@nexu.ai)
+- [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
+- [GitHub Issues](https://github.com/nexu-io/nexu/issues)
+- [support@nexu.ai](mailto:support@nexu.ai)
 
 ### Contributors
 
@@ -265,7 +233,7 @@ nexu is built on the shoulders of excellent open-source projects:
 
 ## 📄 License
 
-This project is open source under the [MIT License](LICENSE).
+[MIT License](LICENSE)
 
 ---
 

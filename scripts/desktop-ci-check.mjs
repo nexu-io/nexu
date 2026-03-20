@@ -49,7 +49,7 @@ function createCheckContext(mode) {
 
     return {
       mode,
-      statusCommand: ["pnpm", ["desktop:status"]],
+      statusCommand: ["pnpm", ["status"]],
       ports: [
         { unit: "controller", port: 50800 },
         { unit: "web", port: 50810 },
@@ -833,10 +833,16 @@ async function captureLogs(context, captureDir) {
       continue;
     }
 
-    await cp(entry.source, join(captureDir, entry.target), {
-      recursive: true,
-      force: true,
-    });
+    try {
+      await cp(entry.source, join(captureDir, entry.target), {
+        recursive: true,
+        force: true,
+      });
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+      // Transient files (e.g. .tmp) may vanish between the existence
+      // check and the recursive copy — safe to ignore.
+    }
   }
 
   if (context.mode === "dev") {
