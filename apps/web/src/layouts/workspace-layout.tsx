@@ -219,6 +219,31 @@ function WorkspaceLayoutInner() {
   }, []);
 
   useEffect(() => {
+    if (!isDesktopClient) {
+      return;
+    }
+
+    const root = document.getElementById("root");
+    const previousHtmlBackground =
+      document.documentElement.style.backgroundColor;
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousRootBackground = root?.style.backgroundColor ?? "";
+    document.documentElement.style.backgroundColor = "transparent";
+    document.body.style.backgroundColor = "transparent";
+    if (root) {
+      root.style.backgroundColor = "transparent";
+    }
+
+    return () => {
+      document.documentElement.style.backgroundColor = previousHtmlBackground;
+      document.body.style.backgroundColor = previousBodyBackground;
+      if (root) {
+        root.style.backgroundColor = previousRootBackground;
+      }
+    };
+  }, [isDesktopClient]);
+
+  useEffect(() => {
     if (!showLogoutConfirm) return;
     const handler = (e: MouseEvent) => {
       if (logoutRef.current && !logoutRef.current.contains(e.target as Node)) {
@@ -314,6 +339,7 @@ function WorkspaceLayoutInner() {
         : selectedSession
           ? `${selectedSession.channelType} · ${formatTime(selectedSession.lastTime)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
+  const desktopGlassTint = "rgba(255, 255, 255, 0.7)";
 
   return (
     <div className="flex h-screen relative">
@@ -344,6 +370,7 @@ function WorkspaceLayoutInner() {
         style={{
           width: collapsed ? 0 : 224,
           transition: "width 200ms ease",
+          background: isDesktopClient ? desktopGlassTint : "transparent",
         }}
       >
         {/* Header / Brand */}
@@ -878,36 +905,48 @@ function WorkspaceLayoutInner() {
       )}
 
       {/* Main content — elevated surface with rounded left edge */}
-      <div className="flex-1 min-w-0 bg-surface-1 rounded-l-[12px] flex flex-col">
-        <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-2 hover:text-text-primary"
-              aria-label="Open menu"
-            >
-              <Menu size={16} />
-            </button>
-            <div className="min-w-0 flex-1 text-center leading-tight">
-              <div className="text-[13px] font-semibold text-text-primary truncate">
-                {mobileTitle}
-              </div>
-              <div className="text-[10px] text-text-muted truncate mt-0.5">
-                {mobileSubtitle}
-              </div>
-            </div>
-            <div className="w-9" />
-          </div>
-        </div>
-
-        <main className="flex-1 overflow-y-auto min-h-0">
-          {showEmptyState ? (
-            <EmptyState onGoConfig={() => navigate("/workspace/settings")} />
-          ) : (
-            <Outlet />
+      <div className="relative flex-1 min-w-0">
+        {isDesktopClient && (
+          <div
+            className="absolute inset-y-0 left-0 w-4 pointer-events-none"
+            style={{ background: desktopGlassTint }}
+          />
+        )}
+        <div
+          className={cn(
+            "relative flex h-full min-w-0 flex-col bg-surface-1 rounded-l-[12px]",
           )}
-        </main>
+        >
+          <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+                aria-label="Open menu"
+              >
+                <Menu size={16} />
+              </button>
+              <div className="min-w-0 flex-1 text-center leading-tight">
+                <div className="text-[13px] font-semibold text-text-primary truncate">
+                  {mobileTitle}
+                </div>
+                <div className="text-[10px] text-text-muted truncate mt-0.5">
+                  {mobileSubtitle}
+                </div>
+              </div>
+              <div className="w-9" />
+            </div>
+          </div>
+
+          <main className="flex-1 overflow-y-auto min-h-0">
+            {showEmptyState ? (
+              <EmptyState onGoConfig={() => navigate("/workspace/settings")} />
+            ) : (
+              <Outlet />
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

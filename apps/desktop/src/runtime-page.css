@@ -180,6 +180,10 @@ body,
   display: none;
 }
 
+.desktop-shell.is-immersive {
+  background: transparent;
+}
+
 .desktop-shell.is-immersive .desktop-shell-stage {
   padding: 0;
   background: none;
@@ -201,7 +205,7 @@ body,
   min-height: 0;
   flex: 1;
   border: 0;
-  background: #fff;
+  background: transparent;
   border-radius: 22px;
 }
 
