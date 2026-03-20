@@ -294,17 +294,9 @@ const en = {
   "models.managed.waitingLogin": "Waiting for browser login...",
   "models.managed.loginButton": "Log in to Nexu",
   "models.managed.availableModels": "Available models",
+  "models.managed.refreshSucceeded": "Models refreshed",
+  "models.managed.refreshFailed": "Could not refresh models",
   "models.managed.totalCount": "{{count}} total",
-  "models.managed.loadingCatalog": "Loading model catalog...",
-  "models.catalog.title": "Available model catalog",
-  "models.catalog.summary":
-    "{{totalModels}} models from {{providerCount}} providers",
-  "models.catalog.connectedHint":
-    "These models are available in the model selector above after login",
-  "models.catalog.loginHint":
-    "Models below are available after logging into your Nexu account",
-  "models.catalog.modelsCount": "{{count}} models",
-  "models.catalog.loginToUse": "Login required",
   "models.byok.getApiKey": "Get API Key",
   "models.byok.apiKey": "API Key",
   "models.byok.apiKeySaved": "API key saved",

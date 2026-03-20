@@ -25,13 +25,13 @@ import {
   deleteApiV1ProvidersByProviderId,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
-  getApiV1LinkCatalog,
   getApiV1Me,
   getApiV1Models,
   getApiV1Providers,
   patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
+  postApiInternalDesktopCloudRefresh,
   postApiV1ProvidersByProviderIdVerify,
   putApiInternalDesktopDefaultModel,
   putApiV1ProvidersByProviderId,
@@ -1158,28 +1158,6 @@ export function ModelsPage() {
   );
 }
 
-// ── Link catalog types ─────────────────────────────────────────
-
-interface LinkModel {
-  id: string;
-  name: string;
-  externalName: string;
-  inputPrice: string | null;
-  outputPrice: string | null;
-}
-
-interface LinkProvider {
-  id: string;
-  name: string;
-  kind: string;
-  models: LinkModel[];
-}
-
-async function fetchLinkCatalog(): Promise<LinkProvider[]> {
-  const { data } = await getApiV1LinkCatalog();
-  return (data?.providers as LinkProvider[]) ?? [];
-}
-
 // ── Managed provider detail (Nexu Official) ───────────────────
 
 function ManagedProviderDetail({
@@ -1190,20 +1168,24 @@ function ManagedProviderDetail({
   currentModelId: string;
 }) {
   const { t } = useTranslation();
-  const { data: linkProviders = [], isLoading: catalogLoading } = useQuery({
-    queryKey: ["link-catalog"],
-    queryFn: fetchLinkCatalog,
-  });
-
-  const totalModels = linkProviders.reduce(
-    (sum, p) => sum + p.models.length,
-    0,
-  );
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [cloudConnected, setCloudConnected] = useState(false);
   const queryClient = useQueryClient();
+  const refreshCloudModels = useMutation({
+    mutationFn: async () => {
+      await postApiInternalDesktopCloudRefresh();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
+      toast.success(t("models.managed.refreshSucceeded"));
+    },
+    onError: () => {
+      toast.error(t("models.managed.refreshFailed"));
+    },
+  });
 
   // Check if already connected on mount
   useEffect(() => {
@@ -1223,10 +1205,6 @@ function ManagedProviderDetail({
         if (data?.connected) {
           setLoginBusy(false);
           setCloudConnected(true);
-          // Refresh provider/model data now that cloud is connected.
-          // Backend onCloudStateChanged callback already ran
-          // ensureValidDefaultModel + syncAll at this point.
-          queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
           queryClient.invalidateQueries({ queryKey: ["models"] });
           queryClient.invalidateQueries({
             queryKey: ["desktop-default-model"],
@@ -1321,11 +1299,15 @@ function ManagedProviderDetail({
               <button
                 type="button"
                 onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
+                  refreshCloudModels.mutate();
                 }}
+                disabled={refreshCloudModels.isPending}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
               >
-                <RefreshCw size={11} />
+                <RefreshCw
+                  size={11}
+                  className={cn(refreshCloudModels.isPending && "animate-spin")}
+                />
                 {t("models.managed.refresh")}
               </button>
               <button
@@ -1432,111 +1414,6 @@ function ManagedProviderDetail({
           </div>
         </div>
       )}
-
-      {/* Link provider catalog */}
-      {catalogLoading ? (
-        <div className="flex items-center gap-2 text-[12px] text-text-muted py-4">
-          <Loader2 size={14} className="animate-spin" />
-          {t("models.managed.loadingCatalog")}
-        </div>
-      ) : linkProviders.length > 0 ? (
-        <LinkModelCatalog
-          linkProviders={linkProviders}
-          totalModels={totalModels}
-          cloudConnected={cloudConnected}
-          currentModelId={currentModelId}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-// ── Link model catalog (read-only) ───────────────────────────
-
-function LinkModelCatalog({
-  linkProviders,
-  totalModels,
-  cloudConnected,
-  currentModelId,
-}: {
-  linkProviders: LinkProvider[];
-  totalModels: number;
-  cloudConnected: boolean;
-  currentModelId: string;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <div className="text-[13px] font-semibold text-text-primary mb-1">
-        {t("models.catalog.title")}
-        <span className="ml-2 text-[11px] font-normal text-text-muted">
-          {t("models.catalog.summary", {
-            totalModels,
-            providerCount: linkProviders.length,
-          })}
-        </span>
-      </div>
-      <div className="text-[11px] text-text-muted mb-4">
-        {cloudConnected
-          ? t("models.catalog.connectedHint")
-          : t("models.catalog.loginHint")}
-      </div>
-      <div className="space-y-5">
-        {linkProviders.map((lp) => (
-          <div key={lp.id}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                <ProviderLogo provider={lp.kind} size={14} />
-              </span>
-              <span className="text-[12px] font-medium text-text-primary">
-                {lp.name}
-              </span>
-              <span className="text-[10px] text-text-muted">
-                {t("models.catalog.modelsCount", { count: lp.models.length })}
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {lp.models.map((m) => {
-                const isSelected = m.id === currentModelId;
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
-                      isSelected
-                        ? "border-accent/30 bg-accent/5"
-                        : "border-border bg-surface-0",
-                      !cloudConnected && "opacity-70",
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                        <ProviderLogo provider={lp.kind} size={16} />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-[12px] font-medium text-text-primary truncate">
-                          {m.name}
-                        </div>
-                        <div className="text-[10px] text-text-muted">
-                          {m.externalName}
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected ? (
-                      <Check size={14} className="text-accent shrink-0" />
-                    ) : !cloudConnected ? (
-                      <span className="text-[10px] text-text-muted/60 shrink-0">
-                        {t("models.catalog.loginToUse")}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

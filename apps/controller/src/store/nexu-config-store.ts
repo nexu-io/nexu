@@ -307,7 +307,8 @@ export class NexuConfigStore {
           const models =
             data.cloudModels && data.cloudModels.length > 0
               ? data.cloudModels
-              : await this.fetchDesktopCloudModels(linkUrl, data.apiKey);
+              : ((await this.fetchDesktopCloudModels(linkUrl, data.apiKey)) ??
+                []);
 
           this.pollingState = null;
           await this.setDesktopCloudState({
@@ -848,6 +849,20 @@ export class NexuConfigStore {
     };
   }
 
+  async refreshDesktopCloudModels() {
+    await this.hydrateDesktopCloudModels(true);
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+    return {
+      connected: cloud.connected,
+      polling: cloud.polling,
+      userName: cloud.userName ?? null,
+      userEmail: cloud.userEmail ?? null,
+      connectedAt: cloud.connectedAt ?? null,
+      models: cloud.models ?? [],
+    };
+  }
+
   async setDefaultModel(modelId: string): Promise<void> {
     await this.store.update((config) => ({
       ...config,
@@ -866,21 +881,21 @@ export class NexuConfigStore {
   private async fetchDesktopCloudModels(
     linkUrl: string,
     apiKey: string,
-  ): Promise<CloudModel[]> {
+  ): Promise<CloudModel[] | null> {
     try {
       const res = await fetch(buildLinkModelsUrl(linkUrl), {
         headers: { Authorization: `Bearer ${apiKey}` },
         signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) {
-        return [];
+        return null;
       }
 
       const data = (await res.json()) as {
         data?: Array<{ id: string; owned_by?: string }>;
       };
       if (!Array.isArray(data.data)) {
-        return [];
+        return null;
       }
 
       return data.data.map((model) => ({
@@ -889,21 +904,25 @@ export class NexuConfigStore {
         provider: model.owned_by,
       }));
     } catch {
-      return [];
+      return null;
     }
   }
 
-  private async hydrateDesktopCloudModels(): Promise<void> {
+  private async hydrateDesktopCloudModels(forceRefresh = false): Promise<void> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
 
-    if (!cloud.connected || !cloud.apiKey || (cloud.models?.length ?? 0) > 0) {
+    if (
+      !cloud.connected ||
+      !cloud.apiKey ||
+      (!forceRefresh && (cloud.models?.length ?? 0) > 0)
+    ) {
       return;
     }
 
     const linkUrl = this.nexuLinkUrl ?? cloud.linkUrl ?? this.nexuCloudUrl;
     const models = await this.fetchDesktopCloudModels(linkUrl, cloud.apiKey);
-    if (models.length === 0) {
+    if (models === null) {
       return;
     }
 

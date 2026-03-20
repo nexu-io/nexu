@@ -915,6 +915,75 @@
         }
       }
     },
+    "/api/internal/desktop/shell-open": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shell open result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Path not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/ready": {
       "get": {
         "tags": [
@@ -1051,6 +1120,73 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-refresh": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cloud refresh",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "configPushed"
+                  ]
                 }
               }
             }
@@ -3262,85 +3398,6 @@
                   },
                   "required": [
                     "valid"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/link-catalog": {
-      "get": {
-        "tags": [
-          "Models"
-        ],
-        "responses": {
-          "200": {
-            "description": "Link catalog placeholder",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "providers": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string"
-                          },
-                          "models": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "externalName": {
-                                  "type": "string"
-                                },
-                                "inputPrice": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "outputPrice": {
-                                  "type": "string",
-                                  "nullable": true
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "name",
-                                "externalName",
-                                "inputPrice",
-                                "outputPrice"
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "kind",
-                          "models"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "providers"
                   ]
                 }
               }
