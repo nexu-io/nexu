@@ -180,6 +180,10 @@ body,
   display: none;
 }
 
+.desktop-shell.is-immersive {
+  background: transparent;
+}
+
 .desktop-shell.is-immersive .desktop-shell-stage {
   padding: 0;
   background: none;
@@ -189,9 +193,9 @@ body,
 .window-drag-bar {
   position: fixed;
   top: 0;
-  left: 100px; /* Leave space for traffic lights + sidebar toggle */
-  right: 0;
-  height: 38px;
+  left: 112px; /* Leave space for traffic lights + sidebar toggle */
+  width: 240px;
+  height: 30px;
   z-index: 9999;
   -webkit-app-region: drag;
 }
@@ -201,7 +205,7 @@ body,
   min-height: 0;
   flex: 1;
   border: 0;
-  background: #fff;
+  background: transparent;
   border-radius: 22px;
 }
 

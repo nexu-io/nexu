@@ -4,6 +4,7 @@ import {
   cloudDisconnectResponseSchema,
   cloudModelsBodySchema,
   cloudModelsResponseSchema,
+  cloudRefreshResponseSchema,
   cloudStatusResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
@@ -55,6 +56,28 @@ export function registerDesktopCompatRoutes(
     }),
     async (c) =>
       c.json(await container.desktopLocalService.connectCloud(), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/desktop/cloud-refresh",
+      tags: ["Desktop"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudRefreshResponseSchema },
+          },
+          description: "Cloud refresh",
+        },
+      },
+    }),
+    async (c) => {
+      const status = await container.desktopLocalService.refreshCloudStatus();
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ...status, configPushed }, 200);
+    },
   );
 
   app.openapi(

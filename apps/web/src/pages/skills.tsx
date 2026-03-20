@@ -1,3 +1,4 @@
+import { GitHubStarCta } from "@/components/github-star-cta";
 import { Switch } from "@/components/ui/switch";
 import {
   useCommunitySkills,
@@ -6,6 +7,7 @@ import {
   useRefreshCatalog,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
+import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
 import { cn } from "@/lib/utils";
@@ -169,6 +171,7 @@ function SkillCard({
 
 export function SkillsPage() {
   const { t } = useTranslation();
+  const { stars } = useGitHubStars();
   const { locale } = useLocale();
   const { data, isLoading, isError } = useCommunitySkills();
   const refreshMutation = useRefreshCatalog();
@@ -410,7 +413,7 @@ export function SkillsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-6 sm:pb-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-10">
           <div>
@@ -418,6 +421,11 @@ export function SkillsPage() {
             <p className="heading-page-desc">{t("skills.pageSubtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
+            <GitHubStarCta
+              label={t("home.starGithub")}
+              stars={stars}
+              variant="button"
+            />
             <div className="relative">
               <Search
                 size={14}

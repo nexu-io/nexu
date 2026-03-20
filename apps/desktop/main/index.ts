@@ -7,6 +7,9 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  nativeTheme,
+  powerMonitor,
+  powerSaveBlocker,
   session,
   shell,
 } from "electron";
@@ -29,6 +32,7 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
@@ -38,6 +42,7 @@ const __dirname = dirname(__filename);
 
 // Set display name early (matches productName in package.json).
 app.setName("Nexu");
+nativeTheme.themeSource = "light";
 
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
@@ -68,6 +73,14 @@ const orchestrator = new RuntimeOrchestrator(
 app.commandLine.appendSwitch("disable-popup-blocking");
 
 const sentryDsn = runtimeConfig.sentryDsn;
+const embeddedWorkspaceTransparentCss = `
+  html,
+  body,
+  #root {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+`;
 
 function readNativeCrashTestTitle(event: Sentry.Event): string | null {
   const taggedTitle =
@@ -178,6 +191,7 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+let sleepGuard: SleepGuard | null = null;
 
 function sendDesktopCommand(
   surface: DesktopSurface,
@@ -327,6 +341,17 @@ function logRendererEvent({
   });
 }
 
+function logSleepGuard(entry: SleepGuardLogEntry): void {
+  writeDesktopMainLog({
+    source: "sleep-guard",
+    stream: entry.stream,
+    kind: entry.kind,
+    message: entry.message,
+    logFilePath: getDesktopLogFilePath("desktop-main.log"),
+    windowId: getMainWindowId(),
+  });
+}
+
 async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
@@ -456,15 +481,23 @@ app.on("second-instance", () => {
 
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
+  const isMacOS = process.platform === "darwin";
   const window = new BrowserWindow({
     width: 1400,
     height: 920,
     minWidth: 1120,
     minHeight: 760,
-    backgroundColor: "#0B1020",
+    backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "Nexu",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
+    ...(isMacOS
+      ? {
+          transparent: true,
+          vibrancy: "sidebar" as const,
+          visualEffectState: "followWindow" as const,
+        }
+      : {}),
     show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -477,6 +510,11 @@ function createMainWindow(): BrowserWindow {
 
   // Per-webContents handler is set globally via app.on('web-contents-created')
   // so we don't need one here on the main window.
+
+  if (isMacOS) {
+    window.setBackgroundColor("#00000000");
+    window.setVibrancy("sidebar");
+  }
 
   window.webContents.on(
     "console-message",
@@ -540,6 +578,10 @@ function createMainWindow(): BrowserWindow {
 
   window.once("ready-to-show", () => {
     logLaunchTimeline("main window ready-to-show");
+    if (isMacOS) {
+      window.setBackgroundColor("#00000000");
+      window.setVibrancy("sidebar");
+    }
     window.show();
     focusMainWindow();
   });
@@ -596,6 +638,21 @@ app.on("web-contents-created", (_event, contents) => {
 
   contents.on("did-finish-load", () => {
     const url = contents.getURL();
+    if (url.startsWith(runtimeConfig.urls.web)) {
+      void contents
+        .insertCSS(embeddedWorkspaceTransparentCss)
+        .catch((error) => {
+          writeDesktopMainLog({
+            source: `embedded:${contentType}:transparent-css`,
+            stream: "stderr",
+            kind: "app",
+            message: `failed to inject transparent workspace CSS url=${url} error=${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            logFilePath: null,
+          });
+        });
+    }
     diagnosticsReporter?.recordEmbeddedDidFinishLoad({
       id: contents.id,
       type: contentType,
@@ -636,7 +693,16 @@ app.whenReady().then(async () => {
   registerIpcHandlers(orchestrator, runtimeConfig);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();
+  sleepGuard = new SleepGuard({
+    powerMonitor,
+    powerSaveBlocker,
+    log: logSleepGuard,
+    onSnapshot: (snapshot) => {
+      diagnosticsReporter?.setSleepGuardSnapshot(snapshot);
+    },
+  });
   const win = createMainWindow();
+  sleepGuard.start("desktop-runtime-active");
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();
@@ -701,6 +767,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  sleepGuard?.dispose("app-before-quit");
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();

@@ -216,20 +216,30 @@ async function stapleNotarizedAppBundles() {
 
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
+  const isCi =
+    process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
   let existingConfig = {};
   const desktopPackage = JSON.parse(
     await readFile(desktopPackageJsonPath, "utf8"),
   );
 
-  try {
-    const existing = await readFile(configPath, "utf8");
-    existingConfig = JSON.parse(existing);
-    console.log(
-      "[dist:mac] loaded existing build-config.json:",
-      existing.trim(),
-    );
-  } catch {
-    // build-config.json is optional for local dist builds.
+  if (isCi) {
+    try {
+      const existing = await readFile(configPath, "utf8");
+      existingConfig = JSON.parse(existing);
+      console.log("[dist:mac] preserving CI-generated build-config.json");
+    } catch {
+      // build-config.json is optional before generation in CI.
+    }
+  } else {
+    try {
+      await rm(configPath, { force: true });
+      console.log(
+        "[dist:mac] removed stale build-config.json before regeneration",
+      );
+    } catch {
+      // Ignore cleanup failures and continue with regeneration.
+    }
   }
 
   const envPath = resolve(electronRoot, ".env");
@@ -254,62 +264,73 @@ async function ensureBuildConfig() {
   };
 
   const config = {
-    ...existingConfig,
     NEXU_CLOUD_URL:
       merged.NEXU_CLOUD_URL ??
       existingConfig.NEXU_CLOUD_URL ??
       "https://nexu.io",
     NEXU_LINK_URL: merged.NEXU_LINK_URL ?? existingConfig.NEXU_LINK_URL ?? null,
+    ...((merged.NEXU_SENTRY_ENV ?? existingConfig.NEXU_SENTRY_ENV)
+      ? {
+          NEXU_SENTRY_ENV:
+            merged.NEXU_SENTRY_ENV ?? existingConfig.NEXU_SENTRY_ENV,
+        }
+      : {}),
     NEXU_DESKTOP_APP_VERSION:
-      existingConfig.NEXU_DESKTOP_APP_VERSION ??
       merged.NEXU_DESKTOP_APP_VERSION ??
+      existingConfig.NEXU_DESKTOP_APP_VERSION ??
       (typeof desktopPackage.version === "string"
         ? desktopPackage.version
         : undefined) ??
       merged.npm_package_version ??
       undefined,
-    ...((existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
-    merged.NEXU_DESKTOP_SENTRY_DSN)
+    ...((merged.NEXU_DESKTOP_SENTRY_DSN ??
+    existingConfig.NEXU_DESKTOP_SENTRY_DSN)
       ? {
           NEXU_DESKTOP_SENTRY_DSN:
-            existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
-            merged.NEXU_DESKTOP_SENTRY_DSN,
+            merged.NEXU_DESKTOP_SENTRY_DSN ??
+            existingConfig.NEXU_DESKTOP_SENTRY_DSN,
         }
       : {}),
-    ...((existingConfig.NEXU_UPDATE_FEED_URL ?? merged.NEXU_UPDATE_FEED_URL)
+    ...((merged.NEXU_UPDATE_FEED_URL ?? existingConfig.NEXU_UPDATE_FEED_URL)
       ? {
           NEXU_UPDATE_FEED_URL:
-            existingConfig.NEXU_UPDATE_FEED_URL ?? merged.NEXU_UPDATE_FEED_URL,
+            merged.NEXU_UPDATE_FEED_URL ?? existingConfig.NEXU_UPDATE_FEED_URL,
         }
       : {}),
-    ...((existingConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
-    merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED)
+    ...((merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
+    existingConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED)
       ? {
           NEXU_DESKTOP_AUTO_UPDATE_ENABLED:
-            existingConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
-            merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
+            merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
+            existingConfig.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
         }
       : {}),
     NEXU_DESKTOP_BUILD_SOURCE:
+      merged.NEXU_DESKTOP_BUILD_SOURCE ??
       existingConfig.NEXU_DESKTOP_BUILD_SOURCE ??
       defaultMetadata.NEXU_DESKTOP_BUILD_SOURCE,
-    ...((existingConfig.NEXU_DESKTOP_BUILD_BRANCH ??
+    ...((merged.NEXU_DESKTOP_BUILD_BRANCH ??
+    existingConfig.NEXU_DESKTOP_BUILD_BRANCH ??
     defaultMetadata.NEXU_DESKTOP_BUILD_BRANCH)
       ? {
           NEXU_DESKTOP_BUILD_BRANCH:
+            merged.NEXU_DESKTOP_BUILD_BRANCH ??
             existingConfig.NEXU_DESKTOP_BUILD_BRANCH ??
             defaultMetadata.NEXU_DESKTOP_BUILD_BRANCH,
         }
       : {}),
-    ...((existingConfig.NEXU_DESKTOP_BUILD_COMMIT ??
+    ...((merged.NEXU_DESKTOP_BUILD_COMMIT ??
+    existingConfig.NEXU_DESKTOP_BUILD_COMMIT ??
     defaultMetadata.NEXU_DESKTOP_BUILD_COMMIT)
       ? {
           NEXU_DESKTOP_BUILD_COMMIT:
+            merged.NEXU_DESKTOP_BUILD_COMMIT ??
             existingConfig.NEXU_DESKTOP_BUILD_COMMIT ??
             defaultMetadata.NEXU_DESKTOP_BUILD_COMMIT,
         }
       : {}),
     NEXU_DESKTOP_BUILD_TIME:
+      merged.NEXU_DESKTOP_BUILD_TIME ??
       existingConfig.NEXU_DESKTOP_BUILD_TIME ??
       defaultMetadata.NEXU_DESKTOP_BUILD_TIME,
   };

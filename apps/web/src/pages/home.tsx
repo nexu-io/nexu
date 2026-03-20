@@ -1,8 +1,11 @@
 import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
+import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
+import { useGitHubStars } from "@/hooks/use-github-stars";
+import { getChannelChatUrl } from "@/lib/channel-links";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Cable } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -59,31 +62,6 @@ function formatRelativeTime(
   return t("home.daysAgo", { count: days });
 }
 
-function getChatUrl(
-  channelType: string,
-  appId?: string | null,
-  botUserId?: string | null,
-  accountId?: string,
-): string {
-  switch (channelType) {
-    case "feishu":
-      return appId
-        ? `https://applink.feishu.cn/client/bot/open?appId=${appId}`
-        : "https://www.feishu.cn/";
-    case "slack": {
-      const teamId = accountId?.replace(/^slack-[^-]+-/, "");
-      if (teamId && botUserId) {
-        return `https://app.slack.com/client/${teamId}/${botUserId}`;
-      }
-      return "https://slack.com/";
-    }
-    case "discord":
-      return "https://discord.com/channels/@me";
-    default:
-      return "https://www.feishu.cn/";
-  }
-}
-
 const SLACK_SVG = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" role="img">
     <title>Slack</title>
@@ -122,7 +100,6 @@ const FEISHU_ICON = (
     style={{ objectFit: "contain" }}
   />
 );
-
 const ONBOARDING_CHANNELS = [
   {
     id: "feishu",
@@ -207,6 +184,7 @@ function getChannelStatusMeta(
 
 export function HomePage() {
   const { t } = useTranslation();
+  const { stars } = useGitHubStars();
   const [modalChannel, setModalChannel] = useState<
     "feishu" | "slack" | "discord" | null
   >(null);
@@ -585,7 +563,7 @@ export function HomePage() {
                           Add nexu Bot
                         </div>
                       </div>
-                      <ArrowRight
+                      <Cable
                         size={13}
                         className="text-text-muted group-hover:text-text-secondary transition-colors shrink-0 mt-0.5"
                       />
@@ -614,11 +592,11 @@ export function HomePage() {
      ══════════════════════════════════════════════════════════════════════ */
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* ═══ TOP: Hero — Bot running (horizontal layout) ═══ */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           <div
-            className="relative w-24 h-24 cursor-default shrink-0"
+            className="relative w-28 h-28 cursor-default shrink-0"
             onMouseEnter={() => setVideoHover(true)}
             onMouseLeave={() => setVideoHover(false)}
           >
@@ -655,6 +633,12 @@ export function HomePage() {
                 />
                 {runtimeDisplay.label}
               </span>
+              <GitHubStarCta
+                label={t("home.starGithub")}
+                stars={stars}
+                variant="inline"
+                className="ml-auto shrink-0"
+              />
             </div>
             <div className="flex items-center gap-2 mt-1.5">
               <InlineModelSelector />
@@ -709,7 +693,7 @@ export function HomePage() {
                       t,
                     );
                     const channelChatUrl = connectedChannel
-                      ? getChatUrl(
+                      ? getChannelChatUrl(
                           ch.id,
                           connectedChannel.appId,
                           connectedChannel.botUserId,
@@ -791,7 +775,7 @@ export function HomePage() {
                       <span className="text-[12px] font-medium text-text-muted group-hover:text-text-secondary flex-1 truncate">
                         {ch.name}
                       </span>
-                      <ArrowRight
+                      <Cable
                         size={12}
                         className="text-text-muted group-hover:text-text-primary transition-colors shrink-0"
                       />
@@ -805,6 +789,14 @@ export function HomePage() {
 
         {/* Activity Feed */}
         <ActivityFeed />
+
+        <GitHubStarCta
+          label={t("home.starNexu")}
+          description={t("home.starCta")}
+          badgeLabel="GitHub"
+          stars={stars}
+          variant="banner"
+        />
       </div>
 
       {modalChannel && (

@@ -7,6 +7,10 @@ export class DesktopLocalService {
     return this.configStore.getDesktopCloudStatus();
   }
 
+  async refreshCloudStatus() {
+    return this.configStore.refreshDesktopCloudModels();
+  }
+
   async connectCloud() {
     return this.configStore.connectDesktopCloud();
   }
@@ -22,40 +26,5 @@ export class DesktopLocalService {
   async setDefaultModel(modelId: string) {
     await this.configStore.setDefaultModel(modelId);
     return { ok: true, modelId };
-  }
-
-  async getLinkCatalog() {
-    const status = await this.configStore.getDesktopCloudStatus();
-    const grouped = new Map<
-      string,
-      Array<{
-        id: string;
-        name: string;
-        externalName: string;
-        inputPrice: null;
-        outputPrice: null;
-      }>
-    >();
-    for (const model of status.models ?? []) {
-      const provider = model.provider ?? "nexu";
-      const current = grouped.get(provider) ?? [];
-      current.push({
-        id: model.id,
-        name: model.name,
-        externalName: model.id,
-        inputPrice: null,
-        outputPrice: null,
-      });
-      grouped.set(provider, current);
-    }
-
-    return {
-      providers: Array.from(grouped.entries()).map(([id, models]) => ({
-        id,
-        name: id,
-        kind: id,
-        models,
-      })),
-    };
   }
 }

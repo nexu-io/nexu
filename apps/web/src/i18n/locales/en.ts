@@ -213,8 +213,10 @@ const en = {
   "home.viewConversationsDesc": "Threads and channel activity",
   "home.manageSkills": "Manage skills",
   "home.manageSkillsDesc": "Tools and capabilities",
-  "home.starGithub": "Star us on GitHub",
-  "home.starGithubDesc": "Follow updates, code, and releases",
+  "home.starGithub": "Star on GitHub",
+  "home.starNexu": "Star nexu on GitHub",
+  "home.starCta":
+    "Help us grow the open-source community — your star makes a difference",
   "home.recentActivity": "Recent Activity",
   "home.noRecentActivity": "No recent conversations",
 
@@ -244,7 +246,7 @@ const en = {
   "settings.general.nameRequired": "Full name is required",
   "settings.general.avatarTooLarge": "Avatar must be 1MB or smaller",
   "settings.general.avatarReadFailed": "Failed to read avatar file",
-  "settings.general.githubTitle": "Star us on GitHub",
+  "settings.general.githubTitle": "Star on GitHub",
   "settings.general.githubBody":
     "Follow releases and support the project in public.",
   "settings.general.githubBadge": "GitHub",
@@ -292,19 +294,11 @@ const en = {
   "models.managed.loginDescription":
     "Sign in with your Nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
   "models.managed.waitingLogin": "Waiting for browser login...",
-  "models.managed.loginButton": "Log in to Nexu",
+  "models.managed.loginButton": "Sign in to Nexu",
   "models.managed.availableModels": "Available models",
+  "models.managed.refreshSucceeded": "Models refreshed",
+  "models.managed.refreshFailed": "Could not refresh models",
   "models.managed.totalCount": "{{count}} total",
-  "models.managed.loadingCatalog": "Loading model catalog...",
-  "models.catalog.title": "Available model catalog",
-  "models.catalog.summary":
-    "{{totalModels}} models from {{providerCount}} providers",
-  "models.catalog.connectedHint":
-    "These models are available in the model selector above after login",
-  "models.catalog.loginHint":
-    "Models below are available after logging into your Nexu account",
-  "models.catalog.modelsCount": "{{count}} models",
-  "models.catalog.loginToUse": "Login required",
   "models.byok.getApiKey": "Get API Key",
   "models.byok.apiKey": "API Key",
   "models.byok.apiKeySaved": "API key saved",

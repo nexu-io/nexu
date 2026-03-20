@@ -1,6 +1,5 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
-  linkCatalogResponseSchema,
   modelListResponseSchema,
   providerListResponseSchema,
   providerResponseSchema,
@@ -161,23 +160,5 @@ export function registerModelRoutes(
         200,
       );
     },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "get",
-      path: "/api/v1/link-catalog",
-      tags: ["Models"],
-      responses: {
-        200: {
-          content: {
-            "application/json": { schema: linkCatalogResponseSchema },
-          },
-          description: "Link catalog placeholder",
-        },
-      },
-    }),
-    async (c) =>
-      c.json(await container.desktopLocalService.getLinkCatalog(), 200),
   );
 }

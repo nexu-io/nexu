@@ -18,6 +18,7 @@ jobs:
     uses: ./.github/workflows/desktop-build.yml
     with:
       environment: nexu-prod
+      sentry_env: "prod"
       cloud_url: "https://nexu.io"
       link_url: "https://link.nexu.io"
       update_feed_url: "https://desktop-releases.nexu.io/beta"

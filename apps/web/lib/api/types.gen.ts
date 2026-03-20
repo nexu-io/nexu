@@ -372,6 +372,39 @@ export type PostApiV1SharedSlackClaimResponses = {
 
 export type PostApiV1SharedSlackClaimResponse = PostApiV1SharedSlackClaimResponses[keyof PostApiV1SharedSlackClaimResponses];
 
+export type PostApiInternalDesktopShellOpenData = {
+    body?: {
+        path: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/shell-open';
+};
+
+export type PostApiInternalDesktopShellOpenErrors = {
+    /**
+     * Path not allowed
+     */
+    403: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiInternalDesktopShellOpenError = PostApiInternalDesktopShellOpenErrors[keyof PostApiInternalDesktopShellOpenErrors];
+
+export type PostApiInternalDesktopShellOpenResponses = {
+    /**
+     * Shell open result
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiInternalDesktopShellOpenResponse = PostApiInternalDesktopShellOpenResponses[keyof PostApiInternalDesktopShellOpenResponses];
+
 export type GetApiInternalDesktopReadyData = {
     body?: never;
     path?: never;
@@ -385,6 +418,7 @@ export type GetApiInternalDesktopReadyResponses = {
      */
     200: {
         ready: boolean;
+        workspacePath: string;
         runtime: {
             ok: boolean;
             status: number;
@@ -440,6 +474,34 @@ export type PostApiInternalDesktopCloudConnectResponses = {
 };
 
 export type PostApiInternalDesktopCloudConnectResponse = PostApiInternalDesktopCloudConnectResponses[keyof PostApiInternalDesktopCloudConnectResponses];
+
+export type PostApiInternalDesktopCloudRefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-refresh';
+};
+
+export type PostApiInternalDesktopCloudRefreshResponses = {
+    /**
+     * Cloud refresh
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudRefreshResponse = PostApiInternalDesktopCloudRefreshResponses[keyof PostApiInternalDesktopCloudRefreshResponses];
 
 export type PostApiInternalDesktopCloudDisconnectData = {
     body?: never;
@@ -1304,35 +1366,6 @@ export type PostApiV1ProvidersByProviderIdVerifyResponses = {
 };
 
 export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
-
-export type GetApiV1LinkCatalogData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/link-catalog';
-};
-
-export type GetApiV1LinkCatalogResponses = {
-    /**
-     * Link catalog placeholder
-     */
-    200: {
-        providers: Array<{
-            id: string;
-            name: string;
-            kind: string;
-            models: Array<{
-                id: string;
-                name: string;
-                externalName: string;
-                inputPrice: string;
-                outputPrice: string;
-            }>;
-        }>;
-    };
-};
-
-export type GetApiV1LinkCatalogResponse = GetApiV1LinkCatalogResponses[keyof GetApiV1LinkCatalogResponses];
 
 export type GetApiV1IntegrationsData = {
     body?: never;

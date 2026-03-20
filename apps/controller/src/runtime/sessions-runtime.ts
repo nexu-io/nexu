@@ -37,11 +37,32 @@ type SessionMetadata = {
   updatedAt?: string;
 };
 
+type SessionMetadataRecord = Record<string, unknown>;
+type SessionHints = {
+  senderName?: string;
+  channelType?: string;
+  metadata?: SessionMetadataRecord;
+  feishuMessageId?: string;
+};
+type ControllerConfigRecord = {
+  channels?: Array<{
+    id?: string;
+    botId?: string;
+    channelType?: string;
+  }>;
+  secrets?: Record<string, string>;
+};
+
 function sessionMetadataPath(filePath: string): string {
   return filePath.replace(/\.jsonl$/, ".meta.json");
 }
 
 export class SessionsRuntime {
+  private readonly feishuTokenCache = new Map<
+    string,
+    { token: string; expiresAt: number }
+  >();
+
   constructor(private readonly env: ControllerEnv) {}
 
   async listSessions(): Promise<SessionResponse[]> {
@@ -71,23 +92,47 @@ export class SessionsRuntime {
 
           const filePath = path.join(sessionsDir, file.name);
           const metadata = await stat(filePath);
-          const extra = await this.readSessionMetadata(filePath);
+          let extra = await this.readSessionMetadata(filePath);
           const sessionKey = file.name.replace(/\.jsonl$/, "");
 
-          // When .meta.json lacks title or channelType, try to infer from
-          // the JSONL content (first user message's sender metadata block).
+          // Read the first user message metadata block and backfill exact
+          // Feishu chat targets for existing sessions without touching
+          // OpenClaw's transcript writer.
+          const hints = await this.inferSessionHints(filePath);
+          const resolvedHintMetadata = await this.resolveExactChatMetadata(
+            agentEntry.name,
+            extra.metadata,
+            hints,
+          );
+
           let { title, channelType } = extra;
-          if (!title || !channelType) {
-            const hints = await this.inferSessionHints(filePath);
-            if (!channelType && hints.channelType) {
-              channelType = hints.channelType;
-            }
-            if (!title && hints.senderName) {
-              title = channelType
-                ? `${hints.senderName} · ${channelType}`
-                : hints.senderName;
-            }
+          if (!channelType && hints.channelType) {
+            channelType = hints.channelType;
           }
+          if (!title && hints.senderName) {
+            title = channelType
+              ? `${hints.senderName} · ${channelType}`
+              : hints.senderName;
+          }
+
+          const { metadata: mergedMetadata, changed: metadataBackfilled } =
+            this.mergeSessionMetadata(extra.metadata, resolvedHintMetadata);
+          if (metadataBackfilled) {
+            extra = {
+              ...extra,
+              metadata: mergedMetadata,
+            };
+            await this.writeSessionMetadata(filePath, extra);
+          }
+
+          // Read actual messages from .jsonl to get accurate count and
+          // last-message timestamp (OpenClaw writes directly to .jsonl and
+          // never updates .meta.json counters).
+          const messages = await this.readMessages(
+            filePath,
+            Number.POSITIVE_INFINITY,
+          );
+          const lastMsg = messages.at(-1);
 
           sessions.push({
             id: file.name,
@@ -97,12 +142,9 @@ export class SessionsRuntime {
             channelId: extra.channelId ?? null,
             title: title ?? sessionKey,
             status: extra.status ?? "active",
-            messageCount: extra.messageCount ?? 0,
-            lastMessageAt: extra.lastMessageAt ?? metadata.mtime.toISOString(),
-            metadata: extra.metadata ?? {
-              source: "openclaw-filesystem",
-              path: filePath,
-            },
+            messageCount: messages.length,
+            lastMessageAt: lastMsg?.createdAt ?? metadata.mtime.toISOString(),
+            metadata: this.buildPublicMetadata(filePath, extra.metadata),
             createdAt: extra.createdAt ?? metadata.birthtime.toISOString(),
             updatedAt: extra.updatedAt ?? metadata.mtime.toISOString(),
           });
@@ -305,14 +347,23 @@ export class SessionsRuntime {
     }
   }
 
+  private buildPublicMetadata(
+    filePath: string,
+    metadata: Record<string, unknown> | null | undefined,
+  ): SessionMetadataRecord {
+    return {
+      ...(metadata ?? {}),
+      source: "openclaw-filesystem",
+      path: filePath,
+    };
+  }
+
   /**
    * Read the first few KB of a JSONL file and extract sender name and
    * channel type from the first user message's "Sender (untrusted metadata)"
    * block. This avoids reading the entire (potentially large) session file.
    */
-  private async inferSessionHints(
-    filePath: string,
-  ): Promise<{ senderName?: string; channelType?: string }> {
+  private async inferSessionHints(filePath: string): Promise<SessionHints> {
     const READ_BYTES = 16_384; // 16 KB is enough for the first ~20 lines
     let chunk: string;
     try {
@@ -345,7 +396,7 @@ export class SessionsRuntime {
       const text = this.extractTextFromContent(content);
       if (!text) continue;
 
-      return this.parseSenderHints(text);
+      return this.parseSessionHints(text);
     }
     return {};
   }
@@ -368,40 +419,37 @@ export class SessionsRuntime {
     return undefined;
   }
 
-  /**
-   * Parse sender name and channel type from the text of a user message.
-   *
-   * OpenClaw injects a "Sender (untrusted metadata)" JSON block at the top
-   * of each user message. The block has `label`, `id`, and optionally `name`.
-   * For Feishu messages the `name` field contains the real user display name,
-   * while `label` typically includes "feishu" for Feishu-originated messages.
-   * For Slack messages `label` typically includes "slack".
-   */
-  private parseSenderHints(text: string): {
-    senderName?: string;
-    channelType?: string;
-  } {
-    // Match the JSON block after "Sender (untrusted metadata):"
-    const match = text.match(
-      /Sender\s+\(untrusted metadata\):\s*```json\s*\n([\s\S]*?)```/,
+  private parseSessionHints(text: string): SessionHints {
+    const senderMeta = this.parseJsonMetadataBlock(
+      text,
+      "Sender (untrusted metadata)",
     );
-    const jsonBlock = match?.[1];
-    if (!jsonBlock) return {};
+    const conversationMeta = this.parseJsonMetadataBlock(
+      text,
+      "Conversation info (untrusted metadata)",
+    );
 
-    let meta: { label?: string; id?: string; name?: string };
-    try {
-      meta = JSON.parse(jsonBlock);
-    } catch {
-      return {};
-    }
+    const senderName =
+      this.readStringValue(senderMeta, "name") ??
+      this.readStringValue(senderMeta, "label") ??
+      this.readStringValue(conversationMeta, "sender") ??
+      undefined;
 
-    const senderName = meta.name || meta.label || undefined;
-
-    // Infer channel type from label / id / surrounding text
     let channelType: string | undefined;
-    const combined =
-      `${meta.label ?? ""} ${meta.id ?? ""} ${text}`.toLowerCase();
-    if (combined.includes("feishu")) {
+    const combined = [
+      this.readStringValue(senderMeta, "label") ?? "",
+      this.readStringValue(senderMeta, "id") ?? "",
+      this.readStringValue(conversationMeta, "sender_id") ?? "",
+      this.readStringValue(conversationMeta, "conversation_label") ?? "",
+      this.readStringValue(conversationMeta, "group_subject") ?? "",
+      text,
+    ]
+      .join(" ")
+      .toLowerCase();
+    if (
+      combined.includes("feishu") ||
+      /\b(?:ou|oc)_[a-f0-9]{32}\b/.test(combined)
+    ) {
       channelType = "feishu";
     } else if (combined.includes("slack")) {
       channelType = "slack";
@@ -409,7 +457,287 @@ export class SessionsRuntime {
       channelType = "discord";
     }
 
-    return { senderName, channelType };
+    return {
+      senderName,
+      channelType,
+      metadata: this.extractExactChatTargetMetadata(
+        senderMeta,
+        conversationMeta,
+      ),
+      feishuMessageId:
+        this.readStringValue(conversationMeta, "message_id") ?? undefined,
+    };
+  }
+
+  private parseJsonMetadataBlock(
+    text: string,
+    title: string,
+  ): SessionMetadataRecord | null {
+    const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = text.match(
+      new RegExp(`${escapedTitle}:\\s*\`\`\`json\\s*\\n([\\s\\S]*?)\`\`\``),
+    );
+    const jsonBlock = match?.[1];
+    if (!jsonBlock) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(jsonBlock) as SessionMetadataRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  private extractExactChatTargetMetadata(
+    senderMeta: SessionMetadataRecord | null,
+    conversationMeta: SessionMetadataRecord | null,
+  ): SessionMetadataRecord | undefined {
+    const metadata: SessionMetadataRecord = {};
+
+    const openChatId = [
+      this.readStringValue(conversationMeta, "openChatId"),
+      this.readStringValue(conversationMeta, "open_chat_id"),
+      this.readStringValue(conversationMeta, "chatId"),
+      this.readStringValue(conversationMeta, "chat_id"),
+      this.readStringValue(conversationMeta, "conversation_label"),
+      this.readStringValue(conversationMeta, "group_subject"),
+    ].find((value) => value?.startsWith("oc_"));
+    if (openChatId) {
+      metadata.openChatId = openChatId;
+    }
+
+    const openId = [
+      this.readStringValue(conversationMeta, "openId"),
+      this.readStringValue(conversationMeta, "open_id"),
+      this.readStringValue(conversationMeta, "sender_id"),
+      this.readStringValue(senderMeta, "openId"),
+      this.readStringValue(senderMeta, "open_id"),
+      this.readStringValue(senderMeta, "id"),
+    ].find((value) => value?.startsWith("ou_"));
+    if (openId) {
+      metadata.openId = openId;
+    }
+
+    return Object.keys(metadata).length > 0 ? metadata : undefined;
+  }
+
+  private mergeSessionMetadata(
+    existing: SessionMetadataRecord | null | undefined,
+    inferred: SessionMetadataRecord | undefined,
+  ): { metadata: SessionMetadataRecord | null; changed: boolean } {
+    if (!inferred || Object.keys(inferred).length === 0) {
+      return { metadata: existing ?? null, changed: false };
+    }
+
+    const merged: SessionMetadataRecord = {
+      ...(existing ?? {}),
+    };
+    let changed = false;
+
+    for (const [key, value] of Object.entries(inferred)) {
+      const current = merged[key];
+      if (typeof current === "string" && current.trim().length > 0) {
+        continue;
+      }
+      merged[key] = value;
+      changed = true;
+    }
+
+    return { metadata: merged, changed };
+  }
+
+  private async resolveExactChatMetadata(
+    botId: string,
+    existing: SessionMetadataRecord | null | undefined,
+    hints: SessionHints,
+  ): Promise<SessionMetadataRecord | undefined> {
+    const existingOpenChatId =
+      this.readStringValue(existing, "openChatId") ??
+      this.readStringValue(existing, "open_chat_id") ??
+      this.readStringValue(existing, "chatId") ??
+      this.readStringValue(existing, "chat_id");
+    if (existingOpenChatId?.startsWith("oc_")) {
+      return hints.metadata;
+    }
+
+    const hintedOpenChatId = this.readStringValue(hints.metadata, "openChatId");
+    if (hintedOpenChatId?.startsWith("oc_")) {
+      return hints.metadata;
+    }
+
+    if (hints.channelType !== "feishu" || !hints.feishuMessageId) {
+      return hints.metadata;
+    }
+
+    const openChatId = await this.fetchFeishuOpenChatIdByMessageId(
+      botId,
+      hints.feishuMessageId,
+    );
+    if (!openChatId) {
+      return hints.metadata;
+    }
+
+    return {
+      ...(hints.metadata ?? {}),
+      openChatId,
+    };
+  }
+
+  private async fetchFeishuOpenChatIdByMessageId(
+    botId: string,
+    messageId: string,
+  ): Promise<string | null> {
+    const credentials = await this.getFeishuCredentials(botId);
+    if (!credentials) {
+      return null;
+    }
+
+    const tenantToken = await this.getFeishuTenantToken(
+      credentials.appId,
+      credentials.appSecret,
+    );
+    if (!tenantToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${tenantToken}`,
+          },
+        },
+      );
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json()) as {
+        code?: number;
+        data?: {
+          chat_id?: string;
+          message?: {
+            chat_id?: string;
+          };
+          items?: Array<{
+            chat_id?: string;
+          }>;
+        };
+      };
+      if (payload.code !== 0) {
+        return null;
+      }
+
+      const openChatId =
+        payload.data?.chat_id ??
+        payload.data?.message?.chat_id ??
+        payload.data?.items?.[0]?.chat_id;
+      return typeof openChatId === "string" && openChatId.startsWith("oc_")
+        ? openChatId
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getFeishuCredentials(
+    botId: string,
+  ): Promise<{ appId: string; appSecret: string } | null> {
+    const config = await this.readControllerConfig();
+    const channel = config?.channels?.find(
+      (item) => item.botId === botId && item.channelType === "feishu",
+    );
+    if (!channel?.id) {
+      return null;
+    }
+
+    const appId = config?.secrets?.[`channel:${channel.id}:appId`];
+    const appSecret = config?.secrets?.[`channel:${channel.id}:appSecret`];
+    if (
+      typeof appId !== "string" ||
+      appId.length === 0 ||
+      typeof appSecret !== "string" ||
+      appSecret.length === 0
+    ) {
+      return null;
+    }
+
+    return { appId, appSecret };
+  }
+
+  private async readControllerConfig(): Promise<ControllerConfigRecord | null> {
+    try {
+      const raw = await readFile(this.env.nexuConfigPath, "utf8");
+      return JSON.parse(raw) as ControllerConfigRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getFeishuTenantToken(
+    appId: string,
+    appSecret: string,
+  ): Promise<string | null> {
+    const cached = this.feishuTokenCache.get(appId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.token;
+    }
+
+    try {
+      const response = await fetch(
+        "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            app_secret: appSecret,
+          }),
+        },
+      );
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json()) as {
+        code?: number;
+        tenant_access_token?: string;
+        expire?: number;
+      };
+      if (
+        payload.code !== 0 ||
+        typeof payload.tenant_access_token !== "string" ||
+        payload.tenant_access_token.length === 0
+      ) {
+        return null;
+      }
+
+      const expiresAt =
+        Date.now() + Math.max((payload.expire ?? 7200) - 60, 60) * 1000;
+      this.feishuTokenCache.set(appId, {
+        token: payload.tenant_access_token,
+        expiresAt,
+      });
+      return payload.tenant_access_token;
+    } catch {
+      return null;
+    }
+  }
+
+  private readStringValue(
+    record: SessionMetadataRecord | null | undefined,
+    key: string,
+  ): string | null {
+    if (!record) {
+      return null;
+    }
+
+    const value = record[key];
+    return typeof value === "string" && value.trim().length > 0 ? value : null;
   }
 
   private async writeSessionMetadata(

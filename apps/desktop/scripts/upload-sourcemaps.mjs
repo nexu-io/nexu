@@ -8,12 +8,10 @@ const repoRoot = resolve(electronRoot, "../..");
 const buildConfigPath = resolve(electronRoot, "build-config.json");
 const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const DEFAULT_SENTRY_ORG = "refly-ai";
-const DEFAULT_SENTRY_PROJECT_BY_SOURCE = {
-  "local-dev": "nexu-desktop-dev",
-  "local-dist": "nexu-desktop-dev",
-  "nightly-test": "nexu-desktop-test",
-  "nightly-prod": "nexu-desktop-prod",
-  release: "nexu-desktop-prod",
+const DEFAULT_SENTRY_PROJECT_BY_ENV = {
+  dev: "nexu-desktop-dev",
+  test: "nexu-desktop-test",
+  prod: "nexu-desktop-prod",
 };
 
 function normalizeCommit(commit) {
@@ -89,7 +87,8 @@ async function resolveUploadBuildMetadata() {
   if (!isCi) {
     return {
       version: packageVersion ?? buildConfig.NEXU_DESKTOP_APP_VERSION ?? null,
-      source: process.env.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dev",
+      sentryEnv:
+        process.env.NEXU_SENTRY_ENV ?? buildConfig.NEXU_SENTRY_ENV ?? "dev",
       commit:
         process.env.NEXU_DESKTOP_BUILD_COMMIT ??
         getGitValue(["rev-parse", "HEAD"]),
@@ -101,10 +100,8 @@ async function resolveUploadBuildMetadata() {
 
   return {
     version: buildConfig.NEXU_DESKTOP_APP_VERSION ?? packageVersion,
-    source:
-      buildConfig.NEXU_DESKTOP_BUILD_SOURCE ??
-      process.env.NEXU_DESKTOP_BUILD_SOURCE ??
-      null,
+    sentryEnv:
+      buildConfig.NEXU_SENTRY_ENV ?? process.env.NEXU_SENTRY_ENV ?? null,
     commit:
       buildConfig.NEXU_DESKTOP_BUILD_COMMIT ??
       process.env.NEXU_DESKTOP_BUILD_COMMIT ??
@@ -115,14 +112,14 @@ async function resolveUploadBuildMetadata() {
   };
 }
 
-function resolveSentryProject(buildSource) {
+function resolveSentryProject(sentryEnv) {
   const explicitProject = process.env.NEXU_DESKTOP_SENTRY_PROJECT;
 
   if (explicitProject) {
     return explicitProject;
   }
 
-  return DEFAULT_SENTRY_PROJECT_BY_SOURCE[buildSource] ?? "";
+  return DEFAULT_SENTRY_PROJECT_BY_ENV[sentryEnv] ?? "";
 }
 
 async function collectArtifactFiles(dirPath) {
@@ -301,7 +298,7 @@ async function main() {
   const buildMetadata = await resolveUploadBuildMetadata();
   const version = buildMetadata.version;
   const dsn = buildMetadata.dsn;
-  const project = resolveSentryProject(buildMetadata.source ?? "local-dev");
+  const project = resolveSentryProject(buildMetadata.sentryEnv ?? "dev");
 
   if (typeof version !== "string" || version.length === 0) {
     console.log(
@@ -319,7 +316,7 @@ async function main() {
 
   if (!project) {
     console.log(
-      "[sourcemaps] skipping upload: no Sentry project configured for this desktop build source.",
+      "[sourcemaps] skipping upload: no Sentry project configured for this NEXU_SENTRY_ENV.",
     );
     return;
   }

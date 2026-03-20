@@ -98,6 +98,9 @@ build_runtime() {
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:openclaw-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" prepare:web-sidecar
   run_logged pnpm --dir "$ELECTRON_DIR" build
+  if ! run_logged "$APP_DIR/scripts/dev-env.sh" pnpm --dir "$ELECTRON_DIR" upload:sourcemaps; then
+    log "warning: desktop sourcemap upload failed; continuing startup"
+  fi
   log_timeline "build_runtime complete"
 }
 

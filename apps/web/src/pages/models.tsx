@@ -1,5 +1,8 @@
+import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { ProviderLogo } from "@/components/provider-logo";
+import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
+import { useGitHubStars } from "@/hooks/use-github-stars";
+import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,11 +12,11 @@ import {
   ChevronDown,
   Cpu,
   ExternalLink,
+  FolderOpen,
   Loader2,
   Pencil,
   RefreshCw,
   Search,
-  Star,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,13 +27,14 @@ import {
   deleteApiV1ProvidersByProviderId,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
-  getApiV1LinkCatalog,
+  getApiInternalDesktopReady,
   getApiV1Me,
   getApiV1Models,
   getApiV1Providers,
   patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
+  postApiInternalDesktopCloudRefresh,
   postApiV1ProvidersByProviderIdVerify,
   putApiInternalDesktopDefaultModel,
   putApiV1ProvidersByProviderId,
@@ -206,8 +210,6 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   zai: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flashx"],
 };
 
-const GITHUB_URL = "https://github.com/nexu-io/nexu";
-
 function buildProviders(
   apiModels: Array<{
     id: string;
@@ -337,9 +339,6 @@ function _GeneralSettings() {
   const [draftName, setDraftName] = useState("");
   const [draftImage, setDraftImage] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [hasStarred, setHasStarred] = useState(
-    () => localStorage.getItem("nexu_starred") === "1",
-  );
 
   const { data: profile } = useQuery({
     queryKey: ["me"],
@@ -425,70 +424,6 @@ function _GeneralSettings() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <button
-        type="button"
-        onClick={() => {
-          localStorage.setItem("nexu_starred", "1");
-          setHasStarred(true);
-          window.open(GITHUB_URL, "_blank", "noopener,noreferrer");
-        }}
-        className="group relative w-full overflow-hidden rounded-2xl text-left transition-transform hover:scale-[1.005]"
-        style={{
-          background:
-            "linear-gradient(135deg, #0d0d10 0%, #1a1a2e 40%, #16213e 70%, #0d0d10 100%)",
-          minHeight: 120,
-        }}
-      >
-        <div className="absolute inset-0 opacity-40 [background:radial-gradient(ellipse_at_30%_50%,rgba(61,185,206,0.15)_0%,transparent_60%)]" />
-        <div className="absolute inset-0 opacity-30 [background:radial-gradient(ellipse_at_70%_30%,rgba(61,185,206,0.1)_0%,transparent_50%)]" />
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 select-none text-[48px] font-bold tracking-[0.2em] text-white/[0.03]">
-          {"> <"}
-        </div>
-        <div className="absolute right-3 top-3 flex gap-1 opacity-20">
-          {[0, 1, 2, 3, 4, 5].map((dot) => (
-            <div key={dot} className="h-1 w-1 rounded-full bg-white" />
-          ))}
-        </div>
-        <div className="absolute bottom-3 left-3 flex gap-1 opacity-10">
-          {[0, 1, 2, 3].map((dot) => (
-            <div key={dot} className="h-1 w-1 rounded-full bg-white" />
-          ))}
-        </div>
-        <div className="relative flex items-center gap-4 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/[0.06] text-white/80">
-            <Star
-              size={20}
-              className={cn(
-                hasStarred ? "fill-amber-400 text-amber-400" : "text-white/70",
-              )}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-semibold text-white">
-              {hasStarred
-                ? t("settings.general.githubStarred")
-                : t("settings.general.githubTitle")}
-            </div>
-            <div className="text-[12px] text-white/55">
-              {hasStarred
-                ? t("settings.general.githubStarredBody")
-                : t("settings.general.githubBody")}
-            </div>
-          </div>
-          {hasStarred ? (
-            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[12px] font-medium text-amber-400">
-              <Star size={12} className="fill-amber-400" />
-              {t("settings.general.githubStarredBadge")}
-            </div>
-          ) : (
-            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/20 bg-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/90 backdrop-blur-sm transition-all group-hover:bg-white group-hover:text-text-primary">
-              <Star size={12} className="text-amber-400" />
-              {t("settings.general.githubBadge")}
-            </div>
-          )}
-        </div>
-      </button>
-
       <div className="overflow-visible rounded-2xl border border-border bg-surface-1">
         <div className="px-5 pb-1 pt-4">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
@@ -613,7 +548,6 @@ function _CurrentModelSelector({
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -629,7 +563,6 @@ function _CurrentModelSelector({
   const currentModel = models.find((m) => m.id === currentModelId);
   const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
 
-  // Group models by provider
   const modelsByProvider = useMemo(() => {
     const map = new Map<string, typeof models>();
     for (const m of models) {
@@ -655,7 +588,6 @@ function _CurrentModelSelector({
     () => new Set(currentGroupKey ? [currentGroupKey] : []),
   );
 
-  // Expand current model's provider when opened
   useEffect(() => {
     if (open) {
       const groupKey = currentModel ? getGroupKey(currentModel) : "";
@@ -671,7 +603,6 @@ function _CurrentModelSelector({
     }
   }, [open, currentModel, modelsByProvider]);
 
-  // Empty state
   if (models.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface-0 px-4 py-4 mb-5">
@@ -706,161 +637,146 @@ function _CurrentModelSelector({
     .filter((p) => p.models.length > 0);
 
   return (
-    <div className="mb-5" ref={ref}>
-      <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2">
-        {t("models.currentModel")}
-      </div>
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="w-full flex items-center justify-between gap-2 rounded-xl border border-border bg-surface-0 px-4 py-3 transition-colors hover:border-border-hover"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            {currentGroupKey ? (
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                <ProviderLogo provider={currentGroupKey} size={16} />
-              </span>
+    <div className="relative mb-8" ref={ref}>
+      <div className="rounded-xl border border-border bg-surface-1 px-4 py-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center shrink-0">
+              <Cpu size={16} className="text-accent" />
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-text-primary">
+                {t("models.currentModel")}
+              </div>
+              <div className="text-[11px] text-text-tertiary">
+                {t("models.configureProviderHint")}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-2 hover:border-border-hover transition-all text-[12px] font-medium text-text-primary"
+          >
+            {currentModel ? (
+              <>
+                <span className="w-4 h-4 shrink-0 flex items-center justify-center">
+                  <ModelLogo
+                    model={currentModel.name}
+                    provider={currentGroupKey}
+                    size={14}
+                  />
+                </span>
+                {currentModel.name}
+              </>
             ) : (
-              <Cpu size={16} className="text-accent shrink-0" />
-            )}
-            <span className="text-[13px] font-medium text-text-primary truncate">
-              {currentModel?.name ??
-                (currentModelId || t("models.noModelConfigured"))}
-            </span>
-            {currentGroupKey && (
-              <span className="text-[10px] text-text-muted/60 shrink-0">
-                ({PROVIDER_LABELS[currentGroupKey] ?? currentGroupKey})
+              <span className="text-text-muted">
+                {currentModelId || t("models.noModelConfigured")}
               </span>
             )}
-          </div>
-          <ChevronDown
-            size={13}
-            className={cn(
-              "text-text-muted transition-transform shrink-0",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-
-        {open && (
-          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-surface-1 shadow-xl">
-            {/* Search */}
-            <div className="px-3 pt-3 pb-2">
-              <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
-                <Search size={14} className="text-text-muted shrink-0" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    if (e.target.value.trim()) {
-                      setExpandedProviders(
-                        new Set(modelsByProvider.map((p) => p.id)),
-                      );
-                    }
-                  }}
-                  placeholder={t("models.searchModels")}
-                  className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Provider groups */}
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-4 z-10 bg-gradient-to-b from-surface-1 to-transparent" />
-              <div
-                className="max-h-[360px] overflow-y-auto py-1"
-                style={{
-                  overscrollBehavior: "contain",
-                  WebkitOverflowScrolling: "touch",
-                }}
-              >
-                {filteredProviders.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-[13px] text-text-muted">
-                    {t("models.byok.none")}
-                  </div>
-                ) : (
-                  filteredProviders.map((provider) => {
-                    const isExpanded =
-                      expandedProviders.has(provider.id) || !!query;
-                    return (
-                      <div key={provider.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (query) return;
-                            setExpandedProviders((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(provider.id))
-                                next.delete(provider.id);
-                              else next.add(provider.id);
-                              return next;
-                            });
-                          }}
-                          className="w-full px-3 py-2 flex items-center gap-2.5 hover:bg-surface-2/50 transition-colors"
-                        >
-                          <ChevronDown
-                            size={11}
-                            className={cn(
-                              "text-text-muted/50 transition-transform",
-                              !isExpanded && "-rotate-90",
-                            )}
-                          />
-                          <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
-                            <ProviderLogo provider={provider.id} size={15} />
-                          </span>
-                          <span className="text-[12px] font-medium text-text-secondary">
-                            {provider.name}
-                          </span>
-                          <span className="text-[11px] text-text-muted/40 ml-auto tabular-nums">
-                            {provider.models.length}
-                          </span>
-                        </button>
-                        {isExpanded &&
-                          provider.models.map((model) => (
-                            <button
-                              key={model.id}
-                              type="button"
-                              onClick={() => {
-                                onSelectModel(model.id);
-                                setOpen(false);
-                                setSearch("");
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-2.5 pl-9 pr-3 py-2 text-left transition-colors hover:bg-surface-2",
-                                model.id === currentModelId && "bg-accent/5",
-                              )}
-                            >
-                              {model.id === currentModelId ? (
-                                <Check
-                                  size={13}
-                                  className="text-accent shrink-0"
-                                />
-                              ) : (
-                                <span className="w-[13px] shrink-0" />
-                              )}
-                              <span className="text-[13px] font-medium text-text-primary truncate flex-1">
-                                {model.name}
-                              </span>
-                            </button>
-                          ))}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 z-10 bg-gradient-to-t from-surface-1 to-transparent" />
-            </div>
-          </div>
-        )}
+            <ChevronDown size={13} className="text-text-muted" />
+          </button>
+        </div>
       </div>
+
+      {open && (
+        <div className="absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border border-border bg-surface-0 shadow-lg overflow-hidden">
+          <div className="px-3 pt-3 pb-2">
+            <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
+              <Search size={14} className="text-text-muted shrink-0" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  if (e.target.value.trim()) {
+                    setExpandedProviders(
+                      new Set(modelsByProvider.map((p) => p.id)),
+                    );
+                  }
+                }}
+                placeholder={t("models.searchModels")}
+                className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-[320px] overflow-y-auto">
+            {filteredProviders.length === 0 ? (
+              <div className="px-4 py-8 text-center text-[13px] text-text-muted">
+                {t("models.byok.none")}
+              </div>
+            ) : (
+              filteredProviders.map((provider) => {
+                const isExpanded =
+                  expandedProviders.has(provider.id) || !!query;
+                return (
+                  <div key={provider.id}>
+                    <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider sticky top-0 bg-surface-0">
+                      {provider.name}
+                    </div>
+                    {isExpanded &&
+                      provider.models.map((model) => {
+                        const isSelected = model.id === currentModelId;
+                        return (
+                          <button
+                            key={model.id}
+                            type="button"
+                            onClick={() => {
+                              onSelectModel(model.id);
+                              setOpen(false);
+                              setSearch("");
+                            }}
+                            className={cn(
+                              "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors",
+                              isSelected ? "bg-accent/5" : "hover:bg-surface-2",
+                            )}
+                          >
+                            <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                              <ModelLogo
+                                model={model.name}
+                                provider={provider.id}
+                                size={14}
+                              />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div
+                                className={cn(
+                                  "text-[12px] truncate",
+                                  isSelected
+                                    ? "font-semibold text-accent"
+                                    : "font-medium text-text-primary",
+                                )}
+                              >
+                                {model.name}
+                              </div>
+                              <div className="text-[10px] text-text-tertiary">
+                                {provider.name}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <Check
+                                size={14}
+                                className="text-accent shrink-0"
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export function ModelsPage() {
   const { t } = useTranslation();
+  const { stars } = useGitHubStars();
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const tabParam = searchParams.get("tab");
@@ -904,6 +820,13 @@ export function ModelsPage() {
 
   const currentModelId = defaultModelData?.modelId ?? "";
   const models = modelsData?.models ?? [];
+  const { data: desktopReadyData } = useQuery({
+    queryKey: ["desktop-ready"],
+    queryFn: async () => {
+      const { data } = await getApiInternalDesktopReady();
+      return data;
+    },
+  });
 
   const userSwitchRef = useRef(false);
   const updateModel = useMutation({
@@ -1021,15 +944,53 @@ export function ModelsPage() {
     [currentModelId, updateModel],
   );
 
+  const handleOpenWorkspace = useCallback(async () => {
+    if (!desktopReadyData?.workspacePath) {
+      toast.error("OpenClaw workspace folder is unavailable.");
+      return;
+    }
+
+    try {
+      await openLocalFolderUrl(pathToFileUrl(desktopReadyData.workspacePath));
+    } catch {
+      toast.error("Failed to open OpenClaw workspace folder.");
+    }
+  }, [desktopReadyData?.workspacePath]);
+
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-6 sm:pb-8">
-        <div className="flex items-center justify-between mb-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="heading-page">{t("models.pageTitle")}</h2>
             <p className="heading-page-desc">{t("models.pageSubtitle")}</p>
           </div>
+          <div className="flex items-center gap-2">
+            <GitHubStarCta
+              label={t("home.starGithub")}
+              stars={stars}
+              variant="button"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                void handleOpenWorkspace();
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-[12px] font-medium text-text-primary hover:border-border-hover hover:bg-surface-1 transition-colors"
+            >
+              <FolderOpen size={13} />
+              Workspace
+            </button>
+          </div>
         </div>
+
+        {models.length > 0 && (
+          <_CurrentModelSelector
+            models={models}
+            currentModelId={currentModelId}
+            onSelectModel={(modelId) => updateModel.mutate(modelId)}
+          />
+        )}
 
         <div>
           {/* Provider sidebar + detail */}
@@ -1038,99 +999,38 @@ export function ModelsPage() {
             style={{ minHeight: 520 }}
           >
             {/* Left: Provider list with Enabled / Providers grouping */}
+            {/* Left: Provider list — flat, no enabled/disabled split */}
             <div className="w-56 shrink-0 bg-surface-0 overflow-y-auto">
-              <div className="p-2">
-                {/* Enabled providers */}
-                {sidebarItems.filter((p) => p.configured).length > 0 && (
-                  <>
-                    <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                      Enabled
-                    </div>
-                    <div className="space-y-0.5 mb-3">
-                      {sidebarItems
-                        .filter((p) => p.configured)
-                        .map((item) => {
-                          const isActive = activeProvider?.id === item.id;
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedProviderId(item.id);
-                                clearSetupParam();
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                                isActive
-                                  ? "bg-surface-3"
-                                  : "hover:bg-surface-2",
-                              )}
-                            >
-                              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                                <ProviderLogo provider={item.id} size={16} />
-                              </span>
-                              <span
-                                className={cn(
-                                  "flex-1 text-[12px] font-medium truncate",
-                                  isActive
-                                    ? "text-accent"
-                                    : "text-text-primary",
-                                )}
-                              >
-                                {item.name}
-                              </span>
-                              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--color-success)] ml-auto" />
-                            </button>
-                          );
-                        })}
-                    </div>
-                  </>
-                )}
-                {/* Other providers */}
-                {sidebarItems.filter((p) => !p.configured).length > 0 && (
-                  <>
-                    <div className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                      Providers
-                    </div>
-                    <div className="space-y-0.5">
-                      {sidebarItems
-                        .filter((p) => !p.configured)
-                        .map((item) => {
-                          const isActive = activeProvider?.id === item.id;
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedProviderId(item.id);
-                                clearSetupParam();
-                              }}
-                              className={cn(
-                                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                                isActive
-                                  ? "bg-surface-3"
-                                  : "hover:bg-surface-2",
-                              )}
-                            >
-                              <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                                <ProviderLogo provider={item.id} size={16} />
-                              </span>
-                              <span
-                                className={cn(
-                                  "flex-1 text-[12px] font-medium truncate",
-                                  isActive
-                                    ? "text-accent"
-                                    : "text-text-primary",
-                                )}
-                              >
-                                {item.name}
-                              </span>
-                            </button>
-                          );
-                        })}
-                    </div>
-                  </>
-                )}
+              <div className="p-2 space-y-0.5">
+                {sidebarItems.map((item) => {
+                  const isActive = activeProvider?.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProviderId(item.id);
+                        clearSetupParam();
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                        isActive ? "bg-surface-3" : "hover:bg-surface-2",
+                      )}
+                    >
+                      <span className="w-5 h-5 shrink-0 flex items-center justify-center">
+                        <ProviderLogo provider={item.id} size={16} />
+                      </span>
+                      <span
+                        className={cn(
+                          "flex-1 text-[12px] font-medium truncate",
+                          isActive ? "text-accent" : "text-text-primary",
+                        )}
+                      >
+                        {item.name}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1206,28 +1106,6 @@ export function ModelsPage() {
   );
 }
 
-// ── Link catalog types ─────────────────────────────────────────
-
-interface LinkModel {
-  id: string;
-  name: string;
-  externalName: string;
-  inputPrice: string | null;
-  outputPrice: string | null;
-}
-
-interface LinkProvider {
-  id: string;
-  name: string;
-  kind: string;
-  models: LinkModel[];
-}
-
-async function fetchLinkCatalog(): Promise<LinkProvider[]> {
-  const { data } = await getApiV1LinkCatalog();
-  return (data?.providers as LinkProvider[]) ?? [];
-}
-
 // ── Managed provider detail (Nexu Official) ───────────────────
 
 function ManagedProviderDetail({
@@ -1238,20 +1116,24 @@ function ManagedProviderDetail({
   currentModelId: string;
 }) {
   const { t } = useTranslation();
-  const { data: linkProviders = [], isLoading: catalogLoading } = useQuery({
-    queryKey: ["link-catalog"],
-    queryFn: fetchLinkCatalog,
-  });
-
-  const totalModels = linkProviders.reduce(
-    (sum, p) => sum + p.models.length,
-    0,
-  );
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [cloudConnected, setCloudConnected] = useState(false);
   const queryClient = useQueryClient();
+  const refreshCloudModels = useMutation({
+    mutationFn: async () => {
+      await postApiInternalDesktopCloudRefresh();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
+      toast.success(t("models.managed.refreshSucceeded"));
+    },
+    onError: () => {
+      toast.error(t("models.managed.refreshFailed"));
+    },
+  });
 
   // Check if already connected on mount
   useEffect(() => {
@@ -1271,10 +1153,6 @@ function ManagedProviderDetail({
         if (data?.connected) {
           setLoginBusy(false);
           setCloudConnected(true);
-          // Refresh provider/model data now that cloud is connected.
-          // Backend onCloudStateChanged callback already ran
-          // ensureValidDefaultModel + syncAll at this point.
-          queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
           queryClient.invalidateQueries({ queryKey: ["models"] });
           queryClient.invalidateQueries({
             queryKey: ["desktop-default-model"],
@@ -1369,11 +1247,15 @@ function ManagedProviderDetail({
               <button
                 type="button"
                 onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ["link-catalog"] });
+                  refreshCloudModels.mutate();
                 }}
+                disabled={refreshCloudModels.isPending}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
               >
-                <RefreshCw size={11} />
+                <RefreshCw
+                  size={11}
+                  className={cn(refreshCloudModels.isPending && "animate-spin")}
+                />
                 {t("models.managed.refresh")}
               </button>
               <button
@@ -1422,7 +1304,7 @@ function ManagedProviderDetail({
             <button
               type="button"
               onClick={() => void handleLogin()}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[12px] font-medium text-white transition-colors hover:bg-accent/90 cursor-pointer"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-[12px] font-medium text-accent-fg transition-colors hover:bg-accent/90 cursor-pointer"
             >
               {t("models.managed.loginButton")}
               <ArrowUpRight size={13} />
@@ -1454,13 +1336,17 @@ function ManagedProviderDetail({
                   className={cn(
                     "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
                     isSelected
-                      ? "border-accent/20 bg-accent/5"
+                      ? "border-accent/30 bg-accent/5"
                       : "border-border bg-surface-0",
                   )}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                      <ProviderLogo provider={provider.id} size={16} />
+                      <ModelLogo
+                        model={model.name}
+                        provider={provider.id}
+                        size={16}
+                      />
                     </span>
                     <div className="min-w-0">
                       <div className="text-[12px] font-medium text-text-primary truncate">
@@ -1480,111 +1366,6 @@ function ManagedProviderDetail({
           </div>
         </div>
       )}
-
-      {/* Link provider catalog */}
-      {catalogLoading ? (
-        <div className="flex items-center gap-2 text-[12px] text-text-muted py-4">
-          <Loader2 size={14} className="animate-spin" />
-          {t("models.managed.loadingCatalog")}
-        </div>
-      ) : linkProviders.length > 0 ? (
-        <LinkModelCatalog
-          linkProviders={linkProviders}
-          totalModels={totalModels}
-          cloudConnected={cloudConnected}
-          currentModelId={currentModelId}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-// ── Link model catalog (read-only) ───────────────────────────
-
-function LinkModelCatalog({
-  linkProviders,
-  totalModels,
-  cloudConnected,
-  currentModelId,
-}: {
-  linkProviders: LinkProvider[];
-  totalModels: number;
-  cloudConnected: boolean;
-  currentModelId: string;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <div className="text-[13px] font-semibold text-text-primary mb-1">
-        {t("models.catalog.title")}
-        <span className="ml-2 text-[11px] font-normal text-text-muted">
-          {t("models.catalog.summary", {
-            totalModels,
-            providerCount: linkProviders.length,
-          })}
-        </span>
-      </div>
-      <div className="text-[11px] text-text-muted mb-4">
-        {cloudConnected
-          ? t("models.catalog.connectedHint")
-          : t("models.catalog.loginHint")}
-      </div>
-      <div className="space-y-5">
-        {linkProviders.map((lp) => (
-          <div key={lp.id}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                <ProviderLogo provider={lp.kind} size={14} />
-              </span>
-              <span className="text-[12px] font-medium text-text-primary">
-                {lp.name}
-              </span>
-              <span className="text-[10px] text-text-muted">
-                {t("models.catalog.modelsCount", { count: lp.models.length })}
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              {lp.models.map((m) => {
-                const isSelected = m.id === currentModelId;
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
-                      isSelected
-                        ? "border-accent/20 bg-accent/5"
-                        : "border-border bg-surface-0",
-                      !cloudConnected && "opacity-70",
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                        <ProviderLogo provider={lp.kind} size={16} />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-[12px] font-medium text-text-primary truncate">
-                          {m.name}
-                        </div>
-                        <div className="text-[10px] text-text-muted">
-                          {m.externalName}
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected ? (
-                      <Check size={14} className="text-accent shrink-0" />
-                    ) : !cloudConnected ? (
-                      <span className="text-[10px] text-text-muted/60 shrink-0">
-                        {t("models.catalog.loginToUse")}
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1719,7 +1500,7 @@ function ByokProviderDetail({
                   href={meta.apiDocsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)]/80 transition-colors flex items-center gap-0.5"
+                  className="text-link text-[11px]"
                 >
                   {t("models.byok.getApiKey")}
                   <ExternalLink size={10} />
@@ -1768,7 +1549,7 @@ function ByokProviderDetail({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={meta.apiKeyPlaceholder}
-                className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/30"
+                className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
               />
               <button
                 type="button"
@@ -1825,7 +1606,7 @@ function ByokProviderDetail({
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder={meta.defaultProxyUrl || "https://api.example.com/v1"}
-            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/30"
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
           />
         </div>
       </div>
@@ -1841,7 +1622,7 @@ function ByokProviderDetail({
           className={cn(
             "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
             !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
-              ? "bg-accent text-white hover:bg-accent/90"
+              ? "bg-accent text-accent-fg hover:bg-accent/90"
               : "bg-surface-2 text-text-muted cursor-not-allowed",
           )}
         >
@@ -1907,13 +1688,17 @@ function ByokProviderDetail({
                 className={cn(
                   "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
                   isSelected
-                    ? "border-accent/20 bg-accent/5"
+                    ? "border-accent/30 bg-accent/5"
                     : "border-border bg-surface-0",
                 )}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                    <ProviderLogo provider={providerId} size={16} />
+                    <ModelLogo
+                      model={modelId}
+                      provider={providerId}
+                      size={16}
+                    />
                   </span>
                   <div className="min-w-0">
                     <div className="text-[12px] font-medium text-text-primary truncate">
