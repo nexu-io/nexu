@@ -9,6 +9,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
 const repoRoot =
   process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const require = createRequire(import.meta.url);
 const isUnsigned =
   process.argv.includes("--unsigned") ||
@@ -214,6 +215,9 @@ async function stapleNotarizedAppBundles() {
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
   let existingConfig = {};
+  const desktopPackage = JSON.parse(
+    await readFile(desktopPackageJsonPath, "utf8"),
+  );
 
   try {
     const existing = await readFile(configPath, "utf8");
@@ -254,6 +258,14 @@ async function ensureBuildConfig() {
       merged.NEXU_CLOUD_URL ??
       "https://nexu.io",
     NEXU_LINK_URL: existingConfig.NEXU_LINK_URL ?? merged.NEXU_LINK_URL ?? null,
+    NEXU_DESKTOP_APP_VERSION:
+      existingConfig.NEXU_DESKTOP_APP_VERSION ??
+      merged.NEXU_DESKTOP_APP_VERSION ??
+      (typeof desktopPackage.version === "string"
+        ? desktopPackage.version
+        : undefined) ??
+      merged.npm_package_version ??
+      undefined,
     ...((existingConfig.NEXU_DESKTOP_SENTRY_DSN ??
     merged.NEXU_DESKTOP_SENTRY_DSN)
       ? {
@@ -371,6 +383,10 @@ async function main() {
     },
   });
   await run("pnpm", ["run", "build"], { cwd: electronRoot, env });
+  await run("node", [resolve(scriptDir, "upload-sourcemaps.mjs")], {
+    cwd: electronRoot,
+    env,
+  });
   await run(
     "node",
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],

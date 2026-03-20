@@ -12,6 +12,7 @@
     "normalize-assets:watch": "node ./scripts/watch-assets.mjs"
   },
   "devDependencies": {
+    "@davidingplus/vitepress-image-viewer": "^1.1.5",
     "sharp": "^0.34.5",
     "vitepress": "^1.6.4"
   }

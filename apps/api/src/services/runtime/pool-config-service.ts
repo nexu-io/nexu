@@ -15,6 +15,8 @@ interface SnapshotRecord {
   configHash: string;
   config: OpenClawConfig;
   createdAt: string;
+  /** Whether the config was successfully pushed to OpenClaw via WS. */
+  configPushed?: boolean;
 }
 
 function toHash(config: OpenClawConfig): string {
@@ -89,8 +91,10 @@ export async function publishPoolConfigSnapshot(
     .where(eq(gatewayPools.id, poolId));
 
   // Push config to OpenClaw via WS (best-effort, failure doesn't affect DB)
+  let configPushed = false;
   try {
     await pushConfig(config);
+    configPushed = true;
   } catch (err) {
     logger.warn({
       message: "openclaw_push_config_failed",
@@ -107,6 +111,7 @@ export async function publishPoolConfigSnapshot(
     configHash,
     config,
     createdAt: now,
+    configPushed,
   };
 }
 

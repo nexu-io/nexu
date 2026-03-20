@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/electron/main";
-import { BrowserWindow, app, ipcMain, shell } from "electron";
+import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -11,7 +11,6 @@ import {
 } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
-import type { CatalogManager } from "./skillhub/catalog-manager";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
 
@@ -19,24 +18,45 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
-let catalogManager: CatalogManager | null = null;
 
 const nativeCrashTestTitles = {
   main: "desktop.main.crash",
   renderer: "desktop.renderer.crash",
 } as const;
 
+const nativeCrashAnnotationKeys = {
+  title: "nexu.crash_title",
+  kind: "nexu.crash_kind",
+} as const;
+
+function setNativeCrashAnnotations(
+  title: (typeof nativeCrashTestTitles)[keyof typeof nativeCrashTestTitles],
+): void {
+  crashReporter.addExtraParameter(nativeCrashAnnotationKeys.title, title);
+  crashReporter.addExtraParameter(
+    nativeCrashAnnotationKeys.kind,
+    "native_crash",
+  );
+}
+
+function clearNativeCrashAnnotations(): void {
+  crashReporter.removeExtraParameter(nativeCrashAnnotationKeys.title);
+  crashReporter.removeExtraParameter(nativeCrashAnnotationKeys.kind);
+}
+
 async function prepareNativeCrashScope(
   title: (typeof nativeCrashTestTitles)[keyof typeof nativeCrashTestTitles],
 ): Promise<void> {
+  setNativeCrashAnnotations(title);
+
   if (!Sentry.isInitialized()) {
     return;
   }
 
   const scope = Sentry.getCurrentScope();
-  scope.setTag("nexu.test_title", title);
-  scope.setTag("nexu.test_kind", "native_crash");
-  scope.setExtra("nexu.test_title", title);
+  scope.setTag("nexu.crash_title", title);
+  scope.setTag("nexu.crash_kind", "native_crash");
+  scope.setExtra("nexu.crash_title", title);
   scope.setFingerprint([title]);
 
   await new Promise((resolve) => setTimeout(resolve, 50));
@@ -48,10 +68,6 @@ export function setUpdateManager(manager: UpdateManager): void {
 
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
-}
-
-export function setCatalogManager(manager: CatalogManager): void {
-  catalogManager = manager;
 }
 
 function assertValidChannel(
@@ -118,6 +134,9 @@ export function registerIpcHandlers(
 
           await prepareNativeCrashScope(nativeCrashTestTitles.renderer);
           browserWindow.webContents.forcefullyCrashRenderer();
+          setTimeout(() => {
+            clearNativeCrashAnnotations();
+          }, 5000);
           return undefined;
         }
 
@@ -125,6 +144,7 @@ export function registerIpcHandlers(
           const controllerBaseUrl = getDesktopRuntimeConfig(process.env, {
             appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
+            useBuildConfig: app.isPackaged,
           }).urls.controllerBase;
 
           const result: HostInvokeResultMap["env:get-controller-base-url"] = {
@@ -138,6 +158,7 @@ export function registerIpcHandlers(
           return getDesktopRuntimeConfig(process.env, {
             appVersion: app.getVersion(),
             resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
+            useBuildConfig: app.isPackaged,
           });
         }
 
@@ -285,43 +306,6 @@ export function registerIpcHandlers(
           }
           await componentUpdater.installUpdate(update);
           return { ok: true };
-        }
-
-        case "skillhub:get-catalog": {
-          if (!catalogManager) {
-            return {
-              skills: [],
-              installedSlugs: [],
-              installedSkills: [],
-              meta: null,
-            };
-          }
-          return catalogManager.getCatalog();
-        }
-
-        case "skillhub:install": {
-          if (!catalogManager) {
-            return { ok: false, error: "Catalog manager not initialized" };
-          }
-          const typedPayload =
-            payload as HostInvokePayloadMap["skillhub:install"];
-          return catalogManager.installSkill(typedPayload.slug);
-        }
-
-        case "skillhub:uninstall": {
-          if (!catalogManager) {
-            return { ok: false, error: "Catalog manager not initialized" };
-          }
-          const typedPayload =
-            payload as HostInvokePayloadMap["skillhub:uninstall"];
-          return catalogManager.uninstallSkill(typedPayload.slug);
-        }
-
-        case "skillhub:refresh-catalog": {
-          if (!catalogManager) {
-            return { ok: false, skillCount: 0 };
-          }
-          return catalogManager.refreshCatalog();
         }
 
         default:

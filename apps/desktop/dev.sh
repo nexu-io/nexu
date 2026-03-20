@@ -4,7 +4,19 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$APP_DIR/../.." && pwd)"
 TMP_DIR="$ROOT_DIR/.tmp"
-DEFAULT_NEXU_CLOUD_URL="http://localhost:5173"
+
+# Source .env files (desktop or controller) for NEXU_CLOUD_URL / NEXU_LINK_URL
+for _env_file in "$APP_DIR/.env" "$ROOT_DIR/apps/controller/.env"; do
+  if [ -f "$_env_file" ]; then
+    # Export only lines matching KEY=VALUE, skip comments and empty lines
+    set -a
+    # shellcheck disable=SC1090
+    source "$_env_file"
+    set +a
+    break
+  fi
+done
+
 export NEXU_WORKSPACE_ROOT="$ROOT_DIR"
 export NEXU_DESKTOP_APP_ROOT="$APP_DIR"
 export NEXU_DESKTOP_RUNTIME_ROOT="$TMP_DIR/desktop"
@@ -106,7 +118,7 @@ start_session() {
   run_logged pnpm --dir "$ROOT_DIR" exec electron --version
   log "starting tmux session '$SESSION_NAME'"
   tmux new-session -d -s "$SESSION_NAME" \
-    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_CLOUD_URL=\"${NEXU_CLOUD_URL:-$DEFAULT_NEXU_CLOUD_URL}\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
+    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_CLOUD_URL=\"${NEXU_CLOUD_URL:-}\" NEXU_LINK_URL=\"${NEXU_LINK_URL:-}\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\" NEXU_DESKTOP_SENTRY_DSN=\"${NEXU_DESKTOP_SENTRY_DSN:-}\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
 }
 
 start() {

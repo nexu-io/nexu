@@ -1,18 +1,17 @@
 /**
- * OpenClaw 通信服务模块
+ * OpenClaw Communication Service
  *
- * 封装与 OpenClaw Gateway 的所有 WebSocket 通信，包括：
- * - 协议层：WS 连接、握手、JSON-RPC 请求/响应、心跳、自动重连
- * - 业务层：配置推送（config.apply）、频道状态查询（channels.status）、就绪检测
+ * Encapsulates all WebSocket communication with the OpenClaw Gateway:
+ * - Protocol layer: WS connection, handshake, JSON-RPC request/response, heartbeat, auto-reconnect
+ * - Business layer: config push (config.apply), channel status query (channels.status), readiness checks
  *
- * 使用 OpenClaw 协议 v3，token-based 认证。
- * 避免直接引用 openclaw 包（GatewayClient 含 device identity、TLS pinning 等桌面侧逻辑）。
+ * Uses OpenClaw protocol v3 with token-based authentication.
+ * Avoids importing the openclaw package directly (GatewayClient includes device identity,
+ * TLS pinning, and other desktop-side logic).
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { OpenClawConfig } from "@nexu/shared";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error -- ws has no bundled types; we only use .OPEN, .send, .close, .on
 import WebSocket from "ws";
 import { logger } from "../lib/logger.js";
 
@@ -378,6 +377,13 @@ export class OpenClawWsClient {
 
 let instance: OpenClawWsClient | null = null;
 
+/** SHA-256 hash of the last config we successfully pushed via pushConfig(). */
+let lastPushedConfigHash: string | null = null;
+
+function configHash(config: OpenClawConfig): string {
+  return createHash("sha256").update(JSON.stringify(config)).digest("hex");
+}
+
 /**
  * Get or create the singleton OpenClaw WS client.
  * The client starts connecting lazily on first access.
@@ -416,7 +422,9 @@ export function initOpenClawService(
   const client = getOpenClawClient();
 
   client.onConnected(() => {
-    // Push latest config from DB on each (re)connect
+    // Push latest config from DB on each (re)connect.
+    // Skip if the config hasn't changed since the last push to avoid the
+    // push → OpenClaw restart → reconnect → push infinite loop.
     void (async () => {
       try {
         const config = await loadConfig();
@@ -424,6 +432,14 @@ export function initOpenClawService(
           logger.info({
             message: "openclaw_init_push_skipped",
             reason: "no config available",
+          });
+          return;
+        }
+        const hash = configHash(config);
+        if (hash === lastPushedConfigHash) {
+          logger.info({
+            message: "openclaw_init_push_skipped",
+            reason: "config unchanged",
           });
           return;
         }
@@ -444,32 +460,41 @@ export function initOpenClawService(
 // ---------------------------------------------------------------------------
 
 /**
- * 推送完整配置到 OpenClaw。
+ * Push a full configuration to OpenClaw.
  *
- * 调用 `config.apply` RPC。OpenClaw 会：
- * 1. 验证配置合法性
- * 2. 持久化到 openclaw.json
- * 3. 通过 SIGUSR1 触发热重载（channels 重新初始化）
+ * Flow:
+ * 1. Call `config.get` to obtain the current config hash (optimistic concurrency)
+ * 2. Call `config.apply` with `baseHash` to push the new configuration
+ * 3. OpenClaw validates → persists to openclaw.json → SIGUSR1 hot-reload
  *
- * @throws 如果 WS 未连接或 RPC 失败
+ * @throws If the WS is not connected or the RPC fails
  */
 export async function pushConfig(config: OpenClawConfig): Promise<void> {
   const client = getOpenClawClient();
+
+  // config.apply requires baseHash for optimistic concurrency control.
+  // Fetch the current config hash first via config.get.
+  const current = await client.request<{ hash?: string }>("config.get");
+  const baseHash = current?.hash;
+
   await client.request("config.apply", {
     raw: JSON.stringify(config, null, 2),
     note: "pushed from nexu-api",
-    restartDelayMs: 500,
+    ...(baseHash ? { baseHash } : {}),
   });
+
+  // Record the hash so onConnected can skip redundant pushes after restart.
+  lastPushedConfigHash = configHash(config);
   logger.info({ message: "openclaw_config_pushed" });
 }
 
 /**
- * 查询所有 channel 的运行状态快照。
+ * Query the runtime status snapshot of all channels.
  *
- * 调用 `channels.status` RPC。当 probe=true 时会触发实时探测
- * （如飞书 bot-info 校验），结果包含在 snapshot.probe 中。
+ * Calls the `channels.status` RPC. When probe=true, real-time probes are triggered
+ * (e.g. Feishu bot-info validation); results are included in snapshot.probe.
  *
- * @throws 如果 WS 未连接或 RPC 失败
+ * @throws If the WS is not connected or the RPC fails
  */
 export async function getChannelsStatus(): Promise<ChannelsStatusResult> {
   const client = getOpenClawClient();
@@ -480,11 +505,11 @@ export async function getChannelsStatus(): Promise<ChannelsStatusResult> {
 }
 
 /**
- * 查询运行时会话列表。
+ * Query runtime session list.
  *
- * 调用 `sessions.list` RPC，返回 OpenClaw 当前活跃的会话快照。
+ * Calls the `sessions.list` RPC, returning OpenClaw's current active session snapshots.
  *
- * @throws 如果 WS 未连接或 RPC 失败
+ * @throws If the WS is not connected or the RPC fails
  */
 export async function getRuntimeSessions(params: {
   limit?: number;
@@ -505,11 +530,11 @@ export async function getRuntimeSessions(params: {
 }
 
 /**
- * 查询会话聊天历史。
+ * Query session chat history.
  *
- * 调用 `chat.history` RPC，返回指定会话的消息列表。
+ * Calls the `chat.history` RPC, returning the message list for a given session.
  *
- * @throws 如果 WS 未连接或 RPC 失败
+ * @throws If the WS is not connected or the RPC fails
  */
 export async function getRuntimeChatHistory(params: {
   sessionKey: string;
@@ -526,15 +551,16 @@ export async function getRuntimeChatHistory(params: {
 }
 
 /**
- * 查询单个 channel 的就绪状态。
+ * Query the readiness state of a single channel.
  *
- * 内部调用 getChannelsStatus() 后按 channelType + accountId 查找匹配的 snapshot。
+ * Internally calls getChannelsStatus() and looks up the matching snapshot
+ * by channelType + accountId.
  *
- * 就绪判断逻辑：
- * - WebSocket 模式（Slack/Discord）：connected === true
- * - Webhook 模式（Feishu）：running && configured && probe.ok
+ * Readiness logic:
+ * - WebSocket-based channels (Slack/Discord): connected === true
+ * - Webhook-based channels (Feishu): running && configured && probe.ok
  *
- * 当 WS 未连接时返回 gatewayConnected: false 而不是抛错（优雅降级）。
+ * Returns gatewayConnected: false (graceful degradation) when WS is not connected.
  */
 export async function getChannelReadiness(
   channelType: string,

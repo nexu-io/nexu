@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { checkSlackTokens } from "./api.js";
-import { fetchInitialConfig } from "./config.js";
 import { env } from "./env.js";
 import { BaseError, GatewayError, logger as gatewayLogger } from "./log.js";
 import {
@@ -95,11 +94,13 @@ function scheduleRestart(
         // best-effort; continue with restart
       }
 
+      // Config is now pushed via WS config.apply from the API server,
+      // which persists to openclaw.json automatically. No need to
+      // re-fetch and overwrite the config file before restart.
       try {
-        await fetchInitialConfig();
         logger.info(
-          { event: "openclaw_restart_config_refreshed" },
-          "wrote fresh config before restart",
+          { event: "openclaw_restart_config_skip" },
+          "skipping config refresh before restart (config pushed via WS)",
         );
       } catch (error) {
         const baseError = BaseError.from(error);

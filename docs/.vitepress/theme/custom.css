@@ -72,3 +72,7 @@ body {
 .vp-doc a {
   text-underline-offset: 2px;
 }
+
+.vp-doc img {
+  cursor: zoom-in;
+}

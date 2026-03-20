@@ -12,12 +12,12 @@ import {
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import {
   registerIpcHandlers,
-  setCatalogManager,
   setComponentUpdater,
   setUpdateManager,
 } from "./ipc";
@@ -28,7 +28,6 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
-import { CatalogManager } from "./skillhub/catalog-manager";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
@@ -50,7 +49,8 @@ const electronRoot = app.isPackaged
   : getDesktopAppRoot();
 const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   appVersion: app.getVersion(),
-  resourcesPath: electronRoot,
+  resourcesPath: app.isPackaged ? electronRoot : undefined,
+  useBuildConfig: app.isPackaged,
 });
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
@@ -68,30 +68,99 @@ app.commandLine.appendSwitch("disable-popup-blocking");
 
 const sentryDsn = runtimeConfig.sentryDsn;
 
+function readNativeCrashTestTitle(event: Sentry.Event): string | null {
+  const taggedTitle =
+    typeof event.tags?.["nexu.crash_title"] === "string"
+      ? event.tags["nexu.crash_title"]
+      : typeof event.extra?.["nexu.crash_title"] === "string"
+        ? event.extra["nexu.crash_title"]
+        : null;
+
+  if (taggedTitle) {
+    return taggedTitle;
+  }
+
+  const electronContext = event.contexts?.electron as
+    | Record<string, unknown>
+    | undefined;
+  const crashpadTitle = electronContext?.["crashpad.nexu.crash_title"];
+
+  return typeof crashpadTitle === "string" ? crashpadTitle : null;
+}
+
+function readNativeCrashTestKind(event: Sentry.Event): string | null {
+  const taggedKind =
+    typeof event.tags?.["nexu.crash_kind"] === "string"
+      ? event.tags["nexu.crash_kind"]
+      : null;
+
+  if (taggedKind) {
+    return taggedKind;
+  }
+
+  const electronContext = event.contexts?.electron as
+    | Record<string, unknown>
+    | undefined;
+  const crashpadKind = electronContext?.["crashpad.nexu.crash_kind"];
+
+  return typeof crashpadKind === "string" ? crashpadKind : null;
+}
+
 if (sentryDsn) {
+  const sentryBuildMetadata = getDesktopSentryBuildMetadata(
+    runtimeConfig.buildInfo,
+  );
+
   Sentry.init({
     dsn: sentryDsn,
     environment: app.isPackaged ? "production" : "development",
-    release: `@nexu/desktop@${app.getVersion()}`,
+    release: sentryBuildMetadata.release,
+    ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
     beforeSend(event) {
-      const testTitle =
-        typeof event.tags?.["nexu.test_title"] === "string"
-          ? event.tags["nexu.test_title"]
-          : typeof event.extra?.["nexu.test_title"] === "string"
-            ? event.extra["nexu.test_title"]
-            : null;
+      const testTitle = readNativeCrashTestTitle(event);
 
       if (!testTitle) {
         return event;
       }
 
+      const testKind = readNativeCrashTestKind(event);
+      const firstException = event.exception?.values?.[0];
+      const updatedException = event.exception?.values
+        ? {
+            ...event.exception,
+            values: [
+              {
+                ...firstException,
+                type: "Error",
+                value: testTitle,
+              },
+              ...event.exception.values.slice(1),
+            ],
+          }
+        : {
+            values: [
+              {
+                type: "Error",
+                value: testTitle,
+              },
+            ],
+          };
+
       return {
         ...event,
         message: testTitle,
+        exception: updatedException,
         fingerprint: [testTitle],
+        tags: {
+          ...event.tags,
+          "nexu.crash_title": testTitle,
+          ...(testKind ? { "nexu.crash_kind": testKind } : {}),
+        },
       };
     },
   });
+
+  Sentry.setContext("build", sentryBuildMetadata.buildContext);
 } else {
   crashReporter.start({
     companyName: "Nexu",
@@ -107,7 +176,6 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let catalogMgr: CatalogManager | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
 function sendDesktopCommand(
@@ -561,42 +629,6 @@ app.whenReady().then(async () => {
       });
     }
 
-    // Resolve static bundled-skills dir: packaged app has it in resources/,
-    // dev mode has it relative to the repo root.
-    // Resolve static bundled-skills dir: packaged app has it in resources/,
-    // dev mode has it relative to the app root.
-    const staticSkillsDir = app.isPackaged
-      ? resolve(process.resourcesPath ?? "", "static/bundled-skills")
-      : resolve(app.getAppPath(), "static/bundled-skills");
-
-    catalogMgr = new CatalogManager(app.getPath("userData"), {
-      staticSkillsDir,
-      log: (level, message) => {
-        writeDesktopMainLog({
-          source: "skillhub",
-          stream: level === "error" ? "stderr" : "stdout",
-          kind: "app",
-          message,
-          logFilePath: getDesktopLogFilePath("desktop-main.log"),
-        });
-      },
-    });
-    setCatalogManager(catalogMgr);
-    catalogMgr.start();
-
-    // Install curated skills on first launch (or re-install missing ones on update).
-    // Runs in background — does not block window creation.
-    void catalogMgr.installCuratedSkills().catch((err) => {
-      // Best-effort — curated skills are not critical for app startup.
-      writeDesktopMainLog({
-        source: "skillhub",
-        stream: "stderr",
-        kind: "app",
-        message: `curated skill install failed: ${err instanceof Error ? err.message : String(err)}`,
-        logFilePath: getDesktopLogFilePath("desktop-main.log"),
-      });
-    });
-
     const win = createMainWindow();
 
     if (app.isPackaged) {
@@ -632,7 +664,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  catalogMgr?.dispose();
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();

@@ -19,6 +19,7 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
@@ -49,10 +50,18 @@ function initializeRendererSentry(dsn: string): void {
     return;
   }
 
+  const sentryBuildMetadata = getDesktopSentryBuildMetadata(
+    window.nexuHost.bootstrap.buildInfo,
+  );
+
   Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
+    release: sentryBuildMetadata.release,
+    ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
   });
+
+  Sentry.setContext("build", sentryBuildMetadata.buildContext);
 
   rendererSentryInitialized = true;
 }

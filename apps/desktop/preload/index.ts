@@ -17,11 +17,13 @@ import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 const validChannels = new Set<string>(hostInvokeChannels);
 
 const runtimeConfig = getDesktopRuntimeConfig(process.env, {
-  resourcesPath: process.resourcesPath,
+  resourcesPath: process.defaultApp ? undefined : process.resourcesPath,
+  useBuildConfig: !process.defaultApp,
 });
 
 const hostBridge: HostBridge = {
   bootstrap: {
+    buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
   },

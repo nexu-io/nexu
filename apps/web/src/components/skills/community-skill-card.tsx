@@ -1,10 +1,10 @@
+import { Switch } from "@/components/ui/switch";
 import {
   useInstallSkill,
   useUninstallSkill,
 } from "@/hooks/use-community-catalog";
-import { cn } from "@/lib/utils";
 import type { MinimalSkill } from "@/types/desktop";
-import { Download, Loader2, Star, Trash2 } from "lucide-react";
+import { Download, Star } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -29,21 +29,23 @@ export function CommunitySkillCard({
 
   const isBusy = pendingAction !== null;
 
-  async function handleInstall() {
-    setPendingAction("install");
-    try {
-      await installMutation.mutateAsync(skill.slug);
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  async function handleUninstall() {
-    setPendingAction("uninstall");
-    try {
-      await uninstallMutation.mutateAsync(skill.slug);
-    } finally {
-      setPendingAction(null);
+  async function handleToggle(checked: boolean) {
+    if (checked) {
+      // Turning ON = Install
+      setPendingAction("install");
+      try {
+        await installMutation.mutateAsync(skill.slug);
+      } finally {
+        setPendingAction(null);
+      }
+    } else {
+      // Turning OFF = Uninstall
+      setPendingAction("uninstall");
+      try {
+        await uninstallMutation.mutateAsync(skill.slug);
+      } finally {
+        setPendingAction(null);
+      }
     }
   }
 
@@ -61,53 +63,26 @@ export function CommunitySkillCard({
             {skill.slug}
           </span>
         </div>
-        {isInstalled ? (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={(e) => {
+        <div
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               e.stopPropagation();
-              void handleUninstall();
-            }}
-            className={cn(
-              "shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
-              isBusy
-                ? "bg-surface-3 text-text-muted cursor-not-allowed"
-                : "bg-red-500/10 text-red-500 hover:bg-red-500/20",
-            )}
-          >
-            {pendingAction === "uninstall" ? (
-              <Loader2 size={10} className="animate-spin" />
-            ) : (
-              <Trash2 size={10} />
-            )}
-            {pendingAction === "uninstall" ? "Removing..." : "Uninstall"}
-          </button>
-        ) : (
-          <button
-            type="button"
+            }
+          }}
+        >
+          <Switch
+            size="xs"
+            checked={isInstalled}
             disabled={isBusy}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              void handleInstall();
-            }}
-            className={cn(
-              "shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
-              isBusy
-                ? "bg-surface-3 text-text-muted cursor-not-allowed"
-                : "bg-accent/10 text-accent hover:bg-accent/20",
-            )}
-          >
-            {pendingAction === "install" ? (
-              <Loader2 size={10} className="animate-spin" />
-            ) : (
-              <Download size={10} />
-            )}
-            {pendingAction === "install" ? "Installing..." : "Install"}
-          </button>
-        )}
+            loading={isBusy}
+            onCheckedChange={handleToggle}
+          />
+        </div>
       </div>
 
       <p className="text-[12px] text-text-muted leading-relaxed line-clamp-2 mb-3">

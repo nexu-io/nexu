@@ -1,11 +1,6 @@
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import type { SkillDb } from "./skill-db.js";
 
 /**
  * Skills to install from ClawHub into `state/bundled-skills/` on first launch.
@@ -63,10 +58,8 @@ export const STATIC_SKILL_SLUGS: readonly string[] = [
 export function copyStaticSkills(params: {
   staticDir: string;
   curatedDir: string;
-  statePath: string;
+  skillDb: SkillDb;
 }): { copied: string[]; skipped: string[] } {
-  const state = readState(params.statePath);
-  const removedSet = new Set(state.removedByUser);
   const copied: string[] = [];
   const skipped: string[] = [];
 
@@ -75,7 +68,7 @@ export function copyStaticSkills(params: {
   }
 
   for (const slug of STATIC_SKILL_SLUGS) {
-    if (removedSet.has(slug)) {
+    if (params.skillDb.isRemovedByUser(slug)) {
       skipped.push(slug);
       continue;
     }
@@ -100,28 +93,6 @@ export function copyStaticSkills(params: {
   return { copied, skipped };
 }
 
-type CuratedState = {
-  /** Slugs the user explicitly uninstalled — don't re-install on update */
-  removedByUser: string[];
-  /** Last set of slugs we attempted to install */
-  lastInstalledVersion: string[];
-};
-
-function readState(statePath: string): CuratedState {
-  if (!existsSync(statePath)) {
-    return { removedByUser: [], lastInstalledVersion: [] };
-  }
-  try {
-    return JSON.parse(readFileSync(statePath, "utf8")) as CuratedState;
-  } catch {
-    return { removedByUser: [], lastInstalledVersion: [] };
-  }
-}
-
-function writeState(statePath: string, state: CuratedState): void {
-  writeFileSync(statePath, JSON.stringify(state, null, 2), "utf8");
-}
-
 export type CuratedInstallResult = {
   installed: string[];
   skipped: string[];
@@ -134,15 +105,13 @@ export type CuratedInstallResult = {
  */
 export function resolveCuratedSkillsToInstall(params: {
   curatedDir: string;
-  statePath: string;
+  skillDb: SkillDb;
 }): { toInstall: string[]; toSkip: string[] } {
-  const state = readState(params.statePath);
-  const removedSet = new Set(state.removedByUser);
   const toInstall: string[] = [];
   const toSkip: string[] = [];
 
   for (const slug of CURATED_SKILL_SLUGS) {
-    if (removedSet.has(slug)) {
+    if (params.skillDb.isRemovedByUser(slug)) {
       toSkip.push(slug);
       continue;
     }
@@ -155,37 +124,4 @@ export function resolveCuratedSkillsToInstall(params: {
   }
 
   return { toInstall, toSkip };
-}
-
-/**
- * Records that the user explicitly uninstalled a curated skill,
- * so it won't be re-installed on the next app update.
- */
-export function recordCuratedRemoval(params: {
-  slug: string;
-  statePath: string;
-}): void {
-  const state = readState(params.statePath);
-  if (!state.removedByUser.includes(params.slug)) {
-    const updated: CuratedState = {
-      ...state,
-      removedByUser: [...state.removedByUser, params.slug],
-    };
-    writeState(params.statePath, updated);
-  }
-}
-
-/**
- * Updates the state file after a successful installation round.
- */
-export function recordCuratedInstallation(params: {
-  statePath: string;
-  installed: string[];
-}): void {
-  const state = readState(params.statePath);
-  const updated: CuratedState = {
-    ...state,
-    lastInstalledVersion: [...CURATED_SKILL_SLUGS],
-  };
-  writeState(params.statePath, updated);
 }

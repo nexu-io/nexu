@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { getDesktopAppRoot } from "./workspace-paths";
 
 export const DEFAULT_CONTROLLER_PORT = 50_800;
 export const DEFAULT_WEB_PORT = 50_810;
@@ -20,6 +21,7 @@ type BuildConfig = {
   NEXU_CLOUD_URL?: string;
   NEXU_LINK_URL?: string | null;
   NEXU_UPDATE_FEED_URL?: string;
+  NEXU_DESKTOP_APP_VERSION?: string;
   NEXU_DESKTOP_SENTRY_DSN?: string;
   NEXU_DESKTOP_BUILD_SOURCE?: string;
   NEXU_DESKTOP_BUILD_BRANCH?: string;
@@ -68,6 +70,10 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
         record,
         "NEXU_UPDATE_FEED_URL",
       ),
+      NEXU_DESKTOP_APP_VERSION: readBuildConfigString(
+        record,
+        "NEXU_DESKTOP_APP_VERSION",
+      ),
       NEXU_DESKTOP_SENTRY_DSN: readBuildConfigString(
         record,
         "NEXU_DESKTOP_SENTRY_DSN",
@@ -92,6 +98,42 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
   } catch {
     return {};
   }
+}
+
+function readJsonVersion(filePath: string): string | undefined {
+  if (!existsSync(filePath)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
+
+    if (!parsed || typeof parsed !== "object") {
+      return undefined;
+    }
+
+    const version = (parsed as { version?: unknown }).version;
+    return typeof version === "string" && version.length > 0
+      ? version
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readPackagedAppVersion(resourcesPath?: string): string | undefined {
+  if (!resourcesPath) {
+    return undefined;
+  }
+
+  return (
+    readJsonVersion(resolve(resourcesPath, "app.asar", "package.json")) ??
+    readJsonVersion(resolve(resourcesPath, "app", "package.json"))
+  );
+}
+
+function readDesktopPackageVersion(): string | undefined {
+  return readJsonVersion(resolve(getDesktopAppRoot(), "package.json"));
 }
 
 export type DesktopBuildSource =
@@ -156,10 +198,16 @@ export function getDesktopRuntimeConfig(
     appVersion?: string;
     openclawBinPath?: string;
     resourcesPath?: string;
+    useBuildConfig?: boolean;
   },
 ): DesktopRuntimeConfig {
-  // Load build-time config (for packaged apps)
-  const buildConfig = loadBuildConfig(defaults?.resourcesPath);
+  const buildConfig =
+    defaults?.useBuildConfig === false
+      ? {}
+      : loadBuildConfig(defaults?.resourcesPath);
+  const fallbackPackageVersion =
+    readPackagedAppVersion(defaults?.resourcesPath) ??
+    readDesktopPackageVersion();
   const ports = {
     controller: Number.parseInt(
       env.NEXU_CONTROLLER_PORT ??
@@ -191,7 +239,13 @@ export function getDesktopRuntimeConfig(
 
   return {
     buildInfo: {
-      version: defaults?.appVersion ?? env.npm_package_version ?? "0.0.0",
+      version:
+        defaults?.appVersion ??
+        env.NEXU_DESKTOP_APP_VERSION ??
+        buildConfig.NEXU_DESKTOP_APP_VERSION ??
+        env.npm_package_version ??
+        fallbackPackageVersion ??
+        "0.0.0",
       source: normalizeBuildSource(
         env.NEXU_DESKTOP_BUILD_SOURCE ?? buildConfig.NEXU_DESKTOP_BUILD_SOURCE,
       ),

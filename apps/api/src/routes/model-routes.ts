@@ -9,6 +9,7 @@ import {
   modelListResponseSchema,
   providerListResponseSchema,
   providerResponseSchema,
+  refreshModelsResponseSchema,
   upsertProviderBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
@@ -131,6 +132,23 @@ const verifyProviderRoute = createRoute({
   },
 });
 
+const refreshModelsRoute = createRoute({
+  method: "post",
+  path: "/api/v1/providers/{providerId}/refresh-models",
+  tags: ["Providers"],
+  request: {
+    params: providerIdParam,
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: refreshModelsResponseSchema },
+      },
+      description: "Refreshed model list",
+    },
+  },
+});
+
 const linkCatalogRoute = createRoute({
   method: "get",
   path: "/api/v1/link-catalog",
@@ -214,6 +232,14 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  siliconflow: "https://api.siliconflow.com/v1",
+  ppio: "https://api.ppinfra.com/v3/openai",
+  openrouter: "https://openrouter.ai/api/v1",
+  minimax: "https://api.minimaxi.com/anthropic",
+  kimi: "https://api.moonshot.cn/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  moonshot: "https://api.moonshot.cn/v1",
+  zai: "https://open.bigmodel.cn/api/paas/v4",
 };
 
 function getVerifyUrl(providerId: string, baseUrl?: string | null): string {
@@ -347,6 +373,14 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
         anthropic: "Anthropic",
         openai: "OpenAI",
         google: "Google AI",
+        siliconflow: "SiliconFlow",
+        ppio: "PPIO",
+        openrouter: "OpenRouter",
+        minimax: "MiniMax",
+        kimi: "Kimi",
+        glm: "GLM",
+        moonshot: "Kimi",
+        zai: "GLM",
         custom: "Custom",
       }[providerId] ??
       providerId;
@@ -431,6 +465,66 @@ export function registerModelRoutes(app: OpenAPIHono<AppBindings>) {
     } catch (err) {
       return c.json({
         valid: false,
+        error: err instanceof Error ? err.message : "Request failed",
+      });
+    }
+  });
+
+  // Refresh models for a saved BYOK provider using stored credentials
+  app.openapi(refreshModelsRoute, async (c) => {
+    const { providerId } = c.req.valid("param");
+
+    const [provider] = await db
+      .select()
+      .from(modelProviders)
+      .where(eq(modelProviders.providerId, providerId));
+
+    if (!provider?.encryptedApiKey) {
+      return c.json({ models: [], error: "No API key configured" });
+    }
+
+    const apiKey = decrypt(provider.encryptedApiKey);
+    const verifyUrl = getVerifyUrl(providerId, provider.baseUrl);
+    if (!verifyUrl) {
+      return c.json({ models: [], error: "Cannot determine models endpoint" });
+    }
+
+    try {
+      const headers: Record<string, string> =
+        providerId === "anthropic"
+          ? {
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            }
+          : { Authorization: `Bearer ${apiKey}` };
+
+      const res = await fetch(verifyUrl, {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!res.ok) {
+        return c.json({ models: [], error: `HTTP ${res.status}` });
+      }
+
+      const data = (await res.json()) as {
+        data?: Array<{ id: string }>;
+      };
+      const models = Array.isArray(data.data) ? data.data.map((m) => m.id) : [];
+
+      // Persist to DB so next page load has cached models
+      await db
+        .update(modelProviders)
+        .set({
+          modelsJson: JSON.stringify(models),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(modelProviders.providerId, providerId));
+
+      return c.json({ models });
+    } catch (err) {
+      return c.json({
+        models: [],
         error: err instanceof Error ? err.message : "Request failed",
       });
     }

@@ -86,7 +86,16 @@ export function registerModelRoutes(
         providerId,
         c.req.valid("json"),
       );
-      return c.json({ provider: result.provider }, result.created ? 201 : 200);
+      const modelResult =
+        await container.modelProviderService.ensureValidDefaultModel();
+      await container.openclawSyncService.syncAll();
+      return c.json(
+        {
+          provider: result.provider,
+          modelAutoSelected: modelResult.changed ? modelResult : undefined,
+        },
+        result.created ? 201 : 200,
+      );
     },
   );
 
@@ -107,8 +116,16 @@ export function registerModelRoutes(
     }),
     async (c) => {
       const { providerId } = c.req.valid("param");
+      const ok =
+        await container.modelProviderService.deleteProvider(providerId);
+      const modelResult =
+        await container.modelProviderService.ensureValidDefaultModel();
+      await container.openclawSyncService.syncAll();
       return c.json(
-        { ok: await container.modelProviderService.deleteProvider(providerId) },
+        {
+          ok,
+          modelAutoSelected: modelResult.changed ? modelResult : undefined,
+        },
         200,
       );
     },

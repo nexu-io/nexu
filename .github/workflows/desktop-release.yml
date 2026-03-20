@@ -118,10 +118,12 @@ jobs:
         run: |
           export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
+            const { version } = require("./apps/desktop/package.json");
             const config = {
               NEXU_CLOUD_URL: "https://nexu.io",
               NEXU_LINK_URL: "https://link.nexu.io",
               NEXU_UPDATE_FEED_URL: `https://desktop-releases.nexu.io/${process.env.CHANNEL}`,
+              NEXU_DESKTOP_APP_VERSION: version,
               NEXU_DESKTOP_BUILD_SOURCE: "release",
               NEXU_DESKTOP_BUILD_BRANCH: "",
               NEXU_DESKTOP_BUILD_COMMIT: process.env.BUILD_COMMIT,
@@ -144,6 +146,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: pnpm --filter @nexu/desktop dist:mac
 
       - name: Prepare release artifacts

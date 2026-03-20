@@ -915,6 +915,59 @@
         }
       }
     },
+    "/api/internal/desktop/ready": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Desktop runtime ready status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "runtime": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "number",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "status"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "degraded",
+                        "unhealthy"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "runtime",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/cloud-status": {
       "get": {
         "tags": [
@@ -1161,11 +1214,15 @@
                     },
                     "modelId": {
                       "type": "string"
+                    },
+                    "configPushed": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "ok",
-                    "modelId"
+                    "modelId",
+                    "configPushed"
                   ]
                 }
               }
@@ -1864,6 +1921,186 @@
                   },
                   "required": [
                     "success"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/live-status": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "responses": {
+          "200": {
+            "description": "Live channel and agent status from OpenClaw gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "gatewayConnected": {
+                      "type": "boolean"
+                    },
+                    "channels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "channelType": {
+                            "type": "string"
+                          },
+                          "channelId": {
+                            "type": "string"
+                          },
+                          "accountId": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "connected",
+                              "connecting",
+                              "disconnected",
+                              "error",
+                              "restarting"
+                            ]
+                          },
+                          "ready": {
+                            "type": "boolean"
+                          },
+                          "connected": {
+                            "type": "boolean"
+                          },
+                          "running": {
+                            "type": "boolean"
+                          },
+                          "configured": {
+                            "type": "boolean"
+                          },
+                          "lastError": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "channelType",
+                          "channelId",
+                          "accountId",
+                          "status",
+                          "ready",
+                          "connected",
+                          "running",
+                          "configured",
+                          "lastError"
+                        ]
+                      }
+                    },
+                    "agent": {
+                      "type": "object",
+                      "properties": {
+                        "modelId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "modelName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "alive": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "modelId",
+                        "modelName",
+                        "alive"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "gatewayConnected",
+                    "channels",
+                    "agent"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/{channelId}/readiness": {
+      "get": {
+        "tags": [
+          "Channels"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channelId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel readiness status from OpenClaw gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "running": {
+                      "type": "boolean"
+                    },
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "lastError": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "gatewayConnected": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "connected",
+                    "running",
+                    "configured",
+                    "lastError",
+                    "gatewayConnected"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Channel not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
                   ]
                 }
               }
@@ -4846,9 +5083,6 @@
                           },
                           "updatedAt": {
                             "type": "string"
-                          },
-                          "homepage": {
-                            "type": "string"
                           }
                         },
                         "required": [
@@ -4859,8 +5093,7 @@
                           "stars",
                           "tags",
                           "version",
-                          "updatedAt",
-                          "homepage"
+                          "updatedAt"
                         ]
                       }
                     },
@@ -4868,6 +5101,36 @@
                       "type": "array",
                       "items": {
                         "type": "string"
+                      }
+                    },
+                    "installedSkills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "curated",
+                              "managed"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "source",
+                          "name",
+                          "description"
+                        ]
                       }
                     },
                     "meta": {
@@ -4894,6 +5157,7 @@
                   "required": [
                     "skills",
                     "installedSlugs",
+                    "installedSkills",
                     "meta"
                   ]
                 }
@@ -5084,9 +5348,6 @@
                     "updatedAt": {
                       "type": "string"
                     },
-                    "homepage": {
-                      "type": "string"
-                    },
                     "installed": {
                       "type": "boolean"
                     },
@@ -5110,7 +5371,6 @@
                     "tags",
                     "version",
                     "updatedAt",
-                    "homepage",
                     "installed",
                     "skillContent",
                     "files"

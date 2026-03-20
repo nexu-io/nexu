@@ -11,7 +11,13 @@ const minimalSkillSchema = z.object({
   tags: z.array(z.string()),
   version: z.string(),
   updatedAt: z.string(),
-  homepage: z.string(),
+});
+
+const installedSkillSchema = z.object({
+  slug: z.string(),
+  source: z.enum(["curated", "managed"]),
+  name: z.string(),
+  description: z.string(),
 });
 
 const catalogMetaSchema = z.object({
@@ -23,6 +29,7 @@ const catalogMetaSchema = z.object({
 const skillhubCatalogResponseSchema = z.object({
   skills: z.array(minimalSkillSchema),
   installedSlugs: z.array(z.string()),
+  installedSkills: z.array(installedSkillSchema),
   meta: catalogMetaSchema.nullable(),
 });
 
@@ -44,7 +51,6 @@ const skillhubDetailResponseSchema = z.object({
   tags: z.array(z.string()),
   version: z.string(),
   updatedAt: z.string(),
-  homepage: z.string(),
   installed: z.boolean(),
   skillContent: z.string().nullable(),
   files: z.array(z.string()),
@@ -56,6 +62,7 @@ export function registerSkillhubRoutes(
   app: OpenAPIHono<ControllerBindings>,
   container: ControllerContainer,
 ): void {
+  // GET /api/v1/skillhub/catalog
   app.openapi(
     createRoute({
       method: "get",
@@ -71,69 +78,75 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const skills = await container.skillService.getSkills();
-      const installedSlugs = Object.entries(skills.items)
-        .filter(([, item]) => item.enabled)
-        .map(([slug]) => slug);
-      return c.json(
-        {
-          skills: installedSlugs.map((slug) => ({
-            slug,
-            name: slug,
-            description: "Local controller-managed skill",
-            downloads: 0,
-            stars: 0,
-            tags: [],
-            version: "1.0.0",
-            updatedAt: new Date().toISOString(),
-            homepage: "https://nexu.io",
-          })),
-          installedSlugs,
-          meta: {
-            version: "local",
-            updatedAt: new Date().toISOString(),
-            skillCount: installedSlugs.length,
-          },
-        },
-        200,
-      );
+      const catalog = container.skillhubService.catalog.getCatalog();
+      return c.json(catalog, 200);
     },
   );
 
-  for (const [pathName, description] of [
-    ["/api/v1/skillhub/install", "Install"],
-    ["/api/v1/skillhub/uninstall", "Uninstall"],
-  ] as const) {
-    app.openapi(
-      createRoute({
-        method: "post",
-        path: pathName,
-        tags: ["SkillHub"],
-        request: {
-          body: {
-            content: {
-              "application/json": {
-                schema: z.object({ slug: skillhubSlugSchema }),
-              },
+  // POST /api/v1/skillhub/install
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/skillhub/install",
+      tags: ["SkillHub"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: z.object({ slug: skillhubSlugSchema }),
             },
           },
         },
-        responses: {
-          200: {
-            content: {
-              "application/json": { schema: skillhubMutationResultSchema },
-            },
-            description,
-          },
-        },
-      }),
-      async (c) => {
-        c.req.valid("json");
-        return c.json({ ok: true }, 200);
       },
-    );
-  }
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: skillhubMutationResultSchema },
+          },
+          description: "Install",
+        },
+      },
+    }),
+    async (c) => {
+      const { slug } = c.req.valid("json");
+      const result = await container.skillhubService.catalog.installSkill(slug);
+      return c.json(result, 200);
+    },
+  );
 
+  // POST /api/v1/skillhub/uninstall
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/skillhub/uninstall",
+      tags: ["SkillHub"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: z.object({ slug: skillhubSlugSchema }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: skillhubMutationResultSchema },
+          },
+          description: "Uninstall",
+        },
+      },
+    }),
+    async (c) => {
+      const { slug } = c.req.valid("json");
+      const result =
+        await container.skillhubService.catalog.uninstallSkill(slug);
+      return c.json(result, 200);
+    },
+  );
+
+  // POST /api/v1/skillhub/refresh
   app.openapi(
     createRoute({
       method: "post",
@@ -149,14 +162,12 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const skills = await container.skillService.getSkills();
-      return c.json(
-        { ok: true, skillCount: Object.keys(skills.items).length },
-        200,
-      );
+      const result = await container.skillhubService.catalog.refreshCatalog();
+      return c.json(result, 200);
     },
   );
 
+  // GET /api/v1/skillhub/skills/{slug}
   app.openapi(
     createRoute({
       method: "get",
@@ -180,25 +191,31 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("param");
-      const skills = await container.skillService.getSkills();
-      const skill = skills.items[slug];
-      if (!skill) {
+      const catalog = container.skillhubService.catalog.getCatalog();
+      const catalogSkill = catalog.skills.find((s) => s.slug === slug);
+      const installed = catalog.installedSlugs.includes(slug);
+      const installedSkill = catalog.installedSkills.find(
+        (s) => s.slug === slug,
+      );
+
+      if (!catalogSkill && !installedSkill) {
         return c.json({ message: "Skill not found" }, 404);
       }
+
       return c.json(
         {
           slug,
-          name: slug,
-          description: skill.metadata.description ?? "",
-          downloads: 0,
-          stars: 0,
-          tags: skill.metadata.tags ?? [],
-          version: "1.0.0",
-          updatedAt: new Date().toISOString(),
-          homepage: "https://nexu.io",
-          installed: skill.enabled,
-          skillContent: skill.content,
-          files: Object.keys(skill.files),
+          name: catalogSkill?.name ?? installedSkill?.name ?? slug,
+          description:
+            catalogSkill?.description ?? installedSkill?.description ?? "",
+          downloads: catalogSkill?.downloads ?? 0,
+          stars: catalogSkill?.stars ?? 0,
+          tags: catalogSkill?.tags ?? [],
+          version: catalogSkill?.version ?? "1.0.0",
+          updatedAt: catalogSkill?.updatedAt ?? new Date().toISOString(),
+          installed,
+          skillContent: null,
+          files: [],
         },
         200,
       );
