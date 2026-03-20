@@ -79,7 +79,7 @@ jobs:
       - name: Verify desktop runtime unit health
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
-        run: pnpm desktop:check:dev
+        run: pnpm check:dev
 
       - name: Capture desktop logs
         if: always()

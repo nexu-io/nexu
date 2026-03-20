@@ -50,11 +50,11 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
   - Use `NEXU_DESKTOP_RELEASE_DIR=/absolute/output/path` when you want packaged artifacts written somewhere other than `apps/desktop/release`.
 
 - `desktop won't cold start`
-  - Start with `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
+  - Start with `pnpm logs` and `./apps/desktop/dev.sh devlog`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
   - If `tmux session 'nexu-desktop' is not running` immediately after start, verify `pnpm -C apps/desktop exec electron --version` succeeds.
-  - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm desktop:start` path.
+  - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm start` path.
 
 - `a runtime unit looks running but behavior is broken`
   - Check the unit's structured lifecycle/probe logs in `apps/desktop/main/runtime/` outputs before changing UI.

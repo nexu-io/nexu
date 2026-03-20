@@ -136,7 +136,7 @@ Exit criteria:
 - `pnpm test`
 - `pnpm build`
 - `pnpm dev`
-- `pnpm desktop:start` and basic controller-first smoke verification
+- `pnpm start` and basic controller-first smoke verification
 - repo grep returns no active references to legacy packages/services
 
 ## Risk notes

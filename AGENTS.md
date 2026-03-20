@@ -25,12 +25,12 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 pnpm install                          # Install
 pnpm dev                              # Local controller-first web stack (Controller + Web)
 pnpm dev:controller                   # Controller only
-pnpm desktop:start                    # Build and launch the desktop local runtime stack
-pnpm desktop:stop                     # Stop the desktop local runtime stack
-pnpm desktop:restart                  # Restart the desktop local runtime stack
-pnpm desktop:status                   # Show desktop local runtime status
-pnpm desktop:dist:mac                 # Build signed macOS desktop distributables
-pnpm desktop:dist:mac:unsigned        # Build unsigned macOS desktop distributables
+pnpm start                            # Build and launch the desktop local runtime stack
+pnpm stop                             # Stop the desktop local runtime stack
+pnpm restart                          # Restart the desktop local runtime stack
+pnpm status                           # Show desktop local runtime status
+pnpm dist:mac                         # Build signed macOS desktop distributables
+pnpm dist:mac:unsigned                # Build unsigned macOS desktop distributables
 pnpm probe:slack prepare              # Launch Chrome Canary with the dedicated Slack probe profile
 pnpm probe:slack run                  # Run the local Slack reply smoke probe against an authenticated DM
 pnpm --filter @nexu/web dev           # Web only
@@ -56,17 +56,17 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 
 ## Desktop local development
 
-- Use `pnpm install` first, then `pnpm desktop:start` / `pnpm desktop:stop` / `pnpm desktop:restart` / `pnpm desktop:status` as the standard local desktop workflow.
+- Use `pnpm install` first, then `pnpm start` / `pnpm stop` / `pnpm restart` / `pnpm status` as the standard local desktop workflow.
 - The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
 - The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
 - The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
-- Treat `pnpm desktop:start` as the canonical cold-start entrypoint for the full local desktop runtime.
+- Treat `pnpm start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
 - Desktop local runtime should not depend on PostgreSQL; controller-owned local state lives under `~/.nexu/`, while desktop dev runtime state remains repo-scoped under `.tmp/desktop/`.
 - `tmux` is required for the desktop local-dev workflow.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
-- For startup troubleshooting, use `pnpm desktop:logs` and `./apps/desktop/dev.sh devlog`.
-- If `pnpm desktop:start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
+- For startup troubleshooting, use `pnpm logs` and `./apps/desktop/dev.sh devlog`.
+- If `pnpm start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
 - Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
 - For deeper desktop runtime inspection, use the existing event/query path (`onRuntimeEvent(...)`, `runtime:query-events`, `queryRuntimeEvents(...)`) instead of rebuilding one-off diagnostics.
 - Use `actionId`, `reasonCode`, and `cursor` / `nextCursor` as the primary correlation and incremental-fetch primitives for desktop runtime debugging.
