@@ -39,10 +39,35 @@ export class OpenClawProcessManager {
 
     this.killOrphanedOpenClawProcesses();
 
-    const child = spawn(this.env.openclawBin, ["gateway", "run"], {
+    // Prefer Electron's Node (v22+) over system node to satisfy OpenClaw's
+    // minimum version requirement. The shell launcher tries system `node`
+    // first, which may be too old.
+    const electronExec = process.env.OPENCLAW_ELECTRON_EXECUTABLE;
+    let cmd: string;
+    let args: string[];
+    let extraEnv: Record<string, string> = {};
+
+    if (electronExec) {
+      // Resolve the openclaw entry point relative to the bin script
+      const binDir = path.dirname(path.resolve(this.env.openclawBin));
+      const entry = path.resolve(
+        binDir,
+        "..",
+        "node_modules/openclaw/openclaw.mjs",
+      );
+      cmd = electronExec;
+      args = [entry, "gateway", "run"];
+      extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+    } else {
+      cmd = this.env.openclawBin;
+      args = ["gateway", "run"];
+    }
+
+    const child = spawn(cmd, args, {
       cwd: path.resolve(this.env.openclawStateDir),
       env: {
         ...process.env,
+        ...extraEnv,
         OPENCLAW_LOG_LEVEL: "info",
       },
       stdio: ["ignore", "pipe", "pipe"],

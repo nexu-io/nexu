@@ -1,5 +1,89 @@
 import { defineConfig } from "vitepress";
 
+const localePreferenceScript = `
+(() => {
+  const storageKey = "nexu-docs-locale";
+  const zhPrefix = "/zh/";
+
+  const normalizePath = (path) => (path === "/zh" ? zhPrefix : path);
+
+  const getLocaleFromPath = (path) => {
+    const normalizedPath = normalizePath(path);
+    return normalizedPath === zhPrefix || normalizedPath.startsWith(zhPrefix)
+      ? "zh"
+      : "en";
+  };
+
+  const getPreferredLocale = () => {
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      if (stored === "en" || stored === "zh") {
+        return stored;
+      }
+    } catch {}
+
+    const languages = Array.isArray(navigator.languages) && navigator.languages.length > 0
+      ? navigator.languages
+      : [navigator.language];
+
+    return languages.some((language) => String(language).toLowerCase().startsWith("zh"))
+      ? "zh"
+      : "en";
+  };
+
+  const setPreferredLocale = (locale) => {
+    try {
+      window.localStorage.setItem(storageKey, locale);
+    } catch {}
+  };
+
+  const pathname = normalizePath(window.location.pathname);
+
+  if (pathname === "/" || pathname === zhPrefix) {
+    const preferredLocale = getPreferredLocale();
+    const targetPath = preferredLocale === "zh" ? zhPrefix : "/";
+
+    if (pathname !== targetPath) {
+      window.location.replace(targetPath + window.location.search + window.location.hash);
+      return;
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const link = target.closest("a[href]");
+    if (!(link instanceof HTMLAnchorElement)) {
+      return;
+    }
+
+    if (link.target && link.target !== "_self") {
+      return;
+    }
+
+    const href = link.getAttribute("href");
+    if (
+      !href ||
+      href.startsWith("#") ||
+      href.startsWith("http://") ||
+      href.startsWith("https://")
+    ) {
+      return;
+    }
+
+    const nextUrl = new URL(link.href, window.location.origin);
+    if (nextUrl.origin !== window.location.origin) {
+      return;
+    }
+
+    setPreferredLocale(getLocaleFromPath(nextUrl.pathname));
+  }, { capture: true });
+})();
+`;
+
 const enSidebar = [
   {
     text: "Get Started",
@@ -30,6 +114,7 @@ const enSidebar = [
     items: [
       { text: "Contributing", link: "/guide/contributing" },
       { text: "Contact Us", link: "/guide/contact" },
+      { text: "Changelog", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
@@ -64,13 +149,14 @@ const zhSidebar = [
     items: [
       { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "联系我们", link: "/zh/guide/contact" },
+      { text: "更新日志", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
 ];
 
 export default defineConfig({
-  title: "Nexu Docs",
-  description: "Nexu documentation for channels, models, and skills.",
+  title: "nexu",
+  description: "nexu documentation for channels, models, and skills.",
   cleanUrls: true,
   lastUpdated: true,
   rewrites: {
@@ -81,20 +167,21 @@ export default defineConfig({
     root: {
       label: "English",
       lang: "en-US",
-      title: "Nexu Docs",
-      description: "Nexu documentation for channels, models, and skills.",
+      title: "nexu",
+      description: "nexu documentation for channels, models, and skills.",
       link: "/",
     },
     zh: {
       label: "简体中文",
       lang: "zh-CN",
-      title: "Nexu 文档",
-      description: "Nexu 的渠道、模型与技能文档。",
+      title: "nexu",
+      description: "nexu 的渠道、模型与技能文档。",
       link: "/zh/",
     },
   },
   head: [
     ["meta", { name: "theme-color", content: "#c96f4a" }],
+    ["script", {}, localePreferenceScript],
     ["link", { rel: "icon", href: "/favicon/favicon.ico", sizes: "any" }],
     [
       "link",

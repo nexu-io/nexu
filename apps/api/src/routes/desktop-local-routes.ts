@@ -10,7 +10,7 @@ import {
   cloudModelsResponseSchema,
   cloudStatusResponseSchema,
 } from "@nexu/shared";
-import { eq } from "drizzle-orm";
+
 import { z } from "zod";
 import { db } from "../db/index.js";
 import { bots, gatewayPools } from "../db/schema/index.js";
@@ -183,7 +183,7 @@ async function pollCloudForAuthorization(
           const [pool] = await db
             .select({ id: gatewayPools.id })
             .from(gatewayPools)
-            .where(eq(gatewayPools.poolName, "default"));
+            .limit(1);
           if (pool) {
             await publishPoolConfigSnapshot(db, pool.id);
           }
@@ -296,7 +296,11 @@ const defaultModelSetRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: z.object({ ok: z.boolean(), modelId: z.string() }),
+          schema: z.object({
+            ok: z.boolean(),
+            modelId: z.string(),
+            configPushed: z.boolean(),
+          }),
         },
       },
       description: "Default model set",
@@ -509,19 +513,21 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
     }
 
     // Trigger config snapshot so gateway picks up the change
+    let configPushed = false;
     try {
       const [pool] = await db
         .select({ id: gatewayPools.id })
         .from(gatewayPools)
-        .where(eq(gatewayPools.poolName, "default"));
+        .limit(1);
       if (pool) {
-        await publishPoolConfigSnapshot(db, pool.id);
+        const snapshot = await publishPoolConfigSnapshot(db, pool.id);
+        configPushed = snapshot.configPushed ?? false;
       }
     } catch (err) {
       logger.error({ message: "default_model_snapshot_failed", error: err });
     }
 
-    return c.json({ ok: true, modelId: body.modelId });
+    return c.json({ ok: true, modelId: body.modelId, configPushed });
   });
 
   // Get current default model
@@ -561,7 +567,7 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
       const [pool] = await db
         .select({ id: gatewayPools.id })
         .from(gatewayPools)
-        .where(eq(gatewayPools.poolName, "default"));
+        .limit(1);
       if (pool) {
         await publishPoolConfigSnapshot(db, pool.id);
       }
@@ -592,7 +598,7 @@ export function registerDesktopLocalRoutes(app: OpenAPIHono<AppBindings>) {
       const [pool] = await db
         .select({ id: gatewayPools.id })
         .from(gatewayPools)
-        .where(eq(gatewayPools.poolName, "default"));
+        .limit(1);
       if (pool) {
         await publishPoolConfigSnapshot(db, pool.id);
       }
@@ -644,7 +650,7 @@ export async function refreshCloudModelsOnStartup(): Promise<void> {
     const [pool] = await db
       .select({ id: gatewayPools.id })
       .from(gatewayPools)
-      .where(eq(gatewayPools.poolName, "default"));
+      .limit(1);
     if (pool) {
       await publishPoolConfigSnapshot(db, pool.id);
     }

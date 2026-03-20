@@ -4,6 +4,18 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$APP_DIR/../.." && pwd)"
 TMP_DIR="$ROOT_DIR/.tmp"
+
+# Source .env files (desktop or controller) for NEXU_CLOUD_URL / NEXU_LINK_URL
+for _env_file in "$APP_DIR/.env" "$ROOT_DIR/apps/controller/.env"; do
+  if [ -f "$_env_file" ]; then
+    # Export only lines matching KEY=VALUE, skip comments and empty lines
+    set -a
+    # shellcheck disable=SC1090
+    source "$_env_file"
+    set +a
+    break
+  fi
+done
 export NEXU_WORKSPACE_ROOT="$ROOT_DIR"
 export NEXU_DESKTOP_APP_ROOT="$APP_DIR"
 export NEXU_DESKTOP_RUNTIME_ROOT="$TMP_DIR/desktop"
@@ -114,7 +126,8 @@ start_session() {
   log "starting tmux session '$SESSION_NAME'"
   tmux new-session -d -s "$SESSION_NAME" \
     "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\" NEXU_DESKTOP_LAUNCH_ID=\"$launch_id\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
-  log_timeline "tmux session created launch_id=$launch_id"
+    "cd \"$ROOT_DIR\" && export NEXU_WORKSPACE_ROOT=\"$ROOT_DIR\" NEXU_DESKTOP_APP_ROOT=\"$ELECTRON_DIR\" NEXU_DESKTOP_RUNTIME_ROOT=\"$NEXU_DESKTOP_RUNTIME_ROOT\" NEXU_CLOUD_URL=\"${NEXU_CLOUD_URL:-}\" NEXU_LINK_URL=\"${NEXU_LINK_URL:-}\" NEXU_DESKTOP_BUILD_SOURCE=\"local-dev\" NEXU_DESKTOP_BUILD_BRANCH=\"$build_branch\" NEXU_DESKTOP_BUILD_COMMIT=\"$build_commit\" NEXU_DESKTOP_BUILD_TIME=\"$built_at\" NEXU_DESKTOP_LAUNCH_ID=\"$launch_id\"; pnpm exec electron apps/desktop; sleep 2; while pgrep -f \"$ELECTRON_MAIN_MATCH\" >/dev/null; do sleep 1; done"
+    log_timeline "tmux session created launch_id=$launch_id"
 }
 
 start() {

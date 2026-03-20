@@ -270,4 +270,123 @@ export function registerChannelRoutes(
       );
     },
   );
+
+  // Channel readiness (queries OpenClaw gateway status)
+  const channelReadinessResponseSchema = z.object({
+    ready: z.boolean(),
+    connected: z.boolean(),
+    running: z.boolean(),
+    configured: z.boolean(),
+    lastError: z.string().nullable(),
+    gatewayConnected: z.boolean(),
+  });
+
+  const channelLiveStatusEntrySchema = z.object({
+    channelType: z.string(),
+    channelId: z.string(),
+    accountId: z.string(),
+    status: z.enum([
+      "connected",
+      "connecting",
+      "disconnected",
+      "error",
+      "restarting",
+    ]),
+    ready: z.boolean(),
+    connected: z.boolean(),
+    running: z.boolean(),
+    configured: z.boolean(),
+    lastError: z.string().nullable(),
+  });
+
+  const channelsLiveStatusResponseSchema = z.object({
+    gatewayConnected: z.boolean(),
+    channels: z.array(channelLiveStatusEntrySchema),
+    agent: z.object({
+      modelId: z.string().nullable(),
+      modelName: z.string().nullable(),
+      alive: z.boolean(),
+    }),
+  });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/channels/live-status",
+      tags: ["Channels"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: channelsLiveStatusResponseSchema },
+          },
+          description: "Live channel and agent status from OpenClaw gateway",
+        },
+      },
+    }),
+    async (c) => {
+      const channels = await container.channelService.listChannels();
+      const liveStatus =
+        await container.gatewayService.getAllChannelsLiveStatus(
+          channels.map((channel) => ({
+            id: channel.id,
+            channelType: channel.channelType,
+            accountId: channel.accountId,
+          })),
+        );
+      const runtime = await container.runtimeConfigService.getRuntimeConfig();
+      const models = await container.modelProviderService.listModels();
+      const modelId = runtime.defaultModelId ?? null;
+      const modelName = modelId
+        ? (models.models.find((model) => model.id === modelId)?.name ?? null)
+        : null;
+
+      return c.json(
+        {
+          gatewayConnected: liveStatus.gatewayConnected,
+          channels: liveStatus.channels,
+          agent: {
+            modelId,
+            modelName,
+            alive:
+              container.gatewayService.isConnected() &&
+              container.runtimeState.gatewayStatus === "active",
+          },
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/channels/{channelId}/readiness",
+      tags: ["Channels"],
+      request: { params: channelIdParamSchema },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: channelReadinessResponseSchema },
+          },
+          description: "Channel readiness status from OpenClaw gateway",
+        },
+        404: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Channel not found",
+        },
+      },
+    }),
+    async (c) => {
+      const { channelId } = c.req.valid("param");
+      const channel = await container.channelService.getChannel(channelId);
+      if (!channel) {
+        return c.json({ message: "Channel not found" }, 404);
+      }
+      const readiness = await container.gatewayService.getChannelReadiness(
+        channel.channelType,
+        channel.accountId,
+      );
+      return c.json(readiness, 200);
+    },
+  );
 }

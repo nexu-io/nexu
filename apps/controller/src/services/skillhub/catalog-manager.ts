@@ -12,23 +12,18 @@ import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import {
-  getOpenclawCuratedSkillsDir,
-  getOpenclawSkillsDir,
-} from "../../shared/desktop-paths";
+  type CuratedInstallResult,
+  copyStaticSkills,
+  resolveCuratedSkillsToInstall,
+} from "./curated-skills.js";
+import type { SkillDb } from "./skill-db.js";
 import type {
   CatalogMeta,
   InstalledSkill,
   MinimalSkill,
   SkillSource,
   SkillhubCatalogData,
-} from "../../shared/skillhub-types";
-import {
-  type CuratedInstallResult,
-  copyStaticSkills,
-  recordCuratedInstallation,
-  recordCuratedRemoval,
-  resolveCuratedSkillsToInstall,
-} from "./curated-skills";
+} from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -41,11 +36,6 @@ function resolveClawHubBin(): string {
   };
   const binRel = pkg.bin?.clawhub ?? pkg.bin?.clawdhub ?? "bin/clawdhub.js";
   return resolve(dirname(pkgPath), binRel);
-}
-
-function resolveNpmBin(): string {
-  const pkgPath = nodeRequire.resolve("npm/package.json");
-  return resolve(dirname(pkgPath), "bin/npm-cli.js");
 }
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
@@ -84,7 +74,7 @@ export class CatalogManager {
   private readonly cacheDir: string;
   private readonly skillsDir: string;
   private readonly curatedSkillsDir: string;
-  private readonly curatedStatePath: string;
+  private readonly db: SkillDb | null;
   private readonly staticSkillsDir: string;
   private readonly metaPath: string;
   private readonly catalogPath: string;
@@ -93,16 +83,19 @@ export class CatalogManager {
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    userDataPath: string,
-    opts?: { staticSkillsDir?: string; log?: SkillhubLogFn },
+    cacheDir: string,
+    opts?: {
+      skillsDir?: string;
+      curatedSkillsDir?: string;
+      staticSkillsDir?: string;
+      skillDb?: SkillDb;
+      log?: SkillhubLogFn;
+    },
   ) {
-    this.cacheDir = resolve(userDataPath, "runtime/skillhub-cache");
-    this.skillsDir = getOpenclawSkillsDir(userDataPath);
-    this.curatedSkillsDir = getOpenclawCuratedSkillsDir(userDataPath);
-    this.curatedStatePath = resolve(
-      this.curatedSkillsDir,
-      ".curated-state.json",
-    );
+    this.cacheDir = cacheDir;
+    this.skillsDir = opts?.skillsDir ?? "";
+    this.curatedSkillsDir = opts?.curatedSkillsDir ?? "";
+    this.db = opts?.skillDb ?? null;
     this.staticSkillsDir = opts?.staticSkillsDir ?? "";
     this.metaPath = resolve(this.cacheDir, "meta.json");
     this.catalogPath = resolve(this.cacheDir, "catalog.json");
@@ -112,6 +105,11 @@ export class CatalogManager {
   }
 
   start(): void {
+    if (process.env.CI) {
+      this.log("info", "skillhub catalog sync skipped in CI");
+      return;
+    }
+
     void this.refreshCatalog().catch(() => {
       // Best-effort initial sync — cached catalog used as fallback.
     });
@@ -212,6 +210,7 @@ export class CatalogManager {
         this.log("warn", `install stderr slug=${slug}: ${stderr.trim()}`);
       this.log("info", `install ok slug=${slug}`);
       await this.installSkillDeps(resolve(this.skillsDir, slug), slug);
+      this.db?.recordInstall(slug, "managed");
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -237,13 +236,14 @@ export class CatalogManager {
         rmSync(managedPath, { recursive: true, force: true });
         removed = true;
         this.log("info", `uninstall ok (managed) slug=${slug}`);
+        this.db?.recordUninstall(slug, "managed");
       }
 
       if (curatedPath && existsSync(curatedPath)) {
         rmSync(curatedPath, { recursive: true, force: true });
         removed = true;
         this.log("info", `uninstall ok (curated) slug=${slug}`);
-        recordCuratedRemoval({ slug, statePath: this.curatedStatePath });
+        this.db?.recordUninstall(slug, "curated");
       }
 
       if (!removed) {
@@ -260,21 +260,26 @@ export class CatalogManager {
 
   async installCuratedSkills(): Promise<CuratedInstallResult> {
     // Step 1: Copy static skills (not on ClawHub) from app bundle
-    if (this.staticSkillsDir) {
+    if (this.staticSkillsDir && this.db) {
       const { copied } = copyStaticSkills({
         staticDir: this.staticSkillsDir,
         curatedDir: this.curatedSkillsDir,
-        statePath: this.curatedStatePath,
+        skillDb: this.db,
       });
       if (copied.length > 0) {
+        this.db.recordBulkInstall(copied, "curated");
         this.log("info", `curated static skills copied: ${copied.join(", ")}`);
       }
     }
 
     // Step 2: Install remaining from ClawHub
+    if (!this.db) {
+      this.log("warn", "curated skills: no SkillDb available, skipping");
+      return { installed: [], skipped: [], failed: [] };
+    }
     const { toInstall, toSkip } = resolveCuratedSkillsToInstall({
       curatedDir: this.curatedSkillsDir,
-      statePath: this.curatedStatePath,
+      skillDb: this.db,
     });
 
     if (toInstall.length === 0) {
@@ -350,10 +355,9 @@ export class CatalogManager {
       );
     }
 
-    recordCuratedInstallation({
-      statePath: this.curatedStatePath,
-      installed,
-    });
+    if (installed.length > 0) {
+      this.db?.recordBulkInstall(installed, "curated");
+    }
 
     return { installed, skipped: toSkip, failed };
   }
@@ -363,6 +367,7 @@ export class CatalogManager {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    this.db?.close();
   }
 
   private async installSkillDeps(
@@ -373,15 +378,8 @@ export class CatalogManager {
 
     this.log("info", `installing npm deps: ${slug}`);
     try {
-      const npmBin = resolveNpmBin();
-      await execFileAsync(
-        process.execPath,
-        [npmBin, "install", "--production", "--no-audit", "--no-fund"],
-        {
-          cwd: skillDir,
-          env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-        },
-      );
+      const npmArgs = ["install", "--production", "--no-audit", "--no-fund"];
+      await execFileAsync("npm", npmArgs, { cwd: skillDir });
       this.log("info", `npm deps installed: ${slug}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

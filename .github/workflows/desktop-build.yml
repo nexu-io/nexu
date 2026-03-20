@@ -138,6 +138,7 @@ jobs:
         run: |
           export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
+            const { version } = require("./apps/desktop/package.json");
             const sentryDsnByEnvironment = {
               "nexu-test": process.env.SENTRY_DSN_TEST,
               "nexu-prod": process.env.SENTRY_DSN_PROD,
@@ -146,6 +147,7 @@ jobs:
             const config = {
               NEXU_CLOUD_URL: process.env.CLOUD_URL,
               NEXU_LINK_URL: process.env.LINK_URL === "null" ? null : process.env.LINK_URL,
+              NEXU_DESKTOP_APP_VERSION: version,
               NEXU_DESKTOP_BUILD_SOURCE: process.env.BUILD_SOURCE,
               NEXU_DESKTOP_BUILD_BRANCH: process.env.BUILD_BRANCH,
               NEXU_DESKTOP_BUILD_COMMIT: process.env.BUILD_COMMIT,
@@ -171,6 +173,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: pnpm --filter @nexu/desktop dist:mac
 
       - name: Prepare artifacts

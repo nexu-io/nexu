@@ -1,18 +1,24 @@
 import { BrandMark } from "@/components/brand-mark";
+import { useAutoUpdate } from "@/hooks/use-auto-update";
+import { useCommunitySkills } from "@/hooks/use-community-catalog";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BookOpen,
   ChevronUp,
+  CircleHelp,
   Globe,
   Home,
   LogOut,
+  Mail,
   Menu,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  ScrollText,
   Settings,
   Sparkles,
   X,
@@ -138,6 +144,14 @@ function LanguageToggle({ collapsed }: { collapsed: boolean }) {
 }
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
+
+const GitHubIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <title>GitHub</title>
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+  </svg>
+);
 
 export function WorkspaceLayout() {
   if (localStorage.getItem(SETUP_COMPLETE_KEY) !== "1") {
@@ -158,10 +172,22 @@ function WorkspaceLayoutInner() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showHelpMenu, setShowHelpMenu] = useState(false);
+  const update = useAutoUpdate();
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+  const hasUpdate =
+    update.phase === "available" ||
+    update.phase === "downloading" ||
+    update.phase === "ready";
+  const updating = update.phase === "downloading";
+  const downloadProgress = Math.round(update.percent);
   const logoutRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
+  const { data: skillsData } = useCommunitySkills();
+  const installedSkillsCount = skillsData?.installedSkills?.length ?? 0;
 
   useEffect(() => {
     track("workspace_view");
@@ -177,6 +203,17 @@ function WorkspaceLayoutInner() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showLogoutConfirm]);
+
+  useEffect(() => {
+    if (!showHelpMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setShowHelpMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showHelpMenu]);
 
   useEffect(() => {
     if (!mobileDrawerOpen) return;
@@ -256,42 +293,69 @@ function WorkspaceLayoutInner() {
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex h-screen">
-      {/* Desktop sidebar */}
-      <div
-        className={cn(
-          "hidden md:flex flex-col shrink-0 border-r border-border bg-surface-1 transition-all duration-200",
-          collapsed ? "w-14" : "w-56",
-        )}
-      >
-        {/* Header */}
-        <div
-          className={cn(
-            "flex items-center border-b border-border",
-            collapsed ? "px-2 py-3 justify-center" : "px-4 py-3 gap-2.5",
-            isDesktopClient && "pt-10",
-          )}
+    <div className="flex h-screen relative">
+      {/* Fixed sidebar toggle — next to traffic lights (desktop client only) */}
+      {isDesktopClient && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="fixed top-[13px] left-[76px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center"
+          style={
+            { WebkitAppRegion: "no-drag", zIndex: 10000 } as React.CSSProperties
+          }
+          title={
+            collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
+          }
         >
           {collapsed ? (
-            <div className="relative group">
-              <BrandMark className="w-7 h-7 transition-opacity group-hover:opacity-0" />
-              <button
-                type="button"
-                onClick={() => setCollapsed(false)}
-                className="absolute inset-0 flex justify-center items-center w-7 h-7 rounded-lg opacity-0 transition-opacity bg-surface-3 text-text-primary group-hover:opacity-100"
-                title={t("layout.expandSidebar")}
-              >
-                <PanelLeftOpen size={14} />
-              </button>
-            </div>
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
+        </button>
+      )}
+
+      {/* Desktop sidebar — transparent bg, no border (matches prototype) */}
+      <div
+        className="hidden md:flex flex-col shrink-0 overflow-hidden"
+        style={{
+          width: collapsed ? 0 : 224,
+          transition: "width 200ms ease",
+        }}
+      >
+        {/* Header / Brand */}
+        <div
+          className={cn(
+            "flex items-center justify-between px-3 pb-2 shrink-0",
+            isDesktopClient && "pt-14",
+            !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
+          )}
+        >
+          {isDesktopClient ? (
+            <>
+              <img
+                src="/brand/logo-black-1.svg"
+                alt="Nexu"
+                className="h-6 object-contain"
+              />
+              {hasUpdate && updateDismissed && (
+                <button
+                  type="button"
+                  onClick={() => setUpdateDismissed(false)}
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[var(--color-brand-primary)] text-white hover:opacity-85 transition-opacity"
+                >
+                  {t("layout.update.badge")}
+                </button>
+              )}
+            </>
           ) : (
             <>
               <BrandMark className="w-7 h-7 shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text-primary">
+                <div className="text-sm font-semibold text-text-primary whitespace-nowrap">
                   Nexu <span className="text-[11px]">🦞</span>
                 </div>
-                <div className="text-[10px] text-text-tertiary">
+                <div className="text-[10px] text-text-tertiary whitespace-nowrap">
                   {t("layout.brand")}
                 </div>
               </div>
@@ -310,64 +374,52 @@ function WorkspaceLayoutInner() {
         {/* Main nav + conversations */}
         <div className="flex-1 overflow-y-auto">
           {/* Nav items */}
-          <div className={cn(collapsed ? "px-2" : "px-3", "pt-3 pb-1")}>
+          <div className="px-2 pt-3 pb-1">
             <Link
               to="/workspace/home"
-              title={collapsed ? t("layout.nav.home") : undefined}
               onClick={() => track("workspace_home_click")}
               className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                isHomePage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
+                isHomePage && "nav-item-active",
               )}
             >
-              <Home size={14} />
-              {!collapsed && t("layout.nav.home")}
+              <Home size={16} className="shrink-0" />
+              {t("layout.nav.home")}
             </Link>
             <Link
               to="/workspace/skills"
-              title={collapsed ? t("layout.nav.skills") : undefined}
               onClick={() => track("workspace_skills_click")}
               className={cn(
-                "flex items-center justify-between w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                isSkillsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
+                isSkillsPage && "nav-item-active",
               )}
             >
-              <span className="flex items-center gap-2">
-                <Sparkles size={14} />
-                {!collapsed && t("layout.nav.skills")}
-              </span>
+              <Sparkles size={16} className="shrink-0" />
+              {t("layout.nav.skills")}
+              {installedSkillsCount > 0 && (
+                <span className="ml-auto text-[10px] text-text-tertiary font-normal">
+                  {installedSkillsCount}
+                </span>
+              )}
             </Link>
             <Link
               to="/workspace/settings"
-              title={collapsed ? t("layout.nav.settings") : undefined}
               onClick={() => track("workspace_settings_click")}
               className={cn(
-                "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5",
-                collapsed ? "justify-center p-2" : "px-3 py-2",
-                isModelsPage
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
+                isModelsPage && "nav-item-active",
               )}
             >
-              <Settings size={14} />
-              {!collapsed && t("layout.nav.settings")}
+              <Settings size={16} className="shrink-0" />
+              {t("layout.nav.settings")}
             </Link>
           </div>
 
           {/* Conversations section */}
-          <div className={cn(collapsed ? "px-2" : "px-3", "pt-2")}>
-            <div className="border-t border-border pt-2 mb-1.5" />
-            {!collapsed && (
-              <div className="px-3 mb-1.5 text-[10px] font-medium text-text-muted uppercase tracking-wider">
-                {t("layout.conversations")}
-              </div>
-            )}
+          <div className="px-2 pt-6">
+            <div className="sidebar-section-label whitespace-nowrap">
+              {t("layout.conversations")}
+            </div>
             <div className="space-y-0.5">
               {sessions.map((s) => {
                 const isActive = selectedSessionId === s.id;
@@ -381,43 +433,15 @@ function WorkspaceLayoutInner() {
                       });
                       navigate(`/workspace/sessions/${s.id}`);
                     }}
-                    title={collapsed ? (s.title ?? undefined) : undefined}
                     className={cn(
-                      "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer",
-                      collapsed
-                        ? "justify-center p-2"
-                        : "px-2.5 py-2 text-left",
-                      isActive
-                        ? "bg-accent/10 text-accent"
-                        : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
+                      "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer px-3 py-1.5",
+                      isActive && "nav-item-active",
                     )}
                   >
-                    {collapsed ? (
-                      <SidebarPlatformIcon platform={s.channelType ?? "web"} />
-                    ) : (
-                      <>
-                        <SidebarPlatformIcon
-                          platform={s.channelType ?? "web"}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] truncate font-medium">
-                            {s.title}
-                          </div>
-                          <div className="text-[10px] text-text-muted truncate">
-                            {formatTime(s.lastMessageAt || s.updatedAt)}
-                            {s.channelType && ` · ${s.channelType}`}
-                          </div>
-                        </div>
-                        <div
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full shrink-0",
-                            s.status === "active"
-                              ? "bg-emerald-500"
-                              : "bg-text-muted/30",
-                          )}
-                        />
-                      </>
-                    )}
+                    <SidebarPlatformIcon platform={s.channelType ?? "web"} />
+                    <span className="truncate text-[12px] whitespace-nowrap">
+                      {s.title}
+                    </span>
                   </button>
                 );
               })}
@@ -425,24 +449,156 @@ function WorkspaceLayoutInner() {
           </div>
         </div>
 
+        {/* Update banner */}
+        {hasUpdate && !updateDismissed && (
+          <div className="mx-3 mb-2 px-3 py-2.5 rounded-[10px] border border-border bg-surface-0/80 backdrop-blur-sm shrink-0 animate-float">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--color-success)]" />
+                </span>
+                <span className="text-[12px] font-medium text-text-primary whitespace-nowrap">
+                  {updating
+                    ? t("layout.update.downloading")
+                    : update.phase === "ready"
+                      ? t("layout.update.readyToInstall")
+                      : t("layout.update.available", {
+                          version: update.version ?? "",
+                        })}
+                </span>
+              </div>
+              {!updating && update.phase !== "ready" && (
+                <button
+                  type="button"
+                  onClick={() => setUpdateDismissed(true)}
+                  className="text-text-muted hover:text-text-primary transition-colors -mr-1"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {updating && (
+              <div className="flex items-center justify-between pl-4 mb-1">
+                <span className="text-[10px] tabular-nums text-text-muted">
+                  {downloadProgress}%
+                </span>
+              </div>
+            )}
+            {updating ? (
+              <div className="pl-4 pr-1">
+                <div className="h-[6px] w-full rounded-full bg-border overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                </div>
+              </div>
+            ) : update.phase === "ready" ? (
+              <div className="flex items-center gap-2 pl-4">
+                <button
+                  type="button"
+                  onClick={() => update.install()}
+                  className="rounded-[6px] px-2.5 py-0.5 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
+                >
+                  {t("layout.update.install")}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 pl-4">
+                <button
+                  type="button"
+                  onClick={() => update.download()}
+                  className="rounded-[6px] px-2.5 py-0.5 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
+                >
+                  {t("layout.update.download")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUpdateDismissed(true)}
+                  className="rounded-[6px] px-2 py-0.5 text-[11px] font-medium text-text-muted hover:text-text-primary transition-colors"
+                >
+                  {t("layout.update.later")}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Icon row — Help & GitHub */}
+        <div className="px-3 pb-1.5 flex items-center gap-1 shrink-0">
+          <div className="relative" ref={helpRef}>
+            {showHelpMenu && (
+              <div className="absolute z-20 bottom-full left-0 mb-2 w-44">
+                <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
+                  <div className="p-1.5">
+                    <a
+                      href="https://docs.nexu.io/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                    >
+                      <BookOpen size={14} />
+                      {t("layout.help.docs")}
+                    </a>
+                    <a
+                      href="mailto:hi@nexu.ai"
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                    >
+                      <Mail size={14} />
+                      {t("layout.help.contact")}
+                    </a>
+                  </div>
+                  <div className="border-t border-border p-1.5">
+                    <a
+                      href="https://github.com/nexu-io/nexu/releases"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                    >
+                      <ScrollText size={14} />
+                      {t("layout.help.changelog")}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowHelpMenu(!showHelpMenu)}
+              className={cn(
+                "w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer",
+                showHelpMenu
+                  ? "text-text-primary bg-black/5"
+                  : "text-text-secondary hover:text-text-primary hover:bg-black/5",
+              )}
+              title={t("layout.help.title")}
+            >
+              <CircleHelp size={16} />
+            </button>
+          </div>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-black/5 transition-colors"
+            title="GitHub"
+          >
+            <GitHubIcon />
+          </a>
+        </div>
+
         {/* Language toggle */}
-        <LanguageToggle collapsed={collapsed} />
+        <LanguageToggle collapsed={false} />
 
         {/* Account — hidden in desktop client */}
         {!isDesktopClient && (
-          <div className="relative" ref={logoutRef}>
+          <div className="relative shrink-0" ref={logoutRef}>
             {showLogoutConfirm && (
-              <div
-                className={cn(
-                  "absolute z-20",
-                  collapsed
-                    ? "bottom-full left-1/2 -translate-x-1/2 mb-2 w-52"
-                    : "bottom-full left-1.5 right-1.5 mb-2",
-                )}
-              >
+              <div className="absolute z-20 bottom-full left-1.5 right-1.5 mb-2">
                 <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
                   <div className="px-3.5 py-3 border-b border-border">
-                    <div className="text-[12px] font-medium text-text-primary truncate">
+                    <div className="text-[12px] font-medium text-text-primary truncate whitespace-nowrap">
                       {userEmail}
                     </div>
                   </div>
@@ -450,7 +606,7 @@ function WorkspaceLayoutInner() {
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
+                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-muted hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer whitespace-nowrap"
                     >
                       <LogOut size={13} />
                       {t("layout.signOut")}
@@ -460,67 +616,39 @@ function WorkspaceLayoutInner() {
               </div>
             )}
 
-            <div
-              className={cn(
-                "border-t border-border",
-                collapsed ? "px-2 py-2.5" : "px-2 py-2",
-              )}
-            >
-              {collapsed ? (
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
-                    className="group"
-                    title={userName}
-                  >
-                    {userImage ? (
-                      <img
-                        src={userImage}
-                        alt={userName}
-                        className="w-8 h-8 rounded-lg object-cover ring-1 ring-accent/10 transition-all group-hover:ring-accent/25"
-                      />
-                    ) : (
-                      <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-accent/5 text-[11px] font-bold text-accent ring-1 ring-accent/10 transition-all group-hover:ring-accent/25">
-                        {userInitial}
-                      </div>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
-                  className="flex gap-2.5 items-center w-full px-2 py-2 rounded-lg transition-all hover:bg-surface-3 cursor-pointer"
-                >
-                  {userImage ? (
-                    <img
-                      src={userImage}
-                      alt={userName}
-                      className="w-7 h-7 rounded-md object-cover ring-1 ring-accent/10 shrink-0"
-                    />
-                  ) : (
-                    <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[10px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
-                      {userInitial}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0 text-left">
-                    <div className="text-[12px] text-text-primary truncate font-medium">
-                      {userName}
-                    </div>
-                    <div className="text-[10px] text-text-muted truncate">
-                      {userEmail}
-                    </div>
-                  </div>
-                  <ChevronUp
-                    size={12}
-                    className={cn(
-                      "text-text-muted/50 shrink-0 transition-transform duration-150",
-                      showLogoutConfirm ? "rotate-0" : "rotate-180",
-                    )}
+            <div className="border-t border-border px-2 py-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
+                className="flex gap-2.5 items-center w-full px-2 py-2 rounded-lg transition-all hover:bg-surface-3 cursor-pointer"
+              >
+                {userImage ? (
+                  <img
+                    src={userImage}
+                    alt={userName}
+                    className="w-7 h-7 rounded-md object-cover ring-1 ring-accent/10 shrink-0"
                   />
-                </button>
-              )}
+                ) : (
+                  <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[10px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
+                    {userInitial}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-[12px] text-text-primary truncate font-medium whitespace-nowrap">
+                    {userName}
+                  </div>
+                  <div className="text-[10px] text-text-muted truncate whitespace-nowrap">
+                    {userEmail}
+                  </div>
+                </div>
+                <ChevronUp
+                  size={12}
+                  className={cn(
+                    "text-text-muted/50 shrink-0 transition-transform duration-150",
+                    showLogoutConfirm ? "rotate-0" : "rotate-180",
+                  )}
+                />
+              </button>
             </div>
           </div>
         )}
@@ -596,9 +724,6 @@ function WorkspaceLayoutInner() {
                     <span className="flex items-center gap-2">
                       <Sparkles size={14} />
                       {t("layout.nav.skills")}
-                    </span>
-                    <span className="text-[10px] font-medium text-text-muted/60 tabular-nums">
-                      {sessions.length > 0 ? sessions.length : ""}
                     </span>
                   </Link>
                   <Link
@@ -731,8 +856,8 @@ function WorkspaceLayoutInner() {
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex-1 min-w-0 bg-surface-0 flex flex-col">
+      {/* Main content — elevated surface with rounded left edge */}
+      <div className="flex-1 min-w-0 bg-surface-1 rounded-l-[12px] flex flex-col">
         <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
           <div className="flex items-center justify-between gap-3">
             <button

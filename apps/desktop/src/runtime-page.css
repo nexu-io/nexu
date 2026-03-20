@@ -189,7 +189,7 @@ body,
 .window-drag-bar {
   position: fixed;
   top: 0;
-  left: 0;
+  left: 100px; /* Leave space for traffic lights + sidebar toggle */
   right: 0;
   height: 38px;
   z-index: 9999;

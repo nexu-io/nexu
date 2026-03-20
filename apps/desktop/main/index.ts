@@ -12,12 +12,12 @@ import {
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import {
   registerIpcHandlers,
-  setCatalogManager,
   setComponentUpdater,
   setUpdateManager,
 } from "./ipc";
@@ -28,7 +28,6 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
-import { CatalogManager } from "./skillhub/catalog-manager";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
 import { UpdateManager } from "./updater/update-manager";
@@ -69,10 +68,15 @@ app.commandLine.appendSwitch("disable-popup-blocking");
 const sentryDsn = runtimeConfig.sentryDsn;
 
 if (sentryDsn) {
+  const sentryBuildMetadata = getDesktopSentryBuildMetadata(
+    runtimeConfig.buildInfo,
+  );
+
   Sentry.init({
     dsn: sentryDsn,
     environment: app.isPackaged ? "production" : "development",
-    release: `@nexu/desktop@${app.getVersion()}`,
+    release: sentryBuildMetadata.release,
+    ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
     beforeSend(event) {
       const testTitle =
         typeof event.tags?.["nexu.test_title"] === "string"
@@ -92,6 +96,8 @@ if (sentryDsn) {
       };
     },
   });
+
+  Sentry.setContext("build", sentryBuildMetadata.buildContext);
 } else {
   crashReporter.start({
     companyName: "Nexu",
@@ -107,7 +113,6 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let catalogMgr: CatalogManager | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
 function sendDesktopCommand(
@@ -649,7 +654,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  catalogMgr?.dispose();
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
   void orchestrator.dispose();

@@ -21,7 +21,24 @@ This guide covers desktop-specific working rules, structure, and troubleshooting
 - `apps/desktop/src/lib/` — Renderer-side adapters for host bridge calls and desktop-specific client helpers.
 - `apps/desktop/shared/` — Contracts shared by main/preload/renderer, including host API types and runtime config structures. Prefer putting cross-boundary types here first.
 - `apps/desktop/scripts/` — Build, packaging, and sidecar preparation scripts. Keep runtime behavior out of these scripts unless it is strictly packaging-related.
+- `apps/controller/src/services/skillhub/` — SkillHub catalog/install/uninstall logic. Runs in the controller process, served via HTTP. The web app uses the HTTP SDK — never IPC.
 - Keep process-management logic out of renderer files; keep presentation logic out of `main/`; keep cross-boundary DTOs out of feature-local files when they are shared by IPC.
+
+## Controller sidecar packaging
+
+The controller is bundled into the desktop distributable as a sidecar. The script `apps/desktop/scripts/prepare-controller-sidecar.mjs` uses `copyRuntimeDependencyClosure` to recursively deep-copy every `dependency` from `apps/controller/package.json` (and all their transitive deps) into `.dist-runtime/controller/node_modules/`.
+
+**Rules:**
+
+- **Keep controller deps minimal.** Each MB in controller `dependencies` adds ~1 MB to the final DMG/ZIP.
+- **Never add heavy CLI tool packages** (e.g. `npm`, `yarn`) as controller dependencies. If the controller needs to invoke a CLI tool, use PATH-based `execFile("npm", ...)` instead.
+- **Native Node.js addons** (e.g. `better-sqlite3`) must live in the controller, NOT in the Electron main process. Electron's built-in Node.js uses a different ABI version (`NODE_MODULE_VERSION`) from system Node.js, which causes "compiled against a different Node.js version" errors. The controller runs as a regular Node.js process (`ELECTRON_RUN_AS_NODE=1`), so native addons work without `electron-rebuild`.
+
+**Before adding a controller dependency**, check its size:
+```bash
+du -sh node_modules/.pnpm/<pkg>@*/node_modules/<pkg>/
+```
+If total size (including transitive deps) exceeds ~5 MB, consider alternatives: PATH-based invocation, optional dependencies, or lazy runtime download.
 
 ## Common troubleshooting
 

@@ -324,7 +324,12 @@ export function createRuntimeUnitManifests(
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
+        OPENCLAW_CURATED_SKILLS_DIR: getOpenclawCuratedSkillsDir(userDataPath),
+        SKILLHUB_STATIC_SKILLS_DIR: isPackaged
+          ? path.resolve(electronRoot, "static/bundled-skills")
+          : path.resolve(repoRoot, "apps/desktop/static/bundled-skills"),
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
+        OPENCLAW_ELECTRON_EXECUTABLE: process.execPath,
         OPENCLAW_EXTENSIONS_DIR: path.resolve(
           openclawPackageRoot,
           "extensions",
@@ -332,6 +337,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_GATEWAY_PORT: String(
           new URL(runtimeConfig.urls.openclawBase).port || 18789,
         ),
+        OPENCLAW_GATEWAY_TOKEN: runtimeConfig.tokens.gateway,
         NODE_PATH: skillNodePath,
         OPENCLAW_DISABLE_BONJOUR: "1",
         TMPDIR: openclawTempDir,

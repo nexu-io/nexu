@@ -1,61 +1,283 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════
+   Nexu Design System 2.0 — Single Source of Truth
+   Synced from: design-system/src/index.css
+   ═══════════════════════════════════════════════════════════════════ */
+
 @theme {
-  /* Fonts */
+  /* ── Typography ── */
   --font-sans: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC",
     "PingFang SC", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
-  --font-script: "Great Vibes", cursive;
+  --font-script: "Caveat", cursive;
 
-  /* shadcn tokens — kept for component compat */
-  --color-background: #fdfcfa;
-  --color-foreground: #1a1a1a;
-  --color-card: #ffffff;
-  --color-card-foreground: #1a1a1a;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #1a1a1a;
-  --color-primary: #1a1a1a;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f8f7f4;
-  --color-secondary-foreground: #1a1a1a;
-  --color-muted: #f0efec;
-  --color-muted-foreground: #6b6b68;
-  --color-accent: #1a1a1a;
-  --color-accent-foreground: #ffffff;
-  --color-destructive: #dc2626;
-  --color-destructive-foreground: #ffffff;
-  --color-border: #e8e7e4;
-  --color-input: #e8e7e4;
-  --color-ring: #1a1a1a;
-  --radius: 0.5rem;
+  /* ── Brand Teal — 10% rule ── */
+  --color-brand-primary: #3db9ce;
+  --color-brand-subtle: rgba(61, 185, 206, 0.08);
 
-  /* Design system — Surface */
-  --color-surface-0: #fdfcfa;
+  /* ── Surface — pure neutral gray, no tint ── */
+  --color-surface-0: #fafafa;
   --color-surface-1: #ffffff;
-  --color-surface-2: #f8f7f4;
-  --color-surface-3: #f0efec;
-  --color-surface-4: #e8e7e3;
-  --color-surface-5: #dfdeda;
+  --color-surface-2: #f5f5f5;
+  --color-surface-3: #eeeeee;
+  --color-surface-4: #e5e5e5;
+  --color-surface-5: #d4d4d4;
 
-  /* Design system — Text */
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #6b6b68;
-  --color-text-tertiary: #9a9a96;
-  --color-text-muted: #bcbcb8;
+  /* ── Alpha Border ── */
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+  --color-border-strong: rgba(0, 0, 0, 0.12);
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-hover: rgba(0, 0, 0, 0.1);
 
-  /* Design system — Accent */
-  --color-accent-hover: #333333;
-  --color-accent-subtle: rgba(26, 26, 26, 0.05);
+  /* ── Text ── */
+  --color-text-heading: #001217;
+  --color-text-primary: #1c1f23;
+  --color-text-secondary: #545659;
+  --color-text-tertiary: #787c80;
+  --color-text-muted: #787c80;
+  --color-text-disabled: rgba(28, 31, 35, 0.38);
+
+  /* ── Accent (primary button) ── */
+  --color-accent: #1c1f23;
+  --color-accent-hover: #222b39;
+  --color-accent-subtle: rgba(28, 31, 35, 0.06);
+  --color-accent-glow: rgba(28, 31, 35, 0.12);
   --color-accent-fg: #ffffff;
 
-  /* Design system — Border */
-  --color-border-subtle: #f0efec;
-  --color-border-hover: #d0cfcb;
+  /* ── Functional ── */
+  --color-error: #f8672f;
+  --color-error-subtle: rgba(248, 103, 47, 0.08);
+  --color-success: #346e58;
+  --color-success-subtle: rgba(52, 110, 88, 0.08);
+  --color-warning: #edc337;
+  --color-warning-subtle: rgba(237, 195, 55, 0.08);
+  --color-danger: #f93920;
+  --color-danger-subtle: rgba(249, 57, 32, 0.08);
+  --color-link: #2657bb;
+  --color-info: #2657bb;
+  --color-info-subtle: rgba(38, 87, 187, 0.08);
 
-  /* Status */
-  --color-success: #16a34a;
-  --color-danger: #dc2626;
+  /* ── Toggle (exclusive — do not reuse for other components) ── */
+  --color-toggle-on: #007aff;
+
+  /* ── Radius ── */
+  --radius: 0.5rem;
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+  --radius-16: 16px;
+  --radius-20: 20px;
+  --radius-24: 24px;
+  --radius-pill: 100px;
+
+  /* ── Shadow ── */
+  --shadow-rest: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 4px 8px 0 rgba(0, 0, 0, 0.08);
+  --shadow-refine: 0 10px 20px -5px rgba(0, 0, 0, 0.06);
+  --shadow-elevated: 0 18px 60px rgba(0, 0, 0, 0.08);
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-focus: 0 0 0 2px rgba(61, 185, 206, 0.25);
+  --shadow-input-inset: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+
+  /* shadcn compat tokens (mapped to design system) */
+  --color-background: #fafafa;
+  --color-foreground: #1c1f23;
+  --color-card: #ffffff;
+  --color-card-foreground: #1c1f23;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1c1f23;
+  --color-primary: #1c1f23;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f5f5f5;
+  --color-secondary-foreground: #1c1f23;
+  --color-muted: #eeeeee;
+  --color-muted-foreground: #545659;
+  --color-destructive: #f93920;
+  --color-destructive-foreground: #ffffff;
+  --color-input: rgba(0, 0, 0, 0.08);
+  --color-ring: #1c1f23;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Typography — heading levels
+   ═══════════════════════════════════════════════════════════════════ */
+
+.heading-page {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-heading);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.heading-page-desc {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.heading-section {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-heading);
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Card Component
+   ═══════════════════════════════════════════════════════════════════ */
+
+.card {
+  border-radius: var(--radius-16);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-rest);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover:not(.card-static) {
+  box-shadow: var(--shadow-refine);
+  transform: translateY(-1px);
+}
+
+.card-static {
+  /* Marker class — no hover effects */
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Tags
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  border: none;
+}
+
+.tag-highlight {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-brand-subtle);
+  color: var(--color-brand-primary);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+  border: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Text Link
+   ═══════════════════════════════════════════════════════════════════ */
+
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-brand-primary);
+  text-decoration: none;
+  transition: text-decoration 0.15s ease;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Sidebar navigation
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-surface-0);
+}
+
+.sidebar-section {
+  padding: 0 8px;
+}
+
+.sidebar-section-label {
+  padding: 0 10px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-6);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  background: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text-primary);
+}
+
+.nav-item-active {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Breathe Animation
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes breathe {
+  0%,
+  100% {
+    border-color: rgba(61, 185, 206, 0.12);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 0 rgba(61, 185, 206, 0);
+    transform: translateY(0);
+  }
+  50% {
+    border-color: rgba(61, 185, 206, 0.35);
+    box-shadow: 0 4px 16px rgba(61, 185, 206, 0.1), 0 0 0 1px
+      rgba(61, 185, 206, 0.08);
+    transform: translateY(-1px);
+  }
+}
+
+.animate-breathe {
+  animation: breathe 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-color: rgba(61, 185, 206, 0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Other animations
+   ═══════════════════════════════════════════════════════════════════ */
 
 @keyframes fade-in-up {
   from {
@@ -71,6 +293,52 @@
 .animate-fade-in-up {
   animation: fade-in-up 0.5s ease-out forwards;
 }
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Global resets
+   ═══════════════════════════════════════════════════════════════════ */
 
 @layer base {
   * {
@@ -94,6 +362,7 @@
   #root {
     height: 100%;
     margin: 0;
+    background-color: transparent;
   }
   body {
     @apply bg-surface-0 text-text-primary;
@@ -101,7 +370,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Restore cursor: pointer on interactive elements (Tailwind v4 preflight removed it) */
+  /* Restore cursor: pointer on interactive elements */
   button,
   [type="button"],
   [type="reset"],

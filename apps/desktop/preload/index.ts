@@ -22,6 +22,7 @@ const runtimeConfig = getDesktopRuntimeConfig(process.env, {
 
 const hostBridge: HostBridge = {
   bootstrap: {
+    buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
   },

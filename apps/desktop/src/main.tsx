@@ -18,10 +18,18 @@ function initializeRendererSentry(dsn: string): void {
     return;
   }
 
+  const sentryBuildMetadata = getDesktopSentryBuildMetadata(
+    window.nexuHost.bootstrap.buildInfo,
+  );
+
   Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
+    release: sentryBuildMetadata.release,
+    ...(sentryBuildMetadata.dist ? { dist: sentryBuildMetadata.dist } : {}),
   });
+
+  Sentry.setContext("build", sentryBuildMetadata.buildContext);
 
   rendererSentryInitialized = true;
 }
