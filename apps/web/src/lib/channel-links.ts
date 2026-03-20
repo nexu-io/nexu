@@ -30,21 +30,6 @@ function getFeishuOpenChatId(
   return null;
 }
 
-function getFeishuOpenId(
-  metadata: Record<string, unknown> | null | undefined,
-): string | null {
-  const direct =
-    readStringValue(metadata, "openId") ??
-    readStringValue(metadata, "open_id") ??
-    readStringValue(metadata, "sender_id");
-
-  if (direct?.startsWith("ou_")) {
-    return direct;
-  }
-
-  return null;
-}
-
 export function getChannelChatUrl(
   channelType: string,
   appId?: string | null,
@@ -57,10 +42,6 @@ export function getChannelChatUrl(
       const openChatId = getFeishuOpenChatId(options?.sessionMetadata);
       if (openChatId) {
         return `https://applink.feishu.cn/client/chat/open?openChatId=${encodeURIComponent(openChatId)}`;
-      }
-      const openId = getFeishuOpenId(options?.sessionMetadata);
-      if (openId) {
-        return `https://applink.feishu.cn/client/chat/open?openId=${encodeURIComponent(openId)}`;
       }
       if (options?.preferExactSessionTarget) {
         return "";

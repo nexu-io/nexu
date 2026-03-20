@@ -503,7 +503,7 @@ export function SessionsPage() {
   const handleUnavailableChatLink = (): void => {
     if (platform === "feishu") {
       toast.info(
-        "This session is missing Feishu openChatId/openId metadata, so the exact chat cannot be opened yet.",
+        "This session is missing Feishu openChatId metadata, so the exact bot chat cannot be opened yet.",
       );
       return;
     }

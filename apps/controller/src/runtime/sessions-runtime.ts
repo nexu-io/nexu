@@ -42,6 +42,15 @@ type SessionHints = {
   senderName?: string;
   channelType?: string;
   metadata?: SessionMetadataRecord;
+  feishuMessageId?: string;
+};
+type ControllerConfigRecord = {
+  channels?: Array<{
+    id?: string;
+    botId?: string;
+    channelType?: string;
+  }>;
+  secrets?: Record<string, string>;
 };
 
 function sessionMetadataPath(filePath: string): string {
@@ -49,6 +58,11 @@ function sessionMetadataPath(filePath: string): string {
 }
 
 export class SessionsRuntime {
+  private readonly feishuTokenCache = new Map<
+    string,
+    { token: string; expiresAt: number }
+  >();
+
   constructor(private readonly env: ControllerEnv) {}
 
   async listSessions(): Promise<SessionResponse[]> {
@@ -85,6 +99,11 @@ export class SessionsRuntime {
           // Feishu chat targets for existing sessions without touching
           // OpenClaw's transcript writer.
           const hints = await this.inferSessionHints(filePath);
+          const resolvedHintMetadata = await this.resolveExactChatMetadata(
+            agentEntry.name,
+            extra.metadata,
+            hints,
+          );
 
           let { title, channelType } = extra;
           if (!channelType && hints.channelType) {
@@ -97,7 +116,7 @@ export class SessionsRuntime {
           }
 
           const { metadata: mergedMetadata, changed: metadataBackfilled } =
-            this.mergeSessionMetadata(extra.metadata, hints.metadata);
+            this.mergeSessionMetadata(extra.metadata, resolvedHintMetadata);
           if (metadataBackfilled) {
             extra = {
               ...extra,
@@ -445,6 +464,8 @@ export class SessionsRuntime {
         senderMeta,
         conversationMeta,
       ),
+      feishuMessageId:
+        this.readStringValue(conversationMeta, "message_id") ?? undefined,
     };
   }
 
@@ -524,6 +545,187 @@ export class SessionsRuntime {
     }
 
     return { metadata: merged, changed };
+  }
+
+  private async resolveExactChatMetadata(
+    botId: string,
+    existing: SessionMetadataRecord | null | undefined,
+    hints: SessionHints,
+  ): Promise<SessionMetadataRecord | undefined> {
+    const existingOpenChatId =
+      this.readStringValue(existing, "openChatId") ??
+      this.readStringValue(existing, "open_chat_id") ??
+      this.readStringValue(existing, "chatId") ??
+      this.readStringValue(existing, "chat_id");
+    if (existingOpenChatId?.startsWith("oc_")) {
+      return hints.metadata;
+    }
+
+    const hintedOpenChatId = this.readStringValue(hints.metadata, "openChatId");
+    if (hintedOpenChatId?.startsWith("oc_")) {
+      return hints.metadata;
+    }
+
+    if (hints.channelType !== "feishu" || !hints.feishuMessageId) {
+      return hints.metadata;
+    }
+
+    const openChatId = await this.fetchFeishuOpenChatIdByMessageId(
+      botId,
+      hints.feishuMessageId,
+    );
+    if (!openChatId) {
+      return hints.metadata;
+    }
+
+    return {
+      ...(hints.metadata ?? {}),
+      openChatId,
+    };
+  }
+
+  private async fetchFeishuOpenChatIdByMessageId(
+    botId: string,
+    messageId: string,
+  ): Promise<string | null> {
+    const credentials = await this.getFeishuCredentials(botId);
+    if (!credentials) {
+      return null;
+    }
+
+    const tenantToken = await this.getFeishuTenantToken(
+      credentials.appId,
+      credentials.appSecret,
+    );
+    if (!tenantToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${tenantToken}`,
+          },
+        },
+      );
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json()) as {
+        code?: number;
+        data?: {
+          chat_id?: string;
+          message?: {
+            chat_id?: string;
+          };
+          items?: Array<{
+            chat_id?: string;
+          }>;
+        };
+      };
+      if (payload.code !== 0) {
+        return null;
+      }
+
+      const openChatId =
+        payload.data?.chat_id ??
+        payload.data?.message?.chat_id ??
+        payload.data?.items?.[0]?.chat_id;
+      return typeof openChatId === "string" && openChatId.startsWith("oc_")
+        ? openChatId
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getFeishuCredentials(
+    botId: string,
+  ): Promise<{ appId: string; appSecret: string } | null> {
+    const config = await this.readControllerConfig();
+    const channel = config?.channels?.find(
+      (item) => item.botId === botId && item.channelType === "feishu",
+    );
+    if (!channel?.id) {
+      return null;
+    }
+
+    const appId = config?.secrets?.[`channel:${channel.id}:appId`];
+    const appSecret = config?.secrets?.[`channel:${channel.id}:appSecret`];
+    if (
+      typeof appId !== "string" ||
+      appId.length === 0 ||
+      typeof appSecret !== "string" ||
+      appSecret.length === 0
+    ) {
+      return null;
+    }
+
+    return { appId, appSecret };
+  }
+
+  private async readControllerConfig(): Promise<ControllerConfigRecord | null> {
+    try {
+      const raw = await readFile(this.env.nexuConfigPath, "utf8");
+      return JSON.parse(raw) as ControllerConfigRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getFeishuTenantToken(
+    appId: string,
+    appSecret: string,
+  ): Promise<string | null> {
+    const cached = this.feishuTokenCache.get(appId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.token;
+    }
+
+    try {
+      const response = await fetch(
+        "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            app_secret: appSecret,
+          }),
+        },
+      );
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json()) as {
+        code?: number;
+        tenant_access_token?: string;
+        expire?: number;
+      };
+      if (
+        payload.code !== 0 ||
+        typeof payload.tenant_access_token !== "string" ||
+        payload.tenant_access_token.length === 0
+      ) {
+        return null;
+      }
+
+      const expiresAt =
+        Date.now() + Math.max((payload.expire ?? 7200) - 60, 60) * 1000;
+      this.feishuTokenCache.set(appId, {
+        token: payload.tenant_access_token,
+        expiresAt,
+      });
+      return payload.tenant_access_token;
+    } catch {
+      return null;
+    }
   }
 
   private readStringValue(
