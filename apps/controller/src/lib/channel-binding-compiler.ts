@@ -136,7 +136,7 @@ export function compileChannelsConfig(params: {
       ? {
           feishu: {
             enabled: true,
-            streaming: true,
+            streaming: false,
             renderMode: "card",
             dmPolicy: "open",
             groupPolicy: "open",
