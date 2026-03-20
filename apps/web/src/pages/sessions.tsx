@@ -1,15 +1,27 @@
-import { BrandMark } from "@/components/brand-mark";
+import { PlatformIcon } from "@/components/platform-icons";
+import { getChannelChatUrl } from "@/lib/channel-links";
+import { getSessionFolderUrl, openLocalFolderUrl } from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Loader2, MessageSquare, WifiOff } from "lucide-react";
+import {
+  ArrowUpRight,
+  FolderOpen,
+  Loader2,
+  MessageSquare,
+  WifiOff,
+} from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
+  getApiV1Channels,
   getApiV1SessionsById,
   getApiV1SessionsByIdMessages,
 } from "../../lib/api/sdk.gen";
+
+const BOT_AVATAR = "/brand/ip-nexu.svg";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,7 +38,7 @@ import {
 function stripMetadata(raw: string): string {
   // Pattern 1 (Feishu/Slack): [message_id: ...]\nsenderName: actualMessage
   const markerMatch = raw.match(
-    /\[message_id:\s*[^\]]+\]\n(.+?):\s*([\s\S]*)$/,
+    /\[message_id:\s*[^\]]+\](?:\n|\\n)(.+?):\s*([\s\S]*)$/,
   );
   if (markerMatch?.[2] != null) {
     return markerMatch[2].trim();
@@ -53,7 +65,9 @@ function stripMetadata(raw: string): string {
  * and returns the sender name portion.
  */
 function extractSenderName(raw: string): string | null {
-  const markerMatch = raw.match(/\[message_id:\s*[^\]]+\]\n(.+?):\s*[\s\S]*$/);
+  const markerMatch = raw.match(
+    /\[message_id:\s*[^\]]+\](?:\n|\\n)(.+?):\s*[\s\S]*$/,
+  );
   if (markerMatch?.[1] != null) {
     return markerMatch[1].trim();
   }
@@ -136,47 +150,56 @@ type Platform =
   | "web"
   | "feishu";
 
-const PLATFORM_CONFIG: Record<
-  string,
-  { bg: string; emoji: string; label: string; openLabel: string }
-> = {
+interface PlatformConfig {
+  badgeClass: string;
+  label: string;
+  openLabel: string;
+}
+
+const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
+  badgeClass:
+    "border-[rgba(107,114,128,0.14)] bg-[rgba(107,114,128,0.08)] text-[#6B7280]",
+  label: "Web",
+  openLabel: "Open",
+};
+
+const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
   slack: {
-    bg: "bg-[rgba(217,153,247,0.15)]",
-    emoji: "#",
+    badgeClass:
+      "border-[rgba(224,30,90,0.12)] bg-[rgba(224,30,90,0.06)] text-[#E01E5A]",
     label: "Slack",
     openLabel: "Open in Slack",
   },
   discord: {
-    bg: "bg-[var(--color-info-subtle)]",
-    emoji: "\uD83C\uDFAE",
+    badgeClass:
+      "border-[rgba(88,101,242,0.14)] bg-[rgba(88,101,242,0.08)] text-[#5865F2]",
     label: "Discord",
     openLabel: "Open in Discord",
   },
   whatsapp: {
-    bg: "bg-emerald-500/15",
-    emoji: "\uD83D\uDCAC",
+    badgeClass:
+      "border-[rgba(37,211,102,0.14)] bg-[rgba(37,211,102,0.08)] text-[#25D366]",
     label: "WhatsApp",
     openLabel: "Open in WhatsApp",
   },
   telegram: {
-    bg: "bg-[var(--color-info-subtle)]",
-    emoji: "\u2708\uFE0F",
+    badgeClass:
+      "border-[rgba(36,161,222,0.14)] bg-[rgba(36,161,222,0.08)] text-[#24A1DE]",
     label: "Telegram",
     openLabel: "Open in Telegram",
   },
   feishu: {
-    bg: "bg-[var(--color-info-subtle)]",
-    emoji: "\uD83D\uDC26",
+    badgeClass:
+      "border-[rgba(51,112,255,0.14)] bg-[rgba(51,112,255,0.08)] text-[#3370FF]",
     label: "Feishu",
     openLabel: "Open in Feishu",
   },
-  web: {
-    bg: "bg-gray-500/15",
-    emoji: "\uD83C\uDF10",
-    label: "Web",
-    openLabel: "Open",
-  },
+  web: DEFAULT_PLATFORM_CONFIG,
 };
+
+function getPlatformConfig(platform: string): PlatformConfig {
+  return PLATFORM_CONFIG[platform as Platform] ?? DEFAULT_PLATFORM_CONFIG;
+}
 
 /** Deterministic gradient for user avatar based on name string */
 const AVATAR_GRADIENTS = [
@@ -272,28 +295,6 @@ interface ChatMessageData {
   createdAt: string | null;
 }
 
-function NexuThinking() {
-  return (
-    <div className="flex items-center gap-3">
-      <BrandMark className="w-9 h-9 -ml-1 object-contain shrink-0 animate-nexu-bounce" />
-      <div className="flex items-center gap-0.5 text-[13px] text-text-tertiary">
-        <span>thinking</span>
-        <span className="inline-flex gap-[2px] ml-[1px]">
-          <span className="animate-dot-fade" style={{ animationDelay: "0s" }}>
-            .
-          </span>
-          <span className="animate-dot-fade" style={{ animationDelay: "0.3s" }}>
-            .
-          </span>
-          <span className="animate-dot-fade" style={{ animationDelay: "0.6s" }}>
-            .
-          </span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
 function ArtifactCard({ summary }: { summary: string | null }) {
   return (
     <div className="mt-2 inline-block rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-[13px]">
@@ -309,6 +310,28 @@ function ArtifactCard({ summary }: { summary: string | null }) {
   );
 }
 
+function SessionPlatformBadge({
+  platform,
+  className,
+}: {
+  platform: string;
+  className?: string;
+}) {
+  const platformCfg = getPlatformConfig(platform);
+  return (
+    <span
+      data-session-platform={platform}
+      className={cn(
+        "inline-flex items-center justify-center rounded-xl border shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
+        platformCfg.badgeClass,
+        className,
+      )}
+    >
+      <PlatformIcon platform={platform} size={16} />
+    </span>
+  );
+}
+
 function ChatBubble({ msg }: { msg: ChatMessageData }) {
   const extracted = extractMessage(msg as unknown as Record<string, unknown>);
   const { text, senderName, hasToolCall, toolCallSummary } = extracted;
@@ -320,13 +343,21 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
   const initials = getInitials(displayName);
 
   return (
-    <div className={`flex gap-3 ${isBot ? "" : "flex-row-reverse"}`}>
+    <div
+      data-chat-message={msg.id}
+      data-chat-role={msg.role}
+      className={`flex gap-3 ${isBot ? "" : "flex-row-reverse"}`}
+    >
       {isBot ? (
-        <BrandMark className="w-9 h-9 -ml-1 mt-0 object-contain shrink-0" />
+        <img
+          src={BOT_AVATAR}
+          alt=""
+          className="shrink-0 w-9 h-9 -ml-1 mt-0 object-contain"
+        />
       ) : (
         <div
           className={cn(
-            "w-8 h-8 mt-0.5 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0",
+            "w-7 h-7 mt-0.5 rounded-lg bg-gradient-to-br flex items-center justify-center shrink-0 ring-1 ring-border/50",
             gradient,
           )}
         >
@@ -338,7 +369,7 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
       <div className={`max-w-[75%] ${isBot ? "" : "text-right"}`}>
         <div
           className={cn(
-            "inline-block px-4 py-2.5 rounded-2xl text-[13px] leading-relaxed whitespace-pre-line break-words",
+            "inline-block px-3.5 py-2.5 rounded-xl text-[13px] leading-relaxed whitespace-pre-line break-words",
             isBot
               ? "bg-surface-1 border border-border text-text-primary rounded-tl-sm"
               : "bg-surface-3 text-text-primary rounded-tr-sm",
@@ -400,6 +431,15 @@ export function SessionsPage() {
     refetchInterval: 5000,
   });
 
+  const { data: channelsData } = useQuery({
+    queryKey: ["channels"],
+    queryFn: async () => {
+      const { data } = await getApiV1Channels();
+      return data;
+    },
+    enabled: !!id,
+  });
+
   const messages = ((chatData as Record<string, unknown> | undefined)
     ?.messages ?? []) as ChatMessageData[];
 
@@ -414,19 +454,62 @@ export function SessionsPage() {
   }
 
   const platform = (session?.channelType ?? "web") as Platform;
-  const platformCfg = PLATFORM_CONFIG[platform] ?? {
-    bg: "bg-gray-500/15",
-    emoji: "\uD83C\uDF10",
-    label: "Web",
-    openLabel: "Open",
-  };
-  const messageCount = session?.messageCount ?? messages.length;
+  const platformCfg = getPlatformConfig(platform);
+  const messageCount = session?.messageCount || messages.length;
   const lastActive = session?.lastMessageAt ?? session?.updatedAt ?? null;
+  const sessionMetadata =
+    (session?.metadata as Record<string, unknown> | null | undefined) ?? null;
+  const linkedChannel = channelsData?.channels?.find(
+    (channel) => channel.id === session?.channelId,
+  );
+  const sessionFolderUrl = getSessionFolderUrl(sessionMetadata);
+  const externalChatUrl =
+    platform === "web"
+      ? ""
+      : getChannelChatUrl(
+          platform,
+          linkedChannel?.appId,
+          linkedChannel?.botUserId,
+          linkedChannel?.accountId,
+          {
+            preferExactSessionTarget: true,
+            sessionMetadata,
+          },
+        );
 
   // Detect group session from title or metadata
   const isGroup =
     (session?.metadata as Record<string, unknown> | null)?.isGroup === true ||
     (session?.title ?? "").includes("(group)");
+
+  const buttonClassName = cn(
+    "inline-flex h-12 items-center justify-center gap-3 rounded-[18px] border bg-white px-5 text-[13px] font-medium text-text-primary shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-colors",
+    "border-[rgba(15,23,42,0.1)] hover:bg-[rgba(248,250,252,0.9)]",
+  );
+
+  const handleOpenFolder = async (): Promise<void> => {
+    if (!sessionFolderUrl) {
+      toast.error("Session folder is unavailable.");
+      return;
+    }
+
+    try {
+      await openLocalFolderUrl(sessionFolderUrl);
+    } catch {
+      toast.error("Failed to open session folder.");
+    }
+  };
+
+  const handleUnavailableChatLink = (): void => {
+    if (platform === "feishu") {
+      toast.info(
+        "This session is missing Feishu openChatId/openId metadata, so the exact chat cannot be opened yet.",
+      );
+      return;
+    }
+
+    toast.info("This channel does not expose a direct chat link yet.");
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -434,22 +517,17 @@ export function SessionsPage() {
       <div className="shrink-0 border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex gap-3 items-center">
-            <div
-              className={cn(
-                "flex justify-center items-center rounded-lg shrink-0",
-                platformCfg.bg,
-              )}
-              style={{ width: 30, height: 30 }}
-            >
-              <span style={{ fontSize: 13 }}>{platformCfg.emoji}</span>
-            </div>
+            <SessionPlatformBadge
+              platform={platform}
+              className="h-[34px] w-[34px] shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-[15px] font-bold text-text-heading truncate">
                   {session?.title ?? id}
                 </h1>
                 {isGroup && (
-                  <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--color-info-subtle)] text-[var(--color-info)]">
                     Group
                   </span>
                 )}
@@ -469,15 +547,46 @@ export function SessionsPage() {
               </div>
             </div>
           </div>
-          {platform !== "web" && (
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-1 px-3 py-1.5 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
+              data-session-folder-url={sessionFolderUrl ?? undefined}
+              onClick={() => {
+                void handleOpenFolder();
+              }}
+              disabled={!sessionFolderUrl}
+              className={cn(
+                buttonClassName,
+                !sessionFolderUrl && "cursor-not-allowed opacity-60",
+              )}
             >
-              {platformCfg.openLabel}
-              <ExternalLink className="h-3 w-3" />
+              <FolderOpen className="size-[18px] text-text-secondary" />
+              <span>Open Folder</span>
             </button>
-          )}
+            {platform !== "web" &&
+              (externalChatUrl ? (
+                <a
+                  href={externalChatUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonClassName}
+                >
+                  <PlatformIcon platform={platform} size={18} />
+                  <span>{platformCfg.openLabel}</span>
+                  <ArrowUpRight className="size-[16px] text-text-muted" />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleUnavailableChatLink}
+                  className={buttonClassName}
+                >
+                  <PlatformIcon platform={platform} size={18} />
+                  <span>{platformCfg.openLabel}</span>
+                  <ArrowUpRight className="size-[16px] text-text-muted" />
+                </button>
+              ))}
+          </div>
         </div>
       </div>
 
@@ -495,11 +604,18 @@ export function SessionsPage() {
         ) : messages.length === 0 ? (
           <ChatEmpty />
         ) : (
-          <div className="max-w-3xl mx-auto px-6 py-6">
+          <div data-chat-thread={id} className="px-6 py-6 space-y-8">
             <div className="space-y-4">
-              {messages.map((msg) => (
-                <ChatBubble key={msg.id} msg={msg} />
-              ))}
+              {messages
+                .filter((msg) => {
+                  const { text } = extractMessage(
+                    msg as unknown as Record<string, unknown>,
+                  );
+                  return text.trim().length > 0;
+                })
+                .map((msg) => (
+                  <ChatBubble key={msg.id} msg={msg} />
+                ))}
               <div ref={endRef} />
             </div>
           </div>

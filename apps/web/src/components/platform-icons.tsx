@@ -1,6 +1,14 @@
 // ─── Platform SVG Icons ─────────────────────────────────────
 // Shared across oauth-callback, integrations, and other pages.
 
+export type PlatformIconName =
+  | "slack"
+  | "discord"
+  | "feishu"
+  | "whatsapp"
+  | "telegram"
+  | "web";
+
 export function SlackIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -32,6 +40,85 @@ export function DiscordIcon({ size = 16 }: { size?: number }) {
       <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
     </svg>
   );
+}
+
+export function FeishuIcon({ size = 16 }: { size?: number }) {
+  return (
+    <img
+      width={size}
+      height={size}
+      alt="Feishu"
+      src="/feishu-logo.png"
+      style={{ objectFit: "contain" }}
+    />
+  );
+}
+
+export function WhatsAppIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img">
+      <title>WhatsApp</title>
+      <path
+        fill="#25D366"
+        d="M20.52 3.48A11.9 11.9 0 0 0 12.06 0C5.51 0 .18 5.33.18 11.88c0 2.09.55 4.13 1.6 5.94L0 24l6.37-1.67a11.83 11.83 0 0 0 5.69 1.45h.01c6.55 0 11.88-5.33 11.88-11.88 0-3.17-1.23-6.14-3.43-8.42Z"
+      />
+      <path
+        fill="#fff"
+        d="M17.63 14.15c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.19.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47a8.95 8.95 0 0 1-1.65-2.05c-.17-.3-.02-.46.13-.62.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.48-.5-.67-.5h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.5s1.07 2.9 1.22 3.1c.15.2 2.1 3.2 5.08 4.49.71.31 1.27.5 1.7.63.72.23 1.37.2 1.88.12.57-.08 1.76-.72 2.01-1.42.25-.7.25-1.3.18-1.42-.08-.12-.28-.2-.58-.35Z"
+      />
+    </svg>
+  );
+}
+
+export function TelegramIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img">
+      <title>Telegram</title>
+      <circle cx="12" cy="12" r="12" fill="#24A1DE" />
+      <path
+        fill="#fff"
+        d="m17.34 6.88-2.08 10.16c-.16.72-.58.9-1.17.56l-3.23-2.38-1.56 1.5c-.17.17-.32.32-.65.32l.23-3.3 6-5.42c.26-.23-.05-.36-.4-.13l-7.42 4.67-3.2-1c-.7-.22-.71-.7.15-1.04l12.5-4.82c.58-.22 1.09.13.9 1.88Z"
+      />
+    </svg>
+  );
+}
+
+export function WebIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img">
+      <title>Web</title>
+      <circle cx="12" cy="12" r="10" stroke="#6B7280" strokeWidth="1.75" />
+      <path
+        d="M2 12h20M12 2a14.5 14.5 0 0 0 0 20M12 2a14.5 14.5 0 0 1 0 20"
+        stroke="#6B7280"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function PlatformIcon({
+  platform,
+  size = 16,
+}: {
+  platform: string;
+  size?: number;
+}) {
+  switch (platform as PlatformIconName) {
+    case "slack":
+      return <SlackIcon size={size} />;
+    case "discord":
+      return <DiscordIcon size={size} />;
+    case "feishu":
+      return <FeishuIcon size={size} />;
+    case "whatsapp":
+      return <WhatsAppIcon size={size} />;
+    case "telegram":
+      return <TelegramIcon size={size} />;
+    default:
+      return <WebIcon size={size} />;
+  }
 }
 
 export function GoogleIcon({ size = 20 }: { size?: number }) {

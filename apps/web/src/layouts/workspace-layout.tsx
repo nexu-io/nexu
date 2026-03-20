@@ -1,4 +1,5 @@
 import { BrandMark } from "@/components/brand-mark";
+import { PlatformIcon } from "@/components/platform-icons";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
 import { type Locale, useLocale } from "@/hooks/use-locale";
@@ -68,27 +69,25 @@ type Platform =
   | "feishu"
   | "web";
 
-const PLATFORM_ICON_CONFIG: Record<Platform, { bg: string; emoji: string }> = {
-  discord: { bg: "bg-indigo-500/15", emoji: "🎮" },
-  slack: { bg: "bg-purple-500/15", emoji: "#" },
-  feishu: { bg: "bg-blue-500/15", emoji: "🐦" },
-  whatsapp: { bg: "bg-emerald-500/15", emoji: "💬" },
-  telegram: { bg: "bg-blue-500/15", emoji: "✈️" },
-  web: { bg: "bg-gray-500/15", emoji: "🌐" },
+const PLATFORM_LABELS: Record<Platform, string> = {
+  discord: "Discord",
+  slack: "Slack",
+  feishu: "Feishu",
+  whatsapp: "WhatsApp",
+  telegram: "Telegram",
+  web: "Web",
 };
 
 function SidebarPlatformIcon({ platform }: { platform: string }) {
-  const config = PLATFORM_ICON_CONFIG[platform as Platform] ?? {
-    bg: "bg-gray-500/15",
-    emoji: "💬",
-  };
   return (
-    <div
-      className={`flex justify-center items-center w-6 h-6 rounded-md shrink-0 ${config.bg}`}
-    >
-      <span className="text-[11px]">{config.emoji}</span>
-    </div>
+    <span className="flex justify-center items-center w-7 h-7 rounded-xl border border-border bg-surface-1 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <PlatformIcon platform={platform} size={15} />
+    </span>
   );
+}
+
+function getPlatformLabel(platform: string): string {
+  return PLATFORM_LABELS[platform as Platform] ?? "Web";
 }
 
 function formatTime(iso: string | null): string {
@@ -370,7 +369,7 @@ function WorkspaceLayoutInner() {
       : isModelsPage
         ? t("layout.mobile.settingsSubtitle")
         : selectedSession
-          ? `${selectedSession.channelType} · ${formatTime(selectedSession.lastTime)}`
+          ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
 
   return (
@@ -516,6 +515,9 @@ function WorkspaceLayoutInner() {
                   <button
                     type="button"
                     key={s.id}
+                    data-sidebar-session-row={s.id}
+                    data-session-channel-type={s.channelType ?? "web"}
+                    data-session-state={s.status || "idle"}
                     onClick={() => {
                       track("workspace_channel_click", {
                         channel_type: s.channelType,
@@ -523,28 +525,38 @@ function WorkspaceLayoutInner() {
                       navigate(`/workspace/sessions/${s.id}`);
                     }}
                     className={cn(
-                      "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] transition-colors cursor-pointer px-3 py-1.5",
+                      "group flex items-center gap-2.5 w-full rounded-[10px] transition-colors cursor-pointer px-3 py-2 text-left",
                       isActive && "nav-item-active",
                     )}
                   >
                     <SidebarPlatformIcon platform={s.channelType ?? "web"} />
                     <div className="flex-1 min-w-0">
-                      <div
-                        className={cn(
-                          "text-[13px] font-medium truncate whitespace-nowrap",
-                          !isActive && "text-text-primary",
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className={cn(
+                            "text-[12px] truncate whitespace-nowrap font-medium",
+                            !isActive && "text-text-primary",
+                          )}
+                        >
+                          {s.title}
+                        </div>
+                        {s.status === "active" && (
+                          <span className="shrink-0 rounded-full bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-success)]">
+                            Live
+                          </span>
                         )}
-                      >
-                        {s.title}
                       </div>
-                      <div className="text-[10px] text-text-muted truncate whitespace-nowrap">
-                        {formatTime(s.lastTime)}
-                        {s.channelType && ` · ${s.channelType}`}
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-text-muted truncate whitespace-nowrap">
+                        <span>{getPlatformLabel(s.channelType ?? "web")}</span>
+                        <span className="text-border">·</span>
+                        <span>{formatTime(s.lastTime)}</span>
                       </div>
                     </div>
-                    {s.status === "active" && (
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                    )}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {s.status === "active" && (
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -866,6 +878,9 @@ function WorkspaceLayoutInner() {
                         <button
                           type="button"
                           key={s.id}
+                          data-sidebar-session-row={s.id}
+                          data-session-channel-type={s.channelType ?? "web"}
+                          data-session-state={s.status || "idle"}
                           onClick={() => {
                             track("workspace_channel_click", {
                               channel_type: s.channelType,
@@ -874,7 +889,7 @@ function WorkspaceLayoutInner() {
                             navigate(`/workspace/sessions/${s.id}`);
                           }}
                           className={cn(
-                            "flex items-center gap-2.5 w-full rounded-lg transition-colors cursor-pointer px-2.5 py-2 text-left",
+                            "flex items-center gap-2.5 w-full rounded-[10px] transition-colors cursor-pointer px-2.5 py-2 text-left",
                             isActive
                               ? "bg-accent/10 text-accent"
                               : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
@@ -882,22 +897,29 @@ function WorkspaceLayoutInner() {
                         >
                           <SidebarPlatformIcon platform={s.channelType} />
                           <div className="flex-1 min-w-0">
-                            <div className="text-[13px] truncate font-medium">
-                              {s.title}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-[13px] truncate font-medium">
+                                {s.title}
+                              </div>
+                              {s.status === "active" && (
+                                <span className="shrink-0 rounded-full bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-success)]">
+                                  Live
+                                </span>
+                              )}
                             </div>
-                            <div className="text-[10px] text-text-muted truncate">
-                              {formatTime(s.lastTime)}
-                              {s.channelType && ` · ${s.channelType}`}
+                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-text-muted truncate">
+                              <span>
+                                {getPlatformLabel(s.channelType ?? "web")}
+                              </span>
+                              <span className="text-border">·</span>
+                              <span>{formatTime(s.lastTime)}</span>
                             </div>
                           </div>
-                          <div
-                            className={cn(
-                              "w-1.5 h-1.5 rounded-full shrink-0",
-                              s.status === "active"
-                                ? "bg-emerald-500"
-                                : "bg-text-muted/30",
-                            )}
-                          />
+                          {s.status === "active" ? (
+                            <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-500" />
+                          ) : (
+                            <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-text-muted/30" />
+                          )}
                         </button>
                       );
                     })}
@@ -975,7 +997,7 @@ function WorkspaceLayoutInner() {
       )}
 
       {/* Main content — elevated surface with rounded left edge */}
-      <div className="flex-1 min-w-0 bg-surface-1 rounded-l-[12px] flex flex-col md:pt-8">
+      <div className="flex-1 overflow-hidden min-w-0 min-h-0 bg-surface-1 rounded-l-[12px] flex flex-col md:pt-8">
         <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
           <div className="flex items-center justify-between gap-3">
             <button

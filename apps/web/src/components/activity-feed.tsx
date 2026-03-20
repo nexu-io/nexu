@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { getApiV1Sessions } from "../../lib/api/sdk.gen";
 
 /**
@@ -114,32 +115,38 @@ export function ActivityFeed() {
       </div>
       <div className="space-y-5">
         {recentSessions.map((session) => (
-          <div key={session.id} className="flex items-start gap-3">
-            {/* Status dot */}
-            <div
-              className={`w-1.5 h-1.5 rounded-full mt-[7px] shrink-0 ${
-                session.status === "active"
-                  ? "bg-[var(--color-success)]"
-                  : "bg-surface-4"
-              }`}
-            />
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] text-text-primary leading-relaxed truncate">
-                {session.title}
-              </p>
-              <div className="mt-1.5 flex items-center gap-2">
-                {session.channelType && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-2 text-text-muted">
-                    {CHANNEL_LABELS[session.channelType] ?? session.channelType}
+          <Link
+            key={session.id}
+            data-activity-session-link={session.id}
+            to={`/workspace/sessions/${session.id}`}
+            className="group -mx-2 block rounded-xl px-2 py-2 transition-colors hover:bg-surface-1"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-1.5 h-1.5 rounded-full mt-[7px] shrink-0 ${
+                  session.status === "active"
+                    ? "bg-[var(--color-success)]"
+                    : "bg-surface-4"
+                }`}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-text-primary leading-relaxed truncate group-hover:text-accent">
+                  {session.title}
+                </p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  {session.channelType && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-2 text-text-muted">
+                      {CHANNEL_LABELS[session.channelType] ??
+                        session.channelType}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-text-muted">
+                    {formatRelativeTime(session.lastMessageAt, t)}
                   </span>
-                )}
-                <span className="text-[10px] text-text-muted">
-                  {formatRelativeTime(session.lastMessageAt, t)}
-                </span>
+                </div>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
