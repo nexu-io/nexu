@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ═══════════════════════════════════════════════════════════════════
    Nexu Design System 2.0 — Single Source of Truth
@@ -7,14 +8,28 @@
 
 @theme {
   /* ── Typography ── */
-  --font-sans: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC",
-    "PingFang SC", sans-serif;
+  --font-sans: "Digits", "Manrope", "Inter", "PingFang SC", -apple-system,
+    "Noto Sans SC";
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+  --font-heading: "Georgia", "Times New Roman", serif;
   --font-script: "Caveat", cursive;
 
   /* ── Brand Teal — 10% rule ── */
   --color-brand-primary: #3db9ce;
   --color-brand-subtle: rgba(61, 185, 206, 0.08);
+
+  /* ── Neutral palette ── */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f9f9f9;
+  --color-neutral-100: #f3f3f3;
+  --color-neutral-200: #eeeeee;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #909599;
+  --color-neutral-500: #787c80;
+  --color-neutral-600: #6c7073;
+  --color-neutral-700: #545659;
+  --color-neutral-800: #222b39;
+  --color-neutral-900: #042028;
 
   /* ── Surface — pure neutral gray, no tint ── */
   --color-surface-0: #fafafa;
@@ -24,19 +39,32 @@
   --color-surface-4: #e5e5e5;
   --color-surface-5: #d4d4d4;
 
+  /* ── Dark surfaces — brand panels ── */
+  --color-dark-bg: #0d0d10;
+  --color-dark-surface: #1a1a1f;
+  --color-dark-surface-hover: #242429;
+  --color-dark-border: rgba(255, 255, 255, 0.08);
+
+  /* ── Warm surfaces — welcome page ── */
+  --color-warm-bg: #f7f5ef;
+  --color-warm-surface: #f6f3ec;
+  --color-warm-surface-hover: #f2eee4;
+
   /* ── Alpha Border ── */
   --color-border-subtle: rgba(0, 0, 0, 0.06);
   --color-border-strong: rgba(0, 0, 0, 0.12);
   --color-border: rgba(0, 0, 0, 0.08);
   --color-border-hover: rgba(0, 0, 0, 0.1);
+  --color-border-card: rgba(0, 0, 0, 0.06);
 
   /* ── Text ── */
   --color-text-heading: #001217;
   --color-text-primary: #1c1f23;
   --color-text-secondary: #545659;
   --color-text-tertiary: #787c80;
-  --color-text-muted: #787c80;
+  --color-text-placeholder: #787c80;
   --color-text-disabled: rgba(28, 31, 35, 0.38);
+  --color-text-muted: #787c80;
 
   /* ── Accent (primary button) ── */
   --color-accent: #1c1f23;
@@ -57,6 +85,7 @@
   --color-link: #2657bb;
   --color-info: #2657bb;
   --color-info-subtle: rgba(38, 87, 187, 0.08);
+  --color-pink: #d999f7;
 
   /* ── Toggle (exclusive — do not reuse for other components) ── */
   --color-toggle-on: #007aff;
@@ -70,7 +99,10 @@
   --radius-16: 16px;
   --radius-20: 20px;
   --radius-24: 24px;
+  --radius-28: 28px;
+  --radius-32: 32px;
   --radius-pill: 100px;
+  --radius-circle: 50%;
 
   /* ── Shadow ── */
   --shadow-rest: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -78,6 +110,9 @@
   --shadow-refine: 0 10px 20px -5px rgba(0, 0, 0, 0.06);
   --shadow-elevated: 0 18px 60px rgba(0, 0, 0, 0.08);
   --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-dropdown-dark: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --shadow-overlay: 0 18px 38px rgba(0, 0, 0, 0.1);
+  --shadow-m: 0 2px 20px 4px rgba(0, 0, 0, 0.04);
   --shadow-focus: 0 0 0 2px rgba(61, 185, 206, 0.25);
   --shadow-input-inset: inset 0 1px 2px rgba(0, 0, 0, 0.02);
 
@@ -98,6 +133,38 @@
   --color-destructive-foreground: #ffffff;
   --color-input: rgba(0, 0, 0, 0.08);
   --color-ring: #1c1f23;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Tabular digits — all numbers render in JetBrains Mono
+   ═══════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: "Digits";
+  src: local("JetBrains Mono"), url("/fonts/JetBrainsMono-Regular.woff2")
+    format("woff2");
+  unicode-range: U+0030-0039, U+002E, U+002C, U+0025, U+002B, U+002D, U+003A;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 88%;
+}
+@font-face {
+  font-family: "Digits";
+  src: local("JetBrains Mono Medium"), url("/fonts/JetBrainsMono-Medium.woff2")
+    format("woff2");
+  unicode-range: U+0030-0039, U+002E, U+002C, U+0025, U+002B, U+002D, U+003A;
+  font-weight: 500;
+  font-display: swap;
+  size-adjust: 88%;
+}
+@font-face {
+  font-family: "Digits";
+  src: local("JetBrains Mono Bold"), url("/fonts/JetBrainsMono-Bold.woff2")
+    format("woff2");
+  unicode-range: U+0030-0039, U+002E, U+002C, U+0025, U+002B, U+002D, U+003A;
+  font-weight: 600 900;
+  font-display: swap;
+  size-adjust: 88%;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -252,8 +319,111 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Breathe Animation
+   Data table
    ═══════════════════════════════════════════════════════════════════ */
+
+.data-table {
+  border-radius: var(--radius-12);
+  border: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+  background: var(--color-surface-1);
+}
+.data-table-header {
+  display: grid;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-0);
+  gap: 0 16px;
+}
+.data-table-header span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.data-table-row {
+  display: grid;
+  align-items: center;
+  padding: 12px 20px;
+  gap: 0 16px;
+  transition: background 0.15s ease;
+}
+.data-table-row:not(:last-child) {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.data-table-row:hover {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+/* Status dot — pair with .data-table */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot-live {
+  background: var(--color-success);
+}
+.status-dot-building {
+  background: var(--color-warning);
+}
+.status-dot-failed {
+  background: var(--color-danger);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Animations — core
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes nexu-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  60% {
+    transform: translateY(1px);
+  }
+}
+@keyframes nexu-spring-in {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  80% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes dot-fade {
+  0%,
+  20% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+  80%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+.animate-nexu-bounce {
+  animation: nexu-bounce 1.2s ease-in-out infinite;
+}
+.animate-dot-fade {
+  animation: dot-fade 1.2s ease-in-out infinite;
+}
 
 @keyframes breathe {
   0%,
@@ -275,25 +445,6 @@
   border-color: rgba(61, 185, 206, 0.12);
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Other animations
-   ═══════════════════════════════════════════════════════════════════ */
-
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out forwards;
-}
-
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -302,11 +453,6 @@
     opacity: 1;
   }
 }
-
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out forwards;
-}
-
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -317,11 +463,26 @@
     transform: scale(1);
   }
 }
-
-.animate-scale-in {
-  animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
-
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @keyframes float {
   0%,
   100% {
@@ -331,9 +492,68 @@
     transform: translateY(-6px);
   }
 }
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0.8;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes energy-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
 
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+.animate-scale-in {
+  animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-page-enter {
+  animation: page-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out forwards;
+}
 .animate-float {
   animation: float 3s ease-in-out infinite;
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out forwards;
+}
+.animate-energy-pulse {
+  animation: energy-pulse 1.5s ease-in-out infinite;
+}
+
+.typing-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -422,6 +642,148 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Markdown preview
+   ═══════════════════════════════════════════════════════════════════ */
+
+.markdown-preview {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+}
+.markdown-preview h1 {
+  font-size: 1.4em;
+  font-weight: 700;
+  margin: 0 0 0.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--color-border);
+}
+.markdown-preview h2 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 1.2em 0 0.4em;
+}
+.markdown-preview h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+  margin: 1em 0 0.3em;
+}
+.markdown-preview p {
+  margin: 0 0 0.7em;
+}
+.markdown-preview ul,
+.markdown-preview ol {
+  margin: 0 0 0.7em;
+  padding-left: 1.5em;
+}
+.markdown-preview li {
+  margin: 0.15em 0;
+}
+.markdown-preview li::marker {
+  color: var(--color-text-tertiary);
+}
+.markdown-preview strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.markdown-preview em {
+  font-style: italic;
+}
+.markdown-preview a {
+  color: var(--color-info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markdown-preview a:hover {
+  opacity: 0.8;
+}
+.markdown-preview blockquote {
+  margin: 0.5em 0;
+  padding: 0.4em 0.8em;
+  border-left: 3px solid var(--color-border-hover);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  border-radius: 0 4px 4px 0;
+}
+.markdown-preview code {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.88em;
+  padding: 0.15em 0.35em;
+  background: var(--color-surface-3);
+  border-radius: 3px;
+  color: var(--color-text-primary);
+}
+.markdown-preview pre {
+  margin: 0.5em 0;
+  padding: 0.8em 1em;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.markdown-preview pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+.markdown-preview table {
+  width: 100%;
+  margin: 0.5em 0;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.markdown-preview th,
+.markdown-preview td {
+  padding: 0.4em 0.6em;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+.markdown-preview th {
+  background: var(--color-surface-2);
+  font-weight: 600;
+  font-size: 0.88em;
+  color: var(--color-text-secondary);
+}
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1em 0;
+}
+.markdown-preview input[type="checkbox"] {
+  margin-right: 0.4em;
+  accent-color: var(--color-accent);
+}
+
+.markdown-preview-compact {
+  font-size: 11px;
+  line-height: 1.6;
+}
+.markdown-preview-compact h1 {
+  font-size: 1.2em;
+}
+.markdown-preview-compact h2 {
+  font-size: 1.1em;
+}
+.markdown-preview-compact pre {
+  padding: 0.5em 0.7em;
+}
+.markdown-preview-compact table {
+  font-size: 0.85em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   No scrollbar utility
+   ═══════════════════════════════════════════════════════════════════ */
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Global resets
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -448,6 +810,7 @@
     height: 100%;
     margin: 0;
     background-color: transparent;
+    color-scheme: light;
   }
   body {
     @apply bg-surface-0 text-text-primary;

@@ -12,7 +12,7 @@
 
 加入我们的 Discord 服务器，与团队和其他用户交流：
 
-👉 [加入 nexu Discord](https://discord.gg/Ynv8dFMRRN)
+👉 [加入 nexu Discord](https://discord.gg/Q6AxCUuMNU)
 
 ### X (Twitter)
 

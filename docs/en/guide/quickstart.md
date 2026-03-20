@@ -1,17 +1,23 @@
 # One-Minute Quick Start
 
-## Step 1: Download and install
+## Step 1: Download and Install
 
 Download the [nexu client](https://nexu.io/download), install it, and double-click to open.
 
-## Step 2: Choose your mode
+![nexu home screen](/assets/nexu-home.webp)
 
-nexu offers two modes:
+## Step 2: Choose Your Mode
 
-- **Sign in** — use nexu's official pre-configured models, ready out of the box
-- **BYOK mode** — enter your own API Key to use custom models
+Open **Settings** from the left sidebar and pick an integration mode:
 
-## Step 3: Configure a channel
+- **Sign in** — select **Nexu Official**, click **Sign in to Nexu**, and high-quality models are ready to use immediately
+- **BYOK mode** — select a provider (Anthropic, OpenAI, etc.), paste your API Key, and click **Save**
+
+![Choose model integration mode](/assets/nexu-settings-open.webp)
+
+![Nexu Official — sign in and go](/assets/nexu-models-official.webp)
+
+## Step 3: Configure a Channel
 
 Pick one channel and complete the setup:
 

@@ -9,7 +9,15 @@ import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
 import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
-import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
+import {
+  Compass,
+  Loader2,
+  Plus,
+  Search,
+  Settings2,
+  Star,
+  Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -17,6 +25,7 @@ import { Link } from "react-router-dom";
 type TopTab = "explore" | "yours";
 type YoursSubTab = "all" | "recommended" | "installed";
 
+const GITHUB_URL = "https://github.com/nexu-io/nexu";
 const PAGE_SIZE = 50;
 
 function useDebounce<T>(value: T, delayMs: number): T {
@@ -377,7 +386,7 @@ export function SkillsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-6 sm:pb-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-10">
           <div>
@@ -385,6 +394,18 @@ export function SkillsPage() {
             <p className="heading-page-desc">{t("skills.pageSubtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-1 hover:border-border-hover transition-all text-[12px] font-medium text-text-secondary hover:text-text-primary"
+            >
+              <Star
+                size={13}
+                className="text-amber-400 group-hover:fill-amber-400 transition-colors"
+              />
+              Star
+            </a>
             <div className="relative">
               <Search
                 size={14}
