@@ -22,29 +22,43 @@ if (pruneTargets.length === 0) {
 
 let removedCount = 0;
 
-for (const relativePath of pruneTargets) {
-  const absolutePath = path.resolve(runtimeDir, relativePath);
-  const relativeDisplayPath = path.relative(runtimeDir, absolutePath) || ".";
+const pruneResults = await Promise.all(
+  pruneTargets.map(async (relativePath) => {
+    const absolutePath = path.resolve(runtimeDir, relativePath);
+    const relativeDisplayPath = path.relative(runtimeDir, absolutePath) || ".";
 
-  if (!absolutePath.startsWith(runtimeDir)) {
-    throw new Error(
-      `Refusing to prune outside runtime directory: ${relativePath}`,
-    );
-  }
+    if (!absolutePath.startsWith(runtimeDir)) {
+      throw new Error(
+        `Refusing to prune outside runtime directory: ${relativePath}`,
+      );
+    }
 
-  if (!(await exists(absolutePath))) {
-    console.log(`Skip missing ${relativeDisplayPath}`);
+    if (!(await exists(absolutePath))) {
+      return { action: "skip", relativeDisplayPath };
+    }
+
+    if (isDryRun) {
+      return { action: "dry-run", relativeDisplayPath };
+    }
+
+    await rm(absolutePath, { recursive: true, force: true });
+    return { action: "removed", relativeDisplayPath };
+  }),
+);
+
+for (const result of pruneResults) {
+  if (result.action === "skip") {
+    console.log(`Skip missing ${result.relativeDisplayPath}`);
     continue;
   }
 
-  if (isDryRun) {
-    console.log(`Would remove ${relativeDisplayPath}`);
+  if (result.action === "dry-run") {
+    console.log(`Would remove ${result.relativeDisplayPath}`);
     removedCount += 1;
     continue;
   }
 
-  await rm(absolutePath, { recursive: true, force: true });
-  console.log(`Removed ${relativeDisplayPath}`);
+  console.log(`Removed ${result.relativeDisplayPath}`);
   removedCount += 1;
 }
 
