@@ -915,6 +915,75 @@
         }
       }
     },
+    "/api/internal/desktop/shell-open": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shell open result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Path not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/ready": {
       "get": {
         "tags": [
@@ -930,6 +999,9 @@
                   "properties": {
                     "ready": {
                       "type": "boolean"
+                    },
+                    "workspacePath": {
+                      "type": "string"
                     },
                     "runtime": {
                       "type": "object",
@@ -958,6 +1030,7 @@
                   },
                   "required": [
                     "ready",
+                    "workspacePath",
                     "runtime",
                     "status"
                   ]

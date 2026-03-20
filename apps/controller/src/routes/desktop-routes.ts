@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { homedir } from "node:os";
 import path from "node:path";
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import type { ControllerContainer } from "../app/container.js";
@@ -7,6 +8,7 @@ import type { ControllerBindings } from "../types.js";
 
 const desktopReadyResponseSchema = z.object({
   ready: z.boolean(),
+  workspacePath: z.string(),
   runtime: z.object({
     ok: z.boolean(),
     status: z.number().nullable(),
@@ -58,10 +60,17 @@ export function registerDesktopRoutes(
       const { path: targetPath } = c.req.valid("json");
       const resolved = path.resolve(targetPath);
       const allowedRoot = path.resolve(env.openclawStateDir);
+      const allowedWorkspaceRoot = path.resolve(
+        path.join(homedir(), ".openclaw", "workspace"),
+      );
 
       if (
-        !resolved.startsWith(allowedRoot + path.sep) &&
-        resolved !== allowedRoot
+        !(
+          resolved.startsWith(allowedRoot + path.sep) ||
+          resolved === allowedRoot ||
+          resolved.startsWith(allowedWorkspaceRoot + path.sep) ||
+          resolved === allowedWorkspaceRoot
+        )
       ) {
         return c.json(
           { ok: false, error: "Path outside allowed directory" },
@@ -105,6 +114,7 @@ export function registerDesktopRoutes(
       return c.json(
         {
           ready: true,
+          workspacePath: path.join(homedir(), ".openclaw", "workspace"),
           runtime,
           status: container.runtimeState.status,
         },

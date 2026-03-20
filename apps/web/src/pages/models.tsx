@@ -2,6 +2,7 @@ import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ProviderLogo } from "@/components/provider-logo";
 import { useGitHubStars } from "@/hooks/use-github-stars";
+import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,6 +27,7 @@ import {
   deleteApiV1ProvidersByProviderId,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
+  getApiInternalDesktopReady,
   getApiV1LinkCatalog,
   getApiV1Me,
   getApiV1Models,
@@ -207,8 +209,6 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   moonshot: ["kimi-k2.5"],
   zai: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flashx"],
 };
-
-const GITHUB_URL = "https://github.com/nexu-io/nexu";
 
 function buildProviders(
   apiModels: Array<{
@@ -812,6 +812,13 @@ export function ModelsPage() {
 
   const currentModelId = defaultModelData?.modelId ?? "";
   const models = modelsData?.models ?? [];
+  const { data: desktopReadyData } = useQuery({
+    queryKey: ["desktop-ready"],
+    queryFn: async () => {
+      const { data } = await getApiInternalDesktopReady();
+      return data;
+    },
+  });
 
   const userSwitchRef = useRef(false);
   const updateModel = useMutation({
@@ -929,6 +936,19 @@ export function ModelsPage() {
     [currentModelId, updateModel],
   );
 
+  const handleOpenWorkspace = useCallback(async () => {
+    if (!desktopReadyData?.workspacePath) {
+      toast.error("OpenClaw workspace folder is unavailable.");
+      return;
+    }
+
+    try {
+      await openLocalFolderUrl(pathToFileUrl(desktopReadyData.workspacePath));
+    } catch {
+      toast.error("Failed to open OpenClaw workspace folder.");
+    }
+  }, [desktopReadyData?.workspacePath]);
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
@@ -945,14 +965,13 @@ export function ModelsPage() {
             />
             <button
               type="button"
-              onClick={() =>
-                window.open(GITHUB_URL, "_blank", "noopener,noreferrer")
-              }
+              onClick={() => {
+                void handleOpenWorkspace();
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-[12px] font-medium text-text-primary hover:border-border-hover hover:bg-surface-1 transition-colors"
             >
               <FolderOpen size={13} />
               Workspace
-              <ArrowUpRight size={12} className="text-text-muted" />
             </button>
           </div>
         </div>

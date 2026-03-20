@@ -372,6 +372,39 @@ export type PostApiV1SharedSlackClaimResponses = {
 
 export type PostApiV1SharedSlackClaimResponse = PostApiV1SharedSlackClaimResponses[keyof PostApiV1SharedSlackClaimResponses];
 
+export type PostApiInternalDesktopShellOpenData = {
+    body?: {
+        path: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/shell-open';
+};
+
+export type PostApiInternalDesktopShellOpenErrors = {
+    /**
+     * Path not allowed
+     */
+    403: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiInternalDesktopShellOpenError = PostApiInternalDesktopShellOpenErrors[keyof PostApiInternalDesktopShellOpenErrors];
+
+export type PostApiInternalDesktopShellOpenResponses = {
+    /**
+     * Shell open result
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiInternalDesktopShellOpenResponse = PostApiInternalDesktopShellOpenResponses[keyof PostApiInternalDesktopShellOpenResponses];
+
 export type GetApiInternalDesktopReadyData = {
     body?: never;
     path?: never;
@@ -385,6 +418,7 @@ export type GetApiInternalDesktopReadyResponses = {
      */
     200: {
         ready: boolean;
+        workspacePath: string;
         runtime: {
             ok: boolean;
             status: number;
