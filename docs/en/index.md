@@ -1,10 +1,10 @@
 # Introduction
 
-**nexu** (next to you) gives you the simplest way to own an OpenClaw 🦞 — download, double-click, start working.
+**nexu** (next to you) is an open-source desktop client (Electron) that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
 
-Built on the open-source OpenClaw 🦞, pre-loaded with essential Skills like Feishu Skills, plus Claude, ChatGPT, Minimax, GLM, Kimi, and more — or bring your own API Key 🔌.
+It offers graphical setup, built-in Feishu Skills, multi-model support, and BYOK.
 
-Connect to Feishu, Slack, or Discord, and your Agent goes mobile 📱 — chat with it right inside the tools you already use.
+Configuration and runtime state stay primarily on your machine.
 
 ![nexu client](/assets/nexu-home.webp)
 
