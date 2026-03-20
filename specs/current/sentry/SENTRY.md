@@ -13,6 +13,7 @@ Key code paths:
 - `apps/desktop/shared/runtime-config.ts`
 - `apps/desktop/shared/sentry-build-metadata.ts`
 - `apps/desktop/main/index.ts`
+- `apps/desktop/main/ipc.ts`
 - `apps/desktop/preload/index.ts`
 - `apps/desktop/src/main.tsx`
 - `apps/desktop/scripts/dist-mac.mjs`
@@ -36,7 +37,7 @@ This mapping is hardcoded in `apps/desktop/scripts/upload-sourcemaps.mjs`.
 
 | Environment | DSN source |
 | --- | --- |
-| Local dev | local runtime env, usually `apps/api/.env` via `NEXU_DESKTOP_SENTRY_DSN` |
+| Local dev | local runtime env, usually `apps/desktop/.env` via `NEXU_DESKTOP_SENTRY_DSN`; dev runtime does not use `build-config.json` |
 | Test | GitHub secret `SENTRY_DSN_NEXU_DESKTOP_TEST` |
 | Prod | GitHub secret `SENTRY_DSN_NEXU_DESKTOP_PROD` |
 
@@ -69,16 +70,19 @@ pnpm --filter @nexu/desktop upload:sourcemaps
 
 #### Local dev DSN injection
 
-For local runs, runtime config resolves the DSN in `apps/desktop/shared/runtime-config.ts` in this order:
+For local dev runs, `apps/desktop/dev.sh` loads `NEXU_DESKTOP_SENTRY_DSN` from `apps/desktop/.env` and exports it into the Electron process.
+
+In local dev mode, desktop runtime config does not fall back to `build-config.json` for Sentry. Effective resolution is:
 
 1. `process.env.NEXU_DESKTOP_SENTRY_DSN`
-2. `build-config.json`
-3. `null`
+2. `null`
 
 In practice, local source of truth is usually:
 
-- `apps/api/.env`
+- `apps/desktop/.env`
 - variable: `NEXU_DESKTOP_SENTRY_DSN`
+
+This is intentional. `apps/desktop/build-config.json` can contain stale CI/test/prod DSNs from earlier packaged builds, so local dev now ignores that file to avoid misrouting local events into the wrong Sentry project.
 
 #### Local dev build metadata resolution
 
@@ -90,6 +94,11 @@ For local sourcemap upload, `apps/desktop/scripts/upload-sourcemaps.mjs` uses lo
 - DSN: prefers env, then `build-config.json`
 
 This is why local upload can work even if `build-config.json` is not a fresh CI-style packaged artifact.
+
+Important distinction:
+
+- local runtime event delivery ignores `build-config.json`
+- local sourcemap upload may still read `build-config.json` as a fallback when env is absent
 
 #### Local dev sourcemap generation
 
@@ -265,6 +274,8 @@ This is the path that depends most directly on uploaded sourcemaps for readable 
 
 - project: `nexu-desktop-dev`
 - environment values typically appear as development-like runtime values
+- DSN comes from local runtime env, typically `apps/desktop/.env` injected by `apps/desktop/dev.sh`
+- `build-config.json` is ignored for local runtime event delivery
 - renderer exceptions should land in the dev project
 - if sourcemaps were uploaded first, renderer stack traces should resolve beyond bundled filenames
 
@@ -299,7 +310,50 @@ If DSN is absent:
 - JavaScript exceptions are not sent to Sentry
 - native crashes stay on the local-only crashReporter fallback path
 
-### 3.5 What must match for readable renderer stacks
+### 3.5 Diagnostics validation findings
+
+The desktop diagnostics page currently exercises three deliberate failure types:
+
+- `desktop.renderer.exception`
+- `desktop.renderer.crash`
+- `desktop.main.crash`
+
+Current local-dev validation result:
+
+- renderer JavaScript exception is the cleanest path to validate immediately in Sentry; with sourcemaps uploaded, stack traces resolve correctly
+- renderer native crash lands in `nexu-desktop-dev` and now carries diagnostic tags such as `nexu.crash_title=desktop.renderer.crash` and `nexu.crash_kind=native_crash`
+- main native crash lands in `nexu-desktop-dev` and carries the same diagnostic tags plus build correlation metadata (`release`, `dist`, `build.commit`, `build.builtAt`)
+
+For native crash diagnostics, the desktop app now writes crash annotations before deliberate crash tests so that recovered minidump events still contain:
+
+- `nexu.crash_title`
+- `nexu.crash_kind`
+
+These fields are useful for triage even when the Sentry issue title remains native-symbol-oriented (for example `electron::ElectronBindings::Crash`) or renderer-minidump-oriented (for example `<unknown>`).
+
+### 3.6 Native crash upload timing
+
+Renderer JavaScript exceptions are reported in-process at the moment they occur.
+
+Native crash behavior is different:
+
+- renderer native crashes may appear very quickly, but still come through the minidump pipeline
+- main process native crashes are typically uploaded on the next app start, when `@sentry/electron/main` scans and submits the minidump left by the prior crashed run
+
+This means a deliberate main-process crash may not create or update its Sentry issue until the next `pnpm desktop:restart` or next manual app launch.
+
+Because upload can happen after restart, the most important fields for correlation are:
+
+- `nexu.crash_title`
+- `nexu.crash_kind`
+- `release`
+- `dist`
+- `build.source`
+- `build.branch`
+- `build.commit`
+- `build.builtAt`
+
+### 3.7 What must match for readable renderer stacks
 
 For sourcemaps to apply correctly to renderer issues, all of these must align:
 

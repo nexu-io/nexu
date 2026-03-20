@@ -28,6 +28,8 @@ export type RuntimeUnitManifest = {
   logFilePath?: string;
   /** Units that depend on this one and should be restarted when this unit restarts. */
   dependents?: RuntimeUnitId[];
+  /** Whether to auto-restart on unexpected exit. Defaults to true. */
+  autoRestart?: boolean;
 };
 
 export type RuntimeUnitRecord = {
@@ -46,4 +48,8 @@ export type RuntimeUnitRecord = {
   logTail: RuntimeLogEntry[];
   stdoutRemainder: string;
   stderrRemainder: string;
+  /** Consecutive auto-restart attempts since last successful run or explicit stop. */
+  autoRestartAttempts: number;
+  /** Set to true when unit is explicitly stopped to suppress auto-restart. */
+  stoppedByUser: boolean;
 };

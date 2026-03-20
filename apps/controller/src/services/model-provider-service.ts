@@ -4,26 +4,41 @@ import type {
   verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { z } from "zod";
+import { logger } from "../lib/logger.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
+
+export interface ModelAutoSelectResult {
+  changed: boolean;
+  previousModelId: string;
+  newModelId: string | null;
+  newModelName: string | null;
+}
 
 const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  siliconflow: "https://api.siliconflow.com/v1",
+  ppio: "https://api.ppinfra.com/v3/openai",
+  openrouter: "https://openrouter.ai/api/v1",
+  minimax: "https://api.minimaxi.com/anthropic",
+  kimi: "https://api.moonshot.cn/v1",
+  glm: "https://open.bigmodel.cn/api/paas/v4",
+  moonshot: "https://api.moonshot.cn/v1",
+  zai: "https://open.bigmodel.cn/api/paas/v4",
 };
 
 function buildProviderUrl(
   baseUrl: string | null | undefined,
-  pathname: string,
+  path: string,
 ): string | null {
   if (!baseUrl || baseUrl.trim().length === 0) {
     return null;
   }
 
-  return new URL(
-    pathname,
-    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
-  ).toString();
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
 type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
@@ -79,6 +94,51 @@ export class ModelProviderService {
 
   async setSelectedModelId(modelId: string | null) {
     return this.configStore.setDesktopSelectedModelId(modelId);
+  }
+
+  /**
+   * Validate that the current defaultModelId exists in the available model
+   * list. If not, auto-select the first available model and persist the
+   * change. Returns whether a switch happened and details for UI toast.
+   */
+  async ensureValidDefaultModel(): Promise<ModelAutoSelectResult> {
+    const { models } = await this.listModels();
+    const config = await this.configStore.getConfig();
+    const currentId = config.runtime.defaultModelId;
+
+    if (models.some((m) => m.id === currentId)) {
+      return {
+        changed: false,
+        previousModelId: currentId,
+        newModelId: null,
+        newModelName: null,
+      };
+    }
+
+    if (models.length === 0) {
+      return {
+        changed: false,
+        previousModelId: currentId,
+        newModelId: null,
+        newModelName: null,
+      };
+    }
+
+    // biome-ignore lint/style/noNonNullAssertion: length checked above
+    const selected = models[0]!;
+    await this.configStore.setDefaultModel(selected.id);
+
+    logger.info(
+      { previous: currentId, selected: selected.id },
+      "default_model_auto_switched",
+    );
+
+    return {
+      changed: true,
+      previousModelId: currentId,
+      newModelId: selected.id,
+      newModelName: selected.name,
+    };
   }
 
   async verifyProvider(

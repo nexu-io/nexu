@@ -205,15 +205,6 @@ function getCuratedSkillsDir(): string | undefined {
   return process.env.OPENCLAW_CURATED_SKILLS_DIR;
 }
 
-type CuratedState = {
-  removedByUser: string[];
-  lastInstalledVersion: string[];
-};
-
-function getCuratedStatePath(curatedDir: string): string {
-  return resolve(curatedDir, ".curated-state.json");
-}
-
 function readJsonFile<T>(path: string): T | null {
   if (!existsSync(path)) {
     return null;
@@ -238,34 +229,6 @@ function readMeta(cacheDir: string): z.infer<typeof catalogMetaSchema> | null {
   return readJsonFile<z.infer<typeof catalogMetaSchema>>(
     resolve(cacheDir, "meta.json"),
   );
-}
-
-function readCuratedState(curatedDir: string): CuratedState {
-  return (
-    readJsonFile<CuratedState>(getCuratedStatePath(curatedDir)) ?? {
-      removedByUser: [],
-      lastInstalledVersion: [],
-    }
-  );
-}
-
-function writeCuratedState(curatedDir: string, state: CuratedState): void {
-  writeFileSync(
-    getCuratedStatePath(curatedDir),
-    JSON.stringify(state, null, 2),
-    "utf8",
-  );
-}
-
-function recordCuratedRemoval(curatedDir: string, slug: string): void {
-  const state = readCuratedState(curatedDir);
-  if (state.removedByUser.includes(slug)) {
-    return;
-  }
-  writeCuratedState(curatedDir, {
-    ...state,
-    removedByUser: [...state.removedByUser, slug],
-  });
 }
 
 function findIndexFile(dir: string): string | null {
@@ -470,16 +433,21 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
     try {
       const clawHubBin = resolveClawHubBin();
       logger.info({ slug, clawHubBin }, "skillhub install resolving clawhub");
-      const { stdout, stderr } = await execFileAsync(process.execPath, [
-        clawHubBin,
-        "--workdir",
-        skillsDir,
-        "--dir",
-        ".",
-        "install",
-        slug,
-        "--force",
-      ]);
+      const INSTALL_TIMEOUT_MS = 180_000;
+      const { stdout, stderr } = await execFileAsync(
+        process.execPath,
+        [
+          clawHubBin,
+          "--workdir",
+          skillsDir,
+          "--dir",
+          ".",
+          "install",
+          slug,
+          "--force",
+        ],
+        { timeout: INSTALL_TIMEOUT_MS },
+      );
       if (stdout)
         logger.info({ slug, stdout: stdout.trim() }, "skillhub install stdout");
       if (stderr)
@@ -487,8 +455,19 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
       logger.info({ slug }, "skillhub install ok");
       return c.json({ ok: true }, 200);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error({ slug, error: message }, "skillhub install failed");
+      const isTimeout =
+        error instanceof Error &&
+        "killed" in error &&
+        (error as { killed?: boolean }).killed;
+      const message = isTimeout
+        ? "Install timed out — please check your network and try again"
+        : error instanceof Error
+          ? error.message
+          : String(error);
+      logger.error(
+        { slug, error: message, isTimeout },
+        "skillhub install failed",
+      );
       return c.json({ ok: false, error: message }, 200);
     }
   });
@@ -545,7 +524,6 @@ export function registerSkillhubRoutes(app: OpenAPIHono<AppBindings>) {
         : null;
       if (curatedDir && curatedPath && existsSync(curatedPath)) {
         rmSync(curatedPath, { recursive: true, force: true });
-        recordCuratedRemoval(curatedDir, slug);
         logger.info({ slug }, "skillhub uninstall ok (curated)");
         return c.json({ ok: true }, 200);
       }

@@ -8,6 +8,7 @@ import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawSkillsWriter } from "../src/runtime/openclaw-skills-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
+import type { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { CompiledOpenClawStore } from "../src/store/compiled-openclaw-store.js";
 import { NexuConfigStore } from "../src/store/nexu-config-store.js";
@@ -62,6 +63,10 @@ describe("OpenClawSyncService", () => {
   it("writes compiled config, skills, and templates from controller state", async () => {
     const configStore = new NexuConfigStore(env);
     const compiledStore = new CompiledOpenClawStore(env);
+    const gatewayService = {
+      isConnected: () => false,
+      pushConfig: async () => false,
+    } as OpenClawGatewayService;
     const syncService = new OpenClawSyncService(
       env,
       configStore,
@@ -70,6 +75,7 @@ describe("OpenClawSyncService", () => {
       new OpenClawSkillsWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
+      gatewayService,
     );
 
     await configStore.createBot({ name: "Assistant", slug: "assistant" });

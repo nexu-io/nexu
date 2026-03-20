@@ -4,6 +4,7 @@ import { parseSetCookieHeader } from "./cookies";
 
 const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
+  useBuildConfig: app.isPackaged,
 });
 
 export const desktopControllerUrl = runtimeConfig.urls.controllerBase;

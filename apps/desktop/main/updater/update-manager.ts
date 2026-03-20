@@ -35,7 +35,8 @@ export class UpdateManager {
   ) {
     this.win = win;
     this.orchestrator = orchestrator;
-    this.source = options?.source ?? "github";
+    // Default to R2 - GitHub is unreliable in China and requires auth for private repos
+    this.source = options?.source ?? "r2";
     this.channel = options?.channel ?? "stable";
     this.feedUrl = options?.feedUrl ?? null;
     this.checkIntervalMs = options?.checkIntervalMs ?? 4 * 60 * 60 * 1000;
@@ -48,7 +49,7 @@ export class UpdateManager {
   }
 
   private configureFeedUrl(): void {
-    // Priority: env var > build config > source/channel logic
+    // Priority: env var > build config (feedUrl) > R2 fallback
     const overrideUrl = process.env.NEXU_UPDATE_FEED_URL ?? this.feedUrl;
 
     if (overrideUrl) {
@@ -59,6 +60,7 @@ export class UpdateManager {
       return;
     }
 
+    // No CI-injected URL: use source-based logic (default R2)
     if (this.source === "github") {
       autoUpdater.setFeedURL({
         provider: "github",

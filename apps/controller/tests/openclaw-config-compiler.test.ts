@@ -3,7 +3,7 @@ import type { ControllerEnv } from "../src/app/env.js";
 import { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.js";
 import type { NexuConfig } from "../src/store/schemas.js";
 
-function createEnv(): ControllerEnv {
+function createEnv(overrides: Record<string, unknown> = {}): ControllerEnv {
   return {
     nodeEnv: "test",
     port: 3010,
@@ -25,10 +25,11 @@ function createEnv(): ControllerEnv {
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
-  };
+    ...overrides,
+  } as unknown as ControllerEnv;
 }
 
-function createConfig(): NexuConfig {
+function createConfig(overrides: Partial<NexuConfig> = {}): NexuConfig {
   const now = new Date().toISOString();
   return {
     $schema: "https://nexu.io/config.json",
@@ -137,6 +138,7 @@ function createConfig(): NexuConfig {
       "channel:feishu-channel-1:connectionMode": "webhook",
       "channel:feishu-channel-1:verificationToken": "verify-token",
     },
+    ...overrides,
   };
 }
 
@@ -173,5 +175,45 @@ describe("compileOpenClawConfig", () => {
     });
     expect(result.plugins?.entries?.feishu?.enabled).toBe(true);
     expect(result.skills?.load?.extraDirs).toEqual(["/tmp/openclaw/skills"]);
+  });
+
+  it("injects env-backed litellm routing for bare local model ids", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [],
+        desktop: {},
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "anthropic/claude-sonnet-4",
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "anthropic/claude-sonnet-4",
+        },
+      }),
+      createEnv({
+        litellmBaseUrl: "https://litellm.powerformer.net",
+        litellmApiKey: "litellm-key",
+      }),
+    );
+
+    expect(result.models?.providers.litellm?.baseUrl).toBe(
+      "https://litellm.powerformer.net",
+    );
+    expect(result.models?.providers.litellm?.models[0]?.id).toBe(
+      "anthropic/claude-sonnet-4",
+    );
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "litellm/anthropic/claude-sonnet-4",
+    });
+    expect(result.agents.list[0]?.model).toEqual({
+      primary: "litellm/anthropic/claude-sonnet-4",
+    });
   });
 });

@@ -56,7 +56,7 @@ export class ComponentUpdater {
   private readonly componentsDir: string;
   private readonly stateFilePath: string;
 
-  constructor(source: UpdateSource = "github") {
+  constructor(source: UpdateSource = "r2") {
     const envOverride = process.env.NEXU_COMPONENT_FEED_URL;
     this.baseUrl =
       envOverride ?? (source === "r2" ? R2_BASE_URL : GITHUB_BASE_URL);

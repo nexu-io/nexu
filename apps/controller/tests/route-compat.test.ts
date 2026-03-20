@@ -20,6 +20,7 @@ import { DesktopLocalService } from "../src/services/desktop-local-service.js";
 import { IntegrationService } from "../src/services/integration-service.js";
 import { LocalUserService } from "../src/services/local-user-service.js";
 import { ModelProviderService } from "../src/services/model-provider-service.js";
+import type { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../src/services/runtime-config-service.js";
 import { SessionService } from "../src/services/session-service.js";
@@ -74,6 +75,10 @@ async function createTestContainer(
   const runtimeHealth = new RuntimeHealth(env);
   const openclawProcess = new OpenClawProcessManager(env);
   const runtimeState = createRuntimeState();
+  const gatewayService = {
+    isConnected: () => false,
+    pushConfig: async () => false,
+  } as OpenClawGatewayService;
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -82,6 +87,7 @@ async function createTestContainer(
     skillsWriter,
     templateWriter,
     watchTrigger,
+    gatewayService,
   );
 
   return {
@@ -106,7 +112,17 @@ async function createTestContainer(
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
     openclawSyncService,
+    wsClient: {
+      isConnected: () => false,
+      stop: vi.fn(),
+      request: vi.fn(),
+    } as unknown as ControllerContainer["wsClient"],
+    gatewayService,
     runtimeState,
+    skillhubService: {
+      start: vi.fn(),
+      dispose: vi.fn(),
+    } as unknown as ControllerContainer["skillhubService"],
     startBackgroundLoops: () => () => {},
   };
 }

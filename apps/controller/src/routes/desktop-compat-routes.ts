@@ -14,6 +14,7 @@ const defaultModelResponseSchema = z.object({ modelId: z.string().nullable() });
 const defaultModelSetResponseSchema = z.object({
   ok: z.boolean(),
   modelId: z.string(),
+  configPushed: z.boolean(),
 });
 
 export function registerDesktopCompatRoutes(
@@ -148,10 +149,10 @@ export function registerDesktopCompatRoutes(
     }),
     async (c) => {
       const body = c.req.valid("json");
-      return c.json(
-        await container.desktopLocalService.setDefaultModel(body.modelId),
-        200,
-      );
+      await container.desktopLocalService.setDefaultModel(body.modelId);
+      // Immediately sync so OpenClaw picks up the change
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, modelId: body.modelId, configPushed }, 200);
     },
   );
 }

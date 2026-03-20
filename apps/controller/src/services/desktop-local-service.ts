@@ -22,7 +22,6 @@ export class DesktopLocalService {
   async getDefaultModel() {
     return this.configStore.getDefaultModel();
   }
-
   async setDefaultModel(modelId: string) {
     await this.configStore.setDefaultModel(modelId);
     return { ok: true, modelId };
