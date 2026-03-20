@@ -33,11 +33,13 @@
 
 ## 📋 概述
 
-**nexu**（next to you）是将 **OpenClaw 🦞** Agent 接入飞书、Slack、Discord 等 IM 的开源桌面客户端。
+**nexu**（next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在飞书、Slack、Discord 等 IM 中。
 
-提供图形化配置、内置飞书 Skills、多模型支持与 BYOK。
+下载即用，图形化配置，内置飞书 Skills，支持 Claude / GPT / Gemini 等多模型与自带 API Key。
 
-配置与运行状态主要保存在本机。
+连接 IM 后，Agent 7×24 小时在线——手机上随时对话，不受桌面限制。
+
+所有数据保存在本机，隐私安全，完全可控。
 
 <p align="center">
   <img src="site/media/readme-screenshot.png" width="660" alt="nexu 截图" />
