@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="site/media/nexu-logo.svg" width="120" alt="nexu Logo" />
+  <img src="site/media/readme-hero.png" width="100%" alt="nexu" />
 </p>
 
 <h1 align="center">nexu</h1>
 
 <p align="center">
-  <strong>The Simplest OpenClaw 🦞 Desktop for One Person Company</strong>
+  <strong>最简单的飞书 OpenClaw 🦞 开源桌面客户端</strong>
 </p>
 
 <p align="center">
@@ -28,36 +28,33 @@
 
 ---
 
-## 概述
+## 📋 概述
 
-**nexu**（next to you）让你用最简单的方式拥有一个 OpenClaw 🦞——下载、双击、开始工作。
+**nexu**（next to you）是将 **OpenClaw 🦞** Agent 接入飞书、Slack、Discord 等 IM 的开源桌面客户端（Electron）。
 
-基于开源 OpenClaw 🦞 打造，预装飞书 Skills 等关键能力，内置 Claude、ChatGPT、Minimax、GLM、Kimi 等主流模型，也支持自带 API Key 🔌。
+提供图形化配置、内置飞书 Skills、多模型支持与 BYOK。
 
-连接飞书、Slack 或 Discord，Agent 直达手机端 📱——在你日常用的聊天工具里直接对话。
+配置与运行状态主要保存在本机。
 
-<!-- TODO: 添加产品 Demo GIF / 截图 -->
-
----
-
-## 为什么选择 nexu
-
-很多开源 Agent 工具在让用户看到价值之前，先要面对冗长安装和零散配置。我们认为第一体验应该反过来。
-
-| 常见问题 | nexu |
-|----------|------|
-| 😩 复杂的 CLI / 环境配置 | ✅ 双击安装，无需终端 |
-| 🧩 技能与集成东拼西凑 | ✅ 内置 OpenClaw 🦞 + 完整飞书 Skills，开箱即用 |
-| 🔧 模型与 API Key 配置 | ✅ nexu 账号直连顶级模型，或自带 API Key |
-| 🎭 Agent 只能"演示" | ✅ 面向真实团队工作流的桌面客户端 |
-| 🚪 必须注册才能用 | ✅ 自带 API Key 即可使用，零注册零登录 |
-| 📵 只能桌面用，手机没法用 | ✅ 连接 IM 频道，手机上随时使用 Agent |
-
-> 开源不应该意味着更难用，而应该意味着更多自由、更多信任、更高的团队杠杆。
+<p align="center">
+  <img src="site/media/readme-screenshot.png" width="660" alt="nexu 截图" />
+</p>
 
 ---
 
-## 核心特性
+## 📊 与常见托管方案的区别
+
+| | 典型托管飞书龙虾方案 | nexu |
+|---|---|---|
+| **🧠 模型** | 常由平台指定或受限 | 自选 Claude / GPT / Gemini 等，可切换 |
+| **📡 数据路径** | 多经第三方服务 | 以本机为主，不依赖我们托管你的业务数据 |
+| **💰 费用** | 订阅 / 按席 | 客户端免费；推理按你自备的 API Key 计费 |
+| **📜 源码** | 闭源 | MIT，可 fork、可审计 |
+| **🔗 渠道** | 视产品而定 | 飞书、Slack、Discord；其他渠道在迭代中 |
+
+---
+
+## 功能要点
 
 ### 🖱 双击安装
 
@@ -82,29 +79,6 @@
 ### 👥 为团队而生
 
 核心开源，同时提供真正可用的桌面体验，兼容团队已有的工具与模型栈。
-
----
-
-## 🚀 快速开始
-
-### 系统要求
-
-- 🍎 **系统**: macOS 12+（Apple Silicon）
-- 💾 **磁盘**: 约 500 MB
-
-### 安装
-
-**推荐：直接下载 Mac 客户端**
-
-1. 打开 [官网](https://nexu.io) 或 [Releases](https://github.com/nexu-io/nexu/releases) 📥
-2. 下载 Mac 安装包
-3. 启动 nexu 🎉
-
-> ⏳ **Windows 与 macOS Intel**：开发中。如需进展可邮件 [support@nexu.ai](mailto:support@nexu.ai)。
-
-### 首次启动
-
-使用 nexu 账号登录，立即使用已支持的模型；也可添加自带 API Key，无需账号即可使用 🔑。
 
 ---
 
@@ -150,54 +124,59 @@ nexu 面向 **One Person Company** 与小团队，让一个人就能拥有一支
 
 ---
 
+## 🚀 快速开始
+
+### 系统要求
+
+- 🍎 **系统**：macOS 12+（Apple Silicon）
+- 💾 **磁盘**：约 500 MB
+
+### 安装
+
+**推荐：直接下载 Mac 客户端**
+
+1. 打开 [官网](https://nexu.io) 或 [Releases](https://github.com/nexu-io/nexu/releases) 📥
+2. 下载 Mac 安装包
+3. 启动 nexu 🎉
+
+> ⏳ **Windows 与 macOS Intel**：开发中。如需进展可邮件 [support@nexu.ai](mailto:support@nexu.ai)。
+
+### 首次启动
+
+使用 nexu 账号登录，立即使用已支持的模型；也可添加自带 API Key，无需账号即可使用 🔑。
+
+---
+
 ## 🛠 开发
 
 ### 前置条件
 
 - **Node.js** 22+（推荐 LTS）
-- **包管理器**: pnpm 10+
+- **pnpm** 10+
 
-### 项目结构
+### 项目结构（节选）
 
 ```
 nexu/
 ├── apps/
-│   ├── api/              # 后端 API 服务
+│   ├── api/              # 后端 API
 │   ├── web/              # Web 前端
-│   ├── landing/          # 落地页
-│   ├── desktop/          # Mac 桌面客户端（Electron）
-│   ├── gateway/          # 网关服务
-│   └── router/           # 路由服务
-├── packages/
-│   └── shared/           # 共享库
-├── openclaw-runtime/     # OpenClaw 核心运行时
-├── skills/               # 内置 Skills（本地开发 & Bot）
-├── nexu-skills/          # nexu Skill 定义
-├── deploy/               # 部署配置（Helm、K8s、Nginx）
-├── docs/                 # 文档 & 设计文档
-├── tests/                # 集成测试 & 契约测试
-├── experiments/          # 实验脚本
-└── specs/                # 规格说明
-```
-
-### 从源码运行
-
-```bash
-git clone https://github.com/nexu-io/nexu.git
-cd nexu
-pnpm install
-pnpm run dev
+│   ├── desktop/          # 桌面客户端（Electron）
+│   └── controller/       # 控制器
+├── packages/shared/      # 共享库
+├── docs/                 # 文档
+├── tests/
+└── specs/
 ```
 
 ### 常用命令
 
 ```bash
-pnpm run dev             # 启动 API + Web + Landing（热重载）
-pnpm run dev:desktop     # 启动桌面客户端
-pnpm run dev:sidecar     # 启动网关 Sidecar
-pnpm run build           # 生产构建（所有包）
-pnpm run lint            # 运行 Linter（Biome + 类型检查）
-pnpm test                # 运行测试（Vitest）
+pnpm run dev             # 开发环境（热重载）
+pnpm run dev:desktop     # 桌面客户端
+pnpm run build           # 生产构建
+pnpm run lint
+pnpm test
 ```
 
 ---
@@ -221,17 +200,6 @@ pnpm test                # 运行测试（Vitest）
 
 ---
 
-## 🙏 致谢
-
-nexu 基于以下优秀开源项目构建：
-
-- [OpenClaw 🦞](https://github.com/nexu-io/nexu) — AI Agent 运行时
-- [Electron](https://www.electronjs.org/) — 跨平台桌面框架
-- [React](https://react.dev/) — UI 组件库
-- [Tailwind CSS](https://tailwindcss.com/) — 实用优先的 CSS 框架
-
----
-
 ## 💬 社区
 
 | 飞书群 | Discord |
@@ -239,9 +207,9 @@ nexu 基于以下优秀开源项目构建：
 | <img src="site/media/feishu-qr.png" width="200" /> | <img src="site/media/discord-qr.png" width="200" /> |
 | [加入飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [加入 Discord](https://discord.gg/nexu) |
 
-- 💡 [GitHub Discussions](https://github.com/nexu-io/nexu/discussions) — 提问与讨论
-- 🐛 [GitHub Issues](https://github.com/nexu-io/nexu/issues) — Bug 反馈与功能建议
-- 📧 邮件：[support@nexu.ai](mailto:support@nexu.ai)
+- [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
+- [GitHub Issues](https://github.com/nexu-io/nexu/issues)
+- [support@nexu.ai](mailto:support@nexu.ai)
 
 ### Contributors
 
@@ -265,7 +233,7 @@ nexu 基于以下优秀开源项目构建：
 
 ## 📄 许可证
 
-本项目采用 [MIT License](LICENSE) 开源。
+[MIT License](LICENSE)
 
 ---
 

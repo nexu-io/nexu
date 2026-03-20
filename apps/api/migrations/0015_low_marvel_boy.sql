@@ -1,1 +1,0 @@
-ALTER TABLE "bots" ALTER COLUMN "model_id" SET DEFAULT 'link/claude-sonnet-4-5';

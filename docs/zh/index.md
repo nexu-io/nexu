@@ -1,10 +1,10 @@
 # 介绍
 
-**nexu**（next to you）让你用最简单的方式拥有一个 OpenClaw 🦞——下载、双击、开始工作。
+**nexu**（next to you）是将 **OpenClaw 🦞** Agent 接入飞书、Slack、Discord 等 IM 的开源桌面客户端（Electron）。
 
-基于开源 OpenClaw 🦞 打造，预装飞书 Skills 等关键能力，内置 Claude、ChatGPT、Minimax、GLM、Kimi 等主流模型，也支持自带 API Key 🔌。
+提供图形化配置、内置飞书 Skills、多模型支持与 BYOK。
 
-连接飞书、Slack 或 Discord，Agent 直达手机端 📱——在你日常用的聊天工具里直接对话。
+配置与运行状态主要保存在本机。
 
 ![nexu 客户端](/assets/nexu-home.webp)
 

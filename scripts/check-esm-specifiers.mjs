@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
 
 const repoRoot = process.cwd();
-const targets = ["apps/api/dist", "apps/gateway/dist"];
+const targets = ["apps/controller/dist"];
 const allowedExtensions = new Set([".js", ".mjs", ".cjs", ".json", ".node"]);
 const jsFileExtensions = new Set([".js", ".mjs", ".cjs"]);
 

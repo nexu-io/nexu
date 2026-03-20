@@ -254,7 +254,7 @@ rm -f "$HOME/Library/Application Support/@nexu/desktop/runtime/openclaw/state/bu
 **Step 2: Build and launch desktop**
 
 ```bash
-pnpm desktop:dist:mac:unsigned
+pnpm dist:mac:unsigned
 ```
 
 Open the DMG and launch Nexu.app.

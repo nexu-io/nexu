@@ -63,7 +63,7 @@ This section covers the build/package side of the Sentry pipeline, including bot
 Local verification usually follows this path:
 
 ```bash
-pnpm desktop:restart
+pnpm restart
 pnpm --filter @nexu/desktop build
 pnpm --filter @nexu/desktop upload:sourcemaps
 ```
@@ -340,7 +340,7 @@ Native crash behavior is different:
 - renderer native crashes may appear very quickly, but still come through the minidump pipeline
 - main process native crashes are typically uploaded on the next app start, when `@sentry/electron/main` scans and submits the minidump left by the prior crashed run
 
-This means a deliberate main-process crash may not create or update its Sentry issue until the next `pnpm desktop:restart` or next manual app launch.
+This means a deliberate main-process crash may not create or update its Sentry issue until the next `pnpm restart` or next manual app launch.
 
 Because upload can happen after restart, the most important fields for correlation are:
 

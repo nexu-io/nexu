@@ -35,12 +35,11 @@ Map changed areas to the docs they affect:
 
 | Changed area | Affected docs |
 |---|---|
-| `apps/api/src/db/schema/` | `specs/generated/db-schema.md`, `ARCHITECTURE.md` |
-| `apps/api/src/routes/` | `specs/references/api-patterns.md`, `ARCHITECTURE.md`, `specs/product-specs/*.md` (if route is user-facing) |
+| `apps/controller/src/routes/` | `specs/references/api-patterns.md`, `ARCHITECTURE.md`, `specs/product-specs/*.md` (if route is user-facing) |
 | `apps/web/src/pages/` or `apps/web/src/app.tsx` | `specs/FRONTEND.md` |
 | `apps/router/src/` | `specs/FRONTEND.md` (proxy routing), `ARCHITECTURE.md` |
 | `apps/landing/` | `ARCHITECTURE.md` (Monorepo layout) |
-| `apps/gateway/src/` | `ARCHITECTURE.md`, `specs/RELIABILITY.md` |
+| `apps/controller/src/runtime/` | `ARCHITECTURE.md`, `specs/RELIABILITY.md` |
 | `packages/shared/src/schemas/` | `ARCHITECTURE.md` (Type safety) |
 | `package.json` scripts | `CLAUDE.md` + `AGENTS.md` Commands sections |
 | New apps/packages dirs | `ARCHITECTURE.md` (Monorepo layout) |
@@ -84,7 +83,7 @@ When the user specifies a scope keyword, limit the check to that area:
 
 1. **Never remove forward-looking documentation** — ask if uncertain whether content is aspirational or stale.
 2. **Preserve original language** (English/Chinese) and writing style of existing docs.
-3. **Regenerate `specs/generated/db-schema.md` fully** from schema source (`apps/api/src/db/schema/index.ts`), don't patch.
+3. For backend API updates, treat `apps/controller` as the source of truth; do not reference removed legacy package paths.
 4. **Always verify `CLAUDE.md` <-> `AGENTS.md` consistency** after any update to either file.
 5. **Do NOT auto-commit** — present the diff summary and let the user decide when to commit.
 

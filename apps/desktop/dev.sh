@@ -47,7 +47,7 @@ Resolved values:
 
 Try:
 1. Run from the Nexu repo checkout root
-2. Start with: pnpm desktop:start
+2. Start with: pnpm start
 3. If launching manually, export both env vars before starting Electron
 EOF
     exit 1

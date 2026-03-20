@@ -106,11 +106,11 @@ Expected: PASS
 
 ---
 
-### Task 4: Build and verify with desktop:start
+### Task 4: Build and verify with start
 
 **Step 1: Start desktop**
 
-Run: `pnpm desktop:start`
+Run: `pnpm start`
 
 **Step 2: Check logs for npm dep installation**
 
@@ -124,7 +124,7 @@ Expected: directories like `imap/`, `nodemailer/`, etc.
 
 **Step 4: Stop desktop**
 
-Run: `pnpm desktop:stop`
+Run: `pnpm stop`
 
 ---
 

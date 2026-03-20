@@ -49,7 +49,7 @@ function createCheckContext(mode) {
 
     return {
       mode,
-      statusCommand: ["pnpm", ["desktop:status"]],
+      statusCommand: ["pnpm", ["status"]],
       ports: [
         { unit: "controller", port: 50800 },
         { unit: "web", port: 50810 },
