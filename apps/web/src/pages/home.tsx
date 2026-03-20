@@ -185,6 +185,12 @@ function getChannelStatusMeta(
 export function HomePage() {
   const { t } = useTranslation();
   const { stars } = useGitHubStars();
+  const isDesktopClient = useMemo(
+    () =>
+      typeof navigator !== "undefined" &&
+      navigator.userAgent.includes("Electron"),
+    [],
+  );
   const [modalChannel, setModalChannel] = useState<
     "feishu" | "slack" | "discord" | null
   >(null);
@@ -592,7 +598,10 @@ export function HomePage() {
      ══════════════════════════════════════════════════════════════════════ */
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <div
+        className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 sm:pb-8 space-y-6"
+        style={{ paddingTop: isDesktopClient ? "2rem" : "1.5rem" }}
+      >
         {/* ═══ TOP: Hero — Bot running (horizontal layout) ═══ */}
         <div className="flex items-center gap-4">
           <div

@@ -193,9 +193,9 @@ body,
 .window-drag-bar {
   position: fixed;
   top: 0;
-  left: 112px; /* Leave space for traffic lights + sidebar toggle */
-  width: 240px;
-  height: 30px;
+  left: 100px; /* Leave space for traffic lights + sidebar toggle */
+  right: 0;
+  height: 38px;
   z-index: 9999;
   -webkit-app-region: drag;
 }

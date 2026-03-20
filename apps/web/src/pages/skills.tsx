@@ -171,6 +171,12 @@ function SkillCard({
 export function SkillsPage() {
   const { t } = useTranslation();
   const { stars } = useGitHubStars();
+  const isDesktopClient = useMemo(
+    () =>
+      typeof navigator !== "undefined" &&
+      navigator.userAgent.includes("Electron"),
+    [],
+  );
   const { locale } = useLocale();
   const { data, isLoading, isError } = useCommunitySkills();
   const refreshMutation = useRefreshCatalog();
@@ -380,7 +386,10 @@ export function SkillsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
+      <div
+        className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 sm:pb-8"
+        style={{ paddingTop: isDesktopClient ? "2rem" : "0.5rem" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-10">
           <div>

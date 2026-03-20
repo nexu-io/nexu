@@ -769,6 +769,12 @@ function _CurrentModelSelector({
 export function ModelsPage() {
   const { t } = useTranslation();
   const { stars } = useGitHubStars();
+  const isDesktopClient = useMemo(
+    () =>
+      typeof navigator !== "undefined" &&
+      navigator.userAgent.includes("Electron"),
+    [],
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const tabParam = searchParams.get("tab");
@@ -951,7 +957,10 @@ export function ModelsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-2 pb-6 sm:pb-8">
+      <div
+        className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 sm:pb-8"
+        style={{ paddingTop: isDesktopClient ? "2rem" : "0.5rem" }}
+      >
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="heading-page">{t("models.pageTitle")}</h2>
