@@ -16,6 +16,10 @@ on:
         required: false
         type: string
         default: "null"
+      sentry_env:
+        description: "NEXU_SENTRY_ENV value (test, prod)"
+        required: true
+        type: string
       release_tag:
         description: "GitHub release tag name"
         required: true
@@ -128,25 +132,26 @@ jobs:
         env:
           CLOUD_URL: ${{ inputs.cloud_url }}
           LINK_URL: ${{ inputs.link_url }}
+          SENTRY_ENV: ${{ inputs.sentry_env }}
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
           BUILD_SOURCE: ${{ inputs.build_source }}
           BUILD_BRANCH: ${{ github.ref_name }}
           BUILD_COMMIT: ${{ github.sha }}
           SENTRY_DSN_TEST: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_TEST }}
           SENTRY_DSN_PROD: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_PROD }}
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
           export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
             const { version } = require("./apps/desktop/package.json");
             const sentryDsnByEnvironment = {
-              "nexu-test": process.env.SENTRY_DSN_TEST,
-              "nexu-prod": process.env.SENTRY_DSN_PROD,
+              test: process.env.SENTRY_DSN_TEST,
+              prod: process.env.SENTRY_DSN_PROD,
             };
-            const sentryDsn = sentryDsnByEnvironment[process.env.TARGET_ENVIRONMENT] ?? "";
+            const sentryDsn = sentryDsnByEnvironment[process.env.SENTRY_ENV] ?? "";
             const config = {
               NEXU_CLOUD_URL: process.env.CLOUD_URL,
               NEXU_LINK_URL: process.env.LINK_URL === "null" ? null : process.env.LINK_URL,
+              NEXU_SENTRY_ENV: process.env.SENTRY_ENV,
               NEXU_DESKTOP_APP_VERSION: version,
               NEXU_DESKTOP_BUILD_SOURCE: process.env.BUILD_SOURCE,
               NEXU_DESKTOP_BUILD_BRANCH: process.env.BUILD_BRANCH,

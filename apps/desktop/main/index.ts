@@ -7,6 +7,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  nativeTheme,
   powerMonitor,
   powerSaveBlocker,
   session,
@@ -41,6 +42,7 @@ const __dirname = dirname(__filename);
 
 // Set display name early (matches productName in package.json).
 app.setName("Nexu");
+nativeTheme.themeSource = "light";
 
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
@@ -71,6 +73,14 @@ const orchestrator = new RuntimeOrchestrator(
 app.commandLine.appendSwitch("disable-popup-blocking");
 
 const sentryDsn = runtimeConfig.sentryDsn;
+const embeddedWorkspaceTransparentCss = `
+  html,
+  body,
+  #root {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+`;
 
 function readNativeCrashTestTitle(event: Sentry.Event): string | null {
   const taggedTitle =
@@ -471,15 +481,23 @@ app.on("second-instance", () => {
 
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
+  const isMacOS = process.platform === "darwin";
   const window = new BrowserWindow({
     width: 1400,
     height: 920,
     minWidth: 1120,
     minHeight: 760,
-    backgroundColor: "#0B1020",
+    backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "Nexu",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
+    ...(isMacOS
+      ? {
+          transparent: true,
+          vibrancy: "sidebar" as const,
+          visualEffectState: "followWindow" as const,
+        }
+      : {}),
     show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -492,6 +510,11 @@ function createMainWindow(): BrowserWindow {
 
   // Per-webContents handler is set globally via app.on('web-contents-created')
   // so we don't need one here on the main window.
+
+  if (isMacOS) {
+    window.setBackgroundColor("#00000000");
+    window.setVibrancy("sidebar");
+  }
 
   window.webContents.on(
     "console-message",
@@ -555,6 +578,10 @@ function createMainWindow(): BrowserWindow {
 
   window.once("ready-to-show", () => {
     logLaunchTimeline("main window ready-to-show");
+    if (isMacOS) {
+      window.setBackgroundColor("#00000000");
+      window.setVibrancy("sidebar");
+    }
     window.show();
     focusMainWindow();
   });
@@ -611,6 +638,21 @@ app.on("web-contents-created", (_event, contents) => {
 
   contents.on("did-finish-load", () => {
     const url = contents.getURL();
+    if (url.startsWith(runtimeConfig.urls.web)) {
+      void contents
+        .insertCSS(embeddedWorkspaceTransparentCss)
+        .catch((error) => {
+          writeDesktopMainLog({
+            source: `embedded:${contentType}:transparent-css`,
+            stream: "stderr",
+            kind: "app",
+            message: `failed to inject transparent workspace CSS url=${url} error=${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            logFilePath: null,
+          });
+        });
+    }
     diagnosticsReporter?.recordEmbeddedDidFinishLoad({
       id: contents.id,
       type: contentType,

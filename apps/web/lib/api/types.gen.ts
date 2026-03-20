@@ -418,6 +418,7 @@ export type GetApiInternalDesktopReadyResponses = {
      */
     200: {
         ready: boolean;
+        workspacePath: string;
         runtime: {
             ok: boolean;
             status: number;

@@ -1000,6 +1000,9 @@
                     "ready": {
                       "type": "boolean"
                     },
+                    "workspacePath": {
+                      "type": "string"
+                    },
                     "runtime": {
                       "type": "object",
                       "properties": {
@@ -1027,6 +1030,7 @@
                   },
                   "required": [
                     "ready",
+                    "workspacePath",
                     "runtime",
                     "status"
                   ]

@@ -1,9 +1,11 @@
 import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
+import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
+import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Cable, Star } from "lucide-react";
+import { ArrowUpRight, Cable } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -98,9 +100,6 @@ const FEISHU_ICON = (
     style={{ objectFit: "contain" }}
   />
 );
-
-const GITHUB_URL = "https://github.com/nexu-io/nexu";
-
 const ONBOARDING_CHANNELS = [
   {
     id: "feishu",
@@ -185,6 +184,7 @@ function getChannelStatusMeta(
 
 export function HomePage() {
   const { t } = useTranslation();
+  const { stars } = useGitHubStars();
   const [modalChannel, setModalChannel] = useState<
     "feishu" | "slack" | "discord" | null
   >(null);
@@ -633,18 +633,12 @@ export function HomePage() {
                 />
                 {runtimeDisplay.label}
               </span>
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex items-center gap-1.5 ml-2 px-2.5 py-1 rounded-full border border-border bg-surface-0 hover:bg-surface-1 hover:border-border-hover transition-all text-[11px] font-medium text-text-secondary hover:text-text-primary"
-              >
-                <Star
-                  size={12}
-                  className="text-amber-400 group-hover:fill-amber-400 transition-colors"
-                />
-                <span>Star us on GitHub</span>
-              </a>
+              <GitHubStarCta
+                label={t("home.starGithub")}
+                stars={stars}
+                variant="inline"
+                className="ml-auto shrink-0"
+              />
             </div>
             <div className="flex items-center gap-2 mt-1.5">
               <InlineModelSelector />
@@ -795,6 +789,14 @@ export function HomePage() {
 
         {/* Activity Feed */}
         <ActivityFeed />
+
+        <GitHubStarCta
+          label={t("home.starNexu")}
+          description={t("home.starCta")}
+          badgeLabel="GitHub"
+          stars={stars}
+          variant="banner"
+        />
       </div>
 
       {modalChannel && (

@@ -184,6 +184,126 @@ const GitHubIcon = () => (
   </svg>
 );
 
+interface UpdateFloatCardProps {
+  phase: ReturnType<typeof useAutoUpdate>["phase"];
+  version: string | null;
+  percent: number;
+  onDownload: () => void;
+  onInstall: () => void;
+  onDismiss: () => void;
+  t: (key: string, options?: Record<string, string>) => string;
+  desktopOffsetLeft: number;
+  desktopOffsetBottom: number;
+  width: number;
+}
+
+function UpdateFloatCard({
+  phase,
+  version,
+  percent,
+  onDownload,
+  onInstall,
+  onDismiss,
+  t,
+  desktopOffsetLeft,
+  desktopOffsetBottom,
+  width,
+}: UpdateFloatCardProps) {
+  const updating = phase === "downloading";
+  const downloadProgress = Math.round(percent);
+
+  if (phase !== "available" && phase !== "downloading" && phase !== "ready") {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed z-50 rounded-[14px] border border-border bg-surface-0/88 px-3.5 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.16)] backdrop-blur-md animate-float"
+      style={
+        {
+          left: desktopOffsetLeft,
+          bottom: desktopOffsetBottom,
+          width,
+          WebkitAppRegion: "no-drag",
+        } as React.CSSProperties
+      }
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="relative mt-0.5 flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--color-success)]" />
+            </span>
+            <span className="text-[12px] font-medium text-text-primary">
+              {updating
+                ? t("layout.update.downloading")
+                : phase === "ready"
+                  ? t("layout.update.readyToInstall")
+                  : t("layout.update.available", {
+                      version: version ?? "",
+                    })}
+            </span>
+          </div>
+        </div>
+        {!updating && phase !== "ready" && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-text-muted hover:text-text-primary transition-colors -mr-1"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+      {updating && (
+        <div className="flex items-center justify-between mt-3 mb-1">
+          <span className="text-[10px] tabular-nums text-text-muted">
+            {downloadProgress}%
+          </span>
+        </div>
+      )}
+      {updating ? (
+        <div>
+          <div className="h-[6px] w-full rounded-full bg-border overflow-hidden">
+            <div
+              className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
+              style={{ width: `${downloadProgress}%` }}
+            />
+          </div>
+        </div>
+      ) : phase === "ready" ? (
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            type="button"
+            onClick={onInstall}
+            className="rounded-[6px] px-2.5 py-1 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
+          >
+            {t("layout.update.install")}
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            type="button"
+            onClick={onDownload}
+            className="rounded-[6px] px-2.5 py-1 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
+          >
+            {t("layout.update.download")}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="rounded-[6px] px-2 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary transition-colors"
+          >
+            {t("layout.update.later")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WorkspaceLayout() {
   if (localStorage.getItem(SETUP_COMPLETE_KEY) !== "1") {
     return <Navigate to="/" replace />;
@@ -194,6 +314,7 @@ export function WorkspaceLayout() {
 
 function WorkspaceLayoutInner() {
   const { t } = useTranslation();
+  const { locale, setLocale } = useLocale();
   const isDesktopClient = useMemo(
     () =>
       typeof navigator !== "undefined" &&
@@ -204,14 +325,13 @@ function WorkspaceLayoutInner() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
   const update = useAutoUpdate();
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const hasUpdate =
     update.phase === "available" ||
     update.phase === "downloading" ||
     update.phase === "ready";
-  const updating = update.phase === "downloading";
-  const downloadProgress = Math.round(update.percent);
   const SIDEBAR_MIN = 160;
   const SIDEBAR_MAX = 320;
   const SIDEBAR_DEFAULT = 192;
@@ -265,6 +385,7 @@ function WorkspaceLayoutInner() {
 
   const logoutRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
@@ -274,6 +395,31 @@ function WorkspaceLayoutInner() {
   useEffect(() => {
     track("workspace_view");
   }, []);
+
+  useEffect(() => {
+    if (!isDesktopClient) {
+      return;
+    }
+
+    const root = document.getElementById("root");
+    const previousHtmlBackground =
+      document.documentElement.style.backgroundColor;
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousRootBackground = root?.style.backgroundColor ?? "";
+    document.documentElement.style.backgroundColor = "transparent";
+    document.body.style.backgroundColor = "transparent";
+    if (root) {
+      root.style.backgroundColor = "transparent";
+    }
+
+    return () => {
+      document.documentElement.style.backgroundColor = previousHtmlBackground;
+      document.body.style.backgroundColor = previousBodyBackground;
+      if (root) {
+        root.style.backgroundColor = previousRootBackground;
+      }
+    };
+  }, [isDesktopClient]);
 
   useEffect(() => {
     if (!showLogoutConfirm) return;
@@ -296,6 +442,17 @@ function WorkspaceLayoutInner() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showHelpMenu]);
+
+  useEffect(() => {
+    if (!showLangMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setShowLangMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showLangMenu]);
 
   useEffect(() => {
     if (!mobileDrawerOpen) return;
@@ -371,9 +528,28 @@ function WorkspaceLayoutInner() {
         : selectedSession
           ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
+  const desktopGlassTint = "rgba(255, 255, 255, 0.08)";
+  const updateFloatWidth = Math.max(140, sidebarWidth - 20);
+  const updateFloatLeft = 10;
+  const updateFloatBottom = 52;
 
   return (
     <div className="flex h-screen relative">
+      {isDesktopClient && hasUpdate && !updateDismissed && (
+        <UpdateFloatCard
+          phase={update.phase}
+          version={update.version}
+          percent={update.percent}
+          onDownload={() => update.download()}
+          onInstall={() => update.install()}
+          onDismiss={() => setUpdateDismissed(true)}
+          t={t}
+          desktopOffsetLeft={updateFloatLeft}
+          desktopOffsetBottom={updateFloatBottom}
+          width={updateFloatWidth}
+        />
+      )}
+
       {/* Fixed sidebar toggle — next to traffic lights (desktop client only) */}
       {isDesktopClient && (
         <button
@@ -401,7 +577,7 @@ function WorkspaceLayoutInner() {
             ...(!collapsed ? { width: sidebarWidth } : {}),
             transition: isResizing.current ? "none" : "width 200ms",
             WebkitAppRegion: "drag",
-            background: "transparent",
+            background: isDesktopClient ? desktopGlassTint : "transparent",
           } as React.CSSProperties
         }
       >
@@ -564,153 +740,128 @@ function WorkspaceLayoutInner() {
           </div>
         </div>
 
-        {/* Update banner */}
-        {hasUpdate && !updateDismissed && (
-          <div
-            className="mx-3 mb-2 px-3 py-2.5 rounded-[10px] border border-border bg-surface-0/80 backdrop-blur-sm shrink-0 animate-float"
-            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-success)] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--color-success)]" />
-                </span>
-                <span className="text-[12px] font-medium text-text-primary whitespace-nowrap">
-                  {updating
-                    ? t("layout.update.downloading")
-                    : update.phase === "ready"
-                      ? t("layout.update.readyToInstall")
-                      : t("layout.update.available", {
-                          version: update.version ?? "",
-                        })}
-                </span>
-              </div>
-              {!updating && update.phase !== "ready" && (
-                <button
-                  type="button"
-                  onClick={() => setUpdateDismissed(true)}
-                  className="text-text-muted hover:text-text-primary transition-colors -mr-1"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            {updating && (
-              <div className="flex items-center justify-between pl-4 mb-1">
-                <span className="text-[10px] tabular-nums text-text-muted">
-                  {downloadProgress}%
-                </span>
-              </div>
-            )}
-            {updating ? (
-              <div className="pl-4 pr-1">
-                <div className="h-[6px] w-full rounded-full bg-border overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
-                    style={{ width: `${downloadProgress}%` }}
-                  />
-                </div>
-              </div>
-            ) : update.phase === "ready" ? (
-              <div className="flex items-center gap-2 pl-4">
-                <button
-                  type="button"
-                  onClick={() => update.install()}
-                  className="rounded-[6px] px-2.5 py-0.5 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
-                >
-                  {t("layout.update.install")}
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 pl-4">
-                <button
-                  type="button"
-                  onClick={() => update.download()}
-                  className="rounded-[6px] px-2.5 py-0.5 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
-                >
-                  {t("layout.update.download")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUpdateDismissed(true)}
-                  className="rounded-[6px] px-2 py-0.5 text-[11px] font-medium text-text-muted hover:text-text-primary transition-colors"
-                >
-                  {t("layout.update.later")}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Icon row — Help & GitHub */}
+        {/* Bottom action row */}
         <div
-          className="px-3 pb-1.5 flex items-center gap-1 shrink-0"
+          className="px-3 pb-1.5 flex items-center justify-between gap-1 shrink-0"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          <div className="relative" ref={helpRef}>
-            {showHelpMenu && (
-              <div className="absolute z-20 bottom-full left-0 mb-2 w-44">
-                <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
-                  <div className="p-1.5">
-                    <a
-                      href="https://docs.nexu.io/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
-                    >
-                      <BookOpen size={14} />
-                      {t("layout.help.docs")}
-                    </a>
-                    <a
-                      href="mailto:hi@nexu.ai"
-                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
-                    >
-                      <Mail size={14} />
-                      {t("layout.help.contact")}
-                    </a>
+          <div className="flex items-center gap-1">
+            <div className="relative" ref={helpRef}>
+              {showHelpMenu && (
+                <div className="absolute z-20 bottom-full left-0 mb-2 w-44">
+                  <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
+                    <div className="p-1.5">
+                      <a
+                        href="https://docs.nexu.io/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                      >
+                        <BookOpen size={14} />
+                        {t("layout.help.docs")}
+                      </a>
+                      <a
+                        href="mailto:hi@nexu.ai"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                      >
+                        <Mail size={14} />
+                        {t("layout.help.contact")}
+                      </a>
+                    </div>
+                    <div className="border-t border-border p-1.5">
+                      <a
+                        href="https://github.com/nexu-io/nexu/releases"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                      >
+                        <ScrollText size={14} />
+                        {t("layout.help.changelog")}
+                      </a>
+                    </div>
                   </div>
-                  <div className="border-t border-border p-1.5">
-                    <a
-                      href="https://github.com/nexu-io/nexu/releases"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowHelpMenu(!showHelpMenu);
+                  setShowLangMenu(false);
+                }}
+                className={cn(
+                  "w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer",
+                  showHelpMenu
+                    ? "text-text-primary bg-black/5"
+                    : "text-text-secondary hover:text-text-primary hover:bg-black/5",
+                )}
+                title={t("layout.help.title")}
+              >
+                <CircleHelp size={16} />
+              </button>
+            </div>
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-black/5 transition-colors"
+              title="GitHub"
+            >
+              <GitHubIcon />
+            </a>
+          </div>
+
+          <div className="relative" ref={langRef}>
+            {showLangMenu && (
+              <div className="absolute z-[60] bottom-full right-0 mb-2 w-28">
+                <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden p-1.5">
+                  {(
+                    [
+                      { value: "en", label: "English" },
+                      { value: "zh", label: "中文" },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setLocale(option.value as Locale);
+                        setShowLangMenu(false);
+                      }}
+                      className={cn(
+                        "flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium transition-all",
+                        locale === option.value
+                          ? "bg-black/5 text-text-primary"
+                          : "text-text-secondary hover:text-text-primary hover:bg-black/5",
+                      )}
                     >
-                      <ScrollText size={14} />
-                      {t("layout.help.changelog")}
-                    </a>
-                  </div>
+                      <span>{option.label}</span>
+                      {locale === option.value && (
+                        <span className="text-[10px] text-text-muted">✓</span>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
             <button
               type="button"
-              onClick={() => setShowHelpMenu(!showHelpMenu)}
+              onClick={() => {
+                setShowLangMenu(!showLangMenu);
+                setShowHelpMenu(false);
+              }}
               className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer",
-                showHelpMenu
+                "h-7 inline-flex items-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors cursor-pointer",
+                showLangMenu
                   ? "text-text-primary bg-black/5"
                   : "text-text-secondary hover:text-text-primary hover:bg-black/5",
               )}
-              title={t("layout.help.title")}
+              title={locale === "en" ? "Switch language" : "切换语言"}
             >
-              <CircleHelp size={16} />
+              <Globe size={14} />
+              <span>{locale === "en" ? "EN" : "中文"}</span>
             </button>
           </div>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-black/5 transition-colors"
-            title="GitHub"
-          >
-            <GitHubIcon />
-          </a>
         </div>
-
-        {/* Language toggle */}
-        <LanguageToggle collapsed={false} />
 
         {/* Account — hidden in desktop client */}
         {!isDesktopClient && (
@@ -997,36 +1148,48 @@ function WorkspaceLayoutInner() {
       )}
 
       {/* Main content — elevated surface with rounded left edge */}
-      <div className="flex-1 overflow-hidden min-w-0 min-h-0 bg-surface-1 rounded-l-[12px] flex flex-col md:pt-8">
-        <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setMobileDrawerOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-2 hover:text-text-primary"
-              aria-label="Open menu"
-            >
-              <Menu size={16} />
-            </button>
-            <div className="min-w-0 flex-1 text-center leading-tight">
-              <div className="text-[13px] font-semibold text-text-primary truncate">
-                {mobileTitle}
-              </div>
-              <div className="text-[10px] text-text-muted truncate mt-0.5">
-                {mobileSubtitle}
-              </div>
-            </div>
-            <div className="w-9" />
-          </div>
-        </div>
-
-        <main className="flex-1 overflow-y-auto min-h-0">
-          {showEmptyState ? (
-            <EmptyState onGoConfig={() => navigate("/workspace/settings")} />
-          ) : (
-            <Outlet />
+      <div className="relative flex-1 min-w-0">
+        {isDesktopClient && (
+          <div
+            className="absolute inset-y-0 left-0 w-4 pointer-events-none"
+            style={{ background: desktopGlassTint }}
+          />
+        )}
+        <div
+          className={cn(
+            "relative flex h-full min-w-0 flex-col bg-surface-1 rounded-l-[12px]",
           )}
-        </main>
+        >
+          <div className="md:hidden sticky top-0 z-30 border-b border-border bg-surface-0/95 backdrop-blur px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+                aria-label="Open menu"
+              >
+                <Menu size={16} />
+              </button>
+              <div className="min-w-0 flex-1 text-center leading-tight">
+                <div className="text-[13px] font-semibold text-text-primary truncate">
+                  {mobileTitle}
+                </div>
+                <div className="text-[10px] text-text-muted truncate mt-0.5">
+                  {mobileSubtitle}
+                </div>
+              </div>
+              <div className="w-9" />
+            </div>
+          </div>
+
+          <main className="flex-1 overflow-y-auto min-h-0">
+            {showEmptyState ? (
+              <EmptyState onGoConfig={() => navigate("/workspace/settings")} />
+            ) : (
+              <Outlet />
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

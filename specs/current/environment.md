@@ -9,12 +9,8 @@ Use this when iterating quickly in development.
 - Restart/start command (from repo root):
 
 ```bash
-pnpm desktop:restart
+pnpm restart
 ```
-
-- Equivalent flow:
-  - `pnpm desktop:start` -> `./apps/desktop/dev.sh start`
-  - `pnpm desktop:restart` -> `./apps/desktop/dev.sh restart`
 
 - Characteristics:
   - Uses tmux session `nexu-desktop`.
@@ -28,7 +24,7 @@ Use this when verifying behavior in a packaged desktop app.
 - Build unsigned local package (from repo root):
 
 ```bash
-pnpm desktop:dist:mac:unsigned
+pnpm dist:mac:unsigned
 ```
 
 - Launch packaged app after build:
