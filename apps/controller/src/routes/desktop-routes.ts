@@ -59,13 +59,24 @@ export function registerDesktopRoutes(
       const resolved = path.resolve(targetPath);
       const allowedRoot = path.resolve(env.openclawStateDir);
 
-      if (!resolved.startsWith(allowedRoot + path.sep) && resolved !== allowedRoot) {
-        return c.json({ ok: false, error: "Path outside allowed directory" }, 403);
+      if (
+        !resolved.startsWith(allowedRoot + path.sep) &&
+        resolved !== allowedRoot
+      ) {
+        return c.json(
+          { ok: false, error: "Path outside allowed directory" },
+          403,
+        );
       }
 
       try {
         await new Promise<void>((resolve, reject) => {
-          const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open";
+          const cmd =
+            process.platform === "darwin"
+              ? "open"
+              : process.platform === "win32"
+                ? "explorer"
+                : "xdg-open";
           execFile(cmd, [resolved], (err) => (err ? reject(err) : resolve()));
         });
         return c.json({ ok: true }, 200);
