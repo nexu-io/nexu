@@ -42,27 +42,6 @@ export const verifyProviderResponseSchema = z.object({
   error: z.string().optional(),
 });
 
-// ── Link Catalog ─────────────────────────────────────────────────
-
-export const linkModelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  externalName: z.string(),
-  inputPrice: z.string().nullable(),
-  outputPrice: z.string().nullable(),
-});
-
-export const linkProviderSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  kind: z.string(),
-  models: z.array(linkModelSchema),
-});
-
-export const linkCatalogResponseSchema = z.object({
-  providers: z.array(linkProviderSchema),
-});
-
 // ── Desktop Cloud ────────────────────────────────────────────────
 
 export const cloudModelSchema = z.object({
@@ -83,6 +62,10 @@ export const cloudStatusResponseSchema = z.object({
 export const cloudConnectResponseSchema = z.object({
   browserUrl: z.string().optional(),
   error: z.string().optional(),
+});
+
+export const cloudRefreshResponseSchema = cloudStatusResponseSchema.extend({
+  configPushed: z.boolean(),
 });
 
 export const cloudDisconnectResponseSchema = z.object({

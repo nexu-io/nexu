@@ -219,7 +219,7 @@ The desktop app must pass `OPENCLAW_SKILLS_DIR` to the API process (not just the
 | `GET /api/v1/skills/{slug}` | Detail from frontmatter |
 | `POST /api/v1/skills/{slug}/install` | Download from GitHub |
 | `DELETE /api/v1/skills/{slug}` | Remove from local skills dir |
-| `PUT /api/internal/skills/{name}` | Kept for backward compat |
+| `PUT /api/internal/skills/{name}` | Removed after SkillHub became the only supported skill management path |
 
 ## 4. Web UI Changes
 

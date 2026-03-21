@@ -1,8 +1,11 @@
+export type SkillSource = "curated" | "managed" | "custom";
+
 export type InstalledSkill = {
   slug: string;
+  source: SkillSource;
   name: string;
   description: string;
-  source: string;
+  installedAt: string | null;
 };
 
 export type SkillhubCatalogData = {

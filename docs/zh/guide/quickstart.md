@@ -4,12 +4,18 @@
 
 下载 [nexu 客户端](https://nexu.io/download)，安装后双击打开。
 
+![nexu 主界面](/assets/nexu-home.webp)
+
 ## 第二步：选择使用方式
 
-nexu 提供两种模式：
+点击左侧导航栏的 **Settings**，选择接入方式：
 
-- **登录账号** — 直接使用 nexu 官方预设的模型，开箱即用
-- **BYOK 模式** — 填入你自己的 API Key，使用自定义模型
+- **登录账号** — 选择 **Nexu Official**，点击 **Sign in to Nexu** 登录，高质量模型立即可用
+- **BYOK 模式** — 选择供应商（Anthropic、OpenAI 等），粘贴 API Key 后点击 **Save**
+
+![选择模型接入方式](/assets/nexu-settings-open.webp)
+
+![Nexu Official — 登录即用](/assets/nexu-models-official.webp)
 
 ## 第三步：配置渠道
 

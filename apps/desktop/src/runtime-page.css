@@ -180,6 +180,10 @@ body,
   display: none;
 }
 
+.desktop-shell.is-immersive {
+  background: transparent;
+}
+
 .desktop-shell.is-immersive .desktop-shell-stage {
   padding: 0;
   background: none;
@@ -201,7 +205,7 @@ body,
   min-height: 0;
   flex: 1;
   border: 0;
-  background: #fff;
+  background: transparent;
   border-radius: 22px;
 }
 
@@ -798,7 +802,8 @@ body,
   border-radius: 9999px;
   background: #3db9ce;
   color: #fff;
-  font-family: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC", "PingFang SC", sans-serif;
+  font-family: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC",
+    "PingFang SC", sans-serif;
   font-size: 10px;
   font-weight: 600;
   line-height: 1.6;
@@ -825,7 +830,8 @@ body,
   background: rgba(250, 250, 250, 0.8);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  font-family: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC", "PingFang SC", sans-serif;
+  font-family: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC",
+    "PingFang SC", sans-serif;
   animation: update-float 3s ease-in-out infinite;
 }
 

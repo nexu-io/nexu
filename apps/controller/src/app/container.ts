@@ -4,7 +4,6 @@ import { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../runtime/openclaw-process.js";
 import { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
 import { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
-import { OpenClawSkillsWriter } from "../runtime/openclaw-skills-writer.js";
 import { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
 import { RuntimeHealth } from "../runtime/runtime-health.js";
@@ -25,7 +24,6 @@ import { OpenClawGatewayService } from "../services/openclaw-gateway-service.js"
 import { OpenClawSyncService } from "../services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../services/runtime-config-service.js";
 import { SessionService } from "../services/session-service.js";
-import { SkillService } from "../services/skill-service.js";
 import { SkillhubService } from "../services/skillhub-service.js";
 import { TemplateService } from "../services/template-service.js";
 import { ArtifactsStore } from "../store/artifacts-store.js";
@@ -41,7 +39,6 @@ export interface ControllerContainer {
   agentService: AgentService;
   channelService: ChannelService;
   sessionService: SessionService;
-  skillService: SkillService;
   runtimeConfigService: RuntimeConfigService;
   modelProviderService: ModelProviderService;
   integrationService: IntegrationService;
@@ -57,14 +54,13 @@ export interface ControllerContainer {
   startBackgroundLoops: () => () => void;
 }
 
-export function createContainer(): ControllerContainer {
+export async function createContainer(): Promise<ControllerContainer> {
   const configStore = new NexuConfigStore(env);
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);
   const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
   const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
-  const skillsWriter = new OpenClawSkillsWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
   const gatewayClient = new GatewayClient(env);
@@ -85,12 +81,11 @@ export function createContainer(): ControllerContainer {
     configWriter,
     runtimePluginWriter,
     runtimeModelWriter,
-    skillsWriter,
     templateWriter,
     watchTrigger,
     gatewayService,
   );
-  const skillhubService = new SkillhubService(env);
+  const skillhubService = await SkillhubService.create(env);
   const modelProviderService = new ModelProviderService(
     configStore,
     env.nodeEnv,
@@ -110,7 +105,6 @@ export function createContainer(): ControllerContainer {
     agentService: new AgentService(configStore, openclawSyncService),
     channelService: new ChannelService(configStore, openclawSyncService),
     sessionService: new SessionService(sessionsRuntime),
-    skillService: new SkillService(configStore, openclawSyncService),
     runtimeConfigService: new RuntimeConfigService(
       configStore,
       openclawSyncService,

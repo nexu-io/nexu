@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
 import {
+  type FSWatcher,
   existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
+  watch,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -24,6 +26,7 @@ import type {
   SkillSource,
   SkillhubCatalogData,
 } from "./types.js";
+import { importSkillZip as extractZip } from "./zip-importer.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,6 +40,8 @@ function resolveClawHubBin(): string {
   const binRel = pkg.bin?.clawhub ?? pkg.bin?.clawdhub ?? "bin/clawdhub.js";
   return resolve(dirname(pkgPath), binRel);
 }
+
+const DEFAULT_DOWNLOAD_COUNT = 1000;
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 
@@ -70,10 +75,13 @@ const CATALOG_DOWNLOAD_URL =
 
 const DAILY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * All skills (curated, managed, custom) live in a single `skillsDir`.
+ * The lowdb ledger (`SkillDb`) is the single source of truth for source categorization.
+ */
 export class CatalogManager {
   private readonly cacheDir: string;
   private readonly skillsDir: string;
-  private readonly curatedSkillsDir: string;
   private readonly db: SkillDb;
   private readonly staticSkillsDir: string;
   private readonly metaPath: string;
@@ -81,12 +89,15 @@ export class CatalogManager {
   private readonly tempCatalogPath: string;
   private readonly log: SkillhubLogFn;
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private skillsWatcher: FSWatcher | null = null;
+  private watchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly WATCH_DEBOUNCE_MS = 2000;
 
   constructor(
     cacheDir: string,
     opts: {
       skillsDir?: string;
-      curatedSkillsDir?: string;
+      curatedSkillsDir?: string; // accepted for backward compat, unused
       staticSkillsDir?: string;
       skillDb: SkillDb;
       log?: SkillhubLogFn;
@@ -94,7 +105,6 @@ export class CatalogManager {
   ) {
     this.cacheDir = cacheDir;
     this.skillsDir = opts.skillsDir ?? "";
-    this.curatedSkillsDir = opts.curatedSkillsDir ?? "";
     this.db = opts.skillDb;
     this.staticSkillsDir = opts.staticSkillsDir ?? "";
     this.metaPath = resolve(this.cacheDir, "meta.json");
@@ -171,22 +181,37 @@ export class CatalogManager {
     }
   }
 
+  /**
+   * Returns the skill catalog. Installed skills come from the DB ledger
+   * (single source of truth), enriched with name/description from SKILL.md on disk.
+   */
   getCatalog(): SkillhubCatalogData {
     const skills = this.readCachedSkills();
     const dbRecords = this.db.getAllInstalled();
 
-    const installedSkills: InstalledSkill[] = dbRecords.map((r) => {
-      const dir =
-        r.source === "curated" ? this.curatedSkillsDir : this.skillsDir;
-      const skillMdPath = resolve(dir, r.slug, "SKILL.md");
-      const { name, description } = this.parseFrontmatter(skillMdPath);
-      return {
-        slug: r.slug,
-        source: r.source,
-        name: name || r.slug,
-        description: description || "",
-      };
-    });
+    const installedSkills: InstalledSkill[] = dbRecords
+      .map((r) => {
+        const skillMdPath = resolve(this.skillsDir, r.slug, "SKILL.md");
+        const { name, description } = this.parseFrontmatter(skillMdPath);
+        return {
+          slug: r.slug,
+          source: r.source,
+          name: name || r.slug,
+          description: description || "",
+          installedAt: r.installedAt,
+        };
+      })
+      .sort((a, b) => {
+        if (a.installedAt && b.installedAt) {
+          const cmp = a.installedAt.localeCompare(b.installedAt);
+          if (cmp !== 0) return cmp;
+        } else if (a.installedAt && !b.installedAt) {
+          return -1;
+        } else if (!a.installedAt && b.installedAt) {
+          return 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
 
     const installedSlugs = installedSkills.map((s) => s.slug);
     const meta = this.readMeta();
@@ -194,6 +219,11 @@ export class CatalogManager {
     return { skills, installedSlugs, installedSkills, meta };
   }
 
+  /**
+   * Install a skill from ClawHub marketplace.
+   * Step A: Download via clawhub into skillsDir
+   * Step B: Record in DB with source "managed"
+   */
   async installSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
     if (!isValidSlug(slug)) {
       this.log("warn", `install rejected slug=${slug} — invalid slug`);
@@ -233,6 +263,12 @@ export class CatalogManager {
     }
   }
 
+  /**
+   * Uninstall a skill.
+   * Step A: Look up source from DB record
+   * Step B: Delete skill folder from skillsDir
+   * Step C: Record uninstall in DB with correct source
+   */
   async uninstallSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
     if (!isValidSlug(slug)) {
       this.log("warn", `uninstall rejected slug=${slug} — invalid slug`);
@@ -241,26 +277,16 @@ export class CatalogManager {
 
     this.log("info", `uninstalling skill slug=${slug}`);
     try {
-      const managedPath = resolveSkillPath(this.skillsDir, slug);
-      const curatedPath = resolveSkillPath(this.curatedSkillsDir, slug);
+      const skillPath = resolveSkillPath(this.skillsDir, slug);
+      if (skillPath && existsSync(skillPath)) {
+        const dbRecords = this.db.getAllInstalled();
+        const record = dbRecords.find((r) => r.slug === slug);
+        const source: SkillSource = record?.source ?? "managed";
 
-      let removed = false;
-
-      if (managedPath && existsSync(managedPath)) {
-        rmSync(managedPath, { recursive: true, force: true });
-        removed = true;
-        this.log("info", `uninstall ok (managed) slug=${slug}`);
-        this.db.recordUninstall(slug, "managed");
-      }
-
-      if (curatedPath && existsSync(curatedPath)) {
-        rmSync(curatedPath, { recursive: true, force: true });
-        removed = true;
-        this.log("info", `uninstall ok (curated) slug=${slug}`);
-        this.db.recordUninstall(slug, "curated");
-      }
-
-      if (!removed) {
+        rmSync(skillPath, { recursive: true, force: true });
+        this.log("info", `uninstall ok (${source}) slug=${slug}`);
+        this.db.recordUninstall(slug, source);
+      } else {
         this.log("warn", `uninstall skip slug=${slug} — dir not found`);
       }
 
@@ -273,11 +299,11 @@ export class CatalogManager {
   }
 
   async installCuratedSkills(): Promise<CuratedInstallResult> {
-    // Step 1: Copy static skills (not on ClawHub) from app bundle
+    // Step 1: Copy static skills (not on ClawHub) from app bundle into skillsDir
     if (this.staticSkillsDir) {
       const { copied } = copyStaticSkills({
         staticDir: this.staticSkillsDir,
-        curatedDir: this.curatedSkillsDir,
+        targetDir: this.skillsDir,
         skillDb: this.db,
       });
       if (copied.length > 0) {
@@ -286,20 +312,19 @@ export class CatalogManager {
       }
     }
 
-    // Step 1b: Record any on-disk curated skills not yet tracked in DB
-    // (handles static skills from a previous run when staticSkillsDir is unset)
-    if (this.curatedSkillsDir && existsSync(this.curatedSkillsDir)) {
+    // Step 1b: Record any on-disk skills in skillsDir not yet tracked in DB
+    if (this.skillsDir && existsSync(this.skillsDir)) {
       const untracked: string[] = [];
       try {
-        for (const entry of readdirSync(this.curatedSkillsDir, {
+        for (const entry of readdirSync(this.skillsDir, {
           withFileTypes: true,
         })) {
           if (
             entry.isDirectory() &&
-            existsSync(
-              resolve(this.curatedSkillsDir, entry.name, "SKILL.md"),
-            ) &&
-            !this.db.isInstalled(entry.name, "curated")
+            existsSync(resolve(this.skillsDir, entry.name, "SKILL.md")) &&
+            !this.db.isInstalled(entry.name, "curated") &&
+            !this.db.isInstalled(entry.name, "managed") &&
+            !this.db.isInstalled(entry.name, "custom")
           ) {
             untracked.push(entry.name);
           }
@@ -316,9 +341,9 @@ export class CatalogManager {
       }
     }
 
-    // Step 2: Install remaining from ClawHub
+    // Step 2: Install remaining curated skills from ClawHub into skillsDir
     const { toInstall, toSkip } = resolveCuratedSkillsToInstall({
-      curatedDir: this.curatedSkillsDir,
+      targetDir: this.skillsDir,
       skillDb: this.db,
     });
 
@@ -339,16 +364,13 @@ export class CatalogManager {
       slug: string,
     ): Promise<{ slug: string; ok: boolean }> => {
       try {
-        this.log(
-          "info",
-          `curated installing: ${slug} -> ${this.curatedSkillsDir}`,
-        );
+        this.log("info", `curated installing: ${slug} -> ${this.skillsDir}`);
         const { stdout, stderr } = await execFileAsync(
           process.execPath,
           [
             clawHubBin,
             "--workdir",
-            this.curatedSkillsDir,
+            this.skillsDir,
             "--dir",
             ".",
             "install",
@@ -368,7 +390,6 @@ export class CatalogManager {
       }
     };
 
-    // Download & extract in parallel batches
     const installed: string[] = [];
     const failed: string[] = [];
 
@@ -386,11 +407,10 @@ export class CatalogManager {
       }
     }
 
-    // Install npm deps in parallel for skills that have package.json
     if (installed.length > 0) {
       await Promise.allSettled(
         installed.map((slug) =>
-          this.installSkillDeps(resolve(this.curatedSkillsDir, slug), slug),
+          this.installSkillDeps(resolve(this.skillsDir, slug), slug),
         ),
       );
     }
@@ -402,84 +422,85 @@ export class CatalogManager {
     return { installed, skipped: toSkip, failed };
   }
 
+  async importSkillZip(
+    zipBuffer: Buffer,
+  ): Promise<{ ok: boolean; slug?: string; error?: string }> {
+    this.log("info", "importing custom skill from zip");
+    const result = extractZip(zipBuffer, this.skillsDir);
+    if (result.ok && result.slug) {
+      this.db.recordInstall(result.slug, "custom");
+      this.log("info", `custom skill imported: ${result.slug}`);
+      await this.installSkillDeps(
+        resolve(this.skillsDir, result.slug),
+        result.slug,
+      );
+    } else {
+      this.log("error", `custom skill import failed: ${result.error}`);
+    }
+    return result;
+  }
+
   /**
-   * Two-way sync between the DB ledger and what's actually on disk.
-   * - DB records with missing SKILL.md → mark uninstalled
-   * - Skill dirs on disk with no DB record → record as installed
+   * One-way sync: scan skillsDir for skills not tracked in DB and record them.
+   * Also marks DB records as uninstalled if the skill folder is missing.
    */
   reconcileDbWithDisk(): void {
+    if (!this.skillsDir || !existsSync(this.skillsDir)) return;
+
+    // Clean up known junk that confuses clawhub CLI
+    for (const junk of [".clawhub", "skills"]) {
+      const junkPath = resolve(this.skillsDir, junk);
+      if (existsSync(junkPath)) {
+        const hasSkillMd = existsSync(resolve(junkPath, "SKILL.md"));
+        if (!hasSkillMd) {
+          rmSync(junkPath, { recursive: true, force: true });
+          this.log("info", `reconcile: removed junk directory ${junk}`);
+        }
+      }
+    }
+
     const dbRecords = this.db.getAllInstalled();
 
-    // DB → disk: check each installed record has a SKILL.md on disk
+    // DB → disk: mark uninstalled if SKILL.md missing
     const missingFromDisk: Array<{ slug: string; source: SkillSource }> = [];
     for (const record of dbRecords) {
-      const dir =
-        record.source === "curated" ? this.curatedSkillsDir : this.skillsDir;
-      if (!dir) continue;
-      const skillMd = resolve(dir, record.slug, "SKILL.md");
+      const skillMd = resolve(this.skillsDir, record.slug, "SKILL.md");
       if (!existsSync(skillMd)) {
         missingFromDisk.push({ slug: record.slug, source: record.source });
       }
     }
 
+    for (const { slug, source } of missingFromDisk) {
+      this.db.markUninstalledBySlugs([slug], source);
+    }
     if (missingFromDisk.length > 0) {
-      const curatedMissing = missingFromDisk
-        .filter((r) => r.source === "curated")
-        .map((r) => r.slug);
-      const managedMissing = missingFromDisk
-        .filter((r) => r.source === "managed")
-        .map((r) => r.slug);
-
-      if (curatedMissing.length > 0) {
-        this.db.markUninstalledBySlugs(curatedMissing, "curated");
-      }
-      if (managedMissing.length > 0) {
-        this.db.markUninstalledBySlugs(managedMissing, "managed");
-      }
       this.log(
         "info",
         `reconcile: ${missingFromDisk.length} DB records marked uninstalled (missing from disk)`,
       );
     }
 
-    // Disk → DB: scan both dirs for skills not in DB
-    const diskOnly: Array<{ slug: string; source: SkillSource }> = [];
+    // Disk → DB: record untracked skills as "managed"
+    const trackedSlugs = new Set(this.db.getAllInstalled().map((r) => r.slug));
+    const diskOnly: string[] = [];
 
-    for (const { dir, source } of [
-      { dir: this.curatedSkillsDir, source: "curated" as const },
-      { dir: this.skillsDir, source: "managed" as const },
-    ]) {
-      if (!dir || !existsSync(dir)) continue;
-      try {
-        const entries = readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (
-            entry.isDirectory() &&
-            existsSync(resolve(dir, entry.name, "SKILL.md")) &&
-            !this.db.isInstalled(entry.name, source)
-          ) {
-            diskOnly.push({ slug: entry.name, source });
-          }
+    try {
+      const entries = readdirSync(this.skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (
+          entry.isDirectory() &&
+          existsSync(resolve(this.skillsDir, entry.name, "SKILL.md")) &&
+          !trackedSlugs.has(entry.name)
+        ) {
+          diskOnly.push(entry.name);
         }
-      } catch {
-        // Directory not readable — skip
       }
+    } catch {
+      // Directory not readable — skip
     }
 
     if (diskOnly.length > 0) {
-      const curatedOnDisk = diskOnly
-        .filter((r) => r.source === "curated")
-        .map((r) => r.slug);
-      const managedOnDisk = diskOnly
-        .filter((r) => r.source === "managed")
-        .map((r) => r.slug);
-
-      if (curatedOnDisk.length > 0) {
-        this.db.recordBulkInstall(curatedOnDisk, "curated");
-      }
-      if (managedOnDisk.length > 0) {
-        this.db.recordBulkInstall(managedOnDisk, "managed");
-      }
+      this.db.recordBulkInstall(diskOnly, "managed");
       this.log(
         "info",
         `reconcile: ${diskOnly.length} on-disk skills recorded in DB`,
@@ -491,10 +512,41 @@ export class CatalogManager {
     }
   }
 
+  /**
+   * Watch skillsDir for external changes (e.g. agent runs `clawhub install`).
+   * Debounces to avoid reconciling mid-write.
+   */
+  startSkillsWatcher(): void {
+    if (!this.skillsDir || !existsSync(this.skillsDir)) return;
+
+    try {
+      this.skillsWatcher = watch(this.skillsDir, () => {
+        if (this.watchDebounceTimer) {
+          clearTimeout(this.watchDebounceTimer);
+        }
+        this.watchDebounceTimer = setTimeout(() => {
+          this.watchDebounceTimer = null;
+          this.reconcileDbWithDisk();
+        }, CatalogManager.WATCH_DEBOUNCE_MS);
+      });
+      this.log("info", "skills directory watcher started");
+    } catch {
+      this.log("warn", "failed to start skills directory watcher");
+    }
+  }
+
   dispose(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.watchDebounceTimer) {
+      clearTimeout(this.watchDebounceTimer);
+      this.watchDebounceTimer = null;
+    }
+    if (this.skillsWatcher) {
+      this.skillsWatcher.close();
+      this.skillsWatcher = null;
     }
     this.db.close();
   }
@@ -526,12 +578,32 @@ export class CatalogManager {
       if (!match?.[1]) return { name: "", description: "" };
       const frontmatter = match[1];
       const nameMatch = frontmatter.match(/^name:\s*['"]?(.+?)['"]?\s*$/m);
+
+      // Match description: single line, or multiline block after | or >
+      let description = "";
       const descMatch = frontmatter.match(
         /^description:\s*['"]?(.+?)['"]?\s*$/m,
       );
+      const rawDesc = descMatch?.[1]?.trim() ?? "";
+      if (rawDesc && rawDesc !== "|" && rawDesc !== ">") {
+        description = rawDesc;
+      } else {
+        // Multiline: collect indented lines after description:
+        const descBlockMatch = frontmatter.match(
+          /^description:\s*[|>]?\s*\n((?:[ \t]+.+\n?)+)/m,
+        );
+        if (descBlockMatch?.[1]) {
+          description = descBlockMatch[1]
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .join(" ");
+        }
+      }
+
       return {
         name: nameMatch?.[1]?.trim() ?? "",
-        description: descMatch?.[1]?.trim() ?? "",
+        description,
       };
     } catch {
       return { name: "", description: "" };
@@ -558,7 +630,6 @@ export class CatalogManager {
 
     const parsed = JSON.parse(readFileSync(indexPath, "utf8")) as unknown;
 
-    // The index can be a plain array or a wrapper object with a `skills` array.
     const raw: unknown[] = Array.isArray(parsed)
       ? parsed
       : typeof parsed === "object" &&
@@ -585,11 +656,13 @@ export class CatalogManager {
             ? new Date(updatedAtRaw).toISOString()
             : String(updatedAtRaw);
 
+        const rawDownloads = Number(stats.downloads ?? entry.downloads ?? 0);
+
         return {
           slug: String(entry.slug ?? ""),
           name: String(entry.name ?? entry.slug ?? ""),
           description: String(entry.description ?? "").slice(0, 150),
-          downloads: Number(stats.downloads ?? entry.downloads ?? 0),
+          downloads: rawDownloads > 0 ? rawDownloads : DEFAULT_DOWNLOAD_COUNT,
           stars: Number(stats.stars ?? entry.stars ?? 0),
           tags: Array.isArray(entry.tags) ? entry.tags.slice(0, 5) : [],
           version: String(entry.version ?? "0.0.0"),
@@ -599,7 +672,6 @@ export class CatalogManager {
   }
 
   private findIndexFile(dir: string): string | null {
-    // Known file names in priority order
     const candidates = [
       "skills_index.local.json",
       "skills_index.json",
@@ -608,7 +680,6 @@ export class CatalogManager {
       "skills.json",
     ];
 
-    // Check root and one level deep
     try {
       const dirs = [dir];
       const entries = readdirSync(dir, { withFileTypes: true });

@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import type { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
-import { OpenClawSkillsWriter } from "../src/runtime/openclaw-skills-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
+import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { CompiledOpenClawStore } from "../src/store/compiled-openclaw-store.js";
 import { NexuConfigStore } from "../src/store/nexu-config-store.js";
@@ -59,7 +59,7 @@ describe("OpenClawSyncService", () => {
     await rm(rootDir, { recursive: true, force: true });
   });
 
-  it("writes compiled config, skills, and templates from controller state", async () => {
+  it("writes compiled config and templates from controller state", async () => {
     const configStore = new NexuConfigStore(env);
     const compiledStore = new CompiledOpenClawStore(env);
     const syncService = new OpenClawSyncService(
@@ -67,9 +67,12 @@ describe("OpenClawSyncService", () => {
       configStore,
       compiledStore,
       new OpenClawConfigWriter(env),
-      new OpenClawSkillsWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
+      new OpenClawGatewayService({
+        isConnected: () => false,
+        pushConfig: async () => false,
+      } as never),
     );
 
     await configStore.createBot({ name: "Assistant", slug: "assistant" });
@@ -79,10 +82,6 @@ describe("OpenClawSyncService", () => {
       teamId: "T123",
       appId: "A123",
       teamName: "Acme",
-    });
-    await configStore.upsertSkill({
-      name: "daily-standup",
-      content: "# Standup",
     });
     const template = await configStore.upsertTemplate({
       name: "AGENTS.md",
@@ -98,12 +97,6 @@ describe("OpenClawSyncService", () => {
     expect(config.channels.slack?.accounts["slack-A123-T123"]?.botToken).toBe(
       "xoxb-test",
     );
-
-    const skillFile = await readFile(
-      path.join(env.openclawSkillsDir, "daily-standup", "SKILL.md"),
-      "utf8",
-    );
-    expect(skillFile).toContain("# Standup");
 
     const templateFile = await readFile(
       path.join(env.openclawWorkspaceTemplatesDir, `${template.id}.md`),

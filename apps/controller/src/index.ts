@@ -5,7 +5,7 @@ import { createApp } from "./app/create-app.js";
 import { logger } from "./lib/logger.js";
 
 async function main(): Promise<void> {
-  const container = createContainer();
+  const container = await createContainer();
   const stopBackgroundLoops = await bootstrapController(container);
   const app = createApp(container);
 

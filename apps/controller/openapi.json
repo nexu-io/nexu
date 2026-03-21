@@ -915,6 +915,75 @@
         }
       }
     },
+    "/api/internal/desktop/shell-open": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Shell open result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Path not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/ready": {
       "get": {
         "tags": [
@@ -930,6 +999,9 @@
                   "properties": {
                     "ready": {
                       "type": "boolean"
+                    },
+                    "workspacePath": {
+                      "type": "string"
                     },
                     "runtime": {
                       "type": "object",
@@ -958,6 +1030,7 @@
                   },
                   "required": [
                     "ready",
+                    "workspacePath",
                     "runtime",
                     "status"
                   ]
@@ -1051,6 +1124,73 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/cloud-refresh": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cloud refresh",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "polling": {
+                      "type": "boolean"
+                    },
+                    "userName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "userEmail": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "connectedAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "provider": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "configPushed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "configPushed"
+                  ]
                 }
               }
             }
@@ -3270,85 +3410,6 @@
         }
       }
     },
-    "/api/v1/link-catalog": {
-      "get": {
-        "tags": [
-          "Models"
-        ],
-        "responses": {
-          "200": {
-            "description": "Link catalog placeholder",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "providers": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string"
-                          },
-                          "models": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "externalName": {
-                                  "type": "string"
-                                },
-                                "inputPrice": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "outputPrice": {
-                                  "type": "string",
-                                  "nullable": true
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "name",
-                                "externalName",
-                                "inputPrice",
-                                "outputPrice"
-                              ]
-                            }
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "kind",
-                          "models"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "providers"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/integrations": {
       "get": {
         "tags": [
@@ -4771,153 +4832,6 @@
         }
       }
     },
-    "/api/internal/skills/latest": {
-      "get": {
-        "tags": [
-          "Internal"
-        ],
-        "responses": {
-          "200": {
-            "description": "Latest skill runtime snapshot",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "version": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "skillsHash": {
-                      "type": "string"
-                    },
-                    "skills": {
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "object",
-                        "additionalProperties": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "version",
-                    "skillsHash",
-                    "skills",
-                    "createdAt"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/internal/skills/{name}": {
-      "put": {
-        "tags": [
-          "Internal"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "name",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "content": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "files": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "active",
-                      "inactive"
-                    ]
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "properties": {
-                      "title": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "owner": {
-                        "type": "string"
-                      },
-                      "tags": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "category": {
-                        "type": "string"
-                      }
-                    },
-                    "default": {}
-                  }
-                },
-                "required": [
-                  "content"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Upserted skill",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "ok",
-                    "name",
-                    "version"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/skillhub/catalog": {
       "get": {
         "tags": [
@@ -4994,7 +4908,8 @@
                             "type": "string",
                             "enum": [
                               "curated",
-                              "managed"
+                              "managed",
+                              "custom"
                             ]
                           },
                           "name": {
@@ -5002,13 +4917,18 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "installedAt": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
                           "slug",
                           "source",
                           "name",
-                          "description"
+                          "description",
+                          "installedAt"
                         ]
                       }
                     },
@@ -5271,6 +5191,79 @@
                   },
                   "required": [
                     "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skillhub/import": {
+      "post": {
+        "tags": [
+          "SkillHub"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {}
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "error"
                   ]
                 }
               }

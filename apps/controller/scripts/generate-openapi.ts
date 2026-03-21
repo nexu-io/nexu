@@ -2,7 +2,8 @@ import fs from "node:fs";
 import { createContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
 
-const app = createApp(createContainer());
+const container = await createContainer();
+const app = createApp(container);
 const spec = app.getOpenAPIDocument({
   openapi: "3.1.0",
   info: { title: "Nexu Controller API", version: "1.0.0" },

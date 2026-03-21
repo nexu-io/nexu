@@ -45,7 +45,7 @@ const envSchema = z.object({
   NEXU_CLOUD_URL: z.string().default("https://nexu.io"),
   NEXU_LINK_URL: z.string().optional(),
   NEXU_HOME: z.string().default("~/.nexu"),
-  OPENCLAW_STATE_DIR: z.string().default("~/.openclaw"),
+  OPENCLAW_STATE_DIR: z.string().default("~/.nexu/runtime/openclaw/state"),
   OPENCLAW_CONFIG_PATH: z.string().optional(),
   OPENCLAW_SKILLS_DIR: z.string().optional(),
   OPENCLAW_CURATED_SKILLS_DIR: z.string().optional(),
@@ -109,7 +109,7 @@ export const env = {
     "nexu-runtime-model.json",
   ),
   skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
-  skillDbPath: path.join(nexuHomeDir, "skill-ledger.db"),
+  skillDbPath: path.join(nexuHomeDir, "skill-ledger.json"),
   staticSkillsDir: parsed.SKILLHUB_STATIC_SKILLS_DIR
     ? expandHomeDir(parsed.SKILLHUB_STATIC_SKILLS_DIR)
     : undefined,

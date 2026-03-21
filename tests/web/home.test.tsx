@@ -47,6 +47,6 @@ describe("HomePage", () => {
     expect(markup).toContain('autoPlay=""');
     expect(markup).toContain('playsInline=""');
     expect(markup).toContain('muted=""');
-    expect(markup).not.toContain('loop=""');
+    expect(markup).toContain('loop=""');
   });
 });

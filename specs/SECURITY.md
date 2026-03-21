@@ -45,7 +45,6 @@ Internal endpoints (`/api/internal/*`) use a two-tier token system:
 | `GET /config`, `GET /config/latest`, `GET /config/versions/:v` | `requireInternalToken` |
 | `POST /register`, `POST /heartbeat` | `requireInternalToken` |
 | `PUT /secrets` | `requireInternalToken` |
-| `PUT /skills/:name`, `GET /skills/latest` | `requireInternalToken` |
 | `POST /sessions`, `PATCH /sessions/:id`, `POST /sessions/sync-discord` | `requireInternalToken` |
 | `GET /secrets/:skillName` | `requireSkillToken` |
 | `POST /artifacts`, `PATCH /artifacts/:id` | `requireSkillToken` |

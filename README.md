@@ -27,13 +27,19 @@
 
 ---
 
+> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude, GPT, Gemini, Kimi, GLM, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
+
+---
+
 ## 📋 Overview
 
-**nexu** (next to you) is an open-source desktop client (Electron) that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
+**nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside Feishu, Slack, Discord, and other IM channels.
 
-It offers graphical setup, built-in Feishu Skills, multi-model support, and BYOK.
+Download and go — graphical setup, built-in Feishu Skills, multi-model support (Claude / GPT / Gemini and more), and bring your own API Key.
 
-Configuration and runtime state stay primarily on your machine.
+Once connected to IM, your Agent is online 24/7 — chat from your phone anytime, anywhere.
+
+All data stays on your machine. Your privacy, fully in your control.
 
 <p align="center">
   <img src="site/media/readme-screenshot.png" width="660" alt="nexu screenshot" />

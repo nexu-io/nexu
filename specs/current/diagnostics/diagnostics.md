@@ -1,51 +1,51 @@
-# Desktop `Export Diagnostics` 执行经验
+# Desktop `Export Diagnostics` Execution Guide
 
-通过菜单 `Help -> Export Diagnostics…` 导出诊断包。
+Export the diagnostics bundle via the menu `Help -> Export Diagnostics…`.
 
-## 执行方式
+## Execution Method
 
-### 1) 先确认桌面端已运行
+### 1) Confirm the desktop app is running
 
 ```bash
 pnpm desktop:status
 ```
 
-期望看到 tmux session `nexu-desktop` 处于 running。
+Expect to see tmux session `nexu-desktop` in running state.
 
-如果未运行，请先启动桌面端。
+If not running, start the desktop app first:
 
 ```bash
 pnpm desktop:start
 ```
 
-### 2) 用 AppleScript 触发菜单并保存（Agent 执行规范）
+### 2) Trigger the menu and save via AppleScript (Agent Execution Spec)
 
-目标：通过 `Help -> Export Diagnostics…` 导出 zip 到 `<nexu-repo-root>/.tmp/diagnostics`。
+Goal: Export a zip via `Help -> Export Diagnostics…` to `<nexu-repo-root>/.tmp/diagnostics`.
 
-不要把 AppleScript 当成“固定脚本一次跑完”，而是按状态机执行：**定位进程 -> 聚焦 -> 点击菜单 -> 等待保存面板 -> 输入路径并保存 -> 校验产物**。
+Do not treat the AppleScript as a "fixed script to run all at once." Instead, execute it as a state machine: **locate process -> focus -> click menu -> wait for save panel -> enter path and save -> verify output**.
 
-#### 失败根因（必须先理解）
+#### Root Causes of Failure (must understand first)
 
-- `keystroke` / `key code` 是发给当前前台窗口，不是绑定到 `p`。
-- `set frontmost of p to true` 只做一次不够，执行过程中焦点可能被用户操作或系统弹窗抢走。
-- 保存 sheet 出现有抖动，固定 `delay` 可能提前输入，导致按键落空或发错窗口。
+- `keystroke` / `key code` are sent to the current foreground window, not bound to process `p`.
+- `set frontmost of p to true` done only once is not enough — focus can be stolen by user actions or system dialogs during execution.
+- The save sheet may appear with jitter; a fixed `delay` may cause premature input, resulting in missed keystrokes or input sent to the wrong window.
 
-#### Agent 执行原则
+#### Agent Execution Principles
 
-1. 每个关键动作前都重新确认目标进程前置（至少：点菜单前、发按键前）。
-2. 只在检测到 `sheet 1 of window 1 of p` 存在后再发送 `Cmd+Shift+G` 与回车序列。
-3. 所有 UI 动作允许有限重试（建议 2-3 次），失败要显式报错，不静默吞掉。
-4. 不依赖“命令退出码成功”；必须用文件时间戳校验是否真的产出新 zip。
+1. Re-confirm the target process is frontmost before every critical action (at minimum: before clicking the menu, before sending keystrokes).
+2. Only send `Cmd+Shift+G` and the return key sequence after detecting that `sheet 1 of window 1 of p` exists.
+3. All UI actions should allow limited retries (recommended 2–3 times); failures must be reported explicitly, never silently swallowed.
+4. Do not rely on "command exit code success"; always verify output by checking file timestamps to confirm a new zip was actually produced.
 
-#### 关键代码片段（用于组合，不要固化成单一长脚本）
+#### Key Code Snippets (for composition — do not hardcode into a single long script)
 
-获取 PID：
+Get PID:
 
 ```bash
 PID=$(ps -ax -o pid,command | rg "Electron apps/desktop$" | awk '{print $1}' | head -n 1)
 ```
 
-聚焦目标进程：
+Focus target process:
 
 ```applescript
 tell application "System Events"
@@ -54,13 +54,13 @@ tell application "System Events"
 end tell
 ```
 
-点击菜单项：
+Click menu item:
 
 ```applescript
 click menu item "Export Diagnostics…" of menu 1 of menu bar item "Help" of menu bar 1 of p
 ```
 
-等待保存 sheet：
+Wait for save sheet:
 
 ```applescript
 repeat 40 times
@@ -71,7 +71,7 @@ repeat 40 times
 end repeat
 ```
 
-输入目录并确认保存：
+Enter directory and confirm save:
 
 ```applescript
 keystroke "G" using {command down, shift down}
@@ -80,15 +80,15 @@ key code 36
 key code 36
 ```
 
-## 校验命令
+## Verification Commands
 
-导出后立刻确认文件存在，记得确认文件时间戳。
+Immediately confirm the file exists after export — check the file timestamp:
 
 ```bash
 ls -lt <nexu-repo-root>/.tmp/diagnostics/nexu-diagnostics-*.zip
 ```
 
-建议同时检查导出包体积与大文件分布：
+Also recommended to check the export bundle size and large file distribution:
 
 ```bash
 ZIP=<nexu-repo-root>/.tmp/diagnostics/nexu-diagnostics-<timestamp>.zip
@@ -98,9 +98,9 @@ unzip -q "$ZIP" -d "$TMP"
 du -ah "$TMP"/nexu-diagnostics-* | sort -hr | head -n 20
 ```
 
-## 导出包目录结构（已确认）
+## Export Bundle Directory Structure (confirmed)
 
-解压后应有单一顶层目录，不会把文件散落到当前目录：
+After extraction, there should be a single top-level directory — files will not be scattered into the current directory:
 
 ```text
 nexu-diagnostics-<timestamp>/
@@ -128,49 +128,49 @@ nexu-diagnostics-<timestamp>/
     └── manifest.json
 ```
 
-建议用下面命令直接看 ZIP 内部路径（比依赖 Finder 展示更可靠）：
+Recommended: use the following command to inspect the ZIP internal paths directly (more reliable than Finder):
 
 ```bash
 unzip -l <nexu-repo-root>/.tmp/diagnostics/nexu-diagnostics-<timestamp>.zip
 ```
 
-## 新增信息说明（用于排障完整性）
+## New Information Notes (for troubleshooting completeness)
 
 - `diagnostics/startup-health.json`
-  - 升级/回滚健康状态（失败计数、版本、最后检查时间）。
+  - Upgrade/rollback health status (failure count, version, last check time).
 - `diagnostics/sentry/**/*.json`
-  - 本地 Sentry 会话/队列/上下文快照（JSON 递归采集，做统一脱敏）。
+  - Local Sentry session/queue/context snapshots (JSON recursively collected, with unified redaction).
 - `diagnostics/crashes/*.json`
-  - 最近 7 天 `DiagnosticReports` 中文件名包含 `exu` 的崩溃报告，转成 JSON（包含 `content` 文本字段）。
+  - Crash reports from the last 7 days in `DiagnosticReports` with filenames containing `exu`, converted to JSON (includes a `content` text field).
 - `logs/openclaw/openclaw-*.log`
-  - `/tmp/openclaw` 下 OpenClaw 原生日志，补足 runtime-units 之外的排障信息。
+  - Native OpenClaw logs from `/tmp/openclaw`, supplementing troubleshooting info beyond runtime-units.
 - `summary/additional-artifacts.json`
-  - 新增采集文件索引（源路径、归档路径、大小、修改时间），用于快速判断“收齐了没有”。
+  - Index of newly collected files (source path, archive path, size, modification time) for quickly determining "did we collect everything?"
 
-## 环境差异说明（本地启动 vs 打包版本）
+## Environment Differences (local dev vs packaged build)
 
-- 两种运行方式统一通过 Electron `userData` 相关路径采集（避免绑定旧路径）。
-- 本地 `pnpm desktop:restart`：`userData` 在 repo 下 `.tmp/desktop/electron`。
-- 打包版本：`userData` 在 `~/Library/Application Support/@nexu/desktop`（或 `NEXU_DESKTOP_USER_DATA_ROOT` 覆盖路径）。
+- Both runtime modes collect via Electron `userData`-relative paths (avoiding hardcoded legacy paths).
+- Local `pnpm restart`: `userData` is at `<repo>/.tmp/desktop/electron`.
+- Packaged build: `userData` is at `~/Library/Application Support/@nexu/desktop` (or overridden by `NEXU_DESKTOP_USER_DATA_ROOT`).
 
-## 脱敏检查（建议）
+## Redaction Check (recommended)
 
-导出后可快速扫描是否存在疑似明文凭据：
+After export, quickly scan for suspected plaintext credentials:
 
 ```bash
 rg --pcre2 -n -i "gw-secret-token|xox[baprs]-|bearer\s+[a-z0-9._-]{8,}|token\"\s*:\s*\"(?!\[REDACTED\])|password\"\s*:\s*\"(?!\[REDACTED\])|secret\"\s*:\s*\"(?!\[REDACTED\])|dsn\"\s*:\s*\"(?!\[REDACTED\])" \
   <unzipped-diagnostics-root>
 ```
 
-## 常见问题
+## Common Issues
 
-1. 报错 `osascript 不允许辅助访问 (-1719)`
-   - 给当前终端应用开启：`系统设置 -> 隐私与安全性 -> 辅助功能`。
+1. **Error: `osascript is not allowed assistive access (-1719)`**
+   - Grant accessibility permission to the current terminal app: `System Settings -> Privacy & Security -> Accessibility`.
 
-2. “路径改了，但没保存”
-   - 说明只完成了目录跳转，没触发最终 Save。
-   - 解决：在路径回车后再补一次或两次 `return`，并在脚本中留短延时。
+2. **"Path changed but didn't save"**
+   - This means only the directory navigation completed, but the final Save was not triggered.
+   - Fix: Add one or two extra `return` key presses after the path entry return, and include a short delay in the script.
 
-3. 执行时切到其他软件，导出偶发失败
-   - 根因：`keystroke` 发送到当前前台窗口，焦点漂移后会打到错误目标。
-   - 解决：每个关键动作前重新 `frontmost`，并显式等待 `sheet` 出现；导出后用 `ls -lt` 强制校验新 zip 是否生成。
+3. **Switching to another app during execution causes intermittent export failures**
+   - Root cause: `keystroke` is sent to the current foreground window — if focus drifts, keystrokes hit the wrong target.
+   - Fix: Re-set `frontmost` before every critical action, explicitly wait for the `sheet` to appear; after export, use `ls -lt` to forcibly verify whether a new zip was generated.

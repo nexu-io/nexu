@@ -7,6 +7,10 @@ import type {
   RuntimeState,
 } from "../shared/host";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import {
+  type SleepGuardSnapshot,
+  createInitialSleepGuardSnapshot,
+} from "./sleep-guard";
 
 type DesktopColdStartStatus = "idle" | "running" | "succeeded" | "failed";
 
@@ -50,6 +54,7 @@ type DesktopDiagnosticsSnapshot = {
   updatedAt: string;
   isPackaged: boolean;
   coldStart: DesktopColdStartSnapshot;
+  sleepGuard: SleepGuardSnapshot;
   renderer: DesktopRendererSnapshot;
   embeddedContents: DesktopEmbeddedContentSnapshot[];
   runtime: {
@@ -77,6 +82,8 @@ export class DesktopDiagnosticsReporter {
     completedAt: null,
     error: null,
   };
+
+  private sleepGuard: SleepGuardSnapshot = createInitialSleepGuardSnapshot();
 
   private readonly renderer: DesktopRendererSnapshot = {
     didFinishLoad: false,
@@ -133,6 +140,15 @@ export class DesktopDiagnosticsReporter {
     this.coldStart.status = "failed";
     this.coldStart.error = error;
     this.coldStart.completedAt = nowIso();
+    this.scheduleFlush();
+  }
+
+  setSleepGuardSnapshot(snapshot: SleepGuardSnapshot): void {
+    this.sleepGuard = {
+      ...snapshot,
+      counters: { ...snapshot.counters },
+      lastEvent: snapshot.lastEvent ? { ...snapshot.lastEvent } : null,
+    };
     this.scheduleFlush();
   }
 
@@ -261,6 +277,13 @@ export class DesktopDiagnosticsReporter {
       updatedAt: nowIso(),
       isPackaged: app.isPackaged,
       coldStart: { ...this.coldStart },
+      sleepGuard: {
+        ...this.sleepGuard,
+        counters: { ...this.sleepGuard.counters },
+        lastEvent: this.sleepGuard.lastEvent
+          ? { ...this.sleepGuard.lastEvent }
+          : null,
+      },
       renderer: {
         ...this.renderer,
         processGone: { ...this.renderer.processGone },

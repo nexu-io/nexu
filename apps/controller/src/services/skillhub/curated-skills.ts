@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { SkillDb } from "./skill-db.js";
 
 /**
- * Skills to install from ClawHub into `state/bundled-skills/` on first launch.
+ * Skills to install from ClawHub on first launch.
  */
 export const CURATED_SKILL_SLUGS: readonly string[] = [
   // Security & tools
@@ -41,8 +41,7 @@ export const CURATED_SKILL_SLUGS: readonly string[] = [
 
 /**
  * Skills shipped as static files in the app bundle (apps/desktop/static/bundled-skills/).
- * These are NOT on ClawHub, so they're copied directly to `state/bundled-skills/`
- * instead of being installed via `clawhub install`.
+ * These are NOT on ClawHub, so they're copied directly to the skills directory.
  */
 export const STATIC_SKILL_SLUGS: readonly string[] = [
   "coding-agent",
@@ -52,12 +51,12 @@ export const STATIC_SKILL_SLUGS: readonly string[] = [
 ] as const;
 
 /**
- * Copies static skills from the app bundle to the curated skills directory.
+ * Copies static skills from the app bundle to the target skills directory.
  * Respects the user's removal ledger — won't re-copy skills the user uninstalled.
  */
 export function copyStaticSkills(params: {
   staticDir: string;
-  curatedDir: string;
+  targetDir: string;
   skillDb: SkillDb;
 }): { copied: string[]; skipped: string[] } {
   const copied: string[] = [];
@@ -73,7 +72,7 @@ export function copyStaticSkills(params: {
       continue;
     }
 
-    const destDir = resolve(params.curatedDir, slug);
+    const destDir = resolve(params.targetDir, slug);
     if (existsSync(resolve(destDir, "SKILL.md"))) {
       skipped.push(slug);
       continue;
@@ -104,7 +103,7 @@ export type CuratedInstallResult = {
  * Skips slugs the user explicitly removed and slugs already present on disk.
  */
 export function resolveCuratedSkillsToInstall(params: {
-  curatedDir: string;
+  targetDir: string;
   skillDb: SkillDb;
 }): { toInstall: string[]; toSkip: string[] } {
   const toInstall: string[] = [];
@@ -115,7 +114,7 @@ export function resolveCuratedSkillsToInstall(params: {
       toSkip.push(slug);
       continue;
     }
-    const skillDir = resolve(params.curatedDir, slug);
+    const skillDir = resolve(params.targetDir, slug);
     if (existsSync(resolve(skillDir, "SKILL.md"))) {
       toSkip.push(slug);
       continue;

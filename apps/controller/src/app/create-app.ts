@@ -12,7 +12,6 @@ import { registerMiscCompatRoutes } from "../routes/misc-compat-routes.js";
 import { registerModelRoutes } from "../routes/model-routes.js";
 import { registerRuntimeConfigRoutes } from "../routes/runtime-config-routes.js";
 import { registerSessionRoutes } from "../routes/session-routes.js";
-import { registerSkillRoutes } from "../routes/skill-routes.js";
 import { registerSkillhubRoutes } from "../routes/skillhub-routes.js";
 import { registerUserRoutes } from "../routes/user-routes.js";
 import { registerWorkspaceTemplateRoutes } from "../routes/workspace-template-routes.js";
@@ -44,7 +43,6 @@ export function createApp(container: ControllerContainer) {
   registerModelRoutes(app, container);
   registerIntegrationRoutes(app, container);
   registerArtifactRoutes(app, container);
-  registerSkillRoutes(app, container);
   registerSkillhubRoutes(app, container);
   registerUserRoutes(app, container);
   registerRuntimeConfigRoutes(app, container);

@@ -372,6 +372,39 @@ export type PostApiV1SharedSlackClaimResponses = {
 
 export type PostApiV1SharedSlackClaimResponse = PostApiV1SharedSlackClaimResponses[keyof PostApiV1SharedSlackClaimResponses];
 
+export type PostApiInternalDesktopShellOpenData = {
+    body?: {
+        path: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/shell-open';
+};
+
+export type PostApiInternalDesktopShellOpenErrors = {
+    /**
+     * Path not allowed
+     */
+    403: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiInternalDesktopShellOpenError = PostApiInternalDesktopShellOpenErrors[keyof PostApiInternalDesktopShellOpenErrors];
+
+export type PostApiInternalDesktopShellOpenResponses = {
+    /**
+     * Shell open result
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiInternalDesktopShellOpenResponse = PostApiInternalDesktopShellOpenResponses[keyof PostApiInternalDesktopShellOpenResponses];
+
 export type GetApiInternalDesktopReadyData = {
     body?: never;
     path?: never;
@@ -385,6 +418,7 @@ export type GetApiInternalDesktopReadyResponses = {
      */
     200: {
         ready: boolean;
+        workspacePath: string;
         runtime: {
             ok: boolean;
             status: number;
@@ -440,6 +474,34 @@ export type PostApiInternalDesktopCloudConnectResponses = {
 };
 
 export type PostApiInternalDesktopCloudConnectResponse = PostApiInternalDesktopCloudConnectResponses[keyof PostApiInternalDesktopCloudConnectResponses];
+
+export type PostApiInternalDesktopCloudRefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/cloud-refresh';
+};
+
+export type PostApiInternalDesktopCloudRefreshResponses = {
+    /**
+     * Cloud refresh
+     */
+    200: {
+        connected: boolean;
+        polling?: boolean;
+        userName?: string;
+        userEmail?: string;
+        connectedAt?: string;
+        models?: Array<{
+            id: string;
+            name: string;
+            provider?: string;
+        }>;
+        configPushed: boolean;
+    };
+};
+
+export type PostApiInternalDesktopCloudRefreshResponse = PostApiInternalDesktopCloudRefreshResponses[keyof PostApiInternalDesktopCloudRefreshResponses];
 
 export type PostApiInternalDesktopCloudDisconnectData = {
     body?: never;
@@ -1305,35 +1367,6 @@ export type PostApiV1ProvidersByProviderIdVerifyResponses = {
 
 export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
 
-export type GetApiV1LinkCatalogData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/link-catalog';
-};
-
-export type GetApiV1LinkCatalogResponses = {
-    /**
-     * Link catalog placeholder
-     */
-    200: {
-        providers: Array<{
-            id: string;
-            name: string;
-            kind: string;
-            models: Array<{
-                id: string;
-                name: string;
-                externalName: string;
-                inputPrice: string;
-                outputPrice: string;
-            }>;
-        }>;
-    };
-};
-
-export type GetApiV1LinkCatalogResponse = GetApiV1LinkCatalogResponses[keyof GetApiV1LinkCatalogResponses];
-
 export type GetApiV1IntegrationsData = {
     body?: never;
     path?: never;
@@ -1797,66 +1830,6 @@ export type GetApiV1ArtifactsByIdResponses = {
 
 export type GetApiV1ArtifactsByIdResponse = GetApiV1ArtifactsByIdResponses[keyof GetApiV1ArtifactsByIdResponses];
 
-export type GetApiInternalSkillsLatestData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/internal/skills/latest';
-};
-
-export type GetApiInternalSkillsLatestResponses = {
-    /**
-     * Latest skill runtime snapshot
-     */
-    200: {
-        version: number;
-        skillsHash: string;
-        skills: {
-            [key: string]: {
-                [key: string]: string;
-            };
-        };
-        createdAt: string;
-    };
-};
-
-export type GetApiInternalSkillsLatestResponse = GetApiInternalSkillsLatestResponses[keyof GetApiInternalSkillsLatestResponses];
-
-export type PutApiInternalSkillsByNameData = {
-    body?: {
-        content: string;
-        files?: {
-            [key: string]: string;
-        };
-        status?: 'active' | 'inactive';
-        metadata?: {
-            title?: string;
-            description?: string;
-            owner?: string;
-            tags?: Array<string>;
-            category?: string;
-        };
-    };
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/internal/skills/{name}';
-};
-
-export type PutApiInternalSkillsByNameResponses = {
-    /**
-     * Upserted skill
-     */
-    200: {
-        ok: boolean;
-        name: string;
-        version: number;
-    };
-};
-
-export type PutApiInternalSkillsByNameResponse = PutApiInternalSkillsByNameResponses[keyof PutApiInternalSkillsByNameResponses];
-
 export type GetApiV1SkillhubCatalogData = {
     body?: never;
     path?: never;
@@ -1882,9 +1855,10 @@ export type GetApiV1SkillhubCatalogResponses = {
         installedSlugs: Array<string>;
         installedSkills: Array<{
             slug: string;
-            source: 'curated' | 'managed';
+            source: 'curated' | 'managed' | 'custom';
             name: string;
             description: string;
+            installedAt: string;
         }>;
         meta: {
             version: string;
@@ -1998,6 +1972,40 @@ export type GetApiV1SkillhubSkillsBySlugResponses = {
 };
 
 export type GetApiV1SkillhubSkillsBySlugResponse = GetApiV1SkillhubSkillsBySlugResponses[keyof GetApiV1SkillhubSkillsBySlugResponses];
+
+export type PostApiV1SkillhubImportData = {
+    body?: {
+        file: unknown;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/skillhub/import';
+};
+
+export type PostApiV1SkillhubImportErrors = {
+    /**
+     * Bad request
+     */
+    400: {
+        ok: false;
+        error: string;
+    };
+};
+
+export type PostApiV1SkillhubImportError = PostApiV1SkillhubImportErrors[keyof PostApiV1SkillhubImportErrors];
+
+export type PostApiV1SkillhubImportResponses = {
+    /**
+     * Import result
+     */
+    200: {
+        ok: boolean;
+        slug?: string;
+        error?: string;
+    };
+};
+
+export type PostApiV1SkillhubImportResponse = PostApiV1SkillhubImportResponses[keyof PostApiV1SkillhubImportResponses];
 
 export type GetApiV1MeData = {
     body?: never;

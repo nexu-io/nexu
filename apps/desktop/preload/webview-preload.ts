@@ -1,62 +1,71 @@
-/**
- * Webview preload — bridges Electron update IPC events and host invoke
- * to the web app running inside the <webview> tag. This allows the web
- * app's useAutoUpdate() hook to receive update events and trigger
- * download/install actions natively.
- */
 import { contextBridge, ipcRenderer } from "electron";
 import {
-  type UpdaterBridge,
-  type UpdaterEvent,
-  type UpdaterEventMap,
-  updaterEvents,
+  type HostBridge,
+  type HostDesktopCommand,
+  type HostInvokeChannel,
+  type HostInvokePayloadMap,
+  type HostInvokeResultMap,
+  type RuntimeEvent,
+  hostInvokeChannels,
 } from "../shared/host";
+import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 
-const validUpdaterEvents = new Set<string>(updaterEvents);
+const validChannels = new Set<string>(hostInvokeChannels);
 
-const updaterBridge: UpdaterBridge = {
-  onEvent<TEvent extends UpdaterEvent>(
-    event: TEvent,
-    callback: (data: UpdaterEventMap[TEvent]) => void,
-  ): () => void {
-    if (!validUpdaterEvents.has(event)) {
-      throw new Error(`Invalid updater event: ${event}`);
+const runtimeConfig = getDesktopRuntimeConfig(process.env, {
+  resourcesPath: process.defaultApp ? undefined : process.resourcesPath,
+  useBuildConfig: !process.defaultApp,
+});
+
+const hostBridge: HostBridge = {
+  bootstrap: {
+    buildInfo: runtimeConfig.buildInfo,
+    sentryDsn: runtimeConfig.sentryDsn,
+    isPackaged: !process.defaultApp,
+  },
+
+  invoke<TChannel extends HostInvokeChannel>(
+    channel: TChannel,
+    payload: HostInvokePayloadMap[TChannel],
+  ): Promise<HostInvokeResultMap[TChannel]> {
+    if (!validChannels.has(channel)) {
+      throw new Error(`Invalid host channel: ${channel}`);
     }
 
-    const handler = (
+    return ipcRenderer.invoke("host:invoke", channel, payload) as Promise<
+      HostInvokeResultMap[TChannel]
+    >;
+  },
+
+  onDesktopCommand(listener) {
+    const wrapped = (
       _event: Electron.IpcRendererEvent,
-      data: UpdaterEventMap[TEvent],
+      command: HostDesktopCommand,
     ) => {
-      callback(data);
+      listener(command);
     };
 
-    ipcRenderer.on(event, handler);
+    ipcRenderer.on("host:desktop-command", wrapped);
 
     return () => {
-      ipcRenderer.removeListener(event, handler);
+      ipcRenderer.removeListener("host:desktop-command", wrapped);
+    };
+  },
+
+  onRuntimeEvent(listener) {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      event: RuntimeEvent,
+    ) => {
+      listener(event);
+    };
+
+    ipcRenderer.on("host:runtime-event", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("host:runtime-event", wrapped);
     };
   },
 };
 
-contextBridge.exposeInMainWorld("nexuUpdater", updaterBridge);
-
-// Debug: mark that the preload ran
-contextBridge.exposeInMainWorld("__webviewPreloadOk", true);
-
-// Minimal host bridge — only update-related invoke channels
-const updateChannels = new Set([
-  "update:check",
-  "update:download",
-  "update:install",
-  "update:get-current-version",
-]);
-
-contextBridge.exposeInMainWorld("nexuHost", {
-  bootstrap: { isPackaged: true, buildInfo: {}, sentryDsn: null },
-  invoke(channel: string, payload: unknown) {
-    if (!updateChannels.has(channel)) {
-      throw new Error(`Invalid webview host channel: ${channel}`);
-    }
-    return ipcRenderer.invoke("host:invoke", channel, payload);
-  },
-});
+contextBridge.exposeInMainWorld("nexuHost", hostBridge);

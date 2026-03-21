@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -6,36 +7,56 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
-import initSqlJs, { type Database } from "sql.js";
+import { LowSync } from "lowdb";
+import { z } from "zod";
 import type { SkillSource } from "./types.js";
 
-export type SkillRecord = {
-  readonly slug: string;
-  readonly source: SkillSource;
-  readonly status: "installed" | "uninstalled";
-  readonly version: string | null;
-  readonly installedAt: string | null;
-  readonly uninstalledAt: string | null;
-};
+const skillRecordSchema = z.object({
+  slug: z.string(),
+  source: z.enum(["curated", "managed", "custom"]),
+  status: z.enum(["installed", "uninstalled"]),
+  version: z.string().nullable().default(null),
+  installedAt: z.string().nullable().default(null),
+  uninstalledAt: z.string().nullable().default(null),
+});
 
-const CREATE_TABLE = `
-CREATE TABLE IF NOT EXISTS skills (
-  slug           TEXT NOT NULL,
-  source         TEXT NOT NULL CHECK(source IN ('curated', 'managed')),
-  status         TEXT NOT NULL CHECK(status IN ('installed', 'uninstalled')),
-  version        TEXT,
-  installed_at   TEXT,
-  uninstalled_at TEXT,
-  PRIMARY KEY (slug, source)
-)`;
+const skillLedgerSchema = z.object({
+  skills: z.array(skillRecordSchema).default([]),
+});
+
+export type SkillRecord = z.infer<typeof skillRecordSchema>;
+type SkillLedger = z.infer<typeof skillLedgerSchema>;
+
+const emptyLedger = (): SkillLedger => ({ skills: [] });
+
+class AtomicJsonFileSync<T> {
+  constructor(private readonly filePath: string) {}
+
+  read(): T | null {
+    if (!existsSync(this.filePath)) {
+      return null;
+    }
+
+    return JSON.parse(readFileSync(this.filePath, "utf8")) as T;
+  }
+
+  write(data: T): void {
+    const tmpPath = `${this.filePath}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf8");
+    renameSync(tmpPath, this.filePath);
+  }
+}
 
 export class SkillDb {
-  private readonly db: Database;
-  private readonly dbPath: string;
+  private readonly db: LowSync<SkillLedger>;
 
-  private constructor(db: Database, dbPath: string) {
-    this.db = db;
-    this.dbPath = dbPath;
+  private constructor(dbPath: string, fallbackData: SkillLedger) {
+    const adapter = new AtomicJsonFileSync<SkillLedger>(dbPath);
+    this.db = new LowSync(adapter, fallbackData);
+    this.db.read();
+    const parsed = skillLedgerSchema.safeParse(this.db.data);
+    this.db.data = parsed.success ? parsed.data : fallbackData;
+    this.persist();
   }
 
   static async create(
@@ -44,174 +65,229 @@ export class SkillDb {
   ): Promise<SkillDb> {
     mkdirSync(dirname(dbPath), { recursive: true });
 
-    const SQL = await initSqlJs();
+    const fallbackData =
+      SkillDb.loadLegacySqliteLedger(dbPath) ??
+      SkillDb.loadLegacyCuratedState(legacyCuratedDir) ??
+      emptyLedger();
 
-    let db: Database;
-    if (existsSync(dbPath)) {
-      const buffer = readFileSync(dbPath);
-      db = new SQL.Database(buffer);
-    } else {
-      db = new SQL.Database();
-    }
-
-    db.run(CREATE_TABLE);
-
-    const instance = new SkillDb(db, dbPath);
-    instance.persist();
-
-    if (legacyCuratedDir) {
-      instance.migrateFromJson(legacyCuratedDir);
-    }
-
-    return instance;
+    return new SkillDb(dbPath, fallbackData);
   }
 
   getAllInstalled(): readonly SkillRecord[] {
-    const results = this.db.exec(
-      "SELECT slug, source, status, version, installed_at, uninstalled_at FROM skills WHERE status = 'installed'",
+    return this.current().skills.filter(
+      (skill) => skill.status === "installed",
     );
-    if (results.length === 0) return [];
-
-    const rows = results[0]?.values ?? [];
-    return rows.map((row) => ({
-      slug: String(row[0]),
-      source: String(row[1]) as SkillSource,
-      status: "installed" as const,
-      version: row[3] != null ? String(row[3]) : null,
-      installedAt: row[4] != null ? String(row[4]) : null,
-      uninstalledAt: row[5] != null ? String(row[5]) : null,
-    }));
   }
 
   recordInstall(slug: string, source: SkillSource, version?: string): void {
-    this.db.run(
-      `INSERT INTO skills (slug, source, status, version, installed_at, uninstalled_at)
-       VALUES (?, ?, 'installed', ?, datetime('now'), NULL)
-       ON CONFLICT(slug, source) DO UPDATE SET
-         status = 'installed',
-         version = COALESCE(excluded.version, version),
-         installed_at = datetime('now'),
-         uninstalled_at = NULL`,
-      [slug, source, version ?? null],
+    const now = new Date().toISOString();
+    const current = this.current();
+    const existing = current.skills.find(
+      (skill) => skill.slug === slug && skill.source === source,
     );
+    const nextRecord: SkillRecord = {
+      slug,
+      source,
+      status: "installed",
+      version: version ?? existing?.version ?? null,
+      installedAt: now,
+      uninstalledAt: null,
+    };
+
+    this.db.data = {
+      skills: this.upsertRecord(current.skills, nextRecord),
+    };
     this.persist();
   }
 
   recordUninstall(slug: string, source: SkillSource): void {
-    this.db.run(
-      `INSERT INTO skills (slug, source, status, uninstalled_at)
-       VALUES (?, ?, 'uninstalled', datetime('now'))
-       ON CONFLICT(slug, source) DO UPDATE SET
-         status = 'uninstalled',
-         uninstalled_at = datetime('now')`,
-      [slug, source],
+    const now = new Date().toISOString();
+    const current = this.current();
+    const existing = current.skills.find(
+      (skill) => skill.slug === slug && skill.source === source,
     );
+    const nextRecord: SkillRecord = {
+      slug,
+      source,
+      status: "uninstalled",
+      version: existing?.version ?? null,
+      installedAt: existing?.installedAt ?? null,
+      uninstalledAt: now,
+    };
+
+    this.db.data = {
+      skills: this.upsertRecord(current.skills, nextRecord),
+    };
     this.persist();
   }
 
   isRemovedByUser(slug: string): boolean {
-    const results = this.db.exec(
-      "SELECT 1 FROM skills WHERE slug = ? AND source = 'curated' AND status = 'uninstalled'",
-      [slug],
+    return this.current().skills.some(
+      (skill) =>
+        skill.slug === slug &&
+        skill.source === "curated" &&
+        skill.status === "uninstalled",
     );
-    return (results[0]?.values.length ?? 0) > 0;
   }
 
   isInstalled(slug: string, source: SkillSource): boolean {
-    const results = this.db.exec(
-      "SELECT 1 FROM skills WHERE slug = ? AND source = ? AND status = 'installed'",
-      [slug, source],
+    return this.current().skills.some(
+      (skill) =>
+        skill.slug === slug &&
+        skill.source === source &&
+        skill.status === "installed",
     );
-    return (results[0]?.values.length ?? 0) > 0;
   }
 
   recordBulkInstall(slugs: readonly string[], source: SkillSource): void {
-    this.db.run("BEGIN TRANSACTION");
-    try {
-      for (const slug of slugs) {
-        this.db.run(
-          `INSERT INTO skills (slug, source, status, installed_at)
-           VALUES (?, ?, 'installed', datetime('now'))
-           ON CONFLICT(slug, source) DO UPDATE SET
-             status = 'installed',
-             installed_at = datetime('now'),
-             uninstalled_at = NULL`,
-          [slug, source],
-        );
-      }
-      this.db.run("COMMIT");
-    } catch (err) {
-      this.db.run("ROLLBACK");
-      throw err;
+    const now = new Date().toISOString();
+    const current = this.current();
+    let skills = [...current.skills];
+
+    for (const slug of slugs) {
+      const existing = skills.find(
+        (skill) => skill.slug === slug && skill.source === source,
+      );
+      const nextRecord: SkillRecord = {
+        slug,
+        source,
+        status: "installed",
+        version: existing?.version ?? null,
+        installedAt: now,
+        uninstalledAt: null,
+      };
+      skills = this.upsertRecord(skills, nextRecord);
     }
+
+    this.db.data = { skills };
     this.persist();
   }
 
   markUninstalledBySlugs(slugs: readonly string[], source: SkillSource): void {
-    if (slugs.length === 0) return;
-    this.db.run("BEGIN TRANSACTION");
-    try {
-      for (const slug of slugs) {
-        this.db.run(
-          `UPDATE skills SET status = 'uninstalled', uninstalled_at = datetime('now')
-           WHERE slug = ? AND source = ? AND status = 'installed'`,
-          [slug, source],
-        );
-      }
-      this.db.run("COMMIT");
-    } catch (err) {
-      this.db.run("ROLLBACK");
-      throw err;
+    if (slugs.length === 0) {
+      return;
     }
+
+    const slugSet = new Set(slugs);
+    const now = new Date().toISOString();
+    this.db.data = {
+      skills: this.current().skills.map((skill) =>
+        slugSet.has(skill.slug) &&
+        skill.source === source &&
+        skill.status === "installed"
+          ? { ...skill, status: "uninstalled", uninstalledAt: now }
+          : skill,
+      ),
+    };
     this.persist();
   }
 
   close(): void {
     this.persist();
-    this.db.close();
+  }
+
+  private current(): SkillLedger {
+    return this.db.data ?? emptyLedger();
   }
 
   private persist(): void {
-    const data = this.db.export();
-    const buffer = Buffer.from(data);
-    const tmpPath = `${this.dbPath}.tmp`;
-    writeFileSync(tmpPath, buffer);
-    renameSync(tmpPath, this.dbPath);
+    this.db.write();
   }
 
-  private migrateFromJson(curatedDir: string): void {
-    const statePath = resolve(curatedDir, ".curated-state.json");
-    if (!existsSync(statePath)) return;
+  private upsertRecord(
+    records: readonly SkillRecord[],
+    nextRecord: SkillRecord,
+  ): SkillRecord[] {
+    const index = records.findIndex(
+      (record) =>
+        record.slug === nextRecord.slug && record.source === nextRecord.source,
+    );
+
+    if (index === -1) {
+      return [...records, nextRecord];
+    }
+
+    return records.map((record, recordIndex) =>
+      recordIndex === index ? nextRecord : record,
+    );
+  }
+
+  private static loadLegacyCuratedState(
+    legacyCuratedDir?: string,
+  ): SkillLedger | null {
+    if (!legacyCuratedDir) {
+      return null;
+    }
+
+    const statePath = resolve(legacyCuratedDir, ".curated-state.json");
+    if (!existsSync(statePath)) {
+      return null;
+    }
 
     try {
       const raw = JSON.parse(readFileSync(statePath, "utf8")) as {
         removedByUser?: string[];
       };
       const removed = raw.removedByUser ?? [];
-      if (removed.length > 0) {
-        this.db.run("BEGIN TRANSACTION");
-        try {
-          for (const slug of removed) {
-            this.db.run(
-              `INSERT INTO skills (slug, source, status, uninstalled_at)
-               VALUES (?, 'curated', 'uninstalled', datetime('now'))
-               ON CONFLICT(slug, source) DO NOTHING`,
-              [slug],
-            );
-          }
-          this.db.run("COMMIT");
-        } catch (err) {
-          this.db.run("ROLLBACK");
-          throw err;
-        }
-        this.persist();
+      if (removed.length === 0) {
+        return emptyLedger();
       }
-      renameSync(
-        statePath,
-        resolve(curatedDir, ".curated-state.json.migrated"),
-      );
+
+      return {
+        skills: removed.map((slug) => ({
+          slug,
+          source: "curated" as const,
+          status: "uninstalled" as const,
+          version: null,
+          installedAt: null,
+          uninstalledAt: new Date().toISOString(),
+        })),
+      };
     } catch {
-      // Best-effort migration — don't block startup
+      return null;
+    }
+  }
+
+  private static loadLegacySqliteLedger(dbPath: string): SkillLedger | null {
+    if (!dbPath.endsWith(".json")) {
+      return null;
+    }
+
+    const legacyDbPath = dbPath.replace(/\.json$/, ".db");
+    if (!existsSync(legacyDbPath) || existsSync(dbPath)) {
+      return null;
+    }
+
+    try {
+      const query =
+        "SELECT slug, source, status, COALESCE(version, ''), COALESCE(installed_at, ''), COALESCE(uninstalled_at, '') FROM skills";
+      const output = execFileSync(
+        "sqlite3",
+        ["-readonly", "-separator", "\t", legacyDbPath, query],
+        { encoding: "utf8" },
+      );
+
+      const skills = output
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          const [slug, source, status, version, installedAt, uninstalledAt] =
+            line.split("\t");
+
+          return skillRecordSchema.parse({
+            slug,
+            source,
+            status,
+            version: version || null,
+            installedAt: installedAt || null,
+            uninstalledAt: uninstalledAt || null,
+          });
+        });
+
+      return skillLedgerSchema.parse({ skills });
+    } catch {
+      return null;
     }
   }
 }

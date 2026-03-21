@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -10,6 +11,15 @@ function makeTempDir(): string {
   return dir;
 }
 
+function hasSqliteCli(): boolean {
+  try {
+    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("SkillDb", () => {
   let tempDir: string;
   let dbPath: string;
@@ -17,7 +27,7 @@ describe("SkillDb", () => {
 
   beforeEach(() => {
     tempDir = makeTempDir();
-    dbPath = resolve(tempDir, "skills.db");
+    dbPath = resolve(tempDir, "skill-ledger.json");
   });
 
   afterEach(() => {
@@ -32,7 +42,7 @@ describe("SkillDb", () => {
   });
 
   it("creates the parent directory before opening a nested database path", async () => {
-    dbPath = resolve(tempDir, "runtime", "skills.db");
+    dbPath = resolve(tempDir, "runtime", "skill-ledger.json");
 
     db = await SkillDb.create(dbPath);
 
@@ -83,7 +93,7 @@ describe("SkillDb", () => {
     expect(db.isRemovedByUser("weather")).toBe(false);
   });
 
-  it("recordBulkInstall inserts multiple records in a transaction", async () => {
+  it("recordBulkInstall inserts multiple records", async () => {
     db = await SkillDb.create(dbPath);
     db.recordBulkInstall(["github", "weather", "calendar"], "curated");
     expect(db.getAllInstalled()).toHaveLength(3);
@@ -119,31 +129,52 @@ describe("SkillDb", () => {
     expect(slugs).toEqual(["github", "weather"]);
   });
 
-  it("migrates .curated-state.json on first open", async () => {
-    const curatedDir = resolve(tempDir, "bundled-skills");
-    mkdirSync(curatedDir, { recursive: true });
-    const statePath = resolve(curatedDir, ".curated-state.json");
-    writeFileSync(
-      statePath,
-      JSON.stringify({
-        removedByUser: ["github", "weather"],
-        lastInstalledVersion: ["github", "weather", "calendar"],
-      }),
-    );
-
-    db = await SkillDb.create(dbPath, curatedDir);
-    expect(db.isRemovedByUser("github")).toBe(true);
-    expect(db.isRemovedByUser("weather")).toBe(true);
-    expect(db.isRemovedByUser("calendar")).toBe(false);
-    // Legacy file renamed
-    expect(existsSync(statePath)).toBe(false);
-    expect(
-      existsSync(resolve(curatedDir, ".curated-state.json.migrated")),
-    ).toBe(true);
+  it("supports custom source type", async () => {
+    db = await SkillDb.create(dbPath);
+    db.recordInstall("my-skill", "custom");
+    expect(db.isInstalled("my-skill", "custom")).toBe(true);
+    expect(db.isInstalled("my-skill", "managed")).toBe(false);
+    const all = db.getAllInstalled();
+    expect(all).toHaveLength(1);
+    expect(all[0].source).toBe("custom");
   });
 
-  it("skips migration if no legacy file exists", async () => {
-    db = await SkillDb.create(dbPath, resolve(tempDir, "nonexistent-dir"));
-    expect(db.getAllInstalled()).toEqual([]);
+  it("migrates a legacy sqlite ledger into the json ledger on first open", async () => {
+    if (!hasSqliteCli()) {
+      return;
+    }
+
+    const legacyDbPath = resolve(tempDir, "skill-ledger.db");
+    execFileSync("sqlite3", [
+      legacyDbPath,
+      `
+      CREATE TABLE skills (
+        slug TEXT NOT NULL,
+        source TEXT NOT NULL,
+        status TEXT NOT NULL,
+        version TEXT,
+        installed_at TEXT,
+        uninstalled_at TEXT,
+        PRIMARY KEY (slug, source)
+      );
+      INSERT INTO skills VALUES ('weather', 'managed', 'installed', '1.2.3', '2026-03-20T10:00:00.000Z', NULL);
+      INSERT INTO skills VALUES ('github', 'curated', 'uninstalled', NULL, NULL, '2026-03-20T11:00:00.000Z');
+      `,
+    ]);
+
+    db = await SkillDb.create(dbPath);
+
+    expect(existsSync(dbPath)).toBe(true);
+    expect(db.getAllInstalled()).toEqual([
+      {
+        slug: "weather",
+        source: "managed",
+        status: "installed",
+        version: "1.2.3",
+        installedAt: "2026-03-20T10:00:00.000Z",
+        uninstalledAt: null,
+      },
+    ]);
+    expect(db.isRemovedByUser("github")).toBe(true);
   });
 });

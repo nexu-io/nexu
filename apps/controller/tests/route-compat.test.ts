@@ -7,7 +7,6 @@ import { createApp } from "../src/app/create-app.js";
 import type { ControllerEnv } from "../src/app/env.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../src/runtime/openclaw-process.js";
-import { OpenClawSkillsWriter } from "../src/runtime/openclaw-skills-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
 import { RuntimeHealth } from "../src/runtime/runtime-health.js";
 import { SessionsRuntime } from "../src/runtime/sessions-runtime.js";
@@ -20,10 +19,11 @@ import { DesktopLocalService } from "../src/services/desktop-local-service.js";
 import { IntegrationService } from "../src/services/integration-service.js";
 import { LocalUserService } from "../src/services/local-user-service.js";
 import { ModelProviderService } from "../src/services/model-provider-service.js";
+import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../src/services/runtime-config-service.js";
 import { SessionService } from "../src/services/session-service.js";
-import { SkillService } from "../src/services/skill-service.js";
+import type { SkillhubService } from "../src/services/skillhub-service.js";
 import { TemplateService } from "../src/services/template-service.js";
 import { ArtifactsStore } from "../src/store/artifacts-store.js";
 import { CompiledOpenClawStore } from "../src/store/compiled-openclaw-store.js";
@@ -67,22 +67,45 @@ async function createTestContainer(
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);
-  const skillsWriter = new OpenClawSkillsWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
   const sessionsRuntime = new SessionsRuntime(env);
   const runtimeHealth = new RuntimeHealth(env);
   const openclawProcess = new OpenClawProcessManager(env);
   const runtimeState = createRuntimeState();
+  const wsClient = {
+    isConnected: () => false,
+    stop: vi.fn(),
+  } as unknown as ControllerContainer["wsClient"];
+  const gatewayService = new OpenClawGatewayService({
+    isConnected: () => false,
+    request: vi.fn(),
+  } as never);
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
     compiledStore,
     configWriter,
-    skillsWriter,
     templateWriter,
     watchTrigger,
+    gatewayService,
   );
+  const skillhubService = {
+    catalog: {
+      getCatalog: () => ({
+        skills: [],
+        installedSlugs: [],
+        installedSkills: [],
+        meta: null,
+      }),
+      installSkill: vi.fn(async () => ({ ok: true })),
+      uninstallSkill: vi.fn(async () => ({ ok: true })),
+      refreshCatalog: vi.fn(async () => ({ ok: true, skillCount: 0 })),
+      importSkillZip: vi.fn(async () => ({ ok: true })),
+    },
+    dispose: vi.fn(),
+    start: vi.fn(),
+  } as unknown as SkillhubService;
 
   return {
     env,
@@ -94,7 +117,6 @@ async function createTestContainer(
     agentService: new AgentService(configStore, openclawSyncService),
     channelService: new ChannelService(configStore, openclawSyncService),
     sessionService: new SessionService(sessionsRuntime),
-    skillService: new SkillService(configStore, openclawSyncService),
     runtimeConfigService: new RuntimeConfigService(
       configStore,
       openclawSyncService,
@@ -105,7 +127,10 @@ async function createTestContainer(
     desktopLocalService: new DesktopLocalService(configStore),
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
+    skillhubService,
     openclawSyncService,
+    wsClient,
+    gatewayService,
     runtimeState,
     startBackgroundLoops: () => () => {},
   };
@@ -229,8 +254,11 @@ describe("controller route compatibility", () => {
     expect(runtimeUpdate.status).toBe(200);
   });
 
-  it("serves skill and workspace template internal compatibility endpoints", async () => {
+  it("does not expose the removed internal skill compatibility endpoints", async () => {
     const app = createApp(container);
+
+    const latestSkills = await app.request("/api/internal/skills/latest");
+    expect(latestSkills.status).toBe(404);
 
     const skillUpsert = await app.request(
       "/api/internal/skills/daily-standup",
@@ -240,10 +268,11 @@ describe("controller route compatibility", () => {
         body: JSON.stringify({ content: "# Standup" }),
       },
     );
-    expect(skillUpsert.status).toBe(200);
+    expect(skillUpsert.status).toBe(404);
+  });
 
-    const latestSkills = await app.request("/api/internal/skills/latest");
-    expect(latestSkills.status).toBe(200);
+  it("serves workspace template internal compatibility endpoints", async () => {
+    const app = createApp(container);
 
     const templateUpsert = await app.request(
       "/api/internal/workspace-templates/AGENTS.md",

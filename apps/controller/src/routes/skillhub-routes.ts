@@ -2,6 +2,8 @@ import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
+const DEFAULT_DOWNLOAD_COUNT = 1000;
+
 const minimalSkillSchema = z.object({
   slug: z.string(),
   name: z.string(),
@@ -15,9 +17,10 @@ const minimalSkillSchema = z.object({
 
 const installedSkillSchema = z.object({
   slug: z.string(),
-  source: z.enum(["curated", "managed"]),
+  source: z.enum(["curated", "managed", "custom"]),
   name: z.string(),
   description: z.string(),
+  installedAt: z.string().nullable(),
 });
 
 const catalogMetaSchema = z.object({
@@ -56,6 +59,12 @@ const skillhubDetailResponseSchema = z.object({
   files: z.array(z.string()),
 });
 
+const skillhubImportResultSchema = z.object({
+  ok: z.boolean(),
+  slug: z.string().optional(),
+  error: z.string().optional(),
+});
+
 const skillhubSlugSchema = z.string().min(1);
 
 export function registerSkillhubRoutes(
@@ -78,7 +87,7 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const catalog = container.skillhubService.getCatalog();
+      const catalog = container.skillhubService.catalog.getCatalog();
       return c.json(catalog, 200);
     },
   );
@@ -109,7 +118,7 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
-      const result = await container.skillhubService.installSkill(slug);
+      const result = await container.skillhubService.catalog.installSkill(slug);
       return c.json(result, 200);
     },
   );
@@ -140,7 +149,8 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
-      const result = await container.skillhubService.uninstallSkill(slug);
+      const result =
+        await container.skillhubService.catalog.uninstallSkill(slug);
       return c.json(result, 200);
     },
   );
@@ -161,7 +171,7 @@ export function registerSkillhubRoutes(
       },
     }),
     async (c) => {
-      const result = await container.skillhubService.refreshCatalog();
+      const result = await container.skillhubService.catalog.refreshCatalog();
       return c.json(result, 200);
     },
   );
@@ -190,7 +200,7 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("param");
-      const catalog = container.skillhubService.getCatalog();
+      const catalog = container.skillhubService.catalog.getCatalog();
       const catalogSkill = catalog.skills.find((s) => s.slug === slug);
       const installed = catalog.installedSlugs.includes(slug);
       const installedSkill = catalog.installedSkills.find(
@@ -201,13 +211,21 @@ export function registerSkillhubRoutes(
         return c.json({ message: "Skill not found" }, 404);
       }
 
+      const isCustom = installedSkill?.source === "custom";
+      const rawDownloads = catalogSkill?.downloads ?? 0;
+      const downloads = isCustom
+        ? 0
+        : rawDownloads > 0
+          ? rawDownloads
+          : DEFAULT_DOWNLOAD_COUNT;
+
       return c.json(
         {
           slug,
           name: catalogSkill?.name ?? installedSkill?.name ?? slug,
           description:
             catalogSkill?.description ?? installedSkill?.description ?? "",
-          downloads: catalogSkill?.downloads ?? 0,
+          downloads,
           stars: catalogSkill?.stars ?? 0,
           tags: catalogSkill?.tags ?? [],
           version: catalogSkill?.version ?? "1.0.0",
@@ -218,6 +236,78 @@ export function registerSkillhubRoutes(
         },
         200,
       );
+    },
+  );
+
+  // POST /api/v1/skillhub/import
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/skillhub/import",
+      tags: ["SkillHub"],
+      request: {
+        body: {
+          content: {
+            "multipart/form-data": {
+              schema: z.object({
+                file: z.instanceof(File),
+              }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: skillhubImportResultSchema },
+          },
+          description: "Import result",
+        },
+        400: {
+          content: {
+            "application/json": {
+              schema: z.object({
+                ok: z.literal(false),
+                error: z.string(),
+              }),
+            },
+          },
+          description: "Bad request",
+        },
+      },
+    }),
+    async (c) => {
+      const body = await c.req.parseBody();
+      const file = body.file;
+
+      if (!(file instanceof File)) {
+        return c.json(
+          { ok: false as const, error: "No zip file provided" },
+          400,
+        );
+      }
+
+      if (!file.name.endsWith(".zip")) {
+        return c.json(
+          { ok: false as const, error: "Only .zip files are accepted" },
+          400,
+        );
+      }
+
+      const maxSize = 50 * 1024 * 1024; // 50 MB
+      if (file.size > maxSize) {
+        return c.json(
+          { ok: false as const, error: "Zip file too large (max 50 MB)" },
+          400,
+        );
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const result =
+        await container.skillhubService.catalog.importSkillZip(buffer);
+
+      return c.json(result, 200);
     },
   );
 }

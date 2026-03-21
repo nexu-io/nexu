@@ -52,7 +52,7 @@ describe("NexuConfigStore", () => {
     await rm(rootDir, { recursive: true, force: true });
   });
 
-  it("persists bot, channel, provider, skill, and template state", async () => {
+  it("persists bot, channel, provider, and template state", async () => {
     const store = new NexuConfigStore(env);
 
     const bot = await store.createBot({ name: "Assistant", slug: "assistant" });
@@ -68,15 +68,11 @@ describe("NexuConfigStore", () => {
       displayName: "OpenAI",
       modelsJson: JSON.stringify(["gpt-4o"]),
     });
-    await store.upsertSkill({ name: "daily-standup", content: "# Standup" });
     await store.upsertTemplate({ name: "AGENTS.md", content: "hello" });
 
     expect(bot.slug).toBe("assistant");
     expect(channel.accountId).toBe("slack-A123-T123");
     expect(provider.provider.hasApiKey).toBe(true);
-    expect((await store.getSkills()).items["daily-standup"]?.content).toBe(
-      "# Standup",
-    );
     expect(await store.listTemplates()).toHaveLength(1);
     expect(await store.listProviders()).toHaveLength(1);
     expect(await store.listChannels()).toHaveLength(1);
@@ -99,7 +95,6 @@ describe("NexuConfigStore", () => {
           integrations: [],
           channels: [],
           templates: {},
-          skills: {},
           desktop: {},
           secrets: {},
         },

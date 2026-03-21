@@ -60,42 +60,6 @@ export const controllerTemplateUpsertBodySchema = z.object({
   status: z.enum(["active", "inactive"]).optional(),
 });
 
-export const controllerSkillItemSchema = z.object({
-  name: z.string(),
-  enabled: z.boolean().default(true),
-  source: z.enum(["inline", "local-path"]).default("inline"),
-  content: z.string().default(""),
-  localPath: z.string().optional(),
-  files: z.record(z.string(), z.string()).default({}),
-  metadata: z
-    .object({
-      title: z.string().optional(),
-      description: z.string().optional(),
-      owner: z.string().optional(),
-      tags: z.array(z.string()).optional(),
-      category: z.string().optional(),
-    })
-    .default({}),
-});
-
-export const controllerSkillsSchema = z.object({
-  version: z.number().int().positive().default(1),
-  defaults: z
-    .object({
-      enabled: z.boolean().default(true),
-      source: z.enum(["inline", "local-path"]).default("inline"),
-    })
-    .default({ enabled: true, source: "inline" }),
-  items: z.record(z.string(), controllerSkillItemSchema).default({}),
-});
-
-export const controllerSkillUpsertBodySchema = z.object({
-  content: z.string().min(1),
-  files: z.record(z.string(), z.string()).optional(),
-  status: z.enum(["active", "inactive"]).optional(),
-  metadata: controllerSkillItemSchema.shape.metadata.optional(),
-});
-
 export const controllerArtifactSchema = z.object({
   id: z.string(),
   botId: z.string(),
@@ -127,7 +91,6 @@ const nexuConfigObjectSchema = z.object({
   integrations: z.array(integrationResponseSchema).default([]),
   channels: z.array(channelResponseSchema).default([]),
   templates: z.record(z.string(), controllerTemplateSchema).default({}),
-  skills: controllerSkillsSchema,
   desktop: z.record(z.unknown()).default({}),
   secrets: z.record(z.string(), z.string()).default({}),
 });
@@ -163,10 +126,6 @@ export const nexuConfigSchema = z.preprocess((input) => {
       typeof candidate.templates === "object" && candidate.templates !== null
         ? candidate.templates
         : {},
-    skills:
-      typeof candidate.skills === "object" && candidate.skills !== null
-        ? candidate.skills
-        : {},
     desktop:
       typeof candidate.desktop === "object" && candidate.desktop !== null
         ? candidate.desktop
@@ -193,7 +152,5 @@ export type ControllerRuntimeConfig = z.infer<
   typeof controllerRuntimeConfigSchema
 >;
 export type ControllerProvider = z.infer<typeof controllerProviderSchema>;
-export type ControllerSkillItem = z.infer<typeof controllerSkillItemSchema>;
-export type ControllerSkills = z.infer<typeof controllerSkillsSchema>;
 export type ControllerArtifact = z.infer<typeof controllerArtifactSchema>;
 export type ArtifactsIndex = z.infer<typeof artifactsIndexSchema>;

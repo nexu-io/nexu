@@ -113,15 +113,23 @@ jobs:
         shell: bash
         env:
           CHANNEL: ${{ steps.meta.outputs.channel }}
+          SENTRY_ENV: "prod"
           BUILD_COMMIT: ${{ steps.meta.outputs.commit_sha }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_PROD }}
+          SENTRY_DSN_TEST: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_TEST }}
+          SENTRY_DSN_PROD: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_PROD }}
         run: |
           export BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           node -e '
             const { version } = require("./apps/desktop/package.json");
+            const sentryDsnByEnvironment = {
+              test: process.env.SENTRY_DSN_TEST,
+              prod: process.env.SENTRY_DSN_PROD,
+            };
+            const sentryDsn = sentryDsnByEnvironment[process.env.SENTRY_ENV] ?? "";
             const config = {
               NEXU_CLOUD_URL: "https://nexu.io",
               NEXU_LINK_URL: "https://link.nexu.io",
+              NEXU_SENTRY_ENV: process.env.SENTRY_ENV,
               NEXU_UPDATE_FEED_URL: `https://desktop-releases.nexu.io/${process.env.CHANNEL}`,
               NEXU_DESKTOP_APP_VERSION: version,
               NEXU_DESKTOP_BUILD_SOURCE: "release",
@@ -129,8 +137,8 @@ jobs:
               NEXU_DESKTOP_BUILD_COMMIT: process.env.BUILD_COMMIT,
               NEXU_DESKTOP_BUILD_TIME: process.env.BUILT_AT,
             };
-            if (process.env.SENTRY_DSN) {
-              config.NEXU_DESKTOP_SENTRY_DSN = process.env.SENTRY_DSN;
+            if (sentryDsn) {
+              config.NEXU_DESKTOP_SENTRY_DSN = sentryDsn;
             }
             require("fs").writeFileSync(
               "apps/desktop/build-config.json",

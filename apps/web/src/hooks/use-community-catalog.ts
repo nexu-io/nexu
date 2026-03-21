@@ -3,6 +3,7 @@ import "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getApiV1SkillhubCatalog,
+  postApiV1SkillhubImport,
   postApiV1SkillhubInstall,
   postApiV1SkillhubRefresh,
   postApiV1SkillhubUninstall,
@@ -58,6 +59,28 @@ export function useUninstallSkill() {
       const result = data as { ok: boolean; error?: string };
       if (!result.ok) {
         throw new Error(result.error ?? "Uninstall failed");
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: DETAIL_QUERY_KEY }),
+      ]);
+      return result;
+    },
+  });
+}
+
+export function useImportSkill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const { data, error } = await postApiV1SkillhubImport({
+        body: { file },
+      });
+      if (error) throw new Error("Import request failed");
+      const result = data as { ok: boolean; slug?: string; error?: string };
+      if (!result.ok) {
+        throw new Error(result.error ?? "Import failed");
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY }),
