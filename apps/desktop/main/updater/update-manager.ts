@@ -1,4 +1,4 @@
-import { type BrowserWindow, app } from "electron";
+import { type BrowserWindow, app, webContents } from "electron";
 import { autoUpdater } from "electron-updater";
 import type { UpdateChannelName, UpdateSource } from "../../shared/host";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
@@ -44,6 +44,7 @@ export class UpdateManager {
 
     autoUpdater.autoDownload = options?.autoDownload ?? false;
     autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.forceDevUpdateConfig = !app.isPackaged;
     this.configureFeedUrl();
     this.bindEvents();
   }
@@ -112,7 +113,15 @@ export class UpdateManager {
 
   private send(channel: string, data: unknown): void {
     if (!this.win.isDestroyed()) {
+      const all = webContents.getAllWebContents();
+      // Send to the main renderer
       this.win.webContents.send(channel, data);
+      // Also forward to any embedded webviews so the web app receives events
+      for (const wc of all) {
+        if (wc.id !== this.win.webContents.id && !wc.isDestroyed()) {
+          wc.send(channel, data);
+        }
+      }
     }
   }
 

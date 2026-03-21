@@ -79,6 +79,7 @@ export class ChannelService {
       appId,
       botUserId: authData.user_id ?? null,
     });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
     return channel;
   }
@@ -118,6 +119,7 @@ export class ChannelService {
       ...input,
       botUserId: userData.id ?? null,
     });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
     return channel;
   }
@@ -143,6 +145,7 @@ export class ChannelService {
     }
 
     const channel = await this.configStore.connectFeishu(input);
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
     return channel;
   }

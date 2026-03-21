@@ -770,20 +770,259 @@ body,
   font-size: 1.3rem;
 }
 
-/* Update Banner */
-.update-banner {
+/* ── Update System — 1:1 replica of design-system prototype ──
+   Token reference (from design-system/src/index.css):
+     --color-surface-0:      #fafafa
+     --color-border:          rgba(0, 0, 0, 0.08)
+     --color-text-primary:    #1c1f23
+     --color-text-muted:      #787c80
+     --color-accent:          #1c1f23
+     --color-success:         #346e58
+     --color-brand-primary:   #3db9ce
+     --color-error:           #f8672f
+     --font-sans:             Inter, SF Pro Display, -apple-system, …
+     backdrop-blur-sm = 4px
+   ───────────────────────────────────────────────────────── */
+
+/* Dismissed badge — positioned in sidebar brand row, right of logo
+   Web app sidebar: 224px wide, pt-14 (56px) traffic-light clearance,
+   px-3 (12px) horizontal padding, logo h-6 (24px).
+   Badge sits right-aligned in that row. */
+.update-badge {
   position: fixed;
-  bottom: 16px;
-  right: 16px;
+  top: 60px;
+  left: 164px;
   z-index: 9000;
-  max-width: 420px;
-  padding: 14px 18px;
-  border-radius: 16px;
-  backdrop-filter: blur(12px);
-  font-size: 0.88rem;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: #3db9ce;
+  color: #fff;
+  font-family: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC", "PingFang SC", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: opacity 120ms ease;
   animation: update-banner-in 240ms ease;
 }
 
+.update-badge:hover {
+  opacity: 0.85;
+}
+
+/* Card — mx-3 mb-2 px-3 py-2.5 rounded-[10px] border border-border
+           bg-surface-0/80 backdrop-blur-sm animate-float */
+.update-card {
+  position: fixed;
+  bottom: 80px;
+  left: 12px;
+  z-index: 9000;
+  width: 220px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(250, 250, 250, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-family: "Inter", "SF Pro Display", -apple-system, "Noto Sans SC", "PingFang SC", sans-serif;
+  animation: update-float 3s ease-in-out infinite;
+}
+
+.update-card--error {
+  border-color: rgba(248, 103, 47, 0.2);
+}
+
+/* Header — flex items-center justify-between mb-1.5 */
+.update-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+/* Status — flex items-center gap-2 */
+.update-card-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Dot — relative flex h-2 w-2 shrink-0 */
+.update-dot-wrapper {
+  position: relative;
+  display: flex;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+/* Ping — animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75 */
+.update-dot-ping {
+  position: absolute;
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: #346e58;
+  opacity: 0.75;
+  animation: update-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Solid dot — relative inline-flex rounded-full h-2 w-2 bg-success */
+.update-dot {
+  position: relative;
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #346e58;
+}
+
+.update-dot--error .update-dot-ping {
+  background: #f8672f;
+}
+
+.update-dot--error .update-dot {
+  background: #f8672f;
+}
+
+/* Title — text-[12px] font-medium text-text-primary whitespace-nowrap */
+.update-card-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1c1f23;
+  white-space: nowrap;
+}
+
+/* Close — text-text-muted hover:text-text-primary transition-colors -mr-1 */
+.update-card-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #787c80;
+  cursor: pointer;
+  margin-right: -4px;
+  transition: color 120ms ease;
+}
+
+.update-card-close:hover {
+  color: #1c1f23;
+}
+
+/* Percent — flex items-center justify-between pl-4 mb-1
+             text-[10px] tabular-nums text-text-muted */
+.update-card-percent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 16px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #787c80;
+}
+
+/* Progress wrap — pl-4 pr-1 */
+.update-card-progress-wrap {
+  padding-left: 16px;
+  padding-right: 4px;
+}
+
+/* Track — h-[6px] w-full rounded-full bg-border overflow-hidden */
+.update-card-progress-track {
+  height: 6px;
+  width: 100%;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Fill — h-full rounded-full bg-brand-primary transition-all duration-300 ease-out */
+.update-card-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: #3db9ce;
+  transition: width 300ms ease-out;
+}
+
+/* Actions — flex items-center gap-2 pl-4 */
+.update-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 16px;
+}
+
+/* Btn base */
+.update-card-btn {
+  border: 0;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+/* Primary — rounded-[6px] px-2.5 py-0.5 bg-accent text-white */
+.update-card-btn--primary {
+  padding: 2px 10px;
+  background: #1c1f23;
+  color: #fff;
+}
+
+.update-card-btn--primary:hover {
+  opacity: 0.85;
+}
+
+/* Ghost — rounded-[6px] px-2 py-0.5 text-text-muted hover:text-text-primary */
+.update-card-btn--ghost {
+  padding: 2px 8px;
+  background: transparent;
+  color: #787c80;
+  transition: color 120ms ease;
+}
+
+.update-card-btn--ghost:hover {
+  color: #1c1f23;
+}
+
+/* Error message */
+.update-card-error-msg {
+  padding-left: 16px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #f8672f;
+  line-height: 1.4;
+}
+
+/* ── Keyframes ── */
+
+/* Float — 3s ease-in-out infinite, ±6px */
+@keyframes update-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Ping — Tailwind animate-ping replica */
+@keyframes update-ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Slide-in entrance */
 @keyframes update-banner-in {
   from {
     opacity: 0;
@@ -793,70 +1032,6 @@ body,
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.update-banner--available,
-.update-banner--downloading,
-.update-banner--ready {
-  border: 1px solid rgba(139, 167, 255, 0.3);
-  background: rgba(12, 16, 22, 0.92);
-  color: #f5f7fb;
-}
-
-.update-banner--error {
-  border: 1px solid rgba(179, 60, 47, 0.4);
-  background: rgba(30, 12, 12, 0.92);
-  color: #f5d0cc;
-}
-
-.update-banner-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.update-banner-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.update-banner-btn {
-  padding: 6px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.82);
-  cursor: pointer;
-  font-size: 0.82rem;
-  transition: background 120ms ease;
-}
-
-.update-banner-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.update-banner-btn--primary {
-  background: #8ba7ff;
-  color: #0c1016;
-  border-color: transparent;
-}
-
-.update-banner-btn--primary:hover {
-  background: #a3baff;
-}
-
-.update-banner-progress {
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-}
-
-.update-banner-progress-bar {
-  height: 100%;
-  background: #8ba7ff;
-  border-radius: 2px;
-  transition: width 300ms ease;
 }
 
 @media (max-width: 860px) {

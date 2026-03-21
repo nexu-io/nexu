@@ -15,6 +15,7 @@ export type UpdateState = {
   releaseNotes: string | null;
   percent: number;
   errorMessage: string | null;
+  dismissed: boolean;
 };
 
 export function useAutoUpdate() {
@@ -24,6 +25,7 @@ export function useAutoUpdate() {
     releaseNotes: null,
     percent: 0,
     errorMessage: null,
+    dismissed: false,
   });
 
   useEffect(() => {
@@ -124,10 +126,16 @@ export function useAutoUpdate() {
   const dismiss = useCallback(() => {
     setState((prev) => ({
       ...prev,
-      phase: "idle",
-      errorMessage: null,
+      dismissed: true,
     }));
   }, []);
 
-  return { ...state, check, download, install, dismiss };
+  const undismiss = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      dismissed: false,
+    }));
+  }, []);
+
+  return { ...state, check, download, install, dismiss, undismiss };
 }

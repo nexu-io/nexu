@@ -206,6 +206,16 @@ function WorkspaceLayoutInner() {
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const update = useAutoUpdate();
   const [updateDismissed, setUpdateDismissed] = useState(false);
+
+  // Trigger an update check on mount when inside the desktop client.
+  // The Electron main process may have already checked before the webview loaded,
+  // so we re-check to ensure the web app receives the current update state.
+  useEffect(() => {
+    if (isDesktopClient) {
+      void update.check();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDesktopClient]);
   const hasUpdate =
     update.phase === "available" ||
     update.phase === "downloading" ||

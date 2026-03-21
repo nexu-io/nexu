@@ -58,7 +58,16 @@ const compactionMemoryFlushSchema = z
   .object({
     enabled: z.boolean().optional(),
     softThresholdTokens: z.number().optional(),
+    forceFlushTranscriptBytes: z.union([z.number(), z.string()]).optional(),
     prompt: z.string().optional(),
+    systemPrompt: z.string().optional(),
+  })
+  .passthrough();
+
+const compactionQualityGuardSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    maxRetries: z.number().optional(),
   })
   .passthrough();
 
@@ -69,6 +78,11 @@ const compactionSchema = z
     keepRecentTokens: z.number().optional(),
     reserveTokensFloor: z.number().optional(),
     maxHistoryShare: z.number().optional(),
+    recentTurnsPreserve: z.number().min(0).max(12).optional(),
+    identifierPolicy: z.enum(["strict", "off", "custom"]).optional(),
+    identifierInstructions: z.string().optional(),
+    qualityGuard: compactionQualityGuardSchema.optional(),
+    postCompactionSections: z.array(z.string()).optional(),
     memoryFlush: compactionMemoryFlushSchema.optional(),
   })
   .passthrough();
@@ -86,6 +100,35 @@ const memorySearchSyncSchema = z
   })
   .passthrough();
 
+const memorySearchStoreSchema = z
+  .object({
+    driver: z.enum(["sqlite"]).optional(),
+    path: z.string().optional(),
+    vectorExtension: z.string().optional(),
+  })
+  .passthrough();
+
+const memorySearchChunkingSchema = z
+  .object({
+    tokenSize: z.number().optional(),
+    overlap: z.number().optional(),
+  })
+  .passthrough();
+
+const memorySearchQuerySchema = z
+  .object({
+    maxResults: z.number().optional(),
+    minScore: z.number().optional(),
+    mmr: z.boolean().optional(),
+    timeDecay: z
+      .object({
+        enabled: z.boolean().optional(),
+        halfLifeDays: z.number().optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
+
 const memorySearchSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -96,6 +139,43 @@ const memorySearchSchema = z
     model: z.string().optional(),
     remote: memorySearchRemoteSchema.optional(),
     sync: memorySearchSyncSchema.optional(),
+    store: memorySearchStoreSchema.optional(),
+    chunking: memorySearchChunkingSchema.optional(),
+    query: memorySearchQuerySchema.optional(),
+  })
+  .passthrough();
+
+const humanDelaySchema = z
+  .object({
+    mode: z.enum(["off", "natural", "custom"]).optional(),
+    minMs: z.number().optional(),
+    maxMs: z.number().optional(),
+  })
+  .passthrough();
+
+const subagentsSchema = z
+  .object({
+    maxConcurrent: z.number().optional(),
+    maxSpawnDepth: z.number().optional(),
+    maxChildrenPerAgent: z.number().optional(),
+    archiveAfterMinutes: z.number().optional(),
+    model: agentModelSchema.optional(),
+    thinking: z.string().optional(),
+  })
+  .passthrough();
+
+const blockStreamingChunkSchema = z
+  .object({
+    minChars: z.number().optional(),
+    maxChars: z.number().optional(),
+    preferParagraph: z.boolean().optional(),
+    preferNewline: z.boolean().optional(),
+  })
+  .passthrough();
+
+const blockStreamingCoalesceSchema = z
+  .object({
+    idleMs: z.number().optional(),
   })
   .passthrough();
 
@@ -107,6 +187,28 @@ const agentsConfigSchema = z.object({
         .optional(),
       compaction: compactionSchema.optional(),
       memorySearch: memorySearchSchema.optional(),
+      // Thinking and verbosity
+      thinkingDefault: z
+        .enum(["off", "minimal", "low", "medium", "high", "xhigh", "adaptive"])
+        .optional(),
+      verboseDefault: z.enum(["off", "on", "full"]).optional(),
+      elevatedDefault: z.enum(["off", "on", "ask", "full"]).optional(),
+      // Streaming
+      blockStreamingDefault: z.enum(["off", "on"]).optional(),
+      blockStreamingBreak: z.enum(["text_end", "message_end"]).optional(),
+      blockStreamingChunk: blockStreamingChunkSchema.optional(),
+      blockStreamingCoalesce: blockStreamingCoalesceSchema.optional(),
+      // Human delay
+      humanDelay: humanDelaySchema.optional(),
+      // Subagents
+      subagents: subagentsSchema.optional(),
+      // Context and bootstrap
+      contextTokens: z.number().optional(),
+      bootstrapMaxChars: z.number().optional(),
+      userTimezone: z.string().optional(),
+      timeFormat: z.enum(["12h", "24h"]).optional(),
+      // Max concurrent
+      maxConcurrent: z.number().optional(),
     })
     .passthrough()
     .optional(),
@@ -327,6 +429,26 @@ const pluginsConfigSchema = z
   })
   .passthrough();
 
+const hookConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+  })
+  .passthrough();
+
+const internalHooksSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    entries: z.record(z.string(), hookConfigSchema).optional(),
+  })
+  .passthrough();
+
+const hooksConfigSchema = z
+  .object({
+    internal: internalHooksSchema.optional(),
+  })
+  .passthrough();
+
 const diagnosticsConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -371,6 +493,7 @@ export const openclawConfigSchema = z.object({
   messages: messagesConfigSchema.optional(),
   diagnostics: diagnosticsConfigSchema.optional(),
   plugins: pluginsConfigSchema.optional(),
+  hooks: hooksConfigSchema.optional(),
 });
 
 export type OpenClawConfig = z.infer<typeof openclawConfigSchema>;

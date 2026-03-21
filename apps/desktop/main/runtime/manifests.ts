@@ -329,6 +329,9 @@ export function createRuntimeUnitManifests(
         SKILLHUB_STATIC_SKILLS_DIR: isPackaged
           ? path.resolve(electronRoot, "static/bundled-skills")
           : path.resolve(repoRoot, "apps/desktop/static/bundled-skills"),
+        PLATFORM_TEMPLATES_DIR: isPackaged
+          ? path.resolve(electronRoot, "static/platform-templates")
+          : path.resolve(repoRoot, "apps/controller/static/platform-templates"),
         OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
         OPENCLAW_ELECTRON_EXECUTABLE: process.execPath,
         OPENCLAW_EXTENSIONS_DIR: path.resolve(

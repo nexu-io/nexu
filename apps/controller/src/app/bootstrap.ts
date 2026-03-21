@@ -4,6 +4,7 @@ export async function bootstrapController(
   container: ControllerContainer,
 ): Promise<() => void> {
   await container.openclawProcess.prepare();
+  await container.openclawSyncService.ensureRuntimeModelPlugin();
 
   // Validate default model against available models before first sync
   await container.modelProviderService.ensureValidDefaultModel();

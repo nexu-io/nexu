@@ -50,6 +50,7 @@ const envSchema = z.object({
   OPENCLAW_SKILLS_DIR: z.string().optional(),
   OPENCLAW_CURATED_SKILLS_DIR: z.string().optional(),
   SKILLHUB_STATIC_SKILLS_DIR: z.string().optional(),
+  PLATFORM_TEMPLATES_DIR: z.string().optional(),
   OPENCLAW_GATEWAY_PORT: z.coerce.number().int().positive().default(18789),
   OPENCLAW_GATEWAY_TOKEN: z.string().optional(),
   OPENCLAW_BIN: z.string().default("openclaw"),
@@ -89,14 +90,31 @@ export const env = {
   openclawSkillsDir: expandHomeDir(
     parsed.OPENCLAW_SKILLS_DIR ?? path.join(openclawStateDir, "skills"),
   ),
+  openclawExtensionsDir: path.join(openclawStateDir, "extensions"),
+  runtimePluginTemplatesDir: workspaceRoot
+    ? path.join(
+        workspaceRoot,
+        "apps",
+        "controller",
+        "static",
+        "runtime-plugins",
+      )
+    : path.resolve(process.cwd(), "static", "runtime-plugins"),
   openclawCuratedSkillsDir: expandHomeDir(
     parsed.OPENCLAW_CURATED_SKILLS_DIR ??
       path.join(openclawStateDir, "bundled-skills"),
+  ),
+  openclawRuntimeModelStatePath: path.join(
+    openclawStateDir,
+    "nexu-runtime-model.json",
   ),
   skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
   skillDbPath: path.join(nexuHomeDir, "skill-ledger.db"),
   staticSkillsDir: parsed.SKILLHUB_STATIC_SKILLS_DIR
     ? expandHomeDir(parsed.SKILLHUB_STATIC_SKILLS_DIR)
+    : undefined,
+  platformTemplatesDir: parsed.PLATFORM_TEMPLATES_DIR
+    ? expandHomeDir(parsed.PLATFORM_TEMPLATES_DIR)
     : undefined,
   openclawWorkspaceTemplatesDir: path.join(
     openclawStateDir,

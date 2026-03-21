@@ -4,12 +4,14 @@
  * High-level business API for communicating with the OpenClaw Gateway via
  * WebSocket RPC. Wraps the low-level OpenClawWsClient to provide:
  *
- * - Config push (config.apply with optimistic concurrency)
+ * - Config push (direct file write for hot-reload without restart)
  * - Channel status query (channels.status)
  * - Single-channel readiness check
  */
 
 import { createHash } from "node:crypto";
+import { mkdir, utimes, writeFile } from "node:fs/promises";
+import path from "node:path";
 import type { OpenClawConfig } from "@nexu/shared";
 import { logger } from "../lib/logger.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
@@ -79,7 +81,10 @@ export class OpenClawGatewayService {
   /** SHA-256 hash of the last config we successfully pushed. */
   private lastPushedConfigHash: string | null = null;
 
-  constructor(private readonly wsClient: OpenClawWsClient) {}
+  constructor(
+    private readonly wsClient: OpenClawWsClient,
+    private readonly configPath?: string,
+  ) {}
 
   /** Whether the WS client has completed handshake and is ready for RPC. */
   isConnected(): boolean {
@@ -98,37 +103,62 @@ export class OpenClawGatewayService {
   /**
    * Push a full configuration to OpenClaw.
    *
-   * Flow:
-   * 1. Call `config.get` to obtain the current config hash (optimistic concurrency)
-   * 2. Call `config.apply` with `baseHash` to push the new configuration
-   * 3. OpenClaw validates -> persists to openclaw.json -> SIGUSR1 hot-reload
+   * Flow (direct file write for hot-reload):
+   * 1. Write config directly to openclaw.json
+   * 2. OpenClaw's file watcher detects change and hot-reloads
+   * 3. For model changes: only heartbeatRunner.updateConfig() is called (no restart!)
+   *
+   * This avoids the SIGUSR1 restart that config.apply RPC would trigger.
    *
    * Returns true if the config was actually pushed (skips if unchanged).
-   * @throws If the WS is not connected or the RPC fails
    */
   async pushConfig(config: OpenClawConfig): Promise<boolean> {
     const hash = this.configHash(config);
 
-    // Skip redundant pushes to avoid push -> restart -> reconnect -> push loop
+    // Skip redundant pushes to avoid unnecessary file writes
     if (hash === this.lastPushedConfigHash) {
       logger.info({}, "openclaw_push_skipped_unchanged");
       return false;
     }
 
-    // config.apply requires baseHash for optimistic concurrency control.
-    const current = await this.wsClient.request<{ hash?: string }>(
-      "config.get",
-    );
-    const baseHash = current?.hash;
+    if (!this.configPath) {
+      // Fallback to RPC if no config path provided (shouldn't happen in practice)
+      logger.warn({}, "openclaw_push_fallback_rpc_no_path");
+      const current = await this.wsClient.request<{ hash?: string }>(
+        "config.get",
+      );
+      const baseHash = current?.hash;
+      await this.wsClient.request("config.apply", {
+        raw: JSON.stringify(config, null, 2),
+        note: "pushed from nexu-controller",
+        ...(baseHash ? { baseHash } : {}),
+      });
+      this.lastPushedConfigHash = hash;
+      logger.info({}, "openclaw_config_pushed_via_rpc");
+      return true;
+    }
 
-    await this.wsClient.request("config.apply", {
-      raw: JSON.stringify(config, null, 2),
-      note: "pushed from nexu-controller",
-      ...(baseHash ? { baseHash } : {}),
-    });
+    // Direct file write + utimes to ensure FSEvents triggers on macOS
+    const configDir = path.dirname(this.configPath);
+    await mkdir(configDir, { recursive: true });
+    const content = JSON.stringify(config, null, 2);
+    await writeFile(this.configPath, content, "utf-8");
+    // Touch the file to ensure FSEvents detects the change
+    const now = new Date();
+    await utimes(this.configPath, now, now);
 
     this.lastPushedConfigHash = hash;
-    logger.info({}, "openclaw_config_pushed");
+    logger.info(
+      {
+        path: this.configPath,
+        contentLength: content.length,
+        modelId:
+          typeof config.agents?.defaults?.model === "string"
+            ? config.agents.defaults.model
+            : (config.agents?.defaults?.model?.primary ?? "unknown"),
+      },
+      "openclaw_config_pushed_via_file",
+    );
     return true;
   }
 

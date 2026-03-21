@@ -1,9 +1,11 @@
-import type {
-  Model,
-  verifyProviderBodySchema,
-  verifyProviderResponseSchema,
+import {
+  type Model,
+  selectPreferredModel,
+  type verifyProviderBodySchema,
+  type verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { z } from "zod";
+import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 
@@ -45,7 +47,10 @@ type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
 type VerifyProviderResponse = z.infer<typeof verifyProviderResponseSchema>;
 
 export class ModelProviderService {
-  constructor(private readonly configStore: NexuConfigStore) {}
+  constructor(
+    private readonly configStore: NexuConfigStore,
+    _nodeEnv: ControllerEnv["nodeEnv"],
+  ) {}
 
   async listModels() {
     const config = await this.configStore.getConfig();
@@ -117,7 +122,7 @@ export class ModelProviderService {
     }
 
     // biome-ignore lint/style/noNonNullAssertion: length checked above
-    const selected = models[0]!;
+    const selected = selectPreferredModel(models) ?? models[0]!;
     await this.configStore.setDefaultModel(selected.id);
 
     logger.info(

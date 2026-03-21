@@ -2,6 +2,8 @@ import { GatewayClient } from "../runtime/gateway-client.js";
 import { startHealthLoop } from "../runtime/loops.js";
 import { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../runtime/openclaw-process.js";
+import { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawSkillsWriter } from "../runtime/openclaw-skills-writer.js";
 import { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
@@ -60,6 +62,8 @@ export function createContainer(): ControllerContainer {
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);
+  const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
+  const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
   const skillsWriter = new OpenClawSkillsWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
@@ -69,19 +73,28 @@ export function createContainer(): ControllerContainer {
   const runtimeState = createRuntimeState();
   const openclawProcess = new OpenClawProcessManager(env);
   const wsClient = new OpenClawWsClient(env);
-  const gatewayService = new OpenClawGatewayService(wsClient);
+  // Write config to the same path OpenClaw monitors (set via OPENCLAW_CONFIG_PATH env var)
+  const gatewayService = new OpenClawGatewayService(
+    wsClient,
+    env.openclawConfigPath,
+  );
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
     compiledStore,
     configWriter,
+    runtimePluginWriter,
+    runtimeModelWriter,
     skillsWriter,
     templateWriter,
     watchTrigger,
     gatewayService,
   );
   const skillhubService = new SkillhubService(env);
-  const modelProviderService = new ModelProviderService(configStore);
+  const modelProviderService = new ModelProviderService(
+    configStore,
+    env.nodeEnv,
+  );
 
   // Wire cloud state change callback for auto-model-selection + sync
   configStore.onCloudStateChanged = async () => {

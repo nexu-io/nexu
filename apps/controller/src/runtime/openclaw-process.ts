@@ -69,6 +69,8 @@ export class OpenClawProcessManager {
         ...process.env,
         ...extraEnv,
         OPENCLAW_LOG_LEVEL: "info",
+        // Explicitly pass config path so OpenClaw's file watcher monitors the correct file
+        OPENCLAW_CONFIG_PATH: this.env.openclawConfigPath,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

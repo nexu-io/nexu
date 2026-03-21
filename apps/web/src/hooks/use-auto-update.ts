@@ -37,11 +37,12 @@ export function useAutoUpdate() {
 
     disposers.push(
       updater.onEvent("update:checking", () => {
-        setState((prev: UpdateState) => ({
-          ...prev,
-          phase: "checking",
-          errorMessage: null,
-        }));
+        setState((prev: UpdateState) => {
+          // Don't regress from downloading/ready (downloadUpdate re-fires check events)
+          if (prev.phase === "downloading" || prev.phase === "ready")
+            return prev;
+          return { ...prev, phase: "checking", errorMessage: null };
+        });
       }),
     );
 
@@ -49,11 +50,11 @@ export function useAutoUpdate() {
       updater.onEvent(
         "update:available",
         (data: { version: string; releaseNotes?: string }) => {
-          setState((prev: UpdateState) => ({
-            ...prev,
-            phase: "available",
-            version: data.version,
-          }));
+          setState((prev: UpdateState) => {
+            if (prev.phase === "downloading" || prev.phase === "ready")
+              return prev;
+            return { ...prev, phase: "available", version: data.version };
+          });
         },
       ),
     );
@@ -112,6 +113,8 @@ export function useAutoUpdate() {
   }, [bridge]);
 
   const download = useCallback(async () => {
+    // Immediately show downloading state before the IPC round-trip
+    setState((prev) => ({ ...prev, phase: "downloading", percent: 0 }));
     try {
       await bridge?.invoke("update:download", undefined);
     } catch {

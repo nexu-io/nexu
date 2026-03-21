@@ -1,0 +1,10 @@
+{
+  "id": "nexu-platform-bootstrap",
+  "name": "Nexu Platform Bootstrap",
+  "description": "Injects platform-managed nexu-platform bootstrap files into workspace bootstrap context.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

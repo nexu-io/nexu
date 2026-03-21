@@ -1,0 +1,10 @@
+{
+  "id": "nexu-runtime-model",
+  "name": "Nexu Runtime Model",
+  "description": "Injects Nexu runtime model selection into model routing and prompt context.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

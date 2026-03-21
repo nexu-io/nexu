@@ -172,6 +172,7 @@ export function DesktopShell() {
       </main>
 
       <UpdateBanner
+        dismissed={update.dismissed}
         errorMessage={update.errorMessage}
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}

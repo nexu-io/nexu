@@ -2,12 +2,28 @@ import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import { compileOpenClawConfig } from "../lib/openclaw-config-compiler.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
+import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
+import type { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import type { OpenClawSkillsWriter } from "../runtime/openclaw-skills-writer.js";
 import type { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import type { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
 import type { CompiledOpenClawStore } from "../store/compiled-openclaw-store.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
+
+function resolvePrimaryModelRef(
+  model: string | { primary: string } | undefined,
+): string {
+  if (typeof model === "string") {
+    return model;
+  }
+
+  if (model && typeof model.primary === "string") {
+    return model.primary;
+  }
+
+  return "anthropic/claude-opus-4-6";
+}
 
 export class OpenClawSyncService {
   private pendingSync: Promise<{ configPushed: boolean }> | null = null;
@@ -27,6 +43,8 @@ export class OpenClawSyncService {
     private readonly configStore: NexuConfigStore,
     private readonly compiledStore: CompiledOpenClawStore,
     private readonly configWriter: OpenClawConfigWriter,
+    private readonly runtimePluginWriter: OpenClawRuntimePluginWriter,
+    private readonly runtimeModelWriter: OpenClawRuntimeModelWriter,
     private readonly skillsWriter: OpenClawSkillsWriter,
     private readonly templateWriter: WorkspaceTemplateWriter,
     private readonly watchTrigger: OpenClawWatchTrigger,
@@ -121,6 +139,19 @@ export class OpenClawSyncService {
     return this.doSync();
   }
 
+  async ensureRuntimeModelPlugin(): Promise<void> {
+    await this.runtimePluginWriter.ensurePlugins();
+    await this.runtimeModelWriter.writeFallback();
+  }
+
+  /**
+   * Write platform templates to a specific bot's workspace.
+   * Called when creating a new bot to seed workspace with platform files.
+   */
+  async writePlatformTemplatesForBot(botId: string): Promise<void> {
+    await this.templateWriter.write([{ id: botId, status: "active" }]);
+  }
+
   private async doSync(): Promise<{ configPushed: boolean }> {
     const seq = ++this.syncCounter;
     const config = await this.configStore.getConfig();
@@ -151,9 +182,11 @@ export class OpenClawSyncService {
 
     // 2. Always write files (persistence + cold-start fallback)
     await this.configWriter.write(compiled);
+    await this.runtimeModelWriter.write(
+      resolvePrimaryModelRef(compiled.agents.defaults?.model),
+    );
     await this.compiledStore.saveConfig(compiled);
     await this.skillsWriter.materialize(config.skills);
-    await this.templateWriter.write(Object.values(config.templates));
 
     // 3. Only touch watch trigger when WS push failed (file-watch hot-reload)
     if (!configPushed) {

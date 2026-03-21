@@ -86,6 +86,10 @@
         "to": "static/bundled-skills"
       },
       {
+        "from": "../controller/static/platform-templates",
+        "to": "static/platform-templates"
+      },
+      {
         "from": "node_modules/sharp",
         "to": "bundled-node-modules/sharp"
       },

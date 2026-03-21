@@ -475,6 +475,15 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
+  // Disable sandbox for webviews so preload scripts have access to Node.js APIs
+  // (needed for contextBridge/ipcRenderer in ESM-built preloads)
+  window.webContents.on(
+    "will-attach-webview",
+    (_event, webPreferences, _params) => {
+      webPreferences.sandbox = false;
+    },
+  );
+
   // Per-webContents handler is set globally via app.on('web-contents-created')
   // so we don't need one here on the main window.
 
@@ -573,6 +582,18 @@ app.on("web-contents-created", (_event, contents) => {
   if (contentType !== "webview") {
     return;
   }
+
+  contents.on("console-message", (_event, level, message, line, sourceId) => {
+    const levelLabel =
+      ["verbose", "info", "warning", "error"][level] ?? String(level);
+    logRendererEvent({
+      source: `embedded:${contentType}:${levelLabel}`,
+      stream: level >= 3 ? "stderr" : "stdout",
+      kind: "app",
+      message: `${message} (${sourceId}:${line})`,
+      windowId: contents.id,
+    });
+  });
 
   contents.on(
     "did-fail-load",

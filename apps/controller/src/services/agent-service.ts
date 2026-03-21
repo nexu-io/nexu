@@ -18,6 +18,7 @@ export class AgentService {
 
   async createBot(input: CreateBotInput) {
     const bot = await this.configStore.createBot(input);
+    await this.syncService.writePlatformTemplatesForBot(bot.id);
     await this.syncService.syncAll();
     return bot;
   }

@@ -146,7 +146,9 @@ function collectLitellmModelIds(config: NexuConfig): string[] {
       (value): value is string => typeof value === "string" && value.length > 0,
     )
     .map((value) => value.replace(/^litellm\//, ""))
-    .filter((value) => !value.startsWith("link/"));
+    .filter(
+      (value) => !value.startsWith("link/") && !value.startsWith("debug/"),
+    );
 }
 
 function compileModelsConfig(
@@ -301,21 +303,32 @@ function compileAgentList(
     }));
 }
 
-function compilePlugins(config: NexuConfig): OpenClawConfig["plugins"] {
+function compilePlugins(
+  config: NexuConfig,
+  env: ControllerEnv,
+): OpenClawConfig["plugins"] {
   const hasFeishu = config.channels.some(
     (channel) =>
       channel.channelType === "feishu" && channel.status === "connected",
   );
 
-  return hasFeishu
-    ? {
-        entries: {
-          feishu: {
-            enabled: true,
-          },
-        },
-      }
-    : undefined;
+  return {
+    load: {
+      paths: [env.openclawExtensionsDir],
+    },
+    entries: {
+      ...(hasFeishu
+        ? {
+            feishu: {
+              enabled: true,
+            },
+          }
+        : {}),
+      "nexu-runtime-model": {
+        enabled: true,
+      },
+    },
+  };
 }
 
 export function compileOpenClawConfig(
@@ -413,7 +426,7 @@ export function compileOpenClawConfig(
       secrets: config.secrets,
     }),
     bindings: compileChannelBindings(config.bots, config.channels),
-    plugins: compilePlugins(config),
+    plugins: compilePlugins(config, env),
     skills: {
       load: {
         watch: true,

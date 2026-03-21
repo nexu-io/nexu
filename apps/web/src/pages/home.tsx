@@ -201,14 +201,14 @@ export function HomePage() {
 
   const CHANNEL_OPTIONS = useMemo(() => getChannelOptions(t), [t]);
 
-  // Runtime health status (polls every 5s)
+  // Runtime health status (polls every 2s for faster feedback)
   const { data: runtimeData } = useQuery({
     queryKey: ["runtime-ready"],
     queryFn: async () => {
       const { data } = await getApiInternalDesktopReady();
       return data;
     },
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   const runtimeDisplay = useMemo(() => {
