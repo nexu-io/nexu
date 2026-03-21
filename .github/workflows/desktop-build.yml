@@ -41,6 +41,11 @@ on:
         description: "Build source label embedded in desktop metadata"
         required: true
         type: string
+    secrets:
+      CLOUDFLARE_ZONE_ID:
+        required: false
+      CLOUDFLARE_API_TOKEN:
+        required: false
 
 permissions:
   contents: write
@@ -340,6 +345,35 @@ jobs:
           # Upload checksum
           echo "Uploading desktop-sha256.txt → ${r2_prefix}/desktop-sha256.txt"
           npx wrangler r2 object put "nexu-desktop-releases/${r2_prefix}/desktop-sha256.txt" --file "apps/desktop/channel-artifacts/desktop-sha256.txt" --remote
+
+      - name: Purge Cloudflare CDN cache for latest artifacts
+        if: inputs.update_feed_url != '' && secrets.CLOUDFLARE_ZONE_ID != ''
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
+          LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
+          LATEST_ZIP: ${{ steps.artifacts.outputs.latest_zip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_url="${UPDATE_FEED_URL%/}"
+          urls=(
+            "${base_url}/${LATEST_DMG}"
+            "${base_url}/${LATEST_ZIP}"
+            "${base_url}/latest-mac.yml"
+          )
+
+          files_json=$(printf '%s\n' "${urls[@]}" | jq -R . | jq -sc '.')
+          echo "[cf-purge] Purging: ${files_json}"
+
+          curl -sf -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"files\": ${files_json}}" \
+            | jq .
 
       - name: Publish Cloudflare download links
         if: inputs.update_feed_url != ''
