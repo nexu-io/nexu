@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@amplitude/unified": "1.0.0-beta.38",
+    "@nexu/shared": "workspace:*",
     "@hey-api/client-fetch": "^0.8.4",
     "@lobehub/icons": "2.33.0",
     "@radix-ui/react-dialog": "^1.1.6",
