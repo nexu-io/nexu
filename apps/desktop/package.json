@@ -1,6 +1,6 @@
 {
   "name": "@nexu/desktop",
-  "version": "0.1.4-beta.1",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "main": "dist-electron/main/bootstrap.js",
@@ -100,7 +100,9 @@
       {
         "from": "build-config.json",
         "to": "build-config.json",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "afterSign": "./scripts/notarize.cjs",
@@ -108,7 +110,10 @@
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "artifactName": "nexu-${version}-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
