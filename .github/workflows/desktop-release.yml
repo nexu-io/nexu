@@ -79,7 +79,7 @@ jobs:
           {
             echo "desktop_version=$desktop_version"
             echo "tag_name=$tag_name"
-            echo "release_name=Nexu Desktop v$desktop_version"
+            echo "release_name=v$desktop_version"
             echo "prerelease=$prerelease"
             echo "channel=$channel"
             echo "commit_sha=$commit_sha"
@@ -216,7 +216,23 @@ jobs:
             apps/desktop/release-artifacts/desktop-sha256.txt
           if-no-files-found: error
 
-      - name: Publish GitHub release
+      - name: Check whether GitHub release already exists
+        id: release_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create draft GitHub release
+        if: steps.release_check.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag_name }}
@@ -236,6 +252,21 @@ jobs:
             apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_dmg }}
             apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_zip }}
             apps/desktop/release-artifacts/desktop-sha256.txt
+
+      - name: Upload assets to existing GitHub release
+        if: steps.release_check.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release upload "$TAG_NAME" \
+            "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_dmg }}" \
+            "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_zip }}" \
+            "apps/desktop/release-artifacts/desktop-sha256.txt" \
+            --clobber
 
       - name: Patch latest-mac.yml for channel naming
         env:
