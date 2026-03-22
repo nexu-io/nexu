@@ -86,6 +86,9 @@ describe("compileOpenClawConfig", () => {
     const compiled = compileOpenClawConfig(createBaseConfig(), createEnv());
 
     expect(compiled.plugins?.entries?.feishu).toEqual({ enabled: true });
+    expect(compiled.plugins?.entries?.["openclaw-weixin"]).toEqual({
+      enabled: true,
+    });
     expect(compiled.channels?.feishu?.enabled).toBe(true);
     expect(compiled.channels?.feishu?.accounts).toEqual({
       __nexu_internal_feishu_prewarm__: {
@@ -175,6 +178,47 @@ describe("compileOpenClawConfig", () => {
       },
     });
     expect(compiled.bindings).toEqual([]);
+  });
+
+  it("keeps openclaw-weixin plugin entry stable when a wechat channel exists", () => {
+    const config = createBaseConfig();
+    config.channels = [
+      {
+        id: "channel_1",
+        botId: "bot_1",
+        channelType: "wechat",
+        accountId: "wx_account_1",
+        status: "connected",
+        teamName: null,
+        appId: null,
+        botUserId: null,
+        createdAt: "2026-03-21T00:00:00.000Z",
+        updatedAt: "2026-03-21T00:00:00.000Z",
+      },
+    ];
+
+    const compiled = compileOpenClawConfig(config, createEnv());
+
+    expect(compiled.plugins?.entries?.["openclaw-weixin"]).toEqual({
+      enabled: true,
+    });
+    expect(compiled.channels?.["openclaw-weixin"]).toEqual({
+      enabled: true,
+      accounts: {
+        wx_account_1: {
+          enabled: true,
+        },
+      },
+    });
+    expect(compiled.bindings).toEqual([
+      {
+        agentId: "bot_1",
+        match: {
+          channel: "openclaw-weixin",
+          accountId: "wx_account_1",
+        },
+      },
+    ]);
   });
 
   it("does not silently rewrite the default model to the first Link model", () => {

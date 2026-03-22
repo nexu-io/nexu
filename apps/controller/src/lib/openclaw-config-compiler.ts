@@ -320,6 +320,9 @@ function compilePlugins(
       feishu: {
         enabled: true,
       },
+      "openclaw-weixin": {
+        enabled: true,
+      },
       "nexu-runtime-model": {
         enabled: true,
       },
