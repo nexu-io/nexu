@@ -40,8 +40,8 @@ jobs:
           desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); process.stdout.write(pkg.version);')
 
           echo "desktop_version=$desktop_version" >> "$GITHUB_OUTPUT"
-          echo "tag_name=desktop-v$desktop_version" >> "$GITHUB_OUTPUT"
-          echo "branch_name=release/desktop-v$desktop_version" >> "$GITHUB_OUTPUT"
+          echo "tag_name=v$desktop_version" >> "$GITHUB_OUTPUT"
+          echo "branch_name=release/v$desktop_version" >> "$GITHUB_OUTPUT"
 
       - name: Commit version bump branch
         env:
