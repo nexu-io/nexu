@@ -7,6 +7,7 @@ import { deflateRawSync } from "node:zlib";
 import { app, dialog } from "electron";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopDiagnosticsFilePath } from "./desktop-diagnostics";
+import { redactJsonValue, scrubUrlTokens } from "./redaction";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 
 export type DiagnosticsExportResult = {
@@ -148,40 +149,6 @@ async function writeZip(
 
   const zipData = Buffer.concat([...chunks, centralDirBuffer, eocd]);
   await writeFile(outputPath, zipData);
-}
-
-// ---------------------------------------------------------------------------
-// Redaction
-// ---------------------------------------------------------------------------
-
-const SENSITIVE_KEY_RE = /token|password|secret|key|dsn/i;
-
-// Scrub token/password/secret values embedded in URL query params or fragments
-// e.g. "http://127.0.0.1:18789/#token=gw-secret-token" → ".../#token=[REDACTED]"
-const SENSITIVE_URL_PARAM_RE = /([?&#])(token|password|secret)(=[^&#\s]*)/gi;
-
-function scrubUrlTokens(str: string): string {
-  return str.replace(SENSITIVE_URL_PARAM_RE, "$1$2=[REDACTED]");
-}
-
-function redactJsonValue(value: unknown, key?: string): unknown {
-  if (typeof value === "string") {
-    if (key && SENSITIVE_KEY_RE.test(key)) {
-      return "[REDACTED]";
-    }
-    return scrubUrlTokens(value);
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => redactJsonValue(item));
-  }
-  if (value !== null && typeof value === "object") {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      result[k] = redactJsonValue(v, k);
-    }
-    return result;
-  }
-  return value;
 }
 
 function scrubTextBuffer(raw: Buffer): Buffer {

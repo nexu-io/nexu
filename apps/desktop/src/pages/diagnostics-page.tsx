@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AppInfo, DiagnosticsInfo } from "../../shared/host";
 import { DiagnosticsActionCard } from "../components/diagnostics-action-card";
 import { SummaryCard } from "../components/summary-card";
+import { useDesktopRuntimeConfig } from "../hooks/use-desktop-runtime-config";
 import {
   getAppInfo,
   getDiagnosticsInfo,
@@ -16,6 +17,7 @@ type DiagnosticsActionId =
   | "main-crash";
 
 export function DiagnosticsPage() {
+  const { runtimeConfig } = useDesktopRuntimeConfig();
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [diagnosticsInfo, setDiagnosticsInfo] =
     useState<DiagnosticsInfo | null>(null);
@@ -125,6 +127,11 @@ export function DiagnosticsPage() {
                 : "local-only"
               : "-"
           }
+        />
+        <SummaryCard
+          label="NEXU_HOME"
+          className="diagnostics-summary-wide"
+          value={runtimeConfig?.paths.nexuHome ?? "-"}
         />
         <SummaryCard
           label="Crash dumps"
