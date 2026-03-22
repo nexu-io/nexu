@@ -1016,6 +1016,13 @@ function DesktopShell() {
         return;
       }
 
+      if (
+        command.type === "desktop:open-about-dialog" ||
+        command.type === "desktop:check-for-updates"
+      ) {
+        return;
+      }
+
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
     });

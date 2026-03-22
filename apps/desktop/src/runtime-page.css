@@ -189,6 +189,113 @@ body,
   background: none;
 }
 
+.desktop-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 12, 18, 0.66);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.desktop-modal-card {
+  width: min(560px, 100%);
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 27, 36, 0.98),
+    rgba(14, 19, 27, 0.98)
+  );
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+}
+
+.desktop-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.desktop-modal-head h2 {
+  margin: 4px 0 8px;
+  font-size: 1.5rem;
+}
+
+.desktop-modal-head p {
+  margin: 0;
+  color: rgba(245, 247, 251, 0.64);
+  line-height: 1.5;
+}
+
+.desktop-modal-close,
+.desktop-modal-primary {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms
+    ease;
+}
+
+.desktop-modal-close {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(245, 247, 251, 0.86);
+}
+
+.desktop-modal-primary {
+  background: #f4efe2;
+  color: #171b22;
+}
+
+.desktop-modal-close:hover,
+.desktop-modal-primary:hover {
+  transform: translateY(-1px);
+}
+
+.desktop-about-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 24px 0 0;
+}
+
+.desktop-about-list div {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.desktop-about-list dt {
+  margin-bottom: 6px;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.desktop-about-list dd {
+  margin: 0;
+  color: rgba(245, 247, 251, 0.9);
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.desktop-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
 /* Transparent drag bar overlaying window top — always present for dragging */
 .window-drag-bar {
   position: fixed;

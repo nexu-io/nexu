@@ -162,6 +162,12 @@ export type HostDesktopCommand =
   | {
       type: "desktop:auth-session-restored";
       surface: "web";
+    }
+  | {
+      type: "desktop:open-about-dialog";
+    }
+  | {
+      type: "desktop:check-for-updates";
     };
 
 export type RuntimeUnitSnapshot = Omit<RuntimeUnitState, "logTail">;

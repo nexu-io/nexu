@@ -30,6 +30,7 @@ export function DesktopShell() {
     isPackaged ? "immersive" : "full",
   );
   const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const { desktopOpenClawUrl, desktopWebUrl, runtimeConfig } =
     useDesktopRuntimeConfig();
   const update = useAutoUpdate();
@@ -41,10 +42,20 @@ export function DesktopShell() {
         return;
       }
 
+      if (command.type === "desktop:open-about-dialog") {
+        setAboutOpen(true);
+        return;
+      }
+
+      if (command.type === "desktop:check-for-updates") {
+        void update.check();
+        return;
+      }
+
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
     });
-  }, []);
+  }, [update]);
 
   return (
     <div
@@ -181,6 +192,88 @@ export function DesktopShell() {
         phase={update.phase}
         version={update.version}
       />
+
+      {aboutOpen && runtimeConfig ? (
+        <div
+          className="desktop-modal-overlay"
+          onClick={() => setAboutOpen(false)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setAboutOpen(false);
+            }
+          }}
+          role="presentation"
+        >
+          <dialog
+            className="desktop-modal-card"
+            open
+            aria-labelledby="desktop-about-title"
+            onClose={() => setAboutOpen(false)}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setAboutOpen(false);
+              }
+            }}
+          >
+            <div className="desktop-modal-head">
+              <div>
+                <span className="desktop-shell-eyebrow">About</span>
+                <h2 id="desktop-about-title">About Nexu</h2>
+                <p>
+                  Desktop runtime shell build information and update channel.
+                </p>
+              </div>
+              <button
+                className="desktop-modal-close"
+                onClick={() => setAboutOpen(false)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <dl className="desktop-about-list">
+              <div>
+                <dt>Version</dt>
+                <dd>{runtimeConfig.buildInfo.version}</dd>
+              </div>
+              <div>
+                <dt>Channel</dt>
+                <dd>{runtimeConfig.updates.channel}</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd>{runtimeConfig.buildInfo.source}</dd>
+              </div>
+              <div>
+                <dt>Branch</dt>
+                <dd>{runtimeConfig.buildInfo.branch ?? "(unknown)"}</dd>
+              </div>
+              <div>
+                <dt>Commit</dt>
+                <dd title={runtimeConfig.buildInfo.commit ?? undefined}>
+                  {formatBuildCommit(runtimeConfig.buildInfo.commit)}
+                </dd>
+              </div>
+              <div>
+                <dt>Built At</dt>
+                <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
+              </div>
+            </dl>
+
+            <div className="desktop-modal-actions">
+              <button
+                className="desktop-modal-primary"
+                onClick={() => void update.check()}
+                type="button"
+              >
+                Check for Updates…
+              </button>
+            </div>
+          </dialog>
+        </div>
+      ) : null}
     </div>
   );
 }
