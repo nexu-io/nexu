@@ -15,8 +15,10 @@ const controllerRoot = resolve(nexuRoot, "apps/controller");
 const controllerDistRoot = resolve(controllerRoot, "dist");
 const sharedRoot = resolve(nexuRoot, "packages/shared");
 const sharedDistRoot = resolve(sharedRoot, "dist");
+const controllerStaticRoot = resolve(controllerRoot, "static");
 const sidecarRoot = getSidecarRoot("controller");
 const sidecarDistRoot = resolve(sidecarRoot, "dist");
+const sidecarStaticRoot = resolve(sidecarRoot, "static");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const controllerNodeModules = resolve(controllerRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
@@ -48,6 +50,10 @@ async function prepareControllerSidecar() {
   await resetDir(sidecarRoot);
 
   await cp(controllerDistRoot, sidecarDistRoot, { recursive: true });
+
+  if (await pathExists(controllerStaticRoot)) {
+    await cp(controllerStaticRoot, sidecarStaticRoot, { recursive: true });
+  }
 
   const controllerPackageJson = JSON.parse(
     await readFile(resolve(controllerRoot, "package.json"), "utf8"),

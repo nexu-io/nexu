@@ -1,19 +1,18 @@
 import { execFile } from "node:child_process";
 import {
-  type FSWatcher,
   existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
-  watch,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import {
+  CURATED_SKILL_SLUGS,
   type CuratedInstallResult,
   copyStaticSkills,
   resolveCuratedSkillsToInstall,
@@ -42,6 +41,14 @@ function resolveClawHubBin(): string {
 }
 
 const DEFAULT_DOWNLOAD_COUNT = 1000;
+
+/**
+ * Corrects known broken slugs in the ClawHub catalog.
+ * Key = broken slug in catalog data, Value = correct slug on ClawHub.
+ */
+const SLUG_CORRECTIONS: Record<string, string> = {
+  "find-skills": "find-skill",
+};
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 
@@ -89,9 +96,6 @@ export class CatalogManager {
   private readonly tempCatalogPath: string;
   private readonly log: SkillhubLogFn;
   private intervalId: ReturnType<typeof setInterval> | null = null;
-  private skillsWatcher: FSWatcher | null = null;
-  private watchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private static readonly WATCH_DEBOUNCE_MS = 2000;
 
   constructor(
     cacheDir: string,
@@ -224,7 +228,10 @@ export class CatalogManager {
    * Step A: Download via clawhub into skillsDir
    * Step B: Record in DB with source "managed"
    */
-  async installSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
+  async installSkill(
+    rawSlug: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const slug = SLUG_CORRECTIONS[rawSlug] ?? rawSlug;
     if (!isValidSlug(slug)) {
       this.log("warn", `install rejected slug=${slug} — invalid slug`);
       return { ok: false, error: "Invalid skill slug" };
@@ -269,7 +276,10 @@ export class CatalogManager {
    * Step B: Delete skill folder from skillsDir
    * Step C: Record uninstall in DB with correct source
    */
-  async uninstallSkill(slug: string): Promise<{ ok: boolean; error?: string }> {
+  async uninstallSkill(
+    rawSlug: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const slug = SLUG_CORRECTIONS[rawSlug] ?? rawSlug;
     if (!isValidSlug(slug)) {
       this.log("warn", `uninstall rejected slug=${slug} — invalid slug`);
       return { ok: false, error: "Invalid skill slug" };
@@ -461,22 +471,58 @@ export class CatalogManager {
 
     const dbRecords = this.db.getAllInstalled();
 
-    // DB → disk: mark uninstalled if SKILL.md missing
-    const missingFromDisk: Array<{ slug: string; source: SkillSource }> = [];
+    // DB → disk: handle "installed" records whose SKILL.md is missing from disk
+    const curatedMissing: Array<{ slug: string; source: SkillSource }> = [];
+    const otherMissing: Array<{ slug: string; source: SkillSource }> = [];
     for (const record of dbRecords) {
       const skillMd = resolve(this.skillsDir, record.slug, "SKILL.md");
       if (!existsSync(skillMd)) {
-        missingFromDisk.push({ slug: record.slug, source: record.source });
+        if (record.source === "curated") {
+          curatedMissing.push({ slug: record.slug, source: record.source });
+        } else {
+          otherMissing.push({ slug: record.slug, source: record.source });
+        }
       }
     }
 
-    for (const { slug, source } of missingFromDisk) {
-      this.db.markUninstalledBySlugs([slug], source);
-    }
-    if (missingFromDisk.length > 0) {
+    // Clean up curated "installed" records missing from disk — remove the
+    // record so installCuratedSkills can re-install them on this startup.
+    if (curatedMissing.length > 0) {
+      this.db.removeRecords(curatedMissing);
       this.log(
         "info",
-        `reconcile: ${missingFromDisk.length} DB records marked uninstalled (missing from disk)`,
+        `reconcile: ${curatedMissing.length} curated installed records removed (missing from disk, eligible for re-install)`,
+      );
+    }
+
+    // Clean up stale "uninstalled" curated records for slugs that have been
+    // retired from CURATED_SKILL_SLUGS. These records block re-installation
+    // via isRemovedByUser() and are no longer needed.
+    // NOTE: We intentionally keep uninstalled records for slugs still in the
+    // curated list — those represent the user's explicit choice to remove them.
+    const activeCuratedSlugs = new Set(CURATED_SKILL_SLUGS);
+    const retiredCurated: Array<{ slug: string; source: SkillSource }> = [];
+    for (const record of this.db.getUninstalledCurated()) {
+      if (!activeCuratedSlugs.has(record.slug)) {
+        retiredCurated.push({ slug: record.slug, source: record.source });
+      }
+    }
+    if (retiredCurated.length > 0) {
+      this.db.removeRecords(retiredCurated);
+      this.log(
+        "info",
+        `reconcile: ${retiredCurated.length} retired curated records purged`,
+      );
+    }
+
+    // Non-curated (managed/custom) skills: mark uninstalled as before
+    for (const { slug, source } of otherMissing) {
+      this.db.markUninstalledBySlugs([slug], source);
+    }
+    if (otherMissing.length > 0) {
+      this.log(
+        "info",
+        `reconcile: ${otherMissing.length} managed/custom records marked uninstalled (missing from disk)`,
       );
     }
 
@@ -507,31 +553,13 @@ export class CatalogManager {
       );
     }
 
-    if (missingFromDisk.length === 0 && diskOnly.length === 0) {
+    if (
+      curatedMissing.length === 0 &&
+      retiredCurated.length === 0 &&
+      otherMissing.length === 0 &&
+      diskOnly.length === 0
+    ) {
       this.log("info", "reconcile: DB and disk are in sync");
-    }
-  }
-
-  /**
-   * Watch skillsDir for external changes (e.g. agent runs `clawhub install`).
-   * Debounces to avoid reconciling mid-write.
-   */
-  startSkillsWatcher(): void {
-    if (!this.skillsDir || !existsSync(this.skillsDir)) return;
-
-    try {
-      this.skillsWatcher = watch(this.skillsDir, () => {
-        if (this.watchDebounceTimer) {
-          clearTimeout(this.watchDebounceTimer);
-        }
-        this.watchDebounceTimer = setTimeout(() => {
-          this.watchDebounceTimer = null;
-          this.reconcileDbWithDisk();
-        }, CatalogManager.WATCH_DEBOUNCE_MS);
-      });
-      this.log("info", "skills directory watcher started");
-    } catch {
-      this.log("warn", "failed to start skills directory watcher");
     }
   }
 
@@ -539,14 +567,6 @@ export class CatalogManager {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-    }
-    if (this.watchDebounceTimer) {
-      clearTimeout(this.watchDebounceTimer);
-      this.watchDebounceTimer = null;
-    }
-    if (this.skillsWatcher) {
-      this.skillsWatcher.close();
-      this.skillsWatcher = null;
     }
     this.db.close();
   }
@@ -708,9 +728,13 @@ export class CatalogManager {
     }
 
     try {
-      return JSON.parse(
+      const skills = JSON.parse(
         readFileSync(this.catalogPath, "utf8"),
       ) as MinimalSkill[];
+      return skills.map((s) => {
+        const corrected = SLUG_CORRECTIONS[s.slug];
+        return corrected ? { ...s, slug: corrected } : s;
+      });
     } catch {
       return [];
     }

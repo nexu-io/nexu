@@ -1,0 +1,149 @@
+// 技术架构图模板
+// 适用于：系统架构、微服务、技术栈等
+
+digraph TechArchitecture {
+    // 全局配置
+    graph [
+        rankdir=TB
+        bgcolor="#f5f5f5"
+        fontname="Arial Unicode MS"
+        splines=ortho
+        nodesep=1.2
+        ranksep=1.5
+    ]
+
+    node [
+        fontname="Arial Unicode MS"
+        fontsize=10
+        style=filled
+        margin=0.4
+    ]
+
+    edge [
+        fontname="Arial Unicode MS"
+        fontsize=8
+    ]
+
+    // 标题
+    title [label="系统架构图" fontsize=18 shape=plaintext]
+
+    // ========== 客户端层 ==========
+    subgraph cluster_client {
+        label="客户端层"
+        style=filled
+        color="#e3f2fd"
+        fontsize=12
+
+        web [label="Web 浏览器" shape=box fillcolor="#2196f3" fontcolor=white]
+        mobile [label="移动应用" shape=box fillcolor="#2196f3" fontcolor=white]
+        desktop [label="桌面应用" shape=box fillcolor="#2196f3" fontcolor=white]
+    }
+
+    // ========== 网关层 ==========
+    subgraph cluster_gateway {
+        label="网关层"
+        style=filled
+        color="#fff3e0"
+        fontsize=12
+
+        api_gateway [
+            label="API Gateway\n负载均衡 | 认证 | 限流"
+            shape=component
+            fillcolor="#ff9800"
+            fontcolor=white
+        ]
+    }
+
+    // ========== 应用层 ==========
+    subgraph cluster_application {
+        label="应用服务层"
+        style=filled
+        color="#e8f5e9"
+        fontsize=12
+
+        service1 [label="用户服务" shape=box fillcolor="#4caf50" fontcolor=white]
+        service2 [label="订单服务" shape=box fillcolor="#4caf50" fontcolor=white]
+        service3 [label="支付服务" shape=box fillcolor="#4caf50" fontcolor=white]
+        service4 [label="通知服务" shape=box fillcolor="#4caf50" fontcolor=white]
+    }
+
+    // ========== 数据层 ==========
+    subgraph cluster_data {
+        label="数据存储层"
+        style=filled
+        color="#fce4ec"
+        fontsize=12
+
+        mysql [label="MySQL\n关系型数据库" shape=cylinder fillcolor="#e91e63" fontcolor=white]
+        redis [label="Redis\n缓存" shape=cylinder fillcolor="#e91e63" fontcolor=white]
+        mongodb [label="MongoDB\n文档数据库" shape=cylinder fillcolor="#e91e63" fontcolor=white]
+    }
+
+    // ========== 基础设施层 ==========
+    subgraph cluster_infra {
+        label="基础设施"
+        style=filled
+        color="#f3e5f5"
+        fontsize=12
+
+        mq [label="消息队列\nRabbitMQ/Kafka" shape=box fillcolor="#9c27b0" fontcolor=white]
+        elk [label="日志系统\nELK Stack" shape=box fillcolor="#9c27b0" fontcolor=white]
+        monitor [label="监控告警\nPrometheus" shape=box fillcolor="#9c27b0" fontcolor=white]
+    }
+
+    // ========== 连接关系 ==========
+    // 客户端 -> 网关
+    web -> api_gateway [label="HTTPS"]
+    mobile -> api_gateway [label="HTTPS"]
+    desktop -> api_gateway [label="HTTPS"]
+
+    // 网关 -> 应用服务
+    api_gateway -> service1 [label="路由"]
+    api_gateway -> service2 [label="路由"]
+    api_gateway -> service3 [label="路由"]
+    api_gateway -> service4 [label="路由"]
+
+    // 应用服务 -> 数据层
+    service1 -> mysql [label="读写" color="#4caf50"]
+    service1 -> redis [label="缓存" color="#ff9800"]
+    service2 -> mysql [label="读写" color="#4caf50"]
+    service2 -> redis [label="缓存" color="#ff9800"]
+    service3 -> mongodb [label="存储" color="#4caf50"]
+
+    // 应用服务 -> 基础设施
+    service2 -> mq [label="发布" style=dashed]
+    service4 -> mq [label="订阅" style=dashed]
+    {service1, service2, service3, service4} -> elk [label="日志" style=dotted color=gray]
+    {service1, service2, service3, service4} -> monitor [label="指标" style=dotted color=gray]
+
+    // ========== 图例 ==========
+    subgraph cluster_legend {
+        label="图例"
+        style=filled
+        color=white
+        fontsize=10
+        rank=sink
+
+        legend_client [label="客户端" fillcolor="#2196f3" fontcolor=white shape=box]
+        legend_service [label="微服务" fillcolor="#4caf50" fontcolor=white shape=box]
+        legend_data [label="数据存储" fillcolor="#e91e63" fontcolor=white shape=cylinder]
+        legend_infra [label="基础设施" fillcolor="#9c27b0" fontcolor=white shape=box]
+        legend_sync [label="━━ 同步调用" shape=plaintext]
+        legend_async [label="- - 异步调用" shape=plaintext]
+        legend_log [label="··· 日志/监控" shape=plaintext]
+
+        legend_client -> legend_service [style=invis]
+        legend_service -> legend_data [style=invis]
+        legend_data -> legend_infra [style=invis]
+        legend_infra -> legend_sync [style=invis]
+        legend_sync -> legend_async [style=invis]
+        legend_async -> legend_log [style=invis]
+    }
+
+    // 布局控制
+    title -> web [style=invis]
+    {rank=same; web; mobile; desktop}
+    {rank=same; service1; service2; service3; service4}
+    {rank=same; mysql; redis; mongodb}
+    {rank=same; mq; elk; monitor}
+}

@@ -1,0 +1,114 @@
+// 概念图谱模板
+// 适用于：知识分类、技术概念、学科体系等
+
+digraph ConceptMap {
+    // 全局配置
+    graph [
+        rankdir=TB
+        bgcolor="white"
+        fontname="Arial Unicode MS"
+        splines=curved
+        nodesep=1.0
+        ranksep=1.5
+    ]
+
+    node [
+        fontname="Arial Unicode MS"
+        fontsize=11
+        style=filled
+        margin=0.3
+    ]
+
+    edge [
+        fontname="Arial Unicode MS"
+        fontsize=9
+        arrowsize=0.8
+    ]
+
+    // 标题
+    title [label="知识图谱" fontsize=20 shape=plaintext]
+
+    // ========== 顶层概念 ==========
+    root [
+        label="核心概念"
+        shape=ellipse
+        fillcolor="#ff6347"
+        fontsize=14
+        fontcolor=white
+    ]
+
+    // ========== 第一层分类 ==========
+    category1 [label="类别1" fillcolor="#ffd700" shape=box style="rounded,filled"]
+    category2 [label="类别2" fillcolor="#87ceeb" shape=box style="rounded,filled"]
+    category3 [label="类别3" fillcolor="#98fb98" shape=box style="rounded,filled"]
+
+    root -> category1 [label="包含"]
+    root -> category2 [label="包含"]
+    root -> category3 [label="包含"]
+
+    // ========== 第二层细分 ==========
+    subgraph cluster_cat1 {
+        label="类别1 详细"
+        style=filled
+        color="#fffacd"
+
+        concept1_1 [label="概念1.1" fillcolor="lightyellow"]
+        concept1_2 [label="概念1.2" fillcolor="lightyellow"]
+        concept1_3 [label="概念1.3" fillcolor="lightyellow"]
+
+        category1 -> concept1_1
+        category1 -> concept1_2
+        category1 -> concept1_3
+    }
+
+    subgraph cluster_cat2 {
+        label="类别2 详细"
+        style=filled
+        color="#e0f7fa"
+
+        concept2_1 [label="概念2.1" fillcolor="lightcyan"]
+        concept2_2 [label="概念2.2" fillcolor="lightcyan"]
+
+        category2 -> concept2_1
+        category2 -> concept2_2
+    }
+
+    subgraph cluster_cat3 {
+        label="类别3 详细"
+        style=filled
+        color="#f1f8e9"
+
+        concept3_1 [label="概念3.1" fillcolor="lightgreen"]
+        concept3_2 [label="概念3.2" fillcolor="lightgreen"]
+
+        category3 -> concept3_1
+        category3 -> concept3_2
+    }
+
+    // ========== 概念间关联 ==========
+    concept1_1 -> concept2_1 [label="依赖" style=dashed color=blue]
+    concept1_2 -> concept3_1 [label="影响" style=dashed color=purple]
+    concept2_2 -> concept3_2 [label="相关" style=dashed color=orange]
+
+    // ========== 图例 ==========
+    subgraph cluster_legend {
+        label="图例"
+        style=filled
+        color=white
+        rank=sink
+
+        legend_core [label="核心概念" fillcolor="#ff6347" shape=ellipse fontcolor=white]
+        legend_category [label="主要类别" fillcolor="#ffd700" shape=box style="rounded,filled"]
+        legend_concept [label="具体概念" fillcolor="lightyellow" shape=box]
+        legend_hierarchy [label="━━ 层次关系" shape=plaintext]
+        legend_association [label="- - 关联关系" shape=plaintext]
+
+        legend_core -> legend_category [style=invis]
+        legend_category -> legend_concept [style=invis]
+        legend_concept -> legend_hierarchy [style=invis]
+        legend_hierarchy -> legend_association [style=invis]
+    }
+
+    // 布局控制
+    title -> root [style=invis]
+}

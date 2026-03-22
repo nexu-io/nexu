@@ -8,9 +8,17 @@ export class OpenClawRuntimePluginWriter {
   async ensurePlugins(): Promise<void> {
     await mkdir(this.env.openclawExtensionsDir, { recursive: true });
 
-    const entries = await readdir(this.env.runtimePluginTemplatesDir, {
-      withFileTypes: true,
-    });
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = await readdir(this.env.runtimePluginTemplatesDir, {
+        withFileTypes: true,
+      });
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        return;
+      }
+      throw err;
+    }
 
     for (const entry of entries) {
       if (!entry.isDirectory()) {

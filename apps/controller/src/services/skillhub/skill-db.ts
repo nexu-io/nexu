@@ -79,6 +79,16 @@ export class SkillDb {
     );
   }
 
+  /**
+   * Returns curated records marked as "uninstalled" — used by reconciliation
+   * to clean up stale entries that block re-installation after a reinstall.
+   */
+  getUninstalledCurated(): readonly SkillRecord[] {
+    return this.current().skills.filter(
+      (skill) => skill.source === "curated" && skill.status === "uninstalled",
+    );
+  }
+
   recordInstall(slug: string, source: SkillSource, version?: string): void {
     const now = new Date().toISOString();
     const current = this.current();
@@ -177,6 +187,24 @@ export class SkillDb {
         skill.status === "installed"
           ? { ...skill, status: "uninstalled", uninstalledAt: now }
           : skill,
+      ),
+    };
+    this.persist();
+  }
+
+  /**
+   * Remove records entirely (not just mark uninstalled).
+   * Used by reconciliation so curated skills can be re-installed on next startup.
+   */
+  removeRecords(
+    entries: ReadonlyArray<{ slug: string; source: SkillSource }>,
+  ): void {
+    if (entries.length === 0) return;
+
+    const keySet = new Set(entries.map((e) => `${e.slug}:${e.source}`));
+    this.db.data = {
+      skills: this.current().skills.filter(
+        (skill) => !keySet.has(`${skill.slug}:${skill.source}`),
       ),
     };
     this.persist();

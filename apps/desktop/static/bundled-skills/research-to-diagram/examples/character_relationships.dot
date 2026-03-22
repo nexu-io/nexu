@@ -1,0 +1,86 @@
+// 人物关系图模板
+// 适用于：文学作品、历史人物、家族关系等
+
+digraph CharacterRelationships {
+    // 全局配置
+    graph [
+        rankdir=TB                    // 布局方向：TB=上到下, LR=左到右
+        bgcolor="#fdfdf5"             // 背景色
+        fontname="Arial Unicode MS"  // 中文字体
+        fontsize=12
+        splines=ortho                 // 边的样式：ortho=正交, curved=曲线
+        nodesep=0.8                   // 节点间距
+        ranksep=1.2                   // 层级间距
+        compound=true                 // 允许跨cluster连接
+    ]
+
+    node [
+        fontname="Arial Unicode MS"
+        fontsize=11
+        shape=box                     // 默认形状
+        style="rounded,filled"
+        fillcolor="#e8f4f8"
+        margin=0.2
+    ]
+
+    edge [
+        fontname="Arial Unicode MS"
+        fontsize=9
+    ]
+
+    // 标题
+    title [label="人物关系图" fontsize=20 shape=plaintext fillcolor=none]
+
+    // ========== 主要团体/家族 ==========
+    subgraph cluster_group1 {
+        label="第一家族"
+        style=filled
+        color=lightgrey
+        fontsize=14
+
+        person1 [label="人物1\n(描述)" fillcolor="#ffd700" shape=ellipse]
+        person2 [label="人物2"]
+        person3 [label="人物3"]
+
+        person1 -> person2 [label="父子" color=black]
+        person1 -> person3 [label="父女" color=black]
+    }
+
+    subgraph cluster_group2 {
+        label="第二家族"
+        style=filled
+        color="#ffe4b5"
+        fontsize=14
+
+        person4 [label="人物4"]
+        person5 [label="人物5"]
+
+        person4 -> person5 [label="夫妻" color=red]
+    }
+
+    // ========== 跨家族关系 ==========
+    person2 -> person5 [label="朋友" style=dashed color=blue]
+    person3 -> person4 [label="师徒" style=dashed color=green]
+
+    // ========== 图例 ==========
+    subgraph cluster_legend {
+        label="图例"
+        style=filled
+        color=white
+        fontsize=10
+
+        legend1 [label="重要人物" fillcolor="#ffd700" shape=ellipse]
+        legend2 [label="普通人物" fillcolor="#e8f4f8" shape=box]
+        legend3 [label="━━ 血缘关系（黑色）" shape=plaintext]
+        legend4 [label="━━ 婚姻关系（红色）" shape=plaintext]
+        legend5 [label="- - 其他关系（虚线）" shape=plaintext]
+
+        legend1 -> legend2 [style=invis]
+        legend2 -> legend3 [style=invis]
+        legend3 -> legend4 [style=invis]
+        legend4 -> legend5 [style=invis]
+    }
+
+    // 布局控制
+    title -> person1 [style=invis]
+}

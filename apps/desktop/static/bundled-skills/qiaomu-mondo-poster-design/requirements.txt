@@ -1,0 +1,7 @@
+# Mondo Poster Prompt - Python Dependencies
+
+# Core dependencies (required for both scripts)
+requests>=2.31.0
+
+# Enhanced script dependencies (optional, only needed for generate_mondo_enhanced.py)
+Pillow>=10.0.0  # For image-to-image and comparison features

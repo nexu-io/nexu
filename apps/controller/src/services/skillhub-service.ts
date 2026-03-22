@@ -28,13 +28,11 @@ export class SkillhubService {
     this.catalogManager.start();
     if (process.env.CI) return;
 
-    void this.catalogManager
-      .installCuratedSkills()
-      .then(() => {
-        this.catalogManager.reconcileDbWithDisk();
-        this.catalogManager.startSkillsWatcher();
-      })
-      .catch(() => {});
+    // Reconcile first: removes stale curated records (e.g. after reinstall)
+    // so installCuratedSkills can re-install them.
+    this.catalogManager.reconcileDbWithDisk();
+
+    void this.catalogManager.installCuratedSkills().catch(() => {});
   }
 
   get catalog(): CatalogManager {

@@ -27,10 +27,11 @@ export const CURATED_SKILL_SLUGS: readonly string[] = [
   "video-frames",
   "session-logs",
   // Skill management
-  "find-skills",
   "skill-creator",
   // Browser & web
   "agent-browser",
+  // Skill discovery
+  "find-skill",
   // Search & content (ClawHub)
   "wechat-article-search",
   // Image generation (ClawHub)
@@ -48,6 +49,9 @@ export const STATIC_SKILL_SLUGS: readonly string[] = [
   "gh-issues",
   "clawhub",
   "nano-banana-one-shop",
+  "deep-research",
+  "research-to-diagram",
+  "qiaomu-mondo-poster-design",
 ] as const;
 
 /**
