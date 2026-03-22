@@ -94,13 +94,14 @@ export class FeishuFallbackAdapter
 
   toSendInput(input: {
     normalized: NormalizedFallback<FallbackErrorCode>;
+    lang: "en" | "zh-CN";
     message: string;
   }) {
     const message = appendOptionalDiagnosticHint(
       input.message,
       input.normalized.params.hint,
       input.normalized.errorCode,
-      this.resolveLang(input.normalized),
+      input.lang,
     );
 
     return {

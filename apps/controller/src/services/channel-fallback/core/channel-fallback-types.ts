@@ -68,6 +68,7 @@ export interface ChannelFallbackAdapter<
   getTemplateMap(): FallbackTemplateMap<TErrorCode>;
   toSendInput(input: {
     normalized: NormalizedFallback<TErrorCode>;
+    lang: FallbackLang;
     message: string;
   }): SendChannelMessageInput;
 }

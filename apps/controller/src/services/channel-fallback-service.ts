@@ -209,7 +209,7 @@ export class ChannelFallbackService {
       lang,
     );
     const message = renderFallbackTemplate(template, normalized.params);
-    const sendInput = adapter.toSendInput({ normalized, message });
+    const sendInput = adapter.toSendInput({ normalized, lang, message });
 
     try {
       const sendResult = await this.messageSender.sendChannelMessage({
