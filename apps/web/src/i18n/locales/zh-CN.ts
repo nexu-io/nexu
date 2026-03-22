@@ -170,6 +170,7 @@ const zhCN = {
   "home.channel.feishu": "飞书 / Feishu",
   "home.channel.slack": "Slack",
   "home.channel.discord": "Discord",
+  "home.channel.wechat": "微信",
   "home.channel.addBot": "添加 nexu Bot",
   "home.tab.channels": "渠道",
   "home.tab.models": "模型 & Key",
@@ -620,6 +621,21 @@ const zhCN = {
   "feishuSetup.helpSuffix": "获取详细说明。",
   "feishuSetup.connectSuccess": "飞书 Bot 已连接！",
   "feishuSetup.connectFailed": "连接飞书失败",
+
+  // ── WeChat Setup ──
+  "wechatSetup.title": "连接微信",
+  "wechatSetup.desc": "使用微信手机端扫码，连接你的个人微信账号。",
+  "wechatSetup.scanQr": "扫码连接",
+  "wechatSetup.scanning": "等待扫码...",
+  "wechatSetup.scanHint": "打开手机微信，扫描上方二维码以关联账号。",
+  "wechatSetup.connectSuccess": "微信已连接！",
+  "wechatSetup.connectFailed": "连接微信失败",
+  "wechatSetup.timeout": "二维码已过期，请重试。",
+  "wechatSetup.retry": "重试",
+  "wechatSetup.gatewayError": "Gateway 未连接，请先启动运行时。",
+  "wechatSetup.waitingGateway": "等待网关启动中...",
+  "wechatSetup.waitingGatewayHint": "第 {{attempt}}/{{total}} 次尝试",
+  "wechatSetup.loadingQr": "正在获取二维码...",
 
   // ── Slack Setup ──
   "slackSetup.stepCreateApp": "创建 Slack App",

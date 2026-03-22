@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-export const channelTypeSchema = z.enum(["slack", "discord", "feishu"]);
+export const channelTypeSchema = z.enum([
+  "slack",
+  "discord",
+  "feishu",
+  "wechat",
+]);
 
 export const channelStatusSchema = z.enum([
   "pending",
@@ -31,6 +36,22 @@ export const connectFeishuSchema = z.object({
   verificationToken: z.string().optional(),
 });
 
+export const connectWechatSchema = z.object({
+  accountId: z.string().min(1),
+});
+
+export const wechatQrStartResponseSchema = z.object({
+  qrDataUrl: z.string().optional(),
+  message: z.string(),
+  sessionKey: z.string().optional(),
+});
+
+export const wechatQrWaitResponseSchema = z.object({
+  connected: z.boolean(),
+  message: z.string(),
+  accountId: z.string().optional(),
+});
+
 export const channelResponseSchema = z.object({
   id: z.string(),
   botId: z.string(),
@@ -58,6 +79,9 @@ export type ChannelStatus = z.infer<typeof channelStatusSchema>;
 export type ConnectSlackInput = z.infer<typeof connectSlackSchema>;
 export type ConnectDiscordInput = z.infer<typeof connectDiscordSchema>;
 export type ConnectFeishuInput = z.infer<typeof connectFeishuSchema>;
+export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
+export type WechatQrStartResponse = z.infer<typeof wechatQrStartResponseSchema>;
+export type WechatQrWaitResponse = z.infer<typeof wechatQrWaitResponseSchema>;
 export type ChannelResponse = z.infer<typeof channelResponseSchema>;
 export type SlackOAuthUrlResponse = z.infer<typeof slackOAuthUrlResponseSchema>;
 

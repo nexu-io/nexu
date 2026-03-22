@@ -282,22 +282,27 @@ export class OpenClawWsClient {
    * Send a JSON-RPC request and wait for the matching response.
    * Rejects if the gateway is not connected or the request times out.
    */
-  async request<T = unknown>(method: string, params?: unknown): Promise<T> {
+  async request<T = unknown>(
+    method: string,
+    params?: unknown,
+    opts?: { timeoutMs?: number },
+  ): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this._connected) {
       throw new Error("openclaw gateway not connected");
     }
     const id = randomUUID();
     const frame: RequestFrame = { type: "req", id, method, params };
+    const timeoutMs = opts?.timeoutMs ?? REQUEST_TIMEOUT_MS;
 
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(
           new Error(
-            `openclaw request "${method}" timed out after ${REQUEST_TIMEOUT_MS}ms`,
+            `openclaw request "${method}" timed out after ${timeoutMs}ms`,
           ),
         );
-      }, REQUEST_TIMEOUT_MS);
+      }, timeoutMs);
 
       this.pending.set(id, {
         resolve: (value) => resolve(value as T),

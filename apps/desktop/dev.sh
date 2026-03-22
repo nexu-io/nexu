@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$APP_DIR/../.." && pwd)"
 TMP_DIR="$ROOT_DIR/.tmp"
+NEXU_DESKTOP_RUNTIME_ROOT="$TMP_DIR/desktop"
 ELECTRON_DIR="$APP_DIR"
 DEV_RUN_SH="$APP_DIR/scripts/dev-run.sh"
 LOCK_DIR="$TMP_DIR/locks/desktop-dev.lock"

@@ -28,6 +28,7 @@ pnpm dev:controller                   # Controller only
 pnpm start                            # Build and launch the desktop local runtime stack
 pnpm stop                             # Stop the desktop local runtime stack
 pnpm restart                          # Restart the desktop local runtime stack
+pnpm reset-state                      # Stop desktop runtime and delete repo-local desktop state
 pnpm status                           # Show desktop local runtime status
 pnpm dist:mac                         # Build signed macOS desktop distributables
 pnpm dist:mac:unsigned                # Build unsigned macOS desktop distributables
@@ -66,6 +67,8 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - `tmux` is required for the desktop local-dev workflow.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
 - For startup troubleshooting, use `pnpm logs` and `./apps/desktop/dev.sh devlog`.
+- `pnpm reset-state` is a dev-only cleanup shortcut for `./apps/desktop/dev.sh reset-state`; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete controller-owned state in `~/.nexu/`.
+- To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/`.
 - If `pnpm start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
 - Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
 - For deeper desktop runtime inspection, use the existing event/query path (`onRuntimeEvent(...)`, `runtime:query-events`, `queryRuntimeEvents(...)`) instead of rebuilding one-off diagnostics.

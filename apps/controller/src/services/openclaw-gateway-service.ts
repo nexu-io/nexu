@@ -202,7 +202,11 @@ export class OpenClawGatewayService {
       return {
         gatewayConnected: true,
         channels: channels.map((channel) => {
-          const accounts = status.channelAccounts?.[channel.channelType] ?? [];
+          const openclawChannelId =
+            channel.channelType === "wechat"
+              ? "openclaw-weixin"
+              : channel.channelType;
+          const accounts = status.channelAccounts?.[openclawChannelId] ?? [];
           const snapshot = accounts.find(
             (entry) => entry.accountId === channel.accountId,
           );
@@ -318,7 +322,9 @@ export class OpenClawGatewayService {
 
     try {
       const status = await this.getChannelsStatus();
-      const accounts = status.channelAccounts?.[channelType] ?? [];
+      const openclawId =
+        channelType === "wechat" ? "openclaw-weixin" : channelType;
+      const accounts = status.channelAccounts?.[openclawId] ?? [];
       const snapshot = accounts.find((a) => a.accountId === accountId);
 
       if (!snapshot) {
@@ -380,6 +386,30 @@ export class OpenClawGatewayService {
         gatewayConnected: false,
       };
     }
+  }
+
+  async wechatQrStart(): Promise<{
+    qrDataUrl?: string;
+    message: string;
+    sessionKey?: string;
+  }> {
+    // Retry once if the WS hasn't reconnected yet (e.g. after config push restart).
+    if (!this.wsClient.isConnected()) {
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return this.wsClient.request("web.login.start", {});
+  }
+
+  async wechatQrWait(sessionKey: string): Promise<{
+    connected: boolean;
+    message: string;
+    accountId?: string;
+  }> {
+    return this.wsClient.request(
+      "web.login.wait",
+      { accountId: sessionKey },
+      { timeoutMs: 500_000 },
+    );
   }
 
   private configHash(config: OpenClawConfig): string {

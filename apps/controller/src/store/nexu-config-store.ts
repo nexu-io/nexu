@@ -232,6 +232,37 @@ export class NexuConfigStore {
     return this.store.read();
   }
 
+  private resolveDesktopCloudLinkUrl(linkUrl?: string | null): string {
+    return this.nexuLinkUrl ?? linkUrl ?? this.nexuCloudUrl;
+  }
+
+  async reconcileConfiguredDesktopCloudState(): Promise<void> {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+
+    if (!cloud.connected) {
+      return;
+    }
+
+    const linkUrl = this.resolveDesktopCloudLinkUrl(cloud.linkUrl);
+    if (cloud.linkUrl === linkUrl) {
+      return;
+    }
+
+    const endpointChanged = cloud.linkUrl !== linkUrl;
+
+    await this.setDesktopCloudState({
+      connected: endpointChanged ? false : cloud.connected,
+      polling: false,
+      userName: endpointChanged ? null : (cloud.userName ?? null),
+      userEmail: endpointChanged ? null : (cloud.userEmail ?? null),
+      connectedAt: endpointChanged ? null : (cloud.connectedAt ?? null),
+      linkUrl,
+      apiKey: endpointChanged ? null : (cloud.apiKey ?? null),
+      models: endpointChanged ? [] : (cloud.models ?? []),
+    });
+  }
+
   private async setDesktopCloudState(input: {
     connected: boolean;
     polling: boolean;
@@ -613,6 +644,39 @@ export class NexuConfigStore {
     return channel;
   }
 
+  async connectWechat(input: { accountId: string }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "wechat",
+      accountId: input.accountId,
+      status: "connected",
+      teamName: null,
+      appId: null,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
   async connectFeishu(input: ConnectFeishuInput): Promise<ChannelResponse> {
     const bot = await this.getOrCreateDefaultBot();
     const connectedAt = now();
@@ -960,6 +1024,20 @@ export class NexuConfigStore {
   private async hydrateDesktopCloudModels(forceRefresh = false): Promise<void> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
+    const linkUrl = this.resolveDesktopCloudLinkUrl(cloud.linkUrl);
+
+    if (cloud.connected && cloud.linkUrl !== linkUrl) {
+      await this.setDesktopCloudState({
+        connected: cloud.connected,
+        polling: cloud.polling,
+        userName: cloud.userName ?? null,
+        userEmail: cloud.userEmail ?? null,
+        connectedAt: cloud.connectedAt ?? null,
+        linkUrl,
+        apiKey: cloud.apiKey ?? null,
+        models: cloud.models ?? [],
+      });
+    }
 
     if (
       !cloud.connected ||
@@ -969,7 +1047,6 @@ export class NexuConfigStore {
       return;
     }
 
-    const linkUrl = this.nexuLinkUrl ?? cloud.linkUrl ?? this.nexuCloudUrl;
     const models = await this.fetchDesktopCloudModels(linkUrl, cloud.apiKey);
     if (models === null) {
       return;

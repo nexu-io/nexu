@@ -42,6 +42,70 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 
 ## Common troubleshooting
 
+## Local State Map
+
+### Dev desktop (`pnpm start` / `pnpm restart`)
+
+- Electron `userData`: `<repo>/.tmp/desktop/electron`
+- Desktop logs: `<repo>/.tmp/desktop/electron/logs`
+- Desktop main log: `<repo>/.tmp/desktop/electron/logs/desktop-main.log`
+- Cold-start log: `<repo>/.tmp/desktop/electron/logs/cold-start.log`
+- Desktop diagnostics snapshot: `<repo>/.tmp/desktop/electron/logs/desktop-diagnostics.json`
+- Startup health state: `<repo>/.tmp/desktop/electron/startup-health.json`
+- Runtime unit logs: `<repo>/.tmp/desktop/electron/logs/runtime-units`
+- Controller unit log: `<repo>/.tmp/desktop/electron/logs/runtime-units/controller.log`
+- Other managed unit logs: `<repo>/.tmp/desktop/electron/logs/runtime-units/<unit>.log`
+- Desktop wrapper log: `<repo>/.tmp/logs/desktop-dev.log`
+- Desktop startup timeline log: `<repo>/.tmp/logs/desktop-startup-timeline.log`
+- OpenClaw runtime root: `<repo>/.tmp/desktop/electron/runtime/openclaw`
+- OpenClaw config: `<repo>/.tmp/desktop/electron/runtime/openclaw/config/openclaw.json`
+- OpenClaw state: `<repo>/.tmp/desktop/electron/runtime/openclaw/state`
+- OpenClaw native log: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
+- Desktop-scoped Nexu home: `<repo>/.tmp/desktop/electron/.nexu`
+- Controller `NEXU_HOME`: points to the desktop-scoped path above when launched by desktop dev
+- Repo-local reset command: `pnpm reset-state` or `./apps/desktop/dev.sh reset-state`
+
+### Packaged desktop (DMG-installed app)
+
+- Electron `userData`: `~/Library/Application Support/@nexu/desktop`
+- Override for local packaged testing: `NEXU_DESKTOP_USER_DATA_ROOT`
+- Desktop logs: `~/Library/Application Support/@nexu/desktop/logs`
+- Desktop main log: `~/Library/Application Support/@nexu/desktop/logs/desktop-main.log`
+- Cold-start log: `~/Library/Application Support/@nexu/desktop/logs/cold-start.log`
+- Desktop diagnostics snapshot: `~/Library/Application Support/@nexu/desktop/logs/desktop-diagnostics.json`
+- Startup health state: `~/Library/Application Support/@nexu/desktop/startup-health.json`
+- Runtime unit logs: `~/Library/Application Support/@nexu/desktop/logs/runtime-units`
+- Controller unit log: `~/Library/Application Support/@nexu/desktop/logs/runtime-units/controller.log`
+- Other managed unit logs: `~/Library/Application Support/@nexu/desktop/logs/runtime-units/<unit>.log`
+- OpenClaw runtime root: `~/Library/Application Support/@nexu/desktop/runtime/openclaw`
+- OpenClaw state: `~/Library/Application Support/@nexu/desktop/runtime/openclaw/state`
+- OpenClaw native log: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
+- Desktop-scoped Nexu home: `~/Library/Application Support/@nexu/desktop/.nexu`
+- Controller `NEXU_HOME`: points to the desktop-scoped path above when launched from the packaged app
+
+### How to use the logs
+
+- Start with the desktop wrapper log in dev when `pnpm start` fails before Electron is fully up: `<repo>/.tmp/logs/desktop-dev.log`
+- Check `cold-start.log` for boot milestones and early main-process startup sequencing
+- Check `desktop-main.log` for main-process runtime behavior, auth recovery, renderer-side forwarded events, and desktop lifecycle diagnostics
+- Check `logs/runtime-units/*.log` for sidecar process logs, especially `controller.log`
+- Check `/tmp/openclaw/openclaw-YYYY-MM-DD.log` for OpenClaw-native channel traffic, agent dispatch, config reloads, hook activity, and model override behavior
+- When exporting diagnostics, the app bundles `desktop-main.log`, `cold-start.log`, `logs/runtime-units/*`, `desktop-diagnostics.json`, `startup-health.json`, and `/tmp/openclaw/openclaw-*.log`
+
+### What `reset-state` actually does
+
+- `pnpm reset-state` is a dev-only command that runs `./apps/desktop/dev.sh reset-state`
+- It stops the tmux-managed desktop stack and removes `$NEXU_DESKTOP_RUNTIME_ROOT`, which is the repo-local desktop runtime root in dev
+- In practice this clears repo-local desktop runtime data such as desktop `userData`, generated OpenClaw config/state, agent workspaces, runtime sessions, and desktop logs under `.tmp/desktop/`
+- It does not touch packaged-app data under `~/Library/Application Support/@nexu/desktop`
+- It does not touch any separately managed `~/.nexu/` state from non-desktop workflows or older local setups
+
+### Full local wipe checklist
+
+- For a normal dev reset, run `pnpm reset-state`
+- For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` if you also want to discard controller-owned or legacy local state outside the desktop-scoped `userData`
+- Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, and any leftover controller state from earlier local runs
+
 - `a locally packaged app needs build-time overrides`
   - Put local-only packaged-app settings in `apps/desktop/.env` and keep that file untracked.
   - Start from `apps/desktop/.env.example`.

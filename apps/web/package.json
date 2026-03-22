@@ -14,9 +14,9 @@
   },
   "dependencies": {
     "@amplitude/unified": "1.0.0-beta.38",
-    "@nexu/shared": "workspace:*",
     "@hey-api/client-fetch": "^0.8.4",
     "@lobehub/icons": "2.33.0",
+    "@nexu/shared": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-select": "^2.1.6",
@@ -30,6 +30,7 @@
     "clsx": "^2.1.1",
     "i18next": "^25.8.18",
     "lucide-react": "^0.474.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-i18next": "^16.5.8",

@@ -124,6 +124,13 @@ export class ChannelService {
     return channel;
   }
 
+  async connectWechat(accountId: string) {
+    const channel = await this.configStore.connectWechat({ accountId });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
   async connectFeishu(input: ConnectFeishuInput) {
     const response = await fetch(
       "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",

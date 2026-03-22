@@ -173,6 +173,7 @@ const en = {
   "home.channel.feishu": "Feishu / Feishu",
   "home.channel.slack": "Slack",
   "home.channel.discord": "Discord",
+  "home.channel.wechat": "WeChat",
   "home.channel.addBot": "Add nexu Bot",
   "home.tab.channels": "Channels",
   "home.tab.models": "Models & Key",
@@ -651,6 +652,24 @@ const en = {
   "feishuSetup.helpSuffix": "for detailed instructions.",
   "feishuSetup.connectSuccess": "Feishu bot connected!",
   "feishuSetup.connectFailed": "Failed to connect Feishu",
+
+  // ── WeChat Setup ──
+  "wechatSetup.title": "Connect WeChat",
+  "wechatSetup.desc":
+    "Scan a QR code with your WeChat mobile app to connect your personal WeChat account.",
+  "wechatSetup.scanQr": "Scan QR to Connect",
+  "wechatSetup.scanning": "Waiting for scan...",
+  "wechatSetup.scanHint":
+    "Open WeChat on your phone and scan the QR code above to link your account.",
+  "wechatSetup.connectSuccess": "WeChat connected!",
+  "wechatSetup.connectFailed": "Failed to connect WeChat",
+  "wechatSetup.timeout": "QR code expired. Please try again.",
+  "wechatSetup.retry": "Try Again",
+  "wechatSetup.gatewayError":
+    "Gateway not connected. Please start the runtime first.",
+  "wechatSetup.waitingGateway": "Waiting for gateway to start...",
+  "wechatSetup.waitingGatewayHint": "Attempt {{attempt}}/{{total}}",
+  "wechatSetup.loadingQr": "Loading QR code...",
 
   // ── Slack Setup ──
   "slackSetup.stepCreateApp": "Create Slack App",

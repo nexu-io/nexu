@@ -680,7 +680,7 @@ export type GetApiV1ChannelsResponses = {
         channels: Array<{
             id: string;
             botId: string;
-            channelType: 'slack' | 'discord' | 'feishu';
+            channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
             accountId: string;
             status: 'pending' | 'connected' | 'disconnected' | 'error';
             teamName: string;
@@ -764,7 +764,7 @@ export type PostApiV1ChannelsSlackConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -807,7 +807,7 @@ export type PostApiV1ChannelsDiscordConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -850,7 +850,7 @@ export type PostApiV1ChannelsFeishuConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -890,7 +890,7 @@ export type GetApiV1ChannelsByChannelIdStatusResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -941,6 +941,110 @@ export type DeleteApiV1ChannelsByChannelIdResponses = {
 };
 
 export type DeleteApiV1ChannelsByChannelIdResponse = DeleteApiV1ChannelsByChannelIdResponses[keyof DeleteApiV1ChannelsByChannelIdResponses];
+
+export type PostApiV1ChannelsWechatQrStartData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/wechat/qr-start';
+};
+
+export type PostApiV1ChannelsWechatQrStartErrors = {
+    /**
+     * Gateway not connected
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWechatQrStartError = PostApiV1ChannelsWechatQrStartErrors[keyof PostApiV1ChannelsWechatQrStartErrors];
+
+export type PostApiV1ChannelsWechatQrStartResponses = {
+    /**
+     * QR code data for WeChat login
+     */
+    200: {
+        qrDataUrl?: string;
+        message: string;
+        sessionKey?: string;
+    };
+};
+
+export type PostApiV1ChannelsWechatQrStartResponse = PostApiV1ChannelsWechatQrStartResponses[keyof PostApiV1ChannelsWechatQrStartResponses];
+
+export type PostApiV1ChannelsWechatQrWaitData = {
+    body?: {
+        sessionKey: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/wechat/qr-wait';
+};
+
+export type PostApiV1ChannelsWechatQrWaitErrors = {
+    /**
+     * Gateway not connected or timeout
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWechatQrWaitError = PostApiV1ChannelsWechatQrWaitErrors[keyof PostApiV1ChannelsWechatQrWaitErrors];
+
+export type PostApiV1ChannelsWechatQrWaitResponses = {
+    /**
+     * WeChat QR login result
+     */
+    200: {
+        connected: boolean;
+        message: string;
+        accountId?: string;
+    };
+};
+
+export type PostApiV1ChannelsWechatQrWaitResponse = PostApiV1ChannelsWechatQrWaitResponses[keyof PostApiV1ChannelsWechatQrWaitResponses];
+
+export type PostApiV1ChannelsWechatConnectData = {
+    body?: {
+        accountId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/wechat/connect';
+};
+
+export type PostApiV1ChannelsWechatConnectErrors = {
+    /**
+     * Connection failed
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWechatConnectError = PostApiV1ChannelsWechatConnectErrors[keyof PostApiV1ChannelsWechatConnectErrors];
+
+export type PostApiV1ChannelsWechatConnectResponses = {
+    /**
+     * Connected wechat channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsWechatConnectResponse = PostApiV1ChannelsWechatConnectResponses[keyof PostApiV1ChannelsWechatConnectResponses];
 
 export type GetApiV1ChannelsLiveStatusData = {
     body?: never;

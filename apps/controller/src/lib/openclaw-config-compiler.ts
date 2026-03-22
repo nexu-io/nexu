@@ -22,6 +22,10 @@ const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
   zai: "https://open.bigmodel.cn/api/paas/v4",
 };
 
+const LINK_PROVIDER_HEADERS = {
+  "User-Agent": "Mozilla/5.0",
+};
+
 function resolveOpenClawProviderId(providerId: string): string {
   switch (providerId) {
     case "kimi":
@@ -210,6 +214,7 @@ function compileModelsConfig(
       baseUrl: `${normalizeProviderBaseUrl(desktopCloud.linkUrl) ?? desktopCloud.linkUrl}/v1`,
       apiKey: desktopCloud.apiKey,
       api: "openai-completions",
+      headers: LINK_PROVIDER_HEADERS,
       models: desktopCloud.models.map((model) =>
         buildModelEntry(model.id, model.name),
       ),
@@ -318,6 +323,9 @@ function compilePlugins(
     },
     entries: {
       feishu: {
+        enabled: true,
+      },
+      "openclaw-weixin": {
         enabled: true,
       },
       "nexu-runtime-model": {

@@ -1,6 +1,15 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +39,56 @@ const rmWithRetriesOptions = {
   maxRetries: 5,
   retryDelay: 200,
 };
+
+/**
+ * Dereference pnpm symlinks for extraResources that electron-builder
+ * copies into the bundle. Without this, symlinks point to non-existent
+ * paths in the final .app bundle, causing codesign to fail.
+ */
+async function dereferencePnpmSymlinks() {
+  const sharpPath = resolve(electronRoot, "node_modules/sharp");
+  const imgPath = resolve(electronRoot, "node_modules/@img");
+
+  // First, dereference sharp if it's a symlink
+  try {
+    const sharpStat = await lstat(sharpPath);
+    if (sharpStat.isSymbolicLink()) {
+      const realSharpPath = await realpath(sharpPath);
+      console.log(
+        `[dist:mac] dereferencing pnpm symlink: ${sharpPath} -> ${realSharpPath}`,
+      );
+      await rm(sharpPath, rmWithRetriesOptions);
+      await cp(realSharpPath, sharpPath, {
+        recursive: true,
+        dereference: true,
+      });
+    }
+  } catch (err) {
+    console.log(`[dist:mac] skipping sharp: ${err.message}`);
+  }
+
+  // Then, copy @img from sharp's node_modules to top-level if it doesn't exist
+  // (pnpm hoists @img inside sharp's node_modules, not at top level)
+  try {
+    const sharpImgPath = resolve(sharpPath, "node_modules/@img");
+    const sharpImgStat = await lstat(sharpImgPath).catch(() => null);
+
+    if (sharpImgStat) {
+      console.log(
+        `[dist:mac] copying @img from sharp's node_modules: ${sharpImgPath} -> ${imgPath}`,
+      );
+      await rm(imgPath, rmWithRetriesOptions);
+      await mkdir(resolve(electronRoot, "node_modules/@img"), {
+        recursive: true,
+      });
+      await cp(sharpImgPath, imgPath, { recursive: true, dereference: true });
+    } else {
+      console.log(`[dist:mac] @img not found in sharp's node_modules`);
+    }
+  } catch (err) {
+    console.log(`[dist:mac] skipping @img: ${err.message}`);
+  }
+}
 
 function parseEnvFile(content) {
   const values = {};
@@ -426,6 +485,10 @@ async function main() {
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
+
+  // Dereference pnpm symlinks before electron-builder runs
+  await dereferencePnpmSymlinks();
+
   // Use git short SHA as CFBundleVersion (shown in parentheses in About dialog).
   // Falls back to "dev" for local builds outside a git repo.
   let buildVersion = "dev";

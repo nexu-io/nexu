@@ -1,11 +1,12 @@
 import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
+import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Cable } from "lucide-react";
+import { ArrowUpRight, Cable, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -100,12 +101,32 @@ const FEISHU_ICON = (
     style={{ objectFit: "contain" }}
   />
 );
+const WECHAT_ICON = (
+  <svg width="16" height="16" viewBox="0 0 1024 1024" role="img">
+    <title>WeChat</title>
+    <path
+      d="M704 397.92c-15.04-140.96-151.04-251.36-316.48-251.36-176 0-317.92 124.16-317.92 277.28a267.36 267.36 0 0 0 129.12 224c8.8 5.6-29.12 85.28-19.68 90.08s28.48-11.2 48.8-26.56 39.52-29.76 48-26.88a362.56 362.56 0 0 0 112 17.44 376.16 376.16 0 0 0 57.44-4.48c36.96 84.8 133.44 145.44 246.56 145.44a305.12 305.12 0 0 0 88.16-12.96c4.48-1.28 21.76 11.36 39.2 24.16s35.36 25.76 39.68 24c13.76-5.76-25.44-69.92-12.96-77.44 65.76-40.48 108.48-105.92 108.48-180-0.16-120-111.04-217.12-250.4-222.72z m-109.12 167.2a28 28 0 1 1 27.68-28 27.84 27.84 0 0 1-27.68 28z m-165.76 54.72a204.64 204.64 0 0 0 1.44 24.32 314.72 314.72 0 0 1-42.88 2.88 302.08 302.08 0 0 1-103.36-17.76c-3.2-1.12-14.4-4.64-20.48 0a265.28 265.28 0 0 0-32 32 142.4 142.4 0 0 0 8.96-38.4c1.12-10.24-14.56-17.6-17.76-19.68a220 220 0 0 1-98.08-178.4c0-122.88 117.6-222.4 262.72-222.4 135.36 0 246.88 86.72 260.96 198.24-124.48 17.44-219.52 108.96-219.52 219.2z m331.68-54.72a28 28 0 1 1 27.68-28 27.68 27.68 0 0 1-27.68 28z"
+      fill="#8DC81B"
+    />
+    <path
+      d="M498.24 286.08a41.92 41.92 0 1 0 41.44 41.92 41.76 41.76 0 0 0-41.44-41.92zM276.96 286.08a41.92 41.92 0 1 0 41.6 41.92 41.6 41.6 0 0 0-41.6-41.92z"
+      fill="#8DC81B"
+    />
+  </svg>
+);
+
 const ONBOARDING_CHANNELS = [
+  {
+    id: "wechat",
+    name: "WeChat",
+    icon: WECHAT_ICON,
+    recommended: true,
+  },
   {
     id: "feishu",
     name: "Feishu",
     icon: FEISHU_ICON,
-    recommended: true,
+    recommended: false,
   },
   {
     id: "slack",
@@ -124,10 +145,16 @@ const ONBOARDING_CHANNELS = [
 function getChannelOptions(t: (key: string) => string) {
   return [
     {
+      id: "wechat",
+      name: t("home.channel.wechat"),
+      icon: WECHAT_ICON,
+      recommended: true,
+    },
+    {
       id: "feishu",
       name: t("home.channel.feishu"),
       icon: FEISHU_ICON,
-      recommended: true,
+      recommended: false,
     },
     {
       id: "slack",
@@ -194,6 +221,7 @@ export function HomePage() {
   const [modalChannel, setModalChannel] = useState<
     "feishu" | "slack" | "discord" | null
   >(null);
+  const [wechatQrOpen, setWechatQrOpen] = useState(false);
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoHover, setVideoHover] = useState(false);
@@ -550,14 +578,20 @@ export function HomePage() {
               </span>
             </div>
             <div className="px-5 pb-5">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {ONBOARDING_CHANNELS.map((ch) => (
                   <button
                     key={ch.id}
                     type="button"
-                    onClick={() =>
-                      setModalChannel(ch.id as "feishu" | "slack" | "discord")
-                    }
+                    onClick={() => {
+                      if (ch.id === "wechat") {
+                        setWechatQrOpen(true);
+                      } else {
+                        setModalChannel(
+                          ch.id as "feishu" | "slack" | "discord",
+                        );
+                      }
+                    }}
                     className={`group relative rounded-xl border px-3 py-3 text-left transition-all cursor-pointer active:scale-[0.98] border-border bg-surface-0 hover:border-border-hover hover:bg-surface-1 ${
                       ch.recommended ? "animate-breathe" : ""
                     }`}
@@ -592,6 +626,17 @@ export function HomePage() {
             onClose={() => setModalChannel(null)}
             onConnected={handleConnected}
             onConnectedChannelCreated={handleChannelCreated}
+          />
+        )}
+
+        {wechatQrOpen && (
+          <WechatQrModal
+            onClose={() => setWechatQrOpen(false)}
+            onConnected={() => {
+              setWechatQrOpen(false);
+              handleConnected();
+            }}
+            gatewayReady={runtimeData?.status === "active"}
           />
         )}
       </div>
@@ -793,9 +838,15 @@ export function HomePage() {
                     <button
                       key={ch.id}
                       type="button"
-                      onClick={() =>
-                        setModalChannel(ch.id as "feishu" | "slack" | "discord")
-                      }
+                      onClick={() => {
+                        if (ch.id === "wechat") {
+                          setWechatQrOpen(true);
+                        } else {
+                          setModalChannel(
+                            ch.id as "feishu" | "slack" | "discord",
+                          );
+                        }
+                      }}
                       className="group flex items-center gap-2.5 rounded-lg border border-dashed border-border bg-surface-0 px-3 py-2 text-left hover:border-solid hover:border-border-hover hover:bg-surface-1 transition-all"
                     >
                       <div className="w-6 h-6 rounded-md flex items-center justify-center bg-surface-1 shrink-0">
@@ -836,6 +887,84 @@ export function HomePage() {
           onConnectedChannelCreated={handleChannelCreated}
         />
       )}
+
+      {wechatQrOpen && (
+        <WechatQrModal
+          onClose={() => setWechatQrOpen(false)}
+          onConnected={() => {
+            setWechatQrOpen(false);
+            handleConnected();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── WeChat QR Modal ──────────────────────────────────────
+
+function WechatQrModal({
+  onClose,
+  onConnected,
+  gatewayReady,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+  gatewayReady?: boolean;
+}) {
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* biome-ignore lint/a11y/useSemanticElements: custom modal without native dialog */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative w-full max-w-md mx-4 rounded-2xl border border-border bg-surface-0 shadow-2xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-border bg-surface-1">
+              {WECHAT_ICON}
+            </div>
+            <div>
+              <div className="text-[14px] font-semibold text-text-primary">
+                {t("wechatSetup.title")}
+              </div>
+              <div className="text-[11px] text-text-muted">
+                {t("wechatSetup.desc")}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-4 py-2">
+          <WechatSetupView
+            onConnected={onConnected}
+            gatewayReady={gatewayReady}
+          />
+        </div>
+      </div>
     </div>
   );
 }

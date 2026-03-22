@@ -1,5 +1,6 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { ModelPickerDropdown } from "@/components/model-picker-dropdown";
 import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
@@ -10,14 +11,12 @@ import {
   ArrowUpRight,
   Camera,
   Check,
-  ChevronDown,
   Cpu,
   ExternalLink,
   FolderOpen,
   Loader2,
   Pencil,
   RefreshCw,
-  Search,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -67,6 +66,19 @@ interface DbProvider {
   baseUrl: string | null;
   hasApiKey: boolean;
   modelsJson: string;
+}
+
+function getModelDisplayLabel(modelId: string): string {
+  return modelId.includes("/")
+    ? modelId.split("/").slice(1).join("/")
+    : modelId;
+}
+
+function isModelSelected(modelId: string, currentModelId: string): boolean {
+  return (
+    modelId === currentModelId ||
+    getModelDisplayLabel(currentModelId) === modelId
+  );
 }
 
 type SettingsTab = "general" | "providers";
@@ -314,27 +326,6 @@ const BYOK_PROVIDER_IDS = [
   "custom",
 ] as const;
 
-// ── Model grouping helpers (same as home.tsx) ─────────────────
-
-function getGroupKey(m: { id: string; provider: string }): string {
-  return m.id.startsWith("link/") ? "nexu" : m.provider;
-}
-
-const PROVIDER_LABELS: Record<string, string> = {
-  nexu: "Nexu Official",
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google AI",
-  siliconflow: "SiliconFlow",
-  ppio: "PPIO",
-  openrouter: "OpenRouter",
-  minimax: "MiniMax",
-  kimi: "Kimi",
-  glm: "GLM",
-  moonshot: "Kimi",
-  zai: "GLM",
-};
-
 // ── Component ──────────────────────────────────────────────────
 
 function _GeneralSettings() {
@@ -550,65 +541,6 @@ function _CurrentModelSelector({
   onSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const currentModel = models.find((m) => m.id === currentModelId);
-  const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
-
-  const modelsByProvider = useMemo(() => {
-    const map = new Map<string, typeof models>();
-    for (const m of models) {
-      const groupKey = getGroupKey(m);
-      const list = map.get(groupKey) ?? [];
-      list.push(m);
-      map.set(groupKey, list);
-    }
-    const entries = Array.from(map.entries());
-    entries.sort((a, b) => {
-      if (a[0] === "nexu") return -1;
-      if (b[0] === "nexu") return 1;
-      return 0;
-    });
-    return entries.map(([provider, ms]) => ({
-      id: provider,
-      name: PROVIDER_LABELS[provider] ?? provider,
-      models: ms,
-    }));
-  }, [models]);
-
-  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
-    () => new Set(currentGroupKey ? [currentGroupKey] : []),
-  );
-
-  useEffect(() => {
-    if (open) {
-      const groupKey = currentModel ? getGroupKey(currentModel) : "";
-      setExpandedProviders(
-        new Set(
-          groupKey
-            ? [groupKey]
-            : modelsByProvider.length > 0 && modelsByProvider[0]
-              ? [modelsByProvider[0].id]
-              : [],
-        ),
-      );
-    }
-  }, [open, currentModel, modelsByProvider]);
-
   if (models.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface-0 px-4 py-4 mb-5">
@@ -629,21 +561,8 @@ function _CurrentModelSelector({
     );
   }
 
-  const query = search.toLowerCase().trim();
-  const filteredProviders = modelsByProvider
-    .map((p) => ({
-      ...p,
-      models: p.models.filter(
-        (m) =>
-          !query ||
-          m.name.toLowerCase().includes(query) ||
-          p.name.toLowerCase().includes(query),
-      ),
-    }))
-    .filter((p) => p.models.length > 0);
-
   return (
-    <div className="relative mb-8" ref={ref}>
+    <div className="relative mb-8">
       <div className="rounded-xl border border-border bg-surface-1 px-4 py-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -659,123 +578,18 @@ function _CurrentModelSelector({
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-2 hover:border-border-hover transition-all text-[12px] font-medium text-text-primary"
-          >
-            {currentModel ? (
-              <>
-                <span className="w-4 h-4 shrink-0 flex items-center justify-center">
-                  <ModelLogo
-                    model={currentModel.name}
-                    provider={currentGroupKey}
-                    size={14}
-                  />
-                </span>
-                {currentModel.name}
-              </>
-            ) : (
-              <span className="text-text-muted">
-                {currentModelId || t("models.noModelConfigured")}
-              </span>
-            )}
-            <ChevronDown size={13} className="text-text-muted" />
-          </button>
+
+          <ModelPickerDropdown
+            models={models}
+            currentModelId={currentModelId}
+            emptyLabel={t("models.noModelConfigured")}
+            onSelectModel={onSelectModel}
+            dropdownAlign="end"
+            triggerClassName="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-2 hover:border-border-hover transition-all text-[12px] font-medium text-text-primary"
+            dropdownClassName="min-w-[360px]"
+          />
         </div>
       </div>
-
-      {open && (
-        <div className="absolute top-full left-0 right-0 z-20 mt-1 rounded-xl border border-border bg-surface-0 shadow-lg overflow-hidden">
-          <div className="px-3 pt-3 pb-2">
-            <div className="flex items-center gap-2.5 rounded-lg bg-surface-0 border border-border px-3 py-2">
-              <Search size={14} className="text-text-muted shrink-0" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  if (e.target.value.trim()) {
-                    setExpandedProviders(
-                      new Set(modelsByProvider.map((p) => p.id)),
-                    );
-                  }
-                }}
-                placeholder={t("models.searchModels")}
-                className="flex-1 bg-transparent text-[13px] text-text-primary placeholder:text-text-muted/50 outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="max-h-[320px] overflow-y-auto">
-            {filteredProviders.length === 0 ? (
-              <div className="px-4 py-8 text-center text-[13px] text-text-muted">
-                {t("models.byok.none")}
-              </div>
-            ) : (
-              filteredProviders.map((provider) => {
-                const isExpanded =
-                  expandedProviders.has(provider.id) || !!query;
-                return (
-                  <div key={provider.id}>
-                    <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider sticky top-0 bg-surface-0">
-                      {provider.name}
-                    </div>
-                    {isExpanded &&
-                      provider.models.map((model) => {
-                        const isSelected = model.id === currentModelId;
-                        return (
-                          <button
-                            key={model.id}
-                            type="button"
-                            onClick={() => {
-                              onSelectModel(model.id);
-                              setOpen(false);
-                              setSearch("");
-                            }}
-                            className={cn(
-                              "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors",
-                              isSelected ? "bg-accent/5" : "hover:bg-surface-2",
-                            )}
-                          >
-                            <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                              <ModelLogo
-                                model={model.name}
-                                provider={provider.id}
-                                size={14}
-                              />
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <div
-                                className={cn(
-                                  "text-[12px] truncate",
-                                  isSelected
-                                    ? "font-semibold text-accent"
-                                    : "font-medium text-text-primary",
-                                )}
-                              >
-                                {model.name}
-                              </div>
-                              <div className="text-[10px] text-text-tertiary">
-                                {provider.name}
-                              </div>
-                            </div>
-                            {isSelected && (
-                              <Check
-                                size={14}
-                                className="text-accent shrink-0"
-                              />
-                            )}
-                          </button>
-                        );
-                      })}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1344,7 +1158,7 @@ function ManagedProviderDetail({
           </div>
           <div className="space-y-1.5">
             {provider.models.map((model) => {
-              const isSelected = model.id === currentModelId;
+              const isSelected = isModelSelected(model.id, currentModelId);
               return (
                 <div
                   key={model.id}
@@ -1696,7 +1510,7 @@ function ByokProviderDetail({
             </div>
           )}
           {displayModels.map((modelId) => {
-            const isSelected = modelId === currentModelId;
+            const isSelected = isModelSelected(modelId, currentModelId);
             return (
               <div
                 key={modelId}

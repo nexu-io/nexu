@@ -5,6 +5,7 @@ import {
   compileOpenClawConfig,
   resolveModelId,
 } from "../lib/openclaw-config-compiler.js";
+import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
 import type { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
@@ -84,6 +85,7 @@ export class OpenClawSyncService {
     private readonly configStore: NexuConfigStore,
     private readonly compiledStore: CompiledOpenClawStore,
     private readonly configWriter: OpenClawConfigWriter,
+    private readonly authProfilesWriter: OpenClawAuthProfilesWriter,
     private readonly runtimePluginWriter: OpenClawRuntimePluginWriter,
     private readonly runtimeModelWriter: OpenClawRuntimeModelWriter,
     private readonly templateWriter: WorkspaceTemplateWriter,
@@ -222,6 +224,7 @@ export class OpenClawSyncService {
 
     // 2. Always write files once (persistence + watcher hot-reload path).
     await this.configWriter.write(compiled);
+    await this.authProfilesWriter.writeForAgents(compiled);
     this.gatewayService.noteConfigWritten(compiled);
     const runtimeModelRef = resolvePrimaryModelRef(
       compiled.agents.defaults?.model,

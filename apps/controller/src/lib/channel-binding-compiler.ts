@@ -30,7 +30,10 @@ export function compileChannelBindings(
     .map((channel) => ({
       agentId: channel.botId,
       match: {
-        channel: channel.channelType,
+        channel:
+          channel.channelType === "wechat"
+            ? "openclaw-weixin"
+            : channel.channelType,
         accountId: channel.accountId,
       },
     }));
@@ -43,6 +46,7 @@ export function compileChannelsConfig(params: {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
   const feishuAccounts: Record<string, FeishuAccountConfig> = {};
+  const wechatAccounts: Record<string, { enabled: boolean }> = {};
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
   const useSlackSocketMode =
     typeof socketAppToken === "string" && socketAppToken.length > 0;
@@ -82,6 +86,11 @@ export function compileChannelsConfig(params: {
         token: secret("botToken"),
         groupPolicy: "open",
       };
+      continue;
+    }
+
+    if (channel.channelType === "wechat") {
+      wechatAccounts[channel.accountId] = { enabled: true };
       continue;
     }
 
@@ -165,6 +174,14 @@ export function compileChannelsConfig(params: {
               scopes: true,
             },
             accounts: feishuAccounts,
+          },
+        }
+      : {}),
+    ...(Object.keys(wechatAccounts).length > 0
+      ? {
+          "openclaw-weixin": {
+            enabled: true,
+            accounts: wechatAccounts,
           },
         }
       : {}),

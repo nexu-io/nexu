@@ -6,7 +6,10 @@ import {
   connectDiscordSchema,
   connectFeishuSchema,
   connectSlackSchema,
+  connectWechatSchema,
   slackOAuthUrlResponseSchema,
+  wechatQrStartResponseSchema,
+  wechatQrWaitResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
@@ -268,6 +271,127 @@ export function registerChannelRoutes(
         },
         200,
       );
+    },
+  );
+
+  // WeChat QR login flow
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/wechat/qr-start",
+      tags: ["Channels"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: wechatQrStartResponseSchema },
+          },
+          description: "QR code data for WeChat login",
+        },
+        502: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Gateway not connected",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        const result = await container.gatewayService.wechatQrStart();
+        return c.json(result, 200);
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to start WeChat QR login",
+          },
+          502,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/wechat/qr-wait",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: z.object({ sessionKey: z.string().min(1) }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: wechatQrWaitResponseSchema },
+          },
+          description: "WeChat QR login result",
+        },
+        502: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Gateway not connected or timeout",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        const { sessionKey } = c.req.valid("json");
+        const result = await container.gatewayService.wechatQrWait(sessionKey);
+        return c.json(result, 200);
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "WeChat QR login failed",
+          },
+          502,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/wechat/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectWechatSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected wechat channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Connection failed",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        const { accountId } = c.req.valid("json");
+        return c.json(
+          await container.channelService.connectWechat(accountId),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "WeChat connect failed",
+          },
+          409,
+        );
+      }
     },
   );
 

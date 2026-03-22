@@ -1,6 +1,7 @@
 import { DiscordSetupView } from "@/components/channel-setup/discord-setup-view";
 import { FeishuSetupView } from "@/components/channel-setup/feishu-setup-view";
 import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
+import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,18 +31,20 @@ import {
   getApiV1Channels,
 } from "../../lib/api/sdk.gen";
 
-type Platform = "slack" | "discord" | "feishu";
+type Platform = "slack" | "discord" | "feishu" | "wechat";
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
+  { id: "wechat", emoji: "\u{1F4AC}", desc: "Personal WeChat" },
+  { id: "feishu", emoji: "\u{1F426}", desc: "Feishu Bot" },
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
-  { id: "feishu", emoji: "\u{1F426}", desc: "Feishu Bot" },
 ];
 
 const PLATFORM_LABELS: Record<Platform, string> = {
   slack: "Slack",
   discord: "Discord",
   feishu: "Feishu",
+  wechat: "WeChat",
 };
 
 // ─── Main page ───────────────────────────────────────────────
@@ -106,7 +109,7 @@ export function ChannelsPage() {
       </div>
 
       {/* Platform selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {PLATFORMS.map((p) => {
           const isActive = platform === p.id;
           const connected = channels.some((ch) => ch.channelType === p.id);
@@ -178,6 +181,11 @@ export function ChannelsPage() {
           />
         ) : platform === "discord" ? (
           <DiscordSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
+        ) : platform === "wechat" ? (
+          <WechatSetupView
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
