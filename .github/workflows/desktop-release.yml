@@ -180,11 +180,11 @@ jobs:
             exit 1
           fi
 
-          # New naming: nexu-simplest-openclaw-desktop-{version}-{channel}-{arch}.{ext}
-          versioned_dmg="nexu-simplest-openclaw-desktop-${VERSION}-${channel}-arm64.dmg"
-          versioned_zip="nexu-simplest-openclaw-desktop-${VERSION}-${channel}-arm64.zip"
-          latest_dmg="nexu-simplest-openclaw-desktop-latest-${channel}-arm64.dmg"
-          latest_zip="nexu-simplest-openclaw-desktop-latest-${channel}-arm64.zip"
+          # New naming: nexu-{version}-{channel}-{arch}.{ext}
+          versioned_dmg="nexu-${VERSION}-${channel}-arm64.dmg"
+          versioned_zip="nexu-${VERSION}-${channel}-arm64.zip"
+          latest_dmg="nexu-latest-${channel}-arm64.dmg"
+          latest_zip="nexu-latest-${channel}-arm64.zip"
 
           cp "${dmg_files[0]}" "apps/desktop/release-artifacts/${versioned_dmg}"
           cp "${zip_files[0]}" "apps/desktop/release-artifacts/${versioned_zip}"
@@ -251,8 +251,8 @@ jobs:
           fi
 
           # electron-builder generates filenames without channel, we need to patch them
-          original_dmg="nexu-simplest-openclaw-desktop-${VERSION}-arm64.dmg"
-          original_zip="nexu-simplest-openclaw-desktop-${VERSION}-arm64.zip"
+          original_dmg="nexu-${VERSION}-arm64.dmg"
+          original_zip="nexu-${VERSION}-arm64.zip"
 
           echo "Patching latest-mac.yml:"
           echo "  ${original_dmg} → ${VERSIONED_DMG}"
