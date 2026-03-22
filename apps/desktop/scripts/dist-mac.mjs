@@ -41,6 +41,18 @@ const rmWithRetriesOptions = {
 };
 
 /**
+ * Recursively dereference all symlinks in a directory using cp -RL.
+ * Node.js fs.cp with dereference:true only dereferences the top-level source,
+ * not nested symlinks inside directories. We need cp -RL for full recursion.
+ */
+async function copyWithFullDereference(src, dest) {
+  await rm(dest, rmWithRetriesOptions);
+  await mkdir(dirname(dest), { recursive: true });
+  // cp -RL: -R recursive, -L dereference symlinks
+  execFileSync("cp", ["-RL", src, dest], { stdio: "inherit" });
+}
+
+/**
  * Dereference pnpm symlinks for extraResources that electron-builder
  * copies into the bundle. Without this, symlinks point to non-existent
  * paths in the final .app bundle, causing codesign to fail.
@@ -67,23 +79,19 @@ async function dereferencePnpmSymlinks() {
     console.log(`[dist:mac] failed to resolve pnpm paths: ${err.message}`);
   }
 
-  // Now dereference sharp
+  // Now dereference sharp using cp -RL for full symlink resolution
   if (realSharpPath) {
     try {
       console.log(
         `[dist:mac] dereferencing sharp: ${sharpPath} -> ${realSharpPath}`,
       );
-      await rm(sharpPath, rmWithRetriesOptions);
-      await cp(realSharpPath, sharpPath, {
-        recursive: true,
-        dereference: true,
-      });
+      await copyWithFullDereference(realSharpPath, sharpPath);
     } catch (err) {
       console.log(`[dist:mac] failed to dereference sharp: ${err.message}`);
     }
   }
 
-  // Copy @img from pnpm directory
+  // Copy @img from pnpm directory using cp -RL for full symlink resolution
   if (pnpmImgPath) {
     try {
       const pnpmImgStat = await lstat(pnpmImgPath).catch(() => null);
@@ -91,8 +99,7 @@ async function dereferencePnpmSymlinks() {
         console.log(
           `[dist:mac] copying @img from pnpm: ${pnpmImgPath} -> ${imgPath}`,
         );
-        await rm(imgPath, rmWithRetriesOptions);
-        await cp(pnpmImgPath, imgPath, { recursive: true, dereference: true });
+        await copyWithFullDereference(pnpmImgPath, imgPath);
       } else {
         console.log(`[dist:mac] @img not found at: ${pnpmImgPath}`);
       }
