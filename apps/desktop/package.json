@@ -100,9 +100,7 @@
       {
         "from": "build-config.json",
         "to": "build-config.json",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ],
     "afterSign": "./scripts/notarize.cjs",
@@ -110,10 +108,7 @@
     "mac": {
       "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg", "zip"],
       "artifactName": "nexu-${version}-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,

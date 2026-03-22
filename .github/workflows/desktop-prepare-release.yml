@@ -35,13 +35,68 @@ jobs:
         run: |
           set -euo pipefail
 
-          cd apps/desktop
-          npm version "${{ inputs.version }}" --no-git-tag-version
-          desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); process.stdout.write(pkg.version);')
+          desktop_version=$(node - <<'EOF'
+          const fs = require("node:fs");
+          const path = "apps/desktop/package.json";
+          const input = process.env.INPUT_VERSION;
+          const source = fs.readFileSync(path, "utf8");
+          const pkg = JSON.parse(source);
+
+          const bump = (version, release) => {
+            const match = version.match(/^(\d+)\.(\d+)\.(\d+)(-.+)?$/);
+            if (!match) {
+              throw new Error(`Unsupported current version: ${version}`);
+            }
+
+            const [, majorRaw, minorRaw, patchRaw] = match;
+            let major = Number(majorRaw);
+            let minor = Number(minorRaw);
+            let patch = Number(patchRaw);
+
+            if (release === "major") {
+              major += 1;
+              minor = 0;
+              patch = 0;
+              return `${major}.${minor}.${patch}`;
+            }
+
+            if (release === "minor") {
+              minor += 1;
+              patch = 0;
+              return `${major}.${minor}.${patch}`;
+            }
+
+            if (release === "patch") {
+              patch += 1;
+              return `${major}.${minor}.${patch}`;
+            }
+
+            return release;
+          };
+
+          const nextVersion = ["major", "minor", "patch"].includes(input)
+            ? bump(pkg.version, input)
+            : input;
+
+          const updated = source.replace(
+            /"version":\s*"[^"]+"/,
+            `"version": "${nextVersion}"`,
+          );
+
+          if (updated === source) {
+            throw new Error("Failed to update apps/desktop/package.json version field");
+          }
+
+          fs.writeFileSync(path, updated);
+          process.stdout.write(nextVersion);
+          EOF
+          )
 
           echo "desktop_version=$desktop_version" >> "$GITHUB_OUTPUT"
           echo "tag_name=v$desktop_version" >> "$GITHUB_OUTPUT"
           echo "branch_name=release/v$desktop_version" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
 
       - name: Commit version bump branch
         env:
