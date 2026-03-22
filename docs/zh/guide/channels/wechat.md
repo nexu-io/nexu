@@ -1,56 +1,45 @@
-# nexu 适配微信，可以在微信上指挥你的龙虾啦
+# 微信
 
-你的 AI 龙虾申请加入你的微信联系人。
+点击「Connect」，微信扫码，即可将微信接入 nexu。无需额外配置。
 
-刚刚，微信上线「ClawBot」插件，支持接入 OpenClaw。nexu 已完成适配，欢迎大家前往体验。
+## 前置条件
 
-> 内测期间，Claude、GPT、Gemini 等顶级模型**全部免费、无限量使用**。
+将微信更新至 **8.0.7** 或更高版本。这是支持 ClawBot 插件的最低版本。
 
----
+## 第一步：在 nexu 中点击连接
 
-## 接入路径
+打开 nexu 客户端，在微信渠道配置中点击「Connect」。
 
-### 第一步：更新微信至 8.0.7
+nexu 会自动安装微信官方 ClawBot 插件（`@tencent-weixin/openclaw-weixin-cli`），无需手动操作。
 
-在微信中将版本更新到 **8.0.7**，这是支持 ClawBot 插件的最低版本。
+<!-- ![点击 Connect](/assets/wechat/step1-nexu-connect.webp) -->
 
-### 第二步：下载 nexu 并接入飞书
+## 第二步：微信扫码授权
 
-打开 nexu（下载地址：[https://nexu.io](https://nexu.io)），按照文档完成飞书渠道配置，让你的 Agent 先跑起来：
+插件安装完成后，nexu 会弹出一个微信授权二维码。
 
-👉 [**飞书渠道配置（图文教程）**](https://docs.nexu.io/zh/guide/channels/feishu)
+1. 打开手机上的**微信**。
+2. 扫描屏幕上的二维码。
+3. 在手机上点击**确认连接**。
 
-完成后在飞书中给 Agent 发一条消息，确认连通。
+<!-- ![扫码授权](/assets/wechat/step2-scan-qrcode.webp) -->
 
-### 第三步：输入官方配置代码
+## 第三步：开始对话
 
-在飞书中给 Agent 发送以下消息：
+连接成功后，在 nexu 客户端点击「Chat」即可跳转到微信与 ClawBot 对话 🎉
 
-```
-npx -y @tencent-weixin/openclaw-weixin-cli@latest install
-```
+<!-- ![微信已连接](/assets/wechat/step3-connected.webp) -->
 
-![WeixinClawBot 插件](/assets/wechat/weixinclawbot.webp)
+## 常见问题
 
-### 第四步：生成二维码并扫码
+**Q: 需要公网服务器吗？**
 
-Agent 执行完成后会生成微信授权二维码，用微信扫码连接。
+不需要。nexu 通过微信 ClawBot 插件直连，无需公网 IP 或回调地址。
 
-<!-- ![扫码连接](/assets/wechat/qrcode.png) -->
+**Q: 需要企业微信或公众号吗？**
 
-### 第五步：微信里完成配置
+不需要。微信 8.0.7 原生支持 ClawBot 插件，个人微信即可使用。
 
-在微信中点击连接，开始和你的微信 ClawBot 对话。
+**Q: 会不会被封号？**
 
-<!-- ![对话截图](/assets/wechat/chat.png) -->
-
-🦞 **部署完成，即在你的好友列表中直接出现！**
-
----
-
-此外 nexu 已接入飞书、Slack、Discord，欢迎多多体验。
-
-- [nexu 官网 — 下载客户端](https://nexu.io)
-- [nexu GitHub — 开源仓库](https://github.com/nexu-io/nexu)
-- [加入飞书交流群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913)
-- [加入 Discord](https://discord.gg/Q6AxCUuMNU)
+不会。ClawBot 是微信官方推出的插件，完全合规。

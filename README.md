@@ -18,7 +18,7 @@
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 Docs</strong></a> &nbsp;·&nbsp;
   <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 Feishu</strong></a> &nbsp;·&nbsp;
   <a href="https://discord.gg/Q6AxCUuMNU" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
-  <a href="https://x.com/Nexu06" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
+  <a href="https://x.com/nexudotio" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
 <p align="center">
