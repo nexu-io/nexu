@@ -89,6 +89,10 @@ interface LiveStatusChannelInput {
   accountId: string;
 }
 
+function isImplicitlyReadyChannelType(channelType: string): boolean {
+  return channelType === "feishu";
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -212,6 +216,20 @@ export class OpenClawGatewayService {
           );
 
           if (!snapshot) {
+            if (isImplicitlyReadyChannelType(channel.channelType)) {
+              return {
+                channelType: channel.channelType,
+                channelId: channel.id,
+                accountId: channel.accountId,
+                status: "connected" satisfies ChannelLiveStatus,
+                ready: true,
+                connected: false,
+                running: true,
+                configured: true,
+                lastError: null,
+              };
+            }
+
             return {
               channelType: channel.channelType,
               channelId: channel.id,
@@ -328,6 +346,17 @@ export class OpenClawGatewayService {
       const snapshot = accounts.find((a) => a.accountId === accountId);
 
       if (!snapshot) {
+        if (isImplicitlyReadyChannelType(channelType)) {
+          return {
+            ready: true,
+            connected: false,
+            running: true,
+            configured: true,
+            lastError: null,
+            gatewayConnected: true,
+          };
+        }
+
         // Channel not yet visible to OpenClaw (config not yet loaded)
         return {
           ready: false,
