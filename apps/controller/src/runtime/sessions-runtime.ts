@@ -127,7 +127,7 @@ export class SessionsRuntime {
             this.shouldReplaceInferredTitle(title, sessionKey) &&
             channelType === "openclaw-weixin"
           ) {
-            title = "WeChat Conversation";
+            title = "WeChat ClawBot";
           }
 
           const { metadata: mergedMetadata, changed: metadataBackfilled } =

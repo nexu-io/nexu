@@ -361,7 +361,7 @@ describe("SessionsRuntime", () => {
       (item) => item.sessionKey === "b1392694-8959-454f-8571-a83cf1f6abef",
     );
 
-    expect(session?.title).toBe("WeChat Conversation");
+    expect(session?.title).toBe("WeChat ClawBot");
   });
 
   it("replaces persisted uuid-like titles with inferred WeChat conversation titles", async () => {
@@ -426,6 +426,6 @@ describe("SessionsRuntime", () => {
     const session = sessions.find((item) => item.sessionKey === sessionKey);
 
     expect(session?.channelType).toBe("openclaw-weixin");
-    expect(session?.title).toBe("WeChat Conversation");
+    expect(session?.title).toBe("WeChat ClawBot");
   });
 });
