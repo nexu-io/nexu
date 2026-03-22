@@ -52,7 +52,10 @@ async function prepareControllerSidecar() {
   await cp(controllerDistRoot, sidecarDistRoot, { recursive: true });
 
   if (await pathExists(controllerStaticRoot)) {
-    await cp(controllerStaticRoot, sidecarStaticRoot, { recursive: true });
+    await cp(controllerStaticRoot, sidecarStaticRoot, {
+      recursive: true,
+      dereference: true,
+    });
   }
 
   const controllerPackageJson = JSON.parse(
