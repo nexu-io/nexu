@@ -109,7 +109,7 @@ describe("OpenClawConfigWriter", () => {
     expect(finalStat.mtimeMs).toBe(firstStat.mtimeMs);
   });
 
-  it("separate writer instances do not share state", async () => {
+  it("new writer instance seeds cache from existing file on cold start", async () => {
     const config = makeConfig();
 
     const writer1 = new OpenClawConfigWriter(env);
@@ -118,11 +118,38 @@ describe("OpenClawConfigWriter", () => {
 
     await new Promise((r) => setTimeout(r, 50));
 
-    // A new writer instance has no memory of previous writes
+    // A new writer instance reads the existing file to seed its cache,
+    // so it skips the write when content matches (cold-start optimization).
     const writer2 = new OpenClawConfigWriter(env);
     await writer2.write(config);
     const secondStat = await stat(env.openclawConfigPath);
 
-    expect(secondStat.mtimeMs).not.toBe(firstStat.mtimeMs);
+    expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);
+  });
+
+  it("new writer instance writes when content differs from existing file", async () => {
+    const configA = makeConfig({ commands: { native: "auto" } });
+    const configB = makeConfig({ commands: { native: "off" } });
+
+    const writer1 = new OpenClawConfigWriter(env);
+    await writer1.write(configA);
+
+    // A new writer reads the existing file, sees different content, and writes.
+    const writer2 = new OpenClawConfigWriter(env);
+    await writer2.write(configB);
+    const written = await readFile(env.openclawConfigPath, "utf8");
+
+    expect(JSON.parse(written)).toEqual(configB);
+  });
+
+  it("cold start with no existing file writes normally", async () => {
+    // No file exists yet — writer should write without error.
+    const writer = new OpenClawConfigWriter(env);
+    const config = makeConfig();
+
+    await writer.write(config);
+
+    const written = await readFile(env.openclawConfigPath, "utf8");
+    expect(JSON.parse(written)).toEqual(config);
   });
 });

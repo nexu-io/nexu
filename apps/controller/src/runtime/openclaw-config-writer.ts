@@ -1,4 +1,4 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { OpenClawConfig } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
@@ -13,6 +13,20 @@ export class OpenClawConfigWriter {
   async write(config: OpenClawConfig): Promise<void> {
     await mkdir(path.dirname(this.env.openclawConfigPath), { recursive: true });
     const content = `${JSON.stringify(config, null, 2)}\n`;
+
+    // On cold start, seed the cache from the existing file on disk so the
+    // first write() after a process restart doesn't trigger an unnecessary
+    // OpenClaw reload when the config hasn't actually changed.
+    if (this.lastWrittenContent === null) {
+      try {
+        this.lastWrittenContent = await readFile(
+          this.env.openclawConfigPath,
+          "utf8",
+        );
+      } catch {
+        // File doesn't exist yet — leave cache empty.
+      }
+    }
 
     // Skip writing if the content hasn't changed since the last write.
     // This prevents OpenClaw's file watcher from triggering unnecessary
