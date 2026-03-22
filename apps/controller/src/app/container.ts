@@ -23,6 +23,7 @@ import { ModelProviderService } from "../services/model-provider-service.js";
 import { OpenClawGatewayService } from "../services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../services/runtime-config-service.js";
+import { RuntimeModelStateService } from "../services/runtime-model-state-service.js";
 import { SessionService } from "../services/session-service.js";
 import { SkillhubService } from "../services/skillhub-service.js";
 import { TemplateService } from "../services/template-service.js";
@@ -40,6 +41,7 @@ export interface ControllerContainer {
   channelService: ChannelService;
   sessionService: SessionService;
   runtimeConfigService: RuntimeConfigService;
+  runtimeModelStateService: RuntimeModelStateService;
   modelProviderService: ModelProviderService;
   integrationService: IntegrationService;
   localUserService: LocalUserService;
@@ -50,6 +52,7 @@ export interface ControllerContainer {
   openclawSyncService: OpenClawSyncService;
   wsClient: OpenClawWsClient;
   gatewayService: OpenClawGatewayService;
+  configStore: NexuConfigStore;
   runtimeState: ControllerRuntimeState;
   startBackgroundLoops: () => () => void;
 }
@@ -69,11 +72,7 @@ export async function createContainer(): Promise<ControllerContainer> {
   const runtimeState = createRuntimeState();
   const openclawProcess = new OpenClawProcessManager(env);
   const wsClient = new OpenClawWsClient(env);
-  // Write config to the same path OpenClaw monitors (set via OPENCLAW_CONFIG_PATH env var)
-  const gatewayService = new OpenClawGatewayService(
-    wsClient,
-    env.openclawConfigPath,
-  );
+  const gatewayService = new OpenClawGatewayService(wsClient);
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -90,10 +89,11 @@ export async function createContainer(): Promise<ControllerContainer> {
     configStore,
     env.nodeEnv,
   );
+  const runtimeModelStateService = new RuntimeModelStateService(env);
 
-  // Wire cloud state change callback for auto-model-selection + sync
+  // Wire cloud state change callback to sync refreshed cloud inventory without
+  // auto-switching the default model during startup or first-channel connect.
   configStore.onCloudStateChanged = async () => {
-    await modelProviderService.ensureValidDefaultModel();
     await openclawSyncService.syncAll();
   };
 
@@ -109,6 +109,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       configStore,
       openclawSyncService,
     ),
+    runtimeModelStateService,
     modelProviderService,
     integrationService: new IntegrationService(configStore),
     localUserService: new LocalUserService(configStore),
@@ -119,6 +120,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     openclawSyncService,
     wsClient,
     gatewayService,
+    configStore,
     runtimeState,
     startBackgroundLoops: () => {
       const stopHealthLoop = startHealthLoop({

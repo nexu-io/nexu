@@ -1,6 +1,7 @@
 import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -10,12 +11,21 @@ import { logger } from "../lib/logger.js";
 const MAX_CONSECUTIVE_RESTARTS = 10;
 const BASE_RESTART_DELAY_MS = 3000;
 const RESTART_WINDOW_MS = 120_000;
+// OpenClaw full-process restarts can take tens of seconds before the successor
+// starts listening again (observed ~20s during first-time Feishu enablement).
+// Keep a generous grace window so the outer supervisor does not spawn a second
+// gateway while the successor is still running doctor/startup work.
+const CONTROLLED_RESTART_GRACE_MS = 45_000;
+const CONTROLLED_RESTART_PROBE_INTERVAL_MS = 500;
 
 export class OpenClawProcessManager {
   private child: ChildProcess | null = null;
   private autoRestartEnabled = false;
   private consecutiveRestarts = 0;
   private lastStartTime = 0;
+  private controlledRestartExpected = false;
+  private controlledRestartTimer: NodeJS.Timeout | null = null;
+  private controlledRestartSuccessorPid: number | null = null;
 
   constructor(private readonly env: ControllerEnv) {}
 
@@ -32,10 +42,28 @@ export class OpenClawProcessManager {
     this.autoRestartEnabled = true;
   }
 
+  noteControlledRestartExpected(source: string): void {
+    if (!this.env.manageOpenclawProcess) {
+      return;
+    }
+
+    if (!this.controlledRestartExpected) {
+      logger.info({ source }, "openclaw_controlled_restart_expected");
+    }
+    this.controlledRestartExpected = true;
+  }
+
   start(): void {
     if (!this.env.manageOpenclawProcess || this.child !== null) {
       return;
     }
+
+    if (this.controlledRestartTimer) {
+      clearTimeout(this.controlledRestartTimer);
+      this.controlledRestartTimer = null;
+    }
+    this.controlledRestartExpected = false;
+    this.controlledRestartSuccessorPid = null;
 
     this.killOrphanedOpenClawProcesses();
 
@@ -75,11 +103,36 @@ export class OpenClawProcessManager {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    logger.info(
+      {
+        configPath: this.env.openclawConfigPath,
+        stateDir: this.env.openclawStateDir,
+        gatewayPort: this.env.openclawGatewayPort,
+      },
+      "openclaw_process_spawned",
+    );
+
     this.child = child;
     this.lastStartTime = Date.now();
 
     if (child.stdout) {
       createInterface({ input: child.stdout }).on("line", (line) => {
+        if (line.includes("restart mode: full process restart (")) {
+          this.noteControlledRestartExpected("stdout");
+          const match = line.match(/spawned pid\s+(\d+)/i);
+          const successorPid = match ? Number(match[1]) : null;
+          if (
+            successorPid !== null &&
+            Number.isInteger(successorPid) &&
+            successorPid > 0
+          ) {
+            this.controlledRestartSuccessorPid = successorPid;
+            logger.info(
+              { successorPid },
+              "openclaw_controlled_restart_successor_pid",
+            );
+          }
+        }
         logger.info({ stream: "stdout", source: "openclaw" }, line);
       });
     }
@@ -106,6 +159,10 @@ export class OpenClawProcessManager {
       );
       this.child = null;
       if (signal !== "SIGTERM") {
+        if (code === 0 && this.controlledRestartExpected) {
+          this.awaitControlledRestart();
+          return;
+        }
         this.scheduleRestart(code, signal);
       }
     });
@@ -195,6 +252,106 @@ export class OpenClawProcessManager {
         this.start();
       });
     }, delayMs);
+  }
+
+  private awaitControlledRestart(): void {
+    if (!this.autoRestartEnabled) {
+      return;
+    }
+
+    this.controlledRestartExpected = false;
+    const startedAt = Date.now();
+
+    const poll = () => {
+      const successorPid = this.controlledRestartSuccessorPid;
+      void Promise.all([
+        this.isGatewayPortOpen(),
+        successorPid !== null
+          ? Promise.resolve(this.isProcessAlive(successorPid))
+          : Promise.resolve(false),
+      ]).then(([ready, successorAlive]) => {
+        if (ready) {
+          logger.info(
+            { successorPid: this.controlledRestartSuccessorPid },
+            "openclaw_controlled_restart_observed",
+          );
+          this.consecutiveRestarts = 0;
+          this.controlledRestartTimer = null;
+          this.controlledRestartSuccessorPid = null;
+          return;
+        }
+
+        // The successor process may stay alive for a long time before the WS
+        // port comes back. Treat a live successor as progress and keep waiting
+        // instead of falling back to a second controller-managed restart.
+        if (successorAlive) {
+          this.controlledRestartTimer = setTimeout(
+            poll,
+            CONTROLLED_RESTART_PROBE_INTERVAL_MS,
+          );
+          return;
+        }
+
+        if (Date.now() - startedAt >= CONTROLLED_RESTART_GRACE_MS) {
+          logger.warn(
+            { successorPid: this.controlledRestartSuccessorPid },
+            "openclaw_controlled_restart_timeout",
+          );
+          this.controlledRestartTimer = null;
+          this.controlledRestartSuccessorPid = null;
+          void this.clearStaleGatewayLocks().then(() => {
+            this.start();
+          });
+          return;
+        }
+
+        this.controlledRestartTimer = setTimeout(
+          poll,
+          CONTROLLED_RESTART_PROBE_INTERVAL_MS,
+        );
+      });
+    };
+
+    logger.info(
+      {
+        graceMs: CONTROLLED_RESTART_GRACE_MS,
+        successorPid: this.controlledRestartSuccessorPid,
+      },
+      "waiting for controlled openclaw restart",
+    );
+    this.controlledRestartTimer = setTimeout(
+      poll,
+      CONTROLLED_RESTART_PROBE_INTERVAL_MS,
+    );
+  }
+
+  private isGatewayPortOpen(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const socket = net.createConnection({
+        host: "127.0.0.1",
+        port: this.env.openclawGatewayPort,
+      });
+
+      const finish = (result: boolean) => {
+        socket.removeAllListeners();
+        socket.destroy();
+        resolve(result);
+      };
+
+      socket.setTimeout(300);
+      socket.once("connect", () => finish(true));
+      socket.once("timeout", () => finish(false));
+      socket.once("error", () => finish(false));
+    });
+  }
+
+  private isProcessAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async clearStaleSessionLocks(): Promise<void> {

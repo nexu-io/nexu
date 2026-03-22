@@ -10,8 +10,6 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdir, utimes, writeFile } from "node:fs/promises";
-import path from "node:path";
 import type { OpenClawConfig } from "@nexu/shared";
 import { logger } from "../lib/logger.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
@@ -78,13 +76,10 @@ interface LiveStatusChannelInput {
 // ---------------------------------------------------------------------------
 
 export class OpenClawGatewayService {
-  /** SHA-256 hash of the last config we successfully pushed. */
+  /** SHA-256 hash of the last config we successfully observed. */
   private lastPushedConfigHash: string | null = null;
 
-  constructor(
-    private readonly wsClient: OpenClawWsClient,
-    private readonly configPath?: string,
-  ) {}
+  constructor(private readonly wsClient: OpenClawWsClient) {}
 
   /** Whether the WS client has completed handshake and is ready for RPC. */
   isConnected(): boolean {
@@ -100,66 +95,18 @@ export class OpenClawGatewayService {
     this.lastPushedConfigHash = this.configHash(config);
   }
 
-  /**
-   * Push a full configuration to OpenClaw.
-   *
-   * Flow (direct file write for hot-reload):
-   * 1. Write config directly to openclaw.json
-   * 2. OpenClaw's file watcher detects change and hot-reloads
-   * 3. For model changes: only heartbeatRunner.updateConfig() is called (no restart!)
-   *
-   * This avoids the SIGUSR1 restart that config.apply RPC would trigger.
-   *
-   * Returns true if the config was actually pushed (skips if unchanged).
-   */
-  async pushConfig(config: OpenClawConfig): Promise<boolean> {
+  async shouldPushConfig(config: OpenClawConfig): Promise<boolean> {
     const hash = this.configHash(config);
 
-    // Skip redundant pushes to avoid unnecessary file writes
     if (hash === this.lastPushedConfigHash) {
       logger.info({}, "openclaw_push_skipped_unchanged");
       return false;
     }
-
-    if (!this.configPath) {
-      // Fallback to RPC if no config path provided (shouldn't happen in practice)
-      logger.warn({}, "openclaw_push_fallback_rpc_no_path");
-      const current = await this.wsClient.request<{ hash?: string }>(
-        "config.get",
-      );
-      const baseHash = current?.hash;
-      await this.wsClient.request("config.apply", {
-        raw: JSON.stringify(config, null, 2),
-        note: "pushed from nexu-controller",
-        ...(baseHash ? { baseHash } : {}),
-      });
-      this.lastPushedConfigHash = hash;
-      logger.info({}, "openclaw_config_pushed_via_rpc");
-      return true;
-    }
-
-    // Direct file write + utimes to ensure FSEvents triggers on macOS
-    const configDir = path.dirname(this.configPath);
-    await mkdir(configDir, { recursive: true });
-    const content = JSON.stringify(config, null, 2);
-    await writeFile(this.configPath, content, "utf-8");
-    // Touch the file to ensure FSEvents detects the change
-    const now = new Date();
-    await utimes(this.configPath, now, now);
-
-    this.lastPushedConfigHash = hash;
-    logger.info(
-      {
-        path: this.configPath,
-        contentLength: content.length,
-        modelId:
-          typeof config.agents?.defaults?.model === "string"
-            ? config.agents.defaults.model
-            : (config.agents?.defaults?.model?.primary ?? "unknown"),
-      },
-      "openclaw_config_pushed_via_file",
-    );
     return true;
+  }
+
+  noteConfigWritten(config: OpenClawConfig): void {
+    this.lastPushedConfigHash = this.configHash(config);
   }
 
   /**
@@ -232,20 +179,28 @@ export class OpenClawGatewayService {
           const connected = snapshot.connected === true;
           const running = snapshot.running === true;
           const configured = snapshot.configured === true;
+          const enabled = snapshot.enabled !== false;
           const hasProbeOk = snapshot.probe?.ok === true;
-          const ready = connected || (running && configured && hasProbeOk);
-          const lastError = snapshot.lastError?.trim()
+          const rawLastError = snapshot.lastError?.trim()
             ? snapshot.lastError
             : null;
+          const lastError = rawLastError === "disabled" ? null : rawLastError;
 
           // For channels like Feishu where `connected` is always false
           // (they use long-polling/WS to Feishu servers, not a direct
           // inbound connection), running + configured + no error means
           // the channel is operational.
           const operationalWithoutProbe = running && configured && !lastError;
+          const ready =
+            enabled &&
+            (connected ||
+              (running && configured && hasProbeOk) ||
+              operationalWithoutProbe);
 
           let derivedStatus: ChannelLiveStatus;
-          if (lastError) {
+          if (!enabled) {
+            derivedStatus = "disconnected";
+          } else if (lastError) {
             derivedStatus = "error";
           } else if (snapshot.restartPending === true) {
             derivedStatus = "restarting";
@@ -263,8 +218,8 @@ export class OpenClawGatewayService {
             accountId: channel.accountId,
             status: derivedStatus,
             ready,
-            connected,
-            running,
+            connected: enabled && connected,
+            running: enabled && running,
             configured,
             lastError,
           };
@@ -335,6 +290,18 @@ export class OpenClawGatewayService {
 
       // WebSocket-based channels (Slack, Discord): connected === true
       // Webhook-based channels (Feishu): running && configured && probe.ok
+      const isEnabled = snapshot.enabled !== false;
+      if (!isEnabled) {
+        return {
+          ready: false,
+          connected: false,
+          running: false,
+          configured: snapshot.configured ?? false,
+          lastError: null,
+          gatewayConnected: true,
+        };
+      }
+
       const isConnected = snapshot.connected === true;
       const isWebhookReady =
         snapshot.running === true &&

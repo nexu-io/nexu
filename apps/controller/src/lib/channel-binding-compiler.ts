@@ -7,6 +7,8 @@ import type {
 } from "@nexu/shared";
 import type { BotResponse, ChannelResponse } from "@nexu/shared";
 
+const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = "__nexu_internal_feishu_prewarm__";
+
 function buildSecretLookup(secrets: Record<string, string>, channelId: string) {
   return (suffix: string): string =>
     secrets[`channel:${channelId}:${suffix}`] ?? "";
@@ -46,7 +48,7 @@ export function compileChannelsConfig(params: {
     typeof socketAppToken === "string" && socketAppToken.length > 0;
 
   for (const channel of params.channels) {
-    if (channel.status !== "connected") {
+    if (channel.status !== "connected" && channel.channelType !== "feishu") {
       continue;
     }
 
@@ -87,7 +89,7 @@ export function compileChannelsConfig(params: {
       const connectionMode =
         secret("connectionMode") === "webhook" ? "webhook" : "websocket";
       feishuAccounts[channel.accountId] = {
-        enabled: true,
+        enabled: channel.status === "connected",
         appId: secret("appId") || channel.appId || channel.accountId,
         appSecret: secret("appSecret"),
         connectionMode,
@@ -103,6 +105,18 @@ export function compileChannelsConfig(params: {
           : {}),
       };
     }
+  }
+
+  if (Object.keys(feishuAccounts).length === 0) {
+    // Keep the Feishu channel subtree stable from the first cold start so the
+    // first real Feishu connect only updates account-level config and can
+    // restart the Feishu channel instead of forcing a full gateway restart.
+    feishuAccounts[INTERNAL_FEISHU_PREWARM_ACCOUNT_ID] = {
+      enabled: false,
+      appId: "nexu-feishu-prewarm",
+      appSecret: "nexu-feishu-prewarm",
+      connectionMode: "websocket",
+    };
   }
 
   return {

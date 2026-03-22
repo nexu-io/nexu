@@ -1,4 +1,4 @@
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile } from "node:fs/promises";
 import path from "node:path";
 import type { ControllerEnv } from "../app/env.js";
 
@@ -17,10 +17,7 @@ export class OpenClawWatchTrigger {
 
   private async touchFile(filePath: string): Promise<void> {
     try {
-      const content = await readFile(filePath, "utf8");
-      const tempPath = `${filePath}.tmp`;
-      await writeFile(tempPath, content, "utf8");
-      await rename(tempPath, filePath);
+      await appendFile(filePath, "", "utf8");
     } catch {
       return;
     }

@@ -224,7 +224,7 @@ function compileModelsConfig(
     : undefined;
 }
 
-function resolveModelId(
+export function resolveModelId(
   config: NexuConfig,
   env: ControllerEnv,
   rawModelId: string,
@@ -268,13 +268,18 @@ function resolveModelId(
 
   if (isDesktopCloudConfig(config.desktop.cloud)) {
     const cloudModels = config.desktop.cloud.models;
+    const slashIndex = rawModelId.indexOf("/");
+    const modelSuffix =
+      slashIndex > 0 ? rawModelId.slice(slashIndex + 1) : null;
     // Only use Link fallback if the model actually exists in Link's model list
     if (cloudModels.some((m) => m.id === rawModelId)) {
       return `link/${rawModelId}`;
     }
-    // Model not found in Link — pick the first available Link model
-    if (cloudModels.length > 0) {
-      return `link/${cloudModels[0]?.id}`;
+    if (
+      modelSuffix &&
+      cloudModels.some((m) => m.id === modelSuffix || m.name === modelSuffix)
+    ) {
+      return `link/${modelSuffix}`;
     }
   }
 
@@ -304,26 +309,17 @@ function compileAgentList(
 }
 
 function compilePlugins(
-  config: NexuConfig,
+  _config: NexuConfig,
   env: ControllerEnv,
 ): OpenClawConfig["plugins"] {
-  const hasFeishu = config.channels.some(
-    (channel) =>
-      channel.channelType === "feishu" && channel.status === "connected",
-  );
-
   return {
     load: {
       paths: [env.openclawExtensionsDir],
     },
     entries: {
-      ...(hasFeishu
-        ? {
-            feishu: {
-              enabled: true,
-            },
-          }
-        : {}),
+      feishu: {
+        enabled: true,
+      },
       "nexu-runtime-model": {
         enabled: true,
       },

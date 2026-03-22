@@ -16,6 +16,8 @@ export interface ModelAutoSelectResult {
   newModelName: string | null;
 }
 
+type DefaultModelValidity = "valid" | "invalid" | "unknown";
+
 const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
@@ -99,11 +101,11 @@ export class ModelProviderService {
    * change. Returns whether a switch happened and details for UI toast.
    */
   async ensureValidDefaultModel(): Promise<ModelAutoSelectResult> {
-    const { models } = await this.listModels();
+    const validity = await this.getDefaultModelValidity();
     const config = await this.configStore.getConfig();
     const currentId = config.runtime.defaultModelId;
 
-    if (models.some((m) => m.id === currentId)) {
+    if (validity !== "invalid") {
       return {
         changed: false,
         previousModelId: currentId,
@@ -111,6 +113,8 @@ export class ModelProviderService {
         newModelName: null,
       };
     }
+
+    const { models } = await this.listModels();
 
     if (models.length === 0) {
       return {
@@ -136,6 +140,42 @@ export class ModelProviderService {
       newModelId: selected.id,
       newModelName: selected.name,
     };
+  }
+
+  private async getDefaultModelValidity(): Promise<DefaultModelValidity> {
+    const config = await this.configStore.getConfig();
+    const currentId = config.runtime.defaultModelId;
+    const desktopCloud = await this.configStore.getDesktopCloudStatus();
+    const inventory = await this.configStore.getDesktopCloudInventoryStatus();
+
+    const providers = config.providers.filter((provider) => provider.enabled);
+    const hasByokInventory = providers.some(
+      (provider) => provider.models.length > 0,
+    );
+    const hasKnownInventory = inventory.hasCloudInventory || hasByokInventory;
+
+    if (!hasKnownInventory) {
+      return "unknown";
+    }
+
+    const cloudModels: Model[] = (desktopCloud.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name || model.id,
+      provider: "nexu",
+      description: "Cloud model via Nexu Link",
+    }));
+    const byokModels: Model[] = providers.flatMap((provider) =>
+      provider.models.map((modelId) => ({
+        id: `${provider.providerId}/${modelId}`,
+        name: modelId,
+        provider: provider.providerId,
+      })),
+    );
+    const knownModels = [...cloudModels, ...byokModels];
+
+    return knownModels.some((model) => model.id === currentId)
+      ? "valid"
+      : "invalid";
   }
 
   async verifyProvider(

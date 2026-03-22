@@ -333,9 +333,10 @@ export function registerChannelRoutes(
             accountId: channel.accountId,
           })),
         );
-      const runtime = await container.runtimeConfigService.getRuntimeConfig();
+      const effectiveModelId =
+        await container.runtimeModelStateService.getEffectiveModelId();
       const models = await container.modelProviderService.listModels();
-      const modelId = runtime.defaultModelId ?? null;
+      const modelId = effectiveModelId;
       const modelName = modelId
         ? (models.models.find((model) => model.id === modelId)?.name ?? null)
         : null;

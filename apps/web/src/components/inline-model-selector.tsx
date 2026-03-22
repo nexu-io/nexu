@@ -38,15 +38,10 @@ function getGroupKey(m: Model): string {
   return m.id.startsWith("link/") ? "nexu" : m.provider;
 }
 
-function formatModelName(modelId: string | null | undefined): string {
-  if (!modelId) return "Claude Sonnet 4.5";
-  const withoutProvider = modelId.includes("/")
+function getModelLabel(modelId: string): string {
+  return modelId.includes("/")
     ? modelId.split("/").slice(1).join("/")
     : modelId;
-  return withoutProvider
-    .split(/[-_]/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
 }
 
 export function InlineModelSelector() {
@@ -91,12 +86,17 @@ export function InlineModelSelector() {
   const models = (modelsData?.models ?? []) as Model[];
   const currentModelId = defaultModelData?.modelId ?? "";
   const currentModel = models.find((m: Model) => m.id === currentModelId);
-  const currentGroupKey = currentModel ? getGroupKey(currentModel) : "";
+  const currentGroupKey = currentModel
+    ? getGroupKey(currentModel)
+    : currentModelId.startsWith("link/")
+      ? "nexu"
+      : (currentModelId.split("/")[0] ?? "");
+  const emptyModelLabel = t("models.noModelConfigured");
 
   // Model name for display
   const modelName = currentModelId
-    ? (currentModel?.name ?? formatModelName(currentModelId))
-    : formatModelName(null);
+    ? (currentModel?.name ?? getModelLabel(currentModelId))
+    : emptyModelLabel;
 
   // Update model mutation
   const updateModel = useMutation({

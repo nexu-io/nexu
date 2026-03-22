@@ -193,6 +193,12 @@ export class OpenClawWsClient {
   private tickTimer: NodeJS.Timeout | null = null;
   private connectTimer: NodeJS.Timeout | null = null;
   private onConnectedCallback: (() => void) | null = null;
+  private onGatewayShutdownCallback:
+    | ((payload: {
+        restartExpectedMs: number | null;
+        reason: string | null;
+      }) => void)
+    | null = null;
   private readonly url: string;
   private readonly token: string;
   private readonly deviceIdentity: DeviceIdentity;
@@ -208,6 +214,15 @@ export class OpenClawWsClient {
   /** Register a callback fired once each time the WS handshake completes. */
   onConnected(cb: () => void): void {
     this.onConnectedCallback = cb;
+  }
+
+  onGatewayShutdown(
+    cb: (payload: {
+      restartExpectedMs: number | null;
+      reason: string | null;
+    }) => void,
+  ): void {
+    this.onGatewayShutdownCallback = cb;
   }
 
   /** Whether the client has completed the handshake and is ready for RPC. */
@@ -331,6 +346,37 @@ export class OpenClawWsClient {
 
     if (evt.event === "tick") {
       this.lastTick = Date.now();
+      return;
+    }
+
+    if (evt.event === "shutdown") {
+      const payload =
+        evt.payload && typeof evt.payload === "object"
+          ? (evt.payload as {
+              restartExpectedMs?: unknown;
+              reason?: unknown;
+            })
+          : undefined;
+      const restartExpectedMs =
+        typeof payload?.restartExpectedMs === "number" &&
+        Number.isFinite(payload.restartExpectedMs)
+          ? payload.restartExpectedMs
+          : null;
+      const reason =
+        typeof payload?.reason === "string" && payload.reason.trim().length > 0
+          ? payload.reason
+          : null;
+
+      logger.info({ restartExpectedMs, reason }, "openclaw_ws_shutdown_event");
+
+      try {
+        this.onGatewayShutdownCallback?.({ restartExpectedMs, reason });
+      } catch (err) {
+        logger.warn(
+          { error: err instanceof Error ? err.message : String(err) },
+          "openclaw_ws_on_shutdown_callback_error",
+        );
+      }
     }
   }
 

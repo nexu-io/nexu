@@ -649,20 +649,31 @@ export class NexuConfigStore {
   }
 
   async disconnectChannel(channelId: string): Promise<boolean> {
-    let removedChannel: ChannelResponse | null = null;
+    let disconnectedChannel: ChannelResponse | null = null;
 
     await this.store.update((config) => ({
       ...config,
-      channels: config.channels.filter((channel) => {
+      channels: config.channels.flatMap((channel) => {
         if (channel.id === channelId) {
-          removedChannel = channel;
-          return false;
+          disconnectedChannel = channel;
+          if (channel.channelType === "feishu") {
+            return [
+              {
+                ...channel,
+                status: "disconnected",
+                updatedAt: new Date().toISOString(),
+              },
+            ];
+          }
+
+          return [];
         }
 
-        return true;
+        return [channel];
       }),
       secrets:
-        removedChannel === null
+        disconnectedChannel === null ||
+        disconnectedChannel.channelType === "feishu"
           ? config.secrets
           : Object.fromEntries(
               Object.entries(config.secrets).filter(
@@ -671,7 +682,7 @@ export class NexuConfigStore {
             ),
     }));
 
-    return removedChannel !== null;
+    return disconnectedChannel !== null;
   }
 
   async listProviders(): Promise<ProviderResponse[]> {
@@ -827,7 +838,6 @@ export class NexuConfigStore {
   }
 
   async getDesktopCloudStatus() {
-    await this.hydrateDesktopCloudModels();
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
     return {
@@ -851,6 +861,22 @@ export class NexuConfigStore {
       userEmail: cloud.userEmail ?? null,
       connectedAt: cloud.connectedAt ?? null,
       models: cloud.models ?? [],
+    };
+  }
+
+  async prepareDesktopCloudModelsForBootstrap(): Promise<void> {
+    await this.hydrateDesktopCloudModels();
+  }
+
+  async getDesktopCloudInventoryStatus(): Promise<{
+    connected: boolean;
+    hasCloudInventory: boolean;
+  }> {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+    return {
+      connected: cloud.connected,
+      hasCloudInventory: (cloud.models?.length ?? 0) > 0,
     };
   }
 

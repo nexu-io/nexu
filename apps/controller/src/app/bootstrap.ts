@@ -6,6 +6,10 @@ export async function bootstrapController(
   await container.openclawProcess.prepare();
   await container.openclawSyncService.ensureRuntimeModelPlugin();
 
+  // Prepare cached cloud model inventory up front so startup config does not
+  // change later as a side effect of read-only model APIs.
+  await container.configStore.prepareDesktopCloudModelsForBootstrap();
+
   // Validate default model against available models before first sync
   await container.modelProviderService.ensureValidDefaultModel();
 
@@ -30,6 +34,12 @@ export async function bootstrapController(
 
   // Start WS client — connects to OpenClaw gateway
   container.wsClient.connect();
+
+  container.wsClient.onGatewayShutdown(({ restartExpectedMs }) => {
+    if (restartExpectedMs !== null) {
+      container.openclawProcess.noteControlledRestartExpected("ws-shutdown");
+    }
+  });
 
   // When WS handshake completes, push current config (skipped if unchanged)
   container.wsClient.onConnected(() => {

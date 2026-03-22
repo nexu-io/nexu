@@ -352,9 +352,14 @@ export function HomePage() {
   }, [sessions]);
 
   const channels = channelsData?.channels ?? [];
-  const connectedCount = channels.length;
+  const activeChannels = channels.filter(
+    (channel) => channel.status === "connected",
+  );
+  const connectedCount = activeChannels.length;
   const hasChannel = connectedCount > 0;
-  const connectedTypes = new Set<string>(channels.map((c) => c.channelType));
+  const connectedTypes = new Set<string>(
+    activeChannels.map((c) => c.channelType),
+  );
 
   const { data: liveStatus } = useQuery({
     queryKey: ["channels-live-status"],
@@ -691,7 +696,7 @@ export function HomePage() {
               <div className="space-y-1.5">
                 {CHANNEL_OPTIONS.filter((ch) => connectedTypes.has(ch.id)).map(
                   (ch) => {
-                    const connectedChannel = channels.find(
+                    const connectedChannel = activeChannels.find(
                       (c) => c.channelType === ch.id,
                     );
                     const statusEntry = connectedChannel
@@ -709,18 +714,33 @@ export function HomePage() {
                           connectedChannel.accountId,
                         )
                       : "";
+                    const handleOpenChannel = () => {
+                      if (!channelChatUrl) {
+                        return;
+                      }
+                      window.open(
+                        channelChatUrl,
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    };
+
                     return (
-                      <button
-                        type="button"
+                      <div
                         key={ch.id}
-                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 cursor-pointer transition-all hover:bg-surface-1 text-left"
-                        onClick={() =>
-                          window.open(
-                            channelChatUrl,
-                            "_blank",
-                            "noopener,noreferrer",
-                          )
-                        }
+                        role={channelChatUrl ? "button" : undefined}
+                        tabIndex={channelChatUrl ? 0 : undefined}
+                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 text-left transition-all hover:bg-surface-1"
+                        onClick={handleOpenChannel}
+                        onKeyDown={(event) => {
+                          if (!channelChatUrl) {
+                            return;
+                          }
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleOpenChannel();
+                          }
+                        }}
                       >
                         <div className="w-8 h-8 rounded-[10px] flex items-center justify-center border border-border bg-white shrink-0">
                           {ch.icon}
@@ -757,7 +777,7 @@ export function HomePage() {
                           Chat
                           <ArrowUpRight size={12} className="-mt-px" />
                         </a>
-                      </button>
+                      </div>
                     );
                   },
                 )}

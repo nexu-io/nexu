@@ -1,6 +1,7 @@
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ControllerEnv } from "../app/env.js";
+import { logger } from "../lib/logger.js";
 
 export interface OpenClawRuntimeModelState {
   selectedModelRef: string;
@@ -33,19 +34,28 @@ export class OpenClawRuntimeModelWriter {
       promptNotice: buildPromptNotice(selectedModelRef),
       updatedAt: new Date().toISOString(),
     };
-    await this.atomicWrite(
+    logger.info(
+      {
+        path: this.env.openclawRuntimeModelStatePath,
+        selectedModelRef,
+      },
+      "runtime_model_write_begin",
+    );
+    await writeFile(
       this.env.openclawRuntimeModelStatePath,
       `${JSON.stringify(payload, null, 2)}\n`,
+      "utf8",
+    );
+    logger.info(
+      {
+        path: this.env.openclawRuntimeModelStatePath,
+        selectedModelRef,
+      },
+      "runtime_model_write_complete",
     );
   }
 
   async writeFallback(): Promise<void> {
     await this.write(RUNTIME_MODEL_FALLBACK);
-  }
-
-  private async atomicWrite(filePath: string, content: string): Promise<void> {
-    const tempPath = `${filePath}.tmp`;
-    await writeFile(tempPath, content, "utf8");
-    await rename(tempPath, filePath);
   }
 }
