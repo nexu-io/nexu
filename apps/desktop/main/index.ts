@@ -28,6 +28,10 @@ import {
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
 import {
+  PortAllocationError,
+  allocateDesktopRuntimePorts,
+} from "./runtime/port-allocation";
+import {
   flushRuntimeLoggers,
   rotateDesktopLogSession,
   writeDesktopMainLog,
@@ -44,6 +48,13 @@ const __dirname = dirname(__filename);
 app.setName("Nexu");
 nativeTheme.themeSource = "light";
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+  process.exit(0);
+}
+
 // Info.plist declares LSUIElement=true so that child processes (spawned with
 // ELECTRON_RUN_AS_NODE) don't create extra Dock icons.  Show the dock icon
 // BEFORE any blocking initialization (tar extraction, directory creation, etc.)
@@ -53,16 +64,30 @@ void app.dock?.show();
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
-const runtimeConfig = getDesktopRuntimeConfig(process.env, {
+const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   appVersion: app.getVersion(),
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
+const { allocations: runtimePortAllocations, runtimeConfig } =
+  await allocateDesktopRuntimePorts(process.env, baseRuntimeConfig).catch(
+    (error: unknown) => {
+      if (error instanceof PortAllocationError) {
+        throw new Error(
+          `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
+            `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
+        );
+      }
+
+      throw error;
+    },
+  );
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
     app.getPath("userData"),
     app.isPackaged,
+    runtimeConfig,
   ),
 );
 
@@ -192,6 +217,16 @@ if (sentryDsn) {
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
+
+logLaunchTimeline(
+  `runtime ports ${runtimePortAllocations
+    .map(
+      (allocation) =>
+        `${allocation.purpose}=${allocation.preferredPort}->${allocation.port} ` +
+        `strategy=${allocation.strategy} attemptDelta=${allocation.attemptDelta}`,
+    )
+    .join(" ")}`,
+);
 
 function sendDesktopCommand(
   surface: DesktopSurface,
@@ -399,7 +434,7 @@ async function runDesktopColdStart(): Promise<void> {
     "bootstrapping desktop auth session",
   );
   logColdStart("bootstrapping desktop auth session");
-  await ensureDesktopAuthSession();
+  await ensureDesktopAuthSession({ runtimeConfig });
   const sessionId = rotateDesktopLogSession();
   logColdStart(`desktop auth session ready sessionId=${sessionId}`);
 
@@ -422,7 +457,7 @@ function triggerDesktopAuthRecovery(reason: string): void {
     logAuthRecovery(reason, "stdout");
 
     try {
-      await ensureDesktopAuthSession({ force: true });
+      await ensureDesktopAuthSession({ force: true, runtimeConfig });
       const sessionId = rotateDesktopLogSession();
       logAuthRecovery(
         `desktop auth session restored sessionId=${sessionId}`,
@@ -467,12 +502,6 @@ function focusMainWindow(): void {
   }
 
   mainWindow.focus();
-}
-
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
-
-if (!hasSingleInstanceLock) {
-  app.quit();
 }
 
 app.on("second-instance", () => {

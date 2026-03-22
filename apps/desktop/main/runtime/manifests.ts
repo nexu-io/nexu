@@ -13,10 +13,7 @@ import {
   getOpenclawCuratedSkillsDir,
   getOpenclawSkillsDir,
 } from "../../shared/desktop-paths";
-import {
-  type DesktopRuntimeConfig,
-  getDesktopRuntimeConfig,
-} from "../../shared/runtime-config";
+import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
 
@@ -207,6 +204,7 @@ export function createRuntimeUnitManifests(
   electronRoot: string,
   userDataPath: string,
   isPackaged: boolean,
+  runtimeConfig: DesktopRuntimeConfig,
 ): RuntimeUnitManifest[] {
   const repoRoot = getWorkspaceRoot();
   const _nexuRoot = repoRoot;
@@ -217,14 +215,6 @@ export function createRuntimeUnitManifests(
   const openclawSidecarRoot = isPackaged
     ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
     : path.resolve(runtimeSidecarBaseRoot, "openclaw");
-  const runtimeConfig: DesktopRuntimeConfig = getDesktopRuntimeConfig(
-    process.env,
-    {
-      openclawBinPath: path.resolve(openclawSidecarRoot, "bin/openclaw"),
-      resourcesPath: isPackaged ? electronRoot : undefined,
-      useBuildConfig: isPackaged,
-    },
-  );
   const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));
   const openclawConfigDir = ensureDir(
@@ -252,6 +242,9 @@ export function createRuntimeUnitManifests(
   );
   const webSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "web");
   const webModulePath = path.resolve(webSidecarRoot, "index.js");
+  const openclawBinPath =
+    process.env.NEXU_OPENCLAW_BIN ??
+    path.resolve(openclawSidecarRoot, "bin/openclaw");
   const controllerPort = runtimeConfig.ports.controller;
   const webPort = runtimeConfig.ports.web;
   const webUrl = runtimeConfig.urls.web;
@@ -332,7 +325,7 @@ export function createRuntimeUnitManifests(
         PLATFORM_TEMPLATES_DIR: isPackaged
           ? path.resolve(electronRoot, "static/platform-templates")
           : path.resolve(repoRoot, "apps/controller/static/platform-templates"),
-        OPENCLAW_BIN: runtimeConfig.paths.openclawBin,
+        OPENCLAW_BIN: openclawBinPath,
         OPENCLAW_ELECTRON_EXECUTABLE: process.execPath,
         OPENCLAW_EXTENSIONS_DIR: path.resolve(
           openclawPackageRoot,
@@ -356,7 +349,7 @@ export function createRuntimeUnitManifests(
       kind: "runtime",
       launchStrategy: "delegated",
       delegatedProcessMatch: "openclaw-gateway",
-      binaryPath: runtimeConfig.paths.openclawBin,
+      binaryPath: openclawBinPath,
       port: null,
       autoStart: true,
       logFilePath: path.resolve(logsDir, "openclaw.log"),

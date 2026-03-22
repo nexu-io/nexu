@@ -1239,6 +1239,32 @@ export class NexuConfigStore {
     return runtime;
   }
 
+  async syncManagedRuntimeGateway(input: {
+    port: number;
+    authMode: ControllerRuntimeConfig["gateway"]["authMode"];
+  }): Promise<void> {
+    await this.store.update((config) => {
+      if (
+        config.runtime.gateway.port === input.port &&
+        config.runtime.gateway.authMode === input.authMode
+      ) {
+        return config;
+      }
+
+      return {
+        ...config,
+        runtime: {
+          ...config.runtime,
+          gateway: {
+            ...config.runtime.gateway,
+            port: input.port,
+            authMode: input.authMode,
+          },
+        },
+      };
+    });
+  }
+
   async listTemplates() {
     const config = await this.getConfig();
     return Object.values(config.templates);

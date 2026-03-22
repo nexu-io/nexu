@@ -5,10 +5,7 @@ import {
   type HostInvokeResultMap,
   hostInvokeChannels,
 } from "../shared/host";
-import {
-  type DesktopRuntimeConfig,
-  getDesktopRuntimeConfig,
-} from "../shared/runtime-config";
+import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
@@ -152,25 +149,15 @@ export function registerIpcHandlers(
         }
 
         case "env:get-controller-base-url": {
-          const controllerBaseUrl = getDesktopRuntimeConfig(process.env, {
-            appVersion: app.getVersion(),
-            resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
-            useBuildConfig: app.isPackaged,
-          }).urls.controllerBase;
-
           const result: HostInvokeResultMap["env:get-controller-base-url"] = {
-            controllerBaseUrl,
+            controllerBaseUrl: runtimeConfig.urls.controllerBase,
           };
 
           return result;
         }
 
         case "env:get-runtime-config": {
-          return getDesktopRuntimeConfig(process.env, {
-            appVersion: app.getVersion(),
-            resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
-            useBuildConfig: app.isPackaged,
-          });
+          return runtimeConfig;
         }
 
         case "runtime:get-state": {
@@ -224,6 +211,7 @@ export function registerIpcHandlers(
             payload as HostInvokePayloadMap["desktop:ensure-auth-session"];
           await ensureDesktopAuthSession({
             force: typedPayload.force === true,
+            runtimeConfig,
           });
 
           const result: HostInvokeResultMap["desktop:ensure-auth-session"] = {

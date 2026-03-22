@@ -1,28 +1,24 @@
-import { app, session } from "electron";
-import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { session } from "electron";
+import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import { parseSetCookieHeader } from "./cookies";
-
-const runtimeConfig = getDesktopRuntimeConfig(process.env, {
-  resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
-  useBuildConfig: app.isPackaged,
-});
-
-export const desktopControllerUrl = runtimeConfig.urls.controllerBase;
-export const desktopWebUrl = runtimeConfig.urls.web;
 
 let ensureSessionPromise: Promise<void> | null = null;
 
-function getAuthHeaders(): Record<string, string> {
+function getAuthHeaders(
+  runtimeConfig: DesktopRuntimeConfig,
+): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    Origin: desktopWebUrl,
-    Referer: `${desktopWebUrl}/`,
+    Origin: runtimeConfig.urls.web,
+    Referer: `${runtimeConfig.urls.web}/`,
   };
 }
 
-async function getDesktopSessionCookieHeader(): Promise<string | null> {
+async function getDesktopSessionCookieHeader(
+  runtimeConfig: DesktopRuntimeConfig,
+): Promise<string | null> {
   const cookies = await session.defaultSession.cookies.get({
-    url: desktopWebUrl,
+    url: runtimeConfig.urls.web,
   });
 
   if (cookies.length === 0) {
@@ -32,8 +28,10 @@ async function getDesktopSessionCookieHeader(): Promise<string | null> {
   return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
 }
 
-async function hasValidDesktopAuthSession(): Promise<boolean> {
-  const cookieHeader = await getDesktopSessionCookieHeader();
+async function hasValidDesktopAuthSession(
+  runtimeConfig: DesktopRuntimeConfig,
+): Promise<boolean> {
+  const cookieHeader = await getDesktopSessionCookieHeader(runtimeConfig);
 
   if (!cookieHeader) {
     return false;
@@ -41,13 +39,13 @@ async function hasValidDesktopAuthSession(): Promise<boolean> {
 
   try {
     const response = await fetch(
-      `${desktopControllerUrl}/api/auth/get-session`,
+      `${runtimeConfig.urls.controllerBase}/api/auth/get-session`,
       {
         headers: {
           Accept: "application/json",
           Cookie: cookieHeader,
-          Origin: desktopWebUrl,
-          Referer: `${desktopWebUrl}/`,
+          Origin: runtimeConfig.urls.web,
+          Referer: `${runtimeConfig.urls.web}/`,
         },
       },
     );
@@ -68,10 +66,12 @@ async function hasValidDesktopAuthSession(): Promise<boolean> {
   }
 }
 
-async function ensureDesktopBootstrapUser(): Promise<void> {
-  await fetch(`${desktopControllerUrl}/api/auth/sign-up/email`, {
+async function ensureDesktopBootstrapUser(
+  runtimeConfig: DesktopRuntimeConfig,
+): Promise<void> {
+  await fetch(`${runtimeConfig.urls.controllerBase}/api/auth/sign-up/email`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(runtimeConfig),
     body: JSON.stringify({
       name: runtimeConfig.desktopAuth.name,
       email: runtimeConfig.desktopAuth.email,
@@ -80,15 +80,17 @@ async function ensureDesktopBootstrapUser(): Promise<void> {
   }).catch(() => null);
 }
 
-async function signInDesktopBootstrapUser(): Promise<{
+async function signInDesktopBootstrapUser(
+  runtimeConfig: DesktopRuntimeConfig,
+): Promise<{
   authUserId: string;
   setCookieHeader: string;
 }> {
   const signInResponse = await fetch(
-    `${desktopControllerUrl}/api/auth/sign-in/email`,
+    `${runtimeConfig.urls.controllerBase}/api/auth/sign-in/email`,
     {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(runtimeConfig),
       body: JSON.stringify({
         email: runtimeConfig.desktopAuth.email,
         password: runtimeConfig.desktopAuth.password,
@@ -130,13 +132,14 @@ async function signInDesktopBootstrapUser(): Promise<{
 }
 
 async function persistDesktopSessionCookies(
+  runtimeConfig: DesktopRuntimeConfig,
   setCookieHeader: string,
 ): Promise<void> {
   const cookies = parseSetCookieHeader(setCookieHeader);
 
   for (const [name, cookie] of cookies.entries()) {
     await session.defaultSession.cookies.set({
-      url: desktopWebUrl,
+      url: runtimeConfig.urls.web,
       name,
       value: cookie.value,
       path: typeof cookie.path === "string" ? cookie.path : "/",
@@ -152,7 +155,7 @@ async function persistDesktopSessionCookies(
   }
 
   const persistedCookies = await session.defaultSession.cookies.get({
-    url: desktopWebUrl,
+    url: runtimeConfig.urls.web,
   });
 
   console.log(
@@ -160,17 +163,21 @@ async function persistDesktopSessionCookies(
   );
 }
 
-async function runEnsureDesktopAuthSession(force: boolean): Promise<void> {
-  if (!force && (await hasValidDesktopAuthSession())) {
+async function runEnsureDesktopAuthSession(
+  runtimeConfig: DesktopRuntimeConfig,
+  force: boolean,
+): Promise<void> {
+  if (!force && (await hasValidDesktopAuthSession(runtimeConfig))) {
     console.log("[desktop:auth-bootstrap] reused existing session");
     return;
   }
 
-  await ensureDesktopBootstrapUser();
-  const { authUserId, setCookieHeader } = await signInDesktopBootstrapUser();
-  await persistDesktopSessionCookies(setCookieHeader);
+  await ensureDesktopBootstrapUser(runtimeConfig);
+  const { authUserId, setCookieHeader } =
+    await signInDesktopBootstrapUser(runtimeConfig);
+  await persistDesktopSessionCookies(runtimeConfig, setCookieHeader);
 
-  if (!(await hasValidDesktopAuthSession())) {
+  if (!(await hasValidDesktopAuthSession(runtimeConfig))) {
     throw new Error("Desktop auth bootstrap did not produce a valid session.");
   }
 
@@ -179,13 +186,17 @@ async function runEnsureDesktopAuthSession(force: boolean): Promise<void> {
   );
 }
 
-export async function ensureDesktopAuthSession(options?: {
+export async function ensureDesktopAuthSession(options: {
+  runtimeConfig: DesktopRuntimeConfig;
   force?: boolean;
 }): Promise<void> {
-  const force = options?.force === true;
+  const force = options.force === true;
 
   if (!ensureSessionPromise) {
-    ensureSessionPromise = runEnsureDesktopAuthSession(force).finally(() => {
+    ensureSessionPromise = runEnsureDesktopAuthSession(
+      options.runtimeConfig,
+      force,
+    ).finally(() => {
       ensureSessionPromise = null;
     });
   }
@@ -193,6 +204,8 @@ export async function ensureDesktopAuthSession(options?: {
   return ensureSessionPromise;
 }
 
-export async function bootstrapDesktopAuthSession(): Promise<void> {
-  return ensureDesktopAuthSession();
+export async function bootstrapDesktopAuthSession(
+  runtimeConfig: DesktopRuntimeConfig,
+): Promise<void> {
+  return ensureDesktopAuthSession({ runtimeConfig });
 }
