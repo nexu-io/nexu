@@ -37,7 +37,6 @@ Map changed areas to the docs they affect:
 |---|---|
 | `apps/controller/src/routes/` | `specs/references/api-patterns.md`, `ARCHITECTURE.md`, `specs/product-specs/*.md` (if route is user-facing) |
 | `apps/web/src/pages/` or `apps/web/src/app.tsx` | `specs/FRONTEND.md` |
-| `apps/router/src/` | `specs/FRONTEND.md` (proxy routing), `ARCHITECTURE.md` |
 | `apps/landing/` | `ARCHITECTURE.md` (Monorepo layout) |
 | `apps/controller/src/runtime/` | `ARCHITECTURE.md`, `specs/RELIABILITY.md` |
 | `packages/shared/src/schemas/` | `ARCHITECTURE.md` (Type safety) |
@@ -69,7 +68,7 @@ When the user specifies a scope keyword, limit the check to that area:
 |---|---|
 | `db` | Schema source vs `specs/generated/db-schema.md` |
 | `api` | Route files vs `specs/references/api-patterns.md` |
-| `frontend` | `apps/web/` + `apps/router/` vs `specs/FRONTEND.md` |
+| `frontend` | `apps/web/` vs `specs/FRONTEND.md` |
 | `commands` | `package.json` scripts vs `CLAUDE.md`/`AGENTS.md` Commands sections |
 | `architecture` | All `apps/` + `packages/` vs `ARCHITECTURE.md` layout |
 | `security` | Auth/crypto code vs `specs/SECURITY.md` |
