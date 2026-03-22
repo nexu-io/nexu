@@ -54,6 +54,7 @@ export interface ControllerContainer {
 
 export async function createContainer(): Promise<ControllerContainer> {
   const configStore = new NexuConfigStore(env);
+  await configStore.reconcileConfiguredDesktopCloudState();
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);

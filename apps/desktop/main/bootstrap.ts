@@ -49,8 +49,8 @@ function configureLocalDevPaths(): void {
   }
 
   const electronRoot = resolve(runtimeRoot, "electron");
-  const userDataPath = electronRoot;
-  const sessionDataPath = resolve(electronRoot, "session");
+  const userDataPath = resolve(electronRoot, "user-data");
+  const sessionDataPath = resolve(electronRoot, "session-data");
   const logsPath = resolve(electronRoot, "logs");
   const nexuHomePath = getDesktopNexuHomeDir(userDataPath);
 
