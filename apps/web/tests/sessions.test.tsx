@@ -100,10 +100,58 @@ describe("SessionsPage", () => {
     expect(markup).toContain('data-session-platform="slack"');
     expect(markup).toContain('data-chat-thread="sess-1"');
     expect(markup).toContain("<title>Slack</title>");
-    expect(markup).toContain("Can you summarize tomorrow&#x27;s meetings?");
+    expect(markup).toContain("<p>Can you summarize tomorrow's meetings?</p>");
     expect(markup).not.toContain("[message_id:");
     expect(markup).toContain("google-calendar");
     expect(markup).toContain("Open in Slack");
+  });
+
+  it("renders markdown formatting with safe links and escaped raw html", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["session-meta", "sess-markdown"], {
+      id: "sess-markdown",
+      title: "Markdown check",
+      channelType: "web",
+      messageCount: 1,
+      lastMessageAt: "2026-03-22T15:00:00.000Z",
+      metadata: {},
+    });
+    queryClient.setQueryData(["chat-history", "sess-markdown"], {
+      messages: [
+        {
+          id: "msg-markdown",
+          role: "assistant",
+          content:
+            "**bold** [docs](https://example.com) `inline`\n\n<script>alert('xss')</script>",
+          timestamp: new Date("2026-03-22T15:00:00.000Z").getTime(),
+          createdAt: "2026-03-22T15:00:00.000Z",
+        },
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/workspace/sessions/sess-markdown"]}>
+          <Routes>
+            <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("<strong>bold</strong>");
+    expect(markup).toContain("<code>inline</code>");
+    expect(markup).toContain(
+      '<a href="https://example.com" target="_blank" rel="noopener noreferrer nofollow">',
+    );
+    expect(markup).toContain("&lt;script&gt;alert('xss')&lt;/script&gt;");
   });
 
   it("strips conversation metadata blocks before rendering user text", () => {

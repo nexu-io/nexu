@@ -1,4 +1,5 @@
 import { PlatformIcon } from "@/components/platform-icons";
+import { ChatMarkdown } from "@/components/ui/chat-markdown";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { getSessionFolderUrl, openLocalFolderUrl } from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
@@ -383,13 +384,13 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
       <div className={`max-w-[75%] ${isBot ? "" : "text-right"}`}>
         <div
           className={cn(
-            "inline-block px-3.5 py-2.5 rounded-xl text-[13px] leading-relaxed whitespace-pre-line break-words",
+            "inline-block px-3.5 py-2.5 rounded-xl text-[13px] break-words",
             isBot
               ? "bg-surface-1 border border-border text-text-primary rounded-tl-sm"
               : "bg-surface-3 text-text-primary rounded-tr-sm",
           )}
         >
-          {text}
+          <ChatMarkdown content={text} />
         </div>
         {isBot && hasToolCall && <ArtifactCard summary={toolCallSummary} />}
         {time && (
