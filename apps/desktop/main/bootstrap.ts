@@ -51,7 +51,7 @@ function configureLocalDevPaths(): void {
   const electronRoot = resolve(runtimeRoot, "electron");
   const userDataPath = resolve(electronRoot, "user-data");
   const sessionDataPath = resolve(electronRoot, "session-data");
-  const logsPath = resolve(electronRoot, "logs");
+  const logsPath = resolve(userDataPath, "logs");
   const nexuHomePath = getDesktopNexuHomeDir(userDataPath);
 
   mkdirSync(userDataPath, { recursive: true });
@@ -63,6 +63,7 @@ function configureLocalDevPaths(): void {
 
   app.setPath("userData", userDataPath);
   app.setPath("sessionData", sessionDataPath);
+  app.setAppLogsPath(logsPath);
 
   safeWrite(
     process.stdout,
@@ -89,6 +90,7 @@ function configurePackagedPaths(): void {
 
   app.setPath("userData", userDataPath);
   app.setPath("sessionData", sessionDataPath);
+  app.setAppLogsPath(logsPath);
 
   safeWrite(
     process.stdout,
