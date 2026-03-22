@@ -48,12 +48,14 @@ const rmWithRetriesOptions = {
 async function dereferencePnpmSymlinks() {
   const sharpPath = resolve(electronRoot, "node_modules/sharp");
   const imgPath = resolve(electronRoot, "node_modules/@img");
+  let pnpmImgPath = null;
 
   // First, dereference sharp if it's a symlink
   try {
     const sharpStat = await lstat(sharpPath);
     if (sharpStat.isSymbolicLink()) {
       const realSharpPath = await realpath(sharpPath);
+      pnpmImgPath = resolve(dirname(realSharpPath), "@img");
       console.log(
         `[dist:mac] dereferencing pnpm symlink: ${sharpPath} -> ${realSharpPath}`,
       );
@@ -70,7 +72,7 @@ async function dereferencePnpmSymlinks() {
   // Then, copy @img from sharp's node_modules to top-level if it doesn't exist
   // (pnpm hoists @img inside sharp's node_modules, not at top level)
   try {
-    const sharpImgPath = resolve(sharpPath, "node_modules/@img");
+    const sharpImgPath = pnpmImgPath ?? resolve(sharpPath, "node_modules/@img");
     const sharpImgStat = await lstat(sharpImgPath).catch(() => null);
 
     if (sharpImgStat) {
@@ -78,9 +80,6 @@ async function dereferencePnpmSymlinks() {
         `[dist:mac] copying @img from sharp's node_modules: ${sharpImgPath} -> ${imgPath}`,
       );
       await rm(imgPath, rmWithRetriesOptions);
-      await mkdir(resolve(electronRoot, "node_modules/@img"), {
-        recursive: true,
-      });
       await cp(sharpImgPath, imgPath, { recursive: true, dereference: true });
     } else {
       console.log(`[dist:mac] @img not found in sharp's node_modules`);

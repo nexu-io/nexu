@@ -3,11 +3,12 @@ name: Desktop Release
 on:
   push:
     tags:
+      - "v*"
       - "desktop-v*"
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release tag (for example: desktop-v0.2.0)"
+        description: "Release tag (for example: v0.2.0)"
         required: true
         type: string
 
@@ -47,7 +48,8 @@ jobs:
           set -euo pipefail
 
           desktop_version=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); process.stdout.write(pkg.version);')
-          expected_tag="desktop-v${desktop_version}"
+          expected_tag="v${desktop_version}"
+          legacy_expected_tag="desktop-v${desktop_version}"
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             tag_name="${{ inputs.tag_name }}"
@@ -55,8 +57,8 @@ jobs:
             tag_name="${GITHUB_REF#refs/tags/}"
           fi
 
-          if [ "$tag_name" != "$expected_tag" ]; then
-            echo "Expected desktop release tag $expected_tag but received $tag_name" >&2
+          if [ "$tag_name" != "$expected_tag" ] && [ "$tag_name" != "$legacy_expected_tag" ]; then
+            echo "Expected desktop release tag $expected_tag (legacy: $legacy_expected_tag) but received $tag_name" >&2
             exit 1
           fi
 

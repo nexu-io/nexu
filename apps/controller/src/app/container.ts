@@ -112,8 +112,13 @@ export async function createContainer(): Promise<ControllerContainer> {
 
   // Wire cloud state change callback to sync refreshed cloud inventory without
   // auto-switching the default model during startup or first-channel connect.
-  configStore.onCloudStateChanged = async () => {
+  configStore.onCloudStateChanged = async (change) => {
     await openclawSyncService.syncAll();
+    if (!change.hadCloudInventory && change.hasCloudInventory) {
+      await openclawProcess.stop();
+      openclawProcess.enableAutoRestart();
+      openclawProcess.start();
+    }
   };
 
   return {
@@ -133,7 +138,11 @@ export async function createContainer(): Promise<ControllerContainer> {
     modelProviderService,
     integrationService: new IntegrationService(configStore),
     localUserService: new LocalUserService(configStore),
-    desktopLocalService: new DesktopLocalService(configStore),
+    desktopLocalService: new DesktopLocalService(
+      configStore,
+      modelProviderService,
+      openclawProcess,
+    ),
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,

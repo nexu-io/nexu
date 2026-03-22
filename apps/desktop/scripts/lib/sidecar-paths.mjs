@@ -3,6 +3,7 @@ import {
   lstat,
   mkdir,
   readFile,
+  readdir,
   realpath,
   rm,
   symlink,
@@ -43,21 +44,55 @@ export function shouldCopyRuntimeDependencies() {
   return value === "1" || value?.toLowerCase() === "true";
 }
 
-export async function linkOrCopyDirectory(sourcePath, targetPath) {
+export async function linkOrCopyDirectory(
+  sourcePath,
+  targetPath,
+  options = {},
+) {
+  const excludeNames = new Set(options.excludeNames ?? []);
+
   if (shouldCopyRuntimeDependencies()) {
     await cp(sourcePath, targetPath, {
       recursive: true,
       dereference: true,
-      filter: (source) => basename(source) !== ".bin",
+      filter: (source) => {
+        const name = basename(source);
+        return name !== ".bin" && !excludeNames.has(name);
+      },
     });
     return;
   }
 
-  await symlink(
-    sourcePath,
-    targetPath,
-    process.platform === "win32" ? "junction" : "dir",
-  );
+  if (excludeNames.size === 0) {
+    await symlink(
+      sourcePath,
+      targetPath,
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    return;
+  }
+
+  await mkdir(targetPath, { recursive: true });
+  const entries = await readdir(sourcePath);
+
+  for (const entry of entries) {
+    if (entry === ".bin" || excludeNames.has(entry)) {
+      continue;
+    }
+
+    const sourceEntryPath = resolve(sourcePath, entry);
+    const sourceEntryStats = await lstat(sourceEntryPath);
+
+    await symlink(
+      sourceEntryPath,
+      resolve(targetPath, entry),
+      process.platform === "win32"
+        ? sourceEntryStats.isDirectory()
+          ? "junction"
+          : "file"
+        : undefined,
+    );
+  }
 }
 
 export async function removePathIfExists(path) {
@@ -87,8 +122,6 @@ async function resolveInstalledPackageRoot(packageRoot, packageName) {
   try {
     resolvedEntryPath = requireFromPackage.resolve(packageName);
   } catch {
-    // Packages with only `bin` (no `main`/`exports`) can't be resolved
-    // by name alone — fall back to resolving their package.json.
     resolvedEntryPath = requireFromPackage.resolve(
       `${packageName}/package.json`,
     );

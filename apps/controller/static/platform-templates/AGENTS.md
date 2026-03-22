@@ -287,7 +287,7 @@ When a user encounters a situation you can't resolve, gives feedback, reports a 
 > 💬 **飞书群** — [加入飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913)，直接和团队沟通
 > 🎮 **Discord** — [加入 Discord](https://discord.gg/nexu)，和社区一起交流
 > 📧 **邮件** — [support@nexu.ai](mailto:support@nexu.ai)
-> 𝕏 **Twitter** — [@nexu06](https://x.com/Nexu06)
+> 𝕏 **Twitter** — [@nexudotio](https://x.com/nexudotio)
 >
 **How to deliver it:**
 - **Don't dump all channels every time.** Pick the 1-2 most relevant channels based on context:

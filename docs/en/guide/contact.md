@@ -18,11 +18,11 @@ Join our Discord server to chat with the team and other users:
 
 Follow us on X for the latest updates:
 
-👉 [Follow @Nexu06](https://x.com/Nexu06)
+👉 [Follow @nexudotio](https://x.com/nexudotio)
 
 ## Links
 
 - **Website**: [nexu.io](https://nexu.io)
 - **GitHub**: [github.com/nexu-io/nexu](https://github.com/nexu-io/nexu)
-- **X (Twitter)**: [x.com/Nexu06](https://x.com/Nexu06)
+- **X (Twitter)**: [x.com/nexudotio](https://x.com/nexudotio)
 - **Email**: [support@nexu.ai](mailto:support@nexu.ai)

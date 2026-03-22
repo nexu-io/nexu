@@ -81,6 +81,8 @@ export function registerModelRoutes(
     }),
     async (c) => {
       const { providerId } = c.req.valid("param");
+      const beforeInventory =
+        await container.modelProviderService.getInventoryStatus();
       const result = await container.modelProviderService.upsertProvider(
         providerId,
         c.req.valid("json"),
@@ -88,6 +90,14 @@ export function registerModelRoutes(
       const modelResult =
         await container.modelProviderService.ensureValidDefaultModel();
       await container.openclawSyncService.syncAll();
+      const afterInventory =
+        await container.modelProviderService.getInventoryStatus();
+      if (
+        !beforeInventory.hasKnownInventory &&
+        afterInventory.hasKnownInventory
+      ) {
+        await container.desktopLocalService.restartRuntime();
+      }
       return c.json(
         {
           provider: result.provider,

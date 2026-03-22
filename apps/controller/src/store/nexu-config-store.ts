@@ -50,6 +50,12 @@ type CloudPollingState = {
   abortController: AbortController;
 };
 
+export type DesktopCloudStateChange = {
+  hadCloudInventory: boolean;
+  hasCloudInventory: boolean;
+  connected: boolean;
+};
+
 function describeFetchError(error: unknown): string {
   if (!(error instanceof Error)) {
     return String(error);
@@ -197,7 +203,7 @@ export class NexuConfigStore {
   private pollingState: CloudPollingState | null = null;
 
   /** Callback fired when cloud state changes (connect/disconnect). */
-  onCloudStateChanged?: () => Promise<void>;
+  onCloudStateChanged?: (change: DesktopCloudStateChange) => Promise<void>;
 
   constructor(env: ControllerEnv) {
     this.nexuCloudUrl = env.nexuCloudUrl;
@@ -335,6 +341,7 @@ export class NexuConfigStore {
         const data = (await res.json()) as CloudPollResponse;
 
         if (data.status === "completed" && data.apiKey) {
+          const previousCloud = readDesktopCloud(await this.getConfig());
           const linkUrl =
             data.linkGatewayUrl ?? this.nexuLinkUrl ?? this.nexuCloudUrl;
           const models =
@@ -354,7 +361,11 @@ export class NexuConfigStore {
             apiKey: data.apiKey,
             models,
           });
-          await this.onCloudStateChanged?.();
+          await this.onCloudStateChanged?.({
+            hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
+            hasCloudInventory: models.length > 0,
+            connected: true,
+          });
           return;
         }
 
@@ -1133,6 +1144,7 @@ export class NexuConfigStore {
   }
 
   async disconnectDesktopCloud() {
+    const previousCloud = readDesktopCloud(await this.getConfig());
     if (this.pollingState) {
       this.pollingState.abortController.abort();
       this.pollingState = null;
@@ -1148,7 +1160,11 @@ export class NexuConfigStore {
       apiKey: null,
       models: [],
     });
-    await this.onCloudStateChanged?.();
+    await this.onCloudStateChanged?.({
+      hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
+      hasCloudInventory: false,
+      connected: false,
+    });
 
     return { ok: true };
   }

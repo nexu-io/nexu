@@ -3,13 +3,14 @@ import {
   chmod,
   cp,
   mkdir,
+  mkdtemp,
   readFile,
   readdir,
   rename,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   electronRoot,
@@ -134,14 +135,12 @@ const CORE_DIST_REPLY_BUNDLE_PATTERNS = [/^reply-.*\.js$/u];
 const FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH = `
       // --- Single-agent dispatch (existing behavior) ---
       const ctxPayload = buildCtxPayloadForAgent(
+        route.sessionKey,
+        route.accountId,
+        ctx.mentionedBot,
+      );
 `.trim();
-const FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT = [
-  "      // --- Single-agent dispatch (existing behavior) ---",
-  "      const ctxPayload = buildCtxPayloadForAgent(",
-  "        route.sessionKey,",
-  "        route.accountId,",
-  "        ctx.mentionedBot,",
-  "      );",
+const FEISHU_SYNTHETIC_PRE_LLM_LINES = [
   "      const syntheticFailureTriggerPrefix = process.env.NEXU_FEISHU_TEST_TRIGGER_PREFIX?.trim();",
   "      if (syntheticFailureTriggerPrefix && ctx.content.includes(syntheticFailureTriggerPrefix)) {",
   "        const syntheticInput = ctx.content.slice(ctx.content.indexOf(syntheticFailureTriggerPrefix) + syntheticFailureTriggerPrefix.length).trim();",
@@ -171,6 +170,17 @@ const FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT = [
   "        );",
   "        return;",
   "      }",
+];
+const FEISHU_SYNTHETIC_PRE_LLM_BLOCK =
+  FEISHU_SYNTHETIC_PRE_LLM_LINES.join("\n");
+const FEISHU_PRE_LLM_SINGLE_AGENT_REPLACEMENT = [
+  "      // --- Single-agent dispatch (existing behavior) ---",
+  "      const ctxPayload = buildCtxPayloadForAgent(",
+  "        route.sessionKey,",
+  "        route.accountId,",
+  "        ctx.mentionedBot,",
+  "      );",
+  ...FEISHU_SYNTHETIC_PRE_LLM_LINES,
 ].join("\n");
 const LEGACY_FEISHU_TRIGGER_CALLSITE = `
         accountId: account.accountId,
@@ -498,17 +508,32 @@ async function signOpenclawNativeBinaries() {
 }
 
 async function applyOpenclawRuntimePatches() {
+  const patchedFiles = new Map();
+
   if (!(await pathExists(openclawPackagePatchRoot))) {
-    return;
+    return patchedFiles;
   }
 
-  await cp(openclawPackagePatchRoot, openclawRoot, {
-    recursive: true,
-    force: true,
-  });
-  console.log(
-    `[openclaw-sidecar] applied runtime patches from ${openclawPackagePatchRoot}`,
-  );
+  const patchFiles = await collectFiles(openclawPackagePatchRoot);
+
+  for (const patchFilePath of patchFiles) {
+    const patchFileRelativePath = relative(
+      openclawPackagePatchRoot,
+      patchFilePath,
+    );
+    patchedFiles.set(
+      patchFileRelativePath,
+      await readFile(patchFilePath, "utf8"),
+    );
+  }
+
+  if (patchFiles.length > 0) {
+    console.log(
+      `[openclaw-sidecar] prepared ${patchFiles.length} runtime patch overlay(s) from ${openclawPackagePatchRoot}`,
+    );
+  }
+
+  return patchedFiles;
 }
 
 function applyExactReplacement(source, search, replacement, label) {
@@ -518,9 +543,27 @@ function applyExactReplacement(source, search, replacement, label) {
   return source.replace(search, replacement);
 }
 
-async function patchReplyOutcomeBridge() {
+function countOccurrences(source, search) {
+  if (search.length === 0) {
+    return 0;
+  }
+
+  let count = 0;
+  let index = 0;
+  while (true) {
+    const nextIndex = source.indexOf(search, index);
+    if (nextIndex === -1) {
+      return count;
+    }
+    count += 1;
+    index = nextIndex + search.length;
+  }
+}
+
+async function patchReplyOutcomeBridge(openclawPackageRoot) {
+  const patchedFiles = new Map();
   const feishuBotPath = resolve(
-    openclawRoot,
+    openclawPackageRoot,
     "extensions",
     "feishu",
     "src",
@@ -549,6 +592,13 @@ async function patchReplyOutcomeBridge() {
     );
   }
 
+  if (feishuBotSource.includes(FEISHU_SYNTHETIC_PRE_LLM_BLOCK)) {
+    feishuBotSource = feishuBotSource.replaceAll(
+      FEISHU_SYNTHETIC_PRE_LLM_BLOCK,
+      "",
+    );
+  }
+
   if (feishuBotSource.includes(FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH)) {
     feishuBotSource = feishuBotSource.replace(
       FEISHU_PRE_LLM_SINGLE_AGENT_SEARCH,
@@ -559,7 +609,22 @@ async function patchReplyOutcomeBridge() {
     );
   }
 
-  await writeFile(feishuBotPath, feishuBotSource, "utf8");
+  if (countOccurrences(feishuBotSource, FEISHU_SYNTHETIC_PRE_LLM_BLOCK) !== 1) {
+    throw new Error(
+      "Feishu bot patch did not converge to a single synthetic pre-llm block.",
+    );
+  }
+
+  if (feishuBotSource.includes("return;\n      }\n        route.sessionKey,")) {
+    throw new Error(
+      "Feishu bot patch left a dangling buildCtxPayloadForAgent argument tail.",
+    );
+  }
+
+  patchedFiles.set(
+    relative(openclawPackageRoot, feishuBotPath),
+    feishuBotSource,
+  );
 
   const patchBundleGroup = async (bundleDir, patterns, label) => {
     const entries = await readdir(bundleDir);
@@ -644,20 +709,53 @@ async function patchReplyOutcomeBridge() {
         );
       }
 
-      await writeFile(bundlePath, source, "utf8");
+      patchedFiles.set(relative(openclawPackageRoot, bundlePath), source);
     }
   };
 
   await patchBundleGroup(
-    resolve(openclawRoot, "dist", "plugin-sdk"),
+    resolve(openclawPackageRoot, "dist", "plugin-sdk"),
     PLUGIN_SDK_BUNDLE_PATTERNS,
     "plugin-sdk reply/dispatch",
   );
   await patchBundleGroup(
-    resolve(openclawRoot, "dist"),
+    resolve(openclawPackageRoot, "dist"),
     CORE_DIST_REPLY_BUNDLE_PATTERNS,
     "core dist reply",
   );
+
+  return patchedFiles;
+}
+
+async function stagePatchedOpenclawPackage() {
+  await mkdir(dirname(sidecarRoot), { recursive: true });
+  const stageRoot = await mkdtemp(
+    resolve(dirname(sidecarRoot), ".openclaw-package-stage-"),
+  );
+  const stagedOpenclawRoot = resolve(stageRoot, "openclaw");
+
+  await cp(openclawRoot, stagedOpenclawRoot, {
+    recursive: true,
+    dereference: true,
+  });
+
+  const overlayFiles = await applyOpenclawRuntimePatches();
+  const bridgePatchedFiles = await patchReplyOutcomeBridge(stagedOpenclawRoot);
+  const patchedFiles = new Map([...overlayFiles, ...bridgePatchedFiles]);
+
+  for (const [patchRelativePath, patchedSource] of patchedFiles) {
+    await writeFile(
+      resolve(stagedOpenclawRoot, patchRelativePath),
+      patchedSource,
+      "utf8",
+    );
+  }
+
+  console.log(
+    `[openclaw-sidecar] staged transactional OpenClaw package with ${patchedFiles.size} patched file(s)`,
+  );
+
+  return { stageRoot, stagedOpenclawRoot };
 }
 
 async function prepareOpenclawSidecar() {
@@ -667,12 +765,18 @@ async function prepareOpenclawSidecar() {
     );
   }
 
-  await applyOpenclawRuntimePatches();
-  await patchReplyOutcomeBridge();
-
   await resetDir(sidecarRoot);
   await mkdir(sidecarBinDir, { recursive: true });
-  await linkOrCopyDirectory(openclawRuntimeNodeModules, sidecarNodeModules);
+  const { stageRoot, stagedOpenclawRoot } = await stagePatchedOpenclawPackage();
+  try {
+    await linkOrCopyDirectory(openclawRuntimeNodeModules, sidecarNodeModules, {
+      excludeNames: ["openclaw"],
+    });
+    await rename(stagedOpenclawRoot, resolve(sidecarNodeModules, "openclaw"));
+  } finally {
+    await removePathIfExists(stageRoot);
+  }
+
   await removePathIfExists(resolve(sidecarNodeModules, "electron"));
   await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
   await chmod(packagedOpenclawEntry, 0o755).catch(() => null);

@@ -16,6 +16,10 @@ export interface ModelAutoSelectResult {
   newModelName: string | null;
 }
 
+export interface ModelInventoryStatus {
+  hasKnownInventory: boolean;
+}
+
 type DefaultModelValidity = "valid" | "invalid" | "unknown";
 
 const PROVIDER_BASE_URLS: Record<string, string> = {
@@ -95,6 +99,19 @@ export class ModelProviderService {
     return this.configStore.deleteProvider(providerId);
   }
 
+  async getInventoryStatus(): Promise<ModelInventoryStatus> {
+    const desktopCloud =
+      await this.configStore.getDesktopCloudInventoryStatus();
+    const config = await this.configStore.getConfig();
+    const hasByokInventory = config.providers
+      .filter((provider) => provider.enabled)
+      .some((provider) => provider.models.length > 0);
+
+    return {
+      hasKnownInventory: desktopCloud.hasCloudInventory || hasByokInventory,
+    };
+  }
+
   /**
    * Validate that the current defaultModelId exists in the available model
    * list. If not, auto-select the first available model and persist the
@@ -146,13 +163,10 @@ export class ModelProviderService {
     const config = await this.configStore.getConfig();
     const currentId = config.runtime.defaultModelId;
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
-    const inventory = await this.configStore.getDesktopCloudInventoryStatus();
+    const inventory = await this.getInventoryStatus();
 
     const providers = config.providers.filter((provider) => provider.enabled);
-    const hasByokInventory = providers.some(
-      (provider) => provider.models.length > 0,
-    );
-    const hasKnownInventory = inventory.hasCloudInventory || hasByokInventory;
+    const hasKnownInventory = inventory.hasKnownInventory;
 
     if (!hasKnownInventory) {
       return "unknown";

@@ -17,7 +17,6 @@
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:cached",
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
-    "preinstall": "npm --prefix ./openclaw-runtime run clean",
     "postinstall": "npm --prefix ./openclaw-runtime run install:pruned && npm --prefix ./apps/controller/static/runtime-plugins/openclaw-weixin install --production --ignore-scripts",
     "prepare": "cp scripts/pre-commit .git/hooks/pre-commit 2>/dev/null; chmod +x .git/hooks/pre-commit 2>/dev/null; true",
     "start": "./apps/desktop/dev.sh start",
