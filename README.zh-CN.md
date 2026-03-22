@@ -5,7 +5,7 @@
 <h1 align="center">nexu</h1>
 
 <p align="center">
-  <strong>最简单的飞书 OpenClaw 🦞 开源桌面客户端</strong>
+  <strong>最简单的微信 & 飞书 OpenClaw 🦞 开源桌面客户端</strong>
 </p>
 
 <p align="center">
@@ -33,9 +33,9 @@
 
 ## 📋 概述
 
-**nexu**（奈苏，next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在飞书、Slack、Discord 等 IM 中。
+**nexu**（奈苏，next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在微信、飞书、Slack、Discord 等 IM 中。
 
-下载即用，图形化配置，内置飞书 Skills，支持 Claude / GPT / Gemini 等多模型与自带 API Key。
+下载即用，图形化配置，已适配微信 ClawBot 插件，内置飞书 Skills，支持 Claude / GPT / Gemini 等多模型与自带 API Key。
 
 连接 IM 后，Agent 7×24 小时在线——手机上随时对话，不受桌面限制。
 
@@ -55,7 +55,7 @@
 | **📡 数据路径** | 本地 | 经第三方服务器，数据不可控 ❌ | **本机为主，不托管你的业务数据** ✅ |
 | **💰 费用** | 免费，但需自行部署 ⚠️ | 订阅 / 按席收费 ❌ | **客户端免费，按自备 API Key 计费** ✅ |
 | **📜 源码** | 开源 | 闭源，无法审计 ❌ | **MIT 开源，可 fork、可审计** ✅ |
-| **🔗 渠道** | 需自行对接 ⚠️ | 视产品而定，常有限制 ❌ | **内置飞书、Slack、Discord，开箱即用** ✅ |
+| **🔗 渠道** | 需自行对接 ⚠️ | 视产品而定，常有限制 ❌ | **内置微信、飞书、Slack、Discord，开箱即用** ✅ |
 | **🖥 使用方式** | CLI，需技术背景 ❌ | 视产品而定 | **纯 GUI，无需 CLI，双击即用** ✅ |
 
 ---
@@ -80,7 +80,7 @@
 
 ### 📱 连接 IM，移动端即用
 
-连接飞书、Slack 或 Discord，你的 AI Agent 立刻出现在手机上。无需额外 App——打开团队聊天工具，随时随地和 Agent 对话。
+连接微信、飞书、Slack 或 Discord，你的 AI Agent 立刻出现在手机上。无需额外 App——打开微信或团队聊天工具，随时随地和 Agent 对话。
 
 ### 👥 为团队而生
 
@@ -208,10 +208,10 @@ pnpm test
 
 ## 💬 社区
 
-| 飞书群 | Discord |
-|:---:|:---:|
-| <img src="site/media/feishu-qr.png" width="200" /> | <img src="site/media/discord-qr.png" width="200" /> |
-| [加入飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [加入 Discord](https://discord.gg/Q6AxCUuMNU) |
+| 微信群 | 飞书群 | Discord |
+|:---:|:---:|:---:|
+| <img src="site/media/wechat-qr.png" width="200" height="200" /> | <img src="site/media/feishu-qr.png" width="200" height="200" /> | <img src="site/media/discord-qr.png" width="200" height="200" /> |
+| 扫码加入微信群 | [加入飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [加入 Discord](https://discord.gg/Q6AxCUuMNU) |
 
 - [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
 - [GitHub Issues](https://github.com/nexu-io/nexu/issues)

@@ -5,7 +5,7 @@
 <h1 align="center">nexu</h1>
 
 <p align="center">
-  <strong>The simplest open-source OpenClaw 🦞 desktop client for Feishu</strong>
+  <strong>The simplest open-source OpenClaw 🦞 desktop client for WeChat & Feishu</strong>
 </p>
 
 <p align="center">
@@ -33,9 +33,9 @@
 
 ## 📋 Overview
 
-**nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside Feishu, Slack, Discord, and other IM channels.
+**nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside WeChat, Feishu, Slack, Discord, and other IM channels.
 
-Download and go — graphical setup, built-in Feishu Skills, multi-model support (Claude / GPT / Gemini and more), and bring your own API Key.
+Download and go — graphical setup, WeChat ClawBot plugin supported, built-in Feishu Skills, multi-model support (Claude / GPT / Gemini and more), and bring your own API Key.
 
 Once connected to IM, your Agent is online 24/7 — chat from your phone anytime, anywhere.
 
@@ -55,7 +55,7 @@ All data stays on your machine. Your privacy, fully in your control.
 | **📡 Data path** | Local | Routed through vendor servers, data out of your control ❌ | **Local-first; we don't host your business data** ✅ |
 | **💰 Cost** | Free, but self-deploy required ⚠️ | Subscription / per-seat pricing ❌ | **Client is free; pay providers via your own API keys** ✅ |
 | **📜 Source** | Open source | Closed source, no audit possible ❌ | **MIT — fork and audit** ✅ |
-| **🔗 Channels** | DIY integration required ⚠️ | Varies by vendor, often limited ❌ | **Built-in Feishu, Slack, Discord — works out of the box** ✅ |
+| **🔗 Channels** | DIY integration required ⚠️ | Varies by vendor, often limited ❌ | **Built-in WeChat, Feishu, Slack, Discord — works out of the box** ✅ |
 | **🖥 Interface** | CLI, requires technical skills ❌ | Varies by vendor | **Pure GUI, no CLI needed, double-click to start** ✅ |
 
 ---
@@ -80,7 +80,7 @@ Prefer your own model providers? Add your API Key and use the client without cre
 
 ### 📱 IM-connected, mobile-ready
 
-Connect to Feishu, Slack, or Discord and your AI agent is instantly available on your phone. No extra app—just open your team chat and start talking to your agent on the go.
+Connect to WeChat, Feishu, Slack, or Discord and your AI agent is instantly available on your phone. No extra app—just open WeChat or your team chat and start talking to your agent on the go.
 
 ### 👥 Built for teams
 
@@ -208,10 +208,10 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## 💬 Community
 
-| Feishu Group | Discord |
-|:---:|:---:|
-| <img src="site/media/feishu-qr.png" width="200" /> | <img src="site/media/discord-qr.png" width="200" /> |
-| [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/Q6AxCUuMNU) |
+| WeChat Group | Feishu Group | Discord |
+|:---:|:---:|:---:|
+| <img src="site/media/wechat-qr.png" width="200" height="200" /> | <img src="site/media/feishu-qr.png" width="200" height="200" /> | <img src="site/media/discord-qr.png" width="200" height="200" /> |
+| Scan to join WeChat group | [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/Q6AxCUuMNU) |
 
 - [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
 - [GitHub Issues](https://github.com/nexu-io/nexu/issues)
