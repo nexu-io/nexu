@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useState } from "react";
 import {
   connectCloudProfile,
   createCloudProfile,
@@ -6,6 +6,7 @@ import {
   disconnectCloudProfile,
   getDesktopCloudStatus,
   importCloudProfiles,
+  onDesktopCommand,
   openExternal,
   switchCloudProfile,
   updateCloudProfile,
@@ -49,25 +50,60 @@ export function CloudProfilePage() {
   const [createCloudUrl, setCreateCloudUrl] = useState("");
   const [createLinkUrl, setCreateLinkUrl] = useState("");
 
-  useEffect(() => {
-    let isCancelled = false;
+  const refreshCloudStatus = useCallback(
+    async (options?: {
+      silent?: boolean;
+      loading?: boolean;
+    }) => {
+      if (options?.loading) {
+        setCloudStatusPhase("loading");
+      }
 
-    void (async () => {
       try {
         const status = await getDesktopCloudStatus();
-        if (!isCancelled) {
-          setCloudStatus(status);
-          setCloudStatusPhase("ready");
+        setCloudStatus(status);
+        setCloudStatusPhase("ready");
+        if (!options?.silent) {
+          setCloudMessage("Cloud profiles synced.");
         }
       } catch (error) {
-        if (!isCancelled) {
-          setCloudStatusPhase("error");
+        setCloudStatusPhase("error");
+        if (!options?.silent) {
           setCloudMessage(
             error instanceof Error
               ? error.message
               : "Failed to load cloud status.",
           );
         }
+        throw error;
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    void (async () => {
+      try {
+        const status = await getDesktopCloudStatus();
+        if (isCancelled) {
+          return;
+        }
+
+        setCloudStatus(status);
+        setCloudStatusPhase("ready");
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        setCloudStatusPhase("error");
+        setCloudMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to load cloud status.",
+        );
       }
     })();
 
@@ -75,6 +111,53 @@ export function CloudProfilePage() {
       isCancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    return onDesktopCommand((command) => {
+      if (command.type !== "desktop:auth-session-restored") {
+        return;
+      }
+
+      void refreshCloudStatus({ silent: false, loading: false });
+    });
+  }, [refreshCloudStatus]);
+
+  useEffect(() => {
+    function handleWindowFocus() {
+      void refreshCloudStatus({ silent: true, loading: false });
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refreshCloudStatus({ silent: true, loading: false });
+      }
+    }
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshCloudStatus]);
+
+  useEffect(() => {
+    const isPolling =
+      cloudStatus?.profiles.some((profile) => profile.polling) ?? false;
+
+    if (!isPolling) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void refreshCloudStatus({ silent: true, loading: false });
+    }, 2000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [cloudStatus?.profiles, refreshCloudStatus]);
 
   async function handleCloudProfileChange(name: string) {
     if (cloudBusy || cloudStatus?.activeProfileName === name) {
