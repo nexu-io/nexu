@@ -1,0 +1,94 @@
+name: Bug Report
+description: Report a bug or unexpected behavior.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out the sections below so we can reproduce and fix it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened. Include error messages, logs, or screenshots if applicable.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of Nexu is affected?
+      multiple: true
+      options:
+        - Desktop app (Electron shell)
+        - Controller (backend / API)
+        - Web dashboard (React UI)
+        - OpenClaw runtime
+        - Skills
+        - Shared schemas / packages
+        - Build / CI / Tooling
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Nexu version
+      description: "App version or commit SHA (find it in the desktop app's About dialog or run `git rev-parse --short HEAD`)."
+      placeholder: "e.g. 0.4.2 or abc1234"
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: "OS, Node.js version, and any other relevant environment details."
+      placeholder: |
+        - OS: macOS 15.3
+        - Node.js: 22.x
+        - pnpm: 9.x
+      render: markdown
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: "Paste any relevant log output. **Redact credentials and tokens.**"
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might help — screenshots, config snippets, related issues, etc.

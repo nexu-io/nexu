@@ -1,0 +1,63 @@
+name: Improvement
+description: Suggest an improvement to existing functionality (refactoring, performance, DX, etc.).
+labels: ["improvement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Suggest an improvement to something that already exists in Nexu.
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: Describe the current behavior or state of things.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed improvement
+      description: What should change and why?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Performance
+        - Developer experience
+        - Code quality / Refactoring
+        - Documentation
+        - Testing
+        - Observability / Logging
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of Nexu does this relate to?
+      multiple: true
+      options:
+        - Desktop app (Electron shell)
+        - Controller (backend / API)
+        - Web dashboard (React UI)
+        - OpenClaw runtime
+        - Skills
+        - Shared schemas / packages
+        - Build / CI / Tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Benchmarks, code pointers, related issues, or anything else.
