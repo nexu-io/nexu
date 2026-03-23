@@ -90,19 +90,25 @@ describe("SkillDirWatcher", () => {
       expect(db.getAllInstalled()).toHaveLength(1);
     });
 
-    it("marks ledger-installed skills as uninstalled when missing from disk", () => {
+    it("marks managed skills as uninstalled when missing from disk", () => {
       db.recordInstall("weather", "managed");
-      db.recordInstall("github", "curated");
 
-      watcher = new SkillDirWatcher({
-        skillsDir,
-        skillDb: db,
-      });
+      watcher = new SkillDirWatcher({ skillsDir, skillDb: db });
       watcher.syncNow();
 
       expect(db.isInstalled("weather", "managed")).toBe(false);
+    });
+
+    it("removes curated records when missing from disk (eligible for re-install)", () => {
+      db.recordInstall("github", "curated");
+
+      watcher = new SkillDirWatcher({ skillsDir, skillDb: db });
+      watcher.syncNow();
+
+      // Record should be fully removed, not just marked uninstalled
       expect(db.isInstalled("github", "curated")).toBe(false);
-      expect(db.getAllInstalled()).toHaveLength(0);
+      // isRemovedByUser should be false — record was removed, not user-uninstalled
+      expect(db.isRemovedByUser("github")).toBe(false);
     });
 
     it("no-ops when skillsDir does not exist", () => {

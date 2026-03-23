@@ -52,15 +52,33 @@ export class SkillDirWatcher {
       );
     }
 
-    // Ledger has it, disk doesn't -> mark uninstalled per source
-    const removed = installed.filter((r) => !diskSet.has(r.slug));
-    const bySource = new Map<SkillSource, string[]>();
-    for (const record of removed) {
-      const list = bySource.get(record.source) ?? [];
-      list.push(record.slug);
-      bySource.set(record.source, list);
+    // Ledger has it, disk doesn't -> handle per source:
+    // - Curated: REMOVE record entirely so getCuratedSlugsToEnqueue re-enqueues them.
+    //   (markUninstalledBySlugs would make isRemovedByUser return true, blocking re-install.)
+    // - Non-curated: mark as uninstalled (preserves user's install history).
+    const missing = installed.filter((r) => !diskSet.has(r.slug));
+    const curatedMissing: Array<{ slug: string; source: SkillSource }> = [];
+    const otherBySource = new Map<SkillSource, string[]>();
+
+    for (const record of missing) {
+      if (record.source === "curated") {
+        curatedMissing.push({ slug: record.slug, source: record.source });
+      } else {
+        const list = otherBySource.get(record.source) ?? [];
+        list.push(record.slug);
+        otherBySource.set(record.source, list);
+      }
     }
-    for (const [source, slugs] of bySource) {
+
+    if (curatedMissing.length > 0) {
+      this.db.removeRecords(curatedMissing);
+      this.log(
+        "info",
+        `Removed ${curatedMissing.length} curated record(s) missing from disk (eligible for re-install): ${curatedMissing.map((r) => r.slug).join(", ")}`,
+      );
+    }
+
+    for (const [source, slugs] of otherBySource) {
       this.db.markUninstalledBySlugs(slugs, source);
       this.log(
         "info",
