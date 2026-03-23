@@ -36,6 +36,14 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
+import {
+  type LaunchdBootstrapResult,
+  bootstrapWithLaunchd,
+  getDefaultPlistDir,
+  installLaunchdQuitHandler,
+  isLaunchdBootstrapEnabled,
+  resolveLaunchdPaths,
+} from "./services";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -217,6 +225,7 @@ if (sentryDsn) {
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
+let launchdResult: LaunchdBootstrapResult | null = null;
 
 logLaunchTimeline(
   `runtime ports ${runtimePortAllocations
@@ -471,6 +480,44 @@ async function runDesktopColdStart(): Promise<void> {
   await orchestrator.startOne("web");
 
   logColdStart("cold start complete");
+  diagnosticsReporter?.markColdStartSucceeded();
+}
+
+async function runLaunchdColdStart(): Promise<void> {
+  diagnosticsReporter?.markColdStartRunning("launchd bootstrap");
+  logColdStart("starting launchd bootstrap");
+
+  const isDev = !app.isPackaged;
+  const paths = resolveLaunchdPaths(app.isPackaged, electronRoot);
+
+  // Derive openclaw paths from nexuHome
+  const nexuHome = runtimeConfig.paths.nexuHome.replace(
+    /^~/,
+    process.env.HOME ?? "",
+  );
+  const openclawConfigPath = resolve(nexuHome, "openclaw.yaml");
+  const openclawStateDir = resolve(nexuHome, "openclaw");
+
+  launchdResult = await bootstrapWithLaunchd({
+    isDev,
+    controllerPort: runtimeConfig.ports.controller,
+    webPort: runtimeConfig.ports.web,
+    webRoot: resolve(__dirname, "../../dist"),
+    plistDir: getDefaultPlistDir(isDev),
+    ...paths,
+    openclawConfigPath,
+    openclawStateDir,
+  });
+
+  logColdStart("launchd services started, bootstrapping auth session");
+  diagnosticsReporter?.markColdStartRunning(
+    "bootstrapping desktop auth session",
+  );
+  await ensureDesktopAuthSession({ runtimeConfig });
+  const sessionId = rotateDesktopLogSession();
+  logColdStart(`desktop auth session ready sessionId=${sessionId}`);
+
+  logColdStart("launchd cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
 }
 
@@ -793,7 +840,29 @@ app.whenReady().then(async () => {
     }
 
     try {
-      await runDesktopColdStart();
+      const useLaunchd = isLaunchdBootstrapEnabled();
+      logColdStart(
+        `bootstrap mode: ${useLaunchd ? "launchd" : "orchestrator"}`,
+      );
+
+      if (useLaunchd) {
+        await runLaunchdColdStart();
+        // Install launchd quit handler after successful bootstrap
+        if (launchdResult) {
+          installLaunchdQuitHandler({
+            launchd: launchdResult.launchd,
+            labels: launchdResult.labels,
+            webServer: launchdResult.webServer,
+            onBeforeQuit: async () => {
+              sleepGuard?.dispose("launchd-quit");
+              await diagnosticsReporter?.flushNow().catch(() => undefined);
+              flushRuntimeLoggers();
+            },
+          });
+        }
+      } else {
+        await runDesktopColdStart();
+      }
       healthCheck.recordSuccess();
     } catch (error) {
       healthCheck.recordFailure();
@@ -850,9 +919,15 @@ app.on("before-quit", (event) => {
   void diagnosticsReporter?.flushNow().catch(() => undefined);
   flushRuntimeLoggers();
 
-  // Prevent Electron from quitting until child processes are cleaned up.
-  // orchestrator.dispose() sends SIGTERM then escalates to SIGKILL, so this
-  // blocks for at most ~5 seconds per managed unit.
+  // If using launchd mode, the quit handler is installed separately
+  // and shows a dialog for quit options
+  if (launchdResult) {
+    // Launchd quit handler is already installed via installLaunchdQuitHandler
+    // This handler just does cleanup; actual quit logic is in quit-handler.ts
+    return;
+  }
+
+  // Legacy orchestrator mode: clean up child processes
   event.preventDefault();
   orchestrator
     .dispose()

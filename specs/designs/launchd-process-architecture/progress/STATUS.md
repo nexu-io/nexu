@@ -22,7 +22,7 @@
 
 ## Current Task
 
-**Phase 8** - Integration tests and wiring to main index.ts
+**Phase 8** - Integration tests
 
 ---
 
@@ -38,6 +38,7 @@
 - [x] Logging unified to `~/.nexu/logs/`
 - [x] Quit handler (`apps/desktop/main/services/quit-handler.ts`)
 - [x] Dev mode script (`scripts/dev-launchd.sh`)
+- [x] Integration into index.ts (behind feature flag)
 
 ---
 
