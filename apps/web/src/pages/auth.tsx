@@ -1,5 +1,10 @@
 import { authClient } from "@/lib/auth-client";
-import { identify, setUserId, track } from "@/lib/tracking";
+import {
+  identify,
+  normalizeAuthSource,
+  setUserId,
+  track,
+} from "@/lib/tracking";
 import "@/lib/api";
 import { BrandMark } from "@/components/brand-mark";
 import { BrandRail } from "@/components/brand-rail";
@@ -201,9 +206,16 @@ export function AuthPage() {
           return;
         }
       }
+      const normalizedSource = normalizeAuthSource(authSourceParam);
       track(isLogin ? "login_email_success" : "signup_email_success", {
         source: authSourceParam ?? "Landing",
       });
+      if (normalizedSource) {
+        track(isLogin ? "login_success" : "signup_success", {
+          method: "email",
+          source: normalizedSource,
+        });
+      }
       identify({
         auth_method: "email",
         user_email: email,
@@ -236,11 +248,22 @@ export function AuthPage() {
     sessionStorage.removeItem("nexu_auth_provider");
     sessionStorage.removeItem("nexu_auth_source");
     if (provider) {
+      const normalizedSource = normalizeAuthSource(source);
       const event =
         mode === "login"
           ? `login_${provider}_success`
           : `signup_${provider}_success`;
       track(event, { source: source ?? "Landing" });
+      if (
+        (provider === "google" || provider === "email") &&
+        normalizedSource &&
+        (mode === "login" || mode === "signup")
+      ) {
+        track(mode === "login" ? "login_success" : "signup_success", {
+          method: provider,
+          source: normalizedSource,
+        });
+      }
       identify({
         auth_method: provider,
         user_email: session.user.email,
@@ -342,7 +365,14 @@ export function AuthPage() {
           setLoading(null);
           return;
         }
+        const normalizedSource = normalizeAuthSource(authSourceParam);
         track("login_email_success", { source: authSourceParam ?? "Landing" });
+        if (normalizedSource) {
+          track("login_success", {
+            method: "email",
+            source: normalizedSource,
+          });
+        }
         identify({ auth_method: "email", user_email: email });
         // Desktop auth is handled by the useEffect watching session changes
         if (!isDesktopAuth) {

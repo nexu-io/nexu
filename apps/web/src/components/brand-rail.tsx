@@ -1,3 +1,4 @@
+import { track } from "@/lib/tracking";
 import {
   ArrowRight,
   Infinity as InfinityIcon,
@@ -173,6 +174,7 @@ export function BrandRail({
             href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => track("auth_github_click")}
             className="group inline-flex items-center gap-3 rounded-[24px] border border-white/8 bg-[#1f1f23]/92 px-5 py-4 text-[14px] font-medium text-white/82 shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition-all hover:border-white/12 hover:bg-[#242429] hover:text-white"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-white/6 bg-white/[0.05] text-white">

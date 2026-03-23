@@ -5,6 +5,7 @@ import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
+import { normalizeChannel, track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Cable, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -697,6 +698,9 @@ export function HomePage() {
                 stars={stars}
                 variant="inline"
                 className="ml-auto shrink-0"
+                onClick={() =>
+                  track("workspace_github_click", { source: "home_card" })
+                }
               />
             </div>
             <div className="flex items-center gap-2 mt-1.5">
@@ -760,9 +764,14 @@ export function HomePage() {
                         )
                       : "";
                     const handleOpenChannel = () => {
-                      if (!channelChatUrl) {
+                      const channel = normalizeChannel(ch.id);
+                      if (!channelChatUrl || !channel) {
                         return;
                       }
+                      track("workspace_chat_in_im_click", {
+                        channel,
+                        where: "home",
+                      });
                       window.open(
                         channelChatUrl,
                         "_blank",
@@ -804,6 +813,10 @@ export function HomePage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (connectedChannel) {
+                              const channel = normalizeChannel(ch.id);
+                              track("workspace_channel_disconnect_click", {
+                                channel: channel ?? ch.id,
+                              });
                               disconnectChannel.mutate(connectedChannel.id);
                             }
                           }}
@@ -818,6 +831,16 @@ export function HomePage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
+                            onClickCapture={() => {
+                              const channel = normalizeChannel(ch.id);
+                              if (!channel) {
+                                return;
+                              }
+                              track("workspace_chat_in_im_click", {
+                                channel,
+                                where: "home",
+                              });
+                            }}
                             className="inline-flex items-center gap-1 text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors ml-3 shrink-0 leading-none"
                           >
                             Chat
@@ -841,6 +864,10 @@ export function HomePage() {
                       key={ch.id}
                       type="button"
                       onClick={() => {
+                        const channel = normalizeChannel(ch.id);
+                        if (channel) {
+                          track("workspace_channel_connect_click", { channel });
+                        }
                         if (ch.id === "wechat") {
                           setWechatQrOpen(true);
                         } else {
@@ -878,6 +905,9 @@ export function HomePage() {
           badgeLabel="GitHub"
           stars={stars}
           variant="banner"
+          onClick={() =>
+            track("workspace_github_click", { source: "home_card" })
+          }
         />
       </div>
 

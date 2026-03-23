@@ -2,7 +2,7 @@ import { PlatformIcon } from "@/components/platform-icons";
 import { ChatMarkdown } from "@/components/ui/chat-markdown";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { getSessionFolderUrl, openLocalFolderUrl } from "@/lib/desktop-links";
-import { track } from "@/lib/tracking";
+import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -585,6 +585,16 @@ export function SessionsPage() {
                   href={externalChatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => {
+                    const channel = normalizeChannel(platform);
+                    if (!channel) {
+                      return;
+                    }
+                    track("workspace_chat_in_im_click", {
+                      channel,
+                      where: "conversation",
+                    });
+                  }}
                   className={buttonClassName}
                 >
                   <PlatformIcon platform={platform} size={18} />

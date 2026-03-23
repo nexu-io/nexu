@@ -1,5 +1,6 @@
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import type { AnalyticsService } from "../services/analytics-service.js";
 import type { OpenClawSyncService } from "../services/openclaw-sync-service.js";
 import type { OpenClawProcessManager } from "./openclaw-process.js";
 import type { RuntimeHealth } from "./runtime-health.js";
@@ -79,6 +80,35 @@ export function startHealthLoop(params: {
       }
       recomputeRuntimeStatus(params.state);
       await sleep(params.env.runtimeHealthIntervalMs);
+    }
+  };
+
+  void run();
+  return () => {
+    stopped = true;
+  };
+}
+
+export function startAnalyticsLoop(params: {
+  env: ControllerEnv;
+  analyticsService: AnalyticsService;
+}): () => void {
+  let stopped = false;
+
+  const run = async () => {
+    while (!stopped) {
+      try {
+        await params.analyticsService.poll();
+      } catch (error) {
+        logger.warn(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "controller analytics loop failed",
+        );
+      }
+
+      await sleep(params.env.runtimeSyncIntervalMs);
     }
   };
 

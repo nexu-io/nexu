@@ -213,9 +213,17 @@ export function SlackOAuthView({
         },
       });
       if (error) {
+        track("workspace_channel_config_submit", {
+          channel: "slack",
+          success: false,
+        });
         toast.error(error.message ?? t("slackSetup.connectFailed"));
         return;
       }
+      track("workspace_channel_config_submit", {
+        channel: "slack",
+        success: true,
+      });
       toast.success(
         t("slackSetup.connectSuccess", { teamName: data?.teamName ?? "" }),
       );

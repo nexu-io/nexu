@@ -68,9 +68,17 @@ export function DiscordSetupView({
         body: { botToken: botToken.trim(), appId: appId.trim() },
       });
       if (error) {
+        track("workspace_channel_config_submit", {
+          channel: "discord",
+          success: false,
+        });
         toast.error(error.message ?? t("discordSetup.connectFailed"));
         return;
       }
+      track("workspace_channel_config_submit", {
+        channel: "discord",
+        success: true,
+      });
       toast.success(
         t("discordSetup.connectSuccess", { teamName: data?.teamName ?? "" }),
       );
