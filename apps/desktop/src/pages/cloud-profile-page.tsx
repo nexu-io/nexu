@@ -371,9 +371,13 @@ export function CloudProfilePage() {
   }
 
   function handleExportProfiles() {
-    const profiles = (cloudStatus?.profiles ?? []).filter(
-      (profile) => profile.name !== "Default",
-    );
+    const profiles = (cloudStatus?.profiles ?? [])
+      .filter((profile) => profile.name !== "Default")
+      .map((profile) => ({
+        name: profile.name,
+        cloudUrl: profile.cloudUrl,
+        linkUrl: profile.linkUrl,
+      }));
     const blob = new Blob([`${JSON.stringify(profiles, null, 2)}\n`], {
       type: "application/json",
     });
