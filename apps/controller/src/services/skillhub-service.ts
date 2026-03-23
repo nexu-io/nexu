@@ -80,6 +80,10 @@ export class SkillhubService {
       this.initialize();
     }
 
+    // Always reconcile disk state with ledger on every startup
+    // (catches skills added/removed while controller was stopped)
+    this.dirWatcher.syncNow();
+
     // Always start watching for external skill changes (agent installs)
     this.dirWatcher.start();
   }
@@ -101,10 +105,7 @@ export class SkillhubService {
       }
     }
 
-    // Step 2: Sync disk state with ledger (detect skills already on disk)
-    this.dirWatcher.syncNow();
-
-    // Step 3: Enqueue curated skills from ClawHub that aren't on disk yet
+    // Step 2: Enqueue curated skills from ClawHub that aren't on disk yet
     const toEnqueue = this.catalogManager.getCuratedSlugsToEnqueue();
     for (const slug of toEnqueue) {
       this.installQueue.enqueue(slug, "managed");

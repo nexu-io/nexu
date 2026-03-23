@@ -49,6 +49,7 @@ export class InstallQueue {
   private readonly pending: MutableQueueItem[] = [];
   private readonly active: Map<string, MutableQueueItem> = new Map();
   private readonly completed: MutableQueueItem[] = [];
+  private readonly cancelled = new Set<string>();
   private readonly cleanupTimers = new Set<ReturnType<typeof setTimeout>>();
   private pauseTimer: ReturnType<typeof setTimeout> | null = null;
   private pausedUntil = 0;
@@ -97,6 +98,34 @@ export class InstallQueue {
    */
   isInFlight(slug: string): boolean {
     return this.active.has(slug) || this.pending.some((i) => i.slug === slug);
+  }
+
+  /**
+   * Cancel a queued or active install. If pending, removes immediately.
+   * If active, marks it so the executor completion handler skips the DB record.
+   * Returns true if the slug was found and cancelled.
+   */
+  cancel(slug: string): boolean {
+    // Remove from pending
+    const pendingIdx = this.pending.findIndex((i) => i.slug === slug);
+    if (pendingIdx !== -1) {
+      const [item] = this.pending.splice(pendingIdx, 1) as [MutableQueueItem];
+      item.status = "failed";
+      item.error = "Cancelled";
+      this.completed.push(item);
+      this.scheduleCleanup(item);
+      this.log("info", `queue: cancelled pending ${slug}`);
+      return true;
+    }
+
+    // Mark active as cancelled (executor will check on completion)
+    if (this.active.has(slug)) {
+      this.cancelled.add(slug);
+      this.log("info", `queue: cancelling active ${slug}`);
+      return true;
+    }
+
+    return false;
   }
 
   getQueue(): readonly QueueItem[] {
@@ -166,10 +195,19 @@ export class InstallQueue {
     this.executor(item.slug, item.source).then(
       () => {
         if (this.disposed) return;
-        item.status = "done";
         this.active.delete(item.slug);
+
+        if (this.cancelled.has(item.slug)) {
+          this.cancelled.delete(item.slug);
+          item.status = "failed";
+          item.error = "Cancelled";
+          this.log("info", `queue: ${item.slug} completed but was cancelled`);
+        } else {
+          item.status = "done";
+          this.log("info", `Install complete: ${item.slug}`);
+        }
+
         this.completed.push(item);
-        this.log("info", `Install complete: ${item.slug}`);
         this.scheduleCleanup(item);
         this.drain();
       },

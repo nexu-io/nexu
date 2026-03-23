@@ -3,6 +3,7 @@ import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
 const DEFAULT_DOWNLOAD_COUNT = 1000;
+const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 
 const minimalSkillSchema = z.object({
   slug: z.string(),
@@ -147,6 +148,9 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
+      if (!SLUG_REGEX.test(slug)) {
+        return c.json({ ok: false, error: "Invalid skill slug" }, 200);
+      }
       const queueItem = container.skillhubService.enqueueInstall(slug);
       return c.json(
         {
@@ -187,6 +191,7 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
+      container.skillhubService.queue.cancel(slug);
       const result =
         await container.skillhubService.catalog.uninstallSkill(slug);
       return c.json(result, 200);

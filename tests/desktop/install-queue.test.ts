@@ -353,6 +353,58 @@ describe("InstallQueue", () => {
     });
   });
 
+  describe("cancel", () => {
+    it("removes pending item and marks as failed/Cancelled", async () => {
+      const d = createDeferred<void>();
+      executor.mockReturnValue(d.promise);
+      createQueue({ maxConcurrency: 1 });
+
+      queue.enqueue("a", "managed");
+      queue.enqueue("b", "managed");
+
+      // "a" is active, "b" is pending
+      const cancelled = queue.cancel("b");
+      expect(cancelled).toBe(true);
+
+      const items = queue.getQueue();
+      const itemB = items.find((i) => i.slug === "b");
+      expect(itemB?.status).toBe("failed");
+      expect(itemB?.error).toBe("Cancelled");
+
+      // "b" should no longer be in-flight
+      expect(queue.isInFlight("b")).toBe(false);
+
+      d.resolve(undefined);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    it("marks active item as cancelled on completion", async () => {
+      const d = createDeferred<void>();
+      executor.mockReturnValue(d.promise);
+      createQueue({ maxConcurrency: 1 });
+
+      queue.enqueue("a", "managed");
+
+      // "a" is active — cancel it
+      const cancelled = queue.cancel("a");
+      expect(cancelled).toBe(true);
+
+      // Complete the executor
+      d.resolve(undefined);
+      await vi.advanceTimersByTimeAsync(0);
+
+      const items = queue.getQueue();
+      const itemA = items.find((i) => i.slug === "a");
+      expect(itemA?.status).toBe("failed");
+      expect(itemA?.error).toBe("Cancelled");
+    });
+
+    it("returns false for unknown slug", () => {
+      createQueue();
+      expect(queue.cancel("nonexistent")).toBe(false);
+    });
+  });
+
   describe("dispose", () => {
     it("stops processing on dispose", async () => {
       const d1 = createDeferred<void>();
