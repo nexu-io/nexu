@@ -271,6 +271,51 @@ export class CatalogManager {
   }
 
   /**
+   * Execute a single clawhub install + npm deps. Does NOT record in DB.
+   * Used by InstallQueue as the executor function.
+   */
+  async executeInstall(rawSlug: string): Promise<void> {
+    const slug = SLUG_CORRECTIONS[rawSlug] ?? rawSlug;
+    if (!isValidSlug(slug)) {
+      throw new Error(`Invalid skill slug: ${slug}`);
+    }
+
+    this.log("info", `installing: ${slug} -> ${this.skillsDir}`);
+    const clawHubBin = resolveClawHubBin();
+    this.log("info", `install resolved clawhub=${clawHubBin}`);
+
+    const { stdout, stderr } = await execFileAsync(
+      process.execPath,
+      [
+        clawHubBin,
+        "--workdir",
+        this.skillsDir,
+        "--dir",
+        ".",
+        "install",
+        slug,
+        "--force",
+      ],
+      { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
+    );
+    if (stdout) this.log("info", `install stdout ${slug}: ${stdout.trim()}`);
+    if (stderr) this.log("warn", `install stderr ${slug}: ${stderr.trim()}`);
+
+    await this.installSkillDeps(resolve(this.skillsDir, slug), slug);
+  }
+
+  /**
+   * Returns curated slugs that have no record in the ledger.
+   * Used by SkillhubService to enqueue on startup.
+   */
+  getCuratedSlugsToEnqueue(): string[] {
+    return CURATED_SKILL_SLUGS.filter(
+      (slug) =>
+        !this.db.isInstalled(slug, "curated") && !this.db.isRemovedByUser(slug),
+    );
+  }
+
+  /**
    * Uninstall a skill.
    * Step A: Look up source from DB record
    * Step B: Delete skill folder from skillsDir
