@@ -228,6 +228,84 @@ const LEGACY_FEISHU_SINGLE_AGENT_TRIGGER_BLOCK = [
 const sidecarRoot = getSidecarRoot("openclaw");
 const sidecarBinDir = resolve(sidecarRoot, "bin");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
+
+// Lark SDK WebSocket state callback patch constants
+const LARK_SDK_PATH = "@larksuiteoapi/node-sdk/lib/index.js";
+
+const LARK_WS_CONSTRUCTOR_SEARCH = `
+        this.wsConfig = new WSConfig();
+        this.isConnecting = false;
+        this.reconnectInfo = {
+`.trim();
+
+const LARK_WS_CONSTRUCTOR_REPLACEMENT = `
+        this.wsConfig = new WSConfig();
+        this.isConnecting = false;
+        this.onStateChange = null;
+        this.reconnectInfo = {
+`.trim();
+
+const LARK_WS_CLIENT_READY_SEARCH = `
+                this.logger.info('[ws]', 'ws client ready');
+                return;
+`.trim();
+
+const LARK_WS_CLIENT_READY_REPLACEMENT = `
+                this.logger.info('[ws]', 'ws client ready');
+                if (typeof this.onStateChange === 'function') {
+                    try { this.onStateChange({ state: 'connected', isReconnect: false }); } catch (e) { this.logger.error('[ws]', 'onStateChange error', e); }
+                }
+                return;
+`.trim();
+
+const LARK_WS_RECONNECT_START_SEARCH = `
+            this.logger.info('[ws]', 'reconnect');
+            if (wsInstance) {
+`.trim();
+
+const LARK_WS_RECONNECT_START_REPLACEMENT = `
+            this.logger.info('[ws]', 'reconnect');
+            if (typeof this.onStateChange === 'function') {
+                try { this.onStateChange({ state: 'disconnected', isReconnect: true }); } catch (e) { this.logger.error('[ws]', 'onStateChange error', e); }
+            }
+            if (wsInstance) {
+`.trim();
+
+const LARK_WS_RECONNECT_SUCCESS_SEARCH = `
+                        if (isSuccess) {
+                            this.logger.debug('[ws]', 'reconnect success');
+                            this.isConnecting = false;
+                            return;
+                        }
+`.trim();
+
+const LARK_WS_RECONNECT_SUCCESS_REPLACEMENT = `
+                        if (isSuccess) {
+                            this.logger.debug('[ws]', 'reconnect success');
+                            if (typeof this.onStateChange === 'function') {
+                                try { this.onStateChange({ state: 'connected', isReconnect: true }); } catch (e) { this.logger.error('[ws]', 'onStateChange error', e); }
+                            }
+                            this.isConnecting = false;
+                            return;
+                        }
+`.trim();
+
+const LARK_WS_CLIENT_CLOSED_SEARCH = `
+        wsInstance === null || wsInstance === void 0 ? void 0 : wsInstance.on('close', () => {
+            this.logger.debug('[ws]', 'client closed');
+            this.reConnect();
+        });
+`.trim();
+
+const LARK_WS_CLIENT_CLOSED_REPLACEMENT = `
+        wsInstance === null || wsInstance === void 0 ? void 0 : wsInstance.on('close', () => {
+            this.logger.debug('[ws]', 'client closed');
+            if (typeof this.onStateChange === 'function') {
+                try { this.onStateChange({ state: 'disconnected', isReconnect: false }); } catch (e) { this.logger.error('[ws]', 'onStateChange error', e); }
+            }
+            this.reConnect();
+        });
+`.trim();
 const packagedOpenclawEntry = resolve(
   sidecarNodeModules,
   "openclaw/openclaw.mjs",
@@ -720,6 +798,71 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
   return patchedFiles;
 }
 
+async function patchLarkSdkWebSocketStateCallback(nodeModulesRoot) {
+  const larkSdkPath = resolve(nodeModulesRoot, LARK_SDK_PATH);
+
+  if (!(await pathExists(larkSdkPath))) {
+    console.log(
+      "[openclaw-sidecar] @larksuiteoapi/node-sdk not found, skipping WebSocket state callback patch",
+    );
+    return;
+  }
+
+  let source = await readFile(larkSdkPath, "utf8");
+
+  if (source.includes("this.onStateChange = null;")) {
+    console.log(
+      "[openclaw-sidecar] Lark SDK WebSocket state callback already patched",
+    );
+    return;
+  }
+
+  // Patch 1: Add onStateChange property to constructor
+  source = applyExactReplacement(
+    source,
+    LARK_WS_CONSTRUCTOR_SEARCH,
+    LARK_WS_CONSTRUCTOR_REPLACEMENT,
+    "Lark SDK: WSClient constructor onStateChange property",
+  );
+
+  // Patch 2: Emit connected event on initial connection
+  source = applyExactReplacement(
+    source,
+    LARK_WS_CLIENT_READY_SEARCH,
+    LARK_WS_CLIENT_READY_REPLACEMENT,
+    "Lark SDK: ws client ready state callback",
+  );
+
+  // Patch 3: Emit disconnected event when reconnect starts
+  source = applyExactReplacement(
+    source,
+    LARK_WS_RECONNECT_START_SEARCH,
+    LARK_WS_RECONNECT_START_REPLACEMENT,
+    "Lark SDK: reconnect start state callback",
+  );
+
+  // Patch 4: Emit connected event on reconnect success
+  source = applyExactReplacement(
+    source,
+    LARK_WS_RECONNECT_SUCCESS_SEARCH,
+    LARK_WS_RECONNECT_SUCCESS_REPLACEMENT,
+    "Lark SDK: reconnect success state callback",
+  );
+
+  // Patch 5: Emit disconnected event on client close
+  source = applyExactReplacement(
+    source,
+    LARK_WS_CLIENT_CLOSED_SEARCH,
+    LARK_WS_CLIENT_CLOSED_REPLACEMENT,
+    "Lark SDK: client closed state callback",
+  );
+
+  await writeFile(larkSdkPath, source, "utf8");
+  console.log(
+    "[openclaw-sidecar] patched Lark SDK WebSocket state callback (5 patches applied)",
+  );
+}
+
 async function stagePatchedOpenclawPackage() {
   await mkdir(dirname(sidecarRoot), { recursive: true });
   const stageRoot = await mkdtemp(
@@ -772,6 +915,10 @@ async function prepareOpenclawSidecar() {
 
   await removePathIfExists(resolve(sidecarNodeModules, "electron"));
   await removePathIfExists(resolve(sidecarNodeModules, "electron-builder"));
+
+  // Patch Lark SDK to expose WebSocket connection state callbacks
+  await patchLarkSdkWebSocketStateCallback(sidecarNodeModules);
+
   await chmod(packagedOpenclawEntry, 0o755).catch(() => null);
   await writeFile(
     resolve(sidecarRoot, "package.json"),
