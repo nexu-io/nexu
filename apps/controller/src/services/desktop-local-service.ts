@@ -28,8 +28,45 @@ export class DesktopLocalService {
     return this.configStore.connectDesktopCloud();
   }
 
+  async connectCloudProfile(name: string) {
+    return this.configStore.connectDesktopCloudProfile(name);
+  }
+
   async disconnectCloud() {
     return this.configStore.disconnectDesktopCloud();
+  }
+
+  async disconnectCloudProfile(name: string) {
+    return this.configStore.disconnectDesktopCloudProfile(name);
+  }
+
+  async importCloudProfiles(
+    profiles: Array<{ name: string; cloudUrl: string; linkUrl: string }>,
+  ) {
+    return this.configStore.setDesktopCloudProfiles(profiles);
+  }
+
+  async createCloudProfile(profile: {
+    name: string;
+    cloudUrl: string;
+    linkUrl: string;
+  }) {
+    return this.configStore.createDesktopCloudProfile(profile);
+  }
+
+  async switchCloudProfile(name: string) {
+    return this.configStore.switchDesktopCloudProfile(name);
+  }
+
+  async updateCloudProfile(
+    previousName: string,
+    profile: { name: string; cloudUrl: string; linkUrl: string },
+  ) {
+    return this.configStore.updateDesktopCloudProfile(previousName, profile);
+  }
+
+  async deleteCloudProfile(name: string) {
+    return this.configStore.deleteDesktopCloudProfile(name);
   }
 
   async setCloudModels(enabledModelIds: string[]) {

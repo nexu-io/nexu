@@ -37,6 +37,7 @@ import {
   triggerMainProcessCrash,
   triggerRendererProcessCrash,
 } from "./lib/host-api";
+import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
 const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
@@ -1105,6 +1106,12 @@ function DesktopShell() {
             onClick={() => setActiveSurface("control")}
           />
           <SurfaceButton
+            active={activeSurface === "cloud-profile"}
+            label="Cloud Profile"
+            meta="Switch cloud endpoints and reset auth state"
+            onClick={() => setActiveSurface("cloud-profile")}
+          />
+          <SurfaceButton
             active={activeSurface === "web"}
             disabled={!desktopWebUrl}
             label="Web"
@@ -1169,6 +1176,13 @@ function DesktopShell() {
           style={{ display: activeSurface === "control" ? "contents" : "none" }}
         >
           <EmbeddedControlPlane />
+        </div>
+        <div
+          style={{
+            display: activeSurface === "cloud-profile" ? "contents" : "none",
+          }}
+        >
+          <CloudProfilePage />
         </div>
         <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
           <SurfaceFrame

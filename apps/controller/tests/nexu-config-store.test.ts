@@ -16,6 +16,8 @@ describe("NexuConfigStore", () => {
       port: 3010,
       host: "127.0.0.1",
       webUrl: "http://localhost:5173",
+      nexuCloudUrl: "https://nexu.io",
+      nexuLinkUrl: "https://link.nexu.io",
       nexuHomeDir: path.join(rootDir, ".nexu"),
       nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
       artifactsIndexPath: path.join(
@@ -32,12 +34,30 @@ describe("NexuConfigStore", () => {
       openclawStateDir: path.join(rootDir, ".openclaw"),
       openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
       openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
+      openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
+      runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
+      openclawCuratedSkillsDir: path.join(
+        rootDir,
+        ".openclaw",
+        "bundled-skills",
+      ),
+      openclawRuntimeModelStatePath: path.join(
+        rootDir,
+        ".openclaw",
+        "nexu-runtime-model.json",
+      ),
+      skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
+      skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+      staticSkillsDir: undefined,
+      platformTemplatesDir: undefined,
       openclawWorkspaceTemplatesDir: path.join(
         rootDir,
         ".openclaw",
         "workspace-templates",
       ),
       openclawBin: "openclaw",
+      litellmBaseUrl: null,
+      litellmApiKey: null,
       openclawGatewayPort: 18789,
       openclawGatewayToken: undefined,
       manageOpenclawProcess: false,
@@ -109,5 +129,126 @@ describe("NexuConfigStore", () => {
 
     expect(config.schemaVersion).toBe(1);
     expect(config.$schema).toBe("https://nexu.io/config.json");
+  });
+
+  it("imports cloud profiles and switches active profile while clearing cloud auth", async () => {
+    const store = new NexuConfigStore(env);
+
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [],
+          runtime: {},
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {
+            localProfile: {
+              id: "user-1",
+              email: "user@nexu.io",
+              name: "Cloud User",
+              image: null,
+              plan: "pro",
+              inviteAccepted: true,
+              onboardingCompleted: true,
+              authSource: "cloud",
+            },
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-03-23T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "secret",
+              models: [{ id: "m1", name: "Model 1" }],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    await store.setDesktopCloudProfiles([
+      {
+        name: "Local Dev",
+        cloudUrl: "http://localhost:5173",
+        linkUrl: "http://localhost:8080",
+      },
+    ]);
+
+    const status = await store.switchDesktopCloudProfile("Local Dev");
+    const config = await store.getConfig();
+
+    expect(status.activeProfileName).toBe("Local Dev");
+    expect(status.cloudUrl).toBe("http://localhost:5173");
+    expect(status.linkUrl).toBe("http://localhost:8080");
+    expect(status.connected).toBe(false);
+    expect(status.models).toEqual([]);
+    expect(status.profiles.map((profile) => profile.name)).toEqual([
+      "Default",
+      "Local Dev",
+    ]);
+    expect(
+      (config.desktop as { localProfile?: { authSource?: string } })
+        .localProfile?.authSource,
+    ).toBe("desktop-local");
+    expect(
+      (config.desktop as { activeCloudProfileName?: string })
+        .activeCloudProfileName,
+    ).toBe("Local Dev");
+  });
+
+  it("updates and deletes custom cloud profiles", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.setDesktopCloudProfiles([
+      {
+        name: "Local Dev",
+        cloudUrl: "http://localhost:5173",
+        linkUrl: "http://localhost:8080",
+      },
+    ]);
+
+    const updated = await store.updateDesktopCloudProfile("Local Dev", {
+      name: "Local QA",
+      cloudUrl: "http://127.0.0.1:5173",
+      linkUrl: "http://127.0.0.1:8080",
+    });
+
+    expect(updated.profiles.map((profile) => profile.name)).toEqual([
+      "Default",
+      "Local QA",
+    ]);
+
+    const deleted = await store.deleteDesktopCloudProfile("Local QA");
+    expect(deleted.profiles.map((profile) => profile.name)).toEqual([
+      "Default",
+    ]);
+    expect(deleted.activeProfileName).toBe("Default");
+  });
+
+  it("creates a custom cloud profile", async () => {
+    const store = new NexuConfigStore(env);
+
+    const created = await store.createDesktopCloudProfile({
+      name: "Staging",
+      cloudUrl: "https://nexu.powerformer.net",
+      linkUrl: "https://nexu.powerformer.net",
+    });
+
+    expect(created.profiles.map((profile) => profile.name)).toEqual([
+      "Default",
+      "Staging",
+    ]);
   });
 });
