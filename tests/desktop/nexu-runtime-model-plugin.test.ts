@@ -1,10 +1,17 @@
 import { readFile, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const pluginModulePath =
-  "../../apps/controller/static/runtime-plugins/nexu-runtime-model/index.js";
-const stateModulePath =
-  "/Users/elian/Documents/refly/nexu/apps/controller/static/nexu-runtime-model.json";
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const pluginModulePath = path.resolve(
+  testDir,
+  "../../apps/controller/static/runtime-plugins/nexu-runtime-model/index.js",
+);
+const stateModulePath = path.resolve(
+  testDir,
+  "../../apps/controller/static/nexu-runtime-model.json",
+);
 
 async function writeState(selectedModelRef: string) {
   await writeFile(

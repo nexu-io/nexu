@@ -1,47 +1,57 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { resolveUpdateFeedUrlForTests } from "../../apps/desktop/main/updater/update-manager";
 
-function resolveFeedUrl(options: {
-  source: "r2" | "github";
-  channel: "stable" | "beta" | "nightly";
-  feedUrl?: string | null;
-  envFeedUrl?: string | undefined;
-}): string {
-  const r2BaseUrl = "https://desktop-releases.nexu.io";
-  const r2FeedUrls = {
-    stable: `${r2BaseUrl}/stable`,
-    beta: `${r2BaseUrl}/beta`,
-    nightly: `${r2BaseUrl}/nightly`,
-  } as const;
+const originalUpdateFeedUrl = process.env.NEXU_UPDATE_FEED_URL;
 
-  const overrideUrl = options.envFeedUrl ?? options.feedUrl;
-  if (overrideUrl) {
-    return overrideUrl;
+afterEach(() => {
+  if (originalUpdateFeedUrl === undefined) {
+    Reflect.deleteProperty(process.env, "NEXU_UPDATE_FEED_URL");
+    return;
   }
-
-  if (options.source === "github") {
-    return "github://nexu-io/nexu";
-  }
-
-  return r2FeedUrls[options.channel];
-}
+  process.env.NEXU_UPDATE_FEED_URL = originalUpdateFeedUrl;
+});
 
 describe("desktop update feed resolution", () => {
   it("uses the nightly R2 feed for nightly channel builds", () => {
     expect(
-      resolveFeedUrl({
+      resolveUpdateFeedUrlForTests({
         source: "r2",
         channel: "nightly",
+        feedUrl: null,
       }),
     ).toBe("https://desktop-releases.nexu.io/nightly");
   });
 
   it("lets explicit feed URLs override the channel mapping", () => {
     expect(
-      resolveFeedUrl({
+      resolveUpdateFeedUrlForTests({
         source: "r2",
         channel: "nightly",
         feedUrl: "https://cdn.example.com/custom-nightly",
       }),
     ).toBe("https://cdn.example.com/custom-nightly");
+  });
+
+  it("lets environment feed URLs override build-config feed URLs", () => {
+    process.env.NEXU_UPDATE_FEED_URL =
+      "https://override.example.com/signed/latest-mac.yml?token=secret";
+
+    expect(
+      resolveUpdateFeedUrlForTests({
+        source: "r2",
+        channel: "stable",
+        feedUrl: "https://cdn.example.com/custom-stable",
+      }),
+    ).toBe("https://override.example.com/signed/latest-mac.yml?token=secret");
+  });
+
+  it("uses the GitHub feed when source is github and no overrides exist", () => {
+    expect(
+      resolveUpdateFeedUrlForTests({
+        source: "github",
+        channel: "stable",
+        feedUrl: null,
+      }),
+    ).toBe("github://nexu-io/nexu");
   });
 });

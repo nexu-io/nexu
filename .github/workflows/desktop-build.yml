@@ -59,6 +59,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate channel input
+        shell: bash
+        run: |
+          case "${{ inputs.channel }}" in
+            stable|beta|nightly) ;;
+            *) echo "Invalid channel: ${{ inputs.channel }}" >&2; exit 1 ;;
+          esac
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:

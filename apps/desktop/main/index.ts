@@ -275,7 +275,10 @@ function installApplicationMenu(): void {
             submenu: [
               { role: "about" },
               {
+                id: "check-for-updates",
                 label: "Check for Updates…",
+                enabled:
+                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
                 click: () => triggerUpdateCheck(),
               },
               { type: "separator" },

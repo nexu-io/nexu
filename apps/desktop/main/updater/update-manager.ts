@@ -1,6 +1,10 @@
 import { type BrowserWindow, app, webContents } from "electron";
 import { autoUpdater } from "electron-updater";
-import type { UpdateChannelName, UpdateSource } from "../../shared/host";
+import type {
+  UpdateChannelName,
+  UpdateCheckDiagnostic,
+  UpdateSource,
+} from "../../shared/host";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
 import { writeDesktopMainLog } from "../runtime/runtime-logger";
 import { R2_BASE_URL } from "./component-updater";
@@ -20,14 +24,47 @@ const R2_FEED_URLS: Record<UpdateChannelName, string> = {
   nightly: `${R2_BASE_URL}/nightly`,
 };
 
-type UpdateCheckDiagnostic = {
-  channel: UpdateChannelName;
+function sanitizeFeedUrl(feedUrl: string): string {
+  try {
+    if (feedUrl.startsWith("github://")) {
+      return feedUrl;
+    }
+
+    const url = new URL(feedUrl);
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return feedUrl;
+  }
+}
+
+function resolveUpdateFeedUrl(options: {
   source: UpdateSource;
-  feedUrl: string;
-  currentVersion: string;
-  remoteVersion?: string;
-  remoteReleaseDate?: string;
-};
+  channel: UpdateChannelName;
+  feedUrl: string | null;
+}): string {
+  const overrideUrl = process.env.NEXU_UPDATE_FEED_URL ?? options.feedUrl;
+  if (overrideUrl) {
+    return overrideUrl;
+  }
+
+  if (options.source === "github") {
+    return "github://nexu-io/nexu";
+  }
+
+  return R2_FEED_URLS[options.channel];
+}
+
+export function resolveUpdateFeedUrlForTests(options: {
+  source: UpdateSource;
+  channel: UpdateChannelName;
+  feedUrl: string | null;
+}): string {
+  return resolveUpdateFeedUrl(options);
+}
 
 export class UpdateManager {
   private readonly win: BrowserWindow;
@@ -38,6 +75,7 @@ export class UpdateManager {
   private readonly checkIntervalMs: number;
   private readonly initialDelayMs: number;
   private currentFeedUrl: string;
+  private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -63,28 +101,19 @@ export class UpdateManager {
   }
 
   private configureFeedUrl(): void {
-    // Priority: env var > build config (feedUrl) > R2 fallback
-    const overrideUrl = process.env.NEXU_UPDATE_FEED_URL ?? this.feedUrl;
+    this.currentFeedUrl = resolveUpdateFeedUrl({
+      source: this.source,
+      channel: this.channel,
+      feedUrl: this.feedUrl,
+    });
 
-    if (overrideUrl) {
-      this.currentFeedUrl = overrideUrl;
-      autoUpdater.setFeedURL({
-        provider: "generic",
-        url: overrideUrl,
-      });
-      return;
-    }
-
-    // No CI-injected URL: use source-based logic (default R2)
-    if (this.source === "github") {
-      this.currentFeedUrl = "github://nexu-io/nexu";
+    if (this.currentFeedUrl === "github://nexu-io/nexu") {
       autoUpdater.setFeedURL({
         provider: "github",
         owner: "nexu-io",
         repo: "nexu",
       });
     } else {
-      this.currentFeedUrl = R2_FEED_URLS[this.channel];
       autoUpdater.setFeedURL({
         provider: "generic",
         url: this.currentFeedUrl,
@@ -99,7 +128,7 @@ export class UpdateManager {
     return {
       channel: this.channel,
       source: this.source,
-      feedUrl: this.currentFeedUrl,
+      feedUrl: sanitizeFeedUrl(this.currentFeedUrl),
       currentVersion: app.getVersion(),
       remoteVersion: partial?.remoteVersion,
       remoteReleaseDate: partial?.remoteReleaseDate,
@@ -182,25 +211,35 @@ export class UpdateManager {
   }
 
   async checkNow(): Promise<{ updateAvailable: boolean }> {
-    try {
-      const result = await autoUpdater.checkForUpdates();
-      const remoteVersion = result?.updateInfo.version;
-      const diagnostic = this.getDiagnostic({
-        remoteVersion,
-        remoteReleaseDate: result?.updateInfo.releaseDate,
-      });
-      this.logCheck("check complete", diagnostic);
-      return {
-        updateAvailable:
-          result !== null && result.updateInfo.version !== app.getVersion(),
-      };
-    } catch (error) {
-      this.logCheck(
-        `check failed: ${error instanceof Error ? error.message : String(error)}`,
-        this.getDiagnostic(),
-      );
-      return { updateAvailable: false };
+    if (this.checkInProgress) {
+      return this.checkInProgress;
     }
+
+    this.checkInProgress = (async () => {
+      try {
+        const result = await autoUpdater.checkForUpdates();
+        const remoteVersion = result?.updateInfo.version;
+        const diagnostic = this.getDiagnostic({
+          remoteVersion,
+          remoteReleaseDate: result?.updateInfo.releaseDate,
+        });
+        this.logCheck("check complete", diagnostic);
+        return {
+          updateAvailable:
+            result !== null && result.updateInfo.version !== app.getVersion(),
+        };
+      } catch (error) {
+        this.logCheck(
+          `check failed: ${error instanceof Error ? error.message : String(error)}`,
+          this.getDiagnostic(),
+        );
+        return { updateAvailable: false };
+      } finally {
+        this.checkInProgress = null;
+      }
+    })();
+
+    return this.checkInProgress;
   }
 
   async downloadUpdate(): Promise<{ ok: boolean }> {

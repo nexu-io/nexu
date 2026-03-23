@@ -282,14 +282,14 @@ export const updaterEvents = [
 
 export type UpdaterEvent = (typeof updaterEvents)[number];
 
-export type UpdateCheckDiagnostic = {
+export interface UpdateCheckDiagnostic {
   channel: UpdateChannelName;
   source: UpdateSource;
   feedUrl: string;
   currentVersion: string;
   remoteVersion?: string;
   remoteReleaseDate?: string;
-};
+}
 
 export type UpdaterEventMap = {
   "update:checking": UpdateCheckDiagnostic;

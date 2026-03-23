@@ -33,6 +33,7 @@ export function DesktopShell() {
   const { desktopOpenClawUrl, desktopWebUrl, runtimeConfig } =
     useDesktopRuntimeConfig();
   const update = useAutoUpdate();
+  const { check: checkForUpdates } = update;
 
   useEffect(() => {
     return onDesktopCommand((command) => {
@@ -42,14 +43,14 @@ export function DesktopShell() {
       }
 
       if (command.type === "desktop:check-for-updates") {
-        void update.check();
+        void checkForUpdates();
         return;
       }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
     });
-  }, [update]);
+  }, [checkForUpdates]);
 
   return (
     <div
