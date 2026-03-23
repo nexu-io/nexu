@@ -179,8 +179,8 @@ export const postApiInternalDesktopCloudConnect = <ThrowOnError extends boolean 
     });
 };
 
-export const postApiInternalDesktopCloudProfileConnect = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfileConnectData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileConnectResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfileConnect = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfileConnectData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileConnectResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profile/connect',
         ...options,
         headers: {
@@ -197,8 +197,8 @@ export const postApiInternalDesktopCloudRefresh = <ThrowOnError extends boolean 
     });
 };
 
-export const postApiInternalDesktopCloudProfileCreate = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfileCreateData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileCreateResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfileCreate = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfileCreateData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileCreateResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profile/create',
         ...options,
         headers: {
@@ -208,8 +208,8 @@ export const postApiInternalDesktopCloudProfileCreate = <ThrowOnError extends bo
     });
 };
 
-export const postApiInternalDesktopCloudProfileUpdate = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfileUpdateData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileUpdateResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfileUpdate = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfileUpdateData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileUpdateResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profile/update',
         ...options,
         headers: {
@@ -219,8 +219,8 @@ export const postApiInternalDesktopCloudProfileUpdate = <ThrowOnError extends bo
     });
 };
 
-export const postApiInternalDesktopCloudProfileDelete = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfileDeleteData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileDeleteResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfileDelete = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfileDeleteData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileDeleteResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profile/delete',
         ...options,
         headers: {
@@ -237,8 +237,8 @@ export const postApiInternalDesktopCloudDisconnect = <ThrowOnError extends boole
     });
 };
 
-export const postApiInternalDesktopCloudProfileDisconnect = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfileDisconnectData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileDisconnectResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfileDisconnect = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfileDisconnectData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileDisconnectResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profile/disconnect',
         ...options,
         headers: {
@@ -248,8 +248,8 @@ export const postApiInternalDesktopCloudProfileDisconnect = <ThrowOnError extend
     });
 };
 
-export const postApiInternalDesktopCloudProfileSelect = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfileSelectData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileSelectResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfileSelect = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfileSelectData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfileSelectResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profile/select',
         ...options,
         headers: {
@@ -259,8 +259,8 @@ export const postApiInternalDesktopCloudProfileSelect = <ThrowOnError extends bo
     });
 };
 
-export const postApiInternalDesktopCloudProfilesImport = <ThrowOnError extends boolean = false>(options?: Options<PostApiInternalDesktopCloudProfilesImportData, ThrowOnError>) => {
-    return (options?.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfilesImportResponse, unknown, ThrowOnError>({
+export const postApiInternalDesktopCloudProfilesImport = <ThrowOnError extends boolean = false>(options: Options<PostApiInternalDesktopCloudProfilesImportData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<PostApiInternalDesktopCloudProfilesImportResponse, unknown, ThrowOnError>({
         url: '/api/internal/desktop/cloud-profiles/import',
         ...options,
         headers: {

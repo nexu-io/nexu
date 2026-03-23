@@ -548,7 +548,7 @@ export type PostApiInternalDesktopCloudConnectResponses = {
 export type PostApiInternalDesktopCloudConnectResponse = PostApiInternalDesktopCloudConnectResponses[keyof PostApiInternalDesktopCloudConnectResponses];
 
 export type PostApiInternalDesktopCloudProfileConnectData = {
-    body?: {
+    body: {
         name: string;
     };
     path?: never;
@@ -638,7 +638,7 @@ export type PostApiInternalDesktopCloudRefreshResponses = {
 export type PostApiInternalDesktopCloudRefreshResponse = PostApiInternalDesktopCloudRefreshResponses[keyof PostApiInternalDesktopCloudRefreshResponses];
 
 export type PostApiInternalDesktopCloudProfileCreateData = {
-    body?: {
+    body: {
         profile: {
             name: string;
             cloudUrl: string;
@@ -687,7 +687,7 @@ export type PostApiInternalDesktopCloudProfileCreateResponses = {
 export type PostApiInternalDesktopCloudProfileCreateResponse = PostApiInternalDesktopCloudProfileCreateResponses[keyof PostApiInternalDesktopCloudProfileCreateResponses];
 
 export type PostApiInternalDesktopCloudProfileUpdateData = {
-    body?: {
+    body: {
         previousName: string;
         profile: {
             name: string;
@@ -737,7 +737,7 @@ export type PostApiInternalDesktopCloudProfileUpdateResponses = {
 export type PostApiInternalDesktopCloudProfileUpdateResponse = PostApiInternalDesktopCloudProfileUpdateResponses[keyof PostApiInternalDesktopCloudProfileUpdateResponses];
 
 export type PostApiInternalDesktopCloudProfileDeleteData = {
-    body?: {
+    body: {
         name: string;
     };
     path?: never;
@@ -800,7 +800,7 @@ export type PostApiInternalDesktopCloudDisconnectResponses = {
 export type PostApiInternalDesktopCloudDisconnectResponse = PostApiInternalDesktopCloudDisconnectResponses[keyof PostApiInternalDesktopCloudDisconnectResponses];
 
 export type PostApiInternalDesktopCloudProfileDisconnectData = {
-    body?: {
+    body: {
         name: string;
     };
     path?: never;
@@ -845,7 +845,7 @@ export type PostApiInternalDesktopCloudProfileDisconnectResponses = {
 export type PostApiInternalDesktopCloudProfileDisconnectResponse = PostApiInternalDesktopCloudProfileDisconnectResponses[keyof PostApiInternalDesktopCloudProfileDisconnectResponses];
 
 export type PostApiInternalDesktopCloudProfileSelectData = {
-    body?: {
+    body: {
         name: string;
     };
     path?: never;
@@ -890,7 +890,7 @@ export type PostApiInternalDesktopCloudProfileSelectResponses = {
 export type PostApiInternalDesktopCloudProfileSelectResponse = PostApiInternalDesktopCloudProfileSelectResponses[keyof PostApiInternalDesktopCloudProfileSelectResponses];
 
 export type PostApiInternalDesktopCloudProfilesImportData = {
-    body?: {
+    body: {
         profiles: Array<{
             name: string;
             cloudUrl: string;

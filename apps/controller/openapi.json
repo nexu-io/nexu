@@ -1285,11 +1285,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -1371,6 +1371,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1465,11 +1466,11 @@
                               },
                               "cloudUrl": {
                                 "type": "string",
-                                "minLength": 1
+                                "format": "uri"
                               },
                               "linkUrl": {
                                 "type": "string",
-                                "minLength": 1
+                                "format": "uri"
                               },
                               "connected": {
                                 "type": "boolean"
@@ -1600,11 +1601,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -1663,6 +1664,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1677,11 +1679,11 @@
                       },
                       "cloudUrl": {
                         "type": "string",
-                        "minLength": 1
+                        "format": "uri"
                       },
                       "linkUrl": {
                         "type": "string",
-                        "minLength": 1
+                        "format": "uri"
                       }
                     },
                     "required": [
@@ -1766,11 +1768,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -1833,6 +1835,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1851,11 +1854,11 @@
                       },
                       "cloudUrl": {
                         "type": "string",
-                        "minLength": 1
+                        "format": "uri"
                       },
                       "linkUrl": {
                         "type": "string",
-                        "minLength": 1
+                        "format": "uri"
                       }
                     },
                     "required": [
@@ -1941,11 +1944,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -2008,6 +2011,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2093,11 +2097,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -2187,6 +2191,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2272,11 +2277,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -2339,6 +2344,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2424,11 +2430,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"
@@ -2491,6 +2497,7 @@
           "Desktop"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -2507,11 +2514,11 @@
                         },
                         "cloudUrl": {
                           "type": "string",
-                          "minLength": 1
+                          "format": "uri"
                         },
                         "linkUrl": {
                           "type": "string",
-                          "minLength": 1
+                          "format": "uri"
                         }
                       },
                       "required": [
@@ -2597,11 +2604,11 @@
                           },
                           "cloudUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "linkUrl": {
                             "type": "string",
-                            "minLength": 1
+                            "format": "uri"
                           },
                           "connected": {
                             "type": "boolean"

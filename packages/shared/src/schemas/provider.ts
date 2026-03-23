@@ -52,8 +52,8 @@ export const cloudModelSchema = z.object({
 
 export const cloudProfileSchema = z.object({
   name: z.string().min(1),
-  cloudUrl: z.string().min(1),
-  linkUrl: z.string().min(1),
+  cloudUrl: z.string().url(),
+  linkUrl: z.string().url(),
 });
 
 export const cloudProfileStatusSchema = cloudProfileSchema.extend({

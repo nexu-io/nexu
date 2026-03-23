@@ -79,6 +79,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": { schema: cloudProfileConnectBodySchema },
           },
@@ -132,6 +133,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": { schema: cloudProfileCreateBodySchema },
           },
@@ -164,6 +166,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": { schema: cloudProfileUpdateBodySchema },
           },
@@ -197,6 +200,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": { schema: cloudProfileDeleteBodySchema },
           },
@@ -247,6 +251,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": {
               schema: cloudProfileDisconnectBodySchema,
@@ -283,6 +288,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": { schema: cloudProfileSelectBodySchema },
           },
@@ -315,6 +321,7 @@ export function registerDesktopCompatRoutes(
       tags: ["Desktop"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": { schema: cloudProfilesImportBodySchema },
           },

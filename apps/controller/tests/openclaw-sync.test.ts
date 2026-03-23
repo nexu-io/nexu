@@ -26,8 +26,6 @@ describe("OpenClawSyncService", () => {
       port: 3010,
       host: "127.0.0.1",
       webUrl: "http://localhost:5173",
-      nexuCloudUrl: "https://nexu.io",
-      nexuLinkUrl: "https://link.nexu.io",
       nexuHomeDir: path.join(rootDir, ".nexu"),
       nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
       artifactsIndexPath: path.join(
@@ -58,6 +56,7 @@ describe("OpenClawSyncService", () => {
       ),
       skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
       skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+      analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
       staticSkillsDir: undefined,
       platformTemplatesDir: undefined,
       openclawWorkspaceTemplatesDir: path.join(
@@ -75,6 +74,7 @@ describe("OpenClawSyncService", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
+      amplitudeApiKey: undefined,
     };
   });
 

@@ -1555,7 +1555,7 @@ export class NexuConfigStore {
         nextProfile.linkUrl,
         switchedCloud.apiKey,
       );
-      nextModels = refreshedModels ?? [];
+      nextModels = refreshedModels ?? nextModels;
     }
 
     await this.setDesktopCloudState({
