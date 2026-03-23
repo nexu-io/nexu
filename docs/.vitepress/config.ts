@@ -184,7 +184,7 @@ export default defineConfig({
     },
   },
   head: [
-    ["meta", { name: "theme-color", content: "#c96f4a" }],
+    ["meta", { name: "theme-color", content: "#3DB9CE" }],
     ["script", {}, localePreferenceScript],
     ["link", { rel: "icon", href: "/favicon/favicon.ico", sizes: "any" }],
     [
@@ -212,10 +212,11 @@ export default defineConfig({
   ],
   themeConfig: {
     logo: {
-      light: "/favicon/favicon-light.svg",
-      dark: "/favicon/favicon-dark.svg",
+      light: "/favicon/nexu-logo-light.svg",
+      dark: "/favicon/nexu-logo-dark.svg",
       alt: "Nexu",
     },
+    siteTitle: false,
     socialLinks: [{ icon: "github", link: "https://github.com/nexu-io/nexu" }],
     langMenuLabel: "Language",
     search: {
