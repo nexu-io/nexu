@@ -14,6 +14,14 @@ async function isSymlink(p: string): Promise<boolean> {
   }
 }
 
+async function shouldCopyPluginPath(sourcePath: string): Promise<boolean> {
+  if (path.basename(sourcePath) !== ".bin") {
+    return true;
+  }
+
+  return !(await isSymlink(sourcePath));
+}
+
 export class OpenClawRuntimePluginWriter {
   constructor(private readonly env: ControllerEnv) {}
 
@@ -45,7 +53,7 @@ export class OpenClawRuntimePluginWriter {
       await cp(sourceDir, targetDir, {
         recursive: true,
         force: true,
-        filter: async (src) => !(await isSymlink(src)),
+        filter: shouldCopyPluginPath,
       });
     }
   }
