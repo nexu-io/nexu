@@ -17,7 +17,10 @@ const openclawRuntimeRoot = process.env.OPENCLAW_RUNTIME_ROOT
   ? resolve(process.env.OPENCLAW_RUNTIME_ROOT)
   : resolve(repoRoot, "openclaw-runtime");
 const openclawRoot = resolve(openclawRuntimeRoot, "node_modules/openclaw");
-const larkSdkRoot = resolve(openclawRuntimeRoot, "node_modules/@larksuiteoapi/node-sdk");
+const larkSdkRoot = resolve(
+  openclawRuntimeRoot,
+  "node_modules/@larksuiteoapi/node-sdk",
+);
 
 // Patch anchors to verify
 const anchors = [

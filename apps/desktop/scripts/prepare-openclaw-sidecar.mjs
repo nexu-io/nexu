@@ -994,10 +994,19 @@ async function patchFeishuChannelStatusUpdates(openclawPackageRoot) {
   let patchCount = 0;
 
   // Patch channel.ts
-  const channelPath = resolve(openclawPackageRoot, "extensions", "feishu", "src", "channel.ts");
+  const channelPath = resolve(
+    openclawPackageRoot,
+    "extensions",
+    "feishu",
+    "src",
+    "channel.ts",
+  );
   if (await pathExists(channelPath)) {
     let source = await readFile(channelPath, "utf8");
-    if (source.includes(FEISHU_CHANNEL_MONITOR_CALL_SEARCH) && !source.includes("setStatus: ctx.setStatus")) {
+    if (
+      source.includes(FEISHU_CHANNEL_MONITOR_CALL_SEARCH) &&
+      !source.includes("setStatus: ctx.setStatus")
+    ) {
       source = applyExactReplacement(
         source,
         FEISHU_CHANNEL_MONITOR_CALL_SEARCH,
@@ -1010,12 +1019,21 @@ async function patchFeishuChannelStatusUpdates(openclawPackageRoot) {
   }
 
   // Patch monitor.ts
-  const monitorPath = resolve(openclawPackageRoot, "extensions", "feishu", "src", "monitor.ts");
+  const monitorPath = resolve(
+    openclawPackageRoot,
+    "extensions",
+    "feishu",
+    "src",
+    "monitor.ts",
+  );
   if (await pathExists(monitorPath)) {
     let source = await readFile(monitorPath, "utf8");
     let patched = false;
 
-    if (source.includes(FEISHU_MONITOR_OPTS_SEARCH) && !source.includes("setStatus?:")) {
+    if (
+      source.includes(FEISHU_MONITOR_OPTS_SEARCH) &&
+      !source.includes("setStatus?:")
+    ) {
       source = applyExactReplacement(
         source,
         FEISHU_MONITOR_OPTS_SEARCH,
@@ -1025,7 +1043,10 @@ async function patchFeishuChannelStatusUpdates(openclawPackageRoot) {
       patched = true;
     }
 
-    if (source.includes(FEISHU_MONITOR_SINGLE_ACCOUNT_CALL_SEARCH) && !source.includes("setStatus: opts.setStatus")) {
+    if (
+      source.includes(FEISHU_MONITOR_SINGLE_ACCOUNT_CALL_SEARCH) &&
+      !source.includes("setStatus: opts.setStatus")
+    ) {
       source = applyExactReplacement(
         source,
         FEISHU_MONITOR_SINGLE_ACCOUNT_CALL_SEARCH,
@@ -1052,12 +1073,21 @@ async function patchFeishuChannelStatusUpdates(openclawPackageRoot) {
   }
 
   // Patch monitor.account.ts
-  const monitorAccountPath = resolve(openclawPackageRoot, "extensions", "feishu", "src", "monitor.account.ts");
+  const monitorAccountPath = resolve(
+    openclawPackageRoot,
+    "extensions",
+    "feishu",
+    "src",
+    "monitor.account.ts",
+  );
   if (await pathExists(monitorAccountPath)) {
     let source = await readFile(monitorAccountPath, "utf8");
     let patched = false;
 
-    if (source.includes(FEISHU_MONITOR_ACCOUNT_PARAMS_SEARCH) && !source.includes("setStatus?:")) {
+    if (
+      source.includes(FEISHU_MONITOR_ACCOUNT_PARAMS_SEARCH) &&
+      !source.includes("setStatus?:")
+    ) {
       source = applyExactReplacement(
         source,
         FEISHU_MONITOR_ACCOUNT_PARAMS_SEARCH,
@@ -1067,7 +1097,10 @@ async function patchFeishuChannelStatusUpdates(openclawPackageRoot) {
       patched = true;
     }
 
-    if (source.includes(FEISHU_MONITOR_WEBSOCKET_CALL_SEARCH) && !source.includes("updateStatus")) {
+    if (
+      source.includes(FEISHU_MONITOR_WEBSOCKET_CALL_SEARCH) &&
+      !source.includes("updateStatus")
+    ) {
       source = applyExactReplacement(
         source,
         FEISHU_MONITOR_WEBSOCKET_CALL_SEARCH,
@@ -1078,7 +1111,10 @@ async function patchFeishuChannelStatusUpdates(openclawPackageRoot) {
     }
 
     if (patched) {
-      patchedFiles.set(relative(openclawPackageRoot, monitorAccountPath), source);
+      patchedFiles.set(
+        relative(openclawPackageRoot, monitorAccountPath),
+        source,
+      );
       patchCount++;
     }
   }
@@ -1106,8 +1142,13 @@ async function stagePatchedOpenclawPackage() {
 
   const overlayFiles = await applyOpenclawRuntimePatches();
   const bridgePatchedFiles = await patchReplyOutcomeBridge(stagedOpenclawRoot);
-  const channelStatusPatchedFiles = await patchFeishuChannelStatusUpdates(stagedOpenclawRoot);
-  const patchedFiles = new Map([...overlayFiles, ...bridgePatchedFiles, ...channelStatusPatchedFiles]);
+  const channelStatusPatchedFiles =
+    await patchFeishuChannelStatusUpdates(stagedOpenclawRoot);
+  const patchedFiles = new Map([
+    ...overlayFiles,
+    ...bridgePatchedFiles,
+    ...channelStatusPatchedFiles,
+  ]);
 
   for (const [patchRelativePath, patchedSource] of patchedFiles) {
     await writeFile(
