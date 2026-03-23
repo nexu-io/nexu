@@ -8,7 +8,7 @@
 ### 1.1 Current Architecture Pain Points
 
 **Double restart issue**:
-```
+```text
 Config change → OpenClaw detects change
             → OpenClaw spawns new process itself (no supervisor detected)
             → Old process exit(0)
@@ -61,7 +61,7 @@ When supervisor is detected, OpenClaw will:
 
 ### 2.1 Architecture Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                          launchd                                 │
 │                                                                  │
@@ -145,7 +145,7 @@ All logs stored in `NEXU_LOG_DIR` directory:
 
 ### 3.2 Log File Structure
 
-```
+```text
 {NEXU_LOG_DIR}/
 ├── controller.log      # Controller stdout
 ├── controller.err      # Controller stderr
@@ -340,7 +340,7 @@ Electron Main Process runs embedded HTTP Server, reuses existing Web Sidecar log
 ```typescript
 // apps/desktop/src/main/embedded-web-server.ts
 
-import { createServer } from "http";
+import { createServer, IncomingMessage, ServerResponse } from "http";
 import { createReadStream, existsSync, statSync } from "fs";
 import * as path from "path";
 
@@ -361,36 +361,72 @@ export function startEmbeddedWebServer(opts: {
 }): Promise<void> {
   const { port, webRoot, controllerPort } = opts;
 
-  const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", `http://localhost:${port}`);
+  return new Promise((resolve, reject) => {
+    const server = createServer(async (req, res) => {
+      const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
-    // API proxy → Controller
-    if (url.pathname.startsWith("/api") || url.pathname.startsWith("/v1")) {
-      return proxyToController(req, res, `http://127.0.0.1:${controllerPort}`);
-    }
+      // API proxy → Controller (including /openapi.json)
+      if (
+        url.pathname.startsWith("/api") ||
+        url.pathname.startsWith("/v1") ||
+        url.pathname === "/openapi.json"
+      ) {
+        return proxyToController(req, res, `http://127.0.0.1:${controllerPort}`);
+      }
 
-    // Static files
-    let filePath = path.join(webRoot, url.pathname);
-    if (!existsSync(filePath) || !filePath.includes(".")) {
-      filePath = path.join(webRoot, "index.html"); // SPA fallback
-    }
+      // Static files
+      let filePath = path.join(webRoot, url.pathname);
 
-    const ext = path.extname(filePath);
-    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+      // SPA fallback: if file doesn't exist or is directory, serve index.html
+      if (!existsSync(filePath) || statSync(filePath).isDirectory()) {
+        filePath = path.join(webRoot, "index.html");
+      }
 
-    try {
-      const stat = statSync(filePath);
-      res.writeHead(200, { "Content-Type": contentType, "Content-Length": stat.size });
-      createReadStream(filePath).pipe(res);
-    } catch {
-      res.writeHead(404);
-      res.end("Not Found");
-    }
+      const ext = path.extname(filePath);
+      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+
+      try {
+        const stat = statSync(filePath);
+        res.writeHead(200, { "Content-Type": contentType, "Content-Length": stat.size });
+        createReadStream(filePath).pipe(res);
+      } catch {
+        res.writeHead(404);
+        res.end("Not Found");
+      }
+    });
+
+    // Error handling
+    server.on("error", (err) => {
+      reject(err);
+    });
+
+    server.listen(port, "127.0.0.1", () => {
+      resolve();
+    });
   });
+}
 
-  return new Promise((resolve) => {
-    server.listen(port, "127.0.0.1", () => resolve());
-  });
+async function proxyToController(
+  req: IncomingMessage,
+  res: ServerResponse,
+  controllerUrl: string
+): Promise<void> {
+  const targetUrl = `${controllerUrl}${req.url}`;
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers: req.headers as Record<string, string>,
+      body: req.method !== "GET" && req.method !== "HEAD" ? req : undefined,
+    });
+
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    const body = await response.arrayBuffer();
+    res.end(Buffer.from(body));
+  } catch (err) {
+    res.writeHead(502);
+    res.end("Bad Gateway");
+  }
 }
 ```
 
@@ -429,8 +465,12 @@ export class LaunchdManager {
   private readonly domain: string;
 
   constructor(opts?: { plistDir?: string }) {
+    if (process.platform !== "darwin") {
+      throw new Error("LaunchdManager only works on macOS");
+    }
     this.plistDir = opts?.plistDir ?? path.join(os.homedir(), "Library/LaunchAgents");
-    this.uid = process.getuid?.() ?? 501;
+    // Use os.userInfo() to get UID, avoid hardcoding
+    this.uid = os.userInfo().uid;
     this.domain = `gui/${this.uid}`;
   }
 
@@ -438,16 +478,27 @@ export class LaunchdManager {
     const plistPath = path.join(this.plistDir, `${label}.plist`);
     await fs.mkdir(this.plistDir, { recursive: true });
     await fs.writeFile(plistPath, plistContent, "utf8");
-    await execFileAsync("launchctl", ["bootstrap", this.domain, plistPath]);
+
+    // Check if service is already registered to avoid duplicate bootstrap
+    const isRegistered = await this.isServiceRegistered(label);
+    if (!isRegistered) {
+      await execFileAsync("launchctl", ["bootstrap", this.domain, plistPath]);
+    }
   }
 
   async uninstallService(label: string): Promise<void> {
     try {
       await execFileAsync("launchctl", ["bootout", `${this.domain}/${label}`]);
-    } catch { /* ignore */ }
+    } catch (err) {
+      // Service may not be running, log but don't throw
+      console.warn(`Failed to bootout ${label}:`, err instanceof Error ? err.message : err);
+    }
     try {
       await fs.unlink(path.join(this.plistDir, `${label}.plist`));
-    } catch { /* ignore */ }
+    } catch (err) {
+      // plist may not exist
+      console.warn(`Failed to remove plist for ${label}:`, err instanceof Error ? err.message : err);
+    }
   }
 
   async startService(label: string): Promise<void> {
@@ -456,6 +507,24 @@ export class LaunchdManager {
 
   async stopService(label: string): Promise<void> {
     await execFileAsync("launchctl", ["kill", "SIGTERM", `${this.domain}/${label}`]);
+  }
+
+  /** Gracefully stop service: send SIGTERM then wait, force kill on timeout */
+  async stopServiceGracefully(label: string, timeoutMs = 5000): Promise<void> {
+    await this.stopService(label);
+
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+      const status = await this.getServiceStatus(label);
+      if (status.status !== "running") {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // Timeout, force stop
+    console.warn(`Service ${label} did not stop in ${timeoutMs}ms, force killing`);
+    await execFileAsync("launchctl", ["kill", "SIGKILL", `${this.domain}/${label}`]);
   }
 
   async restartService(label: string): Promise<void> {
@@ -475,13 +544,31 @@ export class LaunchdManager {
     }
   }
 
-  async isServiceInstalled(label: string): Promise<boolean> {
+  /** Check if service is registered with launchd */
+  async isServiceRegistered(label: string): Promise<boolean> {
+    try {
+      await execFileAsync("launchctl", ["print", `${this.domain}/${label}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Check if plist file exists */
+  async hasPlistFile(label: string): Promise<boolean> {
     try {
       await fs.access(path.join(this.plistDir, `${label}.plist`));
       return true;
     } catch {
       return false;
     }
+  }
+
+  /** Check if service is installed (plist exists and registered) */
+  async isServiceInstalled(label: string): Promise<boolean> {
+    const hasPlist = await this.hasPlistFile(label);
+    const isRegistered = await this.isServiceRegistered(label);
+    return hasPlist && isRegistered;
   }
 }
 ```
@@ -490,6 +577,14 @@ export class LaunchdManager {
 
 ```typescript
 // apps/desktop/src/main/bootstrap-launchd.ts
+
+export interface DesktopEnv {
+  plistDir: string;
+  isDev: boolean;
+  controllerPort: number;
+  webPort: number;
+  webRoot: string;
+}
 
 export async function bootstrapWithLaunchd(env: DesktopEnv): Promise<void> {
   const launchd = new LaunchdManager({ plistDir: env.plistDir });
@@ -501,7 +596,7 @@ export async function bootstrapWithLaunchd(env: DesktopEnv): Promise<void> {
   // 1. Ensure plist installed
   for (const [service, label] of Object.entries(labels)) {
     if (!(await launchd.isServiceInstalled(label))) {
-      const plist = generatePlist(service, env);
+      const plist = generatePlist(service as "controller" | "openclaw", env);
       await launchd.installService(label, plist);
     }
   }
@@ -545,10 +640,10 @@ app.on("before-quit", async (event) => {
   if (response === 2) return; // Cancel
 
   if (response === 0) {
-    // Quit completely: stop all services
+    // Quit completely: gracefully stop all services
     const launchd = new LaunchdManager();
-    await launchd.stopService(labels.openclaw);
-    await launchd.stopService(labels.controller);
+    await launchd.stopServiceGracefully(labels.openclaw);
+    await launchd.stopServiceGracefully(labels.controller);
   }
 
   app.exit(0);
@@ -570,6 +665,19 @@ set -e
 REPO_ROOT=$(pwd)
 LOG_DIR="$REPO_ROOT/.tmp/logs"
 PLIST_DIR="$REPO_ROOT/.tmp/launchd"
+ELECTRON_PID=""
+
+# Cleanup function
+cleanup() {
+  echo "Cleaning up..."
+  if [ -n "$ELECTRON_PID" ]; then
+    kill "$ELECTRON_PID" 2>/dev/null || true
+  fi
+  # Optional: stop launchd services
+  # launchctl kill SIGTERM gui/$(id -u)/com.nexu.controller.dev 2>/dev/null || true
+  # launchctl kill SIGTERM gui/$(id -u)/com.nexu.openclaw.dev 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 mkdir -p "$LOG_DIR" "$PLIST_DIR"
 
@@ -582,18 +690,28 @@ pnpm exec tsx scripts/generate-dev-plist.ts \
   --log-dir="$LOG_DIR" \
   --repo-root="$REPO_ROOT"
 
-# 3. Install/restart services
-UID=$(id -u)
-launchctl bootstrap gui/$UID "$PLIST_DIR/com.nexu.controller.dev.plist" 2>/dev/null || true
-launchctl bootstrap gui/$UID "$PLIST_DIR/com.nexu.openclaw.dev.plist" 2>/dev/null || true
-launchctl kickstart -k gui/$UID/com.nexu.controller.dev
-launchctl kickstart -k gui/$UID/com.nexu.openclaw.dev
+# 3. Install/restart services (show errors instead of silencing)
+UID_VAL=$(id -u)
+
+# Bootstrap (show error if fails)
+if ! launchctl bootstrap gui/$UID_VAL "$PLIST_DIR/com.nexu.controller.dev.plist" 2>&1; then
+  echo "Note: Controller service may already be bootstrapped"
+fi
+if ! launchctl bootstrap gui/$UID_VAL "$PLIST_DIR/com.nexu.openclaw.dev.plist" 2>&1; then
+  echo "Note: OpenClaw service may already be bootstrapped"
+fi
+
+# Kickstart
+launchctl kickstart -k gui/$UID_VAL/com.nexu.controller.dev
+launchctl kickstart -k gui/$UID_VAL/com.nexu.openclaw.dev
 
 # 4. Start Electron
 pnpm exec electron apps/desktop &
+ELECTRON_PID=$!
 
-# 5. Tail logs
-exec tail -f "$LOG_DIR"/*.log
+# 5. Tail logs and wait for Electron to exit
+tail -f "$LOG_DIR"/*.log &
+wait $ELECTRON_PID
 ```
 
 ### 7.2 Development Commands
@@ -622,7 +740,7 @@ pnpm reset-state
 
 Development mode plist stored within repo, isolated from production:
 
-```
+```text
 {repo}/
 └── .tmp/
     ├── launchd/
@@ -662,6 +780,7 @@ Development mode plist stored within repo, isolated from production:
 - [ ] Update `package.json` scripts: `dev`, `stop`, `restart:*`, `logs`, `logs:*`
 - [ ] Unified log directory environment variable `NEXU_LOG_DIR`
 - [ ] Desktop exit behavior changes (quit completely vs background)
+- [ ] `apps/controller/src/app/env.ts`: Add `NEXU_LOG_DIR` and `NEXU_LAUNCHD_MANAGED` to schema
 
 ### 8.4 Background Service Mode
 
@@ -724,7 +843,7 @@ launchctl bootout gui/$(id -u)/com.nexu.controller
 ### B. Directory Structure
 
 **Production**:
-```
+```text
 ~/Library/
 ├── Application Support/Nexu/
 │   ├── config/
@@ -744,7 +863,7 @@ launchctl bootout gui/$(id -u)/com.nexu.controller
 ```
 
 **Development**:
-```
+```text
 {repo}/
 └── .tmp/
     ├── launchd/
