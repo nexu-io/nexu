@@ -16,13 +16,13 @@
 <p align="center">
   <a href="https://nexu.io" target="_blank" rel="noopener"><strong>🌐 Website</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 Docs</strong></a> &nbsp;·&nbsp;
-  <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 Feishu</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/Q6AxCUuMNU" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://github.com/nexu-io/nexu/discussions"><strong>💬 Discussions</strong></a> &nbsp;·&nbsp;
+  <a href="https://github.com/nexu-io/nexu/issues"><strong>🐛 Issues</strong></a> &nbsp;·&nbsp;
   <a href="https://x.com/nexudotio" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
 <p align="center">
-  English &nbsp;·&nbsp; <a href="README.zh-CN.md">简体中文</a>
+  English &nbsp;·&nbsp; <a href="README.zh-CN.md">简体中文</a> &nbsp;·&nbsp; <a href="README.ja.md">日本語</a>
 </p>
 
 ---
@@ -193,7 +193,7 @@ pnpm test
 
 ## 🤝 Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUTING.md) at the repo root (what GitHub shows when you open a PR). The same content is published at [docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing). **Chinese:** [docs.nexu.io (zh)](https://docs.nexu.io/zh/guide/contributing) · [docs/zh/guide/contributing.md](docs/zh/guide/contributing.md).
 
 1. 🍴 Fork this repo
 2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -203,7 +203,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ### Guidelines
 
-- Follow the existing code style (ESLint + Prettier)
+- Follow the existing code style (Biome; run `pnpm lint`)
 - Write tests for new functionality
 - Update documentation as needed
 - Keep commits atomic and descriptive
@@ -212,14 +212,14 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## 💬 Community
 
-| WeChat Group | Feishu Group | Discord |
-|:---:|:---:|:---:|
-| <img src="site/media/wechat-qr.png" width="200" height="200" /> | <img src="site/media/feishu-qr.png" width="200" height="200" /> | <img src="site/media/discord-qr.png" width="200" height="200" /> |
-| Scan to join WeChat group | [Join Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [Join Discord](https://discord.gg/Q6AxCUuMNU) |
+We use GitHub as the primary hub for community interaction. Before opening a new thread, please search existing ones to avoid duplicates.
 
-- [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
-- [GitHub Issues](https://github.com/nexu-io/nexu/issues)
-- [support@nexu.ai](mailto:support@nexu.ai)
+| Channel | When to use |
+|---------|-------------|
+| 💡 [**Discussions**](https://github.com/nexu-io/nexu/discussions) | Ask questions, propose ideas, share use cases, or just say hi. Browse the **Q&A** category for troubleshooting and **Ideas** for feature brainstorming. |
+| 🐛 [**Issues**](https://github.com/nexu-io/nexu/issues) | Report a bug or request a specific feature. Please use the provided issue templates — they help us triage faster. |
+| 📋 [**Roadmap & RFCs**](https://github.com/nexu-io/nexu/discussions/categories/rfc-roadmap) | Follow upcoming plans and join design discussions on proposed changes. |
+| 📧 [**support@nexu.ai**](mailto:support@nexu.ai) | For private inquiries, partnership, or anything not suited for a public thread. |
 
 ### Contributors
 

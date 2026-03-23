@@ -59,7 +59,8 @@
       "*.d.ts",
       "openapi.json",
       "*.astro",
-      ".turbo"
+      ".turbo",
+      "docs/**"
     ]
   }
 }

@@ -60,6 +60,8 @@ const envSchema = z.object({
   RUNTIME_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   DEFAULT_MODEL_ID: z.string().default("anthropic/claude-sonnet-4"),
   WEB_URL: z.string().default("http://localhost:5173"),
+  AMPLITUDE_API_KEY: z.string().optional(),
+  VITE_AMPLITUDE_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -106,6 +108,7 @@ export const env = {
   ),
   skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
   skillDbPath: path.join(nexuHomeDir, "skill-ledger.json"),
+  analyticsStatePath: path.join(nexuHomeDir, "analytics-state.json"),
   staticSkillsDir: parsed.SKILLHUB_STATIC_SKILLS_DIR
     ? expandHomeDir(parsed.SKILLHUB_STATIC_SKILLS_DIR)
     : undefined,
@@ -126,6 +129,8 @@ export const env = {
   runtimeSyncIntervalMs: parsed.RUNTIME_SYNC_INTERVAL_MS,
   runtimeHealthIntervalMs: parsed.RUNTIME_HEALTH_INTERVAL_MS,
   defaultModelId: parsed.DEFAULT_MODEL_ID,
+  amplitudeApiKey:
+    parsed.AMPLITUDE_API_KEY?.trim() || parsed.VITE_AMPLITUDE_API_KEY,
 };
 
 export type ControllerEnv = typeof env;

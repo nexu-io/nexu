@@ -4,6 +4,7 @@ import { ModelPickerDropdown } from "@/components/model-picker-dropdown";
 import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
+import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { selectPreferredModel } from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -79,6 +80,21 @@ function isModelSelected(modelId: string, currentModelId: string): boolean {
     modelId === currentModelId ||
     getModelDisplayLabel(currentModelId) === modelId
   );
+}
+
+function getProviderIdFromModelId(
+  models: Array<{ id: string; provider: string }>,
+  modelId: string,
+): string | null {
+  const matched = models.find((model) => model.id === modelId);
+  if (matched) {
+    return matched.provider;
+  }
+  if (!modelId.includes("/")) {
+    return null;
+  }
+  const [provider] = modelId.split("/");
+  return provider || null;
 }
 
 type SettingsTab = "general" | "providers";
@@ -668,7 +684,16 @@ export function ModelsPage() {
       }
       toast.success(t("models.modelSwitched"), { id: toastId });
     },
-    onSuccess: () => {
+    onSuccess: (_, modelId) => {
+      track("workspace_change_model_change", {
+        previous_provider_name: getProviderIdFromModelId(
+          models,
+          currentModelId,
+        ),
+        previous_model_name: currentModelId || null,
+        provider_name: getProviderIdFromModelId(models, modelId),
+        model_name: modelId,
+      });
       queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
     },
   });
@@ -799,6 +824,9 @@ export function ModelsPage() {
               label={t("home.starGithub")}
               stars={stars}
               variant="button"
+              onClick={() =>
+                track("workspace_github_click", { source: "settings" })
+              }
             />
             <button
               type="button"
@@ -1246,9 +1274,19 @@ function ByokProviderDetail({
   const verifyMutation = useMutation({
     mutationFn: () => verifyApiKey(providerId, apiKey, baseUrl || undefined),
     onSuccess: (result) => {
+      track("workspace_provider_check", {
+        provider_name: providerId,
+        success: result.valid,
+      });
       if (result.valid && result.models) {
         setVerifiedModels(result.models);
       }
+    },
+    onError: () => {
+      track("workspace_provider_check", {
+        provider_name: providerId,
+        success: false,
+      });
     },
   });
 
@@ -1277,6 +1315,9 @@ function ByokProviderDetail({
       });
     },
     onSuccess: () => {
+      track("workspace_provider_save", {
+        provider_name: providerId,
+      });
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
       setApiKey("");

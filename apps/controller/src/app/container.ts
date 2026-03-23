@@ -1,5 +1,6 @@
 import { GatewayClient } from "../runtime/gateway-client.js";
 import { startHealthLoop } from "../runtime/loops.js";
+import { startAnalyticsLoop } from "../runtime/loops.js";
 import { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../runtime/openclaw-process.js";
@@ -15,6 +16,7 @@ import {
 } from "../runtime/state.js";
 import { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
 import { AgentService } from "../services/agent-service.js";
+import { AnalyticsService } from "../services/analytics-service.js";
 import { ArtifactService } from "../services/artifact-service.js";
 import { ChannelFallbackService } from "../services/channel-fallback-service.js";
 import { ChannelService } from "../services/channel-service.js";
@@ -50,6 +52,7 @@ export interface ControllerContainer {
   integrationService: IntegrationService;
   localUserService: LocalUserService;
   desktopLocalService: DesktopLocalService;
+  analyticsService: AnalyticsService;
   artifactService: ArtifactService;
   templateService: TemplateService;
   skillhubService: SkillhubService;
@@ -104,6 +107,11 @@ export async function createContainer(): Promise<ControllerContainer> {
     gatewayService,
   );
   const skillhubService = await SkillhubService.create(env);
+  const analyticsService = new AnalyticsService(
+    env,
+    configStore,
+    sessionsRuntime,
+  );
   const modelProviderService = new ModelProviderService(
     configStore,
     env.nodeEnv,
@@ -143,6 +151,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       modelProviderService,
       openclawProcess,
     ),
+    analyticsService,
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,
@@ -158,10 +167,15 @@ export async function createContainer(): Promise<ControllerContainer> {
         runtimeHealth,
         processManager: openclawProcess,
       });
+      const stopAnalyticsLoop = startAnalyticsLoop({
+        env,
+        analyticsService,
+      });
       skillhubService.start();
 
       return () => {
         stopHealthLoop();
+        stopAnalyticsLoop();
         skillhubService.dispose();
         channelFallbackService.stop();
         wsClient.stop();

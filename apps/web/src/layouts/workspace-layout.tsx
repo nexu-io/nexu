@@ -4,7 +4,7 @@ import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
-import { track } from "@/lib/tracking";
+import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -395,10 +395,6 @@ function WorkspaceLayoutInner() {
   const installedSkillsCount = skillsData?.installedSkills?.length ?? 0;
 
   useEffect(() => {
-    track("workspace_view");
-  }, []);
-
-  useEffect(() => {
     if (!isDesktopClient) {
       return;
     }
@@ -495,6 +491,7 @@ function WorkspaceLayoutInner() {
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
+    track("workspace_logout_click");
     await authClient.signOut();
     window.location.href = "/";
   };
@@ -643,7 +640,10 @@ function WorkspaceLayoutInner() {
           <div className="px-2 pt-3 pb-1">
             <Link
               to="/workspace/home"
-              onClick={() => track("workspace_home_click")}
+              onClick={() => {
+                track("workspace_home_click");
+                track("workspace_sidebar_click", { target: "home" });
+              }}
               className={cn(
                 "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
                 isHomePage && "nav-item-active",
@@ -654,7 +654,10 @@ function WorkspaceLayoutInner() {
             </Link>
             <Link
               to="/workspace/skills"
-              onClick={() => track("workspace_skills_click")}
+              onClick={() => {
+                track("workspace_skills_click");
+                track("workspace_sidebar_click", { target: "skills" });
+              }}
               className={cn(
                 "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
                 isSkillsPage && "nav-item-active",
@@ -670,7 +673,10 @@ function WorkspaceLayoutInner() {
             </Link>
             <Link
               to="/workspace/settings"
-              onClick={() => track("workspace_settings_click")}
+              onClick={() => {
+                track("workspace_settings_click");
+                track("workspace_sidebar_click", { target: "settings" });
+              }}
               className={cn(
                 "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
                 isModelsPage && "nav-item-active",
@@ -697,8 +703,13 @@ function WorkspaceLayoutInner() {
                     data-session-channel-type={s.channelType ?? "web"}
                     data-session-state={s.status || "idle"}
                     onClick={() => {
+                      const channel = normalizeChannel(s.channelType);
                       track("workspace_channel_click", {
                         channel_type: s.channelType,
+                      });
+                      track("workspace_sidebar_click", {
+                        target: "conversations",
+                        ...(channel ? { channel } : {}),
                       });
                       navigate(`/workspace/sessions/${s.id}`);
                     }}
@@ -757,6 +768,9 @@ function WorkspaceLayoutInner() {
                         href="https://docs.nexu.io/"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() =>
+                          track("workspace_docs_click", { type: "doc" })
+                        }
                         className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
                       >
                         <BookOpen size={14} />
@@ -764,6 +778,9 @@ function WorkspaceLayoutInner() {
                       </a>
                       <a
                         href="mailto:hi@nexu.ai"
+                        onClick={() =>
+                          track("workspace_docs_click", { type: "contact" })
+                        }
                         className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
                       >
                         <Mail size={14} />
@@ -775,6 +792,9 @@ function WorkspaceLayoutInner() {
                         href="https://github.com/nexu-io/nexu/releases"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() =>
+                          track("workspace_docs_click", { type: "changelog" })
+                        }
                         className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
                       >
                         <ScrollText size={14} />
@@ -787,6 +807,9 @@ function WorkspaceLayoutInner() {
               <button
                 type="button"
                 onClick={() => {
+                  if (!showHelpMenu) {
+                    track("workspace_help_menu_open");
+                  }
                   setShowHelpMenu(!showHelpMenu);
                   setShowLangMenu(false);
                 }}
@@ -805,6 +828,9 @@ function WorkspaceLayoutInner() {
               href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() =>
+                track("workspace_github_click", { source: "sidebar" })
+              }
               className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-black/5 transition-colors"
               title="GitHub"
             >
@@ -970,6 +996,7 @@ function WorkspaceLayoutInner() {
                     to="/workspace/home"
                     onClick={() => {
                       track("workspace_home_click");
+                      track("workspace_sidebar_click", { target: "home" });
                       setMobileDrawerOpen(false);
                     }}
                     className={cn(
@@ -986,6 +1013,7 @@ function WorkspaceLayoutInner() {
                     to="/workspace/skills"
                     onClick={() => {
                       track("workspace_skills_click");
+                      track("workspace_sidebar_click", { target: "skills" });
                       setMobileDrawerOpen(false);
                     }}
                     className={cn(
@@ -1004,6 +1032,7 @@ function WorkspaceLayoutInner() {
                     to="/workspace/settings"
                     onClick={() => {
                       track("workspace_settings_click");
+                      track("workspace_sidebar_click", { target: "settings" });
                       setMobileDrawerOpen(false);
                     }}
                     className={cn(
@@ -1035,8 +1064,13 @@ function WorkspaceLayoutInner() {
                           data-session-channel-type={s.channelType ?? "web"}
                           data-session-state={s.status || "idle"}
                           onClick={() => {
+                            const channel = normalizeChannel(s.channelType);
                             track("workspace_channel_click", {
                               channel_type: s.channelType,
+                            });
+                            track("workspace_sidebar_click", {
+                              target: "conversations",
+                              ...(channel ? { channel } : {}),
                             });
                             setMobileDrawerOpen(false);
                             navigate(`/workspace/sessions/${s.id}`);

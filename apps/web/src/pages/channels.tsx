@@ -4,6 +4,7 @@ import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
+import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -88,6 +89,9 @@ export function ChannelsPage() {
   const showGuide = !isConfigured || forceGuide;
 
   const handlePlatformChange = (p: Platform) => {
+    if (!channels.some((ch) => ch.channelType === p)) {
+      track("workspace_channel_connect_click", { channel: p });
+    }
     setPlatform(p);
     setForceGuide(false);
   };
@@ -327,7 +331,10 @@ function ConfiguredView({
           </div>
           <button
             type="button"
-            onClick={onShowGuide}
+            onClick={() => {
+              track("workspace_change_config_click");
+              onShowGuide();
+            }}
             className="flex gap-1.5 items-center px-3 py-1.5 text-[11px] text-text-muted rounded-lg border border-border hover:border-border-hover hover:text-text-secondary transition-all shrink-0"
           >
             <BookOpen size={11} /> {t("channels.setupGuide")}
@@ -561,7 +568,12 @@ function ConfiguredView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => disconnectMutation.mutate()}
+                  onClick={() => {
+                    track("workspace_channel_disconnect_click", {
+                      channel: platform,
+                    });
+                    disconnectMutation.mutate();
+                  }}
                   disabled={disconnectMutation.isPending}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] font-medium text-white rounded-lg bg-red-500 hover:bg-red-600 transition-all disabled:opacity-60"
                 >

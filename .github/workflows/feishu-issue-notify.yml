@@ -1,0 +1,60 @@
+name: Feishu Issue Notification
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  notify:
+    name: Notify Feishu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Feishu notification
+        env:
+          WEBHOOK_URL: ${{ secrets.ISSUE_SYNC_FEISHU_BOT_WEBHOOK }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+          REPO: ${{ github.repository }}
+        run: |
+          BODY_SNIPPET="${ISSUE_BODY:0:200}"
+          [ "${#ISSUE_BODY}" -gt 200 ] && BODY_SNIPPET="${BODY_SNIPPET}..."
+
+          PAYLOAD=$(jq -n \
+            --arg title "[${REPO}] New Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}" \
+            --arg author "$ISSUE_AUTHOR" \
+            --arg labels "${ISSUE_LABELS:-none}" \
+            --arg body "${BODY_SNIPPET:-(no description)}" \
+            --arg url "$ISSUE_URL" \
+            '{
+              msg_type: "interactive",
+              card: {
+                schema: "2.0",
+                header: {
+                  title: { tag: "plain_text", content: $title },
+                  template: "orange"
+                },
+                body: {
+                  direction: "vertical",
+                  elements: [
+                    { tag: "markdown", content: ("**Author:** " + $author) },
+                    { tag: "markdown", content: ("**Labels:** " + $labels) },
+                    { tag: "markdown", content: $body },
+                    {
+                      tag: "button",
+                      text: { tag: "plain_text", content: "View Issue" },
+                      url: $url,
+                      type: "primary"
+                    }
+                  ]
+                }
+              }
+            }')
+
+          curl -sS -f -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK_URL"

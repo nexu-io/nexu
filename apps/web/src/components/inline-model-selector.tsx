@@ -1,3 +1,4 @@
+import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +23,18 @@ interface Model {
   provider: string;
   isDefault?: boolean;
   description?: string;
+}
+
+function getProviderIdFromModelId(
+  models: Model[],
+  modelId: string,
+): string | null {
+  const matched = models.find((model) => model.id === modelId);
+  if (matched) {
+    return matched.provider;
+  }
+  const [provider] = modelId.split("/");
+  return provider || null;
 }
 
 export function InlineModelSelector() {
@@ -64,7 +77,16 @@ export function InlineModelSelector() {
       }
       toast.success(t("models.modelSwitched"), { id: toastId });
     },
-    onSuccess: () => {
+    onSuccess: (_, modelId) => {
+      track("workspace_change_model_change", {
+        previous_provider_name: getProviderIdFromModelId(
+          models,
+          currentModelId,
+        ),
+        previous_model_name: currentModelId || null,
+        provider_name: getProviderIdFromModelId(models, modelId),
+        model_name: modelId,
+      });
       queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
       // Config push triggers SIGUSR1 restart; immediately refetch live status
       // so the UI reflects the restart sooner.

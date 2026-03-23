@@ -16,13 +16,13 @@
 <p align="center">
   <a href="https://nexu.io" target="_blank" rel="noopener"><strong>🌐 官网</strong></a> &nbsp;·&nbsp;
   <a href="https://docs.nexu.io" target="_blank" rel="noopener"><strong>📖 文档</strong></a> &nbsp;·&nbsp;
-  <a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913" target="_blank" rel="noopener"><strong>💬 飞书</strong></a> &nbsp;·&nbsp;
-  <a href="https://discord.gg/Q6AxCUuMNU" target="_blank" rel="noopener"><strong>🎮 Discord</strong></a> &nbsp;·&nbsp;
+  <a href="https://github.com/nexu-io/nexu/discussions"><strong>💬 Discussions</strong></a> &nbsp;·&nbsp;
+  <a href="https://github.com/nexu-io/nexu/issues"><strong>🐛 Issues</strong></a> &nbsp;·&nbsp;
   <a href="https://x.com/nexudotio" target="_blank" rel="noopener"><strong>𝕏 Twitter</strong></a>
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> &nbsp;·&nbsp; 简体中文
+  <a href="README.md">English</a> &nbsp;·&nbsp; 简体中文 &nbsp;·&nbsp; <a href="README.ja.md">日本語</a>
 </p>
 
 ---
@@ -193,7 +193,7 @@ pnpm test
 
 ## 🤝 贡献
 
-欢迎贡献！参与方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎贡献！**英文权威指南**在仓库根目录 [CONTRIBUTING.md](CONTRIBUTING.md)（GitHub 发起 PR 时会重点展示）。文档站会同步嵌入该文件：[docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing)。**中文指南：** [docs.nexu.io 参与贡献](https://docs.nexu.io/zh/guide/contributing) · [docs/zh/guide/contributing.md](docs/zh/guide/contributing.md)。
 
 1. 🍴 Fork 本仓库
 2. 🌿 创建功能分支（`git checkout -b feature/amazing-feature`）
@@ -203,7 +203,7 @@ pnpm test
 
 ### 规范
 
-- 遵循现有代码风格（ESLint + Prettier）
+- 遵循现有代码风格（Biome，可运行 `pnpm lint`）
 - 为新功能编写测试
 - 按需更新文档
 - 保持提交原子化且描述清晰
@@ -212,14 +212,14 @@ pnpm test
 
 ## 💬 社区
 
-| 微信群 | 飞书群 | Discord |
-|:---:|:---:|:---:|
-| <img src="site/media/wechat-qr.png" width="200" height="200" /> | <img src="site/media/feishu-qr.png" width="200" height="200" /> | <img src="site/media/discord-qr.png" width="200" height="200" /> |
-| 扫码加入微信群 | [加入飞书群](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913) | [加入 Discord](https://discord.gg/Q6AxCUuMNU) |
+我们以 GitHub 作为社区交流的主要阵地。发帖前请先搜索，避免重复。
 
-- [GitHub Discussions](https://github.com/nexu-io/nexu/discussions)
-- [GitHub Issues](https://github.com/nexu-io/nexu/issues)
-- [support@nexu.ai](mailto:support@nexu.ai)
+| 渠道 | 适用场景 |
+|------|----------|
+| 💡 [**Discussions**](https://github.com/nexu-io/nexu/discussions) | 提问、提想法、分享使用场景，或者打个招呼。**Q&A** 分类适合排查问题，**Ideas** 分类适合功能脑暴。 |
+| 🐛 [**Issues**](https://github.com/nexu-io/nexu/issues) | 提交 Bug 或具体的功能需求。请使用 Issue 模板，方便我们快速分类处理。 |
+| 📋 [**Roadmap & RFCs**](https://github.com/nexu-io/nexu/discussions/categories/rfc-roadmap) | 关注产品规划，参与重大设计方案的讨论。 |
+| 📧 [**support@nexu.ai**](mailto:support@nexu.ai) | 私密咨询、商务合作，或不适合公开讨论的事项。 |
 
 ### Contributors
 

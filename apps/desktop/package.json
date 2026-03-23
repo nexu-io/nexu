@@ -2,6 +2,7 @@
   "name": "@nexu/desktop",
   "version": "0.1.4",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "main": "dist-electron/main/bootstrap.js",
   "description": "Electron desktop shell for Nexu local runtime",
