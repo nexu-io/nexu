@@ -15,13 +15,10 @@ export function SurfaceFrame({
 }) {
   const webviewRefCallback = useCallback(
     (el: HTMLElement | null) => {
-      if (!el || !src) return;
-      if (preload) {
-        el.setAttribute("preload", preload);
-      }
-      el.setAttribute("src", src);
+      if (!el || !preload) return;
+      el.setAttribute("preload", preload);
     },
-    [preload, src],
+    [preload],
   );
 
   return (
@@ -40,6 +37,7 @@ export function SurfaceFrame({
           ref={webviewRefCallback as React.Ref<HTMLWebViewElement>}
           className="desktop-web-frame"
           key={`${src}:${version}`}
+          src={src}
           // @ts-expect-error Electron webview boolean attribute — must be empty string, not boolean
           allowpopups=""
         />
