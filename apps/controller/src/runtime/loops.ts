@@ -71,15 +71,17 @@ export function startHealthLoop(params: {
         params.state.gatewayStatus = "degraded";
         params.state.lastGatewayError = `http_${result.status}`;
       } else {
-        // Gateway unreachable — check if process is alive to distinguish
-        // "starting" (process exists, gateway not ready yet) from
-        // "unhealthy" (process is dead)
+        // Gateway unreachable — use bootPhase + process check to decide status.
+        // During boot, gateway not responding is expected ("starting").
+        // After boot, check if process is alive to distinguish starting vs dead.
+        const stillBooting = params.state.bootPhase === "booting";
         const processAlive = params.processManager?.isAlive() ?? false;
-        params.state.gatewayStatus = processAlive ? "starting" : "unhealthy";
-        params.state.lastGatewayError = processAlive
-          ? "gateway_starting"
-          : "gateway_unreachable";
-        if (!processAlive) {
+        if (stillBooting || processAlive) {
+          params.state.gatewayStatus = "starting";
+          params.state.lastGatewayError = "gateway_starting";
+        } else {
+          params.state.gatewayStatus = "unhealthy";
+          params.state.lastGatewayError = "gateway_unreachable";
           params.processManager?.restartForHealth();
         }
       }

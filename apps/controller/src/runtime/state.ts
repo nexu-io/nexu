@@ -1,6 +1,10 @@
 export type RuntimeStatus = "active" | "starting" | "degraded" | "unhealthy";
 
+export type BootPhase = "booting" | "ready";
+
 export interface ControllerRuntimeState {
+  /** Global boot phase — "booting" until bootstrap completes, then "ready". */
+  bootPhase: BootPhase;
   status: RuntimeStatus;
   configSyncStatus: RuntimeStatus;
   skillsSyncStatus: RuntimeStatus;
@@ -15,6 +19,7 @@ export interface ControllerRuntimeState {
 
 export function createRuntimeState(): ControllerRuntimeState {
   return {
+    bootPhase: "booting",
     status: "starting",
     configSyncStatus: "active",
     skillsSyncStatus: "active",

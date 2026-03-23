@@ -185,11 +185,11 @@ export class OpenClawGatewayService {
     channels: ChannelLiveStatusEntry[];
   }> {
     if (!this.wsClient.isConnected()) {
-      // When gateway isn't connected yet (startup), show "connecting" instead
-      // of "disconnected" so the UI doesn't flash a scary red state.
+      // During boot or when gateway is still starting, show "connecting"
+      // instead of "disconnected" so the UI doesn't flash a scary red state.
       const startupStatus: ChannelLiveStatus =
-        this.runtimeState.gatewayStatus === "starting" ||
-        this.runtimeState.gatewayStatus === "active"
+        this.runtimeState.bootPhase === "booting" ||
+        this.runtimeState.gatewayStatus === "starting"
           ? "connecting"
           : "disconnected";
       return {
