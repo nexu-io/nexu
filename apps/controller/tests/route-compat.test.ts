@@ -197,9 +197,6 @@ describe("controller route compatibility", () => {
   it("serves local auth/user compatibility endpoints", async () => {
     const app = createApp(container);
 
-    const sessionResponse = await app.request("/api/auth/get-session");
-    expect(sessionResponse.status).toBe(200);
-
     const meResponse = await app.request("/api/v1/me");
     expect(meResponse.status).toBe(200);
     const me = (await meResponse.json()) as { email: string };

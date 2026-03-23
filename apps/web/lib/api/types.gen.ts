@@ -240,27 +240,6 @@ export type PostApiV1BotsByBotIdResumeResponses = {
 
 export type PostApiV1BotsByBotIdResumeResponse = PostApiV1BotsByBotIdResumeResponses[keyof PostApiV1BotsByBotIdResumeResponses];
 
-export type PostApiAuthCheckEmailData = {
-    body?: {
-        email?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/auth/check-email';
-};
-
-export type PostApiAuthCheckEmailResponses = {
-    /**
-     * Email check
-     */
-    200: {
-        exists: boolean;
-        verified: boolean;
-    };
-};
-
-export type PostApiAuthCheckEmailResponse = PostApiAuthCheckEmailResponses[keyof PostApiAuthCheckEmailResponses];
-
 export type PostApiV1AuthDesktopAuthorizeData = {
     body?: {
         deviceId: string;

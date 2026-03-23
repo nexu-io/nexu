@@ -6,7 +6,6 @@ import {
   hostInvokeChannels,
 } from "../shared/host";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
-import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import type { ComponentUpdater } from "./updater/component-updater";
@@ -247,21 +246,6 @@ export function registerIpcHandlers(
           >(
             `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-status`,
           );
-        }
-
-        case "desktop:ensure-auth-session": {
-          const typedPayload =
-            payload as HostInvokePayloadMap["desktop:ensure-auth-session"];
-          await ensureDesktopAuthSession({
-            force: typedPayload.force === true,
-            runtimeConfig,
-          });
-
-          const result: HostInvokeResultMap["desktop:ensure-auth-session"] = {
-            ok: true,
-          };
-
-          return result;
         }
 
         case "desktop:create-cloud-profile": {

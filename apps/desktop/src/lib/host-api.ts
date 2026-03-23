@@ -94,15 +94,6 @@ export async function getDesktopCloudStatus() {
   return getHostBridge().invoke("desktop:get-cloud-status", undefined);
 }
 
-export async function ensureDesktopAuthSession(
-  force = false,
-): Promise<boolean> {
-  const result = await getHostBridge().invoke("desktop:ensure-auth-session", {
-    force,
-  });
-  return result.ok;
-}
-
 export async function createCloudProfile(profile: {
   name: string;
   cloudUrl: string;

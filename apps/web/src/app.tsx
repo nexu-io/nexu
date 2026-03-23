@@ -4,7 +4,6 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthLayout } from "./layouts/auth-layout";
 import { InviteGuardLayout } from "./layouts/invite-guard-layout";
 import { WorkspaceLayout } from "./layouts/workspace-layout";
-import { AuthPage } from "./pages/auth";
 import { ChannelsPage } from "./pages/channels";
 import { CommunitySkillDetailPage } from "./pages/community-skill-detail";
 import { FeishuBindPage } from "./pages/feishu-bind";
@@ -24,7 +23,6 @@ function DocumentTitleSync() {
 
   useEffect(() => {
     const titleByPathname: Record<string, string> = {
-      "/auth": t("title.signIn"),
       "/claim": t("title.claim"),
       "/workspace": t("title.home"),
       "/workspace/home": t("title.home"),
@@ -52,7 +50,6 @@ export function App() {
       <DocumentTitleSync />
       <Routes>
         <Route path="/" element={<WelcomePage />} />
-        <Route path="/auth" element={<AuthPage />} />
         <Route path="/claim" element={<SlackClaimPage />} />
         <Route path="/feishu/bind" element={<FeishuBindPage />} />
         <Route element={<AuthLayout />}>

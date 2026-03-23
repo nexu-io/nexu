@@ -10,14 +10,12 @@ import {
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
-  session,
   shell,
 } from "electron";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot } from "../shared/workspace-paths";
-import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import {
@@ -242,13 +240,6 @@ function sendDesktopCommand(
   });
 }
 
-function notifyDesktopAuthSessionRestored(): void {
-  mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:auth-session-restored",
-    surface: "web",
-  });
-}
-
 function triggerUpdateCheck(): void {
   mainWindow?.webContents.send("host:desktop-command", {
     type: "desktop:check-for-updates",
@@ -370,17 +361,6 @@ function logLaunchTimeline(message: string): void {
   });
 }
 
-function logAuthRecovery(message: string, stream: "stdout" | "stderr"): void {
-  writeDesktopMainLog({
-    source: "auth-recovery",
-    stream,
-    kind: "lifecycle",
-    message,
-    logFilePath: getDesktopLogFilePath("desktop-main.log"),
-    windowId: getMainWindowId(),
-  });
-}
-
 function logRendererEvent({
   source,
   stream,
@@ -418,10 +398,7 @@ function logSleepGuard(entry: SleepGuardLogEntry): void {
 async function waitForControllerReadiness(): Promise<void> {
   const startedAt = Date.now();
   const timeoutMs = 15_000;
-  const probeUrl = new URL(
-    "/api/auth/get-session",
-    runtimeConfig.urls.controllerBase,
-  );
+  const probeUrl = new URL("/health", runtimeConfig.urls.controllerBase);
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
@@ -458,66 +435,15 @@ async function runDesktopColdStart(): Promise<void> {
   logColdStart("waiting for controller readiness");
   await waitForControllerReadiness();
 
-  diagnosticsReporter?.markColdStartRunning(
-    "bootstrapping desktop auth session",
-  );
-  logColdStart("bootstrapping desktop auth session");
-  await ensureDesktopAuthSession({ runtimeConfig });
-  const sessionId = rotateDesktopLogSession();
-  logColdStart(`desktop auth session ready sessionId=${sessionId}`);
-
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
   await orchestrator.startOne("web");
 
+  const sessionId = rotateDesktopLogSession();
+  logColdStart(`cold start session ready sessionId=${sessionId}`);
+
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
-}
-
-let authRecoveryPromise: Promise<void> | null = null;
-
-function triggerDesktopAuthRecovery(reason: string): void {
-  if (authRecoveryPromise) {
-    return;
-  }
-
-  authRecoveryPromise = (async () => {
-    logAuthRecovery(reason, "stdout");
-
-    try {
-      await ensureDesktopAuthSession({ force: true, runtimeConfig });
-      const sessionId = rotateDesktopLogSession();
-      logAuthRecovery(
-        `desktop auth session restored sessionId=${sessionId}`,
-        "stdout",
-      );
-      notifyDesktopAuthSessionRestored();
-    } catch (error) {
-      logAuthRecovery(
-        error instanceof Error ? error.message : String(error),
-        "stderr",
-      );
-    } finally {
-      authRecoveryPromise = null;
-    }
-  })();
-}
-
-function installDesktopAuthRecoveryHooks(): void {
-  session.defaultSession.webRequest.onCompleted(
-    {
-      urls: [`${runtimeConfig.urls.controllerBase}/api/auth/*`],
-    },
-    (details) => {
-      if (
-        details.method === "POST" &&
-        details.statusCode < 400 &&
-        details.url.includes("/api/auth/sign-out")
-      ) {
-        triggerDesktopAuthRecovery("detected desktop sign-out");
-      }
-    },
-  );
 }
 
 function focusMainWindow(): void {
@@ -767,7 +693,6 @@ logLaunchTimeline("electron main module evaluated");
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
   installApplicationMenu();
-  installDesktopAuthRecoveryHooks();
   registerIpcHandlers(orchestrator, runtimeConfig);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();

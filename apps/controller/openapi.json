@@ -617,51 +617,6 @@
         }
       }
     },
-    "/api/auth/check-email": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Email check",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "exists": {
-                      "type": "boolean"
-                    },
-                    "verified": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "exists",
-                    "verified"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/auth/desktop-authorize": {
       "post": {
         "tags": [

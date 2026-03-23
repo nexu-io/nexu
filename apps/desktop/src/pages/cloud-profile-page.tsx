@@ -6,7 +6,6 @@ import {
   disconnectCloudProfile,
   getDesktopCloudStatus,
   importCloudProfiles,
-  onDesktopCommand,
   openExternal,
   switchCloudProfile,
   updateCloudProfile,
@@ -111,16 +110,6 @@ export function CloudProfilePage() {
       isCancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    return onDesktopCommand((command) => {
-      if (command.type !== "desktop:auth-session-restored") {
-        return;
-      }
-
-      void refreshCloudStatus({ silent: false, loading: false });
-    });
-  }, [refreshCloudStatus]);
 
   useEffect(() => {
     function handleWindowFocus() {

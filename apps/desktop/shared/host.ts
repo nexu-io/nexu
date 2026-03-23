@@ -17,7 +17,6 @@ export const hostInvokeChannels = [
   "runtime:show-log-file",
   "runtime:query-events",
   "desktop:get-cloud-status",
-  "desktop:ensure-auth-session",
   "desktop:create-cloud-profile",
   "desktop:connect-cloud-profile",
   "desktop:disconnect-cloud-profile",
@@ -80,9 +79,6 @@ export type HostInvokePayloadMap = {
   };
   "runtime:query-events": RuntimeEventQuery;
   "desktop:get-cloud-status": undefined;
-  "desktop:ensure-auth-session": {
-    force?: boolean;
-  };
   "desktop:create-cloud-profile": {
     profile: {
       name: string;
@@ -174,9 +170,6 @@ export type HostInvokeResultMap = {
       connectedAt?: string | null;
       modelCount: number;
     }>;
-  };
-  "desktop:ensure-auth-session": {
-    ok: boolean;
   };
   "desktop:create-cloud-profile": {
     ok: boolean;
@@ -406,10 +399,6 @@ export type HostDesktopCommand =
       type: "develop:show-shell";
       surface: DesktopSurface;
       chromeMode: DesktopChromeMode;
-    }
-  | {
-      type: "desktop:auth-session-restored";
-      surface: "web";
     }
   | {
       type: "desktop:check-for-updates";

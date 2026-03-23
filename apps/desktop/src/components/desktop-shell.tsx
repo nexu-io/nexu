@@ -29,7 +29,7 @@ export function DesktopShell() {
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>(
     isPackaged ? "immersive" : "full",
   );
-  const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
+  const webSurfaceVersion = 0;
   const { desktopOpenClawUrl, desktopWebUrl, runtimeConfig } =
     useDesktopRuntimeConfig();
   const update = useAutoUpdate();
@@ -37,11 +37,6 @@ export function DesktopShell() {
 
   useEffect(() => {
     return onDesktopCommand((command) => {
-      if (command.type === "desktop:auth-session-restored") {
-        setWebSurfaceVersion((current) => current + 1);
-        return;
-      }
-
       if (command.type === "desktop:check-for-updates") {
         void checkForUpdates();
         return;

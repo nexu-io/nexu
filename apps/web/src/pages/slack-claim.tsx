@@ -345,7 +345,7 @@ export function SlackClaimPage() {
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
             <Link
-              to="/auth"
+              to="/"
               className="text-sm text-text-muted hover:text-text-secondary transition-colors"
             >
               {t("claim.goToSignIn")}
@@ -359,9 +359,6 @@ export function SlackClaimPage() {
   // ── Needs auth (not logged in) ──
   if (phase === "needs-auth") {
     const isExisting = resolved?.isExistingWorkspace ?? false;
-    const returnTo = encodeURIComponent(
-      `/claim?token=${encodeURIComponent(claimKey)}`,
-    );
 
     return (
       <div className="flex min-h-screen">
@@ -417,7 +414,7 @@ export function SlackClaimPage() {
               )}
 
               <Link
-                to={`/auth?mode=signup&source=IM&returnTo=${returnTo}`}
+                to="/"
                 onClick={() =>
                   sessionStorage.setItem(CLAIM_RETURN_KEY, claimKey)
                 }
@@ -431,7 +428,7 @@ export function SlackClaimPage() {
                   {t("claim.alreadyHaveAccount")}{" "}
                 </span>
                 <Link
-                  to={`/auth?source=IM&returnTo=${returnTo}`}
+                  to="/"
                   onClick={() =>
                     sessionStorage.setItem(CLAIM_RETURN_KEY, claimKey)
                   }
@@ -534,7 +531,7 @@ export function SlackClaimPage() {
 
               <div className="text-center mt-4">
                 <Link
-                  to="/auth"
+                  to="/"
                   className="text-[13px] text-text-muted hover:text-text-secondary transition-colors"
                 >
                   {t("claim.useDifferentAccount")}
