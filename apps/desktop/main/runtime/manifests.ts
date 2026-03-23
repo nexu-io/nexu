@@ -311,10 +311,6 @@ export function createRuntimeUnitManifests(
         HOST: "127.0.0.1",
         WEB_URL: webUrl,
         NEXU_HOME: runtimeConfig.paths.nexuHome,
-        NEXU_CLOUD_URL: runtimeConfig.urls.nexuCloud,
-        ...(runtimeConfig.urls.nexuLink
-          ? { NEXU_LINK_URL: runtimeConfig.urls.nexuLink }
-          : {}),
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
         OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),

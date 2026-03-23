@@ -125,14 +125,6 @@ export function DesktopShell() {
                 <dt>Built At</dt>
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
               </div>
-              <div>
-                <dt>Cloud</dt>
-                <dd>{runtimeConfig.urls.nexuCloud}</dd>
-              </div>
-              <div>
-                <dt>Link</dt>
-                <dd>{runtimeConfig.urls.nexuLink ?? "(not set)"}</dd>
-              </div>
             </dl>
           </div>
         ) : null}
