@@ -66,29 +66,29 @@ function createGuard() {
 }
 
 describe("SleepGuard", () => {
-  it("starts the strongest available blocker and publishes active state", () => {
+  it("starts app-suspension blocker and publishes active state", () => {
     const { guard, logs, powerSaveBlocker, snapshots } = createGuard();
 
     guard.start("desktop-runtime-active");
 
     expect([...powerSaveBlocker.active.values()]).toEqual([
-      "prevent-display-sleep",
+      "prevent-app-suspension",
     ]);
     expect(snapshots.at(-1)).toMatchObject({
-      activeBlockerType: "prevent-display-sleep",
+      activeBlockerType: "prevent-app-suspension",
       blockerId: 1,
       isStarted: true,
       lastEvent: {
         onBatteryPower: false,
         type: "started",
       },
-      requestedBlockerType: "prevent-display-sleep",
+      requestedBlockerType: "prevent-app-suspension",
       status: "active",
     });
     expect(logs.at(-1)).toMatchObject({
       kind: "lifecycle",
       message:
-        "sleep guard enabled blockerType=prevent-display-sleep blockerId=1 reason=desktop-runtime-active onBatteryPower=false",
+        "sleep guard enabled blockerType=prevent-app-suspension blockerId=1 reason=desktop-runtime-active onBatteryPower=false",
       stream: "system",
     });
   });
@@ -117,7 +117,7 @@ describe("SleepGuard", () => {
       status: "active",
     });
     expect(logs.map((entry) => entry.message)).toContain(
-      "sleep guard observed system suspend while active=true blockerType=prevent-display-sleep onBatteryPower=true",
+      "sleep guard observed system suspend while active=true blockerType=prevent-app-suspension onBatteryPower=true",
     );
   });
 
@@ -142,11 +142,11 @@ describe("SleepGuard", () => {
     expect(logs.at(-1)).toMatchObject({
       kind: "lifecycle",
       message:
-        "sleep guard disabled blockerType=prevent-display-sleep blockerId=1 reason=app-before-quit",
+        "sleep guard disabled blockerType=prevent-app-suspension blockerId=1 reason=app-before-quit",
       stream: "system",
     });
     expect(logs.map((entry) => entry.message)).not.toContain(
-      "sleep guard observed system suspend while active=false blockerType=prevent-display-sleep onBatteryPower=false",
+      "sleep guard observed system suspend while active=false blockerType=prevent-app-suspension onBatteryPower=false",
     );
   });
 });

@@ -55,8 +55,8 @@ type SleepGuardDependencies = {
   onSnapshot?(snapshot: SleepGuardSnapshot): void;
 };
 
-// Strongest Electron-level policy: block idle system sleep and display sleep.
-const DEFAULT_BLOCKER_TYPE: SleepBlockerType = "prevent-display-sleep";
+// Keep the app active during idle without forcing the display to stay on.
+const DEFAULT_BLOCKER_TYPE: SleepBlockerType = "prevent-app-suspension";
 
 function cloneSnapshot(snapshot: SleepGuardSnapshot): SleepGuardSnapshot {
   return {
