@@ -350,50 +350,71 @@ export async function bootstrapWithLaunchd(
     openclaw: SERVICE_LABELS.openclaw(env.isDev),
   };
 
-  // --- Try attach to already-running services ---
-  try {
-    const attached = await tryAttachToRunningServices({
-      launchd,
-      labels,
-      plistDir,
-      isDev: env.isDev,
-      expectedNexuHome: env.nexuHome,
-      webRoot: env.webRoot,
-      controllerPort: env.controllerPort,
-    });
-    if (attached) return attached;
-  } catch (err) {
-    console.warn("Attach attempt failed, proceeding with cold start:", err);
-  }
+  // --- Recover ports from previous session if available ---
+  const recovered = await readRuntimePorts(plistDir);
+  const [controllerStatus, openclawStatus] = await Promise.all([
+    launchd.getServiceStatus(labels.controller),
+    launchd.getServiceStatus(labels.openclaw),
+  ]);
 
-  // --- Cold start: check for port occupiers ---
-  const occupier = await detectPortOccupier(env.openclawPort);
-  if (occupier) {
-    console.warn(
-      `Port ${env.openclawPort} occupied by PID ${occupier.pid}. Killing...`,
-    );
-    try {
-      process.kill(occupier.pid, "SIGKILL");
-      await new Promise((r) => setTimeout(r, 1000));
-    } catch {
-      // best effort
+  const controllerRunning = controllerStatus.status === "running";
+  const openclawRunning = openclawStatus.status === "running";
+  const anyRunning = controllerRunning || openclawRunning;
+
+  // If we have a previous session and at least one service is still running,
+  // validate and reuse the recovered ports. Otherwise use fresh ports.
+  let useRecoveredPorts = false;
+  let effectivePorts = {
+    controllerPort: env.controllerPort,
+    openclawPort: env.openclawPort,
+    webPort: env.webPort,
+  };
+
+  if (recovered && anyRunning && recovered.isDev === env.isDev) {
+    // Validate NEXU_HOME matches (don't attach to wrong environment)
+    const runningNexuHome =
+      controllerStatus.env?.NEXU_HOME ?? openclawStatus.env?.NEXU_HOME;
+    const expectedNexuHome = env.nexuHome;
+
+    if (
+      !expectedNexuHome ||
+      !runningNexuHome ||
+      runningNexuHome === expectedNexuHome
+    ) {
+      effectivePorts = {
+        controllerPort: recovered.controllerPort,
+        openclawPort: recovered.openclawPort,
+        webPort: recovered.webPort,
+      };
+      useRecoveredPorts = true;
+      console.log(
+        `Recovering ports from previous session (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort} web=${effectivePorts.webPort})`,
+      );
+    } else {
+      // NEXU_HOME mismatch — tear down stale services
+      console.log(
+        `NEXU_HOME mismatch (expected=${expectedNexuHome} actual=${runningNexuHome}), tearing down stale services`,
+      );
+      await Promise.allSettled([
+        controllerRunning
+          ? launchd.bootoutService(labels.controller)
+          : Promise.resolve(),
+        openclawRunning
+          ? launchd.bootoutService(labels.openclaw)
+          : Promise.resolve(),
+      ]);
     }
   }
 
-  // Prepare plist environment
-  // Capture system PATH for launchd - launchd doesn't inherit shell env
+  // --- Per-service: validate running ones, start missing ones ---
   const systemPath = process.env.PATH;
-  // Build NODE_PATH for TypeScript plugin resolution
-  // OpenClaw plugins need to resolve dependencies like 'openclaw/plugin-sdk'
-  // env.openclawPath = .../openclaw-runtime/node_modules/openclaw/openclaw.mjs
-  // We need: .../openclaw-runtime/node_modules
   const nodeModulesPath = path.dirname(path.dirname(env.openclawPath));
 
   const plistEnv: PlistEnv = {
     isDev: env.isDev,
     logDir,
-    controllerPort: env.controllerPort,
-    openclawPort: env.openclawPort,
+    controllerPort: effectivePorts.controllerPort,
+    openclawPort: effectivePorts.openclawPort,
     nodePath: env.nodePath,
     controllerEntryPath: env.controllerEntryPath,
     openclawPath: env.openclawPath,
@@ -407,9 +428,43 @@ export async function bootstrapWithLaunchd(
     nodeModulesPath,
   };
 
-  // 1. Ensure services are installed (parallel)
-  console.log("Installing launchd services...");
+  // Health check running services, install + start missing ones
+  let controllerHealthy = false;
+  let openclawHealthy = false;
+  let needsControllerReady = true;
 
+  if (controllerRunning && useRecoveredPorts) {
+    controllerHealthy = await probeControllerHealth(
+      effectivePorts.controllerPort,
+    );
+    if (controllerHealthy) {
+      console.log("Controller already running and healthy");
+      needsControllerReady = false;
+    } else {
+      console.log("Controller running but unhealthy, restarting...");
+      try {
+        await launchd.bootoutService(labels.controller);
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+
+  if (openclawRunning && useRecoveredPorts) {
+    openclawHealthy = await probePort(effectivePorts.openclawPort);
+    if (openclawHealthy) {
+      console.log("OpenClaw already running and healthy");
+    } else {
+      console.log("OpenClaw running but port not listening, restarting...");
+      try {
+        await launchd.bootoutService(labels.openclaw);
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+
+  // Install + start any services that aren't healthy
   const ensureService = async (
     label: string,
     type: "controller" | "openclaw",
@@ -421,48 +476,71 @@ export async function bootstrapWithLaunchd(
     }
   };
 
-  await Promise.all([
-    ensureService(labels.controller, "controller"),
-    ensureService(labels.openclaw, "openclaw"),
-  ]);
-
-  // 2. Start services in parallel
-  console.log("Starting services...");
-
   const ensureRunning = async (label: string) => {
     const status = await launchd.getServiceStatus(label);
     if (status.status !== "running") {
       await launchd.startService(label);
+      console.log(`Started ${label}`);
     }
   };
 
-  // Start both services and embedded web server in parallel
-  const [, , webServer] = await Promise.all([
-    ensureRunning(labels.controller),
-    ensureRunning(labels.openclaw),
-    startEmbeddedWebServer({
-      port: env.webPort,
+  if (!controllerHealthy) {
+    await ensureService(labels.controller, "controller");
+    await ensureRunning(labels.controller);
+  }
+  if (!openclawHealthy) {
+    // Check for port occupier before starting
+    const occupier = await detectPortOccupier(effectivePorts.openclawPort);
+    if (occupier) {
+      console.warn(
+        `Port ${effectivePorts.openclawPort} occupied by PID ${occupier.pid}, killing...`,
+      );
+      try {
+        process.kill(occupier.pid, "SIGKILL");
+        await new Promise((r) => setTimeout(r, 1000));
+      } catch {
+        /* best effort */
+      }
+    }
+    await ensureService(labels.openclaw, "openclaw");
+    await ensureRunning(labels.openclaw);
+  }
+
+  // Start embedded web server
+  let webServer: EmbeddedWebServer;
+  try {
+    webServer = await startEmbeddedWebServer({
+      port: effectivePorts.webPort,
       webRoot: env.webRoot,
-      controllerPort: env.controllerPort,
-    }),
-  ]);
+      controllerPort: effectivePorts.controllerPort,
+    });
+  } catch {
+    // Web port occupied — allocate fresh
+    webServer = await startEmbeddedWebServer({
+      port: 0,
+      webRoot: env.webRoot,
+      controllerPort: effectivePorts.controllerPort,
+    });
+  }
 
   console.log(
-    `Services started, web server ready on http://127.0.0.1:${env.webPort}`,
+    `Services ready (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort})`,
   );
 
-  // 5. Create background readiness promise (non-blocking)
-  const controllerReady = waitForControllerReadiness(env.controllerPort).then(
-    () => console.log("Controller is ready"),
-  );
+  // Controller readiness
+  const controllerReady = needsControllerReady
+    ? waitForControllerReadiness(effectivePorts.controllerPort).then(() =>
+        console.log("Controller is ready"),
+      )
+    : Promise.resolve();
 
-  // 6. Persist port metadata for future attach
+  // Persist port metadata
   await writeRuntimePorts(plistDir, {
     writtenAt: new Date().toISOString(),
     electronPid: process.pid,
-    controllerPort: env.controllerPort,
-    openclawPort: env.openclawPort,
-    webPort: env.webPort,
+    controllerPort: effectivePorts.controllerPort,
+    openclawPort: effectivePorts.openclawPort,
+    webPort: effectivePorts.webPort,
     nexuHome: env.nexuHome ?? path.join(os.homedir(), ".nexu"),
     isDev: env.isDev,
   });
@@ -472,6 +550,7 @@ export async function bootstrapWithLaunchd(
     webServer,
     labels,
     controllerReady,
+    ...(useRecoveredPorts ? { attachedPorts: effectivePorts } : {}),
   };
 }
 
