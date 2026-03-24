@@ -9,6 +9,7 @@
 
 import { BrowserWindow, app, dialog } from "electron";
 import type { EmbeddedWebServer } from "./embedded-web-server";
+import { deleteRuntimePorts } from "./launchd-bootstrap";
 import type { LaunchdManager } from "./launchd-manager";
 
 export interface QuitHandlerOptions {
@@ -18,6 +19,8 @@ export interface QuitHandlerOptions {
     openclaw: string;
   };
   webServer?: EmbeddedWebServer;
+  /** Plist directory for runtime-ports.json cleanup */
+  plistDir?: string;
   /** Called before quitting to flush logs, etc */
   onBeforeQuit?: () => void | Promise<void>;
   /** Called to signal that the app should actually close windows on quit */
@@ -138,6 +141,11 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
           } catch (err) {
             console.error(`Error booting out ${label}:`, err);
           }
+        }
+
+        // Clean up runtime-ports.json so next launch does cold start
+        if (opts.plistDir) {
+          await deleteRuntimePorts(opts.plistDir);
         }
 
         // Mark force-quit and actually exit

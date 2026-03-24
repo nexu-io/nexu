@@ -496,11 +496,27 @@ async function runLaunchdColdStart(): Promise<void> {
     openclawStateDir,
   });
 
-  logColdStart("launchd services started, waiting for controller readiness");
-  diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
-  await launchdResult.controllerReady;
+  if (launchdResult.attachedPorts) {
+    // Attached to existing services — override runtimeConfig with actual ports
+    const { controllerPort, openclawPort, webPort } =
+      launchdResult.attachedPorts;
+    runtimeConfig.ports.controller = controllerPort;
+    runtimeConfig.ports.web = webPort;
+    runtimeConfig.urls.controllerBase = `http://127.0.0.1:${controllerPort}`;
+    runtimeConfig.urls.web = `http://127.0.0.1:${webPort}`;
+    runtimeConfig.urls.openclawBase = `http://127.0.0.1:${openclawPort}`;
+    logColdStart(
+      `attached to running services (controller=${controllerPort} openclaw=${openclawPort} web=${webPort})`,
+    );
+  } else {
+    logColdStart("launchd services started, waiting for controller readiness");
+    diagnosticsReporter?.markColdStartRunning(
+      "waiting for controller readiness",
+    );
+    await launchdResult.controllerReady;
+    logColdStart("controller ready");
+  }
 
-  logColdStart("controller ready");
   const sessionId = rotateDesktopLogSession();
   logColdStart(`launchd cold start complete sessionId=${sessionId}`);
   diagnosticsReporter?.markColdStartSucceeded();
@@ -814,6 +830,7 @@ app.whenReady().then(async () => {
         launchd: launchdResult.launchd,
         labels: launchdResult.labels,
         webServer: launchdResult.webServer,
+        plistDir: getDefaultPlistDir(!app.isPackaged),
         onBeforeQuit: async () => {
           sleepGuard?.dispose("launchd-quit");
           await diagnosticsReporter?.flushNow().catch(() => undefined);

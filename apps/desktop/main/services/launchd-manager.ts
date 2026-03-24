@@ -18,6 +18,8 @@ export interface ServiceStatus {
   plistPath: string;
   status: "running" | "stopped" | "unknown";
   pid?: number;
+  /** Environment variables from launchctl print (only populated when running) */
+  env?: Record<string, string>;
 }
 
 export class LaunchdManager {
@@ -162,12 +164,14 @@ export class LaunchdManager {
       const state = stateMatch?.[1]?.toLowerCase();
 
       const isRunning = state === "running" || (pid !== undefined && pid > 0);
+      const env = isRunning ? this.parseEnvBlock(stdout) : undefined;
 
       return {
         label,
         plistPath,
         status: isRunning ? "running" : "stopped",
         pid,
+        env,
       };
     } catch {
       // Service not registered or error
@@ -177,6 +181,32 @@ export class LaunchdManager {
         status: "unknown",
       };
     }
+  }
+
+  /**
+   * Parse the `environment = { KEY => VALUE }` block from launchctl print.
+   * Must match the top-level `environment` key (not `inherited environment`
+   * or `default environment`).
+   */
+  private parseEnvBlock(stdout: string): Record<string, string> {
+    const env: Record<string, string> = {};
+    const lines = stdout.split("\n");
+    let inBlock = false;
+    for (const line of lines) {
+      if (!inBlock) {
+        // Match tab-indented "environment = {" but not "inherited environment"
+        if (/^\tenvironment = \{/.test(line)) {
+          inBlock = true;
+        }
+        continue;
+      }
+      if (/^\t\}/.test(line)) break;
+      const m = line.match(/^\t\t(\S+)\s+=>\s+(.*)$/);
+      if (m) {
+        env[m[1]] = m[2];
+      }
+    }
+    return env;
   }
 
   /**
