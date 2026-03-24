@@ -24,19 +24,47 @@ export interface QuitHandlerOptions {
 
 export type QuitDecision = "quit-completely" | "run-in-background" | "cancel";
 
-/**
- * Show quit dialog and get user's choice.
- */
-export async function showQuitDialog(): Promise<QuitDecision> {
-  const { response } = await dialog.showMessageBox({
-    type: "question",
+const i18n = {
+  en: {
     buttons: ["Quit Completely", "Run in Background", "Cancel"],
-    defaultId: 0,
     title: "Quit Nexu",
     message: "Choose exit mode",
     detail:
       "Running in background keeps services running, bots continue working.\n\n" +
       "To fully stop services, choose 'Quit Completely'.",
+  },
+  zh: {
+    buttons: ["完全退出", "后台运行", "取消"],
+    title: "退出 Nexu",
+    message: "选择退出方式",
+    detail:
+      "后台运行将保持服务运行，机器人继续工作。\n\n" +
+      "如需完全停止服务，请选择「完全退出」。",
+  },
+} as const;
+
+function getQuitDialogLocale(): {
+  buttons: readonly string[];
+  title: string;
+  message: string;
+  detail: string;
+} {
+  const locale = app.getLocale();
+  return locale.startsWith("zh") ? i18n.zh : i18n.en;
+}
+
+/**
+ * Show quit dialog and get user's choice.
+ */
+export async function showQuitDialog(): Promise<QuitDecision> {
+  const t = getQuitDialogLocale();
+  const { response } = await dialog.showMessageBox({
+    type: "question",
+    buttons: [...t.buttons],
+    defaultId: 0,
+    title: t.title,
+    message: t.message,
+    detail: t.detail,
   });
 
   switch (response) {
