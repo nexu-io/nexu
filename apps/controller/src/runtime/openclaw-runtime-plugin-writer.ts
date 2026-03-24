@@ -1,5 +1,5 @@
 import { cp, mkdir, readdir } from "node:fs/promises";
-import path from "node:path";
+import path, { basename } from "node:path";
 import type { ControllerEnv } from "../app/env.js";
 
 export class OpenClawRuntimePluginWriter {
@@ -30,7 +30,12 @@ export class OpenClawRuntimePluginWriter {
         entry.name,
       );
       const targetDir = path.join(this.env.openclawExtensionsDir, entry.name);
-      await cp(sourceDir, targetDir, { recursive: true, force: true });
+      await cp(sourceDir, targetDir, {
+        recursive: true,
+        force: true,
+        dereference: true,
+        filter: (source) => basename(source) !== ".bin",
+      });
     }
   }
 }

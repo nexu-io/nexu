@@ -449,7 +449,7 @@ async function main() {
   }
 
   const controllerPort =
-    process.env.NEXU_CONTROLLER_PORT ?? process.env.NEXU_API_PORT ?? "50800";
+    env.NEXU_CONTROLLER_PORT ?? env.NEXU_API_PORT ?? "50800";
 
   await rm(releaseRoot, rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
