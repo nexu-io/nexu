@@ -646,8 +646,16 @@ function createMainWindow(): BrowserWindow {
     }
   });
 
-  void window.loadFile(resolve(__dirname, "../../dist/index.html"));
-  logLaunchTimeline("main window loadFile dispatched");
+  // In dev mode, load from vite dev server for HMR support.
+  // In production, load the pre-built static dist file.
+  const viteDevUrl = process.env.VITE_DEV_SERVER_URL;
+  if (viteDevUrl) {
+    void window.loadURL(viteDevUrl);
+    logLaunchTimeline(`main window loadURL dispatched url=${viteDevUrl}`);
+  } else {
+    void window.loadFile(resolve(__dirname, "../../dist/index.html"));
+    logLaunchTimeline("main window loadFile dispatched");
+  }
   mainWindow = window;
   return window;
 }
