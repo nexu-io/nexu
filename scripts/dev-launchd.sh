@@ -150,10 +150,9 @@ start_services() {
   # When this script exits (Electron quit, Ctrl+C, etc), stop everything
   trap 'echo ""; echo "Cleaning up..."; kill $CONTROLLER_WATCH_PID $WEB_WATCH_PID 2>/dev/null; stop_services' EXIT INT TERM
 
-  # Start file watchers in background:
-  # - Controller: tsc --watch → auto-restart launchd service on successful compile
-  # - Web: vite build --watch → auto-rebuild static files (refresh to see changes)
-  echo "Starting file watchers..."
+  # Start controller file watcher in background:
+  # tsc --watch → auto-restart launchd service on successful compile
+  echo "Starting controller watcher..."
 
   (
     cd "$REPO_ROOT/apps/controller"
@@ -167,9 +166,19 @@ start_services() {
   ) &
   CONTROLLER_WATCH_PID=$!
 
+  # Web watcher: poll for source changes every 3s, rebuild if detected
   (
-    cd "$REPO_ROOT/apps/web"
-    pnpm exec vite build --watch 2>&1 | sed 's/^/[web:vite] /'
+    last_hash=""
+    while true; do
+      hash=$(find "$REPO_ROOT/apps/web/src" -name '*.ts' -o -name '*.tsx' -o -name '*.css' 2>/dev/null | sort | xargs stat -f '%m' 2>/dev/null | md5)
+      if [ -n "$last_hash" ] && [ "$hash" != "$last_hash" ]; then
+        echo "[web] Changes detected, rebuilding..."
+        (cd "$REPO_ROOT" && pnpm --filter @nexu/web build 2>&1 | tail -1 | sed 's/^/[web] /')
+        echo "[web] Rebuilt. Refresh page to see changes."
+      fi
+      last_hash="$hash"
+      sleep 3
+    done
   ) &
   WEB_WATCH_PID=$!
 
