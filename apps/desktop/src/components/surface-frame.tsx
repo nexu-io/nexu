@@ -104,7 +104,7 @@ export function SurfaceFrame({
       }
       el.setAttribute("src", src);
     },
-    [preload],
+    [preload, src],
   );
 
   // Listen for webview dom-ready to dismiss the loader overlay
