@@ -1,10 +1,10 @@
 /**
  * Quit Handler - Desktop exit behavior with launchd services
  *
- * Provides quit dialog with options:
+ * On macOS, window close is intercepted to show a quit dialog.
  * - Quit Completely: stop all launchd services and exit
- * - Run in Background: close GUI, keep services running
- * - Cancel: don't quit
+ * - Run in Background: hide window, keep services running
+ * - Cancel: do nothing
  */
 
 import { BrowserWindow, app, dialog } from "electron";
@@ -55,10 +55,7 @@ function getQuitDialogLocale(): {
   return locale.startsWith("zh") ? i18n.zh : i18n.en;
 }
 
-/**
- * Show quit dialog and get user's choice.
- */
-export async function showQuitDialog(): Promise<QuitDecision> {
+async function showQuitDialog(): Promise<QuitDecision> {
   const t = getQuitDialogLocale();
   const { response } = await dialog.showMessageBox({
     type: "question",
@@ -81,60 +78,100 @@ export async function showQuitDialog(): Promise<QuitDecision> {
 
 /**
  * Install quit handler for launchd-managed services.
+ *
+ * Uses the window "close" event (synchronous) as the entry point instead of
+ * "before-quit" (which doesn't reliably support async operations in Electron).
  */
 export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
-  let handling = false;
+  let dialogOpen = false;
 
-  app.on("before-quit", async (event) => {
-    if (handling) return;
+  // Intercept main window close to show quit dialog
+  const interceptWindowClose = (window: BrowserWindow) => {
+    window.on("close", (event) => {
+      // If a force-quit is in progress, let the window close
+      if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
 
-    event.preventDefault();
-    handling = true;
-
-    const decision: QuitDecision = app.isPackaged
-      ? await showQuitDialog()
-      : "run-in-background";
-
-    if (decision === "cancel") {
-      handling = false;
-      return;
-    }
-
-    if (decision === "run-in-background") {
-      // Just hide windows — don't stop services, don't close web server
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.hide();
+      // Dev mode: just hide (vite HMR restarts)
+      if (!app.isPackaged) {
+        event.preventDefault();
+        window.hide();
+        return;
       }
-      handling = false;
-      return;
-    }
 
-    // "quit-completely" — full cleanup and exit
-    try {
-      await opts.onBeforeQuit?.();
-    } catch (err) {
-      console.error("Error in onBeforeQuit:", err);
-    }
+      // Prevent close while dialog is showing
+      if (dialogOpen) {
+        event.preventDefault();
+        return;
+      }
 
-    try {
-      await opts.webServer?.close();
-    } catch (err) {
-      console.error("Error closing web server:", err);
-    }
+      event.preventDefault();
+      dialogOpen = true;
 
-    console.log("Stopping launchd services...");
-    for (const label of [opts.labels.openclaw, opts.labels.controller]) {
-      try {
-        await opts.launchd.bootoutService(label);
-        console.log(`Booted out ${label}`);
-      } catch (err) {
-        console.error(`Error booting out ${label}:`, err);
+      void (async () => {
+        const decision = await showQuitDialog();
+        dialogOpen = false;
+
+        if (decision === "cancel") {
+          return;
+        }
+
+        if (decision === "run-in-background") {
+          window.hide();
+          return;
+        }
+
+        // "quit-completely"
+        try {
+          await opts.onBeforeQuit?.();
+        } catch (err) {
+          console.error("Error in onBeforeQuit:", err);
+        }
+
+        try {
+          await opts.webServer?.close();
+        } catch (err) {
+          console.error("Error closing web server:", err);
+        }
+
+        for (const label of [opts.labels.openclaw, opts.labels.controller]) {
+          try {
+            await opts.launchd.bootoutService(label);
+          } catch (err) {
+            console.error(`Error booting out ${label}:`, err);
+          }
+        }
+
+        // Mark force-quit and actually exit
+        (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+        opts.onForceQuit?.();
+        app.quit();
+      })();
+    });
+  };
+
+  // Apply to all existing windows
+  for (const win of BrowserWindow.getAllWindows()) {
+    interceptWindowClose(win);
+  }
+
+  // Apply to future windows
+  app.on("browser-window-created", (_event, win) => {
+    interceptWindowClose(win);
+  });
+
+  // Also intercept Cmd+Q / Dock "Quit" which triggers before-quit
+  app.on("before-quit", (event) => {
+    if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
+
+    // In packaged mode, prevent quit and let window close handler show dialog
+    if (app.isPackaged) {
+      event.preventDefault();
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) {
+        win.show();
+        win.close(); // Triggers the close handler above
       }
     }
-
-    opts.onForceQuit?.();
-    app.removeAllListeners("before-quit");
-    app.quit();
   });
 }
 
@@ -166,5 +203,6 @@ export async function quitWithDecision(
     }
   }
 
+  (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
   app.quit();
 }

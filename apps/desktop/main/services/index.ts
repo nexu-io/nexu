@@ -29,7 +29,6 @@ export {
 
 export {
   installLaunchdQuitHandler,
-  showQuitDialog,
   quitWithDecision,
   type QuitHandlerOptions,
   type QuitDecision,
