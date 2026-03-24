@@ -2,6 +2,7 @@ import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import type { OpenClawSyncService } from "../services/openclaw-sync-service.js";
 import type { OpenClawProcessManager } from "./openclaw-process.js";
+import type { OpenClawWsClient } from "./openclaw-ws-client.js";
 import type { RuntimeHealth } from "./runtime-health.js";
 import {
   type ControllerRuntimeState,
@@ -55,17 +56,24 @@ export function startHealthLoop(params: {
   state: ControllerRuntimeState;
   runtimeHealth: RuntimeHealth;
   processManager?: OpenClawProcessManager;
+  wsClient?: OpenClawWsClient;
 }): () => void {
   let stopped = false;
 
   const run = async () => {
     while (!stopped) {
+      const prevGateway = params.state.gatewayStatus;
       const checkedAt = new Date().toISOString();
       const result = await params.runtimeHealth.probe();
       params.state.lastGatewayProbeAt = checkedAt;
       if (result.ok) {
         params.state.gatewayStatus = "active";
         params.state.lastGatewayError = null;
+        // Gateway just became reachable — nudge WS client to connect now
+        // instead of waiting for the backoff timer.
+        if (prevGateway !== "active") {
+          params.wsClient?.retryNow();
+        }
       } else if (result.status !== null) {
         // Gateway responded but with an error status code
         params.state.gatewayStatus = "degraded";

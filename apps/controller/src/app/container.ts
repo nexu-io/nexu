@@ -157,6 +157,7 @@ export async function createContainer(): Promise<ControllerContainer> {
         state: runtimeState,
         runtimeHealth,
         processManager: openclawProcess,
+        wsClient,
       });
       skillhubService.start();
 

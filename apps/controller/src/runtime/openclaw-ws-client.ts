@@ -535,6 +535,21 @@ export class OpenClawWsClient {
     this.pending.clear();
   }
 
+  /**
+   * Cancel any pending reconnect timer and connect immediately.
+   * Called by the health loop when it detects the gateway is reachable.
+   */
+  retryNow(): void {
+    if (this.closed || this.ws) return;
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
+    this.backoffMs = 1000;
+    logger.info({}, "openclaw_ws_retry_now");
+    this.connect();
+  }
+
   private scheduleReconnect(): void {
     if (this.closed) {
       return;
