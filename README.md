@@ -215,7 +215,7 @@ Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUT
 ## ❓ FAQ
 
 **Q: Is nexu free?**
-A: The client is completely free and open-source (MIT). During the beta, built-in top-tier models are also free with unlimited usage. After GA, you can bring your own API Key and pay providers directly.
+A: The client is completely free and open-source (MIT). Built-in top-tier models are available for you to use, and you can also choose to bring your own API Key.
 
 **Q: Which operating systems are supported?**
 A: macOS 12+ (Apple Silicon) is supported today. Windows and macOS Intel are in development — email [support@nexu.ai](mailto:support@nexu.ai) for updates.

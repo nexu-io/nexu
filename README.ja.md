@@ -33,7 +33,7 @@
 
 ---
 
-## 📋 What is nexu?
+## 📋 nexu とは？
 
 **nexu**（next to you）は、**OpenClaw 🦞** の Agent を WeChat、Feishu、Slack、Discord などの IM 上で直接動かせるオープンソースのデスクトップクライアントです。
 
@@ -215,7 +215,7 @@ pnpm test
 ## ❓ FAQ
 
 **Q: nexu は無料ですか？**
-A: クライアントは完全無料かつオープンソース（MIT）です。ベータ期間中は内蔵のトップモデルも無料・無制限で利用できます。正式リリース後は、お持ちの API キーでプロバイダーに直接お支払いいただけます。
+A: クライアントは完全無料かつオープンソース（MIT）です。内蔵のトップモデルをご利用いただけるほか、お持ちの API キーを使用することも可能です。
 
 **Q: どの OS に対応していますか？**
 A: 現在 macOS 12 以降（Apple Silicon）に対応しています。Windows および macOS Intel は開発中です。最新情報は [support@nexu.ai](mailto:support@nexu.ai) までお問い合わせください。
