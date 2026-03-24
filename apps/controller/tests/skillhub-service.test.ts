@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => {
     refreshCatalog: ReturnType<typeof vi.fn>;
     executeInstall: ReturnType<typeof vi.fn>;
     getCuratedSlugsToEnqueue: ReturnType<typeof vi.fn>;
+    canonicalizeSlug: ReturnType<typeof vi.fn>;
     reconcileDbWithDisk: ReturnType<typeof vi.fn>;
   }> = [];
 
@@ -65,6 +66,7 @@ const mocks = vi.hoisted(() => {
     }));
     public readonly executeInstall = vi.fn(async () => {});
     public readonly getCuratedSlugsToEnqueue = vi.fn(() => [] as string[]);
+    public readonly canonicalizeSlug = vi.fn((slug: string) => slug);
     public readonly reconcileDbWithDisk = vi.fn();
 
     constructor(

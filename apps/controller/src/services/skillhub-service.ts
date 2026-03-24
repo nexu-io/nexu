@@ -114,7 +114,8 @@ export class SkillhubService {
     // Step 2: Enqueue curated skills from ClawHub that aren't on disk yet
     const toEnqueue = this.catalogManager.getCuratedSlugsToEnqueue();
     for (const slug of toEnqueue) {
-      this.installQueue.enqueue(slug, "managed");
+      const canonical = this.catalogManager.canonicalizeSlug(slug);
+      this.installQueue.enqueue(canonical, "managed");
     }
   }
 
@@ -127,7 +128,8 @@ export class SkillhubService {
   }
 
   enqueueInstall(slug: string): QueueItem {
-    return this.installQueue.enqueue(slug, "managed");
+    const canonical = this.catalogManager.canonicalizeSlug(slug);
+    return this.installQueue.enqueue(canonical, "managed");
   }
 
   dispose(): void {

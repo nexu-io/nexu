@@ -313,6 +313,10 @@ export class CatalogManager {
    * Returns curated slugs that have no record in the ledger.
    * Used by SkillhubService to enqueue on startup.
    */
+  canonicalizeSlug(rawSlug: string): string {
+    return SLUG_CORRECTIONS[rawSlug] ?? rawSlug;
+  }
+
   getCuratedSlugsToEnqueue(): string[] {
     const knownSlugs = this.db.getAllKnownSlugs();
     return CURATED_SKILL_SLUGS.filter((slug) => !knownSlugs.has(slug));

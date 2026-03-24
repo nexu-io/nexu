@@ -3,7 +3,6 @@ import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
 const DEFAULT_DOWNLOAD_COUNT = 1000;
-const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 
 const minimalSkillSchema = z.object({
   slug: z.string(),
@@ -95,7 +94,7 @@ const skillhubImportResultSchema = z.object({
   error: z.string().optional(),
 });
 
-const skillhubSlugSchema = z.string().min(1);
+const skillhubSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,127}$/);
 
 export function registerSkillhubRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -149,9 +148,6 @@ export function registerSkillhubRoutes(
     }),
     async (c) => {
       const { slug } = c.req.valid("json");
-      if (!SLUG_REGEX.test(slug)) {
-        return c.json({ ok: false, error: "Invalid skill slug" }, 200);
-      }
       const queueItem = container.skillhubService.enqueueInstall(slug);
       return c.json(
         {

@@ -239,7 +239,12 @@ export class InstallQueue {
           this.active.delete(item.slug);
           item.status = "done";
           // Record in DB only on successful, non-cancelled completion
-          this.onComplete?.(item.slug, item.source);
+          try {
+            this.onComplete?.(item.slug, item.source);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.log("error", `onComplete failed for ${item.slug}: ${msg}`);
+          }
           this.log("info", `Install complete: ${item.slug}`);
         }
 
