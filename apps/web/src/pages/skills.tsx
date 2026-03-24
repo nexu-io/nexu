@@ -556,14 +556,14 @@ export function SkillsPage() {
           {(
             [
               {
-                id: "explore" as const,
-                label: t("skills.explore"),
-                icon: Compass,
-              },
-              {
                 id: "yours" as const,
                 label: t("skills.yours"),
                 icon: Settings2,
+              },
+              {
+                id: "explore" as const,
+                label: t("skills.explore"),
+                icon: Compass,
               },
             ] as const
           ).map((tab) => {
@@ -702,6 +702,20 @@ export function SkillsPage() {
             )}
           </div>
         )}
+
+        {/* ClawHub disclaimer */}
+        <p className="text-[12px] text-text-tertiary mb-4 font-medium">
+          {t("skills.clawhubDisclaimer")}{" "}
+          <a
+            href="https://github.com/nexu-io/nexu/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[var(--color-accent)] hover:underline"
+          >
+            GitHub Issues
+          </a>
+          {t("skills.clawhubDisclaimerAfterLink")}
+        </p>
 
         {/* Skill Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
