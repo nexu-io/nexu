@@ -47,8 +47,8 @@ Once connected to IM, your Agent is online 24/7 — chat from your phone anytime
 All data stays on your machine. Your privacy, fully in your control.
 
 <p align="center">
-  <video src="site/media/readme-wechat-demo-en.mov" width="100%" autoplay loop muted playsinline>
-    Your browser does not support video playback. <a href="site/media/readme-wechat-demo-en.mov">Download the video</a> to watch.
+  <video src="https://github.com/nexu-io/nexu/raw/main/site/media/readme-wechat-demo-en.mov" width="100%" autoplay loop muted playsinline>
+    Your browser does not support video playback. <a href="https://github.com/nexu-io/nexu/raw/main/site/media/readme-wechat-demo-en.mov">Download the video</a> to watch.
   </video>
 </p>
 

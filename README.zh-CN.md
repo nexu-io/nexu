@@ -47,8 +47,8 @@
 所有数据保存在本机，隐私安全，完全可控。
 
 <p align="center">
-  <video src="site/media/readme-wechat-demo-zh.mov" width="100%" autoplay loop muted playsinline>
-    您的浏览器不支持视频播放，请 <a href="site/media/readme-wechat-demo-zh.mov">点击下载</a> 观看。
+  <video src="https://github.com/nexu-io/nexu/raw/main/site/media/readme-wechat-demo-zh.mov" width="100%" autoplay loop muted playsinline>
+    您的浏览器不支持视频播放，请 <a href="https://github.com/nexu-io/nexu/raw/main/site/media/readme-wechat-demo-zh.mov">点击下载</a> 观看。
   </video>
 </p>
 
