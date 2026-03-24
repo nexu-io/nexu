@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release" /></a>
+  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu?color=blue" alt="Release" /></a>
   <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <a href="https://github.com/nexu-io/nexu/stargazers"><img src="https://img.shields.io/github/stars/nexu-io/nexu?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
