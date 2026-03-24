@@ -138,6 +138,12 @@ start_services() {
   echo "Building web..."
   pnpm --filter @nexu/web build
 
+  # Ensure desktop shell dist exists (Electron loadFile needs it on disk)
+  if [ ! -f "$REPO_ROOT/apps/desktop/dist/index.html" ]; then
+    echo "Building desktop shell..."
+    pnpm --filter @nexu/desktop build
+  fi
+
   # Remove stale plist files so Electron generates fresh ones
   purge_plists
 
