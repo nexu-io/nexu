@@ -236,10 +236,15 @@ export async function stopAllServices(
 export function isLaunchdBootstrapEnabled(): boolean {
   // Explicitly disabled
   if (process.env.NEXU_USE_LAUNCHD === "0") return false;
-  // Explicitly enabled (dev mode)
+  // Explicitly enabled (dev scripts)
   if (process.env.NEXU_USE_LAUNCHD === "1") return true;
-  // Packaged app: default to launchd on macOS
-  if (process.platform === "darwin") return true;
+  // CI environments should use orchestrator mode
+  if (process.env.CI) return false;
+  // Packaged app on macOS: default to launchd
+  // ELECTRON_IS_PACKAGED is not a real env var — check if running from
+  // an .app bundle by looking at the executable path.
+  const isPackaged = !process.execPath.includes("node_modules");
+  if (isPackaged && process.platform === "darwin") return true;
   return false;
 }
 
