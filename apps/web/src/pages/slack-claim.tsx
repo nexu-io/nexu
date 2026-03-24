@@ -80,7 +80,7 @@ function NewWorkspacePanel() {
     <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
       <div className="flex items-center gap-2.5">
         <BrandMark className="w-7 h-7 shrink-0" />
-        <span className="text-[14px] font-semibold text-white/90">Nexu</span>
+        <span className="text-[14px] font-semibold text-white/90">nexu</span>
       </div>
 
       <div>
@@ -127,7 +127,7 @@ function ExistingWorkspacePanel({
     <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
       <div className="flex items-center gap-2.5">
         <BrandMark className="w-7 h-7 shrink-0" />
-        <span className="text-[14px] font-semibold text-white/90">Nexu</span>
+        <span className="text-[14px] font-semibold text-white/90">nexu</span>
       </div>
 
       <div>

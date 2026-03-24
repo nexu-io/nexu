@@ -138,7 +138,7 @@ export function DesktopShell() {
           <SurfaceFrame
             description="Authenticated workspace surface served by the repo-local web sidecar."
             src={desktopWebUrl}
-            title="Nexu Web"
+            title="nexu Web"
             version={webSurfaceVersion}
             preload={getWebviewPreloadUrl()}
           />

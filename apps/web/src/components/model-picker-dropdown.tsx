@@ -12,7 +12,7 @@ export interface ModelPickerItem {
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
-  nexu: "Nexu Official",
+  nexu: "nexu Official",
   anthropic: "Anthropic",
   openai: "OpenAI",
   google: "Google AI",

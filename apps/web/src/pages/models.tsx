@@ -114,7 +114,7 @@ const PROVIDER_META: Record<
   }
 > = {
   nexu: {
-    name: "Nexu Official",
+    name: "nexu Official",
     descriptionKey: "models.provider.nexu.description",
   },
   anthropic: {
@@ -670,7 +670,7 @@ export function ModelsPage() {
     const nexuProvider = providers.find((p) => p.id === "nexu");
     items.push({
       id: "nexu",
-      name: "Nexu Official",
+      name: "nexu Official",
       modelCount: nexuProvider?.models.length ?? 0,
       configured: (nexuProvider?.models.length ?? 0) > 0,
       managed: true,

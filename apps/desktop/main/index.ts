@@ -51,7 +51,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Set display name early (matches productName in package.json).
-app.setName("Nexu");
+app.setName("nexu");
 nativeTheme.themeSource = "light";
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -208,7 +208,7 @@ if (sentryDsn) {
   Sentry.setContext("build", sentryBuildMetadata.buildContext);
 } else {
   crashReporter.start({
-    companyName: "Nexu",
+    companyName: "nexu",
     productName: app.getName(),
     submitURL: "https://127.0.0.1/desktop-crash-reporter-disabled",
     uploadToServer: false,
@@ -533,7 +533,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 1120,
     minHeight: 760,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
-    title: "Nexu",
+    title: "nexu",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     ...(isMacOS

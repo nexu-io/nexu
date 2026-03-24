@@ -404,7 +404,7 @@ describe("controller route compatibility", () => {
 
   it("returns the default bot workspace path for desktop ready", async () => {
     const bot = await container.configStore.createBot({
-      name: "Nexu Assistant",
+      name: "nexu Assistant",
       slug: "nexu-assistant",
       modelId: "anthropic/claude-sonnet-4",
     });

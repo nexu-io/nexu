@@ -595,7 +595,7 @@ function WorkspaceLayoutInner() {
             <>
               <img
                 src="/brand/logo-black-1.svg"
-                alt="Nexu"
+                alt="nexu"
                 className="h-6 object-contain"
               />
               {hasUpdate && updateDismissed && (

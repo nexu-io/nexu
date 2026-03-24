@@ -77,12 +77,12 @@ const SLACK_MANIFEST_BOT_EVENTS = [
 function buildSlackManifestUrl(baseUrl: string): string {
   const manifest = {
     display_information: {
-      name: "Nexu",
-      description: "Nexu — AI-powered workspace for your team",
+      name: "nexu",
+      description: "nexu — AI-powered workspace for your team",
       background_color: "#29292b",
     },
     features: {
-      bot_user: { display_name: "Nexu", always_online: true },
+      bot_user: { display_name: "nexu", always_online: true },
     },
     oauth_config: {
       redirect_urls: [`${baseUrl}/api/oauth/slack/callback`],

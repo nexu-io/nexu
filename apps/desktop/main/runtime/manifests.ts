@@ -255,7 +255,7 @@ export function createRuntimeUnitManifests(
   return [
     {
       id: "web",
-      label: "Nexu Web Surface",
+      label: "nexu Web Surface",
       kind: "surface",
       launchStrategy: "managed",
       runner: "spawn",
@@ -284,7 +284,7 @@ export function createRuntimeUnitManifests(
     },
     {
       id: "controller",
-      label: "Nexu Controller",
+      label: "nexu Controller",
       kind: "service",
       launchStrategy: "managed",
       // Use spawn instead of utility-process due to Electron bugs:

@@ -56,7 +56,7 @@ export function RuntimePage() {
       <header className="runtime-header">
         <div>
           <span className="runtime-eyebrow">Desktop Runtime</span>
-          <h1>Nexu local cold-start control room</h1>
+          <h1>nexu local cold-start control room</h1>
           <p>
             Renderer keeps the browser mental model. Electron main orchestrates
             local runtime units.

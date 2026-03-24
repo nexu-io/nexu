@@ -6,7 +6,7 @@ const container = await createContainer();
 const app = createApp(container);
 const spec = app.getOpenAPIDocument({
   openapi: "3.1.0",
-  info: { title: "Nexu Controller API", version: "1.0.0" },
+  info: { title: "nexu Controller API", version: "1.0.0" },
 });
 
 const outputPath = new URL("../openapi.json", import.meta.url).pathname;

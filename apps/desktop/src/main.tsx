@@ -575,7 +575,7 @@ function RuntimePage() {
       <header className="runtime-header">
         <div>
           <span className="runtime-eyebrow">Desktop Runtime</span>
-          <h1>Nexu local cold-start control room</h1>
+          <h1>nexu local cold-start control room</h1>
           <p>
             Renderer keeps the browser mental model. Electron main orchestrates
             local runtime units.
@@ -877,7 +877,7 @@ function DiagnosticsPage({
           }
         />
         <SummaryCard
-          label="Nexu Home"
+          label="nexu Home"
           className="diagnostics-summary-wide"
           value={runtimeConfig?.paths.nexuHome ?? "-"}
         />
@@ -1120,7 +1120,7 @@ function DesktopShell() {
           <SurfaceFrame
             description="Authenticated workspace surface served by the repo-local web sidecar."
             src={desktopWebUrl}
-            title="Nexu Web"
+            title="nexu Web"
             version={webSurfaceVersion}
             preload={getWebviewPreloadUrl()}
           />
