@@ -18,6 +18,7 @@
     "dist:mac": "node ./scripts/dist-mac.mjs",
     "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
     "dist:win": "node ./scripts/dist-win.mjs",
+    "dist:win:dir": "node ./scripts/dist-win.mjs --dir-only",
     "upload:sourcemaps": "node ./scripts/upload-sourcemaps.mjs",
     "typecheck": "tsc --noEmit"
   },
@@ -125,11 +126,23 @@
       "icon": "build/icon.ico",
       "target": [
         {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
           "target": "dir",
           "arch": ["x64"]
         }
       ],
       "artifactName": "nexu-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "nexu-setup-${version}-${arch}.${ext}"
     },
     "dmg": {
       "size": "2g"

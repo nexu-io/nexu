@@ -182,6 +182,7 @@ async function getElectronVersion() {
 }
 
 async function main() {
+  const dirOnly = process.argv.includes("--dir-only");
   const env = {
     ...process.env,
     NEXU_WORKSPACE_ROOT: repoRoot,
@@ -217,7 +218,7 @@ async function main() {
   await runElectronBuilder(
     [
       "--win",
-      "dir",
+      ...(dirOnly ? ["dir"] : ["nsis", "dir"]),
       "--publish",
       "never",
       `--config.electronVersion=${electronVersion}`,
