@@ -145,7 +145,7 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
 
         // Clean up runtime-ports.json so next launch does cold start
         if (opts.plistDir) {
-          await deleteRuntimePorts(opts.plistDir);
+          await deleteRuntimePorts(opts.plistDir).catch(() => {});
         }
 
         // Mark force-quit and actually exit

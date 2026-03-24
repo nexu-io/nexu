@@ -153,8 +153,12 @@ start_services() {
 
   mkdir -p "$LOG_DIR"
 
+  # Initialize watcher PIDs (set -u safe)
+  CONTROLLER_WATCH_PID=""
+  WEB_WATCH_PID=""
+
   # When this script exits (Electron quit, Ctrl+C, etc), stop everything
-  trap 'echo ""; echo "Cleaning up..."; kill $CONTROLLER_WATCH_PID $WEB_WATCH_PID 2>/dev/null; stop_services' EXIT INT TERM
+  trap 'echo ""; echo "Cleaning up..."; [ -n "$CONTROLLER_WATCH_PID" ] && kill "$CONTROLLER_WATCH_PID" 2>/dev/null; [ -n "$WEB_WATCH_PID" ] && kill "$WEB_WATCH_PID" 2>/dev/null; stop_services' EXIT INT TERM
 
   # Start controller file watcher in background:
   # tsc --watch → auto-restart launchd service on successful compile

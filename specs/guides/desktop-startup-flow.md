@@ -159,7 +159,7 @@ Electron main process
 
 ```
 waitForControllerReadiness()
-  ├─ Poll /health (adaptive: 50ms → 250ms)
+  ├─ Poll /api/auth/get-session (adaptive: 50ms → 250ms)
   └─ Controller bootstrap (~2s)
        ├─ prepare() + ensureRuntimeModelPlugin() + cloudModels  ── parallel
        ├─ ensureValidDefaultModel()

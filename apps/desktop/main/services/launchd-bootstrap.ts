@@ -520,9 +520,10 @@ export async function bootstrapWithLaunchd(
       controllerPort: effectivePorts.controllerPort,
     });
   } catch {
-    // Web port occupied — allocate fresh
+    // Web port occupied — try next port
+    effectivePorts.webPort = effectivePorts.webPort + 1;
     webServer = await startEmbeddedWebServer({
-      port: 0,
+      port: effectivePorts.webPort,
       webRoot: env.webRoot,
       controllerPort: effectivePorts.controllerPort,
     });
