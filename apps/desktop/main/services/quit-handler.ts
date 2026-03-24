@@ -83,75 +83,56 @@ export async function showQuitDialog(): Promise<QuitDecision> {
  * Install quit handler for launchd-managed services.
  */
 export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
-  let isQuitting = false;
+  let handling = false;
 
   app.on("before-quit", async (event) => {
-    // Prevent recursive handling
-    if (isQuitting) {
-      return;
-    }
+    if (handling) return;
 
     event.preventDefault();
+    handling = true;
 
-    // In dev mode, skip dialog and keep services running (vite HMR restarts
-    // Electron frequently; stopping services each time would cause needless
-    // downtime). The dev-launchd.sh stop/clean commands use SIGKILL to bypass
-    // this handler when a full stop is intended.
     const decision: QuitDecision = app.isPackaged
       ? await showQuitDialog()
       : "run-in-background";
 
     if (decision === "cancel") {
+      handling = false;
       return;
     }
 
-    isQuitting = true;
-
-    // Run cleanup callback
-    if (opts.onBeforeQuit) {
-      try {
-        await opts.onBeforeQuit();
-      } catch (err) {
-        console.error("Error in onBeforeQuit:", err);
-      }
-    }
-
-    // Close web server if running
-    if (opts.webServer) {
-      try {
-        await opts.webServer.close();
-      } catch (err) {
-        console.error("Error closing web server:", err);
-      }
-    }
-
-    if (decision === "quit-completely") {
-      // Bootout launchd services (stops + unregisters atomically).
-      // Must bootout instead of SIGTERM because KeepAlive would restart them.
-      console.log("Stopping launchd services...");
-
-      for (const label of [opts.labels.openclaw, opts.labels.controller]) {
-        try {
-          await opts.launchd.bootoutService(label);
-          console.log(`Booted out ${label}`);
-        } catch (err) {
-          console.error(`Error booting out ${label}:`, err);
-        }
-      }
-    } else {
-      // "Run in background" — hide all windows but keep the process alive
-      // so launchd services continue running. User can reopen from Dock.
-      console.log("Keeping services running in background");
+    if (decision === "run-in-background") {
+      // Just hide windows — don't stop services, don't close web server
       for (const win of BrowserWindow.getAllWindows()) {
         win.hide();
       }
-      isQuitting = false;
+      handling = false;
       return;
     }
 
-    // Signal force quit so window close handlers don't intercept
+    // "quit-completely" — full cleanup and exit
+    try {
+      await opts.onBeforeQuit?.();
+    } catch (err) {
+      console.error("Error in onBeforeQuit:", err);
+    }
+
+    try {
+      await opts.webServer?.close();
+    } catch (err) {
+      console.error("Error closing web server:", err);
+    }
+
+    console.log("Stopping launchd services...");
+    for (const label of [opts.labels.openclaw, opts.labels.controller]) {
+      try {
+        await opts.launchd.bootoutService(label);
+        console.log(`Booted out ${label}`);
+      } catch (err) {
+        console.error(`Error booting out ${label}:`, err);
+      }
+    }
+
     opts.onForceQuit?.();
-    // Remove handler and quit
     app.removeAllListeners("before-quit");
     app.quit();
   });
@@ -178,8 +159,8 @@ export async function quitWithDecision(
 
   if (decision === "quit-completely") {
     try {
-      await opts.launchd.stopServiceGracefully(opts.labels.openclaw);
-      await opts.launchd.stopServiceGracefully(opts.labels.controller);
+      await opts.launchd.bootoutService(opts.labels.openclaw);
+      await opts.launchd.bootoutService(opts.labels.controller);
     } catch (err) {
       console.error("Error stopping services:", err);
     }
