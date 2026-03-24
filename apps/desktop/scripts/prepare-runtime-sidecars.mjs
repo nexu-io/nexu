@@ -9,10 +9,23 @@ const repoRoot =
   process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const releaseRuntimeRoot = resolve(electronRoot, ".dist-runtime");
 const isRelease = process.argv.includes("--release");
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
+function createCommandSpec(command, args) {
+  if (process.platform === "win32" && (command === "pnpm" || command === "pnpm.cmd")) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
+    };
+  }
+
+  return { command, args };
+}
 
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(command, args, {
+    const commandSpec = createCommandSpec(command, args);
+    const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: options.cwd ?? repoRoot,
       env: options.env ?? process.env,
       stdio: "inherit",
@@ -43,7 +56,9 @@ async function main() {
   if (isRelease) {
     await resetDir(releaseRuntimeRoot);
     env.NEXU_DESKTOP_SIDECAR_OUT_DIR = releaseRuntimeRoot;
-    env.NEXU_DESKTOP_COPY_RUNTIME_DEPS = "true";
+    if (!env.NEXU_DESKTOP_COPY_RUNTIME_DEPS) {
+      env.NEXU_DESKTOP_COPY_RUNTIME_DEPS = process.platform === "darwin" ? "true" : "false";
+    }
   }
 
   const scripts = [
@@ -53,7 +68,7 @@ async function main() {
   ];
 
   for (const script of scripts) {
-    await run("pnpm", ["run", script], {
+    await run(pnpmCommand, ["run", script], {
       cwd: electronRoot,
       env,
     });

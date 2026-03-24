@@ -17,6 +17,7 @@
     "package:sidecars": "node ./scripts/prepare-runtime-sidecars.mjs --release",
     "dist:mac": "node ./scripts/dist-mac.mjs",
     "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
+    "dist:win": "node ./scripts/dist-win.mjs",
     "upload:sourcemaps": "node ./scripts/upload-sourcemaps.mjs",
     "typecheck": "tsc --noEmit"
   },
@@ -41,7 +42,9 @@
     "react-router-dom": "^7.6.0",
     "sharp": "0.34.5",
     "sonner": "^2.0.1",
-    "tailwind-merge": "^3.0.1"
+    "tailwind-merge": "^3.0.1",
+    "yauzl": "^3.2.1",
+    "yazl": "^3.3.1"
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.0",
@@ -117,6 +120,16 @@
       "extendInfo": {
         "LSUIElement": true
       }
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "dir",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "nexu-${version}-${arch}.${ext}"
     },
     "dmg": {
       "size": "2g"

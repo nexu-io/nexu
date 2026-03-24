@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import {
+  createWriteStream,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -8,7 +9,10 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { chmod, mkdir, rename, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import * as path from "node:path";
+import { pipeline } from "node:stream/promises";
 import {
   getOpenclawCuratedSkillsDir,
   getOpenclawSkillsDir,
@@ -16,6 +20,40 @@ import {
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
+
+const require = createRequire(import.meta.url);
+const yauzl = require("yauzl") as {
+  open: (
+    path: string,
+    options: { lazyEntries: boolean },
+    callback: (error: Error | null, zipFile?: YauzlZipFile) => void,
+  ) => void;
+};
+
+type YauzlEntry = {
+  fileName: string;
+  externalFileAttributes?: number;
+};
+
+type YauzlZipFile = {
+  readEntry: () => void;
+  on: (event: "entry", listener: (entry: YauzlEntry) => void) => void;
+  once: (
+    event: "end" | "error",
+    listener: (() => void) | ((error: Error) => void),
+  ) => void;
+  openReadStream: (
+    entry: YauzlEntry,
+    callback: (error: Error | null, stream?: NodeJS.ReadableStream) => void,
+  ) => void;
+  close: () => void;
+};
+
+type PackagedArchiveMetadata = {
+  format: string;
+  path: string;
+  version?: string;
+};
 
 function ensureDir(path: string): string {
   mkdirSync(path, { recursive: true });
@@ -162,12 +200,125 @@ export function buildSkillNodePath(
   );
 }
 
-function ensurePackagedOpenclawSidecar(
+function resolveArchiveStamp(
+  archivePath: string,
+  archiveMetadata: PackagedArchiveMetadata | null,
+): string {
+  if (archiveMetadata?.version) {
+    return archiveMetadata.version;
+  }
+
+  const archiveStat = statSync(archivePath);
+  return `${archiveStat.size}:${archiveStat.mtimeMs}`;
+}
+
+function readPackagedArchiveMetadata(
+  packagedSidecarRoot: string,
+): PackagedArchiveMetadata | null {
+  const archiveMetadataPath = path.resolve(packagedSidecarRoot, "archive.json");
+
+  if (!existsSync(archiveMetadataPath)) {
+    return null;
+  }
+
+  return JSON.parse(
+    readFileSync(archiveMetadataPath, "utf8"),
+  ) as PackagedArchiveMetadata;
+}
+
+async function extractZipArchive(
+  archivePath: string,
+  destinationRoot: string,
+): Promise<void> {
+  await new Promise<void>((resolveExtract, rejectExtract) => {
+    yauzl.open(archivePath, { lazyEntries: true }, (openError, zipFile) => {
+      if (openError || !zipFile) {
+        rejectExtract(
+          openError ?? new Error(`Unable to open zip archive ${archivePath}`),
+        );
+        return;
+      }
+
+      const closeWithError = (error: Error) => {
+        zipFile.close();
+        rejectExtract(error);
+      };
+
+      zipFile.once("error", closeWithError);
+      zipFile.once("end", () => {
+        zipFile.close();
+        resolveExtract();
+      });
+      zipFile.on("entry", (entry) => {
+        void (async () => {
+          const normalizedPath = entry.fileName.replace(/\\/gu, "/");
+          if (!normalizedPath || normalizedPath === ".") {
+            zipFile.readEntry();
+            return;
+          }
+
+          const destinationPath = path.resolve(destinationRoot, normalizedPath);
+          const relativePath = path.relative(destinationRoot, destinationPath);
+          if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+            throw new Error(
+              `Refusing to extract path outside destination: ${entry.fileName}`,
+            );
+          }
+
+          if (normalizedPath.endsWith("/")) {
+            await mkdir(destinationPath, { recursive: true });
+            zipFile.readEntry();
+            return;
+          }
+
+          await mkdir(path.dirname(destinationPath), { recursive: true });
+          zipFile.openReadStream(entry, async (streamError, readStream) => {
+            if (streamError || !readStream) {
+              closeWithError(
+                streamError ??
+                  new Error(`Unable to read zip entry ${entry.fileName}`),
+              );
+              return;
+            }
+
+            try {
+              await pipeline(readStream, createWriteStream(destinationPath));
+              if (process.platform !== "win32") {
+                const entryMode = entry.externalFileAttributes
+                  ? (entry.externalFileAttributes >>> 16) & 0o777
+                  : 0;
+                if (entryMode > 0) {
+                  await chmod(destinationPath, entryMode);
+                }
+              }
+              zipFile.readEntry();
+            } catch (error) {
+              closeWithError(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+            }
+          });
+        })().catch((error) => {
+          closeWithError(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        });
+      });
+
+      zipFile.readEntry();
+    });
+  });
+}
+
+async function ensurePackagedOpenclawSidecar(
   runtimeSidecarBaseRoot: string,
   runtimeRoot: string,
-): string {
+): Promise<string> {
   const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
-  const archivePath = path.resolve(packagedSidecarRoot, "payload.tar.gz");
+  const archiveMetadata = readPackagedArchiveMetadata(packagedSidecarRoot);
+  const archivePath = archiveMetadata
+    ? path.resolve(packagedSidecarRoot, archiveMetadata.path)
+    : path.resolve(packagedSidecarRoot, "payload.tar.gz");
 
   if (!existsSync(archivePath)) {
     return packagedSidecarRoot;
@@ -177,8 +328,7 @@ function ensurePackagedOpenclawSidecar(
     path.resolve(runtimeRoot, "openclaw-sidecar"),
   );
   const stampPath = path.resolve(extractedSidecarRoot, ".archive-stamp");
-  const archiveStat = statSync(archivePath);
-  const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
+  const archiveStamp = resolveArchiveStamp(archivePath, archiveMetadata);
   const extractedOpenclawEntry = path.resolve(
     extractedSidecarRoot,
     "node_modules/openclaw/openclaw.mjs",
@@ -192,20 +342,43 @@ function ensurePackagedOpenclawSidecar(
     return extractedSidecarRoot;
   }
 
+  const tempExtractedSidecarRoot = path.resolve(
+    runtimeRoot,
+    "openclaw-sidecar.extracting",
+  );
+  await rm(tempExtractedSidecarRoot, { recursive: true, force: true });
+  await mkdir(tempExtractedSidecarRoot, { recursive: true });
+
+  if (!archiveMetadata || archiveMetadata.format === "tar.gz") {
+    execFileSync("tar", ["-xzf", archivePath, "-C", tempExtractedSidecarRoot]);
+  } else if (archiveMetadata.format === "zip") {
+    await extractZipArchive(archivePath, tempExtractedSidecarRoot);
+  } else {
+    throw new Error(
+      `Unsupported packaged archive format: ${archiveMetadata.format}`,
+    );
+  }
+
+  if (process.platform !== "win32") {
+    await chmod(
+      path.resolve(tempExtractedSidecarRoot, "bin/openclaw"),
+      0o755,
+    ).catch(() => null);
+  }
+
   rmSync(extractedSidecarRoot, { recursive: true, force: true });
-  mkdirSync(extractedSidecarRoot, { recursive: true });
-  execFileSync("tar", ["-xzf", archivePath, "-C", extractedSidecarRoot]);
+  await rename(tempExtractedSidecarRoot, extractedSidecarRoot);
   writeFileSync(stampPath, archiveStamp);
 
   return extractedSidecarRoot;
 }
 
-export function createRuntimeUnitManifests(
+export async function createRuntimeUnitManifests(
   electronRoot: string,
   userDataPath: string,
   isPackaged: boolean,
   runtimeConfig: DesktopRuntimeConfig,
-): RuntimeUnitManifest[] {
+): Promise<RuntimeUnitManifest[]> {
   const repoRoot = getWorkspaceRoot();
   const _nexuRoot = repoRoot;
   const runtimeSidecarBaseRoot = isPackaged
@@ -213,7 +386,7 @@ export function createRuntimeUnitManifests(
     : path.resolve(repoRoot, ".tmp/sidecars");
   const runtimeRoot = ensureDir(path.resolve(userDataPath, "runtime"));
   const openclawSidecarRoot = isPackaged
-    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
+    ? await ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
     : path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));

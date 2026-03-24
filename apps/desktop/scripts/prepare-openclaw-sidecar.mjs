@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
 import {
   chmod,
   cp,
+  lstat,
   mkdir,
   mkdtemp,
   readFile,
@@ -10,6 +12,7 @@ import {
   rename,
   writeFile,
 } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +26,9 @@ import {
   resetDir,
   shouldCopyRuntimeDependencies,
 } from "./lib/sidecar-paths.mjs";
+
+const require = createRequire(import.meta.url);
+const { ZipFile } = require("yazl");
 
 const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
 const openclawRuntimeNodeModules = resolve(openclawRuntimeRoot, "node_modules");
@@ -339,7 +345,7 @@ async function computePreparationCacheKey() {
 async function hasReusableSidecar(cacheKey) {
   const requiredPaths = shouldCopyRuntimeDependencies()
     ? [
-        resolve(sidecarRoot, "payload.tar.gz"),
+        resolve(sidecarRoot, "payload.zip"),
         resolve(sidecarRoot, "archive.json"),
         resolve(sidecarRoot, "package.json"),
       ]
@@ -461,6 +467,31 @@ async function collectFiles(rootPath) {
   }
 
   return files;
+}
+
+async function createZipArchive(sourceRoot, archivePath) {
+  const zipFile = new ZipFile();
+  const outputStream = zipFile.outputStream;
+  const filePaths = await collectFiles(sourceRoot);
+
+  const completion = new Promise((resolveArchive, rejectArchive) => {
+    outputStream.once("error", rejectArchive);
+    outputStream.once("close", resolveArchive);
+  });
+
+  outputStream.pipe(createWriteStream(archivePath));
+
+  for (const filePath of filePaths) {
+    const relativePath = relative(sourceRoot, filePath).replace(/\\/gu, "/");
+    const fileStat = await lstat(filePath);
+    zipFile.addFile(filePath, relativePath, {
+      mode: fileStat.mode,
+      mtime: fileStat.mtime,
+    });
+  }
+
+  zipFile.end();
+  await completion;
 }
 
 const nativeBinaryNamePattern = /\.(?:node|dylib|so|dll)$/u;
@@ -1005,18 +1036,19 @@ exit 127
     if (shouldCopyRuntimeDependencies()) {
       const archivePath = resolve(
         dirname(sidecarRoot),
-        "openclaw-sidecar.tar.gz",
+        "openclaw-sidecar.zip",
       );
       await runTimedStep("archive_runtime_dependencies", async () => {
         await removePathIfExists(archivePath);
-        await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
+        await createZipArchive(sidecarRoot, archivePath);
         await resetDir(sidecarRoot);
         await writeFile(
           resolve(sidecarRoot, "archive.json"),
           `${JSON.stringify(
             {
-              format: "tar.gz",
-              path: "payload.tar.gz",
+              format: "zip",
+              path: "payload.zip",
+              version: cacheKey,
             },
             null,
             2,
@@ -1026,7 +1058,7 @@ exit 127
           resolve(sidecarRoot, "package.json"),
           '{\n  "name": "openclaw-sidecar",\n  "private": true\n}\n',
         );
-        await rename(archivePath, resolve(sidecarRoot, "payload.tar.gz"));
+        await rename(archivePath, resolve(sidecarRoot, "payload.zip"));
       });
     }
 

@@ -11,6 +11,17 @@ const cacheFileName = ".postinstall-cache.json";
 const cacheFilePath = path.join(runtimeDir, cacheFileName);
 const lockfilePath = path.join(runtimeDir, "package-lock.json");
 
+function createCommandSpec(command, args) {
+  if (process.platform === "win32" && (command === "npm" || command === "npm.cmd")) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", ["npm", ...args].join(" ")],
+    };
+  }
+
+  return { command, args };
+}
+
 async function readCachedFingerprint() {
   if (!(await exists(cacheFilePath))) {
     return null;
@@ -27,7 +38,8 @@ async function readCachedFingerprint() {
 
 async function run(command, args) {
   await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const commandSpec = createCommandSpec(command, args);
+    const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: runtimeDir,
       stdio: "inherit",
     });

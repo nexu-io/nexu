@@ -83,7 +83,7 @@ const { allocations: runtimePortAllocations, runtimeConfig } =
     },
   );
 const orchestrator = new RuntimeOrchestrator(
-  createRuntimeUnitManifests(
+  await createRuntimeUnitManifests(
     electronRoot,
     app.getPath("userData"),
     app.isPackaged,
