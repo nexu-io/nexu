@@ -38,7 +38,6 @@ const en = {
   "welcome.byok.verify.loading": "Verifying...",
   "welcome.byok.verify.idle": "Verify connection",
   "welcome.byok.success": "Connected, enter nexu",
-  "welcome.customEndpoint": "API Base URL (e.g. http://localhost:11434/v1)",
   "welcome.waitingLogin": "Waiting for browser login...",
   "welcome.waitingLoginHint":
     "Please complete login in the browser. This page will redirect automatically.",
@@ -284,9 +283,6 @@ const en = {
   "models.provider.google.description": "Gemini series AI models",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
-  "models.provider.custom.name": "Custom Provider",
-  "models.provider.custom.description":
-    "Any endpoint compatible with OpenAI API",
   "models.managed.connected": "Log out",
   "models.managed.notConnected": "Not connected",
   "models.managed.cloudConnectAria": "Connect to nexu cloud",

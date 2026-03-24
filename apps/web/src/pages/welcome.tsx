@@ -58,7 +58,6 @@ const PROVIDER_OPTIONS = [
   { id: "minimax", name: "MiniMax", placeholder: "sk-..." },
   { id: "kimi", name: "Kimi", placeholder: "sk-..." },
   { id: "glm", name: "GLM", placeholder: "eyJ..." },
-  { id: "custom", name: "Custom Endpoint", placeholder: "https://..." },
 ] as const;
 
 type Mode = "choose" | "byok";
@@ -116,7 +115,6 @@ export function WelcomePage() {
   const [selectedProvider, setSelectedProvider] = useState("anthropic");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
-  const [customEndpoint, setCustomEndpoint] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [cloudConnecting, setCloudConnecting] = useState(false);
@@ -572,16 +570,6 @@ export function WelcomePage() {
                         {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
-
-                    {selectedProvider === "custom" && (
-                      <input
-                        type="text"
-                        value={customEndpoint}
-                        onChange={(e) => setCustomEndpoint(e.target.value)}
-                        placeholder={t("welcome.customEndpoint")}
-                        className="w-full rounded-2xl border border-border bg-surface-0 px-4 py-3 font-mono text-[13px] text-text-primary placeholder:text-text-muted/50 focus:border-accent/30 focus:outline-none focus:ring-2 focus:ring-accent/10 transition-all"
-                      />
-                    )}
                   </div>
 
                   <div className="mt-5 rounded-2xl border border-black/8 bg-[#f6f3ec] px-4 py-3 text-[12px] leading-[1.7] text-text-secondary">

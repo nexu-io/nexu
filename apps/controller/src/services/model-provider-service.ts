@@ -6,6 +6,7 @@ import {
 } from "@nexu/shared";
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
+import { isSupportedByokProviderId } from "../lib/byok-providers.js";
 import { logger } from "../lib/logger.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 
@@ -68,7 +69,10 @@ export class ModelProviderService {
       description: "Cloud model via Nexu Link",
     }));
 
-    const providers = config.providers.filter((provider) => provider.enabled);
+    const providers = config.providers.filter(
+      (provider) =>
+        provider.enabled && isSupportedByokProviderId(provider.providerId),
+    );
     const byokModels: Model[] = providers.flatMap((provider) =>
       provider.models.map((modelId) => ({
         id: `${provider.providerId}/${modelId}`,
@@ -83,8 +87,11 @@ export class ModelProviderService {
   }
 
   async listProviders() {
+    const providers = await this.configStore.listProviders();
     return {
-      providers: await this.configStore.listProviders(),
+      providers: providers.filter((provider) =>
+        isSupportedByokProviderId(provider.providerId),
+      ),
     };
   }
 
@@ -104,7 +111,10 @@ export class ModelProviderService {
       await this.configStore.getDesktopCloudInventoryStatus();
     const config = await this.configStore.getConfig();
     const hasByokInventory = config.providers
-      .filter((provider) => provider.enabled)
+      .filter(
+        (provider) =>
+          provider.enabled && isSupportedByokProviderId(provider.providerId),
+      )
       .some((provider) => provider.models.length > 0);
 
     return {
@@ -165,7 +175,10 @@ export class ModelProviderService {
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
     const inventory = await this.getInventoryStatus();
 
-    const providers = config.providers.filter((provider) => provider.enabled);
+    const providers = config.providers.filter(
+      (provider) =>
+        provider.enabled && isSupportedByokProviderId(provider.providerId),
+    );
     const hasKnownInventory = inventory.hasKnownInventory;
 
     if (!hasKnownInventory) {
@@ -196,6 +209,10 @@ export class ModelProviderService {
     providerId: string,
     input: VerifyProviderBody,
   ): Promise<VerifyProviderResponse> {
+    if (!isSupportedByokProviderId(providerId)) {
+      return { valid: false, error: "Unsupported provider" };
+    }
+
     const verifyUrl =
       buildProviderUrl(
         input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,

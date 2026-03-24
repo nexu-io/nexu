@@ -200,11 +200,6 @@ const PROVIDER_META: Record<
     apiKeyPlaceholder: "eyJ...",
     defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
   },
-  custom: {
-    name: "Custom",
-    descriptionKey: "models.provider.custom.description",
-    apiKeyPlaceholder: "your-api-key",
-  },
 };
 
 // Well-known models per provider (shown when no verify result yet)
@@ -303,7 +298,7 @@ async function fetchProviders(): Promise<DbProvider[]> {
 }
 
 async function saveProvider(
-  providerId: string,
+  providerId: ByokProviderId,
   body: {
     apiKey?: string;
     baseUrl?: string | null;
@@ -320,7 +315,7 @@ async function saveProvider(
   return data.provider as DbProvider;
 }
 
-async function deleteProvider(providerId: string): Promise<void> {
+async function deleteProvider(providerId: ByokProviderId): Promise<void> {
   const { error } = await deleteApiV1ProvidersByProviderId({
     path: { providerId },
   });
@@ -328,7 +323,7 @@ async function deleteProvider(providerId: string): Promise<void> {
 }
 
 async function verifyApiKey(
-  providerId: string,
+  providerId: ByokProviderId,
   apiKey: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
@@ -353,8 +348,9 @@ const BYOK_PROVIDER_IDS = [
   "minimax",
   "kimi",
   "glm",
-  "custom",
 ] as const;
+
+type ByokProviderId = (typeof BYOK_PROVIDER_IDS)[number];
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -887,7 +883,7 @@ export function ModelsPage() {
                   )
                 ) : (
                   <ByokProviderDetail
-                    providerId={activeProvider.id}
+                    providerId={activeProvider.id as ByokProviderId}
                     dbProvider={dbProviders.find(
                       (p) => p.providerId === activeProvider.id,
                     )}
@@ -1190,7 +1186,7 @@ function ByokProviderDetail({
   onAutoSelectModel,
   onSelectModel,
 }: {
-  providerId: string;
+  providerId: ByokProviderId;
   dbProvider?: DbProvider;
   queryClient: ReturnType<typeof useQueryClient>;
   currentModelId: string;
@@ -1359,7 +1355,7 @@ function ByokProviderDetail({
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Auto-fetch models if none available (e.g. custom provider without verify)
+      // Auto-fetch models if none available yet
       let models = displayModels;
       if (models.length === 0 && apiKey) {
         const result = await verifyApiKey(

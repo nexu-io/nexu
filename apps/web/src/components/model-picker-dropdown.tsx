@@ -24,16 +24,11 @@ const PROVIDER_LABELS: Record<string, string> = {
   glm: "GLM",
   moonshot: "Kimi",
   zai: "GLM",
-  custom: "Custom",
 };
 
 function getGroupKey(model: ModelPickerItem): string {
   if (model.id.startsWith("link/")) {
     return "nexu";
-  }
-
-  if (model.provider.startsWith("custom_")) {
-    return "custom";
   }
 
   return model.provider;
@@ -96,9 +91,7 @@ export function ModelPickerDropdown({
     ? getGroupKey(currentModel)
     : currentModelId.startsWith("link/")
       ? "nexu"
-      : currentModelId.startsWith("custom_")
-        ? "custom"
-        : (currentModelId.split("/")[0] ?? "");
+      : (currentModelId.split("/")[0] ?? "");
   const currentModelLabel = currentModelId
     ? (currentModel?.name ?? getModelLabel(currentModelId))
     : emptyLabel;
@@ -116,8 +109,6 @@ export function ModelPickerDropdown({
     entries.sort((a, b) => {
       if (a[0] === "nexu") return -1;
       if (b[0] === "nexu") return 1;
-      if (a[0] === "custom") return 1;
-      if (b[0] === "custom") return -1;
       return a[0].localeCompare(b[0]);
     });
 

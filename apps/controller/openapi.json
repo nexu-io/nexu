@@ -4832,7 +4832,18 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -4995,7 +5006,18 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -5032,7 +5054,18 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm"
+              ]
             },
             "required": true,
             "name": "providerId",

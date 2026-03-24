@@ -37,7 +37,6 @@ const zhCN = {
   "welcome.byok.verify.loading": "验证中...",
   "welcome.byok.verify.idle": "验证连接",
   "welcome.byok.success": "连接成功，进入 nexu",
-  "welcome.customEndpoint": "API Base URL（例如 http://localhost:11434/v1）",
   "welcome.waitingLogin": "等待浏览器登录完成…",
   "welcome.waitingLoginHint": "请在浏览器中完成登录，此页面会自动跳转",
   "welcome.cancel": "取消",
@@ -274,8 +273,6 @@ const zhCN = {
   "models.provider.google.description": "Gemini 系列 AI 模型",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
-  "models.provider.custom.name": "自定义服务商",
-  "models.provider.custom.description": "任何兼容 OpenAI 的 API 端点",
   "models.managed.connected": "退出登录",
   "models.managed.notConnected": "未连接",
   "models.managed.cloudConnectAria": "连接 nexu 云端",

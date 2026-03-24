@@ -3,6 +3,7 @@ import { openclawConfigSchema } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import type { OAuthConnectionState } from "../runtime/openclaw-auth-profiles-store.js";
 import type { NexuConfig } from "../store/schemas.js";
+import { isSupportedByokProviderId } from "./byok-providers.js";
 import {
   compileChannelBindings,
   compileChannelsConfig,
@@ -108,10 +109,6 @@ function getByokProviderKey(input: {
   baseUrl: string | null;
 }): string {
   const openclawProviderId = resolveOpenClawProviderId(input.providerId);
-  if (input.providerId === "custom") {
-    return `custom_${input.id}`;
-  }
-
   return isByokProviderProxied(input.providerId, input.baseUrl)
     ? `byok_${openclawProviderId}`
     : openclawProviderId;
@@ -184,7 +181,10 @@ function compileModelsConfig(
   }
 
   for (const provider of config.providers.filter(
-    (item) => item.enabled && item.apiKey !== null,
+    (item) =>
+      item.enabled &&
+      item.apiKey !== null &&
+      isSupportedByokProviderId(item.providerId),
   )) {
     const providerKey = getByokProviderKey({
       id: provider.id,
@@ -253,6 +253,10 @@ export function resolveModelId(
   const byokPrefixToKey = new Map<string, string>();
   const byokPrefixToProvider = new Map<string, string>();
   for (const provider of config.providers.filter((item) => item.enabled)) {
+    if (!isSupportedByokProviderId(provider.providerId)) {
+      continue;
+    }
+
     const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
     byokPrefixToKey.set(
       provider.providerId,
@@ -285,10 +289,6 @@ export function resolveModelId(
         }
       }
 
-      // Custom provider: model entry ID is bare modelSuffix (no provider prefix)
-      if (byokKey.startsWith("custom_")) {
-        return `${byokKey}/${modelSuffix}`;
-      }
       const providerScopedModelId = `${openclawProviderId}/${modelSuffix}`;
       return byokKey === openclawProviderId
         ? providerScopedModelId

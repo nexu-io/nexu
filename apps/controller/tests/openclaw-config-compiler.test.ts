@@ -142,7 +142,7 @@ function createConfig(overrides: Partial<NexuConfig> = {}): NexuConfig {
       "channel:feishu-channel-1:verificationToken": "verify-token",
     },
     ...overrides,
-  };
+  } as unknown as NexuConfig;
 }
 
 describe("compileOpenClawConfig", () => {
@@ -255,6 +255,35 @@ describe("compileOpenClawConfig", () => {
     expect(result.agents.list[0]?.model).toEqual({
       primary: "openai/gpt-5.4",
     });
+  });
+
+  it("ignores unsupported custom providers in compiled model config", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [
+          ...createConfig().providers,
+          {
+            ...createConfig().providers[0],
+            id: "provider-3",
+            providerId: "custom",
+            displayName: "Custom",
+            baseUrl: "https://models.example.com/v1",
+            apiKey: "custom-key",
+            models: ["anthropic/claude-sonnet-4"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      }),
+      createEnv(),
+    );
+
+    expect(Object.keys(result.models?.providers ?? {})).not.toContain("custom");
+    expect(
+      Object.keys(result.models?.providers ?? {}).some((key) =>
+        key.startsWith("custom_"),
+      ),
+    ).toBe(false);
   });
 
   it("remaps openai models to OAuth provider ids when persisted OAuth state is connected", () => {

@@ -8,9 +8,12 @@ import {
   verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
+import { supportedByokProviderIds } from "../lib/byok-providers.js";
 import type { ControllerBindings } from "../types.js";
 
-const providerIdParamSchema = z.object({ providerId: z.string() });
+const providerIdParamSchema = z.object({
+  providerId: z.enum(supportedByokProviderIds),
+});
 
 export function registerModelRoutes(
   app: OpenAPIHono<ControllerBindings>,
