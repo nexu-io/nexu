@@ -2,6 +2,7 @@
   "name": "@nexu/controller",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",

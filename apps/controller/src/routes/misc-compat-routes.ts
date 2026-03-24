@@ -10,11 +10,6 @@ import {
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
-const checkEmailBodySchema = z.object({ email: z.string().optional() });
-const checkEmailResponseSchema = z.object({
-  exists: z.boolean(),
-  verified: z.boolean(),
-});
 const desktopAuthorizeBodySchema = z.object({ deviceId: z.string() });
 const desktopAuthorizeResponseSchema = z.object({
   ok: z.boolean(),
@@ -30,31 +25,6 @@ export function registerMiscCompatRoutes(
   app: OpenAPIHono<ControllerBindings>,
   container: ControllerContainer,
 ): void {
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/api/auth/check-email",
-      tags: ["Auth"],
-      request: {
-        body: {
-          content: { "application/json": { schema: checkEmailBodySchema } },
-        },
-      },
-      responses: {
-        200: {
-          content: { "application/json": { schema: checkEmailResponseSchema } },
-          description: "Email check",
-        },
-      },
-    }),
-    async (c) => {
-      const body = c.req.valid("json");
-      const exists =
-        typeof body.email === "string" && body.email.trim().length > 0;
-      return c.json({ exists, verified: exists }, 200);
-    },
-  );
-
   app.openapi(
     createRoute({
       method: "post",

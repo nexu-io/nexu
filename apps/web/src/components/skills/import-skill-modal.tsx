@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useImportSkill } from "@/hooks/use-community-catalog";
+import { track } from "@/lib/tracking";
 import { AlertCircle, CheckCircle2, Lock } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -81,7 +82,11 @@ export default function ImportSkillModal({
   const handleImport = async () => {
     if (!selectedFile) return;
     try {
-      await importMutation.mutateAsync(selectedFile);
+      const result = await importMutation.mutateAsync(selectedFile);
+      track("workspace_skill_enable", {
+        name: result.slug ?? "unknown_skill",
+        skill_source: "custom",
+      });
       setDone(true);
       autoCloseControllerRef.current.schedule(handleClose, 1200);
     } catch {

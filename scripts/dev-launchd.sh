@@ -198,7 +198,11 @@ tail_logs() {
   echo "Tailing logs from $LOG_DIR..."
   echo "(Press Ctrl+C to stop)"
   echo ""
-  tail -f "$LOG_DIR"/*.log
+  if ls "$LOG_DIR"/*.log &>/dev/null; then
+    tail -f "$LOG_DIR"/*.log
+  else
+    echo "No log files found yet. Start services first."
+  fi
 }
 
 # Main

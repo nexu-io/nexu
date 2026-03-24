@@ -50,3 +50,57 @@ describe("openLocalFolderUrl – browser fallback", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe("openLocalFolderUrl – desktop host bridge", () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+  let hostInvokeSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn().mockResolvedValue({ ok: true });
+    hostInvokeSpy = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("window", {
+      nexuHost: {
+        invoke: hostInvokeSpy,
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses controller shell-open for local file URLs even when the desktop bridge exists", async () => {
+    await openLocalFolderUrl("file:///Users/qiyuan/.openclaw/workspace");
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalledWith("/api/internal/desktop/shell-open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/Users/qiyuan/.openclaw/workspace" }),
+    });
+    expect(hostInvokeSpy).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the desktop bridge when controller shell-open fails", async () => {
+    fetchSpy.mockRejectedValue(new Error("controller down"));
+
+    await openLocalFolderUrl("file:///Users/qiyuan/.openclaw/workspace");
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(hostInvokeSpy).toHaveBeenCalledOnce();
+    expect(hostInvokeSpy).toHaveBeenCalledWith("shell:open-external", {
+      url: "file:///Users/qiyuan/.openclaw/workspace",
+    });
+  });
+
+  it("still uses the desktop bridge for non-file URLs", async () => {
+    await openLocalFolderUrl("https://example.com");
+
+    expect(hostInvokeSpy).toHaveBeenCalledOnce();
+    expect(hostInvokeSpy).toHaveBeenCalledWith("shell:open-external", {
+      url: "https://example.com",
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});

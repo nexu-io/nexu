@@ -104,7 +104,7 @@ export function SurfaceFrame({
       }
       el.setAttribute("src", src);
     },
-    [preload, src],
+    [preload],
   );
 
   // Listen for webview dom-ready to dismiss the loader overlay
@@ -132,7 +132,7 @@ export function SurfaceFrame({
           ref={webviewRefCallback as React.Ref<HTMLWebViewElement>}
           className="desktop-web-frame"
           key={`${src}:${version}`}
-          // @ts-expect-error Electron webview boolean attribute
+          // @ts-expect-error Electron webview boolean attribute — must be empty string, not boolean
           allowpopups=""
           style={{ opacity: webviewReady ? 1 : 0 }}
         />

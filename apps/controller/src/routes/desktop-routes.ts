@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process";
-import { homedir } from "node:os";
 import path from "node:path";
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import type { ControllerContainer } from "../app/container.js";
-import { env } from "../app/env.js";
 import type { ControllerBindings } from "../types.js";
 
 const desktopReadyResponseSchema = z.object({
@@ -100,9 +98,9 @@ export function registerDesktopRoutes(
     async (c) => {
       const { path: targetPath } = c.req.valid("json");
       const resolved = path.resolve(targetPath);
-      const allowedRoot = path.resolve(env.openclawStateDir);
+      const allowedRoot = path.resolve(container.env.openclawStateDir);
       const allowedWorkspaceRoot = path.resolve(
-        path.join(homedir(), ".openclaw", "workspace"),
+        path.join(container.env.openclawStateDir, "agents"),
       );
 
       if (
@@ -152,10 +150,22 @@ export function registerDesktopRoutes(
     }),
     async (c) => {
       const runtime = await container.runtimeHealth.probe();
+      const bots = await container.configStore.listBots();
+      const preferredBot =
+        bots.find((bot) => bot.status === "active") ??
+        bots.find((bot) => bot.status !== "deleted") ??
+        null;
+
       return c.json(
         {
           ready: true,
-          workspacePath: path.join(homedir(), ".openclaw", "workspace"),
+          workspacePath: preferredBot
+            ? path.join(
+                container.env.openclawStateDir,
+                "agents",
+                preferredBot.id,
+              )
+            : path.join(container.env.openclawStateDir, "agents"),
           runtime,
           status: container.runtimeState.status,
         },

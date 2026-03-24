@@ -4,20 +4,29 @@ const localePreferenceScript = `
 (() => {
   const storageKey = "nexu-docs-locale";
   const zhPrefix = "/zh/";
+  const jaPrefix = "/ja/";
 
-  const normalizePath = (path) => (path === "/zh" ? zhPrefix : path);
+  const normalizePath = (path) => {
+    if (path === "/zh") return zhPrefix;
+    if (path === "/ja") return jaPrefix;
+    return path;
+  };
 
   const getLocaleFromPath = (path) => {
     const normalizedPath = normalizePath(path);
-    return normalizedPath === zhPrefix || normalizedPath.startsWith(zhPrefix)
-      ? "zh"
-      : "en";
+    if (normalizedPath === zhPrefix || normalizedPath.startsWith(zhPrefix)) {
+      return "zh";
+    }
+    if (normalizedPath === jaPrefix || normalizedPath.startsWith(jaPrefix)) {
+      return "ja";
+    }
+    return "en";
   };
 
   const getPreferredLocale = () => {
     try {
       const stored = window.localStorage.getItem(storageKey);
-      if (stored === "en" || stored === "zh") {
+      if (stored === "en" || stored === "zh" || stored === "ja") {
         return stored;
       }
     } catch {}
@@ -26,9 +35,13 @@ const localePreferenceScript = `
       ? navigator.languages
       : [navigator.language];
 
-    return languages.some((language) => String(language).toLowerCase().startsWith("zh"))
-      ? "zh"
-      : "en";
+    if (languages.some((language) => String(language).toLowerCase().startsWith("zh"))) {
+      return "zh";
+    }
+    if (languages.some((language) => String(language).toLowerCase().startsWith("ja"))) {
+      return "ja";
+    }
+    return "en";
   };
 
   const setPreferredLocale = (locale) => {
@@ -39,9 +52,9 @@ const localePreferenceScript = `
 
   const pathname = normalizePath(window.location.pathname);
 
-  if (pathname === "/" || pathname === zhPrefix) {
+  if (pathname === "/" || pathname === zhPrefix || pathname === jaPrefix) {
     const preferredLocale = getPreferredLocale();
-    const targetPath = preferredLocale === "zh" ? zhPrefix : "/";
+    const targetPath = preferredLocale === "zh" ? zhPrefix : preferredLocale === "ja" ? jaPrefix : "/";
 
     if (pathname !== targetPath) {
       window.location.replace(targetPath + window.location.search + window.location.hash);
@@ -121,6 +134,42 @@ const enSidebar = [
   },
 ];
 
+const jaSidebar = [
+  {
+    text: "はじめに",
+    items: [
+      { text: "イントロダクション", link: "/ja/" },
+      { text: "1分クイックスタート", link: "/ja/guide/quickstart" },
+      { text: "基本コンセプト", link: "/ja/guide/concepts" },
+    ],
+  },
+  {
+    text: "設定",
+    items: [
+      {
+        text: "チャンネル設定",
+        link: "/ja/guide/channels",
+        items: [
+          { text: "Feishu", link: "/ja/guide/channels/feishu" },
+          { text: "Slack", link: "/ja/guide/channels/slack" },
+          { text: "Discord", link: "/ja/guide/channels/discord" },
+        ],
+      },
+      { text: "モデル設定", link: "/ja/guide/models" },
+      { text: "スキルインストール", link: "/ja/guide/skills" },
+    ],
+  },
+  {
+    text: "コミュニティ",
+    items: [
+      { text: "コントリビュート", link: "/ja/guide/contributing" },
+      { text: "お問い合わせ", link: "/ja/guide/contact" },
+      { text: "GitHub で Star", link: "/ja/guide/star" },
+      { text: "更新ログ", link: "https://github.com/nexu-io/nexu/releases" },
+    ],
+  },
+];
+
 const zhSidebar = [
   {
     text: "快速开始",
@@ -182,9 +231,19 @@ export default defineConfig({
       description: "nexu 的渠道、模型与技能文档。",
       link: "/zh/",
     },
+    ja: {
+      label: "日本語",
+      lang: "ja",
+      title: "nexu",
+      description: "nexu のチャンネル、モデル、スキルに関するドキュメント。",
+      link: "/ja/",
+    },
   },
   head: [
-    ["meta", { name: "theme-color", content: "#c96f4a" }],
+    ["meta", { name: "theme-color", content: "#3DB9CE" }],
+    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+    ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
+    ["link", { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" }],
     ["script", {}, localePreferenceScript],
     ["link", { rel: "icon", href: "/favicon/favicon.ico", sizes: "any" }],
     [
@@ -212,10 +271,11 @@ export default defineConfig({
   ],
   themeConfig: {
     logo: {
-      light: "/favicon/favicon-light.svg",
-      dark: "/favicon/favicon-dark.svg",
+      light: "/favicon/nexu-logo-light.svg",
+      dark: "/favicon/nexu-logo-dark.svg",
       alt: "Nexu",
     },
+    siteTitle: false,
     socialLinks: [{ icon: "github", link: "https://github.com/nexu-io/nexu" }],
     langMenuLabel: "Language",
     search: {
@@ -256,6 +316,23 @@ export default defineConfig({
               },
             },
           },
+          ja: {
+            translations: {
+              button: {
+                buttonText: "ドキュメントを検索",
+                buttonAriaLabel: "ドキュメントを検索",
+              },
+              modal: {
+                noResultsText: "該当なし",
+                resetButtonTitle: "検索をクリア",
+                footer: {
+                  selectText: "選択",
+                  navigateText: "移動",
+                  closeText: "閉じる",
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -269,6 +346,7 @@ export default defineConfig({
     sidebar: {
       "/": enSidebar,
       "/zh/": zhSidebar,
+      "/ja/": jaSidebar,
     },
   },
 });

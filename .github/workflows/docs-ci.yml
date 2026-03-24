@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "docs/**"
+      - "CONTRIBUTING.md"
       - ".github/workflows/docs-ci.yml"
   workflow_dispatch:
 
@@ -41,7 +42,7 @@ jobs:
             exit 0
           fi
 
-          if git diff --name-only "$BASE_SHA" "${{ github.sha }}" | grep -E '^(docs/|\.github/workflows/docs-ci\.yml$)' >/dev/null; then
+          if git diff --name-only "$BASE_SHA" "${{ github.sha }}" | grep -E '^(docs/|CONTRIBUTING\.md$|\.github/workflows/docs-ci\.yml$)' >/dev/null; then
             echo "should_build=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_build=false" >> "$GITHUB_OUTPUT"

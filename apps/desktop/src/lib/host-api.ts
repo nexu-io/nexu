@@ -90,13 +90,48 @@ export async function queryRuntimeEvents(
   return result;
 }
 
-export async function ensureDesktopAuthSession(
-  force = false,
-): Promise<boolean> {
-  const result = await getHostBridge().invoke("desktop:ensure-auth-session", {
-    force,
+export async function getDesktopCloudStatus() {
+  return getHostBridge().invoke("desktop:get-cloud-status", undefined);
+}
+
+export async function createCloudProfile(profile: {
+  name: string;
+  cloudUrl: string;
+  linkUrl: string;
+}) {
+  return getHostBridge().invoke("desktop:create-cloud-profile", { profile });
+}
+
+export async function connectCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:connect-cloud-profile", { name });
+}
+
+export async function disconnectCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:disconnect-cloud-profile", { name });
+}
+
+export async function switchCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:switch-cloud-profile", { name });
+}
+
+export async function importCloudProfiles(
+  profiles: Array<{ name: string; cloudUrl: string; linkUrl: string }>,
+) {
+  return getHostBridge().invoke("desktop:import-cloud-profiles", { profiles });
+}
+
+export async function updateCloudProfile(
+  previousName: string,
+  profile: { name: string; cloudUrl: string; linkUrl: string },
+) {
+  return getHostBridge().invoke("desktop:update-cloud-profile", {
+    previousName,
+    profile,
   });
-  return result.ok;
+}
+
+export async function deleteCloudProfile(name: string) {
+  return getHostBridge().invoke("desktop:delete-cloud-profile", { name });
 }
 
 export function onDesktopCommand(

@@ -5,8 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
 import type { ControllerEnv } from "../src/app/env.js";
+import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../src/runtime/openclaw-process.js";
+import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../src/runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
 import { RuntimeHealth } from "../src/runtime/runtime-health.js";
 import { SessionsRuntime } from "../src/runtime/sessions-runtime.js";
@@ -14,6 +17,7 @@ import { createRuntimeState } from "../src/runtime/state.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { AgentService } from "../src/services/agent-service.js";
 import { ArtifactService } from "../src/services/artifact-service.js";
+import { ChannelFallbackService } from "../src/services/channel-fallback-service.js";
 import { ChannelService } from "../src/services/channel-service.js";
 import { DesktopLocalService } from "../src/services/desktop-local-service.js";
 import { IntegrationService } from "../src/services/integration-service.js";
@@ -22,6 +26,7 @@ import { ModelProviderService } from "../src/services/model-provider-service.js"
 import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../src/services/runtime-config-service.js";
+import { RuntimeModelStateService } from "../src/services/runtime-model-state-service.js";
 import { SessionService } from "../src/services/session-service.js";
 import type { SkillhubService } from "../src/services/skillhub-service.js";
 import { TemplateService } from "../src/services/template-service.js";
@@ -37,6 +42,8 @@ async function createTestContainer(
     port: 3010,
     host: "127.0.0.1",
     webUrl: "http://localhost:5173",
+    nexuCloudUrl: "https://nexu.io",
+    nexuLinkUrl: "https://link.nexu.io",
     nexuHomeDir: path.join(rootDir, ".nexu"),
     nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
     artifactsIndexPath: path.join(rootDir, ".nexu", "artifacts", "index.json"),
@@ -48,12 +55,26 @@ async function createTestContainer(
     openclawStateDir: path.join(rootDir, ".openclaw"),
     openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
     openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
+    openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
+    runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
+    openclawCuratedSkillsDir: path.join(rootDir, ".openclaw", "bundled-skills"),
+    openclawRuntimeModelStatePath: path.join(
+      rootDir,
+      ".openclaw",
+      "nexu-runtime-model.json",
+    ),
+    skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
+    skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+    staticSkillsDir: undefined,
+    platformTemplatesDir: undefined,
     openclawWorkspaceTemplatesDir: path.join(
       rootDir,
       ".openclaw",
       "workspace-templates",
     ),
     openclawBin: "openclaw",
+    litellmBaseUrl: null,
+    litellmApiKey: null,
     openclawGatewayPort: 18789,
     openclawGatewayToken: undefined,
     manageOpenclawProcess: false,
@@ -67,6 +88,9 @@ async function createTestContainer(
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);
+  const authProfilesWriter = new OpenClawAuthProfilesWriter();
+  const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
+  const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
   const sessionsRuntime = new SessionsRuntime(env);
@@ -86,9 +110,22 @@ async function createTestContainer(
     configStore,
     compiledStore,
     configWriter,
+    authProfilesWriter,
+    runtimePluginWriter,
+    runtimeModelWriter,
     templateWriter,
     watchTrigger,
     gatewayService,
+  );
+  const modelProviderService = new ModelProviderService(
+    configStore,
+    env.nodeEnv,
+  );
+  const runtimeModelStateService = new RuntimeModelStateService(env);
+  const channelFallbackService = new ChannelFallbackService(
+    openclawProcess,
+    gatewayService,
+    { getLocale: async () => "en" as const },
   );
   const skillhubService = {
     catalog: {
@@ -109,6 +146,7 @@ async function createTestContainer(
 
   return {
     env,
+    configStore,
     gatewayClient: {
       fetchJson: vi.fn(),
     } as unknown as ControllerContainer["gatewayClient"],
@@ -116,15 +154,21 @@ async function createTestContainer(
     openclawProcess,
     agentService: new AgentService(configStore, openclawSyncService),
     channelService: new ChannelService(configStore, openclawSyncService),
+    channelFallbackService,
     sessionService: new SessionService(sessionsRuntime),
     runtimeConfigService: new RuntimeConfigService(
       configStore,
       openclawSyncService,
     ),
-    modelProviderService: new ModelProviderService(configStore),
+    runtimeModelStateService,
+    modelProviderService,
     integrationService: new IntegrationService(configStore),
     localUserService: new LocalUserService(configStore),
-    desktopLocalService: new DesktopLocalService(configStore),
+    desktopLocalService: new DesktopLocalService(
+      configStore,
+      modelProviderService,
+      openclawProcess,
+    ),
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,
@@ -152,9 +196,6 @@ describe("controller route compatibility", () => {
 
   it("serves local auth/user compatibility endpoints", async () => {
     const app = createApp(container);
-
-    const sessionResponse = await app.request("/api/auth/get-session");
-    expect(sessionResponse.status).toBe(200);
 
     const meResponse = await app.request("/api/v1/me");
     expect(meResponse.status).toBe(200);
@@ -252,6 +293,77 @@ describe("controller route compatibility", () => {
       }),
     });
     expect(runtimeUpdate.status).toBe(200);
+
+    const importProfiles = await app.request(
+      "/api/internal/desktop/cloud-profiles/import",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          profiles: [
+            {
+              name: "Local Dev",
+              cloudUrl: "http://localhost:5173",
+              linkUrl: "http://localhost:8080",
+            },
+          ],
+        }),
+      },
+    );
+    expect(importProfiles.status).toBe(200);
+
+    const switchProfile = await app.request(
+      "/api/internal/desktop/cloud-profile/select",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Local Dev" }),
+      },
+    );
+    expect(switchProfile.status).toBe(200);
+
+    const createProfile = await app.request(
+      "/api/internal/desktop/cloud-profile/create",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          profile: {
+            name: "Manual Staging",
+            cloudUrl: "https://staging.example.com",
+            linkUrl: "https://link.staging.example.com",
+          },
+        }),
+      },
+    );
+    expect(createProfile.status).toBe(200);
+
+    const updateProfile = await app.request(
+      "/api/internal/desktop/cloud-profile/update",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          previousName: "Local Dev",
+          profile: {
+            name: "Local QA",
+            cloudUrl: "http://127.0.0.1:5173",
+            linkUrl: "http://127.0.0.1:8080",
+          },
+        }),
+      },
+    );
+    expect(updateProfile.status).toBe(200);
+
+    const deleteProfile = await app.request(
+      "/api/internal/desktop/cloud-profile/delete",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Local QA" }),
+      },
+    );
+    expect(deleteProfile.status).toBe(200);
   });
 
   it("does not expose the removed internal skill compatibility endpoints", async () => {
@@ -288,5 +400,22 @@ describe("controller route compatibility", () => {
       "/api/internal/workspace-templates/latest",
     );
     expect(latestTemplates.status).toBe(200);
+  });
+
+  it("returns the default bot workspace path for desktop ready", async () => {
+    const bot = await container.configStore.createBot({
+      name: "Nexu Assistant",
+      slug: "nexu-assistant",
+      modelId: "anthropic/claude-sonnet-4",
+    });
+    const app = createApp(container);
+
+    const response = await app.request("/api/internal/desktop/ready");
+    expect(response.status).toBe(200);
+
+    const payload = (await response.json()) as { workspacePath: string };
+    expect(payload.workspacePath).toBe(
+      path.join(rootDir, ".openclaw", "agents", bot.id),
+    );
   });
 });

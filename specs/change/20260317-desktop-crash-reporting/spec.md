@@ -100,7 +100,7 @@ created: "2026-03-17"
 
 - [x] Provision the Sentry project via Terraform (currently dev-only and not Terraform-managed).
 - [x] Wire `NEXU_DESKTOP_SENTRY_DSN` into CI nightly builds via GitHub Actions secrets (`desktop-build.yml` → `build-config.json` bake-in pattern, covering both test and prod nightlies).
-- [x] Fix DSN bake-in: `NEXU_DESKTOP_SENTRY_DSN` is now read from `build-config.json` at runtime (same pattern as `NEXU_CLOUD_URL`) rather than from `process.env`, which is empty in packaged apps. Changes span `runtime-config.ts`, `main/index.ts`, `main/ipc.ts`, and `preload/index.ts`.
+- [x] Fix DSN bake-in: `NEXU_DESKTOP_SENTRY_DSN` is now read from `build-config.json` at runtime rather than from `process.env`, which is empty in packaged apps. Changes span `runtime-config.ts`, `main/index.ts`, `main/ipc.ts`, and `preload/index.ts`.
 - [ ] Set the `NEXU_DESKTOP_SENTRY_DSN` GitHub secret (repo-level or per GitHub Environment) once the Terraform-managed Sentry project DSN is confirmed.
 - [ ] Verify the prod DSN is pointing to the correct Sentry project before enabling crash reporting in production.
 

@@ -153,7 +153,7 @@ export function InvitePage() {
               type="button"
               onClick={async () => {
                 await authClient.signOut();
-                navigate("/auth");
+                navigate("/");
               }}
               className="flex items-center gap-1.5 text-[13px] text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
             >

@@ -17,6 +17,15 @@ vi.mock("react-i18next", () => ({
       if (key === "sessions.chat.lastActive" && values?.time != null) {
         return `Last active ${String(values.time)}`;
       }
+      if (key === "sessions.chat.toolActivity") {
+        return "Localized Tool Activity";
+      }
+      if (key === "sessions.chat.toolCompleted") {
+        return "Completed";
+      }
+      if (key === "sessions.chat.replyLabel") {
+        return "Localized Reply";
+      }
       return key;
     },
   }),
@@ -104,6 +113,17 @@ describe("SessionsPage", () => {
     expect(markup).not.toContain("[message_id:");
     expect(markup).toContain("google-calendar");
     expect(markup).toContain("Open in Slack");
+  });
+
+  it("renders assistant tool activity as a compact execution chip", () => {
+    const markup = renderSessionsPage();
+
+    expect(markup).toContain('data-chat-layout="centered"');
+    expect(markup).toContain('data-tool-card="google-calendar"');
+    expect(markup).toContain('data-tool-card-variant="inline-chip"');
+    expect(markup).toContain(">Completed<");
+    expect(markup).toContain("Google Calendar");
+    expect(markup).not.toContain(">Localized Tool Activity<");
   });
 
   it("renders markdown formatting with safe links and escaped raw html", () => {
@@ -378,6 +398,187 @@ describe("SessionsPage", () => {
     );
     expect(markup).not.toContain(
       'href="https://applink.feishu.cn/client/bot/open?appId=cli_xxx"',
+    );
+  });
+
+  it("strips assistant reply markers and keeps tool-only activity visible", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["session-meta", "sess-tool"], {
+      id: "sess-tool",
+      title: "Feishu cleanup",
+      channelType: "feishu",
+      messageCount: 2,
+      lastMessageAt: "2026-03-23T03:20:00.000Z",
+      metadata: {},
+    });
+    queryClient.setQueryData(["chat-history", "sess-tool"], {
+      messages: [
+        {
+          id: "msg-prefix",
+          role: "assistant",
+          content: "[[reply_to_current]] 已处理完成，全部状态已修正为已上线。",
+          timestamp: new Date("2026-03-23T03:19:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:19:00.000Z",
+        },
+        {
+          id: "msg-tool-only",
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              name: "feishu_bitable_list_records",
+            },
+          ],
+          timestamp: new Date("2026-03-23T03:20:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:20:00.000Z",
+        },
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/workspace/sessions/sess-tool"]}>
+          <Routes>
+            <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("已处理完成，全部状态已修正为已上线。");
+    expect(markup).not.toContain("[[reply_to_current]]");
+    expect(markup).toContain('data-tool-card="feishu_bitable_list_records"');
+    expect(markup).toContain("Feishu Bitable List Records");
+  });
+
+  it("falls back to the localized tool label for placeholder tool names", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["session-meta", "sess-tool-fallback"], {
+      id: "sess-tool-fallback",
+      title: "Placeholder tool names",
+      channelType: "web",
+      messageCount: 2,
+      lastMessageAt: "2026-03-23T03:35:00.000Z",
+      metadata: {},
+    });
+    queryClient.setQueryData(["chat-history", "sess-tool-fallback"], {
+      messages: [
+        {
+          id: "msg-placeholder-name",
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              name: "tool",
+            },
+          ],
+          timestamp: new Date("2026-03-23T03:34:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:34:00.000Z",
+        },
+        {
+          id: "msg-separator-name",
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              name: "---",
+            },
+          ],
+          timestamp: new Date("2026-03-23T03:35:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:35:00.000Z",
+        },
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={["/workspace/sessions/sess-tool-fallback"]}
+        >
+          <Routes>
+            <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const fallbackMatches = markup.match(/Localized Tool Activity/g) ?? [];
+
+    expect(markup).toContain('data-tool-card="tool"');
+    expect(markup).toContain('data-tool-card="---"');
+    expect(markup).not.toContain(">Tool<");
+    expect(fallbackMatches).toHaveLength(2);
+  });
+
+  it("renders reply context as quote UI instead of raw metadata", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["session-meta", "sess-reply"], {
+      id: "sess-reply",
+      title: "Feishu reply",
+      channelType: "feishu",
+      messageCount: 1,
+      lastMessageAt: "2026-03-23T03:25:00.000Z",
+      metadata: {},
+    });
+    queryClient.setQueryData(["chat-history", "sess-reply"], {
+      messages: [
+        {
+          id: "msg-reply-context",
+          role: "user",
+          content: [
+            {
+              type: "replyContext",
+              text: "[Interactive Card]",
+            },
+            {
+              type: "text",
+              text: "你是谁",
+            },
+          ],
+          timestamp: new Date("2026-03-23T03:25:00.000Z").getTime(),
+          createdAt: "2026-03-23T03:25:00.000Z",
+        },
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/workspace/sessions/sess-reply"]}>
+          <Routes>
+            <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('data-reply-context="[Interactive Card]"');
+    expect(markup).toContain("Interactive Card");
+    expect(markup).toContain("你是谁");
+    expect(markup).toContain("Localized Reply");
+    expect(markup).not.toContain(">Reply<");
+    expect(markup).not.toContain(
+      "[Replying to: &quot;[Interactive Card]&quot;]",
     );
   });
 });

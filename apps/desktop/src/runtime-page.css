@@ -328,6 +328,472 @@ body,
   margin-bottom: 20px;
 }
 
+.cloud-profile-page {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.cloud-profile-header {
+  align-items: flex-start;
+}
+
+.cloud-profile-status-card,
+.cloud-profile-card {
+  border: 1px solid #ddd5c5;
+  border-radius: 20px;
+  background: rgba(255, 252, 245, 0.92);
+}
+
+.cloud-profile-status-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 260px;
+  padding: 16px 18px;
+}
+
+.cloud-profile-status-card strong {
+  display: block;
+}
+
+.cloud-profile-status-card p {
+  margin: 4px 0 0;
+  color: #5e636d;
+}
+
+.cloud-profile-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #a8a29e;
+  flex: 0 0 auto;
+}
+
+.cloud-profile-status-dot.is-connected {
+  background: #22c55e;
+  box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.12);
+}
+
+.cloud-profile-status-dot.is-loading {
+  background: #f59e0b;
+  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.12);
+}
+
+.cloud-profile-status-dot.is-error {
+  background: #ef4444;
+  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.12);
+}
+
+.cloud-profile-card {
+  max-width: 720px;
+  margin-bottom: 16px;
+  padding: 22px;
+}
+
+.cloud-profile-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.cloud-profile-section-head span {
+  color: #5e636d;
+}
+
+.cloud-profile-import-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  margin-right: 10px;
+  border: 1px solid #d9d0bf;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #1f242c;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.cloud-profile-import-button.is-primary {
+  background: #1f242c;
+  border-color: #1f242c;
+  color: #fff;
+}
+
+.cloud-profile-actions-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.cloud-profile-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cloud-profile-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cloud-profile-list-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e7e0d2;
+  border-radius: 16px;
+  background: #fffdf8;
+  padding: 14px 16px;
+}
+
+.cloud-profile-list-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #1f242c;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cloud-profile-list-main-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cloud-profile-inline-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: #a8a29e;
+}
+
+.cloud-profile-inline-dot.is-connected {
+  background: #22c55e;
+}
+
+.cloud-profile-inline-dot.is-loading {
+  background: #f59e0b;
+}
+
+.cloud-profile-active-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #f5e7c8;
+  color: #8b5e16;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.cloud-profile-model-count {
+  color: #7a7468;
+  font-size: 0.76rem;
+}
+
+.cloud-profile-list-account {
+  color: #5e636d;
+  font-size: 0.92rem;
+}
+
+.cloud-profile-list-url {
+  color: #7a7468;
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  overflow-wrap: anywhere;
+}
+
+.cloud-profile-list-main span {
+  color: #5e636d;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.cloud-profile-list-item.is-active {
+  border-color: #cda86b;
+  box-shadow: 0 6px 18px rgba(79, 70, 51, 0.1);
+}
+
+.cloud-profile-item-actions,
+.cloud-profile-form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cloud-profile-item-actions {
+  opacity: 0.45;
+  transition: opacity 160ms ease;
+}
+
+.cloud-profile-list-item:hover .cloud-profile-item-actions,
+.cloud-profile-list-item:focus-within .cloud-profile-item-actions,
+.cloud-profile-list-item.is-active .cloud-profile-item-actions {
+  opacity: 1;
+}
+
+.cloud-profile-item-action {
+  border: 1px solid #d9d0bf;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: #1f242c;
+  min-height: 40px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.cloud-profile-item-action.is-primary-action {
+  background: #1f242c;
+  border-color: #1f242c;
+  color: #fff;
+}
+
+.cloud-profile-item-action.is-connect {
+  border-color: #b6d7bc;
+  background: #eefaf0;
+  color: #166534;
+}
+
+.cloud-profile-item-action.is-danger {
+  color: #b42318;
+}
+
+.cloud-profile-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.cloud-profile-form-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.cloud-profile-form-grid span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #726857;
+}
+
+.cloud-profile-form-grid input {
+  border: 1px solid #d9d0bf;
+  border-radius: 12px;
+  background: #fffdf8;
+  color: #1f242c;
+  padding: 10px 12px;
+}
+
+.cloud-profile-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+}
+
+.cloud-profile-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(480px, calc(100vw - 32px));
+  margin: 0;
+  border: 0;
+  border-radius: 16px;
+  background: #fffdf8;
+  padding: 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+}
+
+.cloud-profile-modal::backdrop {
+  display: none;
+}
+
+.cloud-profile-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.cloud-profile-modal-header strong {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.cloud-profile-modal-header p {
+  margin: 6px 0 0;
+  color: #5e636d;
+}
+
+.cloud-profile-modal-close {
+  border: 0;
+  background: transparent;
+  color: #78716c;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cloud-profile-modal-form {
+  gap: 20px;
+}
+
+.cloud-profile-modal-actions {
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.runtime-cloud-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  min-width: min(360px, 100%);
+}
+
+.runtime-cloud-eyebrow {
+  margin-bottom: 0;
+}
+
+.runtime-cloud-segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #ddd5c5;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.88);
+}
+
+.runtime-cloud-option {
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #6b7280;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.runtime-cloud-option:hover:not(:disabled) {
+  color: #1f242c;
+}
+
+.runtime-cloud-option.is-active {
+  background: #fff;
+  color: #1f242c;
+  box-shadow: 0 6px 18px rgba(79, 70, 51, 0.12);
+}
+
+.runtime-cloud-option:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.runtime-cloud-meta {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  text-align: right;
+}
+
+.runtime-cloud-meta dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a7f6d;
+}
+
+.runtime-cloud-meta dd {
+  margin: 4px 0 0;
+  color: #374151;
+  font-size: 0.92rem;
+}
+
+.runtime-cloud-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  max-width: 520px;
+  color: #5e636d;
+  font-size: 0.92rem;
+}
+
+.runtime-cloud-message-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: #a8a29e;
+}
+
+.runtime-cloud-message-dot.is-ready {
+  background: #22c55e;
+}
+
+.runtime-cloud-message-dot.is-loading {
+  background: #f59e0b;
+}
+
+.runtime-cloud-message-dot.is-error {
+  background: #ef4444;
+}
+
+.runtime-cloud-message.is-error {
+  color: #b42318;
+}
+
+.cloud-profile-endpoints {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.cloud-profile-endpoints div {
+  border: 1px solid #e7e0d2;
+  border-radius: 16px;
+  background: #fffdf8;
+  padding: 14px 16px;
+}
+
+.cloud-profile-endpoints dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a7f6d;
+}
+
+.cloud-profile-endpoints dd {
+  margin: 8px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  overflow-wrap: anywhere;
+}
+
 .runtime-header h1 {
   margin: 0 0 8px;
   font-size: clamp(2rem, 4vw, 3.6rem);
@@ -1062,6 +1528,21 @@ body,
   .runtime-card-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .runtime-cloud-panel {
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .cloud-profile-status-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .runtime-cloud-meta,
+  .runtime-cloud-message {
+    text-align: left;
   }
 
   .runtime-pane-layout,

@@ -38,6 +38,14 @@ type SessionMetadata = {
 };
 
 type SessionMetadataRecord = Record<string, unknown>;
+type NormalizedTextPart = {
+  type: "text" | "replyContext";
+  text: string;
+};
+type SanitizedUserMessageText = {
+  text: string;
+  replyContext: string | null;
+};
 type SessionHints = {
   senderName?: string;
   channelType?: string;
@@ -55,6 +63,10 @@ type ControllerConfigRecord = {
 
 const UUID_LIKE_TITLE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FEISHU_MENTION_TAGS_SYSTEM_LINE =
+  /\n*\[System: The content may include mention tags in the form <at user_id="[^"]+">[^<]+<\/at>\. Treat these as real mentions of Feishu entities \(users or bots\)\.\]\s*$/u;
+const FEISHU_SELF_MENTION_SYSTEM_LINE =
+  /\n*\[System: If user_id is "[^"]+", that mention refers to you\.\]\s*$/u;
 
 function sessionMetadataPath(filePath: string): string {
   return filePath.replace(/\.jsonl$/, ".meta.json");
@@ -153,6 +165,7 @@ export class SessionsRuntime {
           const messages = await this.readMessages(
             filePath,
             Number.POSITIVE_INFINITY,
+            channelType,
           );
           const lastMsg = messages.at(-1);
 
@@ -281,7 +294,11 @@ export class SessionsRuntime {
     }
     const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
     return {
-      messages: await this.readMessages(filePath, limit ?? 200),
+      messages: await this.readMessages(
+        filePath,
+        limit ?? 200,
+        session.channelType,
+      ),
       sessionKey: session.sessionKey,
     };
   }
@@ -289,6 +306,7 @@ export class SessionsRuntime {
   private async readMessages(
     filePath: string,
     limit: number,
+    channelType?: string | null,
   ): Promise<ChatMessage[]> {
     let raw: string;
     try {
@@ -314,13 +332,19 @@ export class SessionsRuntime {
         if (entry.type !== "message" || !entry.message) continue;
         const role = entry.message.role;
         if (role !== "user" && role !== "assistant") continue;
-        messages.push({
-          id: entry.id ?? "",
-          role,
-          content: entry.message.content,
-          timestamp: entry.message.timestamp ?? null,
-          createdAt: entry.timestamp ?? null,
-        });
+        const normalizedMessage = this.normalizeChatMessage(
+          {
+            id: entry.id ?? "",
+            role,
+            content: entry.message.content,
+            timestamp: entry.message.timestamp ?? null,
+            createdAt: entry.timestamp ?? null,
+          },
+          channelType,
+        );
+        if (normalizedMessage) {
+          messages.push(normalizedMessage);
+        }
       } catch {
         // skip malformed lines
       }
@@ -328,6 +352,312 @@ export class SessionsRuntime {
 
     // Return last N messages
     return messages.slice(-limit);
+  }
+
+  private normalizeChatMessage(
+    message: ChatMessage,
+    channelType?: string | null,
+  ): ChatMessage | null {
+    const content = this.normalizeMessageContent(
+      message.role,
+      message.content,
+      channelType,
+    );
+    if (content == null) {
+      return null;
+    }
+
+    return {
+      ...message,
+      content,
+    };
+  }
+
+  private normalizeMessageContent(
+    role: ChatMessage["role"],
+    content: unknown,
+    channelType?: string | null,
+  ): unknown | null {
+    if (typeof content === "string") {
+      const normalizedParts = this.normalizeTextParts(
+        role,
+        content,
+        channelType,
+      );
+      if (normalizedParts.length === 0) {
+        return null;
+      }
+
+      if (normalizedParts.length === 1 && normalizedParts[0]?.type === "text") {
+        return normalizedParts[0].text;
+      }
+
+      return normalizedParts;
+    }
+
+    if (!Array.isArray(content)) {
+      return content;
+    }
+
+    const normalizedBlocks: Array<Record<string, unknown>> = [];
+    let hasVisibleContent = false;
+
+    for (const part of content) {
+      if (typeof part !== "object" || part === null) {
+        continue;
+      }
+
+      const block = part as Record<string, unknown>;
+      const blockType = typeof block.type === "string" ? block.type : null;
+
+      if (blockType === "thinking") {
+        continue;
+      }
+
+      if (blockType === "text") {
+        const rawText = typeof block.text === "string" ? block.text : null;
+        if (rawText == null) {
+          continue;
+        }
+
+        const normalizedParts = this.normalizeTextParts(
+          role,
+          rawText,
+          channelType,
+        );
+        if (normalizedParts.length === 0) {
+          continue;
+        }
+
+        for (const normalizedPart of normalizedParts) {
+          if (normalizedPart.type === "replyContext") {
+            normalizedBlocks.push(normalizedPart);
+            hasVisibleContent = true;
+            continue;
+          }
+
+          normalizedBlocks.push({
+            ...block,
+            text: normalizedPart.text,
+          });
+          hasVisibleContent = true;
+        }
+        continue;
+      }
+
+      if (blockType === "replyContext") {
+        const replyText =
+          typeof block.text === "string" ? block.text.trim() : "";
+        if (replyText.length === 0) {
+          continue;
+        }
+
+        normalizedBlocks.push({
+          ...block,
+          text: replyText,
+        });
+        hasVisibleContent = true;
+        continue;
+      }
+
+      if (blockType === "toolCall" || blockType === "tool_use") {
+        normalizedBlocks.push(block);
+        hasVisibleContent = true;
+        continue;
+      }
+
+      // Preserve unknown blocks for forward compatibility, but only text,
+      // replyContext, and tool blocks count as visible transcript content.
+      normalizedBlocks.push(block);
+    }
+
+    return hasVisibleContent ? normalizedBlocks : null;
+  }
+
+  private normalizeTextParts(
+    role: ChatMessage["role"],
+    text: string,
+    channelType?: string | null,
+  ): NormalizedTextPart[] {
+    if (role === "assistant") {
+      const normalizedText = this.stripAssistantReplyPrefix(text).trim();
+      return normalizedText.length > 0
+        ? [{ type: "text", text: normalizedText }]
+        : [];
+    }
+
+    const sanitized = this.sanitizeUserMessageText(text, channelType);
+    const normalizedParts: NormalizedTextPart[] = [];
+
+    if (sanitized.replyContext) {
+      normalizedParts.push({
+        type: "replyContext",
+        text: sanitized.replyContext,
+      });
+    }
+    if (sanitized.text.length > 0) {
+      normalizedParts.push({
+        type: "text",
+        text: sanitized.text,
+      });
+    }
+
+    return normalizedParts;
+  }
+
+  private sanitizeUserMessageText(
+    text: string,
+    channelType?: string | null,
+  ): SanitizedUserMessageText {
+    const replyContextFromMetadata = this.extractReplyContextFromMetadata(text);
+    const withoutMetadata = this.stripTranscriptMetadataBlocks(text);
+    const withoutChannelSuffix = this.stripChannelSystemSuffix(
+      withoutMetadata,
+      channelType,
+    );
+
+    let normalizedText = withoutChannelSuffix.trim();
+    const markerMatch = withoutChannelSuffix.match(
+      /\[message_id:\s*[^\]]+\](?:\n|\\n)(.+?):\s*([\s\S]*)$/,
+    );
+    if (markerMatch?.[2] != null) {
+      normalizedText = markerMatch[2].trim();
+    } else {
+      const timestampMatch = withoutChannelSuffix.match(
+        /^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+GMT[+-]\d+\]\s*([\s\S]*)$/,
+      );
+      if (timestampMatch?.[1] != null) {
+        normalizedText = timestampMatch[1].trim();
+      }
+    }
+
+    const extractedReplyContext = this.extractReplyContextPrefix(
+      normalizedText,
+      channelType,
+    );
+
+    return {
+      text: extractedReplyContext.text.trim(),
+      replyContext:
+        replyContextFromMetadata ?? extractedReplyContext.replyContext,
+    };
+  }
+
+  private stripAssistantReplyPrefix(text: string): string {
+    return text.replace(/^\s*\[\[reply_to_current\]\]\s*/u, "");
+  }
+
+  private stripTranscriptMetadataBlocks(text: string): string {
+    return text
+      .replace(
+        /Conversation info \(untrusted metadata\):\s*```json\s*[\s\S]*?```\s*/gu,
+        "",
+      )
+      .replace(
+        /Sender \(untrusted metadata\):\s*```json\s*[\s\S]*?```\s*/gu,
+        "",
+      )
+      .replace(
+        /Replied message \(untrusted, for context\):\s*```json\s*[\s\S]*?```\s*/gu,
+        "",
+      );
+  }
+
+  private stripChannelSystemSuffix(
+    text: string,
+    channelType?: string | null,
+  ): string {
+    if (channelType?.toLowerCase() !== "feishu") {
+      return text;
+    }
+
+    let normalized = text.trimEnd();
+    normalized = normalized.replace(FEISHU_SELF_MENTION_SYSTEM_LINE, "");
+    normalized = normalized.replace(FEISHU_MENTION_TAGS_SYSTEM_LINE, "");
+
+    return normalized.trimEnd();
+  }
+
+  private extractReplyContextFromMetadata(text: string): string | null {
+    const replyMeta = this.parseJsonMetadataBlock(
+      text,
+      "Replied message (untrusted, for context)",
+    );
+    if (!replyMeta) {
+      return null;
+    }
+
+    return (
+      this.readStringValue(replyMeta, "body") ??
+      this.readStringValue(replyMeta, "text") ??
+      this.readStringValue(replyMeta, "message") ??
+      this.readStringValue(replyMeta, "title") ??
+      this.readStringValue(replyMeta, "content") ??
+      null
+    );
+  }
+
+  private extractReplyContextPrefix(
+    text: string,
+    channelType?: string | null,
+  ): SanitizedUserMessageText {
+    const normalizedChannelType = channelType?.toLowerCase() ?? "";
+    const matchers = [
+      normalizedChannelType === "feishu"
+        ? this.matchEnglishReplyContextPrefix(text)
+        : null,
+      normalizedChannelType === "openclaw-weixin" ||
+      normalizedChannelType === "wechat"
+        ? this.matchChineseReplyContextPrefix(text)
+        : null,
+      normalizedChannelType.length === 0
+        ? (this.matchEnglishReplyContextPrefix(text) ??
+          this.matchChineseReplyContextPrefix(text))
+        : null,
+    ].filter((match): match is SanitizedUserMessageText => match != null);
+
+    return (
+      matchers[0] ?? {
+        text,
+        replyContext: null,
+      }
+    );
+  }
+
+  private matchEnglishReplyContextPrefix(
+    text: string,
+  ): SanitizedUserMessageText | null {
+    const match = text.match(
+      /^\[Replying to:\s*(?:"([\s\S]*?)"|([^\]]+))\]\s*(?:(?:\r?\n)|\\n)+([\s\S]*)$/u,
+    );
+    const replyContext = (match?.[1] ?? match?.[2] ?? "").trim();
+    const body = (match?.[3] ?? "").trim();
+    if (!match || replyContext.length === 0) {
+      return null;
+    }
+
+    return {
+      text: body,
+      replyContext,
+    };
+  }
+
+  private matchChineseReplyContextPrefix(
+    text: string,
+  ): SanitizedUserMessageText | null {
+    const match = text.match(
+      /^\[引用:\s*([\s\S]*?)\]\s*(?:(?:\r?\n)|\\n)+([\s\S]*)$/u,
+    );
+    const replyContext = (match?.[1] ?? "").trim();
+    const body = (match?.[2] ?? "").trim();
+    if (!match || replyContext.length === 0) {
+      return null;
+    }
+
+    return {
+      text: body,
+      replyContext,
+    };
   }
 
   async getSession(id: string): Promise<SessionResponse | null> {

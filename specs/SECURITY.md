@@ -1,5 +1,11 @@
 # Security
 
+## Reporting vulnerabilities
+
+**Do not use this file to submit new security issues.** For responsible disclosure (what to send, scope, timelines), see **[`SECURITY.md`](../SECURITY.md)** in the repository root.
+
+The sections below are **implementation and architecture notes** for developers and auditors.
+
 ## Credential handling
 
 - All channel credentials (bot tokens, signing secrets) encrypted at rest with AES-256-GCM

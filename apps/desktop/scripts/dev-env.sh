@@ -28,13 +28,12 @@ ensure_dev_electron_lsui_element() {
     /usr/libexec/PlistBuddy -c 'Add :LSUIElement bool true' "$info_plist"
 }
 
-for env_file in "$APP_DIR/.env" "$ROOT_DIR/apps/controller/.env"; do
+for env_file in "$ROOT_DIR/.env" "$ROOT_DIR/apps/controller/.env" "$APP_DIR/.env"; do
   if [ -f "$env_file" ]; then
     set -a
     # shellcheck disable=SC1090
     source "$env_file"
     set +a
-    break
   fi
 done
 

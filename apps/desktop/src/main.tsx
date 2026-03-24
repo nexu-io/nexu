@@ -38,6 +38,7 @@ import {
   triggerMainProcessCrash,
   triggerRendererProcessCrash,
 } from "./lib/host-api";
+import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
 const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
@@ -949,7 +950,7 @@ function DesktopShell() {
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>(
     isPackaged ? "immersive" : "full",
   );
-  const [webSurfaceVersion, setWebSurfaceVersion] = useState(0);
+  const webSurfaceVersion = 0;
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
   const update = useAutoUpdate();
@@ -961,11 +962,6 @@ function DesktopShell() {
 
   useEffect(() => {
     return onDesktopCommand((command) => {
-      if (command.type === "desktop:auth-session-restored") {
-        setWebSurfaceVersion((current) => current + 1);
-        return;
-      }
-
       if (command.type === "desktop:check-for-updates") {
         void update.check();
         return;
@@ -1052,6 +1048,12 @@ function DesktopShell() {
             onClick={() => setActiveSurface("control")}
           />
           <SurfaceButton
+            active={activeSurface === "cloud-profile"}
+            label="Cloud Profile"
+            meta="Switch cloud endpoints and reset auth state"
+            onClick={() => setActiveSurface("cloud-profile")}
+          />
+          <SurfaceButton
             active={activeSurface === "web"}
             disabled={!desktopWebUrl}
             label="Web"
@@ -1098,14 +1100,6 @@ function DesktopShell() {
                 <dt>Built At</dt>
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
               </div>
-              <div>
-                <dt>Cloud</dt>
-                <dd>{runtimeConfig.urls.nexuCloud}</dd>
-              </div>
-              <div>
-                <dt>Link</dt>
-                <dd>{runtimeConfig.urls.nexuLink ?? "(not set)"}</dd>
-              </div>
             </dl>
           </div>
         ) : null}
@@ -1116,6 +1110,13 @@ function DesktopShell() {
           style={{ display: activeSurface === "control" ? "contents" : "none" }}
         >
           <EmbeddedControlPlane />
+        </div>
+        <div
+          style={{
+            display: activeSurface === "cloud-profile" ? "contents" : "none",
+          }}
+        >
+          <CloudProfilePage />
         </div>
         <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
           <SurfaceFrame

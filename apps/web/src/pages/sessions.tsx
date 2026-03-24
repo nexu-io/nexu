@@ -2,11 +2,12 @@ import { PlatformIcon } from "@/components/platform-icons";
 import { ChatMarkdown } from "@/components/ui/chat-markdown";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { getSessionFolderUrl, openLocalFolderUrl } from "@/lib/desktop-links";
-import { track } from "@/lib/tracking";
+import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
+  CheckCircle2,
   FolderOpen,
   Loader2,
   MessageSquare,
@@ -45,6 +46,10 @@ function stripMetadata(raw: string): string {
     /Sender \(untrusted metadata\):\s*```json\s*[\s\S]*?```\s*/g,
     "",
   );
+  const withoutReplyMeta = withoutSenderMeta.replace(
+    /Replied message \(untrusted, for context\):\s*```json\s*[\s\S]*?```\s*/g,
+    "",
+  );
 
   // Pattern 1 (Feishu/Slack): [message_id: ...]\nsenderName: actualMessage
   const markerMatch = raw.match(
@@ -60,10 +65,14 @@ function stripMetadata(raw: string): string {
   if (tsMatch?.[1] != null) {
     return tsMatch[1].trim();
   }
-  if (withoutSenderMeta !== raw) {
-    return withoutSenderMeta.trim();
+  if (withoutReplyMeta !== raw) {
+    return withoutReplyMeta.trim();
   }
   return raw;
+}
+
+function stripAssistantReplyPrefix(raw: string): string {
+  return raw.replace(/^\s*\[\[reply_to_current\]\]\s*/u, "");
 }
 
 /**
@@ -84,14 +93,46 @@ function extractSenderName(raw: string): string | null {
 
 interface ExtractedMessage {
   text: string;
+  replyContextText: string | null;
   senderName: string | null;
   hasToolCall: boolean;
   toolCallSummary: string | null;
 }
 
+function extractReplyContextPrefix(raw: string): {
+  text: string;
+  replyContextText: string | null;
+} {
+  const englishMatch = raw.match(
+    /^\[Replying to:\s*(?:"([\s\S]*?)"|([^\]]+))\]\s*(?:(?:\r?\n)|\\n)+([\s\S]*)$/u,
+  );
+  if (englishMatch) {
+    return {
+      replyContextText: (englishMatch[1] ?? englishMatch[2] ?? "").trim(),
+      text: (englishMatch[3] ?? "").trim(),
+    };
+  }
+
+  const chineseMatch = raw.match(
+    /^\[引用:\s*([\s\S]*?)\]\s*(?:(?:\r?\n)|\\n)+([\s\S]*)$/u,
+  );
+  if (chineseMatch) {
+    return {
+      replyContextText: (chineseMatch[1] ?? "").trim(),
+      text: (chineseMatch[2] ?? "").trim(),
+    };
+  }
+
+  return {
+    text: raw,
+    replyContextText: null,
+  };
+}
+
 /** Extract display text, sender name, and tool call info from various message content formats. */
 function extractMessage(msg: Record<string, unknown>): ExtractedMessage {
   let raw = "";
+  let replyContextText: string | null = null;
   let hasToolCall = false;
   let toolCallSummary: string | null = null;
 
@@ -108,6 +149,11 @@ function extractMessage(msg: Record<string, unknown>): ExtractedMessage {
     for (const b of blocks) {
       if (b?.type === "text") {
         textParts.push(String(b?.text ?? ""));
+      } else if (b?.type === "replyContext") {
+        const candidate = String(b?.text ?? "").trim();
+        if (candidate.length > 0) {
+          replyContextText = candidate;
+        }
       } else if (b?.type === "toolCall" || b?.type === "tool_use") {
         hasToolCall = true;
         const name = String(b?.name ?? b?.toolName ?? "tool");
@@ -118,9 +164,17 @@ function extractMessage(msg: Record<string, unknown>): ExtractedMessage {
   }
 
   const senderName = msg.role === "user" ? extractSenderName(raw) : null;
+  const sanitizedText =
+    msg.role === "assistant"
+      ? stripAssistantReplyPrefix(stripMetadata(raw))
+      : stripMetadata(raw);
+  const extractedReply = extractReplyContextPrefix(sanitizedText);
+  const text = extractedReply.text;
+  replyContextText ??= extractedReply.replyContextText;
 
   return {
-    text: stripMetadata(raw),
+    text,
+    replyContextText,
     senderName,
     hasToolCall,
     toolCallSummary,
@@ -148,6 +202,44 @@ function formatRelativeTime(iso: string | null | undefined): string {
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
   return d.toLocaleDateString();
+}
+
+function formatToolCallSummary(summary: string | null): string | null {
+  if (!summary) return null;
+
+  const uppercaseTokens = new Set([
+    "api",
+    "ci",
+    "csv",
+    "db",
+    "gh",
+    "pdf",
+    "qa",
+    "sql",
+    "ui",
+    "ux",
+  ]);
+
+  const formatted = summary
+    .split(/[_-\s]+/)
+    .filter(Boolean)
+    .map((token) => {
+      const normalized = token.trim();
+      if (normalized.length === 0) return "";
+      if (/^[A-Z0-9]+$/.test(normalized)) return normalized;
+      if (uppercaseTokens.has(normalized.toLowerCase())) {
+        return normalized.toUpperCase();
+      }
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    })
+    .join(" ")
+    .trim();
+
+  if (formatted.length === 0 || formatted.toLowerCase() === "tool") {
+    return null;
+  }
+
+  return formatted;
 }
 
 type Platform =
@@ -311,16 +403,58 @@ interface ChatMessageData {
 }
 
 function ArtifactCard({ summary }: { summary: string | null }) {
+  const { t } = useTranslation();
+  const formattedSummary =
+    formatToolCallSummary(summary) ?? t("sessions.chat.toolActivity");
+
   return (
-    <div className="mt-2 inline-block rounded-xl border border-border bg-surface-2 px-4 py-2.5 text-[13px]">
-      <div className="flex items-center gap-1.5 text-emerald-500 font-medium">
-        <span>Done!</span>
-      </div>
-      {summary && (
-        <div className="flex items-center gap-1.5 mt-1 text-text-secondary">
-          <span>{summary}</span>
-        </div>
+    <div
+      data-tool-card={summary ?? undefined}
+      data-tool-card-variant="inline-chip"
+      className="mt-0.5 inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-500/12 bg-[rgba(16,185,129,0.06)] px-2.5 py-1.5 text-[12px] shadow-none"
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[rgba(16,185,129,0.12)] text-emerald-600">
+        <CheckCircle2 className="size-[13px]" />
+      </span>
+      <span className="min-w-0 max-w-[16rem] truncate font-medium text-text-primary">
+        {formattedSummary}
+      </span>
+      <span className="shrink-0 text-text-muted/70">·</span>
+      <span className="shrink-0 text-[11px] font-medium text-emerald-700">
+        {t("sessions.chat.toolCompleted")}
+      </span>
+    </div>
+  );
+}
+
+function ReplyContextCard({
+  text,
+  isBot,
+}: {
+  text: string;
+  isBot: boolean;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      data-reply-context={text}
+      className={cn(
+        "inline-flex max-w-full items-start gap-2 rounded-2xl border px-3 py-2 text-left shadow-[0_6px_18px_rgba(15,23,42,0.04)]",
+        isBot
+          ? "border-border bg-[rgba(248,250,252,0.95)] text-text-secondary"
+          : "border-border/70 bg-white/80 text-text-secondary",
       )}
+    >
+      <span className="mt-0.5 h-8 w-1 shrink-0 rounded-full bg-[rgba(148,163,184,0.6)]" />
+      <div className="min-w-0">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+          {t("sessions.chat.replyLabel")}
+        </div>
+        <div className="mt-1 max-w-[28rem] truncate text-[12px] leading-5">
+          {text}
+        </div>
+      </div>
     </div>
   );
 }
@@ -347,11 +481,21 @@ function SessionPlatformBadge({
   );
 }
 
-function ChatBubble({ msg }: { msg: ChatMessageData }) {
-  const extracted = extractMessage(msg as unknown as Record<string, unknown>);
-  const { text, senderName, hasToolCall, toolCallSummary } = extracted;
+function ChatBubble({
+  msg,
+  extracted,
+}: {
+  msg: ChatMessageData;
+  extracted?: ExtractedMessage;
+}) {
+  const resolvedExtracted =
+    extracted ?? extractMessage(msg as unknown as Record<string, unknown>);
+  const { text, replyContextText, senderName, hasToolCall, toolCallSummary } =
+    resolvedExtracted;
   const time = formatTs(msg.timestamp);
   const isBot = msg.role === "assistant";
+  const hasText = text.trim().length > 0;
+  const hasReplyContext = (replyContextText?.trim().length ?? 0) > 0;
 
   const displayName = senderName ?? "User";
   const gradient = getAvatarGradient(displayName);
@@ -361,7 +505,7 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
     <div
       data-chat-message={msg.id}
       data-chat-role={msg.role}
-      className={`flex gap-3 ${isBot ? "" : "flex-row-reverse"}`}
+      className={`flex gap-3 ${isBot ? "items-start" : "flex-row-reverse items-end"}`}
     >
       {isBot ? (
         <img
@@ -381,21 +525,31 @@ function ChatBubble({ msg }: { msg: ChatMessageData }) {
           </span>
         </div>
       )}
-      <div className={`max-w-[75%] ${isBot ? "" : "text-right"}`}>
-        <div
-          className={cn(
-            "inline-block px-3.5 py-2.5 rounded-xl text-[13px] break-words",
-            isBot
-              ? "bg-surface-1 border border-border text-text-primary rounded-tl-sm"
-              : "bg-surface-3 text-text-primary rounded-tr-sm",
-          )}
-        >
-          <ChatMarkdown content={text} />
-        </div>
+      <div
+        className={cn(
+          "flex max-w-[44rem] flex-col gap-2",
+          isBot ? "items-start" : "items-end text-right",
+        )}
+      >
+        {hasReplyContext && replyContextText && (
+          <ReplyContextCard text={replyContextText} isBot={isBot} />
+        )}
+        {hasText && (
+          <div
+            className={cn(
+              "inline-block max-w-full rounded-[20px] px-4 py-3 text-[13px] break-words shadow-[0_10px_24px_rgba(15,23,42,0.04)]",
+              isBot
+                ? "border border-border bg-surface-1 text-text-primary rounded-tl-sm"
+                : "bg-surface-3 text-text-primary rounded-tr-sm",
+            )}
+          >
+            <ChatMarkdown content={text} />
+          </div>
+        )}
         {isBot && hasToolCall && <ArtifactCard summary={toolCallSummary} />}
         {time && (
           <div
-            className={`text-[10px] text-text-muted mt-1 ${isBot ? "" : "text-right"}`}
+            className={`text-[10px] text-text-muted ${isBot ? "pl-1" : "pr-1 text-right"}`}
           >
             {time}
           </div>
@@ -585,6 +739,16 @@ export function SessionsPage() {
                   href={externalChatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => {
+                    const channel = normalizeChannel(platform);
+                    if (!channel) {
+                      return;
+                    }
+                    track("workspace_chat_in_im_click", {
+                      channel,
+                      where: "conversation",
+                    });
+                  }}
                   className={buttonClassName}
                 >
                   <PlatformIcon platform={platform} size={18} />
@@ -620,17 +784,28 @@ export function SessionsPage() {
         ) : messages.length === 0 ? (
           <ChatEmpty />
         ) : (
-          <div data-chat-thread={id} className="px-6 py-6 space-y-8">
-            <div className="space-y-4">
+          <div data-chat-thread={id} className="px-4 py-8 sm:px-6">
+            <div
+              data-chat-layout="centered"
+              className="mx-auto flex w-full max-w-[920px] flex-col gap-5"
+            >
               {messages
-                .filter((msg) => {
-                  const { text } = extractMessage(
+                .map((msg) => ({
+                  msg,
+                  extracted: extractMessage(
                     msg as unknown as Record<string, unknown>,
+                  ),
+                }))
+                .filter(({ extracted }) => {
+                  const { text, replyContextText, hasToolCall } = extracted;
+                  return (
+                    text.trim().length > 0 ||
+                    (replyContextText?.trim().length ?? 0) > 0 ||
+                    hasToolCall
                   );
-                  return text.trim().length > 0;
                 })
-                .map((msg) => (
-                  <ChatBubble key={msg.id} msg={msg} />
+                .map(({ msg, extracted }) => (
+                  <ChatBubble key={msg.id} msg={msg} extracted={extracted} />
                 ))}
               <div ref={endRef} />
             </div>

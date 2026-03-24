@@ -1,6 +1,6 @@
 import { identify, track } from "@/lib/tracking";
 import { ExternalLink, Eye, EyeOff, FileText, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -148,18 +148,28 @@ export function ChannelConnectModal({
     Object.fromEntries(config.fields.map((f) => [f.id, false])),
   );
   const [loading, setLoading] = useState(false);
+  const [submittedSuccessfully, setSubmittedSuccessfully] = useState(false);
 
   const allFilled = config.fields.every((f) => fieldValues[f.id]?.trim());
+
+  const handleClose = useCallback(() => {
+    if (!submittedSuccessfully && !loading) {
+      track("workspace_channel_config_cancel", {
+        channel: channelType,
+      });
+    }
+    onClose();
+  }, [channelType, loading, onClose, submittedSuccessfully]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        handleClose();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [handleClose]);
 
   const handleFieldChange = (id: string, value: string) => {
     setFieldValues((prev) => ({ ...prev, [id]: value }));
@@ -202,6 +212,10 @@ export function ChannelConnectModal({
       }
 
       if (error) {
+        track("workspace_channel_config_submit", {
+          channel: channelType,
+          success: false,
+        });
         if (response?.status === 409) {
           toast.info(t("modal.channelConnected"));
         } else {
@@ -209,8 +223,13 @@ export function ChannelConnectModal({
           return;
         }
       } else {
+        track("workspace_channel_config_submit", {
+          channel: channelType,
+          success: true,
+        });
         track("channel_ready", { channel: channelType });
         identify({ [`${channelType}_connected`]: true });
+        setSubmittedSuccessfully(true);
       }
 
       // Refresh data first, then close modal
@@ -236,7 +255,7 @@ export function ChannelConnectModal({
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal panel */}
@@ -263,7 +282,7 @@ export function ChannelConnectModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label={t("modal.close")}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
           >
@@ -324,7 +343,7 @@ export function ChannelConnectModal({
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 rounded-lg text-[13px] font-medium text-text-secondary hover:bg-surface-2 transition-colors"
           >
             {t("modal.cancel")}

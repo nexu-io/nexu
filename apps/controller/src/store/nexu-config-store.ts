@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import path from "node:path";
 import type {
   BotResponse,
   ChannelResponse,
@@ -7,6 +8,7 @@ import type {
   ConnectSlackInput,
 } from "@nexu/shared";
 import {
+  type cloudProfileSchema,
   type connectIntegrationResponseSchema,
   type connectIntegrationSchema,
   type integrationResponseSchema,
@@ -22,9 +24,12 @@ import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import { LowDbStore } from "./lowdb-store.js";
 import {
+  type CloudProfileEntry,
+  type CloudProfilesFile,
   type ControllerProvider,
   type ControllerRuntimeConfig,
   type NexuConfig,
+  cloudProfilesFileSchema,
   nexuConfigSchema,
   type storedProviderResponseSchema,
 } from "./schemas.js";
@@ -41,13 +46,30 @@ type RefreshIntegrationInput = z.infer<typeof refreshIntegrationSchema>;
 type UserProfileResponse = z.infer<typeof userProfileResponseSchema>;
 type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
 type UpdateAuthSourceInput = z.infer<typeof updateAuthSourceSchema>;
+type CloudProfileInput = z.infer<typeof cloudProfileSchema>;
 
 type CloudModel = { id: string; name: string; provider?: string };
+type DesktopCloudState = {
+  connected: boolean;
+  polling: boolean;
+  userName?: string | null;
+  userEmail?: string | null;
+  connectedAt?: string | null;
+  linkUrl?: string | null;
+  apiKey?: string | null;
+  models?: Array<{ id: string; name: string; provider?: string }>;
+};
 
 type CloudPollingState = {
   deviceId: string;
   deviceSecret: string;
   abortController: AbortController;
+};
+
+const defaultCloudProfile: CloudProfileEntry = {
+  name: "Default",
+  cloudUrl: "https://nexu.io",
+  linkUrl: "https://link.nexu.io",
 };
 
 export type DesktopCloudStateChange = {
@@ -115,22 +137,9 @@ function readLocalProfile(config: NexuConfig): UserProfileResponse {
   return parsed.success ? parsed.data : defaultLocalProfile();
 }
 
-function readDesktopCloud(config: NexuConfig): {
-  connected: boolean;
-  polling: boolean;
-  userName?: string | null;
-  userEmail?: string | null;
-  connectedAt?: string | null;
-  linkUrl?: string;
-  apiKey?: string;
-  models?: Array<{ id: string; name: string; provider?: string }>;
-} {
-  const desktop = config.desktop as Record<string, unknown>;
-  const cloud =
-    typeof desktop.cloud === "object" && desktop.cloud !== null
-      ? (desktop.cloud as Record<string, unknown>)
-      : null;
-
+function normalizeDesktopCloudState(
+  cloud: Record<string, unknown> | null,
+): DesktopCloudState {
   return {
     connected: cloud?.connected === true,
     polling: cloud?.polling === true,
@@ -146,6 +155,37 @@ function readDesktopCloud(config: NexuConfig): {
   };
 }
 
+function readDesktopCloud(config: NexuConfig): DesktopCloudState {
+  const desktop = config.desktop as Record<string, unknown>;
+  const cloud =
+    typeof desktop.cloud === "object" && desktop.cloud !== null
+      ? (desktop.cloud as Record<string, unknown>)
+      : null;
+
+  return normalizeDesktopCloudState(cloud);
+}
+
+function readDesktopCloudSessions(
+  config: NexuConfig,
+): Record<string, DesktopCloudState> {
+  const desktop = config.desktop as Record<string, unknown>;
+  const sessions =
+    typeof desktop.cloudSessions === "object" && desktop.cloudSessions !== null
+      ? (desktop.cloudSessions as Record<string, unknown>)
+      : {};
+
+  return Object.fromEntries(
+    Object.entries(sessions).map(([name, value]) => [
+      name,
+      normalizeDesktopCloudState(
+        typeof value === "object" && value !== null
+          ? (value as Record<string, unknown>)
+          : null,
+      ),
+    ]),
+  );
+}
+
 function readDesktopLocale(config: NexuConfig): "en" | "zh-CN" | null {
   const desktop = config.desktop as Record<string, unknown>;
   if (desktop.locale === "zh-CN") {
@@ -155,6 +195,38 @@ function readDesktopLocale(config: NexuConfig): "en" | "zh-CN" | null {
     return "en";
   }
   return null;
+}
+
+function readDesktopActiveCloudProfileName(config: NexuConfig): string | null {
+  const desktop = config.desktop as Record<string, unknown>;
+  return typeof desktop.activeCloudProfileName === "string"
+    ? desktop.activeCloudProfileName
+    : null;
+}
+
+function normalizeImportedCloudProfiles(
+  profiles: CloudProfileInput[],
+): CloudProfileEntry[] {
+  const deduped = new Map<string, CloudProfileEntry>();
+
+  for (const profile of profiles) {
+    const name = profile.name.trim();
+    if (name.length === 0 || name === defaultCloudProfile.name) {
+      continue;
+    }
+
+    deduped.set(name, {
+      name,
+      cloudUrl: profile.cloudUrl.trim(),
+      linkUrl: profile.linkUrl.trim(),
+    });
+  }
+
+  return [defaultCloudProfile, ...Array.from(deduped.values())];
+}
+
+function isDefaultCloudProfileName(name: string): boolean {
+  return name.trim() === defaultCloudProfile.name;
 }
 
 function now(): string {
@@ -198,16 +270,13 @@ function serializeProvider(
 
 export class NexuConfigStore {
   private readonly store: LowDbStore<NexuConfig>;
-  private readonly nexuCloudUrl: string;
-  private readonly nexuLinkUrl: string | null;
+  private readonly cloudProfilesStore: LowDbStore<CloudProfilesFile>;
   private pollingState: CloudPollingState | null = null;
 
   /** Callback fired when cloud state changes (connect/disconnect). */
   onCloudStateChanged?: (change: DesktopCloudStateChange) => Promise<void>;
 
   constructor(env: ControllerEnv) {
-    this.nexuCloudUrl = env.nexuCloudUrl;
-    this.nexuLinkUrl = env.nexuLinkUrl;
     this.store = new LowDbStore<NexuConfig>(
       env.nexuConfigPath,
       nexuConfigSchema,
@@ -232,14 +301,93 @@ export class NexuConfigStore {
         secrets: {},
       }),
     );
+    this.cloudProfilesStore = new LowDbStore<CloudProfilesFile>(
+      path.join(env.nexuHomeDir, "cloud-profiles.json"),
+      cloudProfilesFileSchema,
+      () => ({
+        schemaVersion: 1,
+        profiles: [defaultCloudProfile],
+      }),
+    );
   }
 
   async getConfig(): Promise<NexuConfig> {
     return this.store.read();
   }
 
-  private resolveDesktopCloudLinkUrl(linkUrl?: string | null): string {
-    return this.nexuLinkUrl ?? linkUrl ?? this.nexuCloudUrl;
+  private async listStoredCloudProfiles(): Promise<CloudProfileEntry[]> {
+    const file = await this.cloudProfilesStore.read();
+    return normalizeImportedCloudProfiles(file.profiles);
+  }
+
+  private resolveActiveCloudProfile(
+    profiles: CloudProfileEntry[],
+    activeProfileName: string | null,
+  ): CloudProfileEntry {
+    return (
+      profiles.find((profile) => profile.name === activeProfileName) ??
+      profiles.find((profile) => profile.name === defaultCloudProfile.name) ??
+      defaultCloudProfile
+    );
+  }
+
+  private async readConfiguredDesktopCloudProfile(config: NexuConfig) {
+    const profiles = await this.listStoredCloudProfiles();
+    const activeProfileName = readDesktopActiveCloudProfileName(config);
+    const activeProfile = this.resolveActiveCloudProfile(
+      profiles,
+      activeProfileName,
+    );
+    return { profiles, activeProfile };
+  }
+
+  private async writeActiveDesktopCloudState(
+    input: DesktopCloudState,
+  ): Promise<void> {
+    await this.store.update((config) => {
+      const activeProfileName =
+        readDesktopActiveCloudProfileName(config) ?? defaultCloudProfile.name;
+      const sessions = readDesktopCloudSessions(config);
+
+      return {
+        ...config,
+        desktop: {
+          ...config.desktop,
+          cloud: {
+            connected: input.connected,
+            polling: input.polling,
+            userName: input.userName ?? null,
+            userEmail: input.userEmail ?? null,
+            connectedAt: input.connectedAt ?? null,
+            linkUrl: input.linkUrl ?? null,
+            apiKey: input.apiKey ?? null,
+            models: input.models ?? [],
+          },
+          cloudSessions: {
+            ...sessions,
+            [activeProfileName]: {
+              connected: input.connected,
+              polling: input.polling,
+              userName: input.userName ?? null,
+              userEmail: input.userEmail ?? null,
+              connectedAt: input.connectedAt ?? null,
+              linkUrl: input.linkUrl ?? null,
+              apiKey: input.apiKey ?? null,
+              models: input.models ?? [],
+            },
+          },
+        },
+      };
+    });
+  }
+
+  private async resolveDesktopCloudLinkUrl(
+    config: NexuConfig,
+    linkUrl?: string | null,
+  ): Promise<string> {
+    const { activeProfile } =
+      await this.readConfiguredDesktopCloudProfile(config);
+    return linkUrl ?? activeProfile.linkUrl ?? activeProfile.cloudUrl;
   }
 
   async reconcileConfiguredDesktopCloudState(): Promise<void> {
@@ -250,7 +398,10 @@ export class NexuConfigStore {
       return;
     }
 
-    const linkUrl = this.resolveDesktopCloudLinkUrl(cloud.linkUrl);
+    const linkUrl = await this.resolveDesktopCloudLinkUrl(
+      config,
+      cloud.linkUrl,
+    );
     if (cloud.linkUrl === linkUrl) {
       return;
     }
@@ -279,22 +430,7 @@ export class NexuConfigStore {
     apiKey?: string | null;
     models?: CloudModel[];
   }): Promise<void> {
-    await this.store.update((config) => ({
-      ...config,
-      desktop: {
-        ...config.desktop,
-        cloud: {
-          connected: input.connected,
-          polling: input.polling,
-          userName: input.userName ?? null,
-          userEmail: input.userEmail ?? null,
-          connectedAt: input.connectedAt ?? null,
-          linkUrl: input.linkUrl ?? null,
-          apiKey: input.apiKey ?? null,
-          models: input.models ?? [],
-        },
-      },
-    }));
+    await this.writeActiveDesktopCloudState(input);
   }
 
   private async sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -341,9 +477,12 @@ export class NexuConfigStore {
         const data = (await res.json()) as CloudPollResponse;
 
         if (data.status === "completed" && data.apiKey) {
-          const previousCloud = readDesktopCloud(await this.getConfig());
-          const linkUrl =
-            data.linkGatewayUrl ?? this.nexuLinkUrl ?? this.nexuCloudUrl;
+          const currentConfig = await this.getConfig();
+          const previousCloud = readDesktopCloud(currentConfig);
+          const linkUrl = await this.resolveDesktopCloudLinkUrl(
+            currentConfig,
+            data.linkGatewayUrl,
+          );
           const models =
             data.cloudModels && data.cloudModels.length > 0
               ? data.cloudModels
@@ -926,6 +1065,9 @@ export class NexuConfigStore {
   async getDesktopCloudStatus() {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
+    const cloudSessions = readDesktopCloudSessions(config);
+    const { profiles, activeProfile } =
+      await this.readConfiguredDesktopCloudProfile(config);
     return {
       connected: cloud.connected,
       polling: cloud.polling,
@@ -933,6 +1075,24 @@ export class NexuConfigStore {
       userEmail: cloud.userEmail ?? null,
       connectedAt: cloud.connectedAt ?? null,
       models: cloud.models ?? [],
+      cloudUrl: activeProfile.cloudUrl,
+      linkUrl: activeProfile.linkUrl,
+      activeProfileName: activeProfile.name,
+      profiles: profiles.map((profile) => {
+        const session =
+          cloudSessions[profile.name] ??
+          (profile.name === activeProfile.name ? cloud : undefined);
+
+        return {
+          ...profile,
+          connected: session?.connected === true,
+          polling: session?.polling === true,
+          userName: session?.userName ?? null,
+          userEmail: session?.userEmail ?? null,
+          connectedAt: session?.connectedAt ?? null,
+          modelCount: session?.models?.length ?? 0,
+        };
+      }),
     };
   }
 
@@ -959,16 +1119,7 @@ export class NexuConfigStore {
 
   async refreshDesktopCloudModels() {
     await this.hydrateDesktopCloudModels(true);
-    const config = await this.getConfig();
-    const cloud = readDesktopCloud(config);
-    return {
-      connected: cloud.connected,
-      polling: cloud.polling,
-      userName: cloud.userName ?? null,
-      userEmail: cloud.userEmail ?? null,
-      connectedAt: cloud.connectedAt ?? null,
-      models: cloud.models ?? [],
-    };
+    return this.getDesktopCloudStatus();
   }
 
   async prepareDesktopCloudModelsForBootstrap(): Promise<void> {
@@ -1035,7 +1186,10 @@ export class NexuConfigStore {
   private async hydrateDesktopCloudModels(forceRefresh = false): Promise<void> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
-    const linkUrl = this.resolveDesktopCloudLinkUrl(cloud.linkUrl);
+    const linkUrl = await this.resolveDesktopCloudLinkUrl(
+      config,
+      cloud.linkUrl,
+    );
 
     if (cloud.connected && cloud.linkUrl !== linkUrl) {
       await this.setDesktopCloudState({
@@ -1076,7 +1230,10 @@ export class NexuConfigStore {
   }
 
   async connectDesktopCloud() {
-    const current = readDesktopCloud(await this.getConfig());
+    const config = await this.getConfig();
+    const current = readDesktopCloud(config);
+    const { activeProfile } =
+      await this.readConfiguredDesktopCloudProfile(config);
     if (this.pollingState || current.polling) {
       return { error: "Connection attempt already in progress" };
     }
@@ -1092,7 +1249,7 @@ export class NexuConfigStore {
       .digest("hex");
 
     let res: Response;
-    const registerUrl = `${this.nexuCloudUrl}/api/auth/device-register`;
+    const registerUrl = `${activeProfile.cloudUrl}/api/auth/device-register`;
     try {
       res = await fetch(registerUrl, {
         method: "POST",
@@ -1131,16 +1288,359 @@ export class NexuConfigStore {
     const abortController = new AbortController();
     this.pollingState = { deviceId, deviceSecret, abortController };
     void this.pollDesktopCloudAuthorization(
-      this.nexuCloudUrl,
+      activeProfile.cloudUrl,
       deviceId,
       deviceSecret,
       abortController.signal,
     );
 
     return {
-      browserUrl: `${this.nexuCloudUrl}/auth?desktop=1&device_id=${encodeURIComponent(deviceId)}`,
+      browserUrl: `${activeProfile.cloudUrl}/auth?desktop=1&device_id=${encodeURIComponent(deviceId)}`,
       error: undefined,
     };
+  }
+
+  async setDesktopCloudProfiles(profiles: CloudProfileInput[]) {
+    const normalizedProfiles = normalizeImportedCloudProfiles(profiles);
+    await this.cloudProfilesStore.write({
+      schemaVersion: 1,
+      profiles: normalizedProfiles,
+    });
+
+    const config = await this.getConfig();
+    const activeProfileName = readDesktopActiveCloudProfileName(config);
+    const activeProfile = this.resolveActiveCloudProfile(
+      normalizedProfiles,
+      activeProfileName,
+    );
+
+    await this.store.update((currentConfig) => {
+      const sessions = readDesktopCloudSessions(currentConfig);
+      const allowedNames = new Set(
+        normalizedProfiles.map((profile) => profile.name),
+      );
+      const nextSessions = Object.fromEntries(
+        Object.entries(sessions).filter(([name]) => allowedNames.has(name)),
+      );
+
+      return {
+        ...currentConfig,
+        desktop: {
+          ...currentConfig.desktop,
+          activeCloudProfileName: activeProfile.name,
+          cloudSessions: nextSessions,
+        },
+      };
+    });
+
+    return this.getDesktopCloudStatus();
+  }
+
+  async createDesktopCloudProfile(profile: CloudProfileInput) {
+    if (isDefaultCloudProfileName(profile.name)) {
+      throw new Error("Default cloud profile name is reserved.");
+    }
+
+    const existingProfiles = await this.listStoredCloudProfiles();
+    if (existingProfiles.some((item) => item.name === profile.name.trim())) {
+      throw new Error(`Cloud profile already exists: ${profile.name.trim()}`);
+    }
+
+    const normalizedProfiles = normalizeImportedCloudProfiles([
+      ...existingProfiles,
+      {
+        name: profile.name.trim(),
+        cloudUrl: profile.cloudUrl.trim(),
+        linkUrl: profile.linkUrl.trim(),
+      },
+    ]);
+
+    await this.cloudProfilesStore.write({
+      schemaVersion: 1,
+      profiles: normalizedProfiles,
+    });
+
+    return this.getDesktopCloudStatus();
+  }
+
+  async updateDesktopCloudProfile(
+    previousName: string,
+    profile: CloudProfileInput,
+  ) {
+    if (
+      isDefaultCloudProfileName(previousName) ||
+      isDefaultCloudProfileName(profile.name)
+    ) {
+      throw new Error("Default cloud profile cannot be edited.");
+    }
+
+    const existingProfiles = await this.listStoredCloudProfiles();
+    if (!existingProfiles.some((item) => item.name === previousName)) {
+      throw new Error(`Unknown cloud profile: ${previousName}`);
+    }
+
+    const nextProfiles = existingProfiles.map((item) =>
+      item.name === previousName
+        ? {
+            name: profile.name.trim(),
+            cloudUrl: profile.cloudUrl.trim(),
+            linkUrl: profile.linkUrl.trim(),
+          }
+        : item,
+    );
+
+    const normalizedProfiles = normalizeImportedCloudProfiles(nextProfiles);
+    await this.cloudProfilesStore.write({
+      schemaVersion: 1,
+      profiles: normalizedProfiles,
+    });
+
+    await this.store.update((config) => {
+      const sessions = readDesktopCloudSessions(config);
+      const previousSession = sessions[previousName];
+      const { [previousName]: _removed, ...restSessions } = sessions;
+
+      return {
+        ...config,
+        desktop: {
+          ...config.desktop,
+          activeCloudProfileName:
+            readDesktopActiveCloudProfileName(config) === previousName
+              ? profile.name.trim()
+              : readDesktopActiveCloudProfileName(config),
+          cloudSessions: previousSession
+            ? {
+                ...restSessions,
+                [profile.name.trim()]: previousSession,
+              }
+            : restSessions,
+        },
+      };
+    });
+
+    return this.getDesktopCloudStatus();
+  }
+
+  async deleteDesktopCloudProfile(name: string) {
+    if (isDefaultCloudProfileName(name)) {
+      throw new Error("Default cloud profile cannot be deleted.");
+    }
+
+    const existingProfiles = await this.listStoredCloudProfiles();
+    if (!existingProfiles.some((item) => item.name === name)) {
+      throw new Error(`Unknown cloud profile: ${name}`);
+    }
+
+    const normalizedProfiles = existingProfiles.filter(
+      (item) => item.name !== name,
+    );
+    await this.cloudProfilesStore.write({
+      schemaVersion: 1,
+      profiles: normalizedProfiles,
+    });
+
+    const previousCloud = readDesktopCloud(await this.getConfig());
+
+    if (this.pollingState) {
+      this.pollingState.abortController.abort();
+      this.pollingState = null;
+    }
+
+    await this.store.update((config) => {
+      const currentProfile = readLocalProfile(config);
+      const shouldResetActive =
+        readDesktopActiveCloudProfileName(config) === name;
+      const sessions = readDesktopCloudSessions(config);
+      const { [name]: _removed, ...restSessions } = sessions;
+
+      return {
+        ...config,
+        desktop: {
+          ...config.desktop,
+          localProfile: {
+            ...currentProfile,
+            authSource: shouldResetActive
+              ? "desktop-local"
+              : currentProfile.authSource,
+          },
+          activeCloudProfileName: shouldResetActive
+            ? defaultCloudProfile.name
+            : readDesktopActiveCloudProfileName(config),
+          cloudSessions: restSessions,
+          cloud: shouldResetActive
+            ? {
+                connected: false,
+                polling: false,
+                userName: null,
+                userEmail: null,
+                connectedAt: null,
+                linkUrl: null,
+                apiKey: null,
+                models: [],
+              }
+            : config.desktop.cloud,
+        },
+      };
+    });
+
+    if (
+      readDesktopActiveCloudProfileName(await this.getConfig()) ===
+      defaultCloudProfile.name
+    ) {
+      await this.onCloudStateChanged?.({
+        hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
+        hasCloudInventory: false,
+        connected: false,
+      });
+    }
+
+    return this.getDesktopCloudStatus();
+  }
+
+  async switchDesktopCloudProfile(name: string) {
+    const config = await this.getConfig();
+    const previousCloud = readDesktopCloud(config);
+    const profiles = await this.listStoredCloudProfiles();
+    const nextProfile = profiles.find((profile) => profile.name === name);
+
+    if (!nextProfile) {
+      throw new Error(`Unknown cloud profile: ${name}`);
+    }
+
+    if (this.pollingState) {
+      this.pollingState.abortController.abort();
+      this.pollingState = null;
+    }
+
+    await this.store.update((currentConfig) => {
+      const sessions = readDesktopCloudSessions(currentConfig);
+      const nextSession = sessions[nextProfile.name];
+
+      return {
+        ...currentConfig,
+        desktop: {
+          ...currentConfig.desktop,
+          activeCloudProfileName: nextProfile.name,
+          cloud: nextSession
+            ? {
+                connected: nextSession.connected,
+                polling: nextSession.polling,
+                userName: nextSession.userName ?? null,
+                userEmail: nextSession.userEmail ?? null,
+                connectedAt: nextSession.connectedAt ?? null,
+                linkUrl: nextSession.linkUrl ?? null,
+                apiKey: nextSession.apiKey ?? null,
+                models: nextSession.models ?? [],
+              }
+            : {
+                connected: false,
+                polling: false,
+                userName: null,
+                userEmail: null,
+                connectedAt: null,
+                linkUrl: null,
+                apiKey: null,
+                models: [],
+              },
+        },
+      };
+    });
+
+    const switchedConfig = await this.getConfig();
+    const switchedCloud = readDesktopCloud(switchedConfig);
+    let nextModels = switchedCloud.models ?? [];
+
+    if (switchedCloud.connected && switchedCloud.apiKey) {
+      const refreshedModels = await this.fetchDesktopCloudModels(
+        nextProfile.linkUrl,
+        switchedCloud.apiKey,
+      );
+      nextModels = refreshedModels ?? nextModels;
+    }
+
+    await this.setDesktopCloudState({
+      connected: switchedCloud.connected,
+      polling: false,
+      userName: switchedCloud.userName ?? null,
+      userEmail: switchedCloud.userEmail ?? null,
+      connectedAt: switchedCloud.connectedAt ?? null,
+      linkUrl: switchedCloud.connected ? nextProfile.linkUrl : null,
+      apiKey: switchedCloud.apiKey ?? null,
+      models: switchedCloud.connected ? nextModels : [],
+    });
+
+    await this.onCloudStateChanged?.({
+      hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
+      hasCloudInventory: nextModels.length > 0,
+      connected: switchedCloud.connected,
+    });
+
+    return this.getDesktopCloudStatus();
+  }
+
+  async connectDesktopCloudProfile(name: string) {
+    const config = await this.getConfig();
+    const activeProfileName = readDesktopActiveCloudProfileName(config);
+
+    if (activeProfileName !== name) {
+      await this.switchDesktopCloudProfile(name);
+    }
+
+    const status = await this.getDesktopCloudStatus();
+    const targetProfile = status.profiles.find(
+      (profile) => profile.name === name,
+    );
+    if (targetProfile?.connected) {
+      return { browserUrl: undefined, error: undefined, status };
+    }
+
+    const result = await this.connectDesktopCloud();
+    return {
+      browserUrl: result.browserUrl,
+      error: result.error,
+      status: await this.getDesktopCloudStatus(),
+    };
+  }
+
+  async disconnectDesktopCloudProfile(name: string) {
+    const config = await this.getConfig();
+    const activeProfileName = readDesktopActiveCloudProfileName(config);
+
+    if (activeProfileName === name) {
+      await this.disconnectDesktopCloud();
+      return this.getDesktopCloudStatus();
+    }
+
+    await this.store.update((currentConfig) => {
+      const sessions = readDesktopCloudSessions(currentConfig);
+      const nextSession = sessions[name];
+
+      if (!nextSession) {
+        return currentConfig;
+      }
+
+      return {
+        ...currentConfig,
+        desktop: {
+          ...currentConfig.desktop,
+          cloudSessions: {
+            ...sessions,
+            [name]: {
+              connected: false,
+              polling: false,
+              userName: null,
+              userEmail: null,
+              connectedAt: null,
+              linkUrl: null,
+              apiKey: null,
+              models: [],
+            },
+          },
+        },
+      };
+    });
+
+    return this.getDesktopCloudStatus();
   }
 
   async disconnectDesktopCloud() {

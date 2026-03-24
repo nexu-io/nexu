@@ -10,6 +10,7 @@ import {
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
+import { mapInstalledSkillSource, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
 import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
@@ -37,10 +38,12 @@ function SkillCard({
   skill,
   isInstalled,
   categoryLabel,
+  skillSource,
 }: {
   skill: MinimalSkill;
   isInstalled: boolean;
   categoryLabel?: string;
+  skillSource: "builtin" | "explore" | "custom";
 }) {
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
@@ -54,6 +57,10 @@ function SkillCard({
     setPendingAction("install");
     try {
       await installMutation.mutateAsync(skill.slug);
+      track("workspace_skill_enable", {
+        name: skill.name,
+        skill_source: skillSource,
+      });
     } finally {
       setPendingAction(null);
     }
@@ -64,6 +71,10 @@ function SkillCard({
       setPendingAction("install");
       try {
         await installMutation.mutateAsync(skill.slug);
+        track("workspace_skill_enable", {
+          name: skill.name,
+          skill_source: skillSource,
+        });
       } finally {
         setPendingAction(null);
       }
@@ -71,6 +82,10 @@ function SkillCard({
       setPendingAction("uninstall");
       try {
         await uninstallMutation.mutateAsync(skill.slug);
+        track("workspace_skill_disable", {
+          name: skill.name,
+          skill_source: skillSource,
+        });
       } finally {
         setPendingAction(null);
       }
@@ -80,6 +95,7 @@ function SkillCard({
   return (
     <Link
       to={`/workspace/skills/${skill.slug}`}
+      draggable={false}
       className={cn(
         "card flex flex-col p-4",
         isInstalled && !pendingAction ? "" : "",
@@ -505,7 +521,7 @@ export function SkillsPage() {
                 {
                   id: "all" as const,
                   label: t("skills.all"),
-                  count: yourSkillsList.length,
+                  count: installedSkills.length,
                 },
                 {
                   id: "recommended" as const,
@@ -607,6 +623,14 @@ export function SkillsPage() {
                 key={skill.slug}
                 skill={skill}
                 isInstalled={installedSlugs.has(skill.slug)}
+                skillSource={
+                  topTab === "explore"
+                    ? "explore"
+                    : mapInstalledSkillSource(
+                        installedSkills.find((item) => item.slug === skill.slug)
+                          ?.source ?? "managed",
+                      )
+                }
                 categoryLabel={
                   firstTag ? getTagLabel(firstTag, locale) : undefined
                 }

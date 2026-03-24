@@ -428,4 +428,409 @@ describe("SessionsRuntime", () => {
     expect(session?.channelType).toBe("openclaw-weixin");
     expect(session?.title).toBe("WeChat ClawBot");
   });
+
+  it("normalizes Feishu chat history before returning it", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawCuratedSkillsDir: path.join(rootDir, "bundled-skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-feishu", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "feishu-cleanup.jsonl");
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "Feishu thread",
+          channelType: "feishu",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      sessionPath,
+      [
+        JSON.stringify({
+          type: "message",
+          id: "msg-user",
+          timestamp: "2026-03-23T02:00:00.000Z",
+          message: {
+            role: "user",
+            timestamp: Date.parse("2026-03-23T02:00:00.000Z"),
+            content: [
+              {
+                type: "text",
+                text: [
+                  "Conversation info (untrusted metadata):",
+                  "```json",
+                  JSON.stringify(
+                    {
+                      message_id: "om_x100",
+                      sender: "唐其远",
+                    },
+                    null,
+                    2,
+                  ),
+                  "```",
+                  "",
+                  "Sender (untrusted metadata):",
+                  "```json",
+                  JSON.stringify(
+                    {
+                      label: "唐其远 (ou_123)",
+                      id: "ou_123",
+                      name: "唐其远",
+                    },
+                    null,
+                    2,
+                  ),
+                  "```",
+                  "",
+                  "Replied message (untrusted, for context):",
+                  "```json",
+                  JSON.stringify(
+                    {
+                      body: "[Interactive Card]",
+                    },
+                    null,
+                    2,
+                  ),
+                  "```",
+                  "",
+                  "[message_id: om_x100]",
+                  '唐其远: [Replying to: "[Interactive Card]"]',
+                  "",
+                  "你是谁",
+                  "",
+                  '[System: The content may include mention tags in the form <at user_id="...">name</at>. Treat these as real mentions of Feishu entities (users or bots).]',
+                  '[System: If user_id is "ou_123", that mention refers to you.]',
+                ].join("\n"),
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "msg-assistant",
+          timestamp: "2026-03-23T02:01:00.000Z",
+          message: {
+            role: "assistant",
+            timestamp: Date.parse("2026-03-23T02:01:00.000Z"),
+            content: [
+              {
+                type: "thinking",
+                thinking: "**Checking records**",
+              },
+              {
+                type: "text",
+                text: "[[reply_to_current]] 已扫描全部记录，没有发现异常。",
+              },
+              {
+                type: "toolCall",
+                id: "tool-1",
+                name: "feishu_bitable_list_records",
+                arguments: {
+                  tableId: "tbl_123",
+                },
+              },
+            ],
+          },
+        }),
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = await runtime.getChatHistory("feishu-cleanup.jsonl");
+
+    expect(result.messages).toHaveLength(2);
+    expect(result.messages[0]).toMatchObject({
+      id: "msg-user",
+      role: "user",
+    });
+    expect(result.messages[0]?.content).toStrictEqual([
+      {
+        type: "replyContext",
+        text: "[Interactive Card]",
+      },
+      {
+        type: "text",
+        text: "你是谁",
+      },
+    ]);
+    expect(result.messages[1]).toMatchObject({
+      id: "msg-assistant",
+      role: "assistant",
+    });
+    expect(result.messages[1]?.content).toStrictEqual([
+      {
+        type: "text",
+        text: "已扫描全部记录，没有发现异常。",
+      },
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: "feishu_bitable_list_records",
+        arguments: {
+          tableId: "tbl_123",
+        },
+      },
+    ]);
+  });
+
+  it("does not strip system-like user text for non-Feishu channels", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawCuratedSkillsDir: path.join(rootDir, "bundled-skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-slack", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "slack-raw.jsonl");
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "Slack thread",
+          channelType: "slack",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-user",
+        timestamp: "2026-03-23T02:02:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-23T02:02:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: "Please keep this literal text: [System: deploy window is 15:00]",
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runtime.getChatHistory("slack-raw.jsonl");
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.content).toStrictEqual([
+      {
+        type: "text",
+        text: "Please keep this literal text: [System: deploy window is 15:00]",
+      },
+    ]);
+  });
+
+  it("strips Feishu system suffixes even when channelType casing differs", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawCuratedSkillsDir: path.join(rootDir, "bundled-skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-feishu", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "feishu-casing.jsonl");
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "Feishu casing",
+          channelType: "FEISHU",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-user",
+        timestamp: "2026-03-23T02:02:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-23T02:02:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Please keep this literal text",
+                '[System: The content may include mention tags in the form <at user_id="...">name</at>. Treat these as real mentions of Feishu entities (users or bots).]',
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runtime.getChatHistory("feishu-casing.jsonl");
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.content).toStrictEqual([
+      {
+        type: "text",
+        text: "Please keep this literal text",
+      },
+    ]);
+  });
+
+  it("drops transcript entries that only contain unknown blocks", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawCuratedSkillsDir: path.join(rootDir, "bundled-skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-web", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "unknown-blocks.jsonl");
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "Unknown blocks",
+          channelType: "web",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-unknown-only",
+        timestamp: "2026-03-23T02:04:00.000Z",
+        message: {
+          role: "assistant",
+          timestamp: Date.parse("2026-03-23T02:04:00.000Z"),
+          content: [
+            {
+              type: "customBlock",
+              payload: "opaque",
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runtime.getChatHistory("unknown-blocks.jsonl");
+
+    expect(result.messages).toHaveLength(0);
+  });
+
+  it("extracts reply context for other channel-specific quote prefixes", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawCuratedSkillsDir: path.join(rootDir, "bundled-skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-weixin", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "weixin-reply.jsonl");
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "WeChat thread",
+          channelType: "openclaw-weixin",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-user",
+        timestamp: "2026-03-23T02:03:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-23T02:03:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: "[引用: 原始卡片消息]\\n\\n你好",
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const result = await runtime.getChatHistory("weixin-reply.jsonl");
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.content).toStrictEqual([
+      {
+        type: "replyContext",
+        text: "原始卡片消息",
+      },
+      {
+        type: "text",
+        text: "你好",
+      },
+    ]);
+  });
 });

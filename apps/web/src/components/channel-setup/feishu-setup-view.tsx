@@ -141,9 +141,17 @@ export function FeishuSetupView({
         body: { appId: appId.trim(), appSecret: appSecret.trim() },
       });
       if (error) {
+        track("workspace_channel_config_submit", {
+          channel: "feishu",
+          success: false,
+        });
         toast.error(error.message ?? t("feishuSetup.connectFailed"));
         return;
       }
+      track("workspace_channel_config_submit", {
+        channel: "feishu",
+        success: true,
+      });
       toast.success(t("feishuSetup.connectSuccess"));
       track("channel_ready", {
         channel: "feishu",
@@ -152,6 +160,10 @@ export function FeishuSetupView({
       identify({ channels_connected: 1 });
       onConnected();
     } catch {
+      track("workspace_channel_config_submit", {
+        channel: "feishu",
+        success: false,
+      });
       toast.error(t("feishuSetup.connectFailed"));
     } finally {
       setConnecting(false);

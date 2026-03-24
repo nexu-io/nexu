@@ -6,7 +6,6 @@ import {
   hostInvokeChannels,
 } from "../shared/host";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
-import { ensureDesktopAuthSession } from "./desktop-bootstrap";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import type { ComponentUpdater } from "./updater/component-updater";
@@ -16,6 +15,41 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchControllerJson<T>(
+  input: string,
+  init?: RequestInit,
+): Promise<T> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 9) {
+        await sleep(500);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Failed to reach controller.");
+}
 
 const nativeCrashTestTitles = {
   main: "desktop.main.crash",
@@ -206,19 +240,117 @@ export function registerIpcHandlers(
           return orchestrator.queryEvents(typedPayload);
         }
 
-        case "desktop:ensure-auth-session": {
+        case "desktop:get-cloud-status": {
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:get-cloud-status"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-status`,
+          );
+        }
+
+        case "desktop:create-cloud-profile": {
           const typedPayload =
-            payload as HostInvokePayloadMap["desktop:ensure-auth-session"];
-          await ensureDesktopAuthSession({
-            force: typedPayload.force === true,
-            runtimeConfig,
-          });
+            payload as HostInvokePayloadMap["desktop:create-cloud-profile"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:create-cloud-profile"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profile/create`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(typedPayload),
+            },
+          );
+        }
 
-          const result: HostInvokeResultMap["desktop:ensure-auth-session"] = {
-            ok: true,
-          };
+        case "desktop:connect-cloud-profile": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:connect-cloud-profile"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:connect-cloud-profile"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profile/connect`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: typedPayload.name }),
+            },
+          );
+        }
 
-          return result;
+        case "desktop:disconnect-cloud-profile": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:disconnect-cloud-profile"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:disconnect-cloud-profile"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profile/disconnect`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: typedPayload.name }),
+            },
+          );
+        }
+
+        case "desktop:switch-cloud-profile": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:switch-cloud-profile"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:switch-cloud-profile"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profile/select`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: typedPayload.name }),
+            },
+          );
+        }
+
+        case "desktop:import-cloud-profiles": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:import-cloud-profiles"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:import-cloud-profiles"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profiles/import`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ profiles: typedPayload.profiles }),
+            },
+          );
+        }
+
+        case "desktop:update-cloud-profile": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:update-cloud-profile"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:update-cloud-profile"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profile/update`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(typedPayload),
+            },
+          );
+        }
+
+        case "desktop:delete-cloud-profile": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:delete-cloud-profile"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:delete-cloud-profile"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/cloud-profile/delete`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(typedPayload),
+            },
+          );
         }
 
         case "shell:open-external": {

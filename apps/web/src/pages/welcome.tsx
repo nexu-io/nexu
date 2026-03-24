@@ -21,6 +21,7 @@ import { LanguageSwitcher } from "../components/language-switcher";
 import { ProviderLogo } from "../components/provider-logo";
 import { useLocale } from "../hooks/use-locale";
 import { usePageTitle } from "../hooks/use-page-title";
+import { track } from "../lib/tracking";
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
 
@@ -216,6 +217,7 @@ export function WelcomePage() {
   ];
 
   const handleAccountLogin = async () => {
+    track("welcome_option_click", { option: "nexu_account" });
     setCloudConnecting(true);
     setLoginError(null);
     try {
@@ -281,6 +283,7 @@ export function WelcomePage() {
   };
 
   const handleByokEntry = () => {
+    track("welcome_option_click", { option: "byok" });
     markSetupComplete();
     navigate("/workspace/settings?setup=1&tab=providers");
   };

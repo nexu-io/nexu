@@ -1,47 +1,73 @@
+/* ═══════════════════════════════════════════════════════════════
+   nexu Docs — Design System Alignment
+   Tokens mapped from design-system/src/index.css
+   ═══════════════════════════════════════════════════════════════ */
+
 :root {
-  --vp-c-brand-1: #c96f4a;
-  --vp-c-brand-2: #d8825f;
-  --vp-c-brand-3: #ae5f3e;
-  --vp-c-brand-soft: rgba(201, 111, 74, 0.14);
-  --vp-c-bg: #fbf7f2;
-  --vp-c-bg-alt: #f6efe6;
-  --vp-c-bg-elv: #fffdfa;
-  --vp-c-bg-soft: #f1e7db;
-  --vp-c-text-1: #2f241d;
-  --vp-c-text-2: #5b4a3f;
-  --vp-c-text-3: #7b695d;
+  /* ── Lighter shadows ── */
+  --vp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.02), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --vp-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --vp-shadow-3: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --vp-shadow-4: 0 10px 32px rgba(0, 0, 0, 0.07), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --vp-shadow-5: 0 14px 40px rgba(0, 0, 0, 0.08), 0 3px 8px rgba(0, 0, 0, 0.04);
+
+  /* ── Brand — teal ── */
+  --vp-c-brand-1: #3DB9CE;
+  --vp-c-brand-2: #5ac5d6;
+  --vp-c-brand-3: #2f9aad;
+  --vp-c-brand-soft: rgba(61, 185, 206, 0.08);
+
+  /* ── Surfaces — neutral gray ── */
+  --vp-c-bg: #FAFAFA;
+  --vp-c-bg-alt: #F5F5F5;
+  --vp-c-bg-elv: #FFFFFF;
+  --vp-c-bg-soft: #EEEEEE;
+
+  /* ── Text — cool gray ── */
+  --vp-c-text-1: #1C1F23;
+  --vp-c-text-2: #545659;
+  --vp-c-text-3: #787c80;
+
+  /* ── Hero ── */
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: linear-gradient(
     120deg,
-    #9d4f2d 0%,
-    #d98d56 55%,
-    #7366d8 100%
+    #2f9aad 0%,
+    #3DB9CE 50%,
+    #5ac5d6 100%
   );
   --vp-home-hero-image-background-image: radial-gradient(
       circle at top left,
-      rgba(217, 141, 86, 0.28),
+      rgba(61, 185, 206, 0.24),
       transparent 46%
     ),
     radial-gradient(
       circle at bottom right,
-      rgba(115, 102, 216, 0.22),
+      rgba(61, 185, 206, 0.16),
       transparent 42%
     );
   --vp-home-hero-image-filter: blur(52px);
 }
 
 .dark {
-  --vp-c-bg: #191512;
-  --vp-c-bg-alt: #211c18;
-  --vp-c-bg-elv: #29231d;
-  --vp-c-bg-soft: #312922;
-  --vp-c-text-1: #f7efe7;
-  --vp-c-text-2: #dbc8b8;
-  --vp-c-text-3: #b49885;
+  /* ── Surfaces — dark ── */
+  --vp-c-bg: #0d0d10;
+  --vp-c-bg-alt: #1a1a1f;
+  --vp-c-bg-elv: #242429;
+  --vp-c-bg-soft: #1a1a1f;
+
+  /* ── Text — dark mode ── */
+  --vp-c-text-1: #f0f0f2;
+  --vp-c-text-2: #a0a4a8;
+  --vp-c-text-3: #6c7073;
 }
 
+/* ── Typography — nexu font stack ── */
+
 body {
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: Manrope, Inter, 'PingFang SC', -apple-system, 'Noto Sans SC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .VPNavBarTitle .title,
@@ -49,25 +75,33 @@ body {
 .vp-doc h1,
 .vp-doc h2,
 .vp-doc h3 {
-  font-family: "Iowan Old Style", "Georgia", serif;
+  font-family: Manrope, Inter, -apple-system, sans-serif;
 }
 
+/* ── Feature cards — card style ── */
+
 .VPFeature {
-  border: 1px solid rgba(140, 96, 69, 0.12);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.88),
-    rgba(247, 240, 232, 0.92)
-  );
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  border-radius: 16px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.VPFeature:hover {
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
 }
 
 .dark .VPFeature {
-  background: linear-gradient(
-    180deg,
-    rgba(49, 41, 34, 0.8),
-    rgba(35, 29, 24, 0.92)
-  );
+  background: #1a1a1f;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
+.dark .VPFeature:hover {
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Content links ── */
 
 .vp-doc a {
   text-underline-offset: 2px;
@@ -75,4 +109,67 @@ body {
 
 .vp-doc img {
   cursor: zoom-in;
+}
+
+/* ── Hide default GitHub social icon (replaced by GitHubStars badge) ── */
+
+.VPSocialLinks {
+  display: none !important;
+}
+
+/* ── Hide default appearance toggle (replaced by ThemeToggle icon button) ── */
+
+.VPNavBarAppearance {
+  display: none !important;
+}
+
+/* ── Hide default language switcher (replaced by LanguageSwitcher component) ── */
+
+.VPNavBarTranslations {
+  display: none !important;
+}
+
+/* ── Prev / Next page navigation ── */
+
+.VPDocFooter .pager-link {
+  position: relative;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--vp-c-bg-elv);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+}
+.VPDocFooter .pager-link:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+.dark .VPDocFooter .pager-link:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.VPDocFooter .pager-link .desc {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vp-c-text-3);
+  margin-bottom: 2px;
+}
+.VPDocFooter .pager-link.prev .desc::before {
+  content: "←";
+  font-size: 11px;
+}
+.VPDocFooter .pager-link.next .desc::after {
+  content: "→";
+  font-size: 11px;
+}
+.VPDocFooter .pager-link .title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+}
+.VPDocFooter .pager-link:hover .title {
+  color: var(--vp-c-text-1);
 }

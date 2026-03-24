@@ -468,7 +468,8 @@ Add a Cloud Connection card in the control panel (`apps/desktop/src/main.tsx`):
 
 ```typescript
 // apps/desktop/shared/runtime-config.ts
-cloudApiUrl: string;  // default: process.env.NEXU_CLOUD_URL ?? "https://nexu.io"
+// Removed: desktop no longer reads cloud/link URLs from env or build config.
+// Active endpoints come from the selected cloud profile in controller-owned state.
 ```
 
 ## 6. Frontend changes (apps/web)
@@ -538,7 +539,7 @@ The local API polls the cloud API directly. No localhost redirect, no new web ro
 
 | File | Action | Description |
 |------|--------|-------------|
-| `shared/runtime-config.ts` | Modify | `cloudApiUrl` config |
+| `shared/runtime-config.ts` | Modify | Remove cloud/link env-based endpoint config |
 | `src/main.tsx` | Modify | Cloud Connection UI card — direct fetch to local API, no new IPC |
 
 Note: No changes to `shared/host.ts` or `main/ipc.ts` — cloud features use direct HTTP fetch, not IPC. The only IPC used is the already-existing `shell:open-external`.
@@ -547,8 +548,9 @@ Note: No changes to `shared/host.ts` or `main/ipc.ts` — cloud features use dir
 
 | Variable | Default | Scope | Description |
 |----------|---------|-------|-------------|
-| `NEXU_CLOUD_URL` | `https://nexu.io` | Desktop | Cloud web + API URL |
 | `NEXU_DESKTOP_MODE` | `false` | Desktop | Enables desktop-only local API routes |
+
+Cloud and Link endpoints are no longer configured through desktop env vars. The active cloud profile selected in the Cloud Profile page is the source of truth.
 
 No container deploy manifest updates are required — these are desktop-only variables.
 

@@ -4,7 +4,10 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import type { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.js";
+import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
+import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../src/runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
@@ -39,12 +42,31 @@ describe("OpenClawSyncService", () => {
       openclawStateDir: path.join(rootDir, ".openclaw"),
       openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
       openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
+      openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
+      runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
+      openclawCuratedSkillsDir: path.join(
+        rootDir,
+        ".openclaw",
+        "bundled-skills",
+      ),
+      openclawRuntimeModelStatePath: path.join(
+        rootDir,
+        ".openclaw",
+        "nexu-runtime-model.json",
+      ),
+      skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
+      skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+      analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
+      staticSkillsDir: undefined,
+      platformTemplatesDir: undefined,
       openclawWorkspaceTemplatesDir: path.join(
         rootDir,
         ".openclaw",
         "workspace-templates",
       ),
       openclawBin: "openclaw",
+      litellmBaseUrl: null,
+      litellmApiKey: null,
       openclawGatewayPort: 18789,
       openclawGatewayToken: undefined,
       manageOpenclawProcess: false,
@@ -52,6 +74,7 @@ describe("OpenClawSyncService", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
+      amplitudeApiKey: undefined,
     };
   });
 
@@ -67,6 +90,9 @@ describe("OpenClawSyncService", () => {
       configStore,
       compiledStore,
       new OpenClawConfigWriter(env),
+      new OpenClawAuthProfilesWriter(),
+      new OpenClawRuntimePluginWriter(env),
+      new OpenClawRuntimeModelWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
       new OpenClawGatewayService({

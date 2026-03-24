@@ -86,24 +86,28 @@ function fileUrlToPath(fileUrl: string): string | null {
 
 export async function openLocalFolderUrl(url: string): Promise<void> {
   const hostBridge = getHostInvokeBridge();
+  const folderPath = fileUrlToPath(url);
+  if (folderPath) {
+    try {
+      const response = await fetch("/api/internal/desktop/shell-open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: folderPath }),
+      });
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // Fall back to the desktop bridge when the controller is unavailable.
+    }
+
+    if (hostBridge) {
+      await hostBridge.invoke("shell:open-external", { url });
+    }
+    return;
+  }
+
   if (hostBridge) {
     await hostBridge.invoke("shell:open-external", { url });
-    return;
-  }
-
-  // Browser mode: call controller API to open the folder
-  const folderPath = fileUrlToPath(url);
-  if (!folderPath) {
-    return;
-  }
-
-  try {
-    await fetch("/api/internal/desktop/shell-open", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: folderPath }),
-    });
-  } catch {
-    // Controller not reachable — silently ignore
   }
 }

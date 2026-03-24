@@ -50,6 +50,21 @@ export const cloudModelSchema = z.object({
   provider: z.string().optional(),
 });
 
+export const cloudProfileSchema = z.object({
+  name: z.string().min(1),
+  cloudUrl: z.string().url(),
+  linkUrl: z.string().url(),
+});
+
+export const cloudProfileStatusSchema = cloudProfileSchema.extend({
+  connected: z.boolean(),
+  polling: z.boolean().optional(),
+  userName: z.string().nullable().optional(),
+  userEmail: z.string().nullable().optional(),
+  connectedAt: z.string().nullable().optional(),
+  modelCount: z.number().int().nonnegative(),
+});
+
 export const cloudStatusResponseSchema = z.object({
   connected: z.boolean(),
   polling: z.boolean().optional(),
@@ -57,6 +72,10 @@ export const cloudStatusResponseSchema = z.object({
   userEmail: z.string().nullable().optional(),
   connectedAt: z.string().nullable().optional(),
   models: z.array(cloudModelSchema).optional(),
+  cloudUrl: z.string(),
+  linkUrl: z.string().nullable(),
+  activeProfileName: z.string(),
+  profiles: z.array(cloudProfileStatusSchema),
 });
 
 export const cloudConnectResponseSchema = z.object({
@@ -71,6 +90,78 @@ export const cloudRefreshResponseSchema = cloudStatusResponseSchema.extend({
 export const cloudDisconnectResponseSchema = z.object({
   ok: z.boolean(),
 });
+
+export const cloudProfileSelectBodySchema = z.object({
+  name: z.string().min(1),
+});
+
+export const cloudProfilesImportBodySchema = z.object({
+  profiles: z.array(cloudProfileSchema),
+});
+
+export const cloudProfileCreateBodySchema = z.object({
+  profile: cloudProfileSchema,
+});
+
+export const cloudProfileUpdateBodySchema = z.object({
+  previousName: z.string().min(1),
+  profile: cloudProfileSchema,
+});
+
+export const cloudProfileDeleteBodySchema = z.object({
+  name: z.string().min(1),
+});
+
+export const cloudProfileConnectBodySchema = z.object({
+  name: z.string().min(1),
+});
+
+export const cloudProfileDisconnectBodySchema = z.object({
+  name: z.string().min(1),
+});
+
+export const cloudProfileSelectResponseSchema =
+  cloudStatusResponseSchema.extend({
+    ok: z.boolean(),
+    configPushed: z.boolean(),
+  });
+
+export const cloudProfilesImportResponseSchema =
+  cloudStatusResponseSchema.extend({
+    ok: z.boolean(),
+    configPushed: z.boolean(),
+  });
+
+export const cloudProfileCreateResponseSchema =
+  cloudStatusResponseSchema.extend({
+    ok: z.boolean(),
+    configPushed: z.boolean(),
+  });
+
+export const cloudProfileUpdateResponseSchema =
+  cloudStatusResponseSchema.extend({
+    ok: z.boolean(),
+    configPushed: z.boolean(),
+  });
+
+export const cloudProfileDeleteResponseSchema =
+  cloudStatusResponseSchema.extend({
+    ok: z.boolean(),
+    configPushed: z.boolean(),
+  });
+
+export const cloudProfileConnectResponseSchema = z.object({
+  browserUrl: z.string().optional(),
+  error: z.string().optional(),
+  status: cloudStatusResponseSchema,
+  configPushed: z.boolean(),
+});
+
+export const cloudProfileDisconnectResponseSchema =
+  cloudStatusResponseSchema.extend({
+    ok: z.boolean(),
+    configPushed: z.boolean(),
+  });
 
 export const cloudModelsBodySchema = z.object({
   enabledModelIds: z.array(z.string()),

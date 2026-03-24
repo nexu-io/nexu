@@ -4,6 +4,20 @@ import {
   cloudDisconnectResponseSchema,
   cloudModelsBodySchema,
   cloudModelsResponseSchema,
+  cloudProfileConnectBodySchema,
+  cloudProfileConnectResponseSchema,
+  cloudProfileCreateBodySchema,
+  cloudProfileCreateResponseSchema,
+  cloudProfileDeleteBodySchema,
+  cloudProfileDeleteResponseSchema,
+  cloudProfileDisconnectBodySchema,
+  cloudProfileDisconnectResponseSchema,
+  cloudProfileSelectBodySchema,
+  cloudProfileSelectResponseSchema,
+  cloudProfileUpdateBodySchema,
+  cloudProfileUpdateResponseSchema,
+  cloudProfilesImportBodySchema,
+  cloudProfilesImportResponseSchema,
   cloudRefreshResponseSchema,
   cloudStatusResponseSchema,
 } from "@nexu/shared";
@@ -61,6 +75,38 @@ export function registerDesktopCompatRoutes(
   app.openapi(
     createRoute({
       method: "post",
+      path: "/api/internal/desktop/cloud-profile/connect",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": { schema: cloudProfileConnectBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudProfileConnectResponseSchema },
+          },
+          description: "Connect cloud profile",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const result = await container.desktopLocalService.connectCloudProfile(
+        body.name,
+      );
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ...result, configPushed }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/api/internal/desktop/cloud-refresh",
       tags: ["Desktop"],
       responses: {
@@ -83,6 +129,106 @@ export function registerDesktopCompatRoutes(
   app.openapi(
     createRoute({
       method: "post",
+      path: "/api/internal/desktop/cloud-profile/create",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": { schema: cloudProfileCreateBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudProfileCreateResponseSchema },
+          },
+          description: "Create cloud profile",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.desktopLocalService.createCloudProfile(
+        body.profile,
+      );
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, ...status, configPushed }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/desktop/cloud-profile/update",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": { schema: cloudProfileUpdateBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudProfileUpdateResponseSchema },
+          },
+          description: "Update cloud profile",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.desktopLocalService.updateCloudProfile(
+        body.previousName,
+        body.profile,
+      );
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, ...status, configPushed }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/desktop/cloud-profile/delete",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": { schema: cloudProfileDeleteBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudProfileDeleteResponseSchema },
+          },
+          description: "Delete cloud profile",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.desktopLocalService.deleteCloudProfile(
+        body.name,
+      );
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, ...status, configPushed }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/api/internal/desktop/cloud-disconnect",
       tags: ["Desktop"],
       responses: {
@@ -96,6 +242,109 @@ export function registerDesktopCompatRoutes(
     }),
     async (c) =>
       c.json(await container.desktopLocalService.disconnectCloud(), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/desktop/cloud-profile/disconnect",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: cloudProfileDisconnectBodySchema,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: cloudProfileDisconnectResponseSchema,
+            },
+          },
+          description: "Disconnect cloud profile",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.desktopLocalService.disconnectCloudProfile(
+        body.name,
+      );
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, ...status, configPushed }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/desktop/cloud-profile/select",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": { schema: cloudProfileSelectBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudProfileSelectResponseSchema },
+          },
+          description: "Switch cloud profile",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.desktopLocalService.switchCloudProfile(
+        body.name,
+      );
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, ...status, configPushed }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/desktop/cloud-profiles/import",
+      tags: ["Desktop"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": { schema: cloudProfilesImportBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: cloudProfilesImportResponseSchema },
+          },
+          description: "Import cloud profiles",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.desktopLocalService.importCloudProfiles(
+        body.profiles,
+      );
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ok: true, ...status, configPushed }, 200);
+    },
   );
 
   app.openapi(

@@ -508,8 +508,6 @@ function buildEnvironmentSummary(runtimeConfig: DesktopRuntimeConfig): object {
       controllerBase: runtimeConfig.urls.controllerBase,
       web: runtimeConfig.urls.web,
       openclawBase: runtimeConfig.urls.openclawBase,
-      nexuCloud: runtimeConfig.urls.nexuCloud,
-      nexuLink: runtimeConfig.urls.nexuLink,
     },
     nexuHome: runtimeConfig.paths.nexuHome,
   };

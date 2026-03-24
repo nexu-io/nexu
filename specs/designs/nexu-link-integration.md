@@ -128,11 +128,11 @@ Link Gateway 也需要 `/v1/*`（`/v1/models`, `/v1/chat/completions` 等）。*
 
 | 方案 | 说明 | Nexu 侧配置 |
 |------|------|-------------|
-| **A. 独立域名**（推荐） | Link Gateway 用独立域名如 `gateway.nexu-link.powerformer.net` | `NEXU_LINK_URL=https://gateway.nexu-link.powerformer.net` |
-| **B. 独立路径前缀** | Link Gateway 挂在 `/link/v1/*` 下 | `NEXU_LINK_URL=https://nexu-link.powerformer.net/link` |
-| **C. 精细路由** | `/v1/chat/*`, `/v1/models`, `/v1/embeddings` → Link；其余 `/v1/*` → Nexu API | `NEXU_LINK_URL=https://nexu-link.powerformer.net` |
+| **A. 独立域名**（推荐） | Link Gateway 用独立域名如 `gateway.nexu-link.powerformer.net` | 在 Cloud Profile 页面把该 profile 的 `linkUrl` 设为 `https://gateway.nexu-link.powerformer.net` |
+| **B. 独立路径前缀** | Link Gateway 挂在 `/link/v1/*` 下 | 在 Cloud Profile 页面把该 profile 的 `linkUrl` 设为 `https://nexu-link.powerformer.net/link` |
+| **C. 精细路由** | `/v1/chat/*`, `/v1/models`, `/v1/embeddings` → Link；其余 `/v1/*` → Nexu API | 在 Cloud Profile 页面把该 profile 的 `linkUrl` 设为 `https://nexu-link.powerformer.net` |
 
-确认后告知我们，我们配置 `NEXU_LINK_URL` 即可。
+确认后把对应地址写入 Cloud Profile 即可，不再需要通过环境变量手动配置。
 
 ---
 
@@ -236,4 +236,3 @@ curl -X POST https://<cloud-domain>/api/auth/desktop-device-register \
 
 # 4. 端到端：桌面端 Connect → 浏览器登录 → 轮询取 Key → 调用 /v1/models
 ```
-
