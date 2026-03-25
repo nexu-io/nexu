@@ -74,7 +74,6 @@ export function CloudProfilePage() {
               : "Failed to load cloud status.",
           );
         }
-        throw error;
       }
     },
     [],
