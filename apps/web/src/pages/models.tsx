@@ -1295,9 +1295,6 @@ function ByokProviderDetail({
   );
   const isMiniMax = providerId === "minimax";
   const hostBridge = getModelsHostInvokeBridge();
-  const hasSavedAccess = Boolean(
-    dbProvider?.hasApiKey || dbProvider?.hasOauthCredential,
-  );
 
   const { data: minimaxOauthStatus } = useQuery({
     queryKey: ["minimax-oauth-status"],
@@ -1311,6 +1308,13 @@ function ByokProviderDetail({
     },
     refetchInterval: (query) => (query.state.data?.inProgress ? 2000 : false),
   });
+
+  const hasMiniMaxOauthAccess =
+    isMiniMax &&
+    (minimaxOauthStatus?.connected === true || dbProvider?.hasOauthCredential);
+  const hasSavedAccess = Boolean(
+    dbProvider?.hasApiKey || hasMiniMaxOauthAccess,
+  );
 
   const visibleMiniMaxOauthError =
     minimaxOauthStatus?.error &&
@@ -1523,6 +1527,15 @@ function ByokProviderDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      if (isMiniMax) {
+        queryClient.setQueryData(["minimax-oauth-status"], {
+          connected: false,
+          inProgress: false,
+          region: oauthRegion,
+          error: null,
+        });
+        queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+      }
       setApiKey("");
       setBaseUrl(meta.defaultProxyUrl ?? "");
       setIsEditingApiKey(true);
@@ -1828,12 +1841,12 @@ function ByokProviderDetail({
                       <Loader2 size={13} className="animate-spin" />
                     )}
                     {!minimaxOauthMutation.isPending &&
-                      (dbProvider?.hasOauthCredential ? (
+                      (hasMiniMaxOauthAccess ? (
                         <RefreshCw size={13} />
                       ) : (
                         <LogIn size={13} />
                       ))}
-                    {dbProvider?.hasOauthCredential
+                    {hasMiniMaxOauthAccess
                       ? t("models.byok.minimax.reconnect")
                       : t("models.byok.minimax.login")}
                   </button>
