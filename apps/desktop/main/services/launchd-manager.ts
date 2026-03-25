@@ -244,6 +244,33 @@ export class LaunchdManager {
   }
 
   /**
+   * Wait for a service to exit after bootout.
+   * Polls status until the service is no longer running or timeout is reached.
+   * If still running after timeout, sends SIGKILL as last resort.
+   */
+  async waitForExit(label: string, timeoutMs = 5000): Promise<void> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+      const status = await this.getServiceStatus(label);
+      if (status.status !== "running") return;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // Last resort: force kill by PID
+    console.warn(
+      `Service ${label} still running after bootout + ${timeoutMs}ms, force killing`,
+    );
+    const status = await this.getServiceStatus(label);
+    if (status.pid) {
+      try {
+        process.kill(status.pid, "SIGKILL");
+      } catch {
+        // Process may have exited between check and kill
+      }
+    }
+  }
+
+  /**
    * Force restart a service (kickstart -k).
    */
   async restartService(label: string): Promise<void> {
