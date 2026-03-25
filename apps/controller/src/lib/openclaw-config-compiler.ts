@@ -19,7 +19,7 @@ const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
   siliconflow: "https://api.siliconflow.com/v1",
   ppio: "https://api.ppinfra.com/v3/openai",
   openrouter: "https://openrouter.ai/api/v1",
-  minimax: "https://api.minimaxi.com/anthropic",
+  minimax: "https://api.minimax.io/anthropic",
   kimi: "https://api.moonshot.cn/v1",
   glm: "https://open.bigmodel.cn/api/paas/v4",
   moonshot: "https://api.moonshot.cn/v1",
@@ -183,7 +183,7 @@ function compileModelsConfig(
   for (const provider of config.providers.filter(
     (item) =>
       item.enabled &&
-      item.apiKey !== null &&
+      (item.apiKey !== null || item.authMode === "oauth") &&
       isSupportedByokProviderId(item.providerId),
   )) {
     const providerKey = getByokProviderKey({
@@ -203,7 +203,10 @@ function compileModelsConfig(
 
     providers[providerKey] = {
       baseUrl,
-      apiKey: provider.apiKey ?? "",
+      apiKey:
+        provider.authMode === "oauth"
+          ? (provider.oauthCredential?.access ?? "")
+          : (provider.apiKey ?? ""),
       api: resolveOpenClawProviderApi(provider.providerId),
       ...(resolveOpenClawProviderAuthHeader(provider.providerId)
         ? { authHeader: true }
@@ -340,9 +343,17 @@ function compileAgentList(
 }
 
 function compilePlugins(
-  _config: NexuConfig,
+  config: NexuConfig,
   env: ControllerEnv,
 ): OpenClawConfig["plugins"] {
+  const hasMiniMaxOauth = config.providers.some(
+    (provider) =>
+      provider.providerId === "minimax" &&
+      provider.enabled &&
+      provider.authMode === "oauth" &&
+      provider.oauthCredential !== null,
+  );
+
   return {
     load: {
       paths: [env.openclawExtensionsDir],
@@ -357,6 +368,13 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
+      ...(hasMiniMaxOauth
+        ? {
+            "minimax-portal-auth": {
+              enabled: true,
+            },
+          }
+        : {}),
     },
   };
 }

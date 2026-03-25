@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Nexu Controller API",
+    "title": "nexu Controller API",
     "version": "1.0.0"
   },
   "components": {
@@ -4788,8 +4788,30 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "authMode": {
+                            "type": "string",
+                            "enum": [
+                              "apiKey",
+                              "oauth"
+                            ]
+                          },
                           "hasApiKey": {
                             "type": "boolean"
+                          },
+                          "hasOauthCredential": {
+                            "type": "boolean"
+                          },
+                          "oauthRegion": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "global",
+                              "cn"
+                            ]
+                          },
+                          "oauthEmail": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "modelsJson": {
                             "type": "string",
@@ -4870,6 +4892,13 @@
                   "displayName": {
                     "type": "string"
                   },
+                  "authMode": {
+                    "type": "string",
+                    "enum": [
+                      "apiKey",
+                      "oauth"
+                    ]
+                  },
                   "modelsJson": {
                     "type": "string"
                   }
@@ -4906,8 +4935,30 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "authMode": {
+                          "type": "string",
+                          "enum": [
+                            "apiKey",
+                            "oauth"
+                          ]
+                        },
                         "hasApiKey": {
                           "type": "boolean"
+                        },
+                        "hasOauthCredential": {
+                          "type": "boolean"
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthEmail": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "modelsJson": {
                           "type": "string",
@@ -4965,8 +5016,30 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "authMode": {
+                          "type": "string",
+                          "enum": [
+                            "apiKey",
+                            "oauth"
+                          ]
+                        },
                         "hasApiKey": {
                           "type": "boolean"
+                        },
+                        "hasOauthCredential": {
+                          "type": "boolean"
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthEmail": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "modelsJson": {
                           "type": "string",
@@ -5038,6 +5111,165 @@
                   },
                   "required": [
                     "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/minimax/oauth/status": {
+      "get": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "MiniMax OAuth status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/minimax/oauth/login": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "global",
+                      "cn"
+                    ]
+                  }
+                },
+                "required": [
+                  "region"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Start MiniMax OAuth login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "started": {
+                      "type": "boolean"
+                    },
+                    "browserUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress",
+                    "started"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancel MiniMax OAuth login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cancelled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress",
+                    "cancelled"
                   ]
                 }
               }

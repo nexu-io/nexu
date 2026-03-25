@@ -134,6 +134,18 @@ export async function deleteCloudProfile(name: string) {
   return getHostBridge().invoke("desktop:delete-cloud-profile", { name });
 }
 
+export async function getMiniMaxOauthStatus() {
+  return getHostBridge().invoke("desktop:get-minimax-oauth-status", undefined);
+}
+
+export async function startMiniMaxOauth(region: "global" | "cn") {
+  return getHostBridge().invoke("desktop:start-minimax-oauth", { region });
+}
+
+export async function cancelMiniMaxOauth() {
+  return getHostBridge().invoke("desktop:cancel-minimax-oauth", undefined);
+}
+
 export function onDesktopCommand(
   listener: (command: HostDesktopCommand) => void,
 ): () => void {

@@ -24,6 +24,9 @@ export const hostInvokeChannels = [
   "desktop:import-cloud-profiles",
   "desktop:update-cloud-profile",
   "desktop:delete-cloud-profile",
+  "desktop:get-minimax-oauth-status",
+  "desktop:start-minimax-oauth",
+  "desktop:cancel-minimax-oauth",
   "shell:open-external",
   "update:check",
   "update:download",
@@ -113,6 +116,11 @@ export type HostInvokePayloadMap = {
   "desktop:delete-cloud-profile": {
     name: string;
   };
+  "desktop:get-minimax-oauth-status": undefined;
+  "desktop:start-minimax-oauth": {
+    region: "global" | "cn";
+  };
+  "desktop:cancel-minimax-oauth": undefined;
   "shell:open-external": {
     url: string;
   };
@@ -344,6 +352,27 @@ export type HostInvokeResultMap = {
       modelCount: number;
     }>;
     configPushed: boolean;
+  };
+  "desktop:get-minimax-oauth-status": {
+    connected: boolean;
+    inProgress: boolean;
+    region?: "global" | "cn" | null;
+    error?: string | null;
+  };
+  "desktop:start-minimax-oauth": {
+    connected: boolean;
+    inProgress: boolean;
+    region?: "global" | "cn" | null;
+    error?: string | null;
+    browserUrl?: string;
+    started: boolean;
+  };
+  "desktop:cancel-minimax-oauth": {
+    connected: boolean;
+    inProgress: boolean;
+    region?: "global" | "cn" | null;
+    error?: string | null;
+    cancelled: boolean;
   };
   "shell:open-external": {
     ok: boolean;

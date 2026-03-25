@@ -1781,7 +1781,11 @@ export type GetApiV1ProvidersResponses = {
             displayName: string;
             enabled: boolean;
             baseUrl: string;
+            authMode?: 'apiKey' | 'oauth';
             hasApiKey: boolean;
+            hasOauthCredential?: boolean;
+            oauthRegion?: 'global' | 'cn';
+            oauthEmail?: string;
             modelsJson: string;
             createdAt?: string;
             updatedAt?: string;
@@ -1817,6 +1821,7 @@ export type PutApiV1ProvidersByProviderIdData = {
         baseUrl?: string;
         enabled?: boolean;
         displayName?: string;
+        authMode?: 'apiKey' | 'oauth';
         modelsJson?: string;
     };
     path: {
@@ -1837,7 +1842,11 @@ export type PutApiV1ProvidersByProviderIdResponses = {
             displayName: string;
             enabled: boolean;
             baseUrl: string;
+            authMode?: 'apiKey' | 'oauth';
             hasApiKey: boolean;
+            hasOauthCredential?: boolean;
+            oauthRegion?: 'global' | 'cn';
+            oauthEmail?: string;
             modelsJson: string;
             createdAt?: string;
             updatedAt?: string;
@@ -1853,7 +1862,11 @@ export type PutApiV1ProvidersByProviderIdResponses = {
             displayName: string;
             enabled: boolean;
             baseUrl: string;
+            authMode?: 'apiKey' | 'oauth';
             hasApiKey: boolean;
+            hasOauthCredential?: boolean;
+            oauthRegion?: 'global' | 'cn';
+            oauthEmail?: string;
             modelsJson: string;
             createdAt?: string;
             updatedAt?: string;
@@ -1862,6 +1875,74 @@ export type PutApiV1ProvidersByProviderIdResponses = {
 };
 
 export type PutApiV1ProvidersByProviderIdResponse = PutApiV1ProvidersByProviderIdResponses[keyof PutApiV1ProvidersByProviderIdResponses];
+
+export type GetApiV1ProvidersMinimaxOauthStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/providers/minimax/oauth/status';
+};
+
+export type GetApiV1ProvidersMinimaxOauthStatusResponses = {
+    /**
+     * MiniMax OAuth status
+     */
+    200: {
+        connected: boolean;
+        inProgress: boolean;
+        region?: 'global' | 'cn';
+        error?: string;
+    };
+};
+
+export type GetApiV1ProvidersMinimaxOauthStatusResponse = GetApiV1ProvidersMinimaxOauthStatusResponses[keyof GetApiV1ProvidersMinimaxOauthStatusResponses];
+
+export type DeleteApiV1ProvidersMinimaxOauthLoginData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/providers/minimax/oauth/login';
+};
+
+export type DeleteApiV1ProvidersMinimaxOauthLoginResponses = {
+    /**
+     * Cancel MiniMax OAuth login
+     */
+    200: {
+        connected: boolean;
+        inProgress: boolean;
+        region?: 'global' | 'cn';
+        error?: string;
+        cancelled: boolean;
+    };
+};
+
+export type DeleteApiV1ProvidersMinimaxOauthLoginResponse = DeleteApiV1ProvidersMinimaxOauthLoginResponses[keyof DeleteApiV1ProvidersMinimaxOauthLoginResponses];
+
+export type PostApiV1ProvidersMinimaxOauthLoginData = {
+    body?: {
+        region: 'global' | 'cn';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/providers/minimax/oauth/login';
+};
+
+export type PostApiV1ProvidersMinimaxOauthLoginResponses = {
+    /**
+     * Start MiniMax OAuth login
+     */
+    200: {
+        connected: boolean;
+        inProgress: boolean;
+        region?: 'global' | 'cn';
+        error?: string;
+        started: boolean;
+        browserUrl?: string;
+    };
+};
+
+export type PostApiV1ProvidersMinimaxOauthLoginResponse = PostApiV1ProvidersMinimaxOauthLoginResponses[keyof PostApiV1ProvidersMinimaxOauthLoginResponses];
 
 export type PostApiV1ProvidersByProviderIdVerifyData = {
     body?: {

@@ -25,6 +25,7 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   deleteApiV1ProvidersByProviderId,
+  deleteApiV1ProvidersMinimaxOauthLogin,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
@@ -33,6 +34,7 @@ import {
   getApiV1Providers,
   getApiV1ProvidersByProviderIdOauthProviderStatus,
   getApiV1ProvidersByProviderIdOauthStatus,
+  getApiV1ProvidersMinimaxOauthStatus,
   patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
@@ -40,6 +42,7 @@ import {
   postApiV1ProvidersByProviderIdOauthDisconnect,
   postApiV1ProvidersByProviderIdOauthStart,
   postApiV1ProvidersByProviderIdVerify,
+  postApiV1ProvidersMinimaxOauthLogin,
   putApiInternalDesktopDefaultModel,
   putApiV1ProvidersByProviderId,
 } from "../../lib/api/sdk.gen";
@@ -68,8 +71,74 @@ interface DbProvider {
   displayName: string;
   enabled: boolean;
   baseUrl: string | null;
+  authMode?: "apiKey" | "oauth";
   hasApiKey: boolean;
+  hasOauthCredential?: boolean;
+  oauthRegion?: "global" | "cn" | null;
+  oauthEmail?: string | null;
   modelsJson: string;
+}
+
+type MiniMaxDesktopOauthStatus = {
+  connected: boolean;
+  inProgress: boolean;
+  region?: "global" | "cn" | null;
+  error?: string | null;
+};
+
+type MiniMaxDesktopOauthStartResult = MiniMaxDesktopOauthStatus & {
+  started: boolean;
+  browserUrl?: string;
+};
+
+type MiniMaxDesktopOauthCancelResult = MiniMaxDesktopOauthStatus & {
+  cancelled: boolean;
+};
+
+type ModelsHostInvokeBridge = {
+  invoke: {
+    (
+      channel: "desktop:get-minimax-oauth-status",
+      payload: undefined,
+    ): Promise<MiniMaxDesktopOauthStatus>;
+    (
+      channel: "desktop:start-minimax-oauth",
+      payload: { region: "global" | "cn" },
+    ): Promise<MiniMaxDesktopOauthStartResult>;
+    (
+      channel: "desktop:cancel-minimax-oauth",
+      payload: undefined,
+    ): Promise<MiniMaxDesktopOauthCancelResult>;
+    (
+      channel: "shell:open-external",
+      payload: { url: string },
+    ): Promise<{ ok: boolean }>;
+  };
+};
+
+function getModelsHostInvokeBridge(): ModelsHostInvokeBridge | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const candidate = (window as Window & { nexuHost?: unknown }).nexuHost;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const invoke = Reflect.get(candidate, "invoke");
+  if (typeof invoke !== "function") {
+    return null;
+  }
+
+  return {
+    invoke: ((channel: string, payload: unknown) =>
+      invoke.call(
+        candidate,
+        channel as never,
+        payload as never,
+      )) as ModelsHostInvokeBridge["invoke"],
+  };
 }
 
 function getModelDisplayLabel(modelId: string): string {
@@ -170,7 +239,7 @@ const PROVIDER_META: Record<
     apiDocsUrl:
       "https://platform.minimaxi.com/user-center/basic-information/interface-key",
     apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.minimaxi.com/anthropic",
+    defaultProxyUrl: "https://api.minimax.io/anthropic",
   },
   kimi: {
     name: "Kimi",
@@ -234,6 +303,7 @@ const DEFAULT_MODELS: Record<string, string[]> = {
     "MiniMax-M2.7",
     "MiniMax-M2.7-highspeed",
     "MiniMax-M2.5",
+    "MiniMax-M2.5-highspeed",
     "MiniMax-VL-01",
   ],
   kimi: ["kimi-k2.5"],
@@ -304,6 +374,7 @@ async function saveProvider(
     baseUrl?: string | null;
     enabled?: boolean;
     displayName?: string;
+    authMode?: "apiKey" | "oauth";
     modelsJson?: string;
   },
 ): Promise<DbProvider> {
@@ -697,7 +768,8 @@ export function ModelsPage() {
         id: pid,
         name: meta.name,
         modelCount: modProv?.models.length ?? 0,
-        configured: db?.hasApiKey ?? false,
+        configured:
+          (db?.hasApiKey ?? false) || (db?.hasOauthCredential ?? false),
         managed: false,
       });
     }
@@ -1206,9 +1278,33 @@ function ByokProviderDetail({
   const [baseUrl, setBaseUrl] = useState(
     dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
   );
+  const [authMode, setAuthMode] = useState<"apiKey" | "oauth">(
+    dbProvider?.authMode ?? "apiKey",
+  );
+  const [oauthRegion, setOauthRegion] = useState<"global" | "cn">(
+    dbProvider?.oauthRegion ?? "global",
+  );
   const [isEditingApiKey, setIsEditingApiKey] = useState(
     !dbProvider?.hasApiKey,
   );
+  const isMiniMax = providerId === "minimax";
+  const hostBridge = getModelsHostInvokeBridge();
+  const hasSavedAccess = Boolean(
+    dbProvider?.hasApiKey || dbProvider?.hasOauthCredential,
+  );
+
+  const { data: minimaxOauthStatus } = useQuery({
+    queryKey: ["minimax-oauth-status"],
+    enabled: isMiniMax,
+    queryFn: async () => {
+      if (hostBridge) {
+        return hostBridge.invoke("desktop:get-minimax-oauth-status", undefined);
+      }
+      const { data } = await getApiV1ProvidersMinimaxOauthStatus();
+      return data;
+    },
+    refetchInterval: (query) => (query.state.data?.inProgress ? 2000 : false),
+  });
 
   // Available models from verification
   const [verifiedModels, setVerifiedModels] = useState<string[] | null>(null);
@@ -1325,12 +1421,25 @@ function ByokProviderDetail({
   useEffect(() => {
     setApiKey("");
     setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
+    setAuthMode(dbProvider?.authMode ?? "apiKey");
+    setOauthRegion(dbProvider?.oauthRegion ?? "global");
     setIsEditingApiKey(!dbProvider?.hasApiKey);
     setVerifiedModels(null);
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
   }, [dbProvider, meta.defaultProxyUrl]);
+
+  useEffect(() => {
+    if (!isMiniMax || authMode !== "oauth") {
+      return;
+    }
+
+    const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
+    if (stored.length > 0) {
+      setVerifiedModels(stored);
+    }
+  }, [authMode, dbProvider?.modelsJson, isMiniMax]);
 
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
@@ -1373,6 +1482,7 @@ function ByokProviderDetail({
         baseUrl: baseUrl || null,
         displayName: meta.name,
         enabled: true,
+        authMode: "apiKey",
         modelsJson: JSON.stringify(models),
       });
     },
@@ -1405,6 +1515,77 @@ function ByokProviderDetail({
       setVerifiedModels(null);
     },
   });
+
+  const minimaxOauthMutation = useMutation({
+    mutationFn: async () => {
+      if (hostBridge) {
+        return hostBridge.invoke("desktop:start-minimax-oauth", {
+          region: oauthRegion,
+        });
+      }
+      const { data, error } = await postApiV1ProvidersMinimaxOauthLogin({
+        body: { region: oauthRegion },
+      });
+      if (error || !data) {
+        throw new Error("Failed to start MiniMax OAuth login");
+      }
+      return data;
+    },
+    onSuccess: (result) => {
+      const browserUrl =
+        "browserUrl" in result && typeof result.browserUrl === "string"
+          ? result.browserUrl
+          : null;
+      if (browserUrl) {
+        window.open(browserUrl, "_blank", "noopener,noreferrer");
+      }
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+    },
+  });
+
+  const cancelMiniMaxOauthMutation = useMutation({
+    mutationFn: async () => {
+      if (hostBridge) {
+        return hostBridge.invoke("desktop:cancel-minimax-oauth", undefined);
+      }
+      const { data, error } = await deleteApiV1ProvidersMinimaxOauthLogin();
+      if (error || !data) {
+        throw new Error("Failed to cancel MiniMax OAuth login");
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+    },
+  });
+
+  useEffect(() => {
+    if (!isMiniMax || !minimaxOauthStatus?.connected) {
+      return;
+    }
+
+    const syncOauthModels = async () => {
+      const providers = await queryClient.fetchQuery({
+        queryKey: ["providers"],
+        queryFn: fetchProviders,
+      });
+      const minimaxProvider = providers.find(
+        (provider) => provider.providerId === "minimax",
+      );
+
+      const providerModels: string[] = JSON.parse(
+        minimaxProvider?.modelsJson ?? "[]",
+      );
+      if (providerModels.length > 0) {
+        setVerifiedModels(providerModels);
+      }
+
+      await queryClient.refetchQueries({ queryKey: ["models"] });
+      await queryClient.refetchQueries({ queryKey: ["desktop-default-model"] });
+    };
+
+    void syncOauthModels();
+  }, [isMiniMax, minimaxOauthStatus?.connected, queryClient]);
 
   // Model list to show: verified > DB stored > defaults
   const displayModels = useMemo(() => {
@@ -1499,7 +1680,6 @@ function ByokProviderDetail({
             </button>
           )}
 
-          {/* Divider between OAuth and API key */}
           {!isOAuthConnected && (
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 border-t border-border" />
@@ -1511,6 +1691,126 @@ function ByokProviderDetail({
           )}
         </div>
       )}
+
+      {isMiniMax && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-border bg-surface-0 p-1">
+          <button
+            type="button"
+            onClick={() => setAuthMode("oauth")}
+            className={cn(
+              "rounded-md px-3 py-2 text-[12px] font-medium transition-colors",
+              authMode === "oauth"
+                ? "bg-accent text-accent-fg"
+                : "text-text-secondary hover:bg-surface-2",
+            )}
+          >
+            OAuth Login
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMode("apiKey")}
+            className={cn(
+              "rounded-md px-3 py-2 text-[12px] font-medium transition-colors",
+              authMode === "apiKey"
+                ? "bg-accent text-accent-fg"
+                : "text-text-secondary hover:bg-surface-2",
+            )}
+          >
+            API Key
+          </button>
+        </div>
+      )}
+
+      {isMiniMax && authMode === "oauth" ? (
+        <div className="space-y-4 mb-6">
+          <div className="rounded-xl border border-border bg-surface-0 p-4">
+            <div className="mb-3 text-[12px] font-medium text-text-primary">
+              MiniMax Coding Plan OAuth
+            </div>
+            <div className="mb-4 text-[11px] leading-6 text-text-secondary">
+              Use MiniMax OAuth for Coding Plan access without manually pasting
+              an API key.
+            </div>
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOauthRegion("global")}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-[11px] font-medium transition-colors",
+                  oauthRegion === "global"
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-border text-text-secondary hover:bg-surface-2",
+                )}
+              >
+                Global
+              </button>
+              <button
+                type="button"
+                onClick={() => setOauthRegion("cn")}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-[11px] font-medium transition-colors",
+                  oauthRegion === "cn"
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-border text-text-secondary hover:bg-surface-2",
+                )}
+              >
+                CN
+              </button>
+            </div>
+            <div className="mb-4 text-[10px] text-text-muted">
+              {oauthRegion === "cn"
+                ? "Endpoint: api.minimaxi.com"
+                : "Endpoint: api.minimax.io"}
+            </div>
+            {minimaxOauthStatus?.connected || dbProvider?.hasOauthCredential ? (
+              <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-700">
+                Connected via OAuth
+                {dbProvider?.oauthEmail ? ` · ${dbProvider.oauthEmail}` : ""}
+              </div>
+            ) : null}
+            {minimaxOauthStatus?.error ? (
+              <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] text-red-600">
+                {minimaxOauthStatus.error}
+              </div>
+            ) : null}
+            <div className="flex items-center gap-3">
+              {minimaxOauthStatus?.inProgress ? (
+                <>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[12px] font-medium text-accent-fg opacity-80"
+                  >
+                    <Loader2 size={13} className="animate-spin" />
+                    Waiting for MiniMax login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cancelMiniMaxOauthMutation.mutate()}
+                    className="rounded-lg px-3 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => minimaxOauthMutation.mutate()}
+                  disabled={minimaxOauthMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[12px] font-medium text-accent-fg transition-colors hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {minimaxOauthMutation.isPending && (
+                    <Loader2 size={13} className="animate-spin" />
+                  )}
+                  {dbProvider?.hasOauthCredential
+                    ? "Reconnect OAuth"
+                    : "Login with MiniMax"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Z.AI Coding Plan section (GLM only) */}
       {isZaiProvider && (
@@ -1576,7 +1876,6 @@ function ByokProviderDetail({
             </div>
           </div>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 my-4">
             <div className="flex-1 border-t border-border" />
             <span className="text-[10px] text-text-muted">
@@ -1587,8 +1886,7 @@ function ByokProviderDetail({
         </div>
       )}
 
-      {/* API Key + API Proxy URL (hidden when OAuth is connected) */}
-      {!isOAuthConnected && (
+      {!isOAuthConnected && (!isMiniMax || authMode === "apiKey") && (
         <div className="space-y-4 mb-6">
           <div>
             <label
@@ -1674,6 +1972,26 @@ function ByokProviderDetail({
             >
               {t("models.byok.proxyUrl")}
             </label>
+            {isMiniMax && (
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBaseUrl("https://api.minimax.io/anthropic")}
+                  className="rounded-md border border-border px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface-2"
+                >
+                  Global
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBaseUrl("https://api.minimaxi.com/anthropic")
+                  }
+                  className="rounded-md border border-border px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface-2"
+                >
+                  CN
+                </button>
+              </div>
+            )}
             <input
               id={`baseurl-${providerId}`}
               type="text"
@@ -1686,31 +2004,32 @@ function ByokProviderDetail({
         </div>
       )}
 
-      {/* Action buttons — above model list (hidden when OAuth connected) */}
       {!isOAuthConnected && (
         <div className="flex items-center gap-3 mb-6">
-          <button
-            type="button"
-            disabled={
-              saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
-            }
-            onClick={() => saveMutation.mutate()}
-            className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-              !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
-                ? "bg-accent text-accent-fg hover:bg-accent/90"
-                : "bg-surface-2 text-text-muted cursor-not-allowed",
-            )}
-          >
-            {saveMutation.isPending && (
-              <Loader2 size={13} className="animate-spin" />
-            )}
-            {dbProvider?.hasApiKey
-              ? t("models.byok.updateConfig")
-              : t("models.byok.saveAndEnable")}
-          </button>
+          {(!isMiniMax || authMode === "apiKey") && (
+            <button
+              type="button"
+              disabled={
+                saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
+              }
+              onClick={() => saveMutation.mutate()}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+                !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
+                  ? "bg-accent text-accent-fg hover:bg-accent/90"
+                  : "bg-surface-2 text-text-muted cursor-not-allowed",
+              )}
+            >
+              {saveMutation.isPending && (
+                <Loader2 size={13} className="animate-spin" />
+              )}
+              {dbProvider?.hasApiKey
+                ? t("models.byok.updateConfig")
+                : t("models.byok.saveAndEnable")}
+            </button>
+          )}
 
-          {dbProvider?.hasApiKey && (
+          {hasSavedAccess && (
             <button
               type="button"
               disabled={deleteMutation.isPending}
@@ -1732,16 +2051,20 @@ function ByokProviderDetail({
         </div>
       )}
 
-      {!isOAuthConnected && saveMutation.isSuccess && (
-        <div className="mb-4 text-[11px] text-[var(--color-success)]">
-          {t("models.byok.saveSuccess")}
-        </div>
-      )}
-      {!isOAuthConnected && saveMutation.isError && (
-        <div className="mb-4 text-[11px] text-red-500">
-          {t("models.byok.saveFailed")}
-        </div>
-      )}
+      {!isOAuthConnected &&
+        (!isMiniMax || authMode === "apiKey") &&
+        saveMutation.isSuccess && (
+          <div className="mb-4 text-[11px] text-[var(--color-success)]">
+            {t("models.byok.saveSuccess")}
+          </div>
+        )}
+      {!isOAuthConnected &&
+        (!isMiniMax || authMode === "apiKey") &&
+        saveMutation.isError && (
+          <div className="mb-4 text-[11px] text-red-500">
+            {t("models.byok.saveFailed")}
+          </div>
+        )}
 
       {/* Model list — clickable to switch active model */}
       <div>

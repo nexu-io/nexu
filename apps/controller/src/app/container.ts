@@ -120,7 +120,9 @@ export async function createContainer(): Promise<ControllerContainer> {
   );
   const modelProviderService = new ModelProviderService(
     configStore,
-    env.nodeEnv,
+    env,
+    openclawSyncService,
+    openclawProcess,
   );
   const runtimeModelStateService = new RuntimeModelStateService(env);
 
