@@ -82,6 +82,9 @@ const MINI_MAX_OAUTH_MODELS = [
 ];
 const MINI_MAX_DEFAULT_POLL_INTERVAL_MS = 2000;
 const MINI_MAX_MAX_POLL_INTERVAL_MS = 10000;
+const MINI_MAX_OAUTH_REQUEST_TIMEOUT_MS = 15000;
+const MINI_MAX_OAUTH_TOKEN_REQUEST_TIMEOUT_MS = 15000;
+const OPENCLAW_COMMAND_TIMEOUT_MS = 30000;
 
 function durationSecondsToMs(valueInSeconds: number): number {
   return valueInSeconds * 1000;
@@ -263,6 +266,19 @@ export class ModelProviderService {
     region: null,
     error: null,
   };
+
+  private isCurrentMiniMaxOauthAttempt(
+    abortController: AbortController,
+  ): boolean {
+    return this.miniMaxOauthAbortController === abortController;
+  }
+
+  private createAbortSignalWithTimeout(
+    signal: AbortSignal,
+    timeoutMs: number,
+  ): AbortSignal {
+    return AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
+  }
 
   constructor(
     private readonly configStore: NexuConfigStore,
@@ -498,21 +514,35 @@ export class ModelProviderService {
         region,
         abortController.signal,
       );
+      if (!this.isCurrentMiniMaxOauthAttempt(abortController)) {
+        return {
+          connected: false,
+          inProgress: false,
+          region,
+          error: null,
+          browserUrl: auth.verification_uri,
+        };
+      }
+
       this.miniMaxOauthBrowserUrl = auth.verification_uri;
-      void this.finishMiniMaxOauthLogin(auth, region, abortController.signal);
+      void this.finishMiniMaxOauthLogin(auth, region, abortController);
       return {
         ...this.miniMaxOauthState,
         browserUrl: auth.verification_uri,
       };
     } catch (error) {
-      this.miniMaxOauthAbortController = null;
-      this.miniMaxOauthState = {
-        connected: false,
-        inProgress: false,
-        region,
-        error:
-          error instanceof Error ? error.message : "MiniMax OAuth init failed",
-      };
+      if (this.isCurrentMiniMaxOauthAttempt(abortController)) {
+        this.miniMaxOauthAbortController = null;
+        this.miniMaxOauthState = {
+          connected: false,
+          inProgress: false,
+          region,
+          error:
+            error instanceof Error
+              ? error.message
+              : "MiniMax OAuth init failed",
+        };
+      }
       throw error;
     }
   }
@@ -572,7 +602,10 @@ export class ModelProviderService {
 
   private async refreshMiniMaxOauthModelsIfNeeded(): Promise<void> {
     const provider = await this.configStore.getProvider("minimax");
-    if (provider?.authMode !== "oauth") {
+    if (
+      provider?.authMode !== "oauth" ||
+      provider.hasOauthCredential !== true
+    ) {
       return;
     }
 
@@ -590,8 +623,10 @@ export class ModelProviderService {
   private async finishMiniMaxOauthLogin(
     auth: MiniMaxOAuthAuthorization & { verifier: string },
     region: MiniMaxRegion,
-    signal: AbortSignal,
+    abortController: AbortController,
   ): Promise<void> {
+    const { signal } = abortController;
+
     try {
       const expiresAt = Date.now() + durationSecondsToMs(auth.expired_in);
       const intervalMs = normalizeMiniMaxPollIntervalMs(auth.interval);
@@ -623,31 +658,39 @@ export class ModelProviderService {
       await this.openclawSyncService.syncAll();
       await this.restartRuntime();
 
-      this.miniMaxOauthState = {
-        connected: true,
-        inProgress: false,
-        region,
-        error: null,
-      };
-      this.miniMaxOauthBrowserUrl = null;
-    } catch (error) {
-      if (signal.aborted) {
+      if (this.isCurrentMiniMaxOauthAttempt(abortController)) {
         this.miniMaxOauthState = {
-          connected: false,
+          connected: true,
           inProgress: false,
           region,
           error: null,
         };
         this.miniMaxOauthBrowserUrl = null;
+      }
+    } catch (error) {
+      if (signal.aborted) {
+        if (this.isCurrentMiniMaxOauthAttempt(abortController)) {
+          this.miniMaxOauthState = {
+            connected: false,
+            inProgress: false,
+            region,
+            error: null,
+          };
+          this.miniMaxOauthBrowserUrl = null;
+        }
         return;
       }
 
-      this.miniMaxOauthState = {
-        connected: false,
-        inProgress: false,
-        region,
-        error: error instanceof Error ? error.message : "MiniMax OAuth failed",
-      };
+      if (this.isCurrentMiniMaxOauthAttempt(abortController)) {
+        this.miniMaxOauthState = {
+          connected: false,
+          inProgress: false,
+          region,
+          error:
+            error instanceof Error ? error.message : "MiniMax OAuth failed",
+        };
+        this.miniMaxOauthBrowserUrl = null;
+      }
       logger.warn(
         {
           error:
@@ -656,9 +699,10 @@ export class ModelProviderService {
         },
         "minimax_oauth_login_failed",
       );
-      this.miniMaxOauthBrowserUrl = null;
     } finally {
-      this.miniMaxOauthAbortController = null;
+      if (this.isCurrentMiniMaxOauthAttempt(abortController)) {
+        this.miniMaxOauthAbortController = null;
+      }
     }
   }
 
@@ -667,6 +711,10 @@ export class ModelProviderService {
     signal: AbortSignal,
   ): Promise<MiniMaxOAuthAuthorization & { verifier: string }> {
     const { verifier, challenge, state } = generatePkce();
+    const requestSignal = this.createAbortSignalWithTimeout(
+      signal,
+      MINI_MAX_OAUTH_REQUEST_TIMEOUT_MS,
+    );
     const response = await fetch(`${getMiniMaxOauthHost(region)}/oauth/code`, {
       method: "POST",
       headers: {
@@ -682,7 +730,7 @@ export class ModelProviderService {
         code_challenge_method: "S256",
         state,
       }),
-      signal,
+      signal: requestSignal,
     });
 
     if (!response.ok) {
@@ -727,6 +775,11 @@ export class ModelProviderService {
         throw new Error("MiniMax OAuth cancelled");
       }
 
+      const requestSignal = this.createAbortSignalWithTimeout(
+        signal,
+        MINI_MAX_OAUTH_TOKEN_REQUEST_TIMEOUT_MS,
+      );
+
       const response = await fetch(
         `${getMiniMaxOauthHost(input.region)}/oauth/token`,
         {
@@ -741,7 +794,7 @@ export class ModelProviderService {
             user_code: input.userCode,
             code_verifier: input.verifier,
           }),
-          signal,
+          signal: requestSignal,
         },
       );
 
@@ -807,6 +860,7 @@ export class ModelProviderService {
             OPENCLAW_CONFIG_PATH: this.env.openclawConfigPath,
             OPENCLAW_STATE_DIR: this.env.openclawStateDir,
           },
+          timeout: OPENCLAW_COMMAND_TIMEOUT_MS,
         },
         (error) => {
           if (error) {

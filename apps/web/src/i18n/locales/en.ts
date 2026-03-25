@@ -346,6 +346,7 @@ const en = {
   "models.byok.minimax.regionCn": "CN",
   "models.byok.minimax.endpoint": "Endpoint: {{endpoint}}",
   "models.byok.minimax.connected": "Connected via OAuth",
+  "models.byok.minimax.dismissError": "Dismiss error",
   "models.byok.minimax.waitingLogin": "Waiting for MiniMax login",
   "models.byok.minimax.cancel": "Cancel",
   "models.byok.minimax.reconnect": "Reconnect",

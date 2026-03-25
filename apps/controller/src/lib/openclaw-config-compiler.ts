@@ -104,9 +104,10 @@ function getDesktopSelectedModel(config: NexuConfig): string | null {
 function isByokProviderProxied(
   providerId: string,
   baseUrl: string | null,
+  oauthRegion: "global" | "cn" | null,
 ): boolean {
   const defaultBaseUrl = normalizeProviderBaseUrl(
-    resolveByokDefaultBaseUrl({ providerId, oauthRegion: null }),
+    resolveByokDefaultBaseUrl({ providerId, oauthRegion }),
   );
   const normalizedBaseUrl = normalizeProviderBaseUrl(baseUrl);
 
@@ -119,9 +120,14 @@ function getByokProviderKey(input: {
   id: string;
   providerId: string;
   baseUrl: string | null;
+  oauthRegion: "global" | "cn" | null;
 }): string {
   const openclawProviderId = resolveOpenClawProviderId(input.providerId);
-  return isByokProviderProxied(input.providerId, input.baseUrl)
+  return isByokProviderProxied(
+    input.providerId,
+    input.baseUrl,
+    input.oauthRegion,
+  )
     ? `byok_${openclawProviderId}`
     : openclawProviderId;
 }
@@ -202,6 +208,7 @@ function compileModelsConfig(
       id: provider.id,
       providerId: provider.providerId,
       baseUrl: provider.baseUrl,
+      oauthRegion: provider.oauthRegion,
     });
     const baseUrl =
       normalizeProviderBaseUrl(
@@ -282,6 +289,7 @@ export function resolveModelId(
         id: provider.id,
         providerId: provider.providerId,
         baseUrl: provider.baseUrl,
+        oauthRegion: provider.oauthRegion,
       }),
     );
     byokPrefixToProvider.set(provider.providerId, openclawProviderId);

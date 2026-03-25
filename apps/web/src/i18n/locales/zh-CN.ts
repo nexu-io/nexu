@@ -334,6 +334,7 @@ const zhCN = {
   "models.byok.minimax.regionCn": "CN",
   "models.byok.minimax.endpoint": "端点：{{endpoint}}",
   "models.byok.minimax.connected": "已通过 OAuth 连接",
+  "models.byok.minimax.dismissError": "关闭错误提示",
   "models.byok.minimax.waitingLogin": "等待 MiniMax 登录",
   "models.byok.minimax.cancel": "取消",
   "models.byok.minimax.reconnect": "重新连接",

@@ -96,6 +96,38 @@ type MiniMaxDesktopOauthCancelResult = MiniMaxDesktopOauthStatus & {
   cancelled: boolean;
 };
 
+function getDefaultMiniMaxAuthMode(
+  providerId: ByokProviderId,
+  dbProvider?: DbProvider,
+): "apiKey" | "oauth" {
+  if (dbProvider?.authMode) {
+    return dbProvider.authMode;
+  }
+  if (dbProvider?.hasApiKey) {
+    return "apiKey";
+  }
+  if (dbProvider?.hasOauthCredential) {
+    return "oauth";
+  }
+
+  return providerId === "minimax" ? "oauth" : "apiKey";
+}
+
+function setMiniMaxOauthErrorInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  error: Error,
+) {
+  queryClient.setQueryData<MiniMaxDesktopOauthStatus>(
+    ["minimax-oauth-status"],
+    (previous) => ({
+      connected: previous?.connected ?? false,
+      inProgress: false,
+      region: previous?.region ?? null,
+      error: error.message,
+    }),
+  );
+}
+
 type ModelsHostInvokeBridge = {
   invoke: {
     (
@@ -633,7 +665,7 @@ function _GeneralSettings() {
 
 export function ModelsPage() {
   const { t } = useTranslation();
-  const { stars } = useGitHubStars();
+  const { stars: starNexu } = useGitHubStars();
   const isDesktopClient = useMemo(
     () =>
       typeof navigator !== "undefined" &&
@@ -844,7 +876,7 @@ export function ModelsPage() {
           <div className="flex items-center gap-2">
             <GitHubStarCta
               label={t("home.starGithub")}
-              stars={stars}
+              stars={starNexu}
               variant="button"
               onClick={() =>
                 track("workspace_github_click", { source: "settings" })
@@ -1282,7 +1314,7 @@ function ByokProviderDetail({
     dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
   );
   const [authMode, setAuthMode] = useState<"apiKey" | "oauth">(
-    dbProvider?.authMode ?? (providerId === "minimax" ? "oauth" : "apiKey"),
+    getDefaultMiniMaxAuthMode(providerId, dbProvider),
   );
   const [oauthRegion, setOauthRegion] = useState<"global" | "cn">(
     dbProvider?.oauthRegion ?? "global",
@@ -1437,9 +1469,7 @@ function ByokProviderDetail({
   useEffect(() => {
     setApiKey("");
     setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
-    setAuthMode(
-      dbProvider?.authMode ?? (providerId === "minimax" ? "oauth" : "apiKey"),
-    );
+    setAuthMode(getDefaultMiniMaxAuthMode(providerId, dbProvider));
     setOauthRegion(dbProvider?.oauthRegion ?? "global");
     setIsEditingApiKey(!dbProvider?.hasApiKey);
     setVerifiedModels(null);
@@ -1449,14 +1479,17 @@ function ByokProviderDetail({
   }, [dbProvider, meta.defaultProxyUrl, providerId]);
 
   useEffect(() => {
-    if (!isMiniMax || authMode !== "oauth") {
+    if (!isMiniMax) {
+      return;
+    }
+
+    if (authMode !== "oauth") {
+      setVerifiedModels(null);
       return;
     }
 
     const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
-    if (stored.length > 0) {
-      setVerifiedModels(stored);
-    }
+    setVerifiedModels(stored.length > 0 ? stored : null);
   }, [authMode, dbProvider?.modelsJson, isMiniMax]);
 
   // ── Verify mutation ──────────────────────────────────
@@ -1568,6 +1601,13 @@ function ByokProviderDetail({
       }
       queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
     },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+      setMiniMaxOauthErrorInCache(
+        queryClient,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    },
   });
 
   const cancelMiniMaxOauthMutation = useMutation({
@@ -1583,6 +1623,13 @@ function ByokProviderDetail({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+      setMiniMaxOauthErrorInCache(
+        queryClient,
+        error instanceof Error ? error : new Error(String(error)),
+      );
     },
   });
 
@@ -1804,7 +1851,7 @@ function ByokProviderDetail({
                     setDismissedMiniMaxOauthError(visibleMiniMaxOauthError)
                   }
                   className="rounded p-0.5 text-red-500/80 transition-colors hover:bg-red-500/10 hover:text-red-600"
-                  aria-label="Dismiss error"
+                  aria-label={t("models.byok.minimax.dismissError")}
                 >
                   <X size={12} />
                 </button>

@@ -55,7 +55,23 @@ function createEnv(homeDir: string): ControllerEnv {
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
+    analyticsStatePath: resolve(homeDir, "analytics-state.json"),
   };
+}
+
+function createService(store: NexuConfigStore, env: ControllerEnv) {
+  return new ModelProviderService(
+    store,
+    env,
+    {
+      syncAll: async () => ({ configPushed: false }),
+    } as never,
+    {
+      stop: async () => {},
+      enableAutoRestart: () => {},
+      start: () => {},
+    } as never,
+  );
 }
 
 describe("ModelProviderService", () => {
@@ -72,7 +88,7 @@ describe("ModelProviderService", () => {
   it("does not auto-switch when model inventory is unknown", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);
-    const service = new ModelProviderService(store, env.nodeEnv);
+    const service = createService(store, env);
 
     const result = await service.ensureValidDefaultModel();
     const config = await store.getConfig();
@@ -125,7 +141,7 @@ describe("ModelProviderService", () => {
 
     const store = new NexuConfigStore(env);
     const before = readFileSync(env.nexuConfigPath, "utf8");
-    const service = new ModelProviderService(store, env.nodeEnv);
+    const service = createService(store, env);
 
     const models = await service.listModels();
     const cloudStatus = await store.getDesktopCloudStatus();
@@ -141,18 +157,7 @@ describe("ModelProviderService", () => {
   it("clears minimax oauth in-progress status once credentials are persisted", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);
-    const service = new ModelProviderService(
-      store,
-      env,
-      {
-        syncAll: async () => ({ configPushed: false }),
-      } as never,
-      {
-        stop: async () => {},
-        enableAutoRestart: () => {},
-        start: () => {},
-      } as never,
-    );
+    const service = createService(store, env);
 
     await store.setProviderOauthCredentials("minimax", {
       displayName: "MiniMax",
@@ -193,18 +198,7 @@ describe("ModelProviderService", () => {
   it("normalizes minimax poll interval without over-scaling millisecond values", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);
-    const service = new ModelProviderService(
-      store,
-      env,
-      {
-        syncAll: async () => ({ configPushed: false }),
-      } as never,
-      {
-        stop: async () => {},
-        enableAutoRestart: () => {},
-        start: () => {},
-      } as never,
-    );
+    const service = createService(store, env);
 
     let capturedIntervalMs = 0;
     (
@@ -246,7 +240,7 @@ describe("ModelProviderService", () => {
             verifier: string;
           },
           region: "global" | "cn",
-          signal: AbortSignal,
+          abortController: AbortController,
         ) => Promise<void>;
       }
     ).finishMiniMaxOauthLogin(
@@ -258,7 +252,7 @@ describe("ModelProviderService", () => {
         verifier: "verifier",
       },
       "global",
-      new AbortController().signal,
+      new AbortController(),
     );
 
     expect(capturedIntervalMs).toBe(2000);
