@@ -38,9 +38,9 @@ jobs:
 
       - name: Process issue
         env:
-          LITELLM_ENDPOINT: ${{ secrets.LITELLM_ENDPOINT }}
-          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
-          LITELLM_MODEL: "google/gemini-2.5-flash"
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: "google/gemini-2.5-flash"
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}

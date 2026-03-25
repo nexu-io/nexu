@@ -55,6 +55,12 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - Prefer merging the latest `main` into long-running feature branches instead of rewriting shared history once a PR is under review.
 - After a PR merges, sync local `main`, then delete the merged feature branch locally and remotely when it is no longer needed.
 
+## Commit & PR conventions
+
+- **No co-author trailer.** Never append `Co-Authored-By:` lines to commit messages.
+- **Conventional commit prefix.** Use `chore:` for changes that are invisible to end users (CI/CD, issue bots, tooling, config). These are excluded from release notes. Use `feat:` / `fix:` / `docs:` etc. for user-visible changes.
+- **PR format.** When creating a pull request, always follow `.github/pull_request_template.md` — fill in What / Why / How / Affected areas / Checklist sections.
+
 ## Desktop local development
 
 - Use `pnpm install` first, then `pnpm start` / `pnpm stop` / `pnpm restart` / `pnpm status` as the standard local desktop workflow.

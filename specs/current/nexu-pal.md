@@ -15,7 +15,7 @@ Runs in order:
 
 1. **First-time contributor welcome** — Uses `actions/first-interaction@v3`. If the author has never opened an issue in this repo before, posts a welcome comment.
 
-2. **Language detection & translation** — Sends the issue title and body to an LLM (`google/gemini-2.5-flash` via LiteLLM proxy). If the content is primarily non-English, posts a comment with the English translation and adds the `ai-translated` label.
+2. **Language detection & translation** — Sends the issue title and body to an LLM (`google/gemini-2.5-flash` via OpenRouter). If the content is primarily non-English, posts a comment with the English translation and adds the `ai-translated` label.
 
 3. **Intent classification** — Sends the (English) title and body to the LLM and assigns one label: `bug`, `enhancement`, or `help-wanted`.
 
@@ -45,8 +45,8 @@ Both workflows create a short-lived token via `actions/create-github-app-token@v
 |--------|---------|
 | `NEXU_PAL_APP_ID` | GitHub App ID |
 | `NEXU_PAL_PRIVATE_KEY_PEM` | GitHub App private key |
-| `LITELLM_ENDPOINT` | LiteLLM proxy base URL |
-| `LITELLM_API_KEY` | LiteLLM proxy API key |
+| `OPENAI_BASE_URL` | OpenRouter base URL |
+| `OPENAI_API_KEY` | OpenRouter API key |
 
 ## File map
 
