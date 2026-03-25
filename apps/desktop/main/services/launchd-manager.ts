@@ -250,13 +250,23 @@ export class LaunchdManager {
    */
   async waitForExit(label: string, timeoutMs = 5000): Promise<void> {
     const startTime = Date.now();
+    let consecutiveUnknown = 0;
+
     while (Date.now() - startTime < timeoutMs) {
       const status = await this.getServiceStatus(label);
-      if (status.status !== "running") return;
+      if (status.status === "stopped") return;
+      if (status.status === "unknown") {
+        consecutiveUnknown++;
+        // After 3 consecutive "unknown" reads, treat as exited
+        if (consecutiveUnknown >= 3) return;
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
+      consecutiveUnknown = 0;
       await new Promise((r) => setTimeout(r, 200));
     }
 
-    // Last resort: force kill by PID
+    // Last resort: force kill by PID, then verify
     console.warn(
       `Service ${label} still running after bootout + ${timeoutMs}ms, force killing`,
     );
@@ -266,6 +276,12 @@ export class LaunchdManager {
         process.kill(status.pid, "SIGKILL");
       } catch {
         // Process may have exited between check and kill
+      }
+      // Re-poll briefly to confirm kill took effect
+      for (let i = 0; i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        const recheck = await this.getServiceStatus(label);
+        if (recheck.status !== "running") return;
       }
     }
   }

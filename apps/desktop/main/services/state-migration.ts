@@ -72,6 +72,7 @@ export function migrateOpenclawState(opts: StateMigrationOpts): void {
   // Skip if source doesn't exist or is empty
   if (!existsSync(sourceStateDir)) {
     log(`source not found: ${sourceStateDir}, nothing to migrate`);
+    mkdirSync(targetStateDir, { recursive: true });
     writeStamp(stampPath);
     return;
   }

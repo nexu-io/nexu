@@ -145,8 +145,10 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
           }
           try {
             await opts.launchd.waitForExit(label, 5000);
-          } catch {
-            // Best effort — process may already be gone
+          } catch (err) {
+            console.warn(
+              `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
         }
 
@@ -211,16 +213,25 @@ export async function quitWithDecision(
       try {
         await opts.launchd.bootoutService(label);
       } catch (err) {
-        console.error(`Error booting out ${label}:`, err);
+        console.warn(
+          `bootout ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
       try {
         await opts.launchd.waitForExit(label, 5000);
-      } catch {
-        // Best effort
+      } catch (err) {
+        console.warn(
+          `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
+
+    (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+    app.exit(0);
+    return;
   }
 
-  (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
-  app.exit(0);
+  // run-in-background: hide window, keep services running
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.hide();
 }
