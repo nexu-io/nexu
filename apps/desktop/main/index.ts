@@ -12,6 +12,7 @@ import {
   powerSaveBlocker,
   shell,
 } from "electron";
+import { getOpenclawSkillsDir } from "../shared/desktop-paths";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
@@ -24,8 +25,12 @@ import {
   setUpdateManager,
 } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
-import { createRuntimeUnitManifests } from "./runtime/manifests";
 import {
+  buildSkillNodePath,
+  createRuntimeUnitManifests,
+} from "./runtime/manifests";
+import {
+  type PortAllocation,
   PortAllocationError,
   allocateDesktopRuntimePorts,
 } from "./runtime/port-allocation";
@@ -36,12 +41,18 @@ import {
 } from "./runtime/runtime-logger";
 import {
   type LaunchdBootstrapResult,
+  SERVICE_LABELS,
   bootstrapWithLaunchd,
   getDefaultPlistDir,
+  getLogDir,
   installLaunchdQuitHandler,
   isLaunchdBootstrapEnabled,
   resolveLaunchdPaths,
 } from "./services";
+import {
+  getLegacyNexuHomeStateDir,
+  migrateOpenclawState,
+} from "./services/state-migration";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -75,19 +86,27 @@ const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
-const { allocations: runtimePortAllocations, runtimeConfig } =
-  await allocateDesktopRuntimePorts(process.env, baseRuntimeConfig).catch(
-    (error: unknown) => {
-      if (error instanceof PortAllocationError) {
-        throw new Error(
-          `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
-            `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
-        );
-      }
+// In launchd mode, skip port probing — the bootstrap has its own port
+// recovery via runtime-ports.json and handles leftover processes gracefully.
+// Probing here would waste time and the results get overridden by attach anyway.
+const useLaunchdMode = isLaunchdBootstrapEnabled();
+const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
+  ? {
+      allocations: [] as PortAllocation[],
+      runtimeConfig: baseRuntimeConfig,
+    }
+  : await allocateDesktopRuntimePorts(process.env, baseRuntimeConfig).catch(
+      (error: unknown) => {
+        if (error instanceof PortAllocationError) {
+          throw new Error(
+            `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
+              `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
+          );
+        }
 
-      throw error;
-    },
-  );
+        throw error;
+      },
+    );
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
@@ -224,6 +243,14 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
+
+// Cold-start gate: IPC handler for `env:get-runtime-config` waits for this
+// promise to resolve before returning, ensuring the renderer always gets the
+// final config with correct ports (not the pre-cold-start defaults).
+let resolveColdStartReady: () => void;
+const coldStartReady = new Promise<void>((r) => {
+  resolveColdStartReady = r;
+});
 
 logLaunchTimeline(
   `runtime ports ${runtimePortAllocations
@@ -466,13 +493,32 @@ async function runLaunchdColdStart(): Promise<void> {
   const isDev = !app.isPackaged;
   const paths = resolveLaunchdPaths(app.isPackaged, electronRoot);
 
-  // Derive openclaw paths from nexuHome (must match controller defaults in env.ts)
   const nexuHome = runtimeConfig.paths.nexuHome.replace(
     /^~/,
     process.env.HOME ?? "",
   );
-  const openclawStateDir = resolve(nexuHome, "runtime", "openclaw", "state");
+
+  // In packaged mode, keep openclaw state under Electron userData (matches v0.1.5).
+  // In dev mode, derive from nexuHome for repo-local isolation.
+  const openclawRuntimeRoot = isDev
+    ? resolve(nexuHome, "runtime", "openclaw")
+    : resolve(app.getPath("userData"), "runtime", "openclaw");
+  const openclawStateDir = resolve(openclawRuntimeRoot, "state");
   const openclawConfigPath = resolve(openclawStateDir, "openclaw.json");
+
+  // Migrate any state created under ~/.nexu during v0.1.6 back to userData path
+  if (!isDev) {
+    const legacyStateDir = getLegacyNexuHomeStateDir(
+      runtimeConfig.paths.nexuHome,
+    );
+    if (legacyStateDir !== openclawStateDir) {
+      migrateOpenclawState({
+        targetStateDir: openclawStateDir,
+        sourceStateDir: legacyStateDir,
+        log: (msg) => logColdStart(`state-migration: ${msg}`),
+      });
+    }
+  }
 
   // In dev mode, serve web app from apps/web/dist
   // In packaged mode, serve from resources/web
@@ -480,13 +526,32 @@ async function runLaunchdColdStart(): Promise<void> {
     ? resolve(getWorkspaceRoot(), "apps", "web", "dist")
     : resolve(electronRoot, "runtime", "web", "dist");
 
+  const repoRoot = getWorkspaceRoot();
+  const userDataPath = app.getPath("userData");
+  const openclawSkillsDir = getOpenclawSkillsDir(userDataPath);
+  const openclawTmpDir = resolve(openclawRuntimeRoot, "tmp");
+  const openclawBinPath =
+    process.env.NEXU_OPENCLAW_BIN ?? resolve(paths.openclawCwd, "bin/openclaw");
+  const openclawPackageRoot = resolve(
+    paths.openclawCwd,
+    "node_modules/openclaw",
+  );
+  const openclawExtensionsDir = resolve(openclawPackageRoot, "extensions");
+  const skillhubStaticSkillsDir = app.isPackaged
+    ? resolve(electronRoot, "static/bundled-skills")
+    : resolve(repoRoot, "apps/desktop/static/bundled-skills");
+  const platformTemplatesDir = app.isPackaged
+    ? resolve(electronRoot, "static/platform-templates")
+    : resolve(repoRoot, "apps/controller/static/platform-templates");
+  const skillNodePath = buildSkillNodePath(electronRoot, app.isPackaged);
+
   launchdResult = await bootstrapWithLaunchd({
     isDev,
     controllerPort: runtimeConfig.ports.controller,
     openclawPort: Number(
       new URL(runtimeConfig.urls.openclawBase).port || 18789,
     ),
-    nexuHome: isDev ? nexuHome : undefined,
+    nexuHome,
     gatewayToken: isDev ? undefined : runtimeConfig.tokens.gateway,
     webPort: runtimeConfig.ports.web,
     webRoot,
@@ -494,17 +559,41 @@ async function runLaunchdColdStart(): Promise<void> {
     ...paths,
     openclawConfigPath,
     openclawStateDir,
+    // Controller-specific env vars
+    webUrl: runtimeConfig.urls.web,
+    openclawSkillsDir,
+    skillhubStaticSkillsDir,
+    platformTemplatesDir,
+    openclawBinPath,
+    openclawExtensionsDir,
+    skillNodePath,
+    openclawTmpDir,
   });
 
-  if (launchdResult.attachedPorts) {
-    // Attached to existing services — override runtimeConfig with actual ports
-    const { controllerPort, openclawPort, webPort } =
-      launchdResult.attachedPorts;
-    runtimeConfig.ports.controller = controllerPort;
-    runtimeConfig.ports.web = webPort;
-    runtimeConfig.urls.controllerBase = `http://127.0.0.1:${controllerPort}`;
-    runtimeConfig.urls.web = `http://127.0.0.1:${webPort}`;
-    runtimeConfig.urls.openclawBase = `http://127.0.0.1:${openclawPort}`;
+  // Wire launchd-managed units into the orchestrator so the control plane
+  // shows correct status, and Start/Stop buttons work via launchd.
+  const launchdLogDir = getLogDir(isDev ? nexuHome : undefined);
+  orchestrator.enableLaunchdMode(
+    launchdResult.launchd,
+    {
+      controller: SERVICE_LABELS.controller(isDev),
+      openclaw: SERVICE_LABELS.openclaw(isDev),
+    },
+    launchdLogDir,
+  );
+
+  // Always sync runtimeConfig with actual effective ports — these may differ
+  // from the initial config if ports were recovered from a previous session or
+  // OS-assigned due to conflicts.
+  const { controllerPort, openclawPort, webPort } =
+    launchdResult.effectivePorts;
+  runtimeConfig.ports.controller = controllerPort;
+  runtimeConfig.ports.web = webPort;
+  runtimeConfig.urls.controllerBase = `http://127.0.0.1:${controllerPort}`;
+  runtimeConfig.urls.web = `http://127.0.0.1:${webPort}`;
+  runtimeConfig.urls.openclawBase = `http://127.0.0.1:${openclawPort}`;
+
+  if (launchdResult.isAttach) {
     logColdStart(
       `attached to running services (controller=${controllerPort} openclaw=${openclawPort} web=${webPort})`,
     );
@@ -772,7 +861,7 @@ logLaunchTimeline("electron main module evaluated");
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
   installApplicationMenu();
-  registerIpcHandlers(orchestrator, runtimeConfig);
+  registerIpcHandlers(orchestrator, runtimeConfig, coldStartReady);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   sleepGuard = new SleepGuard({
@@ -797,12 +886,11 @@ app.whenReady().then(async () => {
     }
 
     try {
-      const useLaunchd = isLaunchdBootstrapEnabled();
       logColdStart(
-        `bootstrap mode: ${useLaunchd ? "launchd" : "orchestrator"}`,
+        `bootstrap mode: ${useLaunchdMode ? "launchd" : "orchestrator"}`,
       );
 
-      if (useLaunchd) {
+      if (useLaunchdMode) {
         await runLaunchdColdStart();
       } else {
         await runDesktopColdStart();
@@ -821,6 +909,9 @@ app.whenReady().then(async () => {
         logFilePath: getDesktopLogFilePath("cold-start.log"),
         windowId: getMainWindowId(),
       });
+    } finally {
+      // Unblock renderer — it will get the final config (or show error state)
+      resolveColdStartReady();
     }
 
     // Install launchd quit handler regardless of cold-start success/failure

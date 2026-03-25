@@ -82,8 +82,8 @@ function NexuLoader({ size = 48 }: { size?: number }) {
 }
 
 export function SurfaceFrame({
-  title,
-  description,
+  title: _title,
+  description: _description,
   src,
   version,
   preload,

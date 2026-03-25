@@ -113,6 +113,7 @@ function assertValidChannel(
 export function registerIpcHandlers(
   orchestrator: RuntimeOrchestrator,
   runtimeConfig: DesktopRuntimeConfig,
+  coldStartReady?: Promise<void>,
 ): void {
   orchestrator.subscribe((runtimeEvent) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -191,6 +192,9 @@ export function registerIpcHandlers(
         }
 
         case "env:get-runtime-config": {
+          // Wait for cold-start to finish so the renderer gets final ports
+          // (web port may change due to fallback during bootstrap).
+          if (coldStartReady) await coldStartReady;
           return runtimeConfig;
         }
 

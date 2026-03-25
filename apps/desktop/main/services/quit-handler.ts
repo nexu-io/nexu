@@ -135,11 +135,20 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
           console.error("Error closing web server:", err);
         }
 
+        // Bootout first (unregisters from launchd so KeepAlive won't respawn),
+        // then wait for the process to actually exit before proceeding.
         for (const label of [opts.labels.openclaw, opts.labels.controller]) {
           try {
             await opts.launchd.bootoutService(label);
           } catch (err) {
             console.error(`Error booting out ${label}:`, err);
+          }
+          try {
+            await opts.launchd.waitForExit(label, 5000);
+          } catch (err) {
+            console.warn(
+              `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
         }
 
@@ -148,10 +157,12 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
           await deleteRuntimePorts(opts.plistDir).catch(() => {});
         }
 
-        // Mark force-quit and actually exit
+        // All services stopped. Force exit immediately — app.quit() alone
+        // can hang if dangling handles keep the event loop alive, and a
+        // delayed exit leaves stale SingletonLock files that block relaunch.
         (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
         opts.onForceQuit?.();
-        app.quit();
+        app.exit(0);
       })();
     });
   };
@@ -198,14 +209,29 @@ export async function quitWithDecision(
   }
 
   if (decision === "quit-completely") {
-    try {
-      await opts.launchd.bootoutService(opts.labels.openclaw);
-      await opts.launchd.bootoutService(opts.labels.controller);
-    } catch (err) {
-      console.error("Error stopping services:", err);
+    for (const label of [opts.labels.openclaw, opts.labels.controller]) {
+      try {
+        await opts.launchd.bootoutService(label);
+      } catch (err) {
+        console.warn(
+          `bootout ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      try {
+        await opts.launchd.waitForExit(label, 5000);
+      } catch (err) {
+        console.warn(
+          `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
+
+    (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+    app.exit(0);
+    return;
   }
 
-  (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
-  app.quit();
+  // run-in-background: hide window, keep services running
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.hide();
 }

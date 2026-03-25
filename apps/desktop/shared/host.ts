@@ -421,7 +421,11 @@ export type RuntimeUnitId = "web" | "control-plane" | "controller" | "openclaw";
 
 export type RuntimeUnitKind = "surface" | "service" | "runtime";
 
-export type RuntimeUnitLaunchStrategy = "embedded" | "managed" | "delegated";
+export type RuntimeUnitLaunchStrategy =
+  | "embedded"
+  | "managed"
+  | "delegated"
+  | "launchd";
 
 export type RuntimeUnitPhase =
   | "idle"
@@ -448,7 +452,12 @@ export type RuntimeReasonCode =
   | "delegated_process_missing"
   | "stdout_line"
   | "stderr_line"
-  | "auto_restart_scheduled";
+  | "auto_restart_scheduled"
+  | "launchd_running"
+  | "launchd_stopped"
+  | "launchd_start_requested"
+  | "launchd_stop_requested"
+  | "launchd_log_line";
 
 export type RuntimeLogEntry = {
   id: string;
