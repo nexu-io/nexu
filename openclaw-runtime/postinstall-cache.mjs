@@ -7,6 +7,7 @@ export const cacheInputs = [
   "package.json",
   "package-lock.json",
   "clean-node-modules.mjs",
+  "install-runtime.mjs",
   "postinstall.mjs",
   "postinstall-cache.mjs",
   "prune-runtime.mjs",
