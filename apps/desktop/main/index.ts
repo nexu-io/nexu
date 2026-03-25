@@ -363,8 +363,6 @@ function installApplicationMenu(): void {
               {
                 id: "check-for-updates",
                 label: "Check for Updates…",
-                enabled:
-                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
                 click: () => triggerUpdateCheck(),
               },
               {

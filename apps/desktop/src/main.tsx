@@ -22,7 +22,7 @@ import type {
 import { NEXU_GITHUB_RELEASES_URL } from "../shared/product-urls";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { SurfaceFrame } from "./components/surface-frame";
-import { UpdateBanner } from "./components/update-banner";
+import { UpdateBanner, UpdateCheckDialog } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
@@ -961,18 +961,6 @@ function DesktopShell() {
   }, []);
 
   useEffect(() => {
-    if (isPackaged) {
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void window.nexuHost.invoke("dev:preview-update-ui", {
-        scenario: "available",
-      });
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [isPackaged]);
-
-  useEffect(() => {
     return onDesktopCommand((command) => {
       if (command.type === "desktop:check-for-updates") {
         void update.check();
@@ -1180,6 +1168,12 @@ function DesktopShell() {
           <DiagnosticsPage runtimeConfig={runtimeConfig} />
         </div>
       </main>
+
+      <UpdateCheckDialog
+        phase={update.phase}
+        version={runtimeConfig?.buildInfo.version ?? null}
+        onClose={update.closeDialog}
+      />
     </div>
   );
 }

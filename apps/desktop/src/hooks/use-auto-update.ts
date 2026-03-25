@@ -116,23 +116,13 @@ export function useAutoUpdate() {
     };
   }, []);
 
-  useEffect(() => {
-    if (state.phase !== "up-to-date") {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setState((prev) =>
-        prev.phase === "up-to-date"
-          ? { ...prev, phase: "idle", userInitiated: false }
-          : prev,
-      );
-    }, 2800);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [state.phase]);
+  const closeDialog = useCallback(() => {
+    setState((prev) =>
+      prev.phase === "checking" || prev.phase === "up-to-date"
+        ? { ...prev, phase: "idle", userInitiated: false }
+        : prev,
+    );
+  }, []);
 
   const check = useCallback(async () => {
     setState((prev) => ({
@@ -179,5 +169,13 @@ export function useAutoUpdate() {
     }));
   }, []);
 
-  return { ...state, check, download, install, dismiss, undismiss };
+  return {
+    ...state,
+    check,
+    download,
+    install,
+    dismiss,
+    undismiss,
+    closeDialog,
+  };
 }

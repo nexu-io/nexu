@@ -444,6 +444,12 @@ export function registerIpcHandlers(
 
         case "update:check": {
           if (!updateManager) {
+            await sleep(1500);
+            for (const win of BrowserWindow.getAllWindows()) {
+              if (!win.isDestroyed()) {
+                win.webContents.send("update:up-to-date", {});
+              }
+            }
             return { updateAvailable: false };
           }
           return updateManager.checkNow();

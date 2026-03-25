@@ -1444,6 +1444,20 @@ body,
   transition: width 300ms ease-out;
 }
 
+.update-card-progress--indeterminate {
+  width: 40% !important;
+  animation: indeterminate-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes indeterminate-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
 /* Actions — flex items-center gap-2 pl-4 */
 .update-card-actions {
   display: flex;
@@ -1614,4 +1628,124 @@ body,
   .surface-frame-header {
     flex-direction: column;
   }
+}
+
+/* ───── Update Check Dialog (centered modal) ───── */
+
+.update-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  pointer-events: none;
+  animation: dialog-fade-in 150ms ease-out;
+}
+
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.update-dialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 260px;
+  padding: 24px 24px 20px;
+  border-radius: 14px;
+  background: #fff;
+  pointer-events: auto;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  animation: dialog-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+}
+
+@keyframes dialog-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.update-dialog-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: #f5f5f5;
+}
+
+.update-dialog-logo svg {
+  width: 26px;
+  height: 26px;
+}
+
+.update-dialog-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1f23;
+}
+
+.update-dialog-subtitle {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.update-dialog-progress {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.update-dialog-progress-track {
+  height: 4px;
+  width: 100%;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.update-dialog-progress-fill {
+  height: 100%;
+  width: 35%;
+  border-radius: 9999px;
+  background: #1c1f23;
+  animation: indeterminate-slide 1.4s ease-in-out infinite;
+}
+
+.update-dialog-btn {
+  width: 100%;
+  padding: 7px 0;
+  margin-top: 4px;
+  border: none;
+  border-radius: 8px;
+  background: #3478f6;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.update-dialog-btn:hover {
+  background: #2563eb;
 }
