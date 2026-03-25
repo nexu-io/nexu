@@ -82,8 +82,8 @@ function NexuLoader({ size = 48 }: { size?: number }) {
 }
 
 export function SurfaceFrame({
-  title,
-  description,
+  title: _title,
+  description: _description,
   src,
   version,
   preload,
@@ -94,8 +94,8 @@ export function SurfaceFrame({
   version: number;
   preload?: string;
 }) {
-  void title;
-  void description;
+  void _title;
+  void _description;
   const [webviewReady, setWebviewReady] = useState(false);
   const prevSrcRef = useRef<string | null>(null);
 
