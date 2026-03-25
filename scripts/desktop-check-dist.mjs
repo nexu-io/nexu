@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access, mkdir, open, writeFile } from "node:fs/promises";
+import { access, mkdir, open, readdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const repoRoot = process.cwd();
@@ -114,7 +114,40 @@ async function resolvePackagedExecutable() {
     return resolve(releaseDir, "win-unpacked", "Nexu.exe");
   }
 
-  return resolve(releaseDir, "Nexu.app", "Contents", "MacOS", "Nexu");
+  const defaultMacExecutable = resolve(
+    releaseDir,
+    "Nexu.app",
+    "Contents",
+    "MacOS",
+    "Nexu",
+  );
+
+  if (await fileExists(defaultMacExecutable)) {
+    return defaultMacExecutable;
+  }
+
+  const releaseEntries = await readdir(releaseDir, { withFileTypes: true });
+
+  for (const entry of releaseEntries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("mac-")) {
+      continue;
+    }
+
+    const macExecutable = resolve(
+      releaseDir,
+      entry.name,
+      "Nexu.app",
+      "Contents",
+      "MacOS",
+      "Nexu",
+    );
+
+    if (await fileExists(macExecutable)) {
+      return macExecutable;
+    }
+  }
+
+  return defaultMacExecutable;
 }
 
 async function main() {
