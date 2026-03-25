@@ -159,6 +159,15 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
         (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
         opts.onForceQuit?.();
         app.quit();
+
+        // Safety net: if Electron doesn't exit within 3s (e.g. due to
+        // dangling handles keeping the event loop alive), force exit.
+        setTimeout(() => {
+          console.warn(
+            "Electron did not exit within 3s after app.quit(), forcing process.exit()",
+          );
+          process.exit(0);
+        }, 3000).unref();
       })();
     });
   };
@@ -221,4 +230,11 @@ export async function quitWithDecision(
 
   (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
   app.quit();
+
+  setTimeout(() => {
+    console.warn(
+      "Electron did not exit within 3s after app.quit(), forcing process.exit()",
+    );
+    process.exit(0);
+  }, 3000).unref();
 }
