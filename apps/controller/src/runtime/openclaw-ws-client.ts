@@ -293,10 +293,33 @@ export class OpenClawWsClient {
     const id = randomUUID();
     const frame: RequestFrame = { type: "req", id, method, params };
     const timeoutMs = opts?.timeoutMs ?? REQUEST_TIMEOUT_MS;
+    const startedAt = Date.now();
+
+    logger.info(
+      {
+        id,
+        method,
+        timeoutMs,
+        params:
+          params && typeof params === "object"
+            ? Object.keys(params as Record<string, unknown>)
+            : typeof params,
+      },
+      "openclaw_ws_request_start",
+    );
 
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
+        logger.warn(
+          {
+            id,
+            method,
+            timeoutMs,
+            durationMs: Date.now() - startedAt,
+          },
+          "openclaw_ws_request_timeout",
+        );
         reject(
           new Error(
             `openclaw request "${method}" timed out after ${timeoutMs}ms`,
@@ -305,8 +328,29 @@ export class OpenClawWsClient {
       }, timeoutMs);
 
       this.pending.set(id, {
-        resolve: (value) => resolve(value as T),
-        reject,
+        resolve: (value) => {
+          logger.info(
+            {
+              id,
+              method,
+              durationMs: Date.now() - startedAt,
+            },
+            "openclaw_ws_request_success",
+          );
+          resolve(value as T);
+        },
+        reject: (error) => {
+          logger.warn(
+            {
+              id,
+              method,
+              durationMs: Date.now() - startedAt,
+              error: error.message,
+            },
+            "openclaw_ws_request_failure",
+          );
+          reject(error);
+        },
         timer,
       });
 

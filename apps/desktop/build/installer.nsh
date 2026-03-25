@@ -6,14 +6,33 @@
 !define NEXU_RUNONCE_VALUE_PREFIX "NexuDesktopCleanup-"
 !define NEXU_WSHELL "$SYSDIR\wscript.exe"
 !define NEXU_CLEANUP_SCRIPT "$TEMP\nexu-desktop-cleanup.vbs"
+!define NEXU_INSTALLER_LOG "$TEMP\nexu-installer-debug.log"
+
+!macro preInit
+  System::Call 'kernel32::GetTickCount() i .r0'
+  FileOpen $1 "${NEXU_INSTALLER_LOG}" a
+  IfErrors +2
+  FileWrite $1 "$0ms | preInit entered$\r$\n"
+  IfErrors +2
+  FileClose $1
+!macroend
 
 !macro customInit
+  Push "customInit entered"
+  Call LogNexuInstallerEvent
   ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
   ${if} $0 == ""
     StrCpy $INSTDIR "$LOCALAPPDATA\Programs\nexu-desktop"
   ${endif}
   SetShellVarContext current
   Call CleanupPriorNexuDataTombstones
+  Push "customInit leaving"
+  Call LogNexuInstallerEvent
+!macroend
+
+!macro customInstall
+  Push "customInstall entered"
+  Call LogNexuInstallerEvent
 !macroend
 
 !macro customUnInstallSection
@@ -24,6 +43,23 @@
 !macroend
 
 !ifndef BUILD_UNINSTALLER
+  Function LogNexuInstallerEvent
+    Exch $0
+    Push $1
+    Push $2
+
+    System::Call 'kernel32::GetTickCount() i .r1'
+    FileOpen $2 "${NEXU_INSTALLER_LOG}" a
+    IfErrors done
+    FileWrite $2 "$1ms | $0$\r$\n"
+    FileClose $2
+
+  done:
+    Pop $2
+    Pop $1
+    Pop $0
+  FunctionEnd
+
   Function WriteNexuCleanupScript
     Push $0
 
@@ -64,6 +100,9 @@
     Push $0
     Push $1
 
+    Push "CleanupPriorNexuDataTombstones start"
+    Call LogNexuInstallerEvent
+
     FindFirst $0 $1 "$APPDATA\${NEXU_TOMBSTONE_PREFIX}*"
     loop:
       StrCmp $1 "" done
@@ -77,6 +116,9 @@
       Goto loop
     done:
       FindClose $0
+
+    Push "CleanupPriorNexuDataTombstones done"
+    Call LogNexuInstallerEvent
 
     Pop $1
     Pop $0

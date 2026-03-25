@@ -218,6 +218,29 @@ async function getElectronVersion() {
   return electronPackageJson.version;
 }
 
+async function getWindowsBuildVersion() {
+  const desktopPackage = JSON.parse(await readFile(desktopPackageJsonPath, "utf8"));
+  const rawVersion =
+    typeof desktopPackage.version === "string"
+      ? desktopPackage.version
+      : process.env.npm_package_version;
+
+  if (typeof rawVersion !== "string" || rawVersion.trim().length === 0) {
+    return "0.0.0.0";
+  }
+
+  const numericParts = rawVersion
+    .split(".")
+    .map((part) => Number.parseInt(part, 10))
+    .filter((part) => Number.isFinite(part));
+
+  while (numericParts.length < 4) {
+    numericParts.push(0);
+  }
+
+  return numericParts.slice(0, 4).join(".");
+}
+
 async function main() {
   const rawArgs = new Set(process.argv.slice(2));
   const dirOnly = rawArgs.has("--dir-only") || rawArgs.has("--target=dir");
@@ -262,14 +285,8 @@ async function main() {
   await ensureBuildConfig();
   await dereferencePnpmSymlinks();
 
-  let buildVersion = "dev";
   const electronVersion = await getElectronVersion();
-  try {
-    buildVersion = execFileSync("git", ["rev-parse", "--short=7", "HEAD"], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    }).trim();
-  } catch {}
+  const buildVersion = await getWindowsBuildVersion();
 
   await runElectronBuilder(
     [

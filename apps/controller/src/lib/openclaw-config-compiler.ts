@@ -214,6 +214,7 @@ function compileModelsConfig(
       baseUrl: `${normalizeProviderBaseUrl(desktopCloud.linkUrl) ?? desktopCloud.linkUrl}/v1`,
       apiKey: desktopCloud.apiKey,
       api: "openai-completions",
+      timeoutMs: 60_000,
       headers: LINK_PROVIDER_HEADERS,
       models: desktopCloud.models.map((model) =>
         buildModelEntry(model.id, model.name),

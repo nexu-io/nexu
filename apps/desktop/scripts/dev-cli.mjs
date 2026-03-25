@@ -133,6 +133,13 @@ function createLauncherEnv() {
   };
 }
 
+function createWebBuildEnv() {
+  return {
+    ...createLauncherEnv(),
+    VITE_DESKTOP_PLATFORM: process.platform,
+  };
+}
+
 async function appendLine(filePath, message) {
   await appendFile(
     filePath,
@@ -564,6 +571,7 @@ async function killResidualProcesses() {
 
 async function buildRuntime() {
   const launcherEnv = createLauncherEnv();
+  const webBuildEnv = createWebBuildEnv();
 
   await runTimedPhase("build_runtime", async () => {
     await log("building runtime artifacts");
@@ -583,7 +591,7 @@ async function buildRuntime() {
     await runLogged(
       pnpmCommand,
       ["--dir", rootDir, "--filter", "@nexu/web", "build"],
-      { env: launcherEnv },
+      { env: webBuildEnv },
     );
     await logTimeline("build_runtime controller sidecar start");
     await runLogged(

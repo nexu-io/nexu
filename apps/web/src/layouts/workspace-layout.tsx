@@ -4,6 +4,7 @@ import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
+import { isWindowsDesktopPlatform } from "@/lib/desktop-platform";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -530,13 +531,23 @@ function WorkspaceLayoutInner() {
         : selectedSession
           ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
-  const desktopGlassTint = "rgba(255, 255, 255, 0.08)";
+  const isWindowsDesktopClient = isDesktopClient && isWindowsDesktopPlatform();
+  const desktopGlassTint = isWindowsDesktopClient
+    ? "#ffffff"
+    : "rgba(255, 255, 255, 0.08)";
   const updateFloatWidth = Math.max(140, sidebarWidth - 20);
   const updateFloatLeft = 10;
   const updateFloatBottom = 52;
 
   return (
-    <div className="flex h-screen relative">
+    <div
+      className="flex h-screen relative overflow-hidden"
+      style={
+        isDesktopClient
+          ? ({ background: desktopGlassTint } as React.CSSProperties)
+          : undefined
+      }
+    >
       {isDesktopClient && hasUpdate && !updateDismissed && (
         <UpdateFloatCard
           phase={update.phase}
@@ -552,12 +563,30 @@ function WorkspaceLayoutInner() {
         />
       )}
 
-      {/* Fixed sidebar toggle — next to traffic lights (desktop client only) */}
-      {isDesktopClient && (
+      {/* Collapsed sidebar toggle (desktop client only) */}
+      {!isWindowsDesktopClient && collapsed && (
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="fixed top-[12px] left-[80px] p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
+          className="fixed top-[16px] left-[24px] h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          title={
+            collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
+          }
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={16} />
+          ) : (
+            <PanelLeftClose size={16} />
+          )}
+        </button>
+      )}
+
+      {isWindowsDesktopClient && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="fixed top-[16px] left-[2px] h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           title={
             collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
@@ -587,52 +616,64 @@ function WorkspaceLayoutInner() {
         {isDesktopClient && <div className="h-14 shrink-0" />}
 
         {/* Header / Brand */}
-        <div
-          className={cn(
-            "flex items-center justify-between px-3 pb-2 shrink-0",
-            !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
-          )}
-          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-        >
-          {isDesktopClient ? (
-            <>
-              <img
-                src="/brand/logo-black-1.svg"
-                alt="Nexu"
-                className="h-6 object-contain"
-              />
-              {hasUpdate && updateDismissed && (
+        {!isWindowsDesktopClient && (
+          <div
+            className={cn(
+              "flex items-center justify-between px-3 pb-2 shrink-0",
+              !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
+            )}
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
+            {isDesktopClient ? (
+              <>
+                <img
+                  src="/brand/logo-black-1.svg"
+                  alt="Nexu"
+                  className="h-6 object-contain"
+                />
+                <div className="flex items-center gap-2">
+                  {hasUpdate && updateDismissed && (
+                    <button
+                      type="button"
+                      onClick={() => setUpdateDismissed(false)}
+                      className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[var(--color-brand-primary)] text-white hover:opacity-85 transition-opacity"
+                    >
+                      {t("layout.update.badge")}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCollapsed(true)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors"
+                    title={t("layout.collapseSidebar")}
+                  >
+                    <PanelLeftClose size={16} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <BrandMark className="w-7 h-7 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-text-primary whitespace-nowrap">
+                    Nexu <span className="text-[11px]">🦞</span>
+                  </div>
+                  <div className="text-[10px] text-text-tertiary whitespace-nowrap">
+                    {t("layout.brand")}
+                  </div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setUpdateDismissed(false)}
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[var(--color-brand-primary)] text-white hover:opacity-85 transition-opacity"
+                  onClick={() => setCollapsed(true)}
+                  className="p-1.5 rounded-lg transition-colors text-text-muted hover:text-text-primary hover:bg-surface-3 shrink-0"
+                  title={t("layout.collapseSidebar")}
                 >
-                  {t("layout.update.badge")}
+                  <PanelLeftClose size={14} />
                 </button>
-              )}
-            </>
-          ) : (
-            <>
-              <BrandMark className="w-7 h-7 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text-primary whitespace-nowrap">
-                  Nexu <span className="text-[11px]">🦞</span>
-                </div>
-                <div className="text-[10px] text-text-tertiary whitespace-nowrap">
-                  {t("layout.brand")}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCollapsed(true)}
-                className="p-1.5 rounded-lg transition-colors text-text-muted hover:text-text-primary hover:bg-surface-3 shrink-0"
-                title={t("layout.collapseSidebar")}
-              >
-                <PanelLeftClose size={14} />
-              </button>
-            </>
-          )}
-        </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Main nav + conversations */}
         <div
@@ -1142,21 +1183,20 @@ function WorkspaceLayoutInner() {
       {!collapsed && (
         <div
           onMouseDown={handleResizeStart}
-          className="hidden md:block w-[3px] shrink-0 cursor-col-resize group relative z-10"
-          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          className="hidden md:block w-px shrink-0 cursor-col-resize group relative z-10"
+          style={
+            {
+              WebkitAppRegion: "no-drag",
+              background: desktopGlassTint,
+            } as React.CSSProperties
+          }
         >
-          <div className="absolute inset-y-0 -left-[2px] -right-[2px]" />
+          <div className="absolute inset-y-0 -left-1.5 -right-1.5" />
         </div>
       )}
 
       {/* Main content — elevated surface with rounded left edge */}
       <div className="relative flex-1 min-w-0">
-        {isDesktopClient && (
-          <div
-            className="absolute inset-y-0 left-0 w-4 pointer-events-none"
-            style={{ background: desktopGlassTint }}
-          />
-        )}
         <div
           className={cn(
             "relative flex h-full min-w-0 flex-col bg-surface-1 rounded-l-[12px]",

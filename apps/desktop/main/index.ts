@@ -43,6 +43,10 @@ import { UpdateManager } from "./updater/update-manager";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const startupEpochMs = Date.now();
+let mainWindow: BrowserWindow | null = null;
+let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+let sleepGuard: SleepGuard | null = null;
 
 // Set display name early (matches productName in package.json).
 app.setName("Nexu");
@@ -64,32 +68,40 @@ void app.dock?.show();
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
+logStartupStep(
+  `electron root resolved packaged=${String(app.isPackaged)} path=${electronRoot}`,
+);
 const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   appVersion: app.getVersion(),
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
+logStartupStep("base runtime config created");
 const { allocations: runtimePortAllocations, runtimeConfig } =
-  await allocateDesktopRuntimePorts(process.env, baseRuntimeConfig).catch(
-    (error: unknown) => {
-      if (error instanceof PortAllocationError) {
-        throw new Error(
-          `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
-            `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
-        );
-      }
+  await measureStartupStep("allocateDesktopRuntimePorts", () =>
+    allocateDesktopRuntimePorts(process.env, baseRuntimeConfig),
+  ).catch((error: unknown) => {
+    if (error instanceof PortAllocationError) {
+      throw new Error(
+        `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
+          `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
+      );
+    }
 
-      throw error;
-    },
-  );
+    throw error;
+  });
+logStartupStep("runtime config ready");
 const orchestrator = new RuntimeOrchestrator(
-  await createRuntimeUnitManifests(
-    electronRoot,
-    app.getPath("userData"),
-    app.isPackaged,
-    runtimeConfig,
+  await measureStartupStep("createRuntimeUnitManifests", () =>
+    createRuntimeUnitManifests(
+      electronRoot,
+      app.getPath("userData"),
+      app.isPackaged,
+      runtimeConfig,
+    ),
   ),
 );
+logStartupStep("runtime orchestrator created");
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
@@ -213,10 +225,6 @@ if (sentryDsn) {
     },
   });
 }
-
-let mainWindow: BrowserWindow | null = null;
-let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
-let sleepGuard: SleepGuard | null = null;
 
 logLaunchTimeline(
   `runtime ports ${runtimePortAllocations
@@ -342,6 +350,27 @@ function logLaunchTimeline(message: string): void {
   });
 }
 
+function logStartupStep(message: string): void {
+  logLaunchTimeline(`[startup +${Date.now() - startupEpochMs}ms] ${message}`);
+}
+
+async function measureStartupStep<T>(
+  name: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  logStartupStep(`${name}:start`);
+  try {
+    const result = await operation();
+    logStartupStep(`${name}:done`);
+    return result;
+  } catch (error) {
+    logStartupStep(
+      `${name}:fail ${error instanceof Error ? error.message : String(error)}`,
+    );
+    throw error;
+  }
+}
+
 function logAuthRecovery(message: string, stream: "stdout" | "stderr"): void {
   writeDesktopMainLog({
     source: "auth-recovery",
@@ -422,6 +451,7 @@ async function waitForControllerReadiness(): Promise<void> {
 }
 
 async function runDesktopColdStart(): Promise<void> {
+  logStartupStep("runDesktopColdStart:start");
   diagnosticsReporter?.markColdStartRunning("starting controller");
   logColdStart("starting controller");
   await orchestrator.startOne("controller");
@@ -444,6 +474,7 @@ async function runDesktopColdStart(): Promise<void> {
 
   logColdStart("cold start complete");
   diagnosticsReporter?.markColdStartSucceeded();
+  logStartupStep("runDesktopColdStart:done");
 }
 
 let authRecoveryPromise: Promise<void> | null = null;
@@ -510,6 +541,7 @@ app.on("second-instance", () => {
 
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
+  logStartupStep("createMainWindow:start");
   const isMacOS = process.platform === "darwin";
   const window = new BrowserWindow({
     width: 1400,
@@ -518,6 +550,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: 760,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "Nexu",
+    autoHideMenuBar: !isMacOS,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 18 },
     ...(isMacOS
@@ -588,6 +621,9 @@ function createMainWindow(): BrowserWindow {
   );
 
   window.webContents.on("did-finish-load", () => {
+    logStartupStep(
+      `main window did-finish-load url=${window.webContents.getURL()}`,
+    );
     diagnosticsReporter?.recordRendererDidFinishLoad(
       window.webContents.getURL(),
     );
@@ -616,12 +652,18 @@ function createMainWindow(): BrowserWindow {
 
   window.once("ready-to-show", () => {
     logLaunchTimeline("main window ready-to-show");
+    logStartupStep("main window ready-to-show");
     if (isMacOS) {
       window.setBackgroundColor("#00000000");
       window.setVibrancy("sidebar");
     }
     window.show();
+    if (!isMacOS) {
+      window.setMenuBarVisibility(false);
+    }
+    logStartupStep("main window show called");
     focusMainWindow();
+    logStartupStep("main window focus requested");
   });
 
   window.on("closed", () => {
@@ -632,6 +674,7 @@ function createMainWindow(): BrowserWindow {
 
   void window.loadFile(resolve(__dirname, "../../dist/index.html"));
   logLaunchTimeline("main window loadFile dispatched");
+  logStartupStep("createMainWindow:loadFile-dispatched");
   mainWindow = window;
   return window;
 }
@@ -735,14 +778,24 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 logLaunchTimeline("electron main module evaluated");
+logStartupStep("electron main module evaluated");
 
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
+  logStartupStep("app.whenReady resolved");
+  logStartupStep("installApplicationMenu:start");
   installApplicationMenu();
+  logStartupStep("installApplicationMenu:done");
+  logStartupStep("installDesktopAuthRecoveryHooks:start");
   installDesktopAuthRecoveryHooks();
+  logStartupStep("installDesktopAuthRecoveryHooks:done");
+  logStartupStep("registerIpcHandlers:start");
   registerIpcHandlers(orchestrator, runtimeConfig);
+  logStartupStep("registerIpcHandlers:done");
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
+  logStartupStep("DesktopDiagnosticsReporter:created");
   const unsubscribeDiagnostics = diagnosticsReporter.start();
+  logStartupStep("DesktopDiagnosticsReporter:started");
   sleepGuard = new SleepGuard({
     powerMonitor,
     powerSaveBlocker,
@@ -751,8 +804,11 @@ app.whenReady().then(async () => {
       diagnosticsReporter?.setSleepGuardSnapshot(snapshot);
     },
   });
+  logStartupStep("SleepGuard:created");
   const win = createMainWindow();
+  logStartupStep(`main window created id=${win.webContents.id}`);
   sleepGuard.start("desktop-runtime-active");
+  logStartupStep("SleepGuard:started");
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();
