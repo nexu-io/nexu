@@ -1,15 +1,15 @@
-name: nexu-pal
+name: "nexu-pal: issue assigned"
 
 on:
   issues:
-    types: [opened]
+    types: [assigned]
 
 permissions:
   contents: read
   issues: write
 
 jobs:
-  process-issue:
+  handle-assignment:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,13 +27,8 @@ jobs:
           app-id: ${{ secrets.NEXU_PAL_APP_ID }}
           private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
 
-      - name: Process issue
+      - name: Handle assignment
         env:
-          LITELLM_ENDPOINT: ${{ secrets.LITELLM_ENDPOINT }}
-          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
-          LITELLM_MODEL: "google/gemini-2.5-flash"
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-        run: node scripts/nexu-pal/process-issue.mjs
+        run: node scripts/nexu-pal/process-issue-assignment.mjs

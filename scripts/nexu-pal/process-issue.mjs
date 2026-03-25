@@ -15,6 +15,7 @@
  *   ISSUE_NUMBER      — Issue number to process
  *   ISSUE_TITLE       — Issue title
  *   ISSUE_BODY        — Issue body (may be empty)
+ *   ISSUE_ASSIGNEE    — Issue assignee login (empty if unassigned)
  */
 
 // ---------------------------------------------------------------------------
@@ -275,6 +276,13 @@ async function main() {
     console.warn(
       `  Unexpected classification label: ${JSON.stringify(classification.label)}; skipping label.`,
     );
+  }
+
+  // Step 3: needs-triage label
+  const issueAssignee = process.env.ISSUE_ASSIGNEE ?? "";
+  if (!issueAssignee) {
+    labels.push("needs-triage");
+    console.log("  No assignee — adding needs-triage label.");
   }
 
   // Apply labels
