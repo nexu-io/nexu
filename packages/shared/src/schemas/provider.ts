@@ -19,7 +19,7 @@ export const providerListResponseSchema = z.object({
 });
 
 export const upsertProviderBodySchema = z.object({
-  apiKey: z.string().optional(),
+  apiKey: z.string().nullable().optional(),
   baseUrl: z.string().nullable().optional(),
   enabled: z.boolean().optional(),
   displayName: z.string().optional(),

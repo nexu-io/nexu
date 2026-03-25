@@ -4846,7 +4846,8 @@
                 "type": "object",
                 "properties": {
                   "apiKey": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "baseUrl": {
                     "type": "string",

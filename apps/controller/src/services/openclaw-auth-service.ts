@@ -190,36 +190,50 @@ export class OpenClawAuthService {
     }
 
     try {
-      const profiles = await this.readAuthProfiles();
-      if (!profiles) return { connected: false };
-
       const profileKey = "openai-codex:default";
-      const profile = profiles.profiles[profileKey];
-      if (
-        typeof profile !== "object" ||
-        profile === null ||
-        !("type" in profile)
-      ) {
-        return { connected: false };
+      const filePaths = await this.listAgentAuthProfilesPaths();
+      for (const filePath of filePaths) {
+        const profiles = await this.readAuthProfilesFile(filePath);
+        if (!profiles) {
+          continue;
+        }
+
+        const profile = profiles.profiles[profileKey];
+        if (
+          typeof profile !== "object" ||
+          profile === null ||
+          !("type" in profile)
+        ) {
+          continue;
+        }
+
+        const typed = profile as Record<string, unknown>;
+        if (typed.type !== "oauth") {
+          continue;
+        }
+
+        const expiresAt =
+          typeof typed.expires === "number" ? typed.expires : undefined;
+        if (expiresAt === undefined) {
+          continue;
+        }
+
+        const now = Date.now();
+        const remainingMs = expiresAt - now;
+        if (remainingMs <= 0) {
+          continue;
+        }
+
+        return {
+          connected: true,
+          provider:
+            typeof typed.provider === "string" ? typed.provider : "openai",
+          expiresAt,
+          remainingMs,
+        };
       }
 
-      const typed = profile as Record<string, unknown>;
-      if (typed.type !== "oauth") return { connected: false };
-
-      const expiresAt =
-        typeof typed.expires === "number" ? typed.expires : undefined;
-      if (expiresAt === undefined) return { connected: false };
-
-      const now = Date.now();
-      const remainingMs = expiresAt - now;
-
-      return {
-        connected: remainingMs > 0,
-        provider:
-          typeof typed.provider === "string" ? typed.provider : "openai",
-        expiresAt,
-        remainingMs: remainingMs > 0 ? remainingMs : 0,
-      };
+      return { connected: false };
     } catch (err: unknown) {
       logger.warn(
         { error: err instanceof Error ? err.message : String(err) },
@@ -233,24 +247,27 @@ export class OpenClawAuthService {
     if (providerId !== "openai") return false;
 
     try {
-      const profilesPath = await this.findAgentAuthProfilesPath();
-      if (!profilesPath) return false;
-
-      const existing = await this.readAuthProfiles();
-      if (!existing) return false;
-
+      const filePaths = await this.listAgentAuthProfilesPaths();
+      if (filePaths.length === 0) return false;
       const profileKey = "openai-codex:default";
-      if (!(profileKey in existing.profiles)) return true; // already disconnected
+      await Promise.all(
+        filePaths.map(async (filePath) => {
+          const existing = await this.readAuthProfilesFile(filePath);
+          if (!existing || !(profileKey in existing.profiles)) {
+            return;
+          }
 
-      const { [profileKey]: _removed, ...remainingProfiles } =
-        existing.profiles;
+          const { [profileKey]: _removed, ...remainingProfiles } =
+            existing.profiles;
 
-      const updated: AuthProfilesData = {
-        ...existing,
-        profiles: remainingProfiles,
-      };
+          const updated: AuthProfilesData = {
+            ...existing,
+            profiles: remainingProfiles,
+          };
 
-      await this.writeAuthProfiles(updated);
+          await this.writeAuthProfilesFile(filePath, updated);
+        }),
+      );
       logger.info({ providerId }, "OAuth profile disconnected");
       return true;
     } catch (err: unknown) {
@@ -470,27 +487,24 @@ export class OpenClawAuthService {
 
   // ── Auth Profiles I/O ───────────────────────────────────────
 
-  private async findAgentAuthProfilesPath(): Promise<string | null> {
+  private async listAgentAuthProfilesPaths(): Promise<string[]> {
     const agentsDir = path.join(this.env.openclawStateDir, "agents");
     try {
       const entries = await readdir(agentsDir, { withFileTypes: true });
-      const firstAgent = entries.find((e) => e.isDirectory());
-      if (!firstAgent) return null;
-      return path.join(
-        agentsDir,
-        firstAgent.name,
-        "agent",
-        "auth-profiles.json",
-      );
+      return entries
+        .filter((entry) => entry.isDirectory())
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map((entry) =>
+          path.join(agentsDir, entry.name, "agent", "auth-profiles.json"),
+        );
     } catch {
-      return null;
+      return [];
     }
   }
 
-  private async readAuthProfiles(): Promise<AuthProfilesData | null> {
-    const filePath = await this.findAgentAuthProfilesPath();
-    if (!filePath) return null;
-
+  private async readAuthProfilesFile(
+    filePath: string,
+  ): Promise<AuthProfilesData | null> {
     try {
       const content = await readFile(filePath, "utf8");
       const parsed: unknown = JSON.parse(content);
@@ -517,11 +531,10 @@ export class OpenClawAuthService {
     }
   }
 
-  private async writeAuthProfiles(data: AuthProfilesData): Promise<void> {
-    const filePath = await this.findAgentAuthProfilesPath();
-    if (!filePath) {
-      throw new Error("No agent directory found for auth profiles");
-    }
+  private async writeAuthProfilesFile(
+    filePath: string,
+    data: AuthProfilesData,
+  ): Promise<void> {
     await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   }
 
@@ -529,18 +542,27 @@ export class OpenClawAuthService {
     key: string,
     profile: OAuthProfile,
   ): Promise<void> {
-    const existing = await this.readAuthProfiles();
-    const base: AuthProfilesData = existing ?? { version: 1, profiles: {} };
+    const filePaths = await this.listAgentAuthProfilesPaths();
+    if (filePaths.length === 0) {
+      throw new Error("No agent directory found for auth profiles");
+    }
 
-    const updated: AuthProfilesData = {
-      ...base,
-      profiles: {
-        ...base.profiles,
-        [key]: profile,
-      },
-    };
+    await Promise.all(
+      filePaths.map(async (filePath) => {
+        const existing = await this.readAuthProfilesFile(filePath);
+        const base: AuthProfilesData = existing ?? { version: 1, profiles: {} };
 
-    await this.writeAuthProfiles(updated);
+        const updated: AuthProfilesData = {
+          ...base,
+          profiles: {
+            ...base.profiles,
+            [key]: profile,
+          },
+        };
+
+        await this.writeAuthProfilesFile(filePath, updated);
+      }),
+    );
   }
 
   // ── Lifecycle Helpers ───────────────────────────────────────

@@ -75,6 +75,7 @@ export function registerProviderOAuthRoutes(
           await container.modelProviderService.upsertProvider(providerId, {
             displayName: "OpenAI",
             enabled: true,
+            apiKey: null,
             modelsJson: JSON.stringify(models),
           });
           await container.openclawSyncService.syncAll();

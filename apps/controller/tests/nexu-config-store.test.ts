@@ -98,6 +98,24 @@ describe("NexuConfigStore", () => {
     expect(await store.listChannels()).toHaveLength(1);
   });
 
+  it("clears an existing provider API key when null is explicitly provided", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.upsertProvider("openai", {
+      apiKey: "sk-test",
+      displayName: "OpenAI",
+      modelsJson: JSON.stringify(["gpt-5.4"]),
+    });
+
+    const result = await store.upsertProvider("openai", {
+      apiKey: null,
+      modelsJson: JSON.stringify(["gpt-5.4"]),
+    });
+
+    expect(result.provider.hasApiKey).toBe(false);
+    expect(result.provider.apiKey).toBeNull();
+  });
+
   it("recovers from a broken primary config using backup-compatible data", async () => {
     const brokenConfigPath = env.nexuConfigPath;
     const backupPath = `${brokenConfigPath}.bak`;
