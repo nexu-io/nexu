@@ -4864,7 +4864,9 @@
                 "openrouter",
                 "minimax",
                 "kimi",
-                "glm"
+                "glm",
+                "moonshot",
+                "zai"
               ]
             },
             "required": true,
@@ -5089,7 +5091,9 @@
                 "openrouter",
                 "minimax",
                 "kimi",
-                "glm"
+                "glm",
+                "moonshot",
+                "zai"
               ]
             },
             "required": true,
@@ -5296,7 +5300,9 @@
                 "openrouter",
                 "minimax",
                 "kimi",
-                "glm"
+                "glm",
+                "moonshot",
+                "zai"
               ]
             },
             "required": true,

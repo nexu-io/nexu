@@ -1798,7 +1798,7 @@ export type GetApiV1ProvidersResponse = GetApiV1ProvidersResponses[keyof GetApiV
 export type DeleteApiV1ProvidersByProviderIdData = {
     body?: never;
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm';
+        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}';
@@ -1825,7 +1825,7 @@ export type PutApiV1ProvidersByProviderIdData = {
         modelsJson?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm';
+        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}';
@@ -1950,7 +1950,7 @@ export type PostApiV1ProvidersByProviderIdVerifyData = {
         baseUrl?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm';
+        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}/verify';

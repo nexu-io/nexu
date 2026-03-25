@@ -217,7 +217,7 @@ const en = {
   "home.manageSkills": "Manage skills",
   "home.manageSkillsDesc": "Tools and capabilities",
   "home.starGithub": "Star on GitHub",
-  "home.starnexu": "Star nexu on GitHub",
+  "home.starNexu": "Star Nexu on GitHub",
   "home.starCta":
     "Help us grow the open-source community — your star makes a difference",
   "home.recentActivity": "Recent Activity",

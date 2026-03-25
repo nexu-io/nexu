@@ -213,7 +213,7 @@ const zhCN = {
   "home.manageSkills": "管理技能",
   "home.manageSkillsDesc": "工具和能力",
   "home.starGithub": "Star on GitHub",
-  "home.starnexu": "在 GitHub 上 Star nexu",
+  "home.starNexu": "在 GitHub 上 Star Nexu",
   "home.starCta": "帮助我们壮大开源社区 — 你的 Star 很重要",
   "home.recentActivity": "最近活动",
   "home.noRecentActivity": "暂无最近对话",
