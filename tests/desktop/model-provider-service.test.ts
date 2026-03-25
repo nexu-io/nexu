@@ -137,4 +137,130 @@ describe("ModelProviderService", () => {
     expect(cloudStatus.models).toHaveLength(1);
     expect(after).toBe(before);
   });
+
+  it("clears minimax oauth in-progress status once credentials are persisted", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = new ModelProviderService(
+      store,
+      env,
+      {
+        syncAll: async () => ({ configPushed: false }),
+      } as never,
+      {
+        stop: async () => {},
+        enableAutoRestart: () => {},
+        start: () => {},
+      } as never,
+    );
+
+    await store.setProviderOauthCredentials("minimax", {
+      displayName: "MiniMax",
+      enabled: true,
+      baseUrl: "https://api.minimax.io/anthropic",
+      models: ["MiniMax-M2.7"],
+      oauthRegion: "global",
+      oauthCredential: {
+        provider: "minimax-portal",
+        access: "access-token",
+        refresh: "refresh-token",
+        expires: Date.now() + 60_000,
+      },
+    });
+
+    (
+      service as unknown as {
+        miniMaxOauthState: {
+          connected: boolean;
+          inProgress: boolean;
+          region: "global" | "cn" | null;
+          error: string | null;
+        };
+      }
+    ).miniMaxOauthState = {
+      connected: false,
+      inProgress: true,
+      region: "global",
+      error: null,
+    };
+
+    const status = await service.getMiniMaxOauthStatus();
+
+    expect(status.connected).toBe(true);
+    expect(status.inProgress).toBe(false);
+  });
+
+  it("normalizes minimax poll interval without over-scaling millisecond values", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = new ModelProviderService(
+      store,
+      env,
+      {
+        syncAll: async () => ({ configPushed: false }),
+      } as never,
+      {
+        stop: async () => {},
+        enableAutoRestart: () => {},
+        start: () => {},
+      } as never,
+    );
+
+    let capturedIntervalMs = 0;
+    (
+      service as unknown as {
+        pollMiniMaxOAuthToken: (
+          input: {
+            region: "global" | "cn";
+            userCode: string;
+            verifier: string;
+            expiresAt: number;
+            intervalMs: number;
+          },
+          signal: AbortSignal,
+        ) => Promise<{
+          access: string;
+          refresh?: string;
+          expires?: number;
+          resourceUrl?: string;
+        }>;
+      }
+    ).pollMiniMaxOAuthToken = async (input) => {
+      capturedIntervalMs = input.intervalMs;
+      return {
+        access: "access-token",
+        refresh: "refresh-token",
+        expires: 3600,
+        resourceUrl: "https://api.minimax.io/anthropic",
+      };
+    };
+
+    await (
+      service as unknown as {
+        finishMiniMaxOauthLogin: (
+          auth: {
+            user_code: string;
+            verification_uri: string;
+            expired_in: number;
+            interval?: number;
+            verifier: string;
+          },
+          region: "global" | "cn",
+          signal: AbortSignal,
+        ) => Promise<void>;
+      }
+    ).finishMiniMaxOauthLogin(
+      {
+        user_code: "user-code",
+        verification_uri: "https://example.com/verify",
+        expired_in: 1800,
+        interval: 2000,
+        verifier: "verifier",
+      },
+      "global",
+      new AbortController().signal,
+    );
+
+    expect(capturedIntervalMs).toBe(2000);
+  });
 });

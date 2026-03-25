@@ -87,6 +87,18 @@ function durationSecondsToMs(valueInSeconds: number): number {
   return valueInSeconds * 1000;
 }
 
+function normalizeMiniMaxPollIntervalMs(interval: number | undefined): number {
+  if (
+    typeof interval !== "number" ||
+    !Number.isFinite(interval) ||
+    interval <= 0
+  ) {
+    return MINI_MAX_DEFAULT_POLL_INTERVAL_MS;
+  }
+
+  return interval >= 100 ? interval : durationSecondsToMs(interval);
+}
+
 function hasSameModels(current: string[], expected: string[]): boolean {
   return (
     current.length === expected.length &&
@@ -436,10 +448,11 @@ export class ModelProviderService {
     const provider = await this.configStore.getProvider("minimax");
     const connected =
       provider?.authMode === "oauth" && provider.hasOauthCredential === true;
+    const inProgress = connected ? false : this.miniMaxOauthState.inProgress;
 
     this.miniMaxOauthState = {
       connected,
-      inProgress: this.miniMaxOauthState.inProgress,
+      inProgress,
       region: provider?.oauthRegion ?? this.miniMaxOauthState.region,
       error: this.miniMaxOauthState.error,
     };
@@ -581,10 +594,7 @@ export class ModelProviderService {
   ): Promise<void> {
     try {
       const expiresAt = Date.now() + durationSecondsToMs(auth.expired_in);
-      const intervalMs =
-        typeof auth.interval === "number"
-          ? durationSecondsToMs(auth.interval)
-          : MINI_MAX_DEFAULT_POLL_INTERVAL_MS;
+      const intervalMs = normalizeMiniMaxPollIntervalMs(auth.interval);
       const token = await this.pollMiniMaxOAuthToken(
         {
           region,
