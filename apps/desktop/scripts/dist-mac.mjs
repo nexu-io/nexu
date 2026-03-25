@@ -24,9 +24,10 @@ const isUnsigned =
   process.argv.includes("--unsigned") ||
   process.env.NEXU_DESKTOP_MAC_UNSIGNED === "1" ||
   process.env.NEXU_DESKTOP_MAC_UNSIGNED?.toLowerCase() === "true";
+const targetMacArch = resolveTargetMacArch();
 const dmgBuilderReleaseName = "dmg-builder@1.2.0";
 const dmgBuilderReleaseVersion = "75c8a6c";
-const dmgBuilderArch = process.arch === "arm64" ? "arm64" : "x86_64";
+const dmgBuilderArch = targetMacArch === "arm64" ? "arm64" : "x86_64";
 const dmgBuilderArchiveName = `dmgbuild-bundle-${dmgBuilderArch}-${dmgBuilderReleaseVersion}.tar.gz`;
 const dmgBuilderChecksum = {
   arm64: "a785f2a385c8c31996a089ef8e26361904b40c772d5ea65a36001212f1fc25e0",
@@ -39,6 +40,24 @@ const rmWithRetriesOptions = {
   maxRetries: 5,
   retryDelay: 200,
 };
+
+function resolveTargetMacArch() {
+  const argValue = process.argv.find((arg) => arg.startsWith("--arch="));
+  const rawArch =
+    argValue?.slice("--arch=".length) ?? process.env.NEXU_DESKTOP_TARGET_ARCH;
+
+  if (!rawArch) {
+    return process.arch === "x64" ? "x64" : "arm64";
+  }
+
+  if (rawArch === "x64" || rawArch === "arm64") {
+    return rawArch;
+  }
+
+  throw new Error(
+    `[dist:mac] Unsupported target arch \"${rawArch}\". Expected \"x64\" or \"arm64\".`,
+  );
+}
 
 /**
  * Dereference pnpm symlinks for extraResources that electron-builder
@@ -413,6 +432,12 @@ async function getElectronVersion() {
 }
 
 async function main() {
+  if (process.arch !== targetMacArch) {
+    throw new Error(
+      `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead.`,
+    );
+  }
+
   await ensureBuildConfig();
 
   const desktopEnv = await loadDesktopEnv();
@@ -498,6 +523,7 @@ async function main() {
   await runElectronBuilder(
     [
       "--mac",
+      `--${targetMacArch}`,
       "--publish",
       "never",
       `--config.electronVersion=${electronVersion}`,
