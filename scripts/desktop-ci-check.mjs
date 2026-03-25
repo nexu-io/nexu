@@ -7,6 +7,21 @@ const repoRoot = process.cwd();
 const maxHealthAttempts = 60;
 const probeTimeoutMs = 5_000;
 const requiredDiagnosticsUnitIds = ["controller", "openclaw"];
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
+function createCommandSpec(command, args) {
+  if (
+    process.platform === "win32" &&
+    (command === "pnpm" || command === "pnpm.cmd")
+  ) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
+    };
+  }
+
+  return { command, args };
+}
 
 function parseArgs(argv) {
   const [mode, ...rest] = argv;
@@ -50,7 +65,7 @@ function createCheckContext(mode) {
 
     return {
       mode,
-      statusCommand: ["pnpm", ["status"]],
+      statusCommand: [pnpmCommand, ["status"]],
       ports: [
         { unit: "controller", port: 50800 },
         { unit: "web", port: 50810 },
@@ -181,7 +196,8 @@ function createCheckContext(mode) {
 
 async function runCommand(command, args) {
   await new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, {
+    const commandSpec = createCommandSpec(command, args);
+    const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: repoRoot,
       env: process.env,
       stdio: "inherit",
@@ -268,6 +284,37 @@ async function readFirstExistingJson(paths) {
 }
 
 async function isPortListening(port) {
+  if (process.platform === "win32") {
+    return new Promise((resolvePromise, rejectPromise) => {
+      const child = spawn("netstat", ["-ano", "-p", "tcp"], {
+        cwd: repoRoot,
+        env: process.env,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+
+      const chunks = [];
+      child.stdout.on("data", (chunk) => chunks.push(chunk));
+      child.on("error", rejectPromise);
+      child.on("exit", (code) => {
+        if (code !== 0) {
+          resolvePromise(false);
+          return;
+        }
+
+        const output = Buffer.concat(chunks).toString("utf8");
+        const lines = output.split(/\r?\n/u);
+        const listening = lines.some((line) => {
+          const normalized = line.trim().replace(/\s+/gu, " ");
+          return (
+            normalized.includes(`:${String(port)} `) &&
+            normalized.includes(" LISTENING ")
+          );
+        });
+        resolvePromise(listening);
+      });
+    });
+  }
+
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn("lsof", [`-iTCP:${String(port)}`, "-sTCP:LISTEN"], {
       cwd: repoRoot,

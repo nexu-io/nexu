@@ -13,6 +13,7 @@ on:
       - "pnpm-workspace.yaml"
       - "scripts/desktop-check-dev.sh"
       - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-check-dist.mjs"
       - "scripts/desktop-ci-check.mjs"
       - "tsconfig.base.json"
       - ".github/workflows/desktop-ci-dist.yml"
@@ -30,6 +31,7 @@ on:
       - "pnpm-workspace.yaml"
       - "scripts/desktop-check-dev.sh"
       - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-check-dist.mjs"
       - "scripts/desktop-ci-check.mjs"
       - "tsconfig.base.json"
       - ".github/workflows/desktop-ci-dist.yml"
@@ -43,7 +45,16 @@ concurrency:
 
 jobs:
   desktop-ci:
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            runs_on: macos-14
+          - os: windows
+            runs_on: windows-latest
+
+    runs-on: ${{ matrix.runs_on }}
     timeout-minutes: 45
 
     steps:
@@ -66,69 +77,59 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Show desktop toolchain versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm exec electron --version
+        shell: pwsh
+        run: pnpm exec electron --version
 
-      - name: Build unsigned macOS desktop bundle
-        run: pnpm dist:mac:unsigned
+      - name: Build unsigned desktop bundle
+        run: ${{ matrix.os == 'macos' && 'pnpm dist:mac:unsigned' || 'pnpm --filter @nexu/desktop dist:win:unsigned' }}
 
       - name: Set packaged app paths
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci"
+          $packagedHome = Join-Path $env:RUNNER_TEMP "desktop-home"
+          $tmpDir = Join-Path $env:RUNNER_TEMP "desktop-tmp"
+          New-Item -ItemType Directory -Force -Path $captureDir, $packagedHome, $tmpDir | Out-Null
 
-          runner_home="$HOME"
-          packaged_home="$RUNNER_TEMP/desktop-home"
-          packaged_user_data_dir="$packaged_home/Library/Application Support/@nexu/desktop"
-          packaged_logs_dir="$packaged_user_data_dir/logs"
-          packaged_runtime_logs_dir="$packaged_logs_dir/runtime-units"
-          default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
-          default_logs_dir="$default_user_data_dir/logs"
-          default_runtime_logs_dir="$default_logs_dir/runtime-units"
-          packaged_app="apps/desktop/release/mac-arm64/Nexu.app"
-          packaged_executable="$packaged_app/Contents/MacOS/Nexu"
+          if ("${{ matrix.os }}" -eq "macos") {
+            $packagedUserDataDir = Join-Path $packagedHome "Library/Application Support/@nexu/desktop"
+            $packagedApp = "apps/desktop/release/mac-arm64/Nexu.app"
+            $packagedExecutable = "$packagedApp/Contents/MacOS/Nexu"
+          } else {
+            $packagedUserDataDir = Join-Path $packagedHome "nexu-desktop"
+            $packagedApp = "apps/desktop/release/win-unpacked"
+            $packagedExecutable = "$packagedApp/Nexu.exe"
+          }
 
-          mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
+          $packagedLogsDir = Join-Path $packagedUserDataDir "logs"
+          $packagedRuntimeLogsDir = Join-Path $packagedLogsDir "runtime-units"
 
-          {
-            echo "PACKAGED_HOME=$packaged_home"
-            echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
-            echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
-            echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
-            echo "DEFAULT_LOGS_DIR=$default_logs_dir"
-            echo "DEFAULT_USER_DATA_DIR=$default_user_data_dir"
-            echo "DEFAULT_RUNTIME_LOGS_DIR=$default_runtime_logs_dir"
-            echo "PACKAGED_APP=$packaged_app"
-            echo "PACKAGED_EXECUTABLE=$packaged_executable"
-          } >> "$GITHUB_ENV"
+          @(
+            "PACKAGED_HOME=$packagedHome",
+            "PACKAGED_LOGS_DIR=$packagedLogsDir",
+            "PACKAGED_USER_DATA_DIR=$packagedUserDataDir",
+            "PACKAGED_RUNTIME_LOGS_DIR=$packagedRuntimeLogsDir",
+            "DEFAULT_LOGS_DIR=$packagedLogsDir",
+            "DEFAULT_USER_DATA_DIR=$packagedUserDataDir",
+            "DEFAULT_RUNTIME_LOGS_DIR=$packagedRuntimeLogsDir",
+            "PACKAGED_APP=$packagedApp",
+            "PACKAGED_EXECUTABLE=$packagedExecutable"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Verify packaged desktop artifacts
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          shopt -s nullglob
+          if ("${{ matrix.os }}" -eq "macos") {
+            $dmgArtifacts = Get-ChildItem "apps/desktop/release/*.dmg" -ErrorAction SilentlyContinue
+            $zipArtifacts = Get-ChildItem "apps/desktop/release/*.zip" -ErrorAction SilentlyContinue
+            if (-not $dmgArtifacts) { throw "No desktop DMG artifact was produced" }
+            if (-not $zipArtifacts) { throw "No desktop ZIP artifact was produced" }
+            $dmgArtifacts | ForEach-Object { "Built artifact: $($_.FullName)" }
+            $zipArtifacts | ForEach-Object { "Built artifact: $($_.FullName)" }
+          }
 
-          dmg_artifacts=(apps/desktop/release/*.dmg)
-          zip_artifacts=(apps/desktop/release/*.zip)
-
-          if [ "${#dmg_artifacts[@]}" -eq 0 ]; then
-            echo "No desktop DMG artifact was produced" >&2
-            exit 1
-          fi
-
-          if [ "${#zip_artifacts[@]}" -eq 0 ]; then
-            echo "No desktop ZIP artifact was produced" >&2
-            exit 1
-          fi
-
-          printf 'Built artifacts:\n'
-          printf ' - %s\n' "${dmg_artifacts[@]}"
-          printf ' - %s\n' "${zip_artifacts[@]}"
-
-          test -d "$PACKAGED_APP"
-          test -x "$PACKAGED_EXECUTABLE"
+          if (-not (Test-Path $env:PACKAGED_APP)) { throw "Packaged app path missing: $env:PACKAGED_APP" }
+          if (-not (Test-Path $env:PACKAGED_EXECUTABLE)) { throw "Packaged executable missing: $env:PACKAGED_EXECUTABLE" }
 
       - name: Verify packaged runtime unit health
         env:
@@ -138,28 +139,28 @@ jobs:
 
       - name: Capture desktop logs
         if: always()
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/desktop-ci"
-          if [ -d "$PACKAGED_LOGS_DIR" ]; then
-            cp -R "$PACKAGED_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/packaged-logs"
-          fi
-          if [ -d "$PACKAGED_RUNTIME_LOGS_DIR" ]; then
-            cp -R "$PACKAGED_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/runtime-unit-logs"
-          fi
-          if [ -d "$DEFAULT_LOGS_DIR" ]; then
-            cp -R "$DEFAULT_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-logs"
-          fi
-          if [ -d "$DEFAULT_RUNTIME_LOGS_DIR" ]; then
-            cp -R "$DEFAULT_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-runtime-unit-logs"
-          fi
+          $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci"
+          New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
+          if (Test-Path $env:PACKAGED_LOGS_DIR) {
+            Copy-Item $env:PACKAGED_LOGS_DIR (Join-Path $captureDir "packaged-logs") -Recurse -Force
+          }
+          if (Test-Path $env:PACKAGED_RUNTIME_LOGS_DIR) {
+            Copy-Item $env:PACKAGED_RUNTIME_LOGS_DIR (Join-Path $captureDir "runtime-unit-logs") -Recurse -Force
+          }
+          if (Test-Path $env:DEFAULT_LOGS_DIR) {
+            Copy-Item $env:DEFAULT_LOGS_DIR (Join-Path $captureDir "default-logs") -Recurse -Force
+          }
+          if (Test-Path $env:DEFAULT_RUNTIME_LOGS_DIR) {
+            Copy-Item $env:DEFAULT_RUNTIME_LOGS_DIR (Join-Path $captureDir "default-runtime-unit-logs") -Recurse -Force
+          }
 
       - name: Upload desktop logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-ci-logs
+          name: desktop-ci-logs-${{ matrix.os }}
           path: ${{ runner.temp }}/desktop-ci
           if-no-files-found: warn
           retention-days: 7

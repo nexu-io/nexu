@@ -25,8 +25,8 @@
     "reset-state": "node ./apps/desktop/scripts/dev-cli.mjs reset-state",
     "status": "node ./apps/desktop/scripts/dev-cli.mjs status",
     "logs": "node ./apps/desktop/scripts/dev-cli.mjs logs",
-    "check:dev": "./scripts/desktop-check-dev.sh",
-    "check:dist": "./scripts/desktop-check-dist.sh",
+    "check:dev": "node ./scripts/desktop-check-dev.mjs",
+    "check:dist": "node ./scripts/desktop-check-dist.mjs",
     "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
     "dist:mac": "pnpm --filter @nexu/desktop dist:mac",
     "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
