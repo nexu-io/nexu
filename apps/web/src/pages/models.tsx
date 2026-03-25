@@ -1708,7 +1708,7 @@ function ByokProviderDetail({
                 : "text-text-secondary hover:bg-surface-2",
             )}
           >
-            OAuth Login
+            {t("models.byok.minimax.authModeOauth")}
           </button>
           <button
             type="button"
@@ -1720,7 +1720,7 @@ function ByokProviderDetail({
                 : "text-text-secondary hover:bg-surface-2",
             )}
           >
-            API Key
+            {t("models.byok.minimax.authModeApiKey")}
           </button>
         </div>
       )}
@@ -1729,11 +1729,10 @@ function ByokProviderDetail({
         <div className="space-y-4 mb-6">
           <div className="rounded-xl border border-border bg-surface-0 p-4">
             <div className="mb-3 text-[12px] font-medium text-text-primary">
-              MiniMax Coding Plan OAuth
+              {t("models.byok.minimax.oauthTitle")}
             </div>
             <div className="mb-4 text-[11px] leading-6 text-text-secondary">
-              Use MiniMax OAuth for Coding Plan access without manually pasting
-              an API key.
+              {t("models.byok.minimax.oauthDescription")}
             </div>
             <div className="mb-4 flex items-center gap-2">
               <button
@@ -1746,7 +1745,7 @@ function ByokProviderDetail({
                     : "border-border text-text-secondary hover:bg-surface-2",
                 )}
               >
-                Global
+                {t("models.byok.minimax.regionGlobal")}
               </button>
               <button
                 type="button"
@@ -1758,17 +1757,18 @@ function ByokProviderDetail({
                     : "border-border text-text-secondary hover:bg-surface-2",
                 )}
               >
-                CN
+                {t("models.byok.minimax.regionCn")}
               </button>
             </div>
             <div className="mb-4 text-[10px] text-text-muted">
-              {oauthRegion === "cn"
-                ? "Endpoint: api.minimaxi.com"
-                : "Endpoint: api.minimax.io"}
+              {t("models.byok.minimax.endpoint", {
+                endpoint:
+                  oauthRegion === "cn" ? "api.minimaxi.com" : "api.minimax.io",
+              })}
             </div>
             {minimaxOauthStatus?.connected || dbProvider?.hasOauthCredential ? (
               <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-700">
-                Connected via OAuth
+                {t("models.byok.minimax.connected")}
                 {dbProvider?.oauthEmail ? ` · ${dbProvider.oauthEmail}` : ""}
               </div>
             ) : null}
@@ -1786,30 +1786,57 @@ function ByokProviderDetail({
                     className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[12px] font-medium text-accent-fg opacity-80"
                   >
                     <Loader2 size={13} className="animate-spin" />
-                    Waiting for MiniMax login
+                    {t("models.byok.minimax.waitingLogin")}
                   </button>
                   <button
                     type="button"
                     onClick={() => cancelMiniMaxOauthMutation.mutate()}
                     className="rounded-lg px-3 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
                   >
-                    Cancel
+                    {t("models.byok.minimax.cancel")}
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => minimaxOauthMutation.mutate()}
-                  disabled={minimaxOauthMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[12px] font-medium text-accent-fg transition-colors hover:bg-accent/90 disabled:opacity-60"
-                >
-                  {minimaxOauthMutation.isPending && (
-                    <Loader2 size={13} className="animate-spin" />
+                <>
+                  <button
+                    type="button"
+                    onClick={() => minimaxOauthMutation.mutate()}
+                    disabled={minimaxOauthMutation.isPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2 disabled:opacity-60"
+                  >
+                    {minimaxOauthMutation.isPending && (
+                      <Loader2 size={13} className="animate-spin" />
+                    )}
+                    {!minimaxOauthMutation.isPending &&
+                      (dbProvider?.hasOauthCredential ? (
+                        <RefreshCw size={13} />
+                      ) : (
+                        <LogIn size={13} />
+                      ))}
+                    {dbProvider?.hasOauthCredential
+                      ? t("models.byok.minimax.reconnect")
+                      : t("models.byok.minimax.login")}
+                  </button>
+                  {hasSavedAccess && (
+                    <button
+                      type="button"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => {
+                        if (confirm(t("models.byok.confirmRemove"))) {
+                          deleteMutation.mutate();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-[12px] font-medium text-red-500 transition-colors hover:bg-red-500/5"
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={13} />
+                      )}
+                      {t("models.byok.remove")}
+                    </button>
                   )}
-                  {dbProvider?.hasOauthCredential
-                    ? "Reconnect OAuth"
-                    : "Login with MiniMax"}
-                </button>
+                </>
               )}
             </div>
           </div>
@@ -1983,7 +2010,7 @@ function ByokProviderDetail({
                   onClick={() => setBaseUrl("https://api.minimax.io/anthropic")}
                   className="rounded-md border border-border px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface-2"
                 >
-                  Global
+                  {t("models.byok.minimax.regionGlobal")}
                 </button>
                 <button
                   type="button"
@@ -1992,7 +2019,7 @@ function ByokProviderDetail({
                   }
                   className="rounded-md border border-border px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface-2"
                 >
-                  CN
+                  {t("models.byok.minimax.regionCn")}
                 </button>
               </div>
             )}
@@ -2033,7 +2060,7 @@ function ByokProviderDetail({
             </button>
           )}
 
-          {hasSavedAccess && (
+          {hasSavedAccess && (!isMiniMax || authMode !== "oauth") && (
             <button
               type="button"
               disabled={deleteMutation.isPending}
@@ -2042,7 +2069,7 @@ function ByokProviderDetail({
                   deleteMutation.mutate();
                 }
               }}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-500 hover:bg-red-500/5 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-[12px] font-medium text-red-500 transition-colors hover:bg-red-500/5"
             >
               {deleteMutation.isPending ? (
                 <Loader2 size={13} className="animate-spin" />
