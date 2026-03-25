@@ -1,6 +1,7 @@
 import { cp, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
+  copyDirectoryTree,
   copyRuntimeDependencyClosure,
   getSidecarRoot,
   linkOrCopyDirectory,
@@ -70,9 +71,8 @@ async function prepareControllerSidecar() {
     await cp(controllerDistRoot, sidecarDistRoot, { recursive: true });
 
     if (await pathExists(controllerStaticRoot)) {
-      await cp(controllerStaticRoot, sidecarStaticRoot, {
-        recursive: true,
-        dereference: true,
+      await copyDirectoryTree(controllerStaticRoot, sidecarStaticRoot, {
+        filter: ({ sourcePath }) => basename(sourcePath) !== ".bin",
       });
     }
 

@@ -143,16 +143,16 @@ jobs:
         run: |
           $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci"
           New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
-          if (Test-Path $env:PACKAGED_LOGS_DIR) {
+          if ($env:PACKAGED_LOGS_DIR -and (Test-Path $env:PACKAGED_LOGS_DIR)) {
             Copy-Item $env:PACKAGED_LOGS_DIR (Join-Path $captureDir "packaged-logs") -Recurse -Force
           }
-          if (Test-Path $env:PACKAGED_RUNTIME_LOGS_DIR) {
+          if ($env:PACKAGED_RUNTIME_LOGS_DIR -and (Test-Path $env:PACKAGED_RUNTIME_LOGS_DIR)) {
             Copy-Item $env:PACKAGED_RUNTIME_LOGS_DIR (Join-Path $captureDir "runtime-unit-logs") -Recurse -Force
           }
-          if (Test-Path $env:DEFAULT_LOGS_DIR) {
+          if ($env:DEFAULT_LOGS_DIR -and (Test-Path $env:DEFAULT_LOGS_DIR)) {
             Copy-Item $env:DEFAULT_LOGS_DIR (Join-Path $captureDir "default-logs") -Recurse -Force
           }
-          if (Test-Path $env:DEFAULT_RUNTIME_LOGS_DIR) {
+          if ($env:DEFAULT_RUNTIME_LOGS_DIR -and (Test-Path $env:DEFAULT_RUNTIME_LOGS_DIR)) {
             Copy-Item $env:DEFAULT_RUNTIME_LOGS_DIR (Join-Path $captureDir "default-runtime-unit-logs") -Recurse -Force
           }
 

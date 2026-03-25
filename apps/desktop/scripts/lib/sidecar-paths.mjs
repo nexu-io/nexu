@@ -52,11 +52,9 @@ export async function linkOrCopyDirectory(
   const excludeNames = new Set(options.excludeNames ?? []);
 
   if (shouldCopyRuntimeDependencies()) {
-    await cp(sourcePath, targetPath, {
-      recursive: true,
-      dereference: true,
-      filter: (source) => {
-        const name = basename(source);
+    await copyDirectoryTree(sourcePath, targetPath, {
+      filter: ({ sourcePath: candidateSourcePath }) => {
+        const name = basename(candidateSourcePath);
         return name !== ".bin" && !excludeNames.has(name);
       },
     });
@@ -118,6 +116,49 @@ export async function linkOrCopyDirectory(
       });
     }
   }
+}
+
+export async function copyDirectoryTree(sourcePath, targetPath, options = {}) {
+  const sourceStats = await lstat(sourcePath);
+  const relativePath = options.baseSourcePath
+    ? relative(options.baseSourcePath, sourcePath)
+    : "";
+
+  if (
+    options.filter &&
+    !options.filter({
+      sourcePath,
+      targetPath,
+      relativePath,
+      sourceStats,
+    })
+  ) {
+    return;
+  }
+
+  if (sourceStats.isSymbolicLink()) {
+    return;
+  }
+
+  if (sourceStats.isDirectory()) {
+    await mkdir(targetPath, { recursive: true });
+    const entries = await readdir(sourcePath);
+
+    for (const entry of entries) {
+      await copyDirectoryTree(
+        resolve(sourcePath, entry),
+        resolve(targetPath, entry),
+        {
+          ...options,
+          baseSourcePath: options.baseSourcePath ?? sourcePath,
+        },
+      );
+    }
+    return;
+  }
+
+  await mkdir(dirname(targetPath), { recursive: true });
+  await cp(sourcePath, targetPath, { force: true });
 }
 
 export async function removePathIfExists(path) {
@@ -208,19 +249,19 @@ export async function copyRuntimeDependencyClosure({
 
     await mkdir(dirname(targetPackageRoot), { recursive: true });
     await rm(targetPackageRoot, { recursive: true, force: true });
-    await cp(sourcePackageRoot, targetPackageRoot, {
-      recursive: true,
-      dereference: true,
-      filter: (source) => {
-        if (basename(source) === ".bin") {
+    await copyDirectoryTree(sourcePackageRoot, targetPackageRoot, {
+      filter: ({
+        sourcePath: candidateSourcePath,
+        relativePath: candidateRelativePath,
+      }) => {
+        if (basename(candidateSourcePath) === ".bin") {
           return false;
         }
 
-        const relativePath = relative(sourcePackageRoot, source);
         return (
-          relativePath === "" ||
-          (!relativePath.startsWith("node_modules/") &&
-            relativePath !== "node_modules")
+          candidateRelativePath === "" ||
+          (!candidateRelativePath.startsWith("node_modules/") &&
+            candidateRelativePath !== "node_modules")
         );
       },
     });
