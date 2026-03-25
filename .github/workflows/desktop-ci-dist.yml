@@ -148,6 +148,17 @@ jobs:
           test -d "$PACKAGED_APP"
           test -x "$PACKAGED_EXECUTABLE"
 
+      - name: Upload desktop build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-dist-${{ matrix.arch }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify packaged runtime unit health
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci

@@ -194,9 +194,22 @@ async function runElectronBuilder(args, options = {}) {
   const electronBuilderCli = require.resolve("electron-builder/cli.js", {
     paths: [electronRoot, repoRoot],
   });
+  const electronBuilderPreload = resolve(
+    scriptDir,
+    "electron-builder-pnpm-json-preload.cjs",
+  );
   const targetOpenFiles = process.env.NEXU_DESKTOP_MAX_OPEN_FILES ?? "8192";
+  const baseEnv = options.env ?? process.env;
+  const existingNodeOptions = baseEnv.NODE_OPTIONS?.trim();
+  const nodeOptions = [
+    existingNodeOptions,
+    `--require=${electronBuilderPreload}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const command = [
     `target=${shellEscape(targetOpenFiles)}`,
+    `export NODE_OPTIONS=${shellEscape(nodeOptions)}`,
     'hard_limit=$(ulimit -Hn 2>/dev/null || printf %s "$target")',
     'if [ "$hard_limit" != "unlimited" ] && [ "$hard_limit" -lt "$target" ]; then target="$hard_limit"; fi',
     'ulimit -n "$target" 2>/dev/null || true',
