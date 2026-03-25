@@ -24,7 +24,10 @@ const sidecarRoot = resolve(rootDir, ".tmp", "sidecars");
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const gitCommand = process.platform === "win32" ? "git.exe" : "git";
 function createCommandSpec(command, args) {
-  if (process.platform === "win32" && (command === "pnpm" || command === "pnpm.cmd")) {
+  if (
+    process.platform === "win32" &&
+    (command === "pnpm" || command === "pnpm.cmd")
+  ) {
     return {
       command: "cmd.exe",
       args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
@@ -131,7 +134,10 @@ function createLauncherEnv() {
 }
 
 async function appendLine(filePath, message) {
-  await appendFile(filePath, `[${timestamp()}] ${stripTerminalControl(message)}\n`);
+  await appendFile(
+    filePath,
+    `[${timestamp()}] ${stripTerminalControl(message)}\n`,
+  );
 }
 
 async function log(message) {
@@ -163,7 +169,10 @@ async function ensureBaseDirs() {
 }
 
 function validateWorkspaceLayout() {
-  if (!existsSync(resolve(rootDir, "package.json")) || !existsSync(resolve(appDir, "package.json"))) {
+  if (
+    !existsSync(resolve(rootDir, "package.json")) ||
+    !existsSync(resolve(appDir, "package.json"))
+  ) {
     throw new Error(
       [
         "[desktop-dev] invalid workspace layout detected",
@@ -198,7 +207,10 @@ async function acquireLock() {
       }
       return;
     } catch (error) {
-      if (!(error instanceof Error) || !String(error.message).includes("EEXIST")) {
+      if (
+        !(error instanceof Error) ||
+        !String(error.message).includes("EEXIST")
+      ) {
         throw error;
       }
 
@@ -275,7 +287,10 @@ function hasReusableArtifacts() {
     resolve(appDir, "dist/index.html"),
     resolve(appDir, "dist-electron/main/bootstrap.js"),
     resolve(rootDir, ".tmp/sidecars/controller/dist/index.js"),
-    resolve(rootDir, ".tmp/sidecars/openclaw/node_modules/openclaw/openclaw.mjs"),
+    resolve(
+      rootDir,
+      ".tmp/sidecars/openclaw/node_modules/openclaw/openclaw.mjs",
+    ),
     resolve(rootDir, ".tmp/sidecars/web/index.js"),
   ];
 
@@ -308,10 +323,14 @@ function isPidRunning(pid) {
   }
 
   if (process.platform === "win32") {
-    const result = spawnSync("tasklist", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    const result = spawnSync(
+      "tasklist",
+      ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
     return result.status === 0 && result.stdout.includes(`"${pid}"`);
   }
 
@@ -384,10 +403,14 @@ function listListeningPids(ports) {
 
   const pids = new Set();
   for (const port of ports) {
-    const result = spawnSync("lsof", [`-tiTCP:${String(port)}`, "-sTCP:LISTEN"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    const result = spawnSync(
+      "lsof",
+      [`-tiTCP:${String(port)}`, "-sTCP:LISTEN"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
     if (result.status !== 0) {
       continue;
     }
@@ -447,7 +470,9 @@ async function runLogged(command, args, options = {}) {
         `run:fail ${command} ${args.join(" ")} exit=${code ?? "null"} durationMs=${Date.now() - startedAt}`,
       );
       rejectPromise(
-        new Error(`Command failed: ${command} ${args.join(" ")} (exit ${code ?? "null"})`),
+        new Error(
+          `Command failed: ${command} ${args.join(" ")} (exit ${code ?? "null"})`,
+        ),
       );
     });
   });
@@ -459,12 +484,16 @@ function createDesktopEnv(launchId) {
     NEXU_WORKSPACE_ROOT: rootDir,
     NEXU_DESKTOP_APP_ROOT: appDir,
     NEXU_DESKTOP_RUNTIME_ROOT: runtimeRoot,
-    NEXU_DESKTOP_BUILD_SOURCE: process.env.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dev",
+    NEXU_DESKTOP_BUILD_SOURCE:
+      process.env.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dev",
     NEXU_DESKTOP_BUILD_BRANCH:
-      process.env.NEXU_DESKTOP_BUILD_BRANCH ?? readGitValue(["rev-parse", "--abbrev-ref", "HEAD"], "unknown"),
+      process.env.NEXU_DESKTOP_BUILD_BRANCH ??
+      readGitValue(["rev-parse", "--abbrev-ref", "HEAD"], "unknown"),
     NEXU_DESKTOP_BUILD_COMMIT:
-      process.env.NEXU_DESKTOP_BUILD_COMMIT ?? readGitValue(["rev-parse", "HEAD"], "unknown"),
-    NEXU_DESKTOP_BUILD_TIME: process.env.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
+      process.env.NEXU_DESKTOP_BUILD_COMMIT ??
+      readGitValue(["rev-parse", "HEAD"], "unknown"),
+    NEXU_DESKTOP_BUILD_TIME:
+      process.env.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
     NEXU_DESKTOP_LAUNCH_ID: launchId,
   };
 }
@@ -477,23 +506,41 @@ function ensureDarwinLsuiElement() {
   try {
     const electronExec = runCapture(
       pnpmCommand,
-      ["--dir", rootDir, "exec", "node", "-e", 'const electron=require("electron"); process.stdout.write(electron)'],
+      [
+        "--dir",
+        rootDir,
+        "exec",
+        "node",
+        "-e",
+        'const electron=require("electron"); process.stdout.write(electron)',
+      ],
       { env: process.env },
     ).stdout.trim();
     if (!electronExec || !electronExec.endsWith("/Contents/MacOS/Electron")) {
       return;
     }
-    const electronApp = electronExec.slice(0, -"/Contents/MacOS/Electron".length);
+    const electronApp = electronExec.slice(
+      0,
+      -"/Contents/MacOS/Electron".length,
+    );
     const infoPlist = resolve(electronApp, "Contents/Info.plist");
     if (!existsSync(infoPlist)) {
       return;
     }
-    spawnSync("/usr/libexec/PlistBuddy", ["-c", "Set :LSUIElement true", infoPlist], {
-      stdio: "ignore",
-    });
-    spawnSync("/usr/libexec/PlistBuddy", ["-c", "Add :LSUIElement bool true", infoPlist], {
-      stdio: "ignore",
-    });
+    spawnSync(
+      "/usr/libexec/PlistBuddy",
+      ["-c", "Set :LSUIElement true", infoPlist],
+      {
+        stdio: "ignore",
+      },
+    );
+    spawnSync(
+      "/usr/libexec/PlistBuddy",
+      ["-c", "Add :LSUIElement bool true", infoPlist],
+      {
+        stdio: "ignore",
+      },
+    );
   } catch {}
 }
 
@@ -521,22 +568,48 @@ async function buildRuntime() {
   await runTimedPhase("build_runtime", async () => {
     await log("building runtime artifacts");
     await logTimeline("build_runtime shared build start");
-    await runLogged(pnpmCommand, ["--dir", rootDir, "--filter", "@nexu/shared", "build"], { env: launcherEnv });
+    await runLogged(
+      pnpmCommand,
+      ["--dir", rootDir, "--filter", "@nexu/shared", "build"],
+      { env: launcherEnv },
+    );
     await logTimeline("build_runtime controller build start");
-    await runLogged(pnpmCommand, ["--dir", rootDir, "--filter", "@nexu/controller", "build"], { env: launcherEnv });
+    await runLogged(
+      pnpmCommand,
+      ["--dir", rootDir, "--filter", "@nexu/controller", "build"],
+      { env: launcherEnv },
+    );
     await logTimeline("build_runtime web build start");
-    await runLogged(pnpmCommand, ["--dir", rootDir, "--filter", "@nexu/web", "build"], { env: launcherEnv });
+    await runLogged(
+      pnpmCommand,
+      ["--dir", rootDir, "--filter", "@nexu/web", "build"],
+      { env: launcherEnv },
+    );
     await logTimeline("build_runtime controller sidecar start");
-    await runLogged(pnpmCommand, ["--dir", appDir, "prepare:controller-sidecar"], { env: launcherEnv });
+    await runLogged(
+      pnpmCommand,
+      ["--dir", appDir, "prepare:controller-sidecar"],
+      { env: launcherEnv },
+    );
     await logTimeline("build_runtime openclaw sidecar start");
-    await runLogged(pnpmCommand, ["--dir", appDir, "prepare:openclaw-sidecar"], { env: launcherEnv });
+    await runLogged(
+      pnpmCommand,
+      ["--dir", appDir, "prepare:openclaw-sidecar"],
+      { env: launcherEnv },
+    );
     await logTimeline("build_runtime web sidecar start");
-    await runLogged(pnpmCommand, ["--dir", appDir, "prepare:web-sidecar"], { env: launcherEnv });
+    await runLogged(pnpmCommand, ["--dir", appDir, "prepare:web-sidecar"], {
+      env: launcherEnv,
+    });
     await logTimeline("build_runtime desktop build start");
-    await runLogged(pnpmCommand, ["--dir", appDir, "build"], { env: launcherEnv });
+    await runLogged(pnpmCommand, ["--dir", appDir, "build"], {
+      env: launcherEnv,
+    });
 
     if (!process.env.SENTRY_AUTH_TOKEN?.trim()) {
-      await log("skipping desktop sourcemap upload because SENTRY_AUTH_TOKEN is unset");
+      await log(
+        "skipping desktop sourcemap upload because SENTRY_AUTH_TOKEN is unset",
+      );
     } else {
       try {
         await logTimeline("build_runtime upload sourcemaps start");
@@ -547,7 +620,9 @@ async function buildRuntime() {
           },
         });
       } catch {
-        await log("warning: desktop sourcemap upload failed; continuing startup");
+        await log(
+          "warning: desktop sourcemap upload failed; continuing startup",
+        );
       }
     }
 
@@ -565,7 +640,11 @@ async function startSession() {
 
     await logTimeline(`launch electron requested launch_id=${launchId}`);
     const stdoutFd = openSync(logFile, "a");
-    const commandSpec = createCommandSpec(pnpmCommand, ["exec", "electron", "apps/desktop"]);
+    const commandSpec = createCommandSpec(pnpmCommand, [
+      "exec",
+      "electron",
+      "apps/desktop",
+    ]);
     const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: rootDir,
       env,
@@ -582,7 +661,9 @@ async function startSession() {
       runtimeRoot,
       platform: process.platform,
     });
-    await logTimeline(`background process started launch_id=${launchId} pid=${child.pid ?? "unknown"}`);
+    await logTimeline(
+      `background process started launch_id=${launchId} pid=${child.pid ?? "unknown"}`,
+    );
     await log(`started desktop process pid=${child.pid ?? "unknown"}`);
   });
 }
@@ -593,24 +674,30 @@ async function start() {
       validateWorkspaceLayout();
       const state = await readState();
       if (state?.electronPid && isPidRunning(state.electronPid)) {
-      await log(`desktop process is already running pid=${state.electronPid}`);
-      return;
-    }
-
-    await killResidualProcesses();
-    if (shouldReuseBuildArtifacts() && hasReusableArtifacts()) {
-      await log("reusing existing build artifacts");
-    } else {
-      if (shouldForceFullStart()) {
-        await log("full desktop rebuild forced by CLI/environment");
-      } else if (shouldReuseBuildArtifacts()) {
-        await log("build reuse enabled but artifacts are incomplete; running full build");
-      } else {
-        await log("build reuse disabled by CLI/environment; running full build");
+        await log(
+          `desktop process is already running pid=${state.electronPid}`,
+        );
+        return;
       }
-      await buildRuntime();
-    }
-    await startSession();
+
+      await killResidualProcesses();
+      if (shouldReuseBuildArtifacts() && hasReusableArtifacts()) {
+        await log("reusing existing build artifacts");
+      } else {
+        if (shouldForceFullStart()) {
+          await log("full desktop rebuild forced by CLI/environment");
+        } else if (shouldReuseBuildArtifacts()) {
+          await log(
+            "build reuse enabled but artifacts are incomplete; running full build",
+          );
+        } else {
+          await log(
+            "build reuse disabled by CLI/environment; running full build",
+          );
+        }
+        await buildRuntime();
+      }
+      await startSession();
     });
   });
 }
@@ -632,7 +719,9 @@ async function resetState() {
     await removePathWithRetry(sidecarRoot);
     await removePathWithRetry(lockDir);
     await removeState();
-    await log(`reset desktop runtime state at '${runtimeRoot}' and cleared cached sidecars at '${sidecarRoot}'`);
+    await log(
+      `reset desktop runtime state at '${runtimeRoot}' and cleared cached sidecars at '${sidecarRoot}'`,
+    );
   });
 }
 
@@ -645,7 +734,9 @@ async function status() {
   validateWorkspaceLayout();
   const state = await readState();
   if (state?.electronPid && isPidRunning(state.electronPid)) {
-    console.log(`[${timestamp()}] desktop process is running pid=${state.electronPid}`);
+    console.log(
+      `[${timestamp()}] desktop process is running pid=${state.electronPid}`,
+    );
   } else {
     console.log(`[${timestamp()}] desktop process is not running`);
   }
@@ -705,12 +796,15 @@ try {
   await ensureBaseDirs();
   const action = commandMap[command];
   if (!action) {
-    console.error("Usage: node apps/desktop/scripts/dev-cli.mjs <start|stop|restart|reset-state|status|logs|devlog|control>");
+    console.error(
+      "Usage: node apps/desktop/scripts/dev-cli.mjs <start|stop|restart|reset-state|status|logs|devlog|control>",
+    );
     process.exit(1);
   }
   await action();
 } catch (error) {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
   await ensureBaseDirs();
   await appendLine(logFile, `fatal: ${message}`);
   console.error(message);

@@ -12,7 +12,10 @@ const isRelease = process.argv.includes("--release");
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 function createCommandSpec(command, args) {
-  if (process.platform === "win32" && (command === "pnpm" || command === "pnpm.cmd")) {
+  if (
+    process.platform === "win32" &&
+    (command === "pnpm" || command === "pnpm.cmd")
+  ) {
     return {
       command: "cmd.exe",
       args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],

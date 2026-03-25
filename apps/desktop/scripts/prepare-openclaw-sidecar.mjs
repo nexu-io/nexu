@@ -308,9 +308,9 @@ async function collectFileTreeEntries(rootPath) {
     }),
   );
 
-  return nestedEntries.flat().sort((a, b) =>
-    a.relativePath.localeCompare(b.relativePath),
-  );
+  return nestedEntries
+    .flat()
+    .sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 }
 
 async function computePreparationCacheKey() {
@@ -335,9 +335,11 @@ async function computePreparationCacheKey() {
     hash.update(entry.content);
   }
 
-  hash.update(JSON.stringify({
-    copyRuntimeDependencies: shouldCopyRuntimeDependencies(),
-  }));
+  hash.update(
+    JSON.stringify({
+      copyRuntimeDependencies: shouldCopyRuntimeDependencies(),
+    }),
+  );
 
   return hash.digest("hex");
 }
@@ -1031,13 +1033,12 @@ exit 127
 `,
     );
     await chmod(wrapperPath, 0o755);
-    await runTimedStep("sign_native_binaries", () => signOpenclawNativeBinaries());
+    await runTimedStep("sign_native_binaries", () =>
+      signOpenclawNativeBinaries(),
+    );
 
     if (shouldCopyRuntimeDependencies()) {
-      const archivePath = resolve(
-        dirname(sidecarRoot),
-        "openclaw-sidecar.zip",
-      );
+      const archivePath = resolve(dirname(sidecarRoot), "openclaw-sidecar.zip");
       await runTimedStep("archive_runtime_dependencies", async () => {
         await removePathIfExists(archivePath);
         await createZipArchive(sidecarRoot, archivePath);

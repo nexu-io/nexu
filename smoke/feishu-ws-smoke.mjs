@@ -11,7 +11,9 @@ const desktopConfigPath = resolve(
   ".tmp/desktop/electron/user-data/runtime/openclaw/config/openclaw.json",
 );
 
-const requireFromRuntime = createRequire(resolve(openclawRuntimeRoot, "package.json"));
+const requireFromRuntime = createRequire(
+  resolve(openclawRuntimeRoot, "package.json"),
+);
 const Lark = requireFromRuntime("@larksuiteoapi/node-sdk");
 const defaultDomain = Lark.Domain?.Feishu ?? "https://open.feishu.cn";
 

@@ -62,7 +62,7 @@ function createCheckContext(mode) {
         openclawHealth: "http://127.0.0.1:18789/health",
       },
       processChecks: {
-        tmuxSessionName: "nexu-desktop",
+        stateFile: resolve(repoRoot, ".tmp/desktop/manager/state.json"),
       },
       diagnosticsFiles: [resolve(desktopLogsDir, "desktop-diagnostics.json")],
       logs: {
@@ -280,19 +280,6 @@ async function isPortListening(port) {
   });
 }
 
-async function isTmuxSessionRunning(sessionName) {
-  return new Promise((resolvePromise) => {
-    const child = spawn("tmux", ["has-session", "-t", sessionName], {
-      cwd: repoRoot,
-      env: process.env,
-      stdio: "ignore",
-    });
-
-    child.on("error", () => resolvePromise(false));
-    child.on("exit", (code) => resolvePromise(code === 0));
-  });
-}
-
 function isPidAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -323,6 +310,32 @@ async function readPidIfAlive(pidFile) {
     : { alive: false, pid, detail: `pid ${pid} is not running` };
 }
 
+async function readStatePidIfAlive(stateFile) {
+  if (!stateFile || !(await fileExists(stateFile))) {
+    return { alive: false, pid: null, detail: "state file is missing" };
+  }
+
+  let parsedState;
+  try {
+    parsedState = JSON.parse(await readFile(stateFile, "utf8"));
+  } catch {
+    return { alive: false, pid: null, detail: "state file is invalid JSON" };
+  }
+
+  const pid = parsedState?.electronPid;
+  if (!Number.isInteger(pid)) {
+    return {
+      alive: false,
+      pid: null,
+      detail: "state file does not contain a valid electronPid",
+    };
+  }
+
+  return isPidAlive(pid)
+    ? { alive: true, pid, detail: `pid ${pid} is running` }
+    : { alive: false, pid, detail: `pid ${pid} is not running` };
+}
+
 async function fetchText(url) {
   try {
     const response = await fetch(url, {
@@ -343,20 +356,24 @@ async function collectAppProcessResults(context) {
   if (context.processChecks.pidFile) {
     return {
       mainProcess: await readPidIfAlive(context.processChecks.pidFile),
-      tmuxSession: null,
+      auxiliaryProcess: null,
+    };
+  }
+
+  if (context.processChecks.stateFile) {
+    return {
+      mainProcess: await readStatePidIfAlive(context.processChecks.stateFile),
+      auxiliaryProcess: null,
     };
   }
 
   return {
     mainProcess: {
-      alive: true,
+      alive: false,
       pid: null,
-      detail: "dev app liveness is tracked via tmux session",
+      detail: "no desktop process check configured",
     },
-    tmuxSession: {
-      alive: await isTmuxSessionRunning(context.processChecks.tmuxSessionName),
-      detail: `tmux session ${context.processChecks.tmuxSessionName}`,
-    },
+    auxiliaryProcess: null,
   };
 }
 
@@ -947,10 +964,6 @@ async function verifyRuntime(context) {
       context.mode === "dev" ? "desktop-shell" : "packaged-app",
       probeResults.appProcessResults.mainProcess.detail,
     );
-  }
-
-  if (probeResults.appProcessResults.tmuxSession?.alive === false) {
-    addMissing("desktop-shell", "tmux session nexu-desktop is not running");
   }
 
   if (!probeResults.openclawHealth.ok) {
