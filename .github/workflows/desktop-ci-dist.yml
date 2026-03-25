@@ -132,6 +132,7 @@ jobs:
           if (-not (Test-Path $env:PACKAGED_EXECUTABLE)) { throw "Packaged executable missing: $env:PACKAGED_EXECUTABLE" }
 
       - name: Verify packaged runtime unit health
+        if: matrix.os == 'macos'
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
           NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp

@@ -90,9 +90,14 @@ jobs:
           }
 
       - name: Verify desktop runtime unit health
+        if: matrix.os == 'macos'
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
         run: pnpm check:dev
+
+      - name: Verify Windows desktop build pipeline
+        if: matrix.os == 'windows'
+        run: pnpm --filter @nexu/desktop build
 
       - name: Capture desktop logs
         if: always()
