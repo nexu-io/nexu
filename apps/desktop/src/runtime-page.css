@@ -28,11 +28,13 @@ body,
 .desktop-sidebar {
   display: flex;
   width: 272px;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 24px;
   padding: 48px 18px 20px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   background: #0c1016;
+  overflow: hidden;
 }
 
 .desktop-sidebar h1 {
@@ -84,6 +86,9 @@ body,
 
 .desktop-nav {
   display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   flex-direction: column;
   gap: 10px;
 }
@@ -124,11 +129,31 @@ body,
 }
 
 .desktop-sidebar-config {
-  margin-top: auto;
+  flex-shrink: 0;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.desktop-changelog-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #8ba7ff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.desktop-changelog-link:hover {
+  color: #b4c4ff;
 }
 
 .desktop-config-list {
@@ -1247,12 +1272,16 @@ body,
      --color-text-primary:    #1c1f23
      --color-text-muted:      #787c80
      --color-accent:          #1c1f23
-     --color-success:         #346e58
+     --color-success:         #00a365
      --color-brand-primary:   #3db9ce
      --color-error:           #f8672f
      --font-sans:             Inter, SF Pro Display, -apple-system, …
      backdrop-blur-sm = 4px
    ───────────────────────────────────────────────────────── */
+
+:root {
+  --color-success: #00a365;
+}
 
 /* Dismissed badge — positioned in sidebar brand row, right of logo
    Web app sidebar: 224px wide, pt-14 (56px) traffic-light clearance,
@@ -1285,12 +1314,10 @@ body,
 /* Card — mx-3 mb-2 px-3 py-2.5 rounded-[10px] border border-border
            bg-surface-0/80 backdrop-blur-sm animate-float */
 .update-card {
-  position: fixed;
-  bottom: 80px;
-  left: 12px;
-  z-index: 9000;
-  width: 220px;
-  padding: 10px 12px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px 14px;
+  box-sizing: border-box;
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(250, 250, 250, 0.8);
@@ -1302,15 +1329,15 @@ body,
 }
 
 .update-card--error {
-  border-color: rgba(248, 103, 47, 0.2);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
-/* Header — flex items-center justify-between mb-1.5 */
+/* Header — flex items-center justify-between mb-3 */
 .update-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
 }
 
 /* Status — flex items-center gap-2 */
@@ -1336,7 +1363,7 @@ body,
   width: 100%;
   height: 100%;
   border-radius: 9999px;
-  background: #346e58;
+  background: var(--color-success);
   opacity: 0.75;
   animation: update-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
@@ -1348,7 +1375,7 @@ body,
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: #346e58;
+  background: var(--color-success);
 }
 
 .update-dot--error .update-dot-ping {
@@ -1385,23 +1412,19 @@ body,
   color: #1c1f23;
 }
 
-/* Percent — flex items-center justify-between pl-4 mb-1
-             text-[10px] tabular-nums text-text-muted */
+/* Percent — right-aligned below the progress bar */
 .update-card-percent {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-left: 16px;
-  margin-bottom: 4px;
+  justify-content: flex-end;
+  margin-top: 6px;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: #787c80;
 }
 
-/* Progress wrap — pl-4 pr-1 */
+/* Progress wrap */
 .update-card-progress-wrap {
-  padding-left: 16px;
-  padding-right: 4px;
+  padding: 0;
 }
 
 /* Track — h-[6px] w-full rounded-full bg-border overflow-hidden */
@@ -1413,11 +1436,11 @@ body,
   overflow: hidden;
 }
 
-/* Fill — h-full rounded-full bg-brand-primary transition-all duration-300 ease-out */
+/* Fill — deepest brand blue */
 .update-card-progress-fill {
   height: 100%;
   border-radius: 9999px;
-  background: #3db9ce;
+  background: #1c1f23;
   transition: width 300ms ease-out;
 }
 
@@ -1448,9 +1471,9 @@ body,
   transition: opacity 120ms ease;
 }
 
-/* Primary — rounded-[6px] px-2.5 py-0.5 bg-accent text-white */
+/* Primary — rounded-[6px] px-3 py-1 bg-accent text-white */
 .update-card-btn--primary {
-  padding: 2px 10px;
+  padding: 5px 12px;
   background: #1c1f23;
   color: #fff;
 }
@@ -1459,9 +1482,9 @@ body,
   opacity: 0.85;
 }
 
-/* Ghost — rounded-[6px] px-2 py-0.5 text-text-muted hover:text-text-primary */
+/* Ghost — rounded-[6px] px-2.5 py-1 text-text-muted hover:text-text-primary */
 .update-card-btn--ghost {
-  padding: 2px 8px;
+  padding: 5px 10px;
   background: transparent;
   color: #787c80;
   transition: color 120ms ease;
@@ -1471,7 +1494,24 @@ body,
   color: #1c1f23;
 }
 
-/* Error message */
+.update-card-changelog {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: #787c80;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 120ms ease;
+}
+
+.update-card-changelog:hover {
+  color: #1c1f23;
+}
+
 .update-card-error-msg {
   padding-left: 16px;
   margin-bottom: 6px;

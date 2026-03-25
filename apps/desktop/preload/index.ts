@@ -25,7 +25,7 @@ const hostBridge: HostBridge = {
   bootstrap: {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
-    isPackaged: !process.defaultApp,
+    isPackaged: process.env.NEXU_DESKTOP_IS_PACKAGED === "true",
   },
 
   invoke<TChannel extends HostInvokeChannel>(

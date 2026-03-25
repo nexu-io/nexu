@@ -19,6 +19,7 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { NEXU_GITHUB_RELEASES_URL } from "../shared/product-urls";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { SurfaceFrame } from "./components/surface-frame";
 import { UpdateBanner } from "./components/update-banner";
@@ -32,6 +33,7 @@ import {
   installComponent,
   onDesktopCommand,
   onRuntimeEvent,
+  openExternal,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -575,7 +577,7 @@ function RuntimePage() {
       <header className="runtime-header">
         <div>
           <span className="runtime-eyebrow">Desktop Runtime</span>
-          <h1>Nexu local cold-start control room</h1>
+          <h1>nexu local cold-start control room</h1>
           <p>
             Renderer keeps the browser mental model. Electron main orchestrates
             local runtime units.
@@ -877,7 +879,7 @@ function DiagnosticsPage({
           }
         />
         <SummaryCard
-          label="Nexu Home"
+          label="nexu Home"
           className="diagnostics-summary-wide"
           value={runtimeConfig?.paths.nexuHome ?? "-"}
         />
@@ -957,6 +959,18 @@ function DesktopShell() {
       .then(setRuntimeConfig)
       .catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (isPackaged) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void window.nexuHost.invoke("dev:preview-update-ui", {
+        scenario: "available",
+      });
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [isPackaged]);
 
   useEffect(() => {
     return onDesktopCommand((command) => {
@@ -1099,8 +1113,29 @@ function DesktopShell() {
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
               </div>
             </dl>
+            <button
+              type="button"
+              className="desktop-changelog-link"
+              onClick={() => {
+                void openExternal(NEXU_GITHUB_RELEASES_URL);
+              }}
+            >
+              Release notes…
+            </button>
           </div>
         ) : null}
+
+        <UpdateBanner
+          dismissed={update.dismissed}
+          errorMessage={update.errorMessage}
+          onDismiss={update.dismiss}
+          onDownload={() => void update.download()}
+          onInstall={() => void update.install()}
+          onRetry={() => void update.check()}
+          percent={update.percent}
+          phase={update.phase}
+          version={update.version}
+        />
       </aside>
 
       <main className="desktop-shell-stage">
@@ -1120,7 +1155,7 @@ function DesktopShell() {
           <SurfaceFrame
             description="Authenticated workspace surface served by the repo-local web sidecar."
             src={desktopWebUrl}
-            title="Nexu Web"
+            title="nexu Web"
             version={webSurfaceVersion}
             preload={getWebviewPreloadUrl()}
           />
@@ -1145,17 +1180,6 @@ function DesktopShell() {
           <DiagnosticsPage runtimeConfig={runtimeConfig} />
         </div>
       </main>
-
-      <UpdateBanner
-        dismissed={update.dismissed}
-        errorMessage={update.errorMessage}
-        onDismiss={update.dismiss}
-        onDownload={() => void update.download()}
-        onInstall={() => void update.install()}
-        percent={update.percent}
-        phase={update.phase}
-        version={update.version}
-      />
     </div>
   );
 }

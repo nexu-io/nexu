@@ -43,6 +43,7 @@ export function useAutoUpdate() {
           ...prev,
           phase: prev.userInitiated ? "checking" : prev.phase,
           errorMessage: null,
+          ...(prev.userInitiated ? { dismissed: false } : {}),
         }));
       }),
     );
@@ -55,6 +56,7 @@ export function useAutoUpdate() {
           version: data.version,
           releaseNotes: data.releaseNotes ?? null,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -77,6 +79,7 @@ export function useAutoUpdate() {
           phase: "downloading",
           percent: data.percent,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -89,6 +92,7 @@ export function useAutoUpdate() {
           version: data.version,
           percent: 100,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -100,6 +104,7 @@ export function useAutoUpdate() {
           phase: "error",
           errorMessage: data.message,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );

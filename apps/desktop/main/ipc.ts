@@ -1,8 +1,10 @@
 import * as Sentry from "@sentry/electron/main";
 import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
 import {
+  type DevUpdatePreviewScenario,
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
+  type UpdateCheckDiagnostic,
   hostInvokeChannels,
 } from "../shared/host";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
@@ -100,6 +102,81 @@ export function setUpdateManager(manager: UpdateManager | null): void {
 
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
+}
+
+const DEV_PREVIEW_VERSION = "99.0.0-preview";
+
+function mockUpdateCheckDiagnostic(): UpdateCheckDiagnostic {
+  return {
+    channel: "stable",
+    source: "r2",
+    feedUrl: "https://updates.nexu.io/dev-preview",
+    currentVersion: app.getVersion(),
+    remoteVersion: DEV_PREVIEW_VERSION,
+  };
+}
+
+/**
+ * Unpackaged builds have no UpdateManager; this replays the same IPC events
+ * the renderer listens to so designers can verify the update card before dist.
+ */
+export function broadcastDevUpdatePreview(
+  scenario: DevUpdatePreviewScenario,
+): void {
+  if (app.isPackaged) {
+    return;
+  }
+
+  const diagnostic = mockUpdateCheckDiagnostic();
+
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) {
+      continue;
+    }
+
+    const { webContents } = win;
+
+    switch (scenario) {
+      case "available": {
+        webContents.send("update:available", {
+          version: DEV_PREVIEW_VERSION,
+          releaseNotes: "Dev preview — UI only; not a real release.",
+          diagnostic,
+        });
+        break;
+      }
+      case "downloading": {
+        webContents.send("update:available", {
+          version: DEV_PREVIEW_VERSION,
+          diagnostic,
+        });
+        webContents.send("update:progress", {
+          percent: 52,
+          bytesPerSecond: 1_048_576,
+          transferred: 22_000_000,
+          total: 42_000_000,
+        });
+        break;
+      }
+      case "ready": {
+        webContents.send("update:downloaded", {
+          version: DEV_PREVIEW_VERSION,
+        });
+        break;
+      }
+      case "error": {
+        webContents.send("update:error", {
+          message: "Dev preview: simulated update error.",
+          diagnostic,
+        });
+        break;
+      }
+      default: {
+        const _exhaustive: never = scenario;
+        void _exhaustive;
+      }
+    }
+  }
 }
 
 function assertValidChannel(
@@ -437,6 +514,20 @@ export function registerIpcHandlers(
           }
           await componentUpdater.installUpdate(update);
           return { ok: true };
+        }
+
+        case "dev:preview-update-ui": {
+          if (app.isPackaged) {
+            const denied: HostInvokeResultMap["dev:preview-update-ui"] = {
+              ok: false,
+            };
+            return denied;
+          }
+          const typedPayload =
+            payload as HostInvokePayloadMap["dev:preview-update-ui"];
+          broadcastDevUpdatePreview(typedPayload.scenario);
+          const ok: HostInvokeResultMap["dev:preview-update-ui"] = { ok: true };
+          return ok;
         }
 
         default:

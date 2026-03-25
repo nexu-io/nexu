@@ -1,4 +1,6 @@
+import { NEXU_GITHUB_RELEASES_URL } from "../../shared/product-urls";
 import type { UpdatePhase } from "../hooks/use-auto-update";
+import { openExternal } from "../lib/host-api";
 
 interface UpdateBannerProps {
   phase: UpdatePhase;
@@ -9,6 +11,7 @@ interface UpdateBannerProps {
   onDownload: () => void;
   onInstall: () => void;
   onDismiss: () => void;
+  onRetry: () => void;
 }
 
 /**
@@ -48,6 +51,7 @@ export function UpdateBanner({
   onDownload,
   onInstall,
   onDismiss,
+  onRetry,
 }: UpdateBannerProps) {
   if (phase === "idle" || dismissed) {
     return null;
@@ -72,9 +76,9 @@ export function UpdateBanner({
             <span className="update-dot" />
           </span>
           <span className="update-card-title">
-            {isChecking && "Checking for updates..."}
-            {isUpToDate && "You're up to date"}
-            {isDownloading && "Downloading update\u2026"}
+            {isChecking && "Checking\u2026"}
+            {isUpToDate && "Up to date"}
+            {isDownloading && "Downloading\u2026"}
             {isAvailable && `v${version} available`}
             {isReady && `v${version} ready`}
             {isError && "Update failed"}
@@ -113,24 +117,22 @@ export function UpdateBanner({
         </div>
       )}
 
-      {/* Downloading — percentage + progress bar */}
+      {/* Downloading — progress bar, then percentage right-aligned below */}
       {isDownloading && (
-        <>
+        <div className="update-card-progress-wrap">
+          <div className="update-card-progress-track">
+            <div
+              className="update-card-progress-fill"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
           <div className="update-card-percent">
             <span>{Math.round(percent)}%</span>
           </div>
-          <div className="update-card-progress-wrap">
-            <div className="update-card-progress-track">
-              <div
-                className="update-card-progress-fill"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-          </div>
-        </>
+        </div>
       )}
 
-      {/* Available — Download / Later */}
+      {/* Available — Download + Changelog */}
       {isAvailable && (
         <div className="update-card-actions">
           <button
@@ -141,16 +143,16 @@ export function UpdateBanner({
             Download
           </button>
           <button
-            className="update-card-btn update-card-btn--ghost"
-            onClick={onDismiss}
             type="button"
+            className="update-card-changelog"
+            onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
           >
-            Later
+            Changelog
           </button>
         </div>
       )}
 
-      {/* Ready — Restart / Later */}
+      {/* Ready — Restart + Changelog */}
       {isReady && (
         <div className="update-card-actions">
           <button
@@ -161,31 +163,33 @@ export function UpdateBanner({
             Restart
           </button>
           <button
-            className="update-card-btn update-card-btn--ghost"
-            onClick={onDismiss}
             type="button"
+            className="update-card-changelog"
+            onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
           >
-            Later
+            Changelog
           </button>
         </div>
       )}
 
-      {/* Error — message + Dismiss */}
+      {/* Error — Retry + Changelog */}
       {isError && (
-        <>
-          <div className="update-card-error-msg">
-            {errorMessage ?? "Unknown error"}
-          </div>
-          <div className="update-card-actions">
-            <button
-              className="update-card-btn update-card-btn--ghost"
-              onClick={onDismiss}
-              type="button"
-            >
-              Dismiss
-            </button>
-          </div>
-        </>
+        <div className="update-card-actions">
+          <button
+            className="update-card-btn update-card-btn--primary"
+            onClick={onRetry}
+            type="button"
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            className="update-card-changelog"
+            onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
+          >
+            Changelog
+          </button>
+        </div>
       )}
     </div>
   );
