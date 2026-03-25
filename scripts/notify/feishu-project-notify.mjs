@@ -12,7 +12,7 @@
  *
  * Environment variables:
  *   WEBHOOK_URL    — Feishu bot webhook URL
- *   ACTION         — projects_v2_item action (created | edited | archived | deleted | restored)
+ *   ACTION         — projects_v2_item action (created | edited | reordered | converted | archived | deleted | restored)
  *   CHANGES_JSON   — JSON string of github.event.changes (field_value changes)
  *   ITEM_NODE_ID   — GraphQL node ID of the project item
  *   PROJECT_NUMBER — Project number
@@ -191,7 +191,11 @@ function buildProjectUrl() {
 
 const ACTION_CONFIG = {
   created: { text: "📋 新建需求/Bug", color: "blue" },
-  edited: { text: "🔄 状态变更", color: "orange" },
+  edited: { text: "🔄 项目条目变更", color: "orange" },
+  /** Often fired when dragging a card between columns (e.g. TODO → In progress). */
+  reordered: { text: "📌 看板移动/重排", color: "orange" },
+  /** Draft (or item) converted to a tracked issue/PR. */
+  converted: { text: "🔗 已转为 Issue/PR", color: "turquoise" },
   archived: { text: "📦 已归档", color: "grey" },
   deleted: { text: "🗑️ 已删除", color: "red" },
   restored: { text: "♻️ 已恢复", color: "green" },
@@ -228,7 +232,7 @@ async function main() {
   let { text: actionText, color: headerColor } =
     ACTION_CONFIG[action] ?? ACTION_CONFIG.edited;
 
-  if (action === "edited" && changeInfo) {
+  if ((action === "edited" || action === "reordered") && changeInfo) {
     if (changeInfo.field === "Status") {
       actionText = "🔄 状态变更";
     } else if (changeInfo.field === "Assignees") {

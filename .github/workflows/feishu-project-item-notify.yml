@@ -1,8 +1,26 @@
+# Feishu notifications for GitHub Projects (classic "new Projects").
+#
+# Requirements (otherwise this workflow never runs):
+# - Project must be an organization-level project under the same org as this repo
+#   (e.g. nexu-io). User-owned projects do not deliver `projects_v2_item` to org flows.
+# - Link this repository to the project when GitHub offers "Linked repositories"
+#   (Project … menu → Settings), so item activity can target this repo's workflows.
+#
+# Note: dragging a card between columns often emits `reordered`, not `edited`.
 name: Feishu Project Item Notification
 
 on:
   projects_v2_item:
-    types: [created, edited, archived, deleted, restored]
+    types:
+      [
+        created,
+        edited,
+        reordered,
+        converted,
+        archived,
+        deleted,
+        restored,
+      ]
 
 jobs:
   notify:
