@@ -35,33 +35,19 @@ Open the nexu client, enter the App ID and Bot Token in the Discord channel sett
 
 ![Enable Message Content Intent](/assets/discord/step4-intents.webp)
 
-2. In the left menu, go to "OAuth2" → "URL Generator" and select Scopes:
-   - `bot`
-   - `applications.commands`
+2. In the left menu, go to "OAuth2". Under Scopes, select `bot`. Under Bot Permissions, select `Administrator`.
 
-![Select Scopes](/assets/discord/step5-scopes.webp)
+![Select Scopes & Bot Permissions](/assets/discord/step5-scopes.webp)
 
-3. Under Bot Permissions, select:
-   - `View Channels`
-   - `Send Messages`
-   - `Read Message History`
-   - `Embed Links`
-   - `Attach Files`
-   - `Add Reactions`
-   - `Use External Emojis`
-   - `Use External Stickers`
-
-![Select Bot Permissions](/assets/discord/step5-permissions.webp)
-
-4. Copy the generated URL at the bottom of the page and open it in your browser.
+3. Copy the generated URL at the bottom of the page and open it in your browser.
 
 ![Copy generated URL](/assets/discord/step5-generated-url.webp)
 
-5. Select your server and click "Continue".
+4. Select your server and click "Continue".
 
 ![Select server](/assets/discord/step3-select-server.webp)
 
-6. Confirm the permissions and click "Authorize" to add the bot.
+5. Confirm the permissions and click "Authorize" to add the bot.
 
 ![Authorize bot](/assets/discord/step3-authorize.webp)
 
