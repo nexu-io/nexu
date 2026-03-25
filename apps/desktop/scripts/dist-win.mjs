@@ -6,13 +6,17 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const require = createRequire(import.meta.url);
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 function createCommandSpec(command, args) {
-  if (process.platform === "win32" && (command === "pnpm" || command === "pnpm.cmd")) {
+  if (
+    process.platform === "win32" &&
+    (command === "pnpm" || command === "pnpm.cmd")
+  ) {
     return {
       command: "cmd.exe",
       args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
@@ -39,7 +43,9 @@ async function dereferencePnpmSymlinks() {
     if (sharpStat.isSymbolicLink()) {
       const realSharpPath = await realpath(sharpPath);
       pnpmImgPath = resolve(dirname(realSharpPath), "@img");
-      console.log(`[dist:win] dereferencing pnpm symlink: ${sharpPath} -> ${realSharpPath}`);
+      console.log(
+        `[dist:win] dereferencing pnpm symlink: ${sharpPath} -> ${realSharpPath}`,
+      );
       await rm(sharpPath, rmWithRetriesOptions);
       await cp(realSharpPath, sharpPath, {
         recursive: true,
@@ -47,19 +53,25 @@ async function dereferencePnpmSymlinks() {
       });
     }
   } catch (error) {
-    console.log(`[dist:win] skipping sharp: ${error instanceof Error ? error.message : String(error)}`);
+    console.log(
+      `[dist:win] skipping sharp: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   try {
     const sharpImgPath = pnpmImgPath ?? resolve(sharpPath, "node_modules/@img");
     const sharpImgStat = await lstat(sharpImgPath).catch(() => null);
     if (sharpImgStat) {
-      console.log(`[dist:win] copying @img from sharp's node_modules: ${sharpImgPath} -> ${imgPath}`);
+      console.log(
+        `[dist:win] copying @img from sharp's node_modules: ${sharpImgPath} -> ${imgPath}`,
+      );
       await rm(imgPath, rmWithRetriesOptions);
       await cp(sharpImgPath, imgPath, { recursive: true, dereference: true });
     }
   } catch (error) {
-    console.log(`[dist:win] skipping @img: ${error instanceof Error ? error.message : String(error)}`);
+    console.log(
+      `[dist:win] skipping @img: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -114,7 +126,11 @@ function run(command, args, options = {}) {
         resolveRun();
         return;
       }
-      rejectRun(new Error(`${command} ${args.join(" ")} exited with code ${code ?? "null"}.`));
+      rejectRun(
+        new Error(
+          `${command} ${args.join(" ")} exited with code ${code ?? "null"}.`,
+        ),
+      );
     });
   });
 }
@@ -128,7 +144,9 @@ async function runElectronBuilder(args, options = {}) {
 
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
-  const desktopPackage = JSON.parse(await readFile(desktopPackageJsonPath, "utf8"));
+  const desktopPackage = JSON.parse(
+    await readFile(desktopPackageJsonPath, "utf8"),
+  );
   const envPath = resolve(electronRoot, ".env");
   let fileEnv = {};
   try {
@@ -144,7 +162,9 @@ async function ensureBuildConfig() {
     NEXU_LINK_URL: merged.NEXU_LINK_URL ?? null,
     NEXU_DESKTOP_APP_VERSION:
       merged.NEXU_DESKTOP_APP_VERSION ??
-      (typeof desktopPackage.version === "string" ? desktopPackage.version : undefined) ??
+      (typeof desktopPackage.version === "string"
+        ? desktopPackage.version
+        : undefined) ??
       merged.npm_package_version ??
       undefined,
     ...(merged.NEXU_DESKTOP_SENTRY_DSN
@@ -154,29 +174,46 @@ async function ensureBuildConfig() {
       ? { NEXU_UPDATE_FEED_URL: merged.NEXU_UPDATE_FEED_URL }
       : {}),
     ...(merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED
-      ? { NEXU_DESKTOP_AUTO_UPDATE_ENABLED: merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED }
+      ? {
+          NEXU_DESKTOP_AUTO_UPDATE_ENABLED:
+            merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
+        }
       : {}),
     NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
-    ...(merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch
-      ? { NEXU_DESKTOP_BUILD_BRANCH: merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch }
+    ...((merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch)
+      ? {
+          NEXU_DESKTOP_BUILD_BRANCH:
+            merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch,
+        }
       : {}),
-    ...(merged.NEXU_DESKTOP_BUILD_COMMIT ?? gitCommit
-      ? { NEXU_DESKTOP_BUILD_COMMIT: merged.NEXU_DESKTOP_BUILD_COMMIT ?? gitCommit }
+    ...((merged.NEXU_DESKTOP_BUILD_COMMIT ?? gitCommit)
+      ? {
+          NEXU_DESKTOP_BUILD_COMMIT:
+            merged.NEXU_DESKTOP_BUILD_COMMIT ?? gitCommit,
+        }
       : {}),
-    NEXU_DESKTOP_BUILD_TIME: merged.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
+    NEXU_DESKTOP_BUILD_TIME:
+      merged.NEXU_DESKTOP_BUILD_TIME ?? new Date().toISOString(),
   };
 
   await writeFile(configPath, JSON.stringify(config, null, 2));
-  console.log("[dist:win] generated build-config.json from env:", JSON.stringify(config));
+  console.log(
+    "[dist:win] generated build-config.json from env:",
+    JSON.stringify(config),
+  );
 }
 
 async function getElectronVersion() {
   const electronPackageJsonPath = require.resolve("electron/package.json", {
     paths: [electronRoot, repoRoot],
   });
-  const electronPackageJson = JSON.parse(await readFile(electronPackageJsonPath, "utf8"));
+  const electronPackageJson = JSON.parse(
+    await readFile(electronPackageJsonPath, "utf8"),
+  );
   if (typeof electronPackageJson.version !== "string") {
-    throw new Error(`Unable to determine Electron version from ${electronPackageJsonPath}.`);
+    throw new Error(
+      `Unable to determine Electron version from ${electronPackageJsonPath}.`,
+    );
   }
   return electronPackageJson.version;
 }
@@ -195,15 +232,33 @@ async function main() {
   await rm(releaseRoot, rmWithRetriesOptions);
   await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
 
-  await run(pnpmCommand, ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], { env });
-  await run(pnpmCommand, ["--dir", repoRoot, "--filter", "@nexu/controller", "build"], { env });
-  await run(pnpmCommand, ["--dir", repoRoot, "openclaw-runtime:install"], { env });
-  await run(pnpmCommand, ["--dir", repoRoot, "--filter", "@nexu/web", "build"], { env });
-  await run(pnpmCommand, ["run", "build"], { cwd: electronRoot, env });
-  await run("node", [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"], {
-    cwd: electronRoot,
+  await run(
+    pnpmCommand,
+    ["--dir", repoRoot, "--filter", "@nexu/shared", "build"],
+    { env },
+  );
+  await run(
+    pnpmCommand,
+    ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
+    { env },
+  );
+  await run(pnpmCommand, ["--dir", repoRoot, "openclaw-runtime:install"], {
     env,
   });
+  await run(
+    pnpmCommand,
+    ["--dir", repoRoot, "--filter", "@nexu/web", "build"],
+    { env },
+  );
+  await run(pnpmCommand, ["run", "build"], { cwd: electronRoot, env });
+  await run(
+    "node",
+    [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
+    {
+      cwd: electronRoot,
+      env,
+    },
+  );
   await ensureBuildConfig();
   await dereferencePnpmSymlinks();
 
@@ -225,6 +280,7 @@ async function main() {
       `--config.electronVersion=${electronVersion}`,
       `--config.buildVersion=${buildVersion}`,
       `--config.directories.output=${releaseRoot}`,
+      ...(dirOnly ? ["--config.win.signAndEditExecutable=false"] : []),
     ],
     {
       cwd: electronRoot,
