@@ -304,7 +304,9 @@ const DEFAULT_MODELS: Record<string, string[]> = {
     "MiniMax-M2.7-highspeed",
     "MiniMax-M2.5",
     "MiniMax-M2.5-highspeed",
-    "MiniMax-VL-01",
+    "MiniMax-M2.1",
+    "MiniMax-M2.1-highspeed",
+    "MiniMax-M2",
   ],
   kimi: ["kimi-k2.5"],
   glm: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flash"],
@@ -1279,7 +1281,7 @@ function ByokProviderDetail({
     dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
   );
   const [authMode, setAuthMode] = useState<"apiKey" | "oauth">(
-    dbProvider?.authMode ?? "apiKey",
+    dbProvider?.authMode ?? (providerId === "minimax" ? "oauth" : "apiKey"),
   );
   const [oauthRegion, setOauthRegion] = useState<"global" | "cn">(
     dbProvider?.oauthRegion ?? "global",
@@ -1421,14 +1423,16 @@ function ByokProviderDetail({
   useEffect(() => {
     setApiKey("");
     setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
-    setAuthMode(dbProvider?.authMode ?? "apiKey");
+    setAuthMode(
+      dbProvider?.authMode ?? (providerId === "minimax" ? "oauth" : "apiKey"),
+    );
     setOauthRegion(dbProvider?.oauthRegion ?? "global");
     setIsEditingApiKey(!dbProvider?.hasApiKey);
     setVerifiedModels(null);
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
-  }, [dbProvider, meta.defaultProxyUrl]);
+  }, [dbProvider, meta.defaultProxyUrl, providerId]);
 
   useEffect(() => {
     if (!isMiniMax || authMode !== "oauth") {

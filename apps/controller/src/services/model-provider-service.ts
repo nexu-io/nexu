@@ -70,13 +70,23 @@ const MINI_MAX_API_MODELS = [
   "MiniMax-M2.7-highspeed",
   "MiniMax-M2.5",
   "MiniMax-M2.5-highspeed",
-  "MiniMax-VL-01",
+  "MiniMax-M2.1",
+  "MiniMax-M2.1-highspeed",
+  "MiniMax-M2",
 ];
 const MINI_MAX_OAUTH_MODELS = [
+  "MiniMax-M2.7",
+  "MiniMax-M2.7-highspeed",
   "MiniMax-M2.5",
   "MiniMax-M2.5-highspeed",
-  "MiniMax-M2.5-Lightning",
 ];
+
+function hasSameModels(current: string[], expected: string[]): boolean {
+  return (
+    current.length === expected.length &&
+    current.every((model, index) => model === expected[index])
+  );
+}
 
 const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
@@ -244,6 +254,8 @@ export class ModelProviderService {
   ) {}
 
   async listModels() {
+    await this.refreshMiniMaxOauthModelsIfNeeded();
+
     const config = await this.configStore.getConfig();
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
     const cloudModels: Model[] = (desktopCloud.models ?? []).map((model) => ({
@@ -271,6 +283,8 @@ export class ModelProviderService {
   }
 
   async listProviders() {
+    await this.refreshMiniMaxOauthModelsIfNeeded();
+
     const providers = await this.configStore.listProviders();
     return {
       providers: providers.filter((provider) =>
@@ -411,6 +425,8 @@ export class ModelProviderService {
   }
 
   async getMiniMaxOauthStatus(): Promise<MiniMaxOauthStatus> {
+    await this.refreshMiniMaxOauthModelsIfNeeded();
+
     const provider = await this.configStore.getProvider("minimax");
     const connected =
       provider?.authMode === "oauth" && provider.hasOauthCredential === true;
@@ -496,6 +512,8 @@ export class ModelProviderService {
   }
 
   private async getDefaultModelValidity(): Promise<DefaultModelValidity> {
+    await this.refreshMiniMaxOauthModelsIfNeeded();
+
     const config = await this.configStore.getConfig();
     const currentId = config.runtime.defaultModelId;
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
@@ -531,6 +549,23 @@ export class ModelProviderService {
 
   private async enableMiniMaxOauthPlugin(): Promise<void> {
     await this.execOpenClawCommand(["plugins", "enable", MINI_MAX_PLUGIN_ID]);
+  }
+
+  private async refreshMiniMaxOauthModelsIfNeeded(): Promise<void> {
+    const provider = await this.configStore.getProvider("minimax");
+    if (provider?.authMode !== "oauth") {
+      return;
+    }
+
+    const currentModels = provider.models ?? [];
+
+    if (hasSameModels(currentModels, MINI_MAX_OAUTH_MODELS)) {
+      return;
+    }
+
+    await this.configStore.upsertProvider("minimax", {
+      modelsJson: JSON.stringify(MINI_MAX_OAUTH_MODELS),
+    });
   }
 
   private async finishMiniMaxOauthLogin(
