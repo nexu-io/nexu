@@ -49,7 +49,7 @@ jobs:
         include:
           - runner: macos-14
             arch: arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             arch: x64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45

@@ -27,7 +27,7 @@ jobs:
         include:
           - runner: macos-14
             arch: arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             arch: x64
     runs-on: ${{ matrix.runner }}
 
@@ -261,7 +261,7 @@ jobs:
           body: |
             Desktop release for `${{ steps.meta.outputs.desktop_version }}`.
 
-            Assets include signed macOS `.dmg` and `.zip` packages plus `desktop-sha256.txt`.
+            Assets include signed macOS `.dmg` and `.zip` packages plus architecture-specific SHA-256 checksum files.
 
             The packaged `Nexu.app` bundle is notarized and stapled during the build before the archives are published.
           files: |

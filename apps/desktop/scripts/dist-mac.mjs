@@ -271,7 +271,9 @@ async function stapleNotarizedAppBundles() {
     : resolve(electronRoot, "release");
   const releaseEntries = await readdir(releaseRoot, { withFileTypes: true });
   const appBundleDirs = releaseEntries.filter(
-    (entry) => entry.isDirectory() && entry.name.startsWith("mac-"),
+    (entry) =>
+      entry.isDirectory() &&
+      (entry.name === "mac" || entry.name.startsWith("mac-")),
   );
 
   if (appBundleDirs.length === 0) {
@@ -331,6 +333,10 @@ async function ensureBuildConfig() {
   const gitCommit = getGitValue(["rev-parse", "HEAD"]);
 
   const defaultMetadata = {
+    NEXU_DESKTOP_UPDATE_CHANNEL:
+      merged.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      existingConfig.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      "stable",
     NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
     NEXU_DESKTOP_BUILD_BRANCH:
       merged.NEXU_DESKTOP_BUILD_BRANCH ?? (gitBranch || undefined),
@@ -341,6 +347,10 @@ async function ensureBuildConfig() {
   };
 
   const config = {
+    NEXU_DESKTOP_UPDATE_CHANNEL:
+      merged.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      existingConfig.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      defaultMetadata.NEXU_DESKTOP_UPDATE_CHANNEL,
     ...((merged.NEXU_SENTRY_ENV ?? existingConfig.NEXU_SENTRY_ENV)
       ? {
           NEXU_SENTRY_ENV:

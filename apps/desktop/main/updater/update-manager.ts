@@ -19,7 +19,13 @@ export interface UpdateManagerOptions {
 }
 
 function getMacFeedArch(arch: string = process.arch): "arm64" | "x64" {
-  return arch === "x64" ? "x64" : "arm64";
+  if (arch === "x64" || arch === "arm64") {
+    return arch;
+  }
+
+  throw new Error(
+    `[update-manager] Unsupported mac architecture "${arch}". Expected "x64" or "arm64".`,
+  );
 }
 
 function getDefaultR2FeedUrl(
