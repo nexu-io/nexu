@@ -17,7 +17,7 @@
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:cached",
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
-    "postinstall": "npm --prefix ./openclaw-runtime run install:pruned && npm --prefix ./apps/controller/static/runtime-plugins/openclaw-weixin install --production --ignore-scripts",
+    "postinstall": "npm --prefix ./openclaw-runtime run install:pruned && npm --prefix ./apps/controller/static/runtime-plugins/openclaw-weixin install --production --ignore-scripts && node ./scripts/clean-runtime-plugin-installs.mjs",
     "prepare": "node ./scripts/setup-git-hooks.mjs",
     "start": "node ./apps/desktop/scripts/dev-cli.mjs start",
     "stop": "node ./apps/desktop/scripts/dev-cli.mjs stop",
