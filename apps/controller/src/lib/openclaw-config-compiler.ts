@@ -38,6 +38,19 @@ const OAUTH_PROVIDER_MAP: Record<string, string> = {
   openai: "openai-codex",
 };
 
+function resolveByokDefaultBaseUrl(input: {
+  providerId: string;
+  oauthRegion: "global" | "cn" | null;
+}): string | undefined {
+  const openclawProviderId = resolveOpenClawProviderId(input.providerId);
+
+  if (openclawProviderId === "minimax" && input.oauthRegion === "cn") {
+    return "https://api.minimaxi.com/anthropic";
+  }
+
+  return BYOK_DEFAULT_BASE_URLS[openclawProviderId];
+}
+
 function resolveOpenClawProviderId(providerId: string): string {
   switch (providerId) {
     case "kimi":
@@ -92,9 +105,8 @@ function isByokProviderProxied(
   providerId: string,
   baseUrl: string | null,
 ): boolean {
-  const openclawProviderId = resolveOpenClawProviderId(providerId);
   const defaultBaseUrl = normalizeProviderBaseUrl(
-    BYOK_DEFAULT_BASE_URLS[openclawProviderId],
+    resolveByokDefaultBaseUrl({ providerId, oauthRegion: null }),
   );
   const normalizedBaseUrl = normalizeProviderBaseUrl(baseUrl);
 
@@ -191,10 +203,13 @@ function compileModelsConfig(
       providerId: provider.providerId,
       baseUrl: provider.baseUrl,
     });
-    const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
     const baseUrl =
       normalizeProviderBaseUrl(
-        provider.baseUrl ?? BYOK_DEFAULT_BASE_URLS[openclawProviderId],
+        provider.baseUrl ??
+          resolveByokDefaultBaseUrl({
+            providerId: provider.providerId,
+            oauthRegion: provider.oauthRegion,
+          }),
       ) ?? normalizeProviderBaseUrl(BYOK_DEFAULT_BASE_URLS.openai);
 
     if (baseUrl === null) {

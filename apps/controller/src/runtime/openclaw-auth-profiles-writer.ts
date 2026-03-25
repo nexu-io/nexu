@@ -1,6 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import type { OpenClawConfig } from "@nexu/shared";
 import { logger } from "../lib/logger.js";
 import type { ControllerProvider } from "../store/schemas.js";
@@ -143,11 +140,6 @@ export class OpenClawAuthProfilesWriter {
       string,
       AuthProfileRecord
     >;
-    const payload = {
-      version: 1,
-      profiles,
-    } satisfies AuthProfilesData;
-
     await Promise.all(
       (config.agents?.list ?? []).map(async (agent) => {
         if (
@@ -189,26 +181,6 @@ export class OpenClawAuthProfilesWriter {
               preservedKeys,
             },
             "Preserved non-api_key auth profiles during config sync",
-          );
-        }
-
-        const defaultUserAgentAuthProfilesPath = path.join(
-          os.homedir(),
-          ".openclaw",
-          "agents",
-          agent.id,
-          "agent",
-          "auth-profiles.json",
-        );
-
-        if (defaultUserAgentAuthProfilesPath !== authProfilesPath) {
-          await mkdir(path.dirname(defaultUserAgentAuthProfilesPath), {
-            recursive: true,
-          });
-          await writeFile(
-            defaultUserAgentAuthProfilesPath,
-            `${JSON.stringify(payload, null, 2)}\n`,
-            "utf8",
           );
         }
       }),

@@ -8,6 +8,8 @@ export const supportedByokProviderIds = [
   "minimax",
   "kimi",
   "glm",
+  "moonshot",
+  "zai",
 ] as const;
 
 export type SupportedByokProviderId = (typeof supportedByokProviderIds)[number];

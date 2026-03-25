@@ -80,6 +80,12 @@ const MINI_MAX_OAUTH_MODELS = [
   "MiniMax-M2.5",
   "MiniMax-M2.5-highspeed",
 ];
+const MINI_MAX_DEFAULT_POLL_INTERVAL_MS = 2000;
+const MINI_MAX_MAX_POLL_INTERVAL_MS = 10000;
+
+function durationSecondsToMs(valueInSeconds: number): number {
+  return valueInSeconds * 1000;
+}
 
 function hasSameModels(current: string[], expected: string[]): boolean {
   return (
@@ -574,13 +580,18 @@ export class ModelProviderService {
     signal: AbortSignal,
   ): Promise<void> {
     try {
+      const expiresAt = Date.now() + durationSecondsToMs(auth.expired_in);
+      const intervalMs =
+        typeof auth.interval === "number"
+          ? durationSecondsToMs(auth.interval)
+          : MINI_MAX_DEFAULT_POLL_INTERVAL_MS;
       const token = await this.pollMiniMaxOAuthToken(
         {
           region,
           userCode: auth.user_code,
           verifier: auth.verifier,
-          expiresAt: auth.expired_in,
-          intervalMs: auth.interval ?? 2000,
+          expiresAt,
+          intervalMs,
         },
         signal,
       );
@@ -740,7 +751,7 @@ export class ModelProviderService {
           return {
             access,
             refresh,
-            expires,
+            expires: Date.now() + durationSecondsToMs(expires),
             resourceUrl:
               typeof payload.resource_url === "string"
                 ? payload.resource_url
@@ -763,7 +774,10 @@ export class ModelProviderService {
       }
 
       await sleep(pollIntervalMs);
-      pollIntervalMs = Math.min(pollIntervalMs * 1.5, 10000);
+      pollIntervalMs = Math.min(
+        pollIntervalMs * 1.5,
+        MINI_MAX_MAX_POLL_INTERVAL_MS,
+      );
     }
 
     throw new Error("MiniMax OAuth timed out waiting for authorization.");
