@@ -932,7 +932,7 @@ export function HomePage() {
         <ActivityFeed />
 
         <GitHubStarCta
-          label={t("home.starNexu")}
+          label={t("home.starnexu")}
           description={t("home.starCta")}
           badgeLabel="GitHub"
           stars={stars}
