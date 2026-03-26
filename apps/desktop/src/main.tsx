@@ -313,7 +313,8 @@ function RuntimeUnitCard({
   busy: boolean;
 }) {
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
-  const isManaged = unit.launchStrategy === "managed";
+  const isManaged =
+    unit.launchStrategy === "managed" || unit.launchStrategy === "launchd";
   const canStart =
     isManaged &&
     (unit.phase === "idle" ||
@@ -535,7 +536,11 @@ function RuntimePage() {
     return {
       running: units.filter((unit) => unit.phase === "running").length,
       failed: units.filter((unit) => unit.phase === "failed").length,
-      managed: units.filter((unit) => unit.launchStrategy === "managed").length,
+      managed: units.filter(
+        (unit) =>
+          unit.launchStrategy === "managed" ||
+          unit.launchStrategy === "launchd",
+      ).length,
     };
   }, [runtimeState]);
 
@@ -971,6 +976,8 @@ function DesktopShell() {
   }, [update]);
 
   // Poll the controller ready endpoint through the web sidecar proxy before mounting the webview.
+  // Note: getRuntimeConfig() IPC handler waits for cold-start to complete, so
+  // runtimeConfig always has the final ports (including any fallback).
   const [controllerReady, setControllerReady] = useState(false);
 
   useEffect(() => {

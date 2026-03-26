@@ -42,14 +42,12 @@ After a successful connection, use the **Nexu Bot Model** dropdown at the top of
 | OpenAI | `https://api.openai.com/v1` | `sk-...` |
 | Google AI | `https://generativelanguage.googleapis.com/v1beta` | `AIza...` |
 | xAI | `https://api.x.ai/v1` | `xai-...` |
-| Custom | your OpenAI-compatible endpoint | provider-specific |
 
 ## Best Practices
 
 - Use least-privilege API keys to minimize unnecessary access scope.
 - Never expose keys in screenshots, support tickets, or git history.
 - When adding a BYOK provider, click **Verify Connection** first to confirm connectivity before saving.
-- Use the **Custom** provider type when you need a proxy, self-hosted gateway, or OpenAI-compatible inference service.
 
 ## FAQ
 

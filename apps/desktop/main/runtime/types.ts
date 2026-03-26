@@ -20,6 +20,10 @@ export type RuntimeUnitManifest = {
   modulePath?: string;
   cwd?: string;
   delegatedProcessMatch?: string;
+  /** Launchd service label (e.g. "io.nexu.controller.dev") for launchd-managed units. */
+  launchdLabel?: string;
+  /** Directory where launchd writes stdout/stderr log files for this unit. */
+  launchdLogDir?: string;
   binaryPath?: string;
   port: number | null;
   startupTimeoutMs?: number;

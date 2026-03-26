@@ -35,6 +35,24 @@ export interface PlistEnv {
   systemPath?: string;
   /** NODE_PATH for module resolution (TypeScript plugins need this) */
   nodeModulesPath?: string;
+
+  // --- Controller-specific env vars (must match manifests.ts) ---
+  /** Web UI URL for CORS/redirects */
+  webUrl: string;
+  /** OpenClaw skills directory */
+  openclawSkillsDir: string;
+  /** Bundled static skills directory */
+  skillhubStaticSkillsDir: string;
+  /** Platform templates directory */
+  platformTemplatesDir: string;
+  /** OpenClaw binary path */
+  openclawBinPath: string;
+  /** OpenClaw extensions directory */
+  openclawExtensionsDir: string;
+  /** Skill NODE_PATH for controller module resolution */
+  skillNodePath: string;
+  /** TMPDIR for openclaw temp files */
+  openclawTmpDir: string;
 }
 
 /**
@@ -78,10 +96,38 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <string>1</string>
         <key>PORT</key>
         <string>${env.controllerPort}</string>
+        <key>HOST</key>
+        <string>127.0.0.1</string>
+        <key>WEB_URL</key>
+        <string>${escapeXml(env.webUrl)}</string>
         <key>OPENCLAW_GATEWAY_PORT</key>
         <string>${env.openclawPort}</string>
         <key>RUNTIME_MANAGE_OPENCLAW_PROCESS</key>
-        <string>false</string>${
+        <string>false</string>
+        <key>RUNTIME_GATEWAY_PROBE_ENABLED</key>
+        <string>false</string>
+        <key>OPENCLAW_STATE_DIR</key>
+        <string>${escapeXml(env.openclawStateDir)}</string>
+        <key>OPENCLAW_CONFIG_PATH</key>
+        <string>${escapeXml(env.openclawConfigPath)}</string>
+        <key>OPENCLAW_SKILLS_DIR</key>
+        <string>${escapeXml(env.openclawSkillsDir)}</string>
+        <key>SKILLHUB_STATIC_SKILLS_DIR</key>
+        <string>${escapeXml(env.skillhubStaticSkillsDir)}</string>
+        <key>PLATFORM_TEMPLATES_DIR</key>
+        <string>${escapeXml(env.platformTemplatesDir)}</string>
+        <key>OPENCLAW_BIN</key>
+        <string>${escapeXml(env.openclawBinPath)}</string>
+        <key>OPENCLAW_ELECTRON_EXECUTABLE</key>
+        <string>${escapeXml(process.execPath)}</string>
+        <key>OPENCLAW_EXTENSIONS_DIR</key>
+        <string>${escapeXml(env.openclawExtensionsDir)}</string>
+        <key>NODE_PATH</key>
+        <string>${escapeXml(env.skillNodePath)}</string>
+        <key>OPENCLAW_DISABLE_BONJOUR</key>
+        <string>1</string>
+        <key>TMPDIR</key>
+        <string>${escapeXml(env.openclawTmpDir)}</string>${
           env.nexuHome
             ? `
         <key>NEXU_HOME</key>
@@ -92,6 +138,12 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
             ? `
         <key>OPENCLAW_GATEWAY_TOKEN</key>
         <string>${escapeXml(env.gatewayToken)}</string>`
+            : ""
+        }${
+          env.systemPath
+            ? `
+        <key>PATH</key>
+        <string>${escapeXml(env.systemPath)}</string>`
             : ""
         }
         <key>NODE_ENV</key>

@@ -30,6 +30,8 @@
 
 > 🦞 **最丝滑接入微信 OpenClaw**：扫码即连，开箱即用。
 >
+> 🖥 **已支持平台**：macOS（Apple Silicon）· macOS（Intel）· Windows — [下载地址](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe)
+>
 > 🎉 **内测福利**：内测期间，Gemini 等顶级模型 **免费使用**。[立即下载体验 →](https://nexu.io)
 
 ---
@@ -60,7 +62,7 @@
 
 | | OpenClaw 官方 | 典型托管飞书龙虾方案 | **nexu** ✅ |
 |---|---|---|---|
-| **🧠 模型** | 自选，但需手动配置 ⚠️ | 平台指定，不可更换 ❌ | **自选 Gemini 等，GUI 一键切换** ✅ |
+| **🧠 模型** | 自选，但需手动配置 ⚠️ | 平台指定，不可更换 ❌ | **自选 Gemini 等，GUI 一键切换；MiniMax / Codex / GLM 支持 OAuth** ✅ |
 | **📡 数据路径** | 本地 | 经第三方服务器，数据不可控 ❌ | **本机为主，不托管你的业务数据** ✅ |
 | **💰 费用** | 免费，但需自行部署 ⚠️ | 订阅 / 按席收费 ❌ | **客户端免费，按自备 API Key 计费** ✅ |
 | **📜 源码** | 开源 | 闭源，无法审计 ❌ | **MIT 开源，可 fork、可审计** ✅ |
@@ -82,6 +84,10 @@
 ### 🧠 顶级模型，开箱即用
 
 通过 nexu 账号直接使用 Gemini 等模型，无需额外配置。也可随时切换为自带 API Key。
+
+### 🔐 OAuth 一键登录，免填 Key
+
+支持 MiniMax、OpenAI Codex、GLM（Z.AI Coding Plan）OAuth 登录——点击授权即可使用，无需手动复制粘贴 API Key。
 
 ### 🔑 支持自带 API Key，无需登录
 
@@ -143,18 +149,19 @@ nexu 面向 **One Person Company** 与小团队，让一个人就能拥有一支
 
 ### 系统要求
 
-- 🍎 **系统**：macOS 12+（Apple Silicon）
+- 🍎 **macOS**：macOS 12+（Apple Silicon & Intel）
+- 🪟 **Windows**：Windows 10+
 - 💾 **磁盘**：约 500 MB
 
 ### 安装
 
-**推荐：直接下载 Mac 客户端**
+**推荐：直接下载客户端**
 
-1. 打开 [官网](https://nexu.io) 或 [Releases](https://github.com/nexu-io/nexu/releases) 📥
-2. 下载 Mac 安装包
-3. 启动 nexu 🎉
-
-> ⏳ **Windows 与 macOS Intel**：开发中。如需进展可邮件 [support@nexu.ai](mailto:support@nexu.ai)。
+| 平台 | 下载 |
+|------|------|
+| 🍎 macOS（Apple Silicon） | [官网](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🍎 macOS（Intel） | [下载](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
+| 🪟 Windows | [下载](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
 
 ### 首次启动
 
@@ -221,7 +228,7 @@ pnpm test
 A: 客户端完全免费且开源（MIT）。内置多款顶级模型供你使用，也可以选择自带 API Key。
 
 **Q: 支持哪些操作系统？**
-A: 目前支持 macOS 12+（Apple Silicon）。Windows 和 macOS Intel 版本正在开发中，可邮件 [support@nexu.ai](mailto:support@nexu.ai) 获取进展。
+A: 支持 macOS 12+（Apple Silicon & Intel）和 Windows 10+。
 
 **Q: 支持哪些 IM 平台？**
 A: 内置支持微信、飞书、Slack、Discord，开箱即用。

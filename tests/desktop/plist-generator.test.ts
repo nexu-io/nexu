@@ -17,6 +17,14 @@ describe("generatePlist", () => {
     openclawStateDir: "/Users/testuser/.nexu/openclaw",
     controllerCwd: "/app/controller",
     openclawCwd: "/app",
+    webUrl: "http://127.0.0.1:50801",
+    openclawSkillsDir: "/Users/testuser/.nexu/openclaw/state/skills",
+    skillhubStaticSkillsDir: "/app/static/bundled-skills",
+    platformTemplatesDir: "/app/static/platform-templates",
+    openclawBinPath: "/app/openclaw/bin/openclaw",
+    openclawExtensionsDir: "/app/node_modules/openclaw/extensions",
+    skillNodePath: "/app/bundled-node-modules",
+    openclawTmpDir: "/Users/testuser/.nexu/openclaw/tmp",
   };
 
   it("generates valid controller plist XML", async () => {

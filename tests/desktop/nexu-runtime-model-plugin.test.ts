@@ -47,33 +47,6 @@ describe("nexu-runtime-model plugin", () => {
     await writeFile(stateModulePath, beforeState, "utf8");
   });
 
-  it("keeps custom provider overrides as embedded model refs", async () => {
-    await writeState(
-      "custom_e00c608f-34a4-4979-b063-b82c243d8c69/anthropic/claude-3.7-sonnet",
-    );
-
-    const { default: plugin } = await import(
-      `${pluginModulePath}?t=${Date.now()}`
-    );
-    let beforeModelResolveHandler:
-      | (() => Promise<Record<string, string> | undefined>)
-      | undefined;
-
-    plugin.register({
-      on(event, handler) {
-        if (event === "before_model_resolve") {
-          beforeModelResolveHandler = handler;
-        }
-      },
-    });
-
-    const result = await beforeModelResolveHandler?.();
-
-    expect(result).toEqual({
-      modelOverride: "anthropic/claude-3.7-sonnet",
-    });
-  });
-
   it("preserves provider overrides for Link and proxied BYOK providers", async () => {
     const { default: plugin } = await import(
       `${pluginModulePath}?t=${Date.now()}`

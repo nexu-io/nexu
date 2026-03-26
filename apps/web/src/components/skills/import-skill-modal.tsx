@@ -237,6 +237,8 @@ export default function ImportSkillModal({
                   type="url"
                   placeholder="https://github.com/user/repo"
                   className="mt-1.5"
+                  disabled
+                  readOnly
                 />
                 <div className="mt-4 flex items-start gap-1.5">
                   <Lock size={12} className="text-text-muted shrink-0 mt-0.5" />

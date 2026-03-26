@@ -24,16 +24,21 @@ Use this when verifying behavior in a packaged desktop app.
 - Build unsigned local package (from repo root):
 
 ```bash
-pnpm dist:mac:unsigned
+pnpm dist:mac:unsigned:arm64
+# or
+pnpm dist:mac:unsigned:x64
 ```
 
 - Launch packaged app after build:
 
 ```bash
 open "apps/desktop/release/mac-arm64/Nexu.app"
+# or
+open "apps/desktop/release/mac/Nexu.app"
 ```
 
 - Characteristics:
   - Generates artifacts under `apps/desktop/release` by default (`.app`, `.dmg`, `.zip`).
+  - Use the `:arm64` scripts on Apple Silicon builders and the `:x64` scripts on Intel builders.
   - Does not use `dev.sh`/tmux lifecycle.
   - Intended for local packaged-app checks (closer to release behavior).

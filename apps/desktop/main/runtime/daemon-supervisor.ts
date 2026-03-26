@@ -3,7 +3,10 @@ import {
   execFileSync,
   spawn,
 } from "node:child_process";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { Socket } from "node:net";
+import { userInfo } from "node:os";
+import { resolve } from "node:path";
 import { type UtilityProcess, utilityProcess } from "electron";
 import type {
   RuntimeEvent,
@@ -17,6 +20,10 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../../shared/host";
+import type {
+  LaunchdManager,
+  ServiceStatus,
+} from "../services/launchd-manager";
 import { writeRuntimeLogEntry } from "./runtime-logger";
 import type { RuntimeUnitManifest, RuntimeUnitRecord } from "./types";
 
@@ -58,6 +65,11 @@ export class RuntimeOrchestrator {
 
   private readonly recentEntries: RuntimeLogEntry[] = [];
 
+  private launchdManager: LaunchdManager | null = null;
+
+  /** Tracks last-read byte offset per launchd log file to avoid re-reading. */
+  private readonly launchdLogOffsets = new Map<string, number>();
+
   constructor(manifests: RuntimeUnitManifest[]) {
     for (const manifest of manifests) {
       const record: RuntimeUnitRecord = {
@@ -65,7 +77,8 @@ export class RuntimeOrchestrator {
         phase:
           manifest.launchStrategy === "embedded"
             ? "running"
-            : manifest.launchStrategy === "delegated"
+            : manifest.launchStrategy === "delegated" ||
+                manifest.launchStrategy === "launchd"
               ? "stopped"
               : "idle",
         pid: null,
@@ -109,6 +122,7 @@ export class RuntimeOrchestrator {
 
   getRuntimeState(): RuntimeState {
     this.refreshDelegatedUnits();
+    this.refreshLaunchdUnits();
 
     return {
       startedAt: this.startedAt,
@@ -131,7 +145,10 @@ export class RuntimeOrchestrator {
 
   async startAll(): Promise<RuntimeState> {
     for (const record of this.units.values()) {
-      if (record.manifest.launchStrategy === "managed") {
+      if (
+        record.manifest.launchStrategy === "managed" ||
+        record.manifest.launchStrategy === "launchd"
+      ) {
         await this.startUnit(record.manifest.id);
       }
     }
@@ -146,7 +163,11 @@ export class RuntimeOrchestrator {
 
   async stopAll(): Promise<RuntimeState> {
     const stopPromises = Array.from(this.units.values())
-      .filter((record) => record.manifest.launchStrategy === "managed")
+      .filter(
+        (record) =>
+          record.manifest.launchStrategy === "managed" ||
+          record.manifest.launchStrategy === "launchd",
+      )
       .map((record) => this.stopUnit(record.manifest.id));
 
     await Promise.all(stopPromises);
@@ -200,6 +221,35 @@ export class RuntimeOrchestrator {
 
   async dispose(): Promise<void> {
     await this.stopAll();
+  }
+
+  /**
+   * Upgrade specific units to launchd management.
+   * Call this after launchd bootstrap to wire status, start/stop, and logs
+   * for units that are managed by launchd instead of the orchestrator.
+   */
+  enableLaunchdMode(
+    manager: LaunchdManager,
+    unitLabels: Record<string, string>,
+    logDir: string,
+  ): void {
+    this.launchdManager = manager;
+
+    for (const [unitId, label] of Object.entries(unitLabels)) {
+      const record = this.units.get(unitId);
+      if (!record) continue;
+
+      record.manifest.launchStrategy = "launchd";
+      record.manifest.launchdLabel = label;
+      record.manifest.launchdLogDir = logDir;
+      // Reset from idle to stopped — refreshLaunchdUnits will set the real phase
+      if (record.phase === "idle") {
+        record.phase = "stopped";
+      }
+    }
+
+    // Immediately refresh to pick up current state
+    this.refreshLaunchdUnits();
   }
 
   queryEvents(query: RuntimeEventQuery): RuntimeEventQueryResult {
@@ -333,6 +383,11 @@ export class RuntimeOrchestrator {
   private async startUnit(id: string): Promise<void> {
     const record = this.requireRecord(id);
 
+    if (record.manifest.launchStrategy === "launchd") {
+      await this.startLaunchdUnit(record);
+      return;
+    }
+
     if (record.manifest.launchStrategy !== "managed") {
       if (record.manifest.launchStrategy === "embedded") {
         record.phase = "running";
@@ -439,6 +494,11 @@ export class RuntimeOrchestrator {
 
   private async stopUnit(id: string): Promise<void> {
     const record = this.requireRecord(id);
+
+    if (record.manifest.launchStrategy === "launchd") {
+      await this.stopLaunchdUnit(record);
+      return;
+    }
 
     if (record.manifest.launchStrategy !== "managed") {
       return;
@@ -547,9 +607,11 @@ export class RuntimeOrchestrator {
       commandSummary:
         record.manifest.command && record.manifest.args
           ? [record.manifest.command, ...record.manifest.args].join(" ")
-          : record.manifest.launchStrategy === "delegated"
-            ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
-            : null,
+          : record.manifest.launchStrategy === "launchd"
+            ? `launchd service: ${record.manifest.launchdLabel ?? "unknown"}`
+            : record.manifest.launchStrategy === "delegated"
+              ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
+              : null,
       binaryPath: record.manifest.binaryPath ?? null,
       logFilePath: record.logFilePath,
       logTail: record.logTail,
@@ -585,6 +647,264 @@ export class RuntimeOrchestrator {
     for (const listener of this.listeners) {
       listener(event);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Launchd unit management
+  // ---------------------------------------------------------------------------
+
+  private refreshLaunchdUnits(): void {
+    if (!this.launchdManager) return;
+
+    for (const record of this.units.values()) {
+      if (record.manifest.launchStrategy !== "launchd") continue;
+      this.refreshLaunchdUnit(record);
+    }
+  }
+
+  private refreshLaunchdUnit(record: RuntimeUnitRecord): void {
+    const label = record.manifest.launchdLabel;
+    if (!label || !this.launchdManager) return;
+
+    let status: ServiceStatus;
+    try {
+      // getServiceStatus is async but we need sync refresh for getRuntimeState.
+      // Use execFileSync to call launchctl print directly.
+      const uid = userInfo().uid;
+      const domain = `gui/${uid}`;
+      const output = execFileSync(
+        "launchctl",
+        ["print", `${domain}/${label}`],
+        { encoding: "utf-8", timeout: 3000 },
+      );
+
+      const pidMatch = output.match(/pid\s*=\s*(\d+)/i);
+      const pid = pidMatch ? Number.parseInt(pidMatch[1], 10) : undefined;
+      const stateMatch = output.match(/state\s*=\s*(\w+)/i);
+      const state = stateMatch?.[1]?.toLowerCase();
+      const isRunning = state === "running" || (pid !== undefined && pid > 0);
+
+      status = {
+        label,
+        plistPath: "",
+        status: isRunning ? "running" : "stopped",
+        pid,
+      };
+    } catch {
+      status = { label, plistPath: "", status: "unknown" };
+    }
+
+    const previousPhase = record.phase;
+    const previousPid = record.pid;
+
+    if (status.status === "running") {
+      setRecordPhase(record, "running");
+      record.pid = status.pid ?? null;
+      record.startedAt ??= nowIso();
+      record.exitedAt = null;
+      record.exitCode = null;
+      record.lastError = null;
+      markProbeSuccess(record);
+    } else if (status.status === "stopped") {
+      setRecordPhase(record, "stopped");
+      record.pid = null;
+      markProbeFailure(record);
+    } else {
+      // unknown — service not registered (e.g. after bootout). If we were
+      // stopping, transition to stopped so the unit doesn't get stuck.
+      if (record.phase === "stopping") {
+        setRecordPhase(record, "stopped");
+      }
+      record.pid = null;
+    }
+
+    if (previousPhase !== record.phase || previousPid !== record.pid) {
+      const reasonCode =
+        record.phase === "running" ? "launchd_running" : "launchd_stopped";
+      const actionId = beginAction(record, "probe");
+      this.logStateChange(record, {
+        kind: "probe",
+        actionId,
+        reasonCode,
+        message: `launchd service ${label} is ${status.status} (pid=${status.pid ?? "none"})`,
+      });
+    }
+
+    // Tail launchd log files
+    this.tailLaunchdLogs(record);
+  }
+
+  /**
+   * Read new lines from launchd stdout/stderr log files and append to logTail.
+   */
+  private tailLaunchdLogs(record: RuntimeUnitRecord): void {
+    const logDir = record.manifest.launchdLogDir;
+    if (!logDir) return;
+
+    const unitId = record.manifest.id;
+    const logFiles = [
+      { path: resolve(logDir, `${unitId}.log`), stream: "stdout" as const },
+      {
+        path: resolve(logDir, `${unitId}.error.log`),
+        stream: "stderr" as const,
+      },
+    ];
+
+    for (const logFile of logFiles) {
+      try {
+        const stat = statSync(logFile.path);
+        const prevOffset = this.launchdLogOffsets.get(logFile.path) ?? 0;
+        const fileSize = stat.size;
+
+        if (fileSize <= prevOffset) continue;
+
+        // Read only new bytes (cap at 64KB per poll to avoid blocking)
+        const maxRead = 64 * 1024;
+        const readStart = Math.max(prevOffset, fileSize - maxRead);
+        const buffer = Buffer.alloc(fileSize - readStart);
+        const fd = openSync(logFile.path, "r");
+        try {
+          readSync(fd, buffer, 0, buffer.length, readStart);
+        } finally {
+          closeSync(fd);
+        }
+
+        const newContent = buffer.toString("utf-8");
+        // Only process lines from prevOffset onwards (readStart may be earlier for first read)
+        const effectiveContent =
+          readStart < prevOffset
+            ? newContent.slice(prevOffset - readStart)
+            : newContent;
+
+        const lines = effectiveContent.split(/\r?\n/);
+        // Last element might be incomplete — don't advance past it
+        const incomplete = lines.pop() ?? "";
+        const newOffset = fileSize - Buffer.byteLength(incomplete, "utf-8");
+        this.launchdLogOffsets.set(logFile.path, newOffset);
+
+        for (const line of lines) {
+          const trimmed = line.trimEnd();
+          if (!trimmed) continue;
+
+          const prefix = logFile.stream === "stderr" ? "[stderr] " : "";
+          const entry = createRuntimeLogEntry({
+            unitId: record.manifest.id,
+            stream: logFile.stream,
+            kind: "app",
+            actionId: null,
+            reasonCode: "launchd_log_line",
+            message: `${prefix}${trimmed}`,
+          });
+          persistLogEntry(record, entry, this.rememberEntry.bind(this));
+          this.emitUnitLog(record, entry);
+        }
+      } catch {
+        // Log file may not exist yet — that's fine
+      }
+    }
+  }
+
+  private async startLaunchdUnit(record: RuntimeUnitRecord): Promise<void> {
+    const label = record.manifest.launchdLabel;
+    if (!label || !this.launchdManager) return;
+
+    if (record.phase === "starting" || record.phase === "running") {
+      return;
+    }
+
+    const actionId = beginAction(record, "start");
+    if (record.startedAt) {
+      record.restartCount += 1;
+    }
+    setRecordPhase(record, "starting");
+    record.stoppedByUser = false;
+
+    this.logStateChange(record, {
+      kind: "lifecycle",
+      actionId,
+      reasonCode: "launchd_start_requested",
+      message: `launchd service ${label} start requested`,
+    });
+
+    try {
+      // If the service was previously stopped via bootout, it needs to be
+      // re-bootstrapped before it can be kickstarted.
+      const isRegistered = await this.launchdManager.isServiceRegistered(label);
+      if (!isRegistered) {
+        // Re-install will re-bootstrap using the plist file on disk
+        const hasPlist = await this.launchdManager.hasPlistFile(label);
+        if (hasPlist) {
+          await this.launchdManager.rebootstrapFromPlist(label);
+        } else {
+          setRecordPhase(record, "failed");
+          record.lastError = `Plist file missing for ${label}, cannot start.`;
+          this.logStateChange(record, {
+            kind: "lifecycle",
+            actionId,
+            reasonCode: "start_failed",
+            message: record.lastError,
+          });
+          return;
+        }
+      }
+
+      await this.launchdManager.startService(label);
+      // Wait briefly for process to appear
+      await new Promise((r) => setTimeout(r, 1000));
+      this.refreshLaunchdUnit(record);
+
+      const isRunning =
+        record.phase === ("running" as RuntimeUnitRecord["phase"]);
+      this.logStateChange(record, {
+        kind: "lifecycle",
+        actionId,
+        reasonCode: isRunning ? "start_succeeded" : "start_failed",
+        message: `launchd service ${label} is ${record.phase} (pid=${record.pid ?? "none"})`,
+      });
+    } catch (error) {
+      setRecordPhase(record, "failed");
+      record.lastError =
+        error instanceof Error ? error.message : "Failed to start via launchd.";
+      this.logStateChange(record, {
+        kind: "lifecycle",
+        actionId,
+        reasonCode: "start_failed",
+        message: `launchd service ${label} failed to start: ${record.lastError}`,
+      });
+    }
+  }
+
+  private async stopLaunchdUnit(record: RuntimeUnitRecord): Promise<void> {
+    const label = record.manifest.launchdLabel;
+    if (!label || !this.launchdManager) return;
+
+    const actionId = beginAction(record, "stop");
+    record.stoppedByUser = true;
+    setRecordPhase(record, "stopping");
+
+    this.logStateChange(record, {
+      kind: "lifecycle",
+      actionId,
+      reasonCode: "launchd_stop_requested",
+      message: `launchd service ${label} stopping`,
+    });
+
+    try {
+      // Use bootout instead of SIGTERM to prevent KeepAlive from respawning
+      // the process. bootout unregisters the service so launchd won't restart it.
+      await this.launchdManager.bootoutService(label);
+      await this.launchdManager.waitForExit(label, 5000);
+    } catch {
+      // Service may already be stopped/unregistered
+    }
+
+    this.refreshLaunchdUnit(record);
+    this.logStateChange(record, {
+      kind: "lifecycle",
+      actionId,
+      reasonCode: "stop_requested",
+      message: `launchd service ${label} is ${record.phase}`,
+    });
   }
 
   private refreshDelegatedUnits(): void {

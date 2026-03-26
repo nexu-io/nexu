@@ -25,7 +25,19 @@ export const controllerProviderSchema = z.object({
   displayName: z.string().nullable(),
   enabled: z.boolean(),
   baseUrl: z.string().nullable(),
+  authMode: z.enum(["apiKey", "oauth"]).default("apiKey"),
   apiKey: z.string().nullable(),
+  oauthRegion: z.enum(["global", "cn"]).nullable().default(null),
+  oauthCredential: z
+    .object({
+      provider: z.string(),
+      access: z.string(),
+      refresh: z.string().optional(),
+      expires: z.number().int().optional(),
+      email: z.string().optional(),
+    })
+    .nullable()
+    .default(null),
   models: z.array(z.string()).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -36,6 +48,7 @@ export const controllerProviderInputSchema = z.object({
   baseUrl: z.string().nullable().optional(),
   enabled: z.boolean().optional(),
   displayName: z.string().optional(),
+  authMode: z.enum(["apiKey", "oauth"]).optional(),
   modelsJson: z.string().optional(),
 });
 

@@ -142,7 +142,7 @@ function createConfig(overrides: Partial<NexuConfig> = {}): NexuConfig {
       "channel:feishu-channel-1:verificationToken": "verify-token",
     },
     ...overrides,
-  };
+  } as unknown as NexuConfig;
 }
 
 describe("compileOpenClawConfig", () => {
@@ -255,6 +255,70 @@ describe("compileOpenClawConfig", () => {
     expect(result.agents.list[0]?.model).toEqual({
       primary: "openai/gpt-5.4",
     });
+  });
+
+  it("ignores unsupported custom providers in compiled model config", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [
+          ...createConfig().providers,
+          {
+            ...createConfig().providers[0],
+            id: "provider-3",
+            providerId: "custom",
+            displayName: "Custom",
+            baseUrl: "https://models.example.com/v1",
+            apiKey: "custom-key",
+            models: ["anthropic/claude-sonnet-4"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      }),
+      createEnv(),
+    );
+
+    expect(Object.keys(result.models?.providers ?? {})).not.toContain("custom");
+    expect(
+      Object.keys(result.models?.providers ?? {}).some((key) =>
+        key.startsWith("custom_"),
+      ),
+    ).toBe(false);
+  });
+
+  it("uses the CN MiniMax endpoint for CN OAuth providers", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [
+          {
+            id: "provider-minimax-cn",
+            providerId: "minimax",
+            displayName: "MiniMax",
+            enabled: true,
+            baseUrl: null,
+            authMode: "oauth",
+            apiKey: null,
+            oauthRegion: "cn",
+            oauthCredential: {
+              provider: "minimax-portal",
+              access: "access-token",
+              refresh: "refresh-token",
+              expires: Date.now() + 60_000,
+            },
+            models: ["MiniMax-M2.7"],
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.minimax?.baseUrl).toBe(
+      "https://api.minimaxi.com/anthropic",
+    );
   });
 
   it("remaps openai models to OAuth provider ids when persisted OAuth state is connected", () => {

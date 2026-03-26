@@ -56,6 +56,24 @@ export interface LaunchdBootstrapEnv {
   gatewayToken?: string;
   /** Plist directory (default: ~/Library/LaunchAgents or repo-local for dev) */
   plistDir?: string;
+
+  // --- Controller env vars (must match manifests.ts) ---
+  /** Web UI URL for CORS/redirects */
+  webUrl: string;
+  /** OpenClaw skills directory */
+  openclawSkillsDir: string;
+  /** Bundled static skills directory */
+  skillhubStaticSkillsDir: string;
+  /** Platform templates directory */
+  platformTemplatesDir: string;
+  /** OpenClaw binary path */
+  openclawBinPath: string;
+  /** OpenClaw extensions directory */
+  openclawExtensionsDir: string;
+  /** Skill NODE_PATH for controller module resolution */
+  skillNodePath: string;
+  /** TMPDIR for openclaw temp files */
+  openclawTmpDir: string;
 }
 
 export interface LaunchdBootstrapResult {
@@ -67,12 +85,14 @@ export interface LaunchdBootstrapResult {
   };
   /** Promise that resolves when controller is ready (for optional awaiting) */
   controllerReady: Promise<void>;
-  /** If set, these are ports recovered from an attached session */
-  attachedPorts?: {
+  /** Actual ports used (may differ from requested if OS-assigned or recovered) */
+  effectivePorts: {
     controllerPort: number;
     openclawPort: number;
     webPort: number;
   };
+  /** True if services were already running and we attached to them */
+  isAttach: boolean;
 }
 
 /** Metadata persisted between sessions for attach discovery */
@@ -209,111 +229,21 @@ async function probePort(port: number): Promise<boolean> {
   });
 }
 
-async function _tryAttachToRunningServices(opts: {
-  launchd: LaunchdManager;
-  labels: { controller: string; openclaw: string };
-  plistDir: string;
-  isDev: boolean;
-  expectedNexuHome?: string;
-  webRoot: string;
-  controllerPort: number;
-}): Promise<LaunchdBootstrapResult | null> {
-  // 1. Read runtime-ports.json
-  const meta = await readRuntimePorts(opts.plistDir);
-  if (!meta) return null;
+// ---------------------------------------------------------------------------
+// Process liveness check
+// ---------------------------------------------------------------------------
 
-  // 2. Validate mode matches
-  if (meta.isDev !== opts.isDev) {
-    console.log("Attach: isDev mismatch, skipping");
-    return null;
-  }
-
-  // 3. Check both services are running (parallel)
-  const [controllerStatus, openclawStatus] = await Promise.all([
-    opts.launchd.getServiceStatus(opts.labels.controller),
-    opts.launchd.getServiceStatus(opts.labels.openclaw),
-  ]);
-
-  if (
-    controllerStatus.status !== "running" ||
-    openclawStatus.status !== "running"
-  ) {
-    console.log(
-      `Attach: services not running (controller=${controllerStatus.status} openclaw=${openclawStatus.status})`,
-    );
-    return null;
-  }
-
-  // 4. Validate NEXU_HOME from controller env matches expectations
-  const controllerNexuHome = controllerStatus.env?.NEXU_HOME;
-  if (opts.expectedNexuHome && controllerNexuHome !== opts.expectedNexuHome) {
-    console.log(
-      `Attach: NEXU_HOME mismatch (expected=${opts.expectedNexuHome} actual=${controllerNexuHome}), tearing down`,
-    );
-    await Promise.allSettled([
-      opts.launchd.bootoutService(opts.labels.openclaw),
-      opts.launchd.bootoutService(opts.labels.controller),
-    ]);
-    return null;
-  }
-
-  // 5. Recover ports from running services
-  const controllerPort = controllerStatus.env?.PORT
-    ? Number(controllerStatus.env.PORT)
-    : meta.controllerPort;
-  const openclawPort = meta.openclawPort;
-
-  // 6. Health probes (parallel)
-  const [controllerHealthy, openclawListening] = await Promise.all([
-    probeControllerHealth(controllerPort),
-    probePort(openclawPort),
-  ]);
-
-  if (!controllerHealthy || !openclawListening) {
-    console.log(
-      `Attach: health check failed (controller=${controllerHealthy} openclaw=${openclawListening}), tearing down`,
-    );
-    await Promise.allSettled([
-      opts.launchd.bootoutService(opts.labels.openclaw),
-      opts.launchd.bootoutService(opts.labels.controller),
-    ]);
-    return null;
-  }
-
-  // 7. Start embedded web server
-  let webPort = meta.webPort;
-  let webServer: EmbeddedWebServer;
+/**
+ * Check if a process with the given PID is still alive.
+ * Uses kill(pid, 0) which doesn't send a signal but checks for existence.
+ */
+function isProcessAlive(pid: number): boolean {
   try {
-    webServer = await startEmbeddedWebServer({
-      port: webPort,
-      webRoot: opts.webRoot,
-      controllerPort,
-    });
+    process.kill(pid, 0);
+    return true;
   } catch {
-    // Port occupied (previous Electron died without cleanup) — try fresh port
-    webPort = 0; // OS assigns free port
-    webServer = await startEmbeddedWebServer({
-      port: webPort,
-      webRoot: opts.webRoot,
-      controllerPort,
-    });
+    return false;
   }
-
-  console.log(
-    `Attached to running services (controller=${controllerPort} openclaw=${openclawPort} web=${webPort})`,
-  );
-
-  return {
-    launchd: opts.launchd,
-    webServer,
-    labels: opts.labels,
-    controllerReady: Promise.resolve(),
-    attachedPorts: {
-      controllerPort,
-      openclawPort,
-      webPort,
-    },
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +267,80 @@ async function detectPortOccupier(
 }
 
 /**
+ * Find a free port starting from the preferred port.
+ * Tries preferred, then preferred+1, +2, ... up to 10 attempts, then port 0 (OS-assigned).
+ */
+async function findFreePort(preferred: number): Promise<number> {
+  for (let offset = 0; offset < 10; offset++) {
+    const port = preferred + offset;
+    const occupier = await detectPortOccupier(port);
+    if (!occupier) return port;
+  }
+  // All 10 ports occupied — let OS assign
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Stale plist cleanup — detect plists from a different app installation
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if existing plists on disk are stale (from a different app version or
+ * installation path). Compares the full plist content against what we would
+ * generate now — since generatePlist() is deterministic, any difference means
+ * the plist is outdated (new env vars, different ports, different paths, etc.).
+ *
+ * Stale plists are bootout + deleted so the bootstrap can install fresh ones.
+ */
+async function cleanupStalePlists(
+  launchd: LaunchdManager,
+  plistDir: string,
+  labels: { controller: string; openclaw: string },
+  plistEnv: PlistEnv,
+): Promise<void> {
+  let cleaned = false;
+  for (const [type, label] of Object.entries(labels) as [
+    "controller" | "openclaw",
+    string,
+  ][]) {
+    const plistPath = path.join(plistDir, `${label}.plist`);
+    let existing: string;
+    try {
+      existing = await fs.readFile(plistPath, "utf8");
+    } catch {
+      continue; // No plist file — nothing to clean
+    }
+
+    const expected = generatePlist(type, plistEnv);
+    if (existing === expected) {
+      continue; // Content matches — not stale
+    }
+
+    console.log(`Stale plist detected for ${label}, cleaning up`);
+    try {
+      await launchd.bootoutService(label);
+    } catch {
+      // May not be registered — that's fine
+    }
+    try {
+      await fs.unlink(plistPath);
+    } catch {
+      // Best effort
+    }
+    cleaned = true;
+  }
+
+  // If any plist was stale, runtime-ports.json is also stale
+  if (cleaned) {
+    try {
+      await fs.unlink(path.join(plistDir, "runtime-ports.json"));
+    } catch {
+      // Best effort
+    }
+  }
+}
+
+/**
  * Bootstrap desktop using launchd for process management.
  */
 export async function bootstrapWithLaunchd(
@@ -354,6 +358,39 @@ export async function bootstrapWithLaunchd(
     controller: SERVICE_LABELS.controller(env.isDev),
     openclaw: SERVICE_LABELS.openclaw(env.isDev),
   };
+
+  // --- Clean up stale plists from a previous/different installation ---
+  // Build a plistEnv with default ports for comparison. If existing plists
+  // differ from what we'd generate now, they're from a different version or
+  // installation and should be cleaned up.
+  const systemPath = process.env.PATH;
+  const nodeModulesPath = path.dirname(path.dirname(env.openclawPath));
+  const cleanupPlistEnv: PlistEnv = {
+    isDev: env.isDev,
+    logDir,
+    controllerPort: env.controllerPort,
+    openclawPort: env.openclawPort,
+    nodePath: env.nodePath,
+    controllerEntryPath: env.controllerEntryPath,
+    openclawPath: env.openclawPath,
+    openclawConfigPath: env.openclawConfigPath,
+    openclawStateDir: env.openclawStateDir,
+    controllerCwd: env.controllerCwd,
+    openclawCwd: env.openclawCwd,
+    nexuHome: env.nexuHome,
+    gatewayToken: env.gatewayToken,
+    systemPath,
+    nodeModulesPath,
+    webUrl: env.webUrl,
+    openclawSkillsDir: env.openclawSkillsDir,
+    skillhubStaticSkillsDir: env.skillhubStaticSkillsDir,
+    platformTemplatesDir: env.platformTemplatesDir,
+    openclawBinPath: env.openclawBinPath,
+    openclawExtensionsDir: env.openclawExtensionsDir,
+    skillNodePath: env.skillNodePath,
+    openclawTmpDir: env.openclawTmpDir,
+  };
+  await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
   // --- Recover ports from previous session if available ---
   const recovered = await readRuntimePorts(plistDir);
@@ -376,6 +413,16 @@ export async function bootstrapWithLaunchd(
   };
 
   if (recovered && anyRunning && recovered.isDev === env.isDev) {
+    // Detect stale session: if the previous Electron process is dead, the web
+    // server port won't be listening. We can still reuse controller/openclaw
+    // ports since launchd keeps those running, but we'll need a fresh web port.
+    const previousElectronAlive = isProcessAlive(recovered.electronPid);
+    if (!previousElectronAlive) {
+      console.log(
+        `Previous Electron (pid=${recovered.electronPid}) is dead, web port ${recovered.webPort} likely stale`,
+      );
+    }
+
     // Validate NEXU_HOME matches (don't attach to wrong environment)
     const runningNexuHome =
       controllerStatus.env?.NEXU_HOME ?? openclawStatus.env?.NEXU_HOME;
@@ -389,7 +436,8 @@ export async function bootstrapWithLaunchd(
       effectivePorts = {
         controllerPort: recovered.controllerPort,
         openclawPort: recovered.openclawPort,
-        webPort: recovered.webPort,
+        // Keep controller/openclaw ports but use fresh web port if Electron died
+        webPort: previousElectronAlive ? recovered.webPort : env.webPort,
       };
       useRecoveredPorts = true;
       console.log(
@@ -409,31 +457,26 @@ export async function bootstrapWithLaunchd(
           : Promise.resolve(),
       ]);
     }
+  } else if (anyRunning && !recovered) {
+    // Services running but no runtime-ports.json (e.g. file was deleted or
+    // corrupted). We can't know the ports they're using, so tear them down
+    // and do a clean cold start with fresh ports.
+    console.log(
+      "Services running but no runtime-ports.json found, tearing down for clean start",
+    );
+    await Promise.allSettled([
+      controllerRunning
+        ? launchd.bootoutService(labels.controller)
+        : Promise.resolve(),
+      openclawRunning
+        ? launchd.bootoutService(labels.openclaw)
+        : Promise.resolve(),
+    ]);
   }
 
   // --- Per-service: validate running ones, start missing ones ---
-  const systemPath = process.env.PATH;
-  const nodeModulesPath = path.dirname(path.dirname(env.openclawPath));
 
-  const plistEnv: PlistEnv = {
-    isDev: env.isDev,
-    logDir,
-    controllerPort: effectivePorts.controllerPort,
-    openclawPort: effectivePorts.openclawPort,
-    nodePath: env.nodePath,
-    controllerEntryPath: env.controllerEntryPath,
-    openclawPath: env.openclawPath,
-    openclawConfigPath: env.openclawConfigPath,
-    openclawStateDir: env.openclawStateDir,
-    controllerCwd: env.controllerCwd,
-    openclawCwd: env.openclawCwd,
-    nexuHome: env.nexuHome,
-    gatewayToken: env.gatewayToken,
-    systemPath,
-    nodeModulesPath,
-  };
-
-  // Health check running services, install + start missing ones
+  // Health check running services
   let controllerHealthy = false;
   let openclawHealthy = false;
   let needsControllerReady = true;
@@ -469,16 +512,46 @@ export async function bootstrapWithLaunchd(
     }
   }
 
-  // Install + start any services that aren't healthy
+  // Resolve port conflicts BEFORE generating plists. If a port is occupied
+  // (e.g. packaged app running on the same port), find a free alternative.
+  // This must happen before plist generation because the port is baked into
+  // the plist's PORT environment variable.
+  if (!controllerHealthy) {
+    const freePort = await findFreePort(effectivePorts.controllerPort);
+    if (freePort !== effectivePorts.controllerPort) {
+      console.log(
+        `Controller port ${effectivePorts.controllerPort} occupied, using ${freePort}`,
+      );
+      effectivePorts.controllerPort = freePort;
+    }
+  }
+  if (!openclawHealthy) {
+    const freePort = await findFreePort(effectivePorts.openclawPort);
+    if (freePort !== effectivePorts.openclawPort) {
+      console.log(
+        `OpenClaw port ${effectivePorts.openclawPort} occupied, using ${freePort}`,
+      );
+      effectivePorts.openclawPort = freePort;
+    }
+  }
+
+  // Build plistEnv with final resolved ports
+  const plistEnv: PlistEnv = {
+    ...cleanupPlistEnv,
+    controllerPort: effectivePorts.controllerPort,
+    openclawPort: effectivePorts.openclawPort,
+  };
+
+  // Install + start any services that aren't healthy.
+  // Always generate the plist and pass to installService — it detects content
+  // changes and bootout + re-bootstraps when needed (fixes config drift after
+  // app upgrades).
   const ensureService = async (
     label: string,
     type: "controller" | "openclaw",
   ) => {
-    if (!(await launchd.isServiceInstalled(label))) {
-      const plist = generatePlist(type, plistEnv);
-      await launchd.installService(label, plist);
-      console.log(`Installed ${label}`);
-    }
+    const plist = generatePlist(type, plistEnv);
+    await launchd.installService(label, plist);
   };
 
   const ensureRunning = async (label: string) => {
@@ -494,19 +567,6 @@ export async function bootstrapWithLaunchd(
     await ensureRunning(labels.controller);
   }
   if (!openclawHealthy) {
-    // Check for port occupier before starting
-    const occupier = await detectPortOccupier(effectivePorts.openclawPort);
-    if (occupier) {
-      console.warn(
-        `Port ${effectivePorts.openclawPort} occupied by PID ${occupier.pid}, killing...`,
-      );
-      try {
-        process.kill(occupier.pid, "SIGKILL");
-        await new Promise((r) => setTimeout(r, 1000));
-      } catch {
-        /* best effort */
-      }
-    }
     await ensureService(labels.openclaw, "openclaw");
     await ensureRunning(labels.openclaw);
   }
@@ -520,14 +580,15 @@ export async function bootstrapWithLaunchd(
       controllerPort: effectivePorts.controllerPort,
     });
   } catch {
-    // Web port occupied — try next port
-    effectivePorts.webPort = effectivePorts.webPort + 1;
+    // Web port occupied — let OS assign a free port
     webServer = await startEmbeddedWebServer({
-      port: effectivePorts.webPort,
+      port: 0,
       webRoot: env.webRoot,
       controllerPort: effectivePorts.controllerPort,
     });
   }
+  // Update effective port to actual bound port (may differ if OS-assigned)
+  effectivePorts.webPort = webServer.port;
 
   console.log(
     `Services ready (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort})`,
@@ -556,7 +617,8 @@ export async function bootstrapWithLaunchd(
     webServer,
     labels,
     controllerReady,
-    ...(useRecoveredPorts ? { attachedPorts: effectivePorts } : {}),
+    effectivePorts,
+    isAttach: useRecoveredPorts,
   };
 }
 

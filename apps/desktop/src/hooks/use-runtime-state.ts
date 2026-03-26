@@ -65,7 +65,11 @@ export function useRuntimeState() {
     return {
       running: units.filter((unit) => unit.phase === "running").length,
       failed: units.filter((unit) => unit.phase === "failed").length,
-      managed: units.filter((unit) => unit.launchStrategy === "managed").length,
+      managed: units.filter(
+        (unit) =>
+          unit.launchStrategy === "managed" ||
+          unit.launchStrategy === "launchd",
+      ).length,
     };
   }, [units]);
 

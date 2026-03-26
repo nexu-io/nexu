@@ -24,6 +24,9 @@ export const hostInvokeChannels = [
   "desktop:import-cloud-profiles",
   "desktop:update-cloud-profile",
   "desktop:delete-cloud-profile",
+  "desktop:get-minimax-oauth-status",
+  "desktop:start-minimax-oauth",
+  "desktop:cancel-minimax-oauth",
   "shell:open-external",
   "update:check",
   "update:download",
@@ -113,6 +116,11 @@ export type HostInvokePayloadMap = {
   "desktop:delete-cloud-profile": {
     name: string;
   };
+  "desktop:get-minimax-oauth-status": undefined;
+  "desktop:start-minimax-oauth": {
+    region: "global" | "cn";
+  };
+  "desktop:cancel-minimax-oauth": undefined;
   "shell:open-external": {
     url: string;
   };
@@ -345,6 +353,27 @@ export type HostInvokeResultMap = {
     }>;
     configPushed: boolean;
   };
+  "desktop:get-minimax-oauth-status": {
+    connected: boolean;
+    inProgress: boolean;
+    region?: "global" | "cn" | null;
+    error?: string | null;
+  };
+  "desktop:start-minimax-oauth": {
+    connected: boolean;
+    inProgress: boolean;
+    region?: "global" | "cn" | null;
+    error?: string | null;
+    browserUrl?: string;
+    started: boolean;
+  };
+  "desktop:cancel-minimax-oauth": {
+    connected: boolean;
+    inProgress: boolean;
+    region?: "global" | "cn" | null;
+    error?: string | null;
+    cancelled: boolean;
+  };
   "shell:open-external": {
     ok: boolean;
   };
@@ -421,7 +450,11 @@ export type RuntimeUnitId = "web" | "control-plane" | "controller" | "openclaw";
 
 export type RuntimeUnitKind = "surface" | "service" | "runtime";
 
-export type RuntimeUnitLaunchStrategy = "embedded" | "managed" | "delegated";
+export type RuntimeUnitLaunchStrategy =
+  | "embedded"
+  | "managed"
+  | "delegated"
+  | "launchd";
 
 export type RuntimeUnitPhase =
   | "idle"
@@ -448,7 +481,12 @@ export type RuntimeReasonCode =
   | "delegated_process_missing"
   | "stdout_line"
   | "stderr_line"
-  | "auto_restart_scheduled";
+  | "auto_restart_scheduled"
+  | "launchd_running"
+  | "launchd_stopped"
+  | "launchd_start_requested"
+  | "launchd_stop_requested"
+  | "launchd_log_line";
 
 export type RuntimeLogEntry = {
   id: string;

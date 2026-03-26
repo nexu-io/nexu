@@ -113,6 +113,7 @@ function assertValidChannel(
 export function registerIpcHandlers(
   orchestrator: RuntimeOrchestrator,
   runtimeConfig: DesktopRuntimeConfig,
+  coldStartReady?: Promise<void>,
 ): void {
   orchestrator.subscribe((runtimeEvent) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -191,6 +192,9 @@ export function registerIpcHandlers(
         }
 
         case "env:get-runtime-config": {
+          // Wait for cold-start to finish so the renderer gets final ports
+          // (web port may change due to fallback during bootstrap).
+          if (coldStartReady) await coldStartReady;
           return runtimeConfig;
         }
 
@@ -353,10 +357,49 @@ export function registerIpcHandlers(
           );
         }
 
+        case "desktop:get-minimax-oauth-status": {
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:get-minimax-oauth-status"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/status`,
+          );
+        }
+
+        case "desktop:start-minimax-oauth": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:start-minimax-oauth"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:start-minimax-oauth"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/login`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(typedPayload),
+            },
+          );
+        }
+
+        case "desktop:cancel-minimax-oauth": {
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:cancel-minimax-oauth"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/login`,
+            {
+              method: "DELETE",
+            },
+          );
+        }
+
         case "shell:open-external": {
           const typedPayload =
             payload as HostInvokePayloadMap["shell:open-external"];
+          console.info("[host:invoke:shell-open-external]", typedPayload.url);
           await shell.openExternal(typedPayload.url);
+          console.info(
+            "[host:invoke:shell-open-external:done]",
+            typedPayload.url,
+          );
 
           const result: HostInvokeResultMap["shell:open-external"] = {
             ok: true,

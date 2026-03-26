@@ -30,6 +30,8 @@
 
 > 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
 >
+> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Downloads](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe)
+>
 > 🎉 **Beta Perk**: During the beta period, top-tier models like Gemini and more are **free to use**. [Download and try now →](https://nexu.io)
 
 ---
@@ -60,7 +62,7 @@ All data stays on your machine. Your privacy, fully in your control.
 
 | | OpenClaw (official) | Typical hosted Feishu + agent stacks | **nexu** ✅ |
 |---|---|---|---|
-| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Gemini, etc. — one-click switch in GUI** ✅ |
+| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Gemini, etc. — one-click switch in GUI; MiniMax / Codex / GLM support OAuth** ✅ |
 | **📡 Data path** | Local | Routed through vendor servers, data out of your control ❌ | **Local-first; we don't host your business data** ✅ |
 | **💰 Cost** | Free, but self-deploy required ⚠️ | Subscription / per-seat pricing ❌ | **Client is free; pay providers via your own API keys** ✅ |
 | **📜 Source** | Open source | Closed source, no audit possible ❌ | **MIT — fork and audit** ✅ |
@@ -82,6 +84,10 @@ Native OpenClaw 🦞 Skills and full Feishu Skills ship together. Agents move be
 ### 🧠 Top-tier models, out of the box
 
 Use Gemini and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
+
+### 🔐 OAuth login, no key needed
+
+MiniMax, OpenAI Codex, and GLM (Z.AI Coding Plan) support OAuth login—authorize with one click, no need to copy-paste API keys.
 
 ### 🔑 Bring your own API Key, no login
 
@@ -143,18 +149,19 @@ Requirement breakdown, asset search, copywriting, design annotation—free up cr
 
 ### System requirements
 
-- 🍎 **OS**: macOS 12+ (Apple Silicon)
+- 🍎 **macOS**: macOS 12+ (Apple Silicon & Intel)
+- 🪟 **Windows**: Windows 10+
 - 💾 **Storage**: ~500 MB
 
 ### Installation
 
-**Pre-built Mac client (recommended)**
+**Pre-built client (recommended)**
 
-1. Go to the [official site](https://nexu.io) or [Releases](https://github.com/nexu-io/nexu/releases) 📥
-2. Download the Mac installer
-3. Launch nexu 🎉
-
-> ⏳ **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
+| Platform | Download |
+|----------|----------|
+| 🍎 macOS (Apple Silicon) | [Official site](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🍎 macOS (Intel) | [Download](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
+| 🪟 Windows | [Download](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
 
 ### First launch
 
@@ -221,7 +228,7 @@ Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUT
 A: The client is completely free and open-source (MIT). Multiple top-tier models are built in for you to use, and you can also bring your own API Key.
 
 **Q: Which operating systems are supported?**
-A: macOS 12+ (Apple Silicon) is supported today. Windows and macOS Intel are in development — email [support@nexu.ai](mailto:support@nexu.ai) for updates.
+A: macOS 12+ (Apple Silicon & Intel) and Windows 10+ are supported.
 
 **Q: Which IM platforms are supported?**
 A: WeChat, Feishu, Slack, and Discord are built in and work out of the box.

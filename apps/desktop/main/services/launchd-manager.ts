@@ -39,29 +39,56 @@ export class LaunchdManager {
 
   /**
    * Install and bootstrap a launchd service.
+   * If the service is already registered but the plist content has changed,
+   * bootout the old service and re-bootstrap with the new plist.
    */
   async installService(label: string, plistContent: string): Promise<void> {
     const plistPath = path.join(this.plistDir, `${label}.plist`);
     await fs.mkdir(this.plistDir, { recursive: true });
-    await fs.writeFile(plistPath, plistContent, "utf8");
 
     const isRegistered = await this.isServiceRegistered(label);
-    if (!isRegistered) {
+
+    if (isRegistered) {
+      // Check if plist content changed — if so, bootout and re-bootstrap
+      let existingContent: string | null = null;
       try {
-        const { stdout, stderr } = await execFileAsync("launchctl", [
-          "bootstrap",
-          this.domain,
-          plistPath,
-        ]);
-        if (stdout) console.log(`Bootstrap ${label}:`, stdout);
-        if (stderr) console.warn(`Bootstrap ${label} warnings:`, stderr);
-      } catch (err) {
-        console.error(
-          `Failed to bootstrap ${label}:`,
-          err instanceof Error ? err.message : err,
-        );
-        throw err;
+        existingContent = await fs.readFile(plistPath, "utf8");
+      } catch {
+        // File missing but service registered — stale registration
       }
+
+      if (existingContent === plistContent) {
+        // Plist unchanged and already registered — nothing to do
+        return;
+      }
+
+      // Content changed or file missing: bootout old, write new, re-bootstrap
+      console.log(`Plist content changed for ${label}, bootout + re-bootstrap`);
+      try {
+        await this.bootoutService(label);
+        // Brief wait for launchd to finish teardown
+        await new Promise((r) => setTimeout(r, 500));
+      } catch {
+        // Service may have been in a bad state — continue with fresh bootstrap
+      }
+    }
+
+    await fs.writeFile(plistPath, plistContent, "utf8");
+
+    try {
+      const { stdout, stderr } = await execFileAsync("launchctl", [
+        "bootstrap",
+        this.domain,
+        plistPath,
+      ]);
+      if (stdout) console.log(`Bootstrap ${label}:`, stdout);
+      if (stderr) console.warn(`Bootstrap ${label} warnings:`, stderr);
+    } catch (err) {
+      console.error(
+        `Failed to bootstrap ${label}:`,
+        err instanceof Error ? err.message : err,
+      );
+      throw err;
     }
   }
 
@@ -241,6 +268,66 @@ export class LaunchdManager {
     const hasPlist = await this.hasPlistFile(label);
     const isRegistered = await this.isServiceRegistered(label);
     return hasPlist && isRegistered;
+  }
+
+  /**
+   * Wait for a service to exit after bootout.
+   * Polls status until the service is no longer running or timeout is reached.
+   * If still running after timeout, sends SIGKILL as last resort.
+   */
+  async waitForExit(label: string, timeoutMs = 5000): Promise<void> {
+    const startTime = Date.now();
+    let consecutiveUnknown = 0;
+
+    while (Date.now() - startTime < timeoutMs) {
+      const status = await this.getServiceStatus(label);
+      if (status.status === "stopped") return;
+      if (status.status === "unknown") {
+        consecutiveUnknown++;
+        // After 3 consecutive "unknown" reads, treat as exited
+        if (consecutiveUnknown >= 3) return;
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
+      consecutiveUnknown = 0;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // Last resort: force kill by PID, then verify
+    console.warn(
+      `Service ${label} still running after bootout + ${timeoutMs}ms, force killing`,
+    );
+    const status = await this.getServiceStatus(label);
+    if (status.pid) {
+      try {
+        process.kill(status.pid, "SIGKILL");
+      } catch {
+        // Process may have exited between check and kill
+      }
+      // Re-poll briefly to confirm kill took effect
+      for (let i = 0; i < 5; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        const recheck = await this.getServiceStatus(label);
+        if (recheck.status !== "running") return;
+      }
+    }
+  }
+
+  /**
+   * Re-bootstrap a service from its existing plist file on disk.
+   * Used after bootout to re-register the service with launchd.
+   */
+  async rebootstrapFromPlist(label: string): Promise<void> {
+    const plistPath = path.join(this.plistDir, `${label}.plist`);
+    try {
+      await execFileAsync("launchctl", ["bootstrap", this.domain, plistPath]);
+    } catch (err) {
+      console.error(
+        `Failed to re-bootstrap ${label}:`,
+        err instanceof Error ? err.message : err,
+      );
+      throw err;
+    }
   }
 
   /**

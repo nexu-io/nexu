@@ -91,6 +91,8 @@ function createTestContainer(rootDir: string): ControllerContainer {
       {} as ControllerContainer["runtimeModelStateService"],
     modelProviderService: {
       upsertProvider,
+      deleteProvider: vi.fn(async () => true),
+      ensureValidDefaultModel: vi.fn(async () => null),
     } as unknown as ControllerContainer["modelProviderService"],
     integrationService: {} as ControllerContainer["integrationService"],
     localUserService: {} as ControllerContainer["localUserService"],
@@ -172,5 +174,85 @@ describe("provider OAuth routes", () => {
       status: "completed",
       models: ["gpt-5.4"],
     });
+  });
+
+  it("disconnect removes provider models and syncs config", async () => {
+    const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
+    (
+      container.openclawAuthService.getProviderOAuthStatus as ReturnType<
+        typeof vi.fn
+      >
+    ).mockResolvedValueOnce({ connected: true });
+    (
+      container.openclawAuthService.disconnectOAuth as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce(true);
+    const app = createApp(container);
+
+    const response = await app.request(
+      "/api/v1/providers/openai/oauth/disconnect",
+      { method: "POST" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(container.modelProviderService.deleteProvider).toHaveBeenCalledWith(
+      "openai",
+    );
+    expect(
+      container.modelProviderService.ensureValidDefaultModel,
+    ).toHaveBeenCalledTimes(1);
+    expect(container.openclawSyncService.syncAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("disconnect does not delete provider when OAuth disconnect fails", async () => {
+    const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
+    (
+      container.openclawAuthService.getProviderOAuthStatus as ReturnType<
+        typeof vi.fn
+      >
+    ).mockResolvedValueOnce({ connected: true });
+    (
+      container.openclawAuthService.disconnectOAuth as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce(false);
+    const app = createApp(container);
+
+    const response = await app.request(
+      "/api/v1/providers/openai/oauth/disconnect",
+      { method: "POST" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: false });
+    expect(
+      container.modelProviderService.deleteProvider,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("disconnect does not delete provider when no OAuth profile was connected", async () => {
+    const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
+    (
+      container.openclawAuthService.getProviderOAuthStatus as ReturnType<
+        typeof vi.fn
+      >
+    ).mockResolvedValueOnce({ connected: false });
+    (
+      container.openclawAuthService.disconnectOAuth as ReturnType<typeof vi.fn>
+    ).mockResolvedValueOnce(true);
+    const app = createApp(container);
+
+    const response = await app.request(
+      "/api/v1/providers/openai/oauth/disconnect",
+      { method: "POST" },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true });
+    expect(
+      container.modelProviderService.deleteProvider,
+    ).not.toHaveBeenCalled();
+    expect(
+      container.modelProviderService.ensureValidDefaultModel,
+    ).not.toHaveBeenCalled();
+    expect(container.openclawSyncService.syncAll).not.toHaveBeenCalled();
   });
 });

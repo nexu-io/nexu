@@ -3,6 +3,7 @@ import { openclawConfigSchema } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import type { OAuthConnectionState } from "../runtime/openclaw-auth-profiles-store.js";
 import type { NexuConfig } from "../store/schemas.js";
+import { isSupportedByokProviderId } from "./byok-providers.js";
 import {
   compileChannelBindings,
   compileChannelsConfig,
@@ -18,7 +19,7 @@ const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
   siliconflow: "https://api.siliconflow.com/v1",
   ppio: "https://api.ppinfra.com/v3/openai",
   openrouter: "https://openrouter.ai/api/v1",
-  minimax: "https://api.minimaxi.com/anthropic",
+  minimax: "https://api.minimax.io/anthropic",
   kimi: "https://api.moonshot.cn/v1",
   glm: "https://open.bigmodel.cn/api/paas/v4",
   moonshot: "https://api.moonshot.cn/v1",
@@ -36,6 +37,19 @@ const EMPTY_OAUTH_CONNECTION_STATE: OAuthConnectionState = {
 const OAUTH_PROVIDER_MAP: Record<string, string> = {
   openai: "openai-codex",
 };
+
+function resolveByokDefaultBaseUrl(input: {
+  providerId: string;
+  oauthRegion: "global" | "cn" | null;
+}): string | undefined {
+  const openclawProviderId = resolveOpenClawProviderId(input.providerId);
+
+  if (openclawProviderId === "minimax" && input.oauthRegion === "cn") {
+    return "https://api.minimaxi.com/anthropic";
+  }
+
+  return BYOK_DEFAULT_BASE_URLS[openclawProviderId];
+}
 
 function resolveOpenClawProviderId(providerId: string): string {
   switch (providerId) {
@@ -90,10 +104,10 @@ function getDesktopSelectedModel(config: NexuConfig): string | null {
 function isByokProviderProxied(
   providerId: string,
   baseUrl: string | null,
+  oauthRegion: "global" | "cn" | null,
 ): boolean {
-  const openclawProviderId = resolveOpenClawProviderId(providerId);
   const defaultBaseUrl = normalizeProviderBaseUrl(
-    BYOK_DEFAULT_BASE_URLS[openclawProviderId],
+    resolveByokDefaultBaseUrl({ providerId, oauthRegion }),
   );
   const normalizedBaseUrl = normalizeProviderBaseUrl(baseUrl);
 
@@ -106,13 +120,14 @@ function getByokProviderKey(input: {
   id: string;
   providerId: string;
   baseUrl: string | null;
+  oauthRegion: "global" | "cn" | null;
 }): string {
   const openclawProviderId = resolveOpenClawProviderId(input.providerId);
-  if (input.providerId === "custom") {
-    return `custom_${input.id}`;
-  }
-
-  return isByokProviderProxied(input.providerId, input.baseUrl)
+  return isByokProviderProxied(
+    input.providerId,
+    input.baseUrl,
+    input.oauthRegion,
+  )
     ? `byok_${openclawProviderId}`
     : openclawProviderId;
 }
@@ -184,17 +199,24 @@ function compileModelsConfig(
   }
 
   for (const provider of config.providers.filter(
-    (item) => item.enabled && item.apiKey !== null,
+    (item) =>
+      item.enabled &&
+      (item.apiKey !== null || item.authMode === "oauth") &&
+      isSupportedByokProviderId(item.providerId),
   )) {
     const providerKey = getByokProviderKey({
       id: provider.id,
       providerId: provider.providerId,
       baseUrl: provider.baseUrl,
+      oauthRegion: provider.oauthRegion,
     });
-    const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
     const baseUrl =
       normalizeProviderBaseUrl(
-        provider.baseUrl ?? BYOK_DEFAULT_BASE_URLS[openclawProviderId],
+        provider.baseUrl ??
+          resolveByokDefaultBaseUrl({
+            providerId: provider.providerId,
+            oauthRegion: provider.oauthRegion,
+          }),
       ) ?? normalizeProviderBaseUrl(BYOK_DEFAULT_BASE_URLS.openai);
 
     if (baseUrl === null) {
@@ -203,7 +225,10 @@ function compileModelsConfig(
 
     providers[providerKey] = {
       baseUrl,
-      apiKey: provider.apiKey ?? "",
+      apiKey:
+        provider.authMode === "oauth"
+          ? (provider.oauthCredential?.access ?? "")
+          : (provider.apiKey ?? ""),
       api: resolveOpenClawProviderApi(provider.providerId),
       ...(resolveOpenClawProviderAuthHeader(provider.providerId)
         ? { authHeader: true }
@@ -253,6 +278,10 @@ export function resolveModelId(
   const byokPrefixToKey = new Map<string, string>();
   const byokPrefixToProvider = new Map<string, string>();
   for (const provider of config.providers.filter((item) => item.enabled)) {
+    if (!isSupportedByokProviderId(provider.providerId)) {
+      continue;
+    }
+
     const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
     byokPrefixToKey.set(
       provider.providerId,
@@ -260,6 +289,7 @@ export function resolveModelId(
         id: provider.id,
         providerId: provider.providerId,
         baseUrl: provider.baseUrl,
+        oauthRegion: provider.oauthRegion,
       }),
     );
     byokPrefixToProvider.set(provider.providerId, openclawProviderId);
@@ -285,10 +315,6 @@ export function resolveModelId(
         }
       }
 
-      // Custom provider: model entry ID is bare modelSuffix (no provider prefix)
-      if (byokKey.startsWith("custom_")) {
-        return `${byokKey}/${modelSuffix}`;
-      }
       const providerScopedModelId = `${openclawProviderId}/${modelSuffix}`;
       return byokKey === openclawProviderId
         ? providerScopedModelId
@@ -340,9 +366,17 @@ function compileAgentList(
 }
 
 function compilePlugins(
-  _config: NexuConfig,
+  config: NexuConfig,
   env: ControllerEnv,
 ): OpenClawConfig["plugins"] {
+  const hasMiniMaxOauth = config.providers.some(
+    (provider) =>
+      provider.providerId === "minimax" &&
+      provider.enabled &&
+      provider.authMode === "oauth" &&
+      provider.oauthCredential !== null,
+  );
+
   return {
     load: {
       paths: [env.openclawExtensionsDir],
@@ -357,6 +391,13 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
+      ...(hasMiniMaxOauth
+        ? {
+            "minimax-portal-auth": {
+              enabled: true,
+            },
+          }
+        : {}),
     },
   };
 }

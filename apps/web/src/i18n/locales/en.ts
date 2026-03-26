@@ -38,7 +38,6 @@ const en = {
   "welcome.byok.verify.loading": "Verifying...",
   "welcome.byok.verify.idle": "Verify connection",
   "welcome.byok.success": "Connected, enter nexu",
-  "welcome.customEndpoint": "API Base URL (e.g. http://localhost:11434/v1)",
   "welcome.waitingLogin": "Waiting for browser login...",
   "welcome.waitingLoginHint":
     "Please complete login in the browser. This page will redirect automatically.",
@@ -218,7 +217,7 @@ const en = {
   "home.manageSkills": "Manage skills",
   "home.manageSkillsDesc": "Tools and capabilities",
   "home.starGithub": "Star on GitHub",
-  "home.starnexu": "Star nexu on GitHub",
+  "home.starNexu": "Star Nexu on GitHub",
   "home.starCta":
     "Help us grow the open-source community — your star makes a difference",
   "home.recentActivity": "Recent Activity",
@@ -284,9 +283,6 @@ const en = {
   "models.provider.google.description": "Gemini series AI models",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
-  "models.provider.custom.name": "Custom Provider",
-  "models.provider.custom.description":
-    "Any endpoint compatible with OpenAI API",
   "models.managed.connected": "Log out",
   "models.managed.notConnected": "Not connected",
   "models.managed.cloudConnectAria": "Connect to nexu cloud",
@@ -341,6 +337,20 @@ const en = {
   "models.byok.oauthFailed": "ChatGPT login failed",
   "models.byok.oauthOrApiKey": "Or enter an API key manually",
   "models.byok.oauthDescription": "Use your ChatGPT Plus/Pro subscription",
+  "models.byok.minimax.authModeOauth": "OAuth Login",
+  "models.byok.minimax.authModeApiKey": "API Key",
+  "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
+  "models.byok.minimax.oauthDescription":
+    "Use MiniMax OAuth for Coding Plan access without manually pasting an API key.",
+  "models.byok.minimax.regionGlobal": "Global",
+  "models.byok.minimax.regionCn": "CN",
+  "models.byok.minimax.endpoint": "Endpoint: {{endpoint}}",
+  "models.byok.minimax.connected": "Connected via OAuth",
+  "models.byok.minimax.dismissError": "Dismiss error",
+  "models.byok.minimax.waitingLogin": "Waiting for MiniMax login",
+  "models.byok.minimax.cancel": "Cancel",
+  "models.byok.minimax.reconnect": "Reconnect",
+  "models.byok.minimax.login": "Login with MiniMax",
   "models.byok.zaiCodingPlan": "Z.AI Coding Plan",
   "models.byok.zaiCodingPlanDesc":
     "Free models with your Z.AI Coding Plan subscription",

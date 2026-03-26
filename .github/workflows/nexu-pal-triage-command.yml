@@ -1,15 +1,16 @@
-name: "nexu-pal: issue assigned"
+name: "nexu-pal: triage command"
 
 on:
-  issues:
-    types: [assigned]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
   issues: write
 
 jobs:
-  handle-assignment:
+  handle-triage-command:
+    if: ${{ !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,8 +28,10 @@ jobs:
           app-id: ${{ secrets.NEXU_PAL_APP_ID }}
           private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
 
-      - name: Handle assignment
+      - name: Handle triage command
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: node scripts/nexu-pal/process-issue-assignment.mjs
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+        run: node scripts/nexu-pal/process-triage-command.mjs

@@ -240,7 +240,7 @@ export class OpenClawSyncService {
 
     // 2. Always write files once (persistence + watcher hot-reload path).
     await this.configWriter.write(compiled);
-    await this.authProfilesWriter.writeForAgents(compiled);
+    await this.authProfilesWriter.writeForAgents(compiled, config.providers);
     this.gatewayService.noteConfigWritten(compiled);
     const runtimeModelRef = resolvePrimaryModelRef(
       compiled.agents.defaults?.model,

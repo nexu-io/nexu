@@ -94,6 +94,8 @@ export function SurfaceFrame({
   version: number;
   preload?: string;
 }) {
+  void _title;
+  void _description;
   const [webviewReady, setWebviewReady] = useState(false);
   const prevSrcRef = useRef<string | null>(null);
 

@@ -29,7 +29,11 @@
     "check:dist": "./scripts/desktop-check-dist.sh",
     "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
     "dist:mac": "pnpm --filter @nexu/desktop dist:mac",
-    "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
+    "dist:mac:arm64": "pnpm --filter @nexu/desktop dist:mac:arm64",
+    "dist:mac:x64": "pnpm --filter @nexu/desktop dist:mac:x64",
+    "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
+    "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
+    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

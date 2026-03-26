@@ -135,8 +135,18 @@ export function registerProviderOAuthRoutes(
     }),
     async (c) => {
       const { providerId } = c.req.valid("param");
+      const wasConnected = (
+        await container.openclawAuthService.getProviderOAuthStatus(providerId)
+      ).connected;
       const ok =
         await container.openclawAuthService.disconnectOAuth(providerId);
+      if (ok && wasConnected) {
+        // Remove the provider's stored model list so models don't linger
+        // in the model selector after OAuth is revoked.
+        await container.modelProviderService.deleteProvider(providerId);
+        await container.modelProviderService.ensureValidDefaultModel();
+        await container.openclawSyncService.syncAll();
+      }
       return c.json({ ok }, 200);
     },
   );
