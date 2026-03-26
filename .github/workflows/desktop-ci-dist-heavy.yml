@@ -75,6 +75,18 @@ jobs:
             desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-
             desktop-npm-cache-${{ runner.os }}-
 
+      - name: Restore Electron build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            apps/desktop/.cache
+          key: desktop-electron-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/package.json') }}
+          restore-keys: |
+            desktop-electron-cache-${{ runner.os }}-${{ matrix.arch }}-
+            desktop-electron-cache-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
