@@ -6,19 +6,18 @@
 ---
 
 ## Twitter Thread — 中文版（可直接发）
-
+![](20260326113059.png)
 ### (1/3) Hook + 价值主张
 
-在 Nexu 里接入了 @dotey 宝玉老师的 Skills，体验了一把自媒体人效率革命：
+做自媒体，**创作本身就够吃劲**：灵感枯竭、选题空窗、一稿改十遍才过关——脑子已经空了，还要**同一套内容改四遍、发四个平台**（改语气、补标签、切图、复制粘贴），等于在疲惫上再叠一层体力活。
 
-→ 自动发布 Twitter
-→ 小红书图片处理 / 修图
-→ 从内容选题、生成到发布，一条链路跑通
+最近在 Nexu 里接入了 @dotey 宝玉老师的 Skills，把后面这段「多平台搬运」砍掉了：
 
-以前是「写完内容，手动分发 4 个平台」
-现在是「在 Nexu 里一句话，全流程自动执行」
+→ 自动发布 Twitter  
+→ 小红书图片处理 / 修图  
+→ 选题 → 生成 → 多平台适配，一条链路  
 
-对做内容的人来说，最重要的不是多一个工具，而是把重复动作自动化，把时间留给判断和创意。
+以前是写完再手动分发；现在是**一句话，全流程自动跑**。少耗在搬运上，多留给选题、打磨和恢复状态。
 
 ### (2/3) 案例演示
 
@@ -33,10 +32,9 @@
 
 Nexu 直接输出了 4 份内容，每份都适配了对应平台的格式和调性。
 
-→ 小红书版：emoji 标题 + 结构化清单 + 标签
-→ vlog 脚本：分镜 + 旁白 + 时间轴
+→ 小红书版：emoji 标题 + 结构化清单 + 标签  
+→ vlog 脚本：分镜 + 旁白 + 时间轴  
 → X 版：英文短帖 + thread 结构
-→ 微信版：叙事长文 + 配图建议
 
 一次输入，多平台自动适配。这就是 Skill 生态的威力。
 
@@ -59,16 +57,15 @@ Nexu 现在可以接入任何社区 Skill，欢迎交流你们的自动化玩法
 
 ### (1/3) Hook + Value Prop
 
-Just integrated @dotey's Skills into Nexu — and it's a game-changer for content creators.
+Creating is already brutal — **dry spells, blank pages, endless rewrites**. You're drained before you ship. Then you still need **one piece, four platforms**: retone, hashtags, crops, copy-paste — another layer of grind on top of an empty tank.
 
-→ Auto-publish to Twitter
-→ Xiaohongshu image processing & editing
-→ End-to-end pipeline: from topic ideation → content generation → publishing
+I plugged @dotey's Skills into Nexu to strip away that second layer:
 
-Before: "Write content, then manually distribute to 4 platforms."
-Now: "One prompt in Nexu, entire workflow runs automatically."
+→ Auto-publish to Twitter  
+→ Xiaohongshu image processing & editing  
+→ Ideation → generation → multi-platform fit, one pipeline  
 
-For content creators, the real win isn't another tool — it's automating the repetitive stuff so you can focus on judgment and creativity.
+Before: write, then manually repost everywhere. Now: **one prompt, full workflow**. Less energy on logistics — more room to think, refine, and recover.
 
 ### (2/3) Demo
 
