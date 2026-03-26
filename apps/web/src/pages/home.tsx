@@ -851,6 +851,16 @@ export function HomePage() {
                         </div>
                         <button
                           type="button"
+                          aria-label={
+                            isConnectedLive
+                              ? t("home.disconnect")
+                              : statusMeta.label
+                          }
+                          title={
+                            isConnectedLive
+                              ? t("home.disconnect")
+                              : statusMeta.label
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
                             if (connectedChannel) {
@@ -866,10 +876,16 @@ export function HomePage() {
                         >
                           {isConnectedLive ? (
                             <>
-                              <span className="group-hover:hidden">
+                              <span
+                                className="group-hover:hidden"
+                                aria-hidden="true"
+                              >
                                 {statusMeta.label}
                               </span>
-                              <span className="hidden group-hover:inline">
+                              <span
+                                className="hidden group-hover:inline"
+                                aria-hidden="true"
+                              >
                                 {t("home.disconnect")}
                               </span>
                             </>
