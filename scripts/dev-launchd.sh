@@ -138,8 +138,10 @@ start_services() {
   echo "Log directory: $LOG_DIR"
   echo ""
 
-  # Build all dependencies (shared must build before controller/web)
+  # Clean stale dist to avoid stale incremental output (tsc doesn't remove
+  # dist files for deleted source files) and ensure desktop bundles fresh code
   echo "Building..."
+  rm -rf "$REPO_ROOT/packages/shared/dist" "$REPO_ROOT/apps/controller/dist" "$REPO_ROOT/apps/desktop/dist-electron"
   pnpm build
 
   # Ensure desktop shell dist exists (Electron loadFile needs it on disk)
@@ -193,10 +195,14 @@ start_services() {
   WEB_WATCH_PID=$!
 
   # Start Electron desktop with launchd mode (blocks until quit)
+  # Use dev-env.sh to patch LSUIElement and source .env files before launch.
+  # Without this, child processes spawned with process.execPath show extra
+  # Dock icons on macOS because Launch Services caches the un-patched plist.
   echo "Starting Electron desktop (launchd mode)..."
   echo ""
   cd "$REPO_ROOT"
-  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" NEXU_HOME="$DEV_NEXU_HOME" pnpm exec electron apps/desktop
+  NEXU_USE_LAUNCHD=1 NEXU_HOME="$DEV_NEXU_HOME" \
+    apps/desktop/scripts/dev-env.sh pnpm exec electron apps/desktop
 }
 
 show_status() {
