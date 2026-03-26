@@ -243,15 +243,32 @@ on_issue_comment(event):
 
 ## Plan
 
-- [ ] Phase 1: Refactor issue-opened automation to a runnable label-only triage flow with bug-only auto-labeling and stubbed roadmap/duplicate detectors.
+- [x] Phase 1: Refactor issue-opened automation to a runnable label-only triage flow with bug-only auto-labeling and stubbed roadmap/duplicate detectors.
 - [ ] Phase 2: Add `needs-triage`-driven Feishu dual-webhook routing while keeping roadmap and duplicate detection as stub-only no-op implementations.
 - [ ] Phase 3: Stabilize the triage pipeline interfaces and executor behavior around the stubbed flow so later detectors can be swapped in without changing entrypoints.
 - [ ] Phase 4: Add permission-gated `/triage accepted|declined|duplicated` command handling and complete the label-state-machine transitions.
 - [ ] Phase 5: Replace the roadmap matcher stub with a real implementation.
 - [ ] Phase 6: Replace the duplicate detector stub with a real implementation.
 - [ ] Phase 7: Add `needs-information` handling and define the issue edit/reopen re-entry flow.
-- [ ] Phase 8: Update `specs/current/nexu-pal.md` to reflect the final workflow, state machine, and secret layout.
 
 ## Notes
+
+### Implementation
+
+- `.github/workflows/nexu-pal-issue-opened.yml` - switched issue-opened automation to the new Phase 1 entry script.
+- `scripts/nexu-pal/process-issue-opened.mjs` - added the new opened-issue triage entrypoint.
+- `scripts/nexu-pal/lib/github-client.mjs` - added shared GitHub issue helpers and ordered label application.
+- `scripts/nexu-pal/lib/triage-opened-engine.mjs` - added `TriagePlan` generation with bug-only classification and `needs-triage` planning.
+- `scripts/nexu-pal/lib/signals/roadmap-matcher.mjs` - added Phase 1 roadmap matcher stub.
+- `scripts/nexu-pal/lib/signals/duplicate-detector.mjs` - added Phase 1 duplicate detector stub.
+- Kept translation as an internal preprocessing step for classification quality, but removed translation comment and `ai-translated` output so Phase 1 stays label-only.
+- Left the old `scripts/nexu-pal/process-issue.mjs` in place temporarily but detached from the workflow to avoid expanding Phase 1 scope into cleanup-only changes.
+
+### Verification
+
+- `node --check scripts/nexu-pal/lib/github-client.mjs && node --check scripts/nexu-pal/lib/triage-opened-engine.mjs && node --check scripts/nexu-pal/process-issue-opened.mjs` ✅
+- `pnpm lint` ✅
+- `pnpm test` ⚠️ failed due to pre-existing unrelated tests: `tests/desktop/skill-dir-watcher.test.ts` and `tests/desktop/openclaw-auth-profiles-writer.test.ts`.
+- Manual implementation review confirmed Phase 1 now applies labels only, keeps auto-labeling to `bug`, and leaves roadmap/duplicate detection as no-op stubs.
 
 <!-- Optional: Alternatives considered, open questions, etc. -->
