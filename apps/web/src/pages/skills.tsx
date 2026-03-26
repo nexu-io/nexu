@@ -756,7 +756,7 @@ export function SkillsPage() {
             href="https://github.com/nexu-io/nexu/issues"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--color-accent)] hover:underline"
+            className="text-[var(--color-link)] hover:underline"
           >
             GitHub Issues
           </a>{" "}

@@ -1,4 +1,4 @@
-import { type BrowserWindow, app, webContents } from "electron";
+import { type BrowserWindow, Menu, app, webContents } from "electron";
 import { autoUpdater } from "electron-updater";
 import type {
   UpdateChannelName,
@@ -77,6 +77,12 @@ export class UpdateManager {
   private currentFeedUrl: string;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private menuPhase:
+    | "idle"
+    | "checking"
+    | "downloading"
+    | "up-to-date"
+    | "downloaded" = "idle";
 
   constructor(
     win: BrowserWindow,
@@ -151,6 +157,7 @@ export class UpdateManager {
       const diagnostic = this.getDiagnostic();
       this.logCheck("checking for update", diagnostic);
       this.send("update:checking", diagnostic);
+      this.syncAppMenu("checking");
     });
 
     autoUpdater.on("update-available", (info) => {
@@ -165,6 +172,7 @@ export class UpdateManager {
           typeof info.releaseNotes === "string" ? info.releaseNotes : undefined,
         diagnostic,
       });
+      this.syncAppMenu("downloading");
     });
 
     autoUpdater.on("update-not-available", (info) => {
@@ -174,6 +182,7 @@ export class UpdateManager {
       });
       this.logCheck("update not available", diagnostic);
       this.send("update:up-to-date", { diagnostic });
+      this.syncAppMenu("up-to-date");
     });
 
     autoUpdater.on("download-progress", (progress) => {
@@ -187,12 +196,14 @@ export class UpdateManager {
 
     autoUpdater.on("update-downloaded", (info) => {
       this.send("update:downloaded", { version: info.version });
+      this.syncAppMenu("downloaded");
     });
 
     autoUpdater.on("error", (error) => {
       const diagnostic = this.getDiagnostic();
       this.logCheck(`update error: ${error.message}`, diagnostic);
       this.send("update:error", { message: error.message, diagnostic });
+      this.syncAppMenu("idle");
     });
   }
 
@@ -207,6 +218,42 @@ export class UpdateManager {
           wc.send(channel, data);
         }
       }
+    }
+  }
+
+  get isDownloaded(): boolean {
+    return this.menuPhase === "downloaded";
+  }
+
+  private syncAppMenu(
+    phase: "idle" | "checking" | "downloading" | "up-to-date" | "downloaded",
+  ): void {
+    this.menuPhase = phase;
+    const item =
+      Menu.getApplicationMenu()?.getMenuItemById("check-for-updates");
+    if (!item) return;
+
+    switch (phase) {
+      case "idle":
+        item.label = "Check for Updates…";
+        item.enabled = true;
+        break;
+      case "checking":
+        item.label = "Checking for Updates…";
+        item.enabled = false;
+        break;
+      case "up-to-date":
+        item.label = "Check for Updates…";
+        item.enabled = false;
+        break;
+      case "downloading":
+        item.label = "Downloading Update…";
+        item.enabled = false;
+        break;
+      case "downloaded":
+        item.label = "Install Update…";
+        item.enabled = true;
+        break;
     }
   }
 

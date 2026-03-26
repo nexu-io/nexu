@@ -525,7 +525,7 @@ function WorkspaceLayoutInner() {
       : isModelsPage
         ? t("layout.mobile.settingsSubtitle")
         : selectedSession
-          ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
+          ? formatTime(selectedSession.lastTime)
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
   const desktopGlassTint = "rgba(255, 255, 255, 0.08)";
   const updateFloatWidth = Math.max(140, sidebarWidth - 20);
@@ -730,9 +730,7 @@ function WorkspaceLayoutInner() {
                           {s.title}
                         </div>
                       </div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-text-muted truncate whitespace-nowrap">
-                        <span>{getPlatformLabel(s.channelType ?? "web")}</span>
-                        <span className="text-border">·</span>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted truncate whitespace-nowrap">
                         <span>{formatTime(s.lastTime)}</span>
                       </div>
                     </div>
@@ -1089,11 +1087,7 @@ function WorkspaceLayoutInner() {
                                 {s.title}
                               </div>
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-text-muted truncate">
-                              <span>
-                                {getPlatformLabel(s.channelType ?? "web")}
-                              </span>
-                              <span className="text-border">·</span>
+                            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted truncate">
                               <span>{formatTime(s.lastTime)}</span>
                             </div>
                           </div>

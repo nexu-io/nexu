@@ -1,4 +1,3 @@
-import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
 import { GitHubStarCta } from "@/components/github-star-cta";
@@ -736,17 +735,6 @@ export function HomePage() {
             </div>
             <div className="flex items-center gap-2 mt-1.5">
               <InlineModelSelector />
-              {agentIndicator && (
-                <span
-                  className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                  title={agentIndicator.label}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${agentIndicator.colorClass} ${agentIndicator.pulse ? "animate-pulse" : ""}`}
-                  />
-                  {agentIndicator.label}
-                </span>
-              )}
               <div className="flex items-center gap-2 text-[11px] text-text-muted ml-3">
                 <span>
                   {sessionsData
@@ -927,9 +915,6 @@ export function HomePage() {
             )}
           </div>
         </div>
-
-        {/* Activity Feed */}
-        <ActivityFeed />
 
         <GitHubStarCta
           label={t("home.starNexu")}

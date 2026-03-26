@@ -219,14 +219,14 @@ export function ModelPickerDropdown({
         }}
         className={cn(
           compact
-            ? "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-surface-0 hover:border-border-hover hover:bg-surface-1 transition-all text-[12px] text-text-primary"
-            : "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-2 hover:border-border-hover transition-all text-[12px] font-medium text-text-primary",
+            ? "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-surface-0 hover:border-border-hover hover:bg-surface-1 transition-all text-[13px] text-text-primary"
+            : "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-2 hover:border-border-hover transition-all text-[13px] font-medium text-text-primary",
           triggerClassName,
         )}
       >
         <span
           className={cn(
-            compact ? "w-4 h-4" : "w-4 h-4",
+            compact ? "w-[18px] h-[18px]" : "w-[18px] h-[18px]",
             "shrink-0 flex items-center justify-center",
           )}
         >
@@ -234,10 +234,10 @@ export function ModelPickerDropdown({
             <ModelLogo
               model={currentModelLabel}
               provider={currentGroupKey}
-              size={14}
+              size={16}
             />
           ) : (
-            <Cpu size={13} className="text-text-muted" />
+            <Cpu size={15} className="text-text-muted" />
           )}
         </span>
         <span className={cn(compact ? "font-medium" : undefined)}>
@@ -264,7 +264,7 @@ export function ModelPickerDropdown({
           <div className="px-3 pt-3 pb-2">
             <div className="flex items-center gap-2 rounded-lg bg-surface-0 border border-border px-3 py-2">
               <Search
-                size={compact ? 12 : 14}
+                size={compact ? 14 : 15}
                 className="text-text-muted shrink-0"
               />
               <input
@@ -296,8 +296,8 @@ export function ModelPickerDropdown({
             <div
               className={cn(
                 compact
-                  ? "max-h-[280px] overflow-y-auto py-1"
-                  : "max-h-[320px] overflow-y-auto",
+                  ? "max-h-[360px] overflow-y-auto py-1"
+                  : "max-h-[400px] overflow-y-auto",
               )}
               style={
                 compact
@@ -336,7 +336,7 @@ export function ModelPickerDropdown({
                         }}
                         className={cn(
                           compact
-                            ? "w-full px-3 py-1.5 flex items-center gap-2 hover:bg-surface-2/50 transition-colors"
+                            ? "w-full px-3 py-2 flex items-center gap-2 hover:bg-surface-2/50 transition-colors"
                             : "w-full px-3 pt-2.5 pb-1 text-left hover:bg-surface-1/50 transition-colors flex items-center gap-2",
                         )}
                       >
@@ -347,14 +347,14 @@ export function ModelPickerDropdown({
                             !isExpanded && "-rotate-90",
                           )}
                         />
-                        <span className="w-[14px] h-[14px] shrink-0 flex items-center justify-center">
-                          <ProviderLogo provider={provider.id} size={13} />
+                        <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
+                          <ProviderLogo provider={provider.id} size={16} />
                         </span>
                         <span
                           className={cn(
                             compact
-                              ? "text-[12px]"
-                              : "text-[12px] uppercase tracking-wider",
+                              ? "text-[13px]"
+                              : "text-[13px] uppercase tracking-wider",
                             "font-medium text-text-secondary",
                           )}
                         >
@@ -378,8 +378,8 @@ export function ModelPickerDropdown({
                               }}
                               className={cn(
                                 compact
-                                  ? "w-full flex items-center gap-2 pl-8 pr-3 py-1.5 text-left transition-colors hover:bg-surface-2"
-                                  : "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors",
+                                  ? "w-full flex items-center gap-2 pl-8 pr-3 py-2 text-left transition-colors hover:bg-surface-2"
+                                  : "w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors",
                                 isSelected
                                   ? "bg-brand-primary/5"
                                   : compact
@@ -406,19 +406,19 @@ export function ModelPickerDropdown({
                                   ) : null}
                                 </span>
                               )}
-                              <span className="w-[14px] h-[14px] shrink-0 flex items-center justify-center">
+                              <span className="w-[18px] h-[18px] shrink-0 flex items-center justify-center">
                                 <ModelLogo
                                   model={model.name}
                                   provider={provider.id}
-                                  size={13}
+                                  size={16}
                                 />
                               </span>
                               <div className="flex-1 min-w-0">
                                 <div
                                   className={cn(
                                     compact
-                                      ? "text-[12px]"
-                                      : "text-[12px] truncate",
+                                      ? "text-[13px]"
+                                      : "text-[13px] truncate",
                                     isSelected
                                       ? "font-semibold text-text-primary"
                                       : "font-medium text-text-primary",
@@ -427,7 +427,7 @@ export function ModelPickerDropdown({
                                   {model.name}
                                 </div>
                                 {!compact && (
-                                  <div className="text-[12px] text-text-tertiary">
+                                  <div className="text-[13px] text-text-tertiary">
                                     {provider.name}
                                   </div>
                                 )}
@@ -454,9 +454,9 @@ export function ModelPickerDropdown({
                   track("workspace_configure_model_provider_click");
                   onOpenSettings();
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-text-secondary hover:bg-surface-2 transition-colors"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] text-text-primary hover:bg-surface-2 transition-colors"
               >
-                <Settings size={11} />
+                <Settings size={16} />
                 <span>{t("home.configureProviders")}</span>
               </button>
             </div>

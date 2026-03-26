@@ -413,7 +413,7 @@ const zhCN = {
   "skills.yours": "我的",
   "skills.clawhubDisclaimer":
     "Skill 来自 ClawHub，网络或服务偶有不稳定；若遇到问题，欢迎在",
-  "skills.clawhubDisclaimerAfterLink": "反馈。",
+  "skills.clawhubDisclaimerAfterLink": "反馈",
   "skills.recommended": "推荐",
   "skills.installed": "已安装",
   "skills.installQueued": "技能已加入安装队列",

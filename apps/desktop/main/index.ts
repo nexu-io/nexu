@@ -243,6 +243,7 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
+let updateManagerRef: UpdateManager | null = null;
 
 // Cold-start gate: IPC handler for `env:get-runtime-config` waits for this
 // promise to resolve before returning, ensuring the renderer always gets the
@@ -341,7 +342,13 @@ function installApplicationMenu(): void {
                 label: "Check for Updates…",
                 enabled:
                   app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-                click: () => triggerUpdateCheck(),
+                click: () => {
+                  if (updateManagerRef?.isDownloaded) {
+                    void updateManagerRef.quitAndInstall();
+                    return;
+                  }
+                  triggerUpdateCheck();
+                },
               },
               { type: "separator" },
               { role: "services" },
@@ -935,6 +942,7 @@ app.whenReady().then(async () => {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
       });
+      updateManagerRef = updateMgr;
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
     } else {

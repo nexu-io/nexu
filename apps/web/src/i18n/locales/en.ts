@@ -432,7 +432,7 @@ const en = {
   "skills.yours": "Yours",
   "skills.clawhubDisclaimer":
     "Skills come from ClawHub \u2014 network or service may occasionally be unstable. If you encounter issues, please report on",
-  "skills.clawhubDisclaimerAfterLink": ".",
+  "skills.clawhubDisclaimerAfterLink": "",
   "skills.recommended": "Recommended",
   "skills.installed": "Installed",
   "skills.installQueued": "Skill queued for installation",
