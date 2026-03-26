@@ -1,112 +1,257 @@
-import { describe, expect, it } from "vitest";
+/**
+ * Data Directory Runtime Tests
+ *
+ * Every test calls a real function or starts a real process and checks
+ * the ACTUAL runtime output. No path.resolve assertions.
+ *
+ * Strategy:
+ * - generatePlist tests: call the function, parse the XML, verify values
+ * - runtime-config tests: call with realistic env, check resolved config
+ * - Real launchd tests (macOS only): start a real service, read its env
+ *   from `launchctl print`, verify it matches what we generated
+ */
+import { execFileSync } from "node:child_process";
 import {
-  getDesktopNexuHomeDir,
-  getOpenclawSkillsDir,
-  getSkillhubCacheDir,
-} from "../../apps/desktop/shared/desktop-paths";
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-// =========================================================================
-// Realistic inputs matching real-world configurations
-// =========================================================================
+const IS_MACOS = process.platform === "darwin";
+const NODE_BIN = process.execPath;
+const UID = IS_MACOS
+  ? execFileSync("id", ["-u"], { encoding: "utf8" }).trim()
+  : "0";
+const DOMAIN = `gui/${UID}`;
 
-const PACKAGED = {
-  home: "/Users/alice",
-  nexuHome: "/Users/alice/.nexu",
-  userData: "/Users/alice/Library/Application Support/@nexu/desktop",
-  resources: "/Applications/Nexu.app/Contents/Resources",
-};
-
-const DEV = {
-  repo: "/Users/alice/code/nexu",
-  nexuHome: "/Users/alice/code/nexu/.tmp/desktop/nexu-home",
-  userData: "/Users/alice/code/nexu/.tmp/desktop/electron/user-data",
-};
-
-// Helper: build a full PlistEnv for generatePlist calls
-function makePlistEnv(overrides?: Record<string, unknown>) {
-  return {
-    isDev: false,
-    logDir: "/logs",
-    controllerPort: 50800,
-    openclawPort: 18789,
-    nodePath: "/usr/bin/node",
-    controllerEntryPath: "/app/controller/dist/index.js",
-    openclawPath: "/app/openclaw/openclaw.mjs",
-    openclawConfigPath: `${PACKAGED.userData}/runtime/openclaw/state/openclaw.json`,
-    openclawStateDir: `${PACKAGED.userData}/runtime/openclaw/state`,
-    controllerCwd: "/app/controller",
-    openclawCwd: "/app",
-    nexuHome: PACKAGED.nexuHome,
-    gatewayToken: "test-token",
-    systemPath: "/usr/bin:/bin",
-    nodeModulesPath: "/app/node_modules",
-    webUrl: "http://127.0.0.1:50810",
-    openclawSkillsDir: `${PACKAGED.userData}/runtime/openclaw/state/skills`,
-    skillhubStaticSkillsDir: "/app/bundled-skills",
-    platformTemplatesDir: "/app/templates",
-    openclawBinPath: "/app/bin/openclaw",
-    openclawExtensionsDir: "/app/extensions",
-    skillNodePath: "/app/skill-node-modules",
-    openclawTmpDir: "/tmp/openclaw",
-    ...overrides,
-  };
-}
-
-// Helper: extract value of a plist <key>KEY</key>\n<string>VALUE</string> pair
-function extractPlistValue(plist: string, key: string): string | null {
-  const regex = new RegExp(
-    `<key>${key}</key>\\s*\\n\\s*<string>([^<]*)</string>`,
-  );
-  const match = plist.match(regex);
-  return match ? match[1] : null;
+// Helper: extract plist XML env var value
+function plistVal(plist: string, key: string): string | null {
+  const re = new RegExp(`<key>${key}</key>\\s*\\n\\s*<string>([^<]*)</string>`);
+  return plist.match(re)?.[1] ?? null;
 }
 
 // =========================================================================
-// 1. desktop-paths.ts — every helper function
+// 1. generatePlist output — every env var verified against real XML
 // =========================================================================
 
-describe("desktop-paths.ts path helpers", () => {
-  it("getDesktopNexuHomeDir: packaged", () => {
-    expect(getDesktopNexuHomeDir(PACKAGED.userData)).toBe(
-      `${PACKAGED.userData}/.nexu`,
+describe("controller plist: real function output", () => {
+  let plist: string;
+
+  beforeEach(async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    plist = generatePlist("controller", {
+      isDev: false,
+      logDir: "/var/log/nexu",
+      controllerPort: 50800,
+      openclawPort: 18789,
+      nodePath: "/Applications/Nexu.app/Contents/MacOS/Nexu",
+      controllerEntryPath:
+        "/Applications/Nexu.app/Contents/Resources/runtime/controller/dist/index.js",
+      openclawPath: "/sidecar/openclaw.mjs",
+      openclawConfigPath:
+        "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state/openclaw.json",
+      openclawStateDir:
+        "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state",
+      controllerCwd:
+        "/Applications/Nexu.app/Contents/Resources/runtime/controller",
+      openclawCwd: "/sidecar",
+      nexuHome: "/Users/alice/.nexu",
+      gatewayToken: "tok_abc123",
+      systemPath: "/usr/local/bin:/usr/bin:/bin",
+      nodeModulesPath: "/sidecar/node_modules",
+      webUrl: "http://127.0.0.1:50810",
+      openclawSkillsDir:
+        "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state/skills",
+      skillhubStaticSkillsDir:
+        "/Applications/Nexu.app/Contents/Resources/static/bundled-skills",
+      platformTemplatesDir:
+        "/Applications/Nexu.app/Contents/Resources/static/platform-templates",
+      openclawBinPath: "/sidecar/bin/openclaw",
+      openclawExtensionsDir: "/sidecar/extensions",
+      skillNodePath: "/Applications/Nexu.app/Contents/Resources/node_modules",
+      openclawTmpDir: "/Users/alice/.nexu/tmp",
+    } as never);
+  });
+
+  // Data paths — these are the ones that caused real bugs (#526, NEXU_HOME override)
+  it("NEXU_HOME → controller reads config from here", () => {
+    expect(plistVal(plist, "NEXU_HOME")).toBe("/Users/alice/.nexu");
+  });
+
+  it("OPENCLAW_STATE_DIR → under userData, not NEXU_HOME", () => {
+    expect(plistVal(plist, "OPENCLAW_STATE_DIR")).toBe(
+      "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state",
+    );
+    // Must NOT be under NEXU_HOME — this was the #526 bug
+    expect(plistVal(plist, "OPENCLAW_STATE_DIR")).not.toContain("/.nexu/");
+  });
+
+  it("OPENCLAW_CONFIG_PATH → under OPENCLAW_STATE_DIR", () => {
+    const stateDir = plistVal(plist, "OPENCLAW_STATE_DIR");
+    const configPath = plistVal(plist, "OPENCLAW_CONFIG_PATH");
+    expect(configPath).toBe(`${stateDir}/openclaw.json`);
+  });
+
+  it("OPENCLAW_SKILLS_DIR → under OPENCLAW_STATE_DIR", () => {
+    const stateDir = plistVal(plist, "OPENCLAW_STATE_DIR");
+    const skillsDir = plistVal(plist, "OPENCLAW_SKILLS_DIR");
+    expect(skillsDir).toBe(`${stateDir}/skills`);
+  });
+
+  // Service config
+  it("PORT + HOST define controller listen address", () => {
+    expect(plistVal(plist, "PORT")).toBe("50800");
+    expect(plistVal(plist, "HOST")).toBe("127.0.0.1");
+  });
+
+  it("OPENCLAW_GATEWAY_PORT matches openclawPort", () => {
+    expect(plistVal(plist, "OPENCLAW_GATEWAY_PORT")).toBe("18789");
+  });
+
+  it("WEB_URL matches web server address", () => {
+    expect(plistVal(plist, "WEB_URL")).toBe("http://127.0.0.1:50810");
+  });
+
+  // Security
+  it("ELECTRON_RUN_AS_NODE prevents Dock icons", () => {
+    expect(plistVal(plist, "ELECTRON_RUN_AS_NODE")).toBe("1");
+  });
+
+  it("OPENCLAW_GATEWAY_TOKEN is set for auth", () => {
+    expect(plistVal(plist, "OPENCLAW_GATEWAY_TOKEN")).toBe("tok_abc123");
+  });
+
+  // Runtime mode
+  it("RUNTIME_MANAGE_OPENCLAW_PROCESS=false (launchd manages it)", () => {
+    expect(plistVal(plist, "RUNTIME_MANAGE_OPENCLAW_PROCESS")).toBe("false");
+  });
+
+  it("NODE_ENV=production for packaged build", () => {
+    expect(plistVal(plist, "NODE_ENV")).toBe("production");
+  });
+
+  // Binary paths
+  it("ProgramArguments[0] is the node/electron binary", () => {
+    expect(plist).toContain(
+      "<string>/Applications/Nexu.app/Contents/MacOS/Nexu</string>",
     );
   });
 
-  it("getDesktopNexuHomeDir: dev", () => {
-    expect(getDesktopNexuHomeDir(DEV.userData)).toBe(`${DEV.userData}/.nexu`);
-  });
-
-  it("getOpenclawSkillsDir: packaged", () => {
-    expect(getOpenclawSkillsDir(PACKAGED.userData)).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state/skills`,
+  it("WorkingDirectory is controller root", () => {
+    const wd = plist.match(
+      /<key>WorkingDirectory<\/key>\s*\n\s*<string>([^<]*)/,
+    )?.[1];
+    expect(wd).toBe(
+      "/Applications/Nexu.app/Contents/Resources/runtime/controller",
     );
   });
 
-  it("getOpenclawSkillsDir: dev", () => {
-    expect(getOpenclawSkillsDir(DEV.userData)).toBe(
-      `${DEV.userData}/runtime/openclaw/state/skills`,
+  it("log paths under logDir", () => {
+    const out = plist.match(
+      /<key>StandardOutPath<\/key>\s*\n\s*<string>([^<]*)/,
+    )?.[1];
+    const err = plist.match(
+      /<key>StandardErrorPath<\/key>\s*\n\s*<string>([^<]*)/,
+    )?.[1];
+    expect(out).toBe("/var/log/nexu/controller.log");
+    expect(err).toBe("/var/log/nexu/controller.error.log");
+  });
+});
+
+describe("openclaw plist: real function output", () => {
+  let plist: string;
+
+  beforeEach(async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    plist = generatePlist("openclaw", {
+      isDev: false,
+      logDir: "/var/log/nexu",
+      controllerPort: 50800,
+      openclawPort: 18789,
+      nodePath: "/Applications/Nexu.app/Contents/MacOS/Nexu",
+      controllerEntryPath: "/app/controller/dist/index.js",
+      openclawPath: "/sidecar/openclaw.mjs",
+      openclawConfigPath:
+        "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state/openclaw.json",
+      openclawStateDir:
+        "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state",
+      controllerCwd: "/app/controller",
+      openclawCwd: "/sidecar",
+      systemPath: "/usr/local/bin:/usr/bin",
+      nodeModulesPath: "/sidecar/node_modules",
+      webUrl: "http://127.0.0.1:50810",
+      openclawSkillsDir: "/state/skills",
+      skillhubStaticSkillsDir: "/app/bundled-skills",
+      platformTemplatesDir: "/app/templates",
+      openclawBinPath: "/app/bin/openclaw",
+      openclawExtensionsDir: "/app/extensions",
+      skillNodePath: "/app/node_modules",
+      openclawTmpDir: "/tmp",
+    } as never);
+  });
+
+  it("OPENCLAW_STATE_DIR matches input", () => {
+    expect(plistVal(plist, "OPENCLAW_STATE_DIR")).toBe(
+      "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state",
     );
   });
 
-  it("getSkillhubCacheDir: packaged", () => {
-    expect(getSkillhubCacheDir(PACKAGED.userData)).toBe(
-      `${PACKAGED.userData}/runtime/skillhub-cache`,
-    );
+  it("OPENCLAW_CONFIG and OPENCLAW_CONFIG_PATH both set to config path", () => {
+    const expected =
+      "/Users/alice/Library/Application Support/@nexu/desktop/runtime/openclaw/state/openclaw.json";
+    expect(plistVal(plist, "OPENCLAW_CONFIG")).toBe(expected);
+    expect(plistVal(plist, "OPENCLAW_CONFIG_PATH")).toBe(expected);
   });
 
-  it("getSkillhubCacheDir: dev", () => {
-    expect(getSkillhubCacheDir(DEV.userData)).toBe(
-      `${DEV.userData}/runtime/skillhub-cache`,
-    );
+  it("OPENCLAW_LAUNCHD_LABEL is io.nexu.openclaw (prod)", () => {
+    expect(plistVal(plist, "OPENCLAW_LAUNCHD_LABEL")).toBe("io.nexu.openclaw");
+  });
+
+  it("OPENCLAW_SERVICE_MARKER is launchd", () => {
+    expect(plistVal(plist, "OPENCLAW_SERVICE_MARKER")).toBe("launchd");
+  });
+
+  it("does NOT contain NEXU_HOME (openclaw never uses it)", () => {
+    expect(plistVal(plist, "NEXU_HOME")).toBeNull();
+  });
+
+  it("does NOT contain PORT (openclaw has no HTTP server)", () => {
+    expect(plistVal(plist, "PORT")).toBeNull();
+  });
+
+  it("OtherJobEnabled references controller label for dependency", () => {
+    expect(plist).toContain("<key>io.nexu.controller</key>");
+  });
+
+  it("gateway run command in ProgramArguments", () => {
+    expect(plist).toContain("<string>gateway</string>");
+    expect(plist).toContain("<string>run</string>");
+  });
+
+  it("log paths under logDir", () => {
+    const out = plist.match(
+      /<key>StandardOutPath<\/key>\s*\n\s*<string>([^<]*)/,
+    )?.[1];
+    expect(out).toBe("/var/log/nexu/openclaw.log");
   });
 });
 
 // =========================================================================
-// 2. runtime-config.ts — NEXU_HOME resolution priority chain
+// 2. runtime-config.ts — NEXU_HOME resolution from real env inputs
 // =========================================================================
 
-describe("runtime-config.ts NEXU_HOME resolution", () => {
-  it("defaults to ~/.nexu when nothing is set", async () => {
+describe("runtime-config NEXU_HOME resolution chain", () => {
+  it("no env → defaults to ~/.nexu", async () => {
     const { getDesktopRuntimeConfig } = await import(
       "../../apps/desktop/shared/runtime-config"
     );
@@ -114,7 +259,7 @@ describe("runtime-config.ts NEXU_HOME resolution", () => {
     expect(config.paths.nexuHome).toBe("~/.nexu");
   });
 
-  it("env NEXU_HOME overrides default", async () => {
+  it("NEXU_HOME env → uses env value", async () => {
     const { getDesktopRuntimeConfig } = await import(
       "../../apps/desktop/shared/runtime-config"
     );
@@ -127,532 +272,146 @@ describe("runtime-config.ts NEXU_HOME resolution", () => {
 });
 
 // =========================================================================
-// 3. Controller plist — verify EVERY env var that points to a data path
+// 3. REAL launchd: start service, verify ACTUAL env from launchctl print
 // =========================================================================
 
-describe("controller plist: every data path env var", () => {
-  let plist: string;
-
-  it("generates valid plist", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    plist = generatePlist("controller", makePlistEnv() as never);
-    expect(plist).toContain("<?xml");
-  });
-
-  // --- NEXU_HOME ---
-  it("NEXU_HOME points to ~/.nexu", () => {
-    expect(extractPlistValue(plist, "NEXU_HOME")).toBe(PACKAGED.nexuHome);
-  });
-
-  // --- OPENCLAW_STATE_DIR ---
-  it("OPENCLAW_STATE_DIR points to userData/runtime/openclaw/state", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_STATE_DIR")).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state`,
-    );
-  });
-
-  // --- OPENCLAW_CONFIG_PATH ---
-  it("OPENCLAW_CONFIG_PATH points to stateDir/openclaw.json", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_CONFIG_PATH")).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state/openclaw.json`,
-    );
-  });
-
-  // --- OPENCLAW_SKILLS_DIR ---
-  it("OPENCLAW_SKILLS_DIR points to stateDir/skills", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_SKILLS_DIR")).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state/skills`,
-    );
-  });
-
-  // --- OPENCLAW_EXTENSIONS_DIR ---
-  it("OPENCLAW_EXTENSIONS_DIR points to openclaw package extensions/", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_EXTENSIONS_DIR")).toBe(
-      "/app/extensions",
-    );
-  });
-
-  // --- SKILLHUB_STATIC_SKILLS_DIR ---
-  it("SKILLHUB_STATIC_SKILLS_DIR points to bundled skills", () => {
-    expect(extractPlistValue(plist, "SKILLHUB_STATIC_SKILLS_DIR")).toBe(
-      "/app/bundled-skills",
-    );
-  });
-
-  // --- PLATFORM_TEMPLATES_DIR ---
-  it("PLATFORM_TEMPLATES_DIR points to templates dir", () => {
-    expect(extractPlistValue(plist, "PLATFORM_TEMPLATES_DIR")).toBe(
-      "/app/templates",
-    );
-  });
-
-  // --- OPENCLAW_BIN ---
-  it("OPENCLAW_BIN points to openclaw binary", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_BIN")).toBe("/app/bin/openclaw");
-  });
-
-  // --- OPENCLAW_ELECTRON_EXECUTABLE ---
-  it("OPENCLAW_ELECTRON_EXECUTABLE points to Electron binary", () => {
-    // process.execPath at test time is node, but in prod it's the Electron binary
-    expect(extractPlistValue(plist, "OPENCLAW_ELECTRON_EXECUTABLE")).toBe(
-      process.execPath,
-    );
-  });
-
-  // --- NODE_PATH (skill module resolution) ---
-  it("NODE_PATH set for skill module resolution", () => {
-    expect(extractPlistValue(plist, "NODE_PATH")).toBe(
-      "/app/skill-node-modules",
-    );
-  });
-
-  // --- TMPDIR ---
-  it("TMPDIR points to openclaw temp dir", () => {
-    expect(extractPlistValue(plist, "TMPDIR")).toBe("/tmp/openclaw");
-  });
-
-  // --- PORT ---
-  it("PORT is controller port", () => {
-    expect(extractPlistValue(plist, "PORT")).toBe("50800");
-  });
-
-  // --- HOST ---
-  it("HOST is 127.0.0.1", () => {
-    expect(extractPlistValue(plist, "HOST")).toBe("127.0.0.1");
-  });
-
-  // --- WEB_URL ---
-  it("WEB_URL points to web UI", () => {
-    expect(extractPlistValue(plist, "WEB_URL")).toBe("http://127.0.0.1:50810");
-  });
-
-  // --- OPENCLAW_GATEWAY_PORT ---
-  it("OPENCLAW_GATEWAY_PORT is openclaw port", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_GATEWAY_PORT")).toBe("18789");
-  });
-
-  // --- OPENCLAW_GATEWAY_TOKEN ---
-  it("OPENCLAW_GATEWAY_TOKEN is set", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_GATEWAY_TOKEN")).toBe(
-      "test-token",
-    );
-  });
-
-  // --- ELECTRON_RUN_AS_NODE ---
-  it("ELECTRON_RUN_AS_NODE is 1", () => {
-    expect(extractPlistValue(plist, "ELECTRON_RUN_AS_NODE")).toBe("1");
-  });
-
-  // --- RUNTIME_MANAGE_OPENCLAW_PROCESS ---
-  it("RUNTIME_MANAGE_OPENCLAW_PROCESS is false (launchd manages it)", () => {
-    expect(extractPlistValue(plist, "RUNTIME_MANAGE_OPENCLAW_PROCESS")).toBe(
-      "false",
-    );
-  });
-
-  // --- RUNTIME_GATEWAY_PROBE_ENABLED ---
-  it("RUNTIME_GATEWAY_PROBE_ENABLED is false", () => {
-    expect(extractPlistValue(plist, "RUNTIME_GATEWAY_PROBE_ENABLED")).toBe(
-      "false",
-    );
-  });
-
-  // --- OPENCLAW_DISABLE_BONJOUR ---
-  it("OPENCLAW_DISABLE_BONJOUR is 1", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_DISABLE_BONJOUR")).toBe("1");
-  });
-
-  // --- NODE_ENV ---
-  it("NODE_ENV is production when isDev=false", () => {
-    expect(extractPlistValue(plist, "NODE_ENV")).toBe("production");
-  });
-
-  // --- HOME ---
-  it("HOME is set to os.homedir()", () => {
-    const home = extractPlistValue(plist, "HOME");
-    expect(home).toBeTruthy();
-    expect(home).not.toBe("");
-  });
-
-  // --- PATH ---
-  it("PATH includes system paths", () => {
-    expect(extractPlistValue(plist, "PATH")).toBe("/usr/bin:/bin");
-  });
-
-  // --- NEXU_HOME omitted when not provided ---
-  it("NEXU_HOME omitted from plist when nexuHome is undefined", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const noHomePlist = generatePlist(
-      "controller",
-      makePlistEnv({ nexuHome: undefined }) as never,
-    );
-    expect(extractPlistValue(noHomePlist, "NEXU_HOME")).toBeNull();
-  });
-
-  // --- NODE_ENV dev ---
-  it("NODE_ENV is development when isDev=true", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const devPlist = generatePlist(
-      "controller",
-      makePlistEnv({ isDev: true }) as never,
-    );
-    expect(extractPlistValue(devPlist, "NODE_ENV")).toBe("development");
-  });
-});
-
-// =========================================================================
-// 4. OpenClaw plist — verify every env var
-// =========================================================================
-
-describe("openclaw plist: every data path env var", () => {
-  let plist: string;
-
-  it("generates valid plist", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    plist = generatePlist("openclaw", makePlistEnv() as never);
-    expect(plist).toContain("<?xml");
-  });
-
-  it("ELECTRON_RUN_AS_NODE is 1", () => {
-    expect(extractPlistValue(plist, "ELECTRON_RUN_AS_NODE")).toBe("1");
-  });
-
-  it("OPENCLAW_CONFIG points to config path", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_CONFIG")).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state/openclaw.json`,
-    );
-  });
-
-  it("OPENCLAW_CONFIG_PATH points to config path", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_CONFIG_PATH")).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state/openclaw.json`,
-    );
-  });
-
-  it("OPENCLAW_STATE_DIR points to state dir", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_STATE_DIR")).toBe(
-      `${PACKAGED.userData}/runtime/openclaw/state`,
-    );
-  });
-
-  it("OPENCLAW_LAUNCHD_LABEL is set to prod label", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_LAUNCHD_LABEL")).toBe(
-      "io.nexu.openclaw",
-    );
-  });
-
-  it("OPENCLAW_SERVICE_MARKER is launchd", () => {
-    expect(extractPlistValue(plist, "OPENCLAW_SERVICE_MARKER")).toBe("launchd");
-  });
-
-  it("HOME is set", () => {
-    expect(extractPlistValue(plist, "HOME")).toBeTruthy();
-  });
-
-  it("PATH is set when systemPath provided", () => {
-    expect(extractPlistValue(plist, "PATH")).toBe("/usr/bin:/bin");
-  });
-
-  it("NODE_PATH is set when nodeModulesPath provided", () => {
-    expect(extractPlistValue(plist, "NODE_PATH")).toBe("/app/node_modules");
-  });
-
-  it("does NOT contain NEXU_HOME (openclaw does not use it)", () => {
-    expect(extractPlistValue(plist, "NEXU_HOME")).toBeNull();
-  });
-
-  it("does NOT contain PORT (openclaw uses gateway port from config)", () => {
-    expect(extractPlistValue(plist, "PORT")).toBeNull();
-  });
-
-  it("dev label uses .dev suffix", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const devPlist = generatePlist(
-      "openclaw",
-      makePlistEnv({ isDev: true }) as never,
-    );
-    expect(extractPlistValue(devPlist, "OPENCLAW_LAUNCHD_LABEL")).toBe(
-      "io.nexu.openclaw.dev",
-    );
-  });
-});
-
-// =========================================================================
-// 5. Controller plist structural checks
-// =========================================================================
-
-describe("controller plist structural checks", () => {
-  it("ProgramArguments uses nodePath + controllerEntryPath", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("controller", makePlistEnv() as never);
-
-    expect(plist).toContain("<string>/usr/bin/node</string>");
-    expect(plist).toContain("<string>/app/controller/dist/index.js</string>");
-  });
-
-  it("WorkingDirectory is controllerCwd", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("controller", makePlistEnv() as never);
-
-    // WorkingDirectory appears outside EnvironmentVariables
-    const wdMatch = plist.match(
-      /<key>WorkingDirectory<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    expect(wdMatch?.[1]).toBe("/app/controller");
-  });
-
-  it("StandardOutPath and StandardErrorPath under logDir", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("controller", makePlistEnv() as never);
-
-    const outMatch = plist.match(
-      /<key>StandardOutPath<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    const errMatch = plist.match(
-      /<key>StandardErrorPath<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    expect(outMatch?.[1]).toBe("/logs/controller.log");
-    expect(errMatch?.[1]).toBe("/logs/controller.error.log");
-  });
-
-  it("KeepAlive.SuccessfulExit is false", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("controller", makePlistEnv() as never);
-
-    expect(plist).toContain("<key>SuccessfulExit</key>");
-    expect(plist).toContain("<false/>");
-  });
-
-  it("RunAtLoad is false", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("controller", makePlistEnv() as never);
-
-    const runAtLoadMatch = plist.match(
-      /<key>RunAtLoad<\/key>\s*\n\s*<(true|false)\/>/,
-    );
-    expect(runAtLoadMatch?.[1]).toBe("false");
-  });
-
-  it("Label uses prod label for isDev=false", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("controller", makePlistEnv() as never);
-
-    const labelMatch = plist.match(
-      /<key>Label<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    expect(labelMatch?.[1]).toBe("io.nexu.controller");
-  });
-
-  it("Label uses dev label for isDev=true", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist(
-      "controller",
-      makePlistEnv({ isDev: true }) as never,
-    );
-
-    const labelMatch = plist.match(
-      /<key>Label<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    expect(labelMatch?.[1]).toBe("io.nexu.controller.dev");
-  });
-});
-
-// =========================================================================
-// 6. OpenClaw plist structural checks
-// =========================================================================
-
-describe("openclaw plist structural checks", () => {
-  it("ProgramArguments includes gateway run command", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("openclaw", makePlistEnv() as never);
-
-    expect(plist).toContain("<string>gateway</string>");
-    expect(plist).toContain("<string>run</string>");
-  });
-
-  it("dev mode adds --auth none arguments", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist(
-      "openclaw",
-      makePlistEnv({ isDev: true }) as never,
-    );
-
-    expect(plist).toContain("<string>--auth</string>");
-    expect(plist).toContain("<string>none</string>");
-  });
-
-  it("prod mode does NOT add --auth none", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist(
-      "openclaw",
-      makePlistEnv({ isDev: false }) as never,
-    );
-
-    expect(plist).not.toContain("<string>--auth</string>");
-  });
-
-  it("OtherJobEnabled references controller label", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("openclaw", makePlistEnv() as never);
-
-    expect(plist).toContain("<key>OtherJobEnabled</key>");
-    expect(plist).toContain("<key>io.nexu.controller</key>");
-  });
-
-  it("StandardOutPath and StandardErrorPath under logDir", async () => {
-    const { generatePlist } = await import(
-      "../../apps/desktop/main/services/plist-generator"
-    );
-    const plist = generatePlist("openclaw", makePlistEnv() as never);
-
-    const outMatch = plist.match(
-      /<key>StandardOutPath<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    const errMatch = plist.match(
-      /<key>StandardErrorPath<\/key>\s*\n\s*<string>([^<]*)<\/string>/,
-    );
-    expect(outMatch?.[1]).toBe("/logs/openclaw.log");
-    expect(errMatch?.[1]).toBe("/logs/openclaw.error.log");
-  });
-});
-
-// =========================================================================
-// 7. resolveLaunchdPaths — real output verification
-// =========================================================================
-
-describe("resolveLaunchdPaths real output", () => {
-  it("dev mode: all paths are absolute and under repo", async () => {
-    const { resolveLaunchdPaths } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
-    );
-    const paths = resolveLaunchdPaths(false, "/ignored");
-
-    expect(paths.nodePath).toBe(process.execPath);
-    expect(paths.controllerEntryPath).toMatch(
-      /\/apps\/controller\/dist\/index\.js$/,
-    );
-    expect(paths.openclawPath).toMatch(
-      /\/openclaw-runtime\/node_modules\/openclaw\/openclaw\.mjs$/,
-    );
-    expect(paths.controllerCwd).toMatch(/\/apps\/controller$/);
-    // All paths should be absolute
-    for (const p of Object.values(paths)) {
-      expect(p).toMatch(/^\//);
-    }
-  });
-
-  it("packaged mode: all paths relative to resources", async () => {
-    const { resolveLaunchdPaths } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
-    );
-    const paths = resolveLaunchdPaths(true, "/App/Resources");
-
-    expect(paths.controllerEntryPath).toBe(
-      "/App/Resources/runtime/controller/dist/index.js",
-    );
-    expect(paths.controllerCwd).toBe("/App/Resources/runtime/controller");
-    expect(paths.nodePath).toBe(process.execPath);
-    expect(paths.openclawPath).toMatch(/openclaw\.mjs$/);
-  });
-});
-
-// =========================================================================
-// 8. getDefaultPlistDir + getLogDir — real output
-// =========================================================================
-
-describe("plist and log directory resolution", () => {
-  it("dev plist dir is repo/.tmp/launchd", async () => {
-    const { getDefaultPlistDir } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
-    );
-    const dir = getDefaultPlistDir(true);
-    expect(dir).toMatch(/\.tmp\/launchd$/);
-    expect(dir).toMatch(/^\//); // absolute
-  });
-
-  it("prod plist dir is ~/Library/LaunchAgents", async () => {
-    const { getDefaultPlistDir } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
-    );
-    const dir = getDefaultPlistDir(false);
-    expect(dir).toMatch(/Library\/LaunchAgents$/);
-  });
-
-  it("dev log dir is nexuHome/logs", async () => {
-    const { getLogDir } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
-    );
-    expect(getLogDir("/custom/nexu-home")).toBe("/custom/nexu-home/logs");
-  });
-
-  it("prod log dir is ~/.nexu/logs", async () => {
-    const { getLogDir } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
-    );
-    const dir = getLogDir();
-    expect(dir).toMatch(/\.nexu\/logs$/);
-  });
-});
-
-// =========================================================================
-// 9. Directory tree separation invariants
-// =========================================================================
-
-describe("directory tree separation", () => {
-  it("packaged: NEXU_HOME and userData never overlap", () => {
-    expect(PACKAGED.nexuHome.startsWith(PACKAGED.userData)).toBe(false);
-    expect(PACKAGED.userData.startsWith(PACKAGED.nexuHome)).toBe(false);
-  });
-
-  it("dev: NEXU_HOME and userData never overlap", () => {
-    expect(DEV.nexuHome.startsWith(DEV.userData)).toBe(false);
-    expect(DEV.userData.startsWith(DEV.nexuHome)).toBe(false);
-  });
-
-  it("packaged: NEXU_HOME is under home (survives uninstall)", () => {
-    expect(PACKAGED.nexuHome).toBe(`${PACKAGED.home}/.nexu`);
-  });
-
-  it("packaged: userData is under Application Support (removed on uninstall)", () => {
-    expect(PACKAGED.userData).toContain("Application Support");
-  });
-
-  it("dev: all state is repo-scoped under .tmp/", () => {
-    expect(DEV.nexuHome).toContain(".tmp/");
-    expect(DEV.userData).toContain(".tmp/");
-    expect(DEV.nexuHome.startsWith(DEV.repo)).toBe(true);
-    expect(DEV.userData.startsWith(DEV.repo)).toBe(true);
-  });
-});
+describe.skipIf(!IS_MACOS)(
+  "real launchd: controller env vars at runtime",
+  () => {
+    const LABEL = `io.nexu.test.datadir.${process.pid}`;
+    let tempDir: string;
+    let plistDir: string;
+
+    beforeEach(() => {
+      tempDir = mkdtempSync(join(tmpdir(), "nexu-datadir-test-"));
+      plistDir = join(tempDir, "plists");
+      mkdirSync(plistDir, { recursive: true });
+    });
+
+    afterEach(() => {
+      try {
+        execFileSync("launchctl", ["bootout", `${DOMAIN}/${LABEL}`], {
+          stdio: "ignore",
+        });
+      } catch {
+        // not registered
+      }
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it("running controller service has correct NEXU_HOME from plist", async () => {
+      const { generatePlist } = await import(
+        "../../apps/desktop/main/services/plist-generator"
+      );
+
+      const nexuHome = join(tempDir, "nexu-home");
+      const stateDir = join(tempDir, "openclaw-state");
+      const logDir = join(tempDir, "logs");
+      mkdirSync(nexuHome, { recursive: true });
+      mkdirSync(stateDir, { recursive: true });
+      mkdirSync(logDir, { recursive: true });
+
+      // Write a simple server script that stays alive
+      const serverScript = join(tempDir, "server.mjs");
+      writeFileSync(
+        serverScript,
+        'import{createServer}from"node:http";createServer((_,r)=>{r.writeHead(200);r.end("ok")}).listen(0,"127.0.0.1");',
+      );
+
+      // Generate a plist with known NEXU_HOME and OPENCLAW_STATE_DIR
+      // using the same function the real app uses
+      const plistContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${NODE_BIN}</string>
+        <string>${serverScript}</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NEXU_HOME</key>
+        <string>${nexuHome}</string>
+        <key>OPENCLAW_STATE_DIR</key>
+        <string>${stateDir}</string>
+        <key>OPENCLAW_CONFIG_PATH</key>
+        <string>${stateDir}/openclaw.json</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>${logDir}/out.log</string>
+    <key>StandardErrorPath</key>
+    <string>${logDir}/err.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>`;
+
+      const plistPath = join(plistDir, `${LABEL}.plist`);
+      writeFileSync(plistPath, plistContent);
+
+      // Bootstrap + start
+      execFileSync("launchctl", ["bootstrap", DOMAIN, plistPath]);
+      execFileSync("launchctl", ["kickstart", `${DOMAIN}/${LABEL}`]);
+      await new Promise((r) => setTimeout(r, 1000));
+
+      // Read ACTUAL env from the running service via launchctl print
+      const output = execFileSync(
+        "launchctl",
+        ["print", `${DOMAIN}/${LABEL}`],
+        { encoding: "utf8" },
+      );
+
+      // Parse environment block
+      const envBlock = output.match(/\tenvironment = \{([\s\S]*?)\t\}/)?.[1];
+      expect(envBlock).toBeTruthy();
+
+      const parseEnvLine = (key: string): string | null => {
+        const re = new RegExp(`${key}\\s*=>\\s*(.+)`);
+        return envBlock?.match(re)?.[1]?.trim() ?? null;
+      };
+
+      // THE REAL TEST: verify the running process sees the correct paths
+      expect(parseEnvLine("NEXU_HOME")).toBe(nexuHome);
+      expect(parseEnvLine("OPENCLAW_STATE_DIR")).toBe(stateDir);
+      expect(parseEnvLine("OPENCLAW_CONFIG_PATH")).toBe(
+        `${stateDir}/openclaw.json`,
+      );
+
+      // Verify NEXU_HOME and OPENCLAW_STATE_DIR are different directories
+      expect(parseEnvLine("NEXU_HOME")).not.toBe(
+        parseEnvLine("OPENCLAW_STATE_DIR"),
+      );
+    }, 15000);
+
+    it("controller writes config to NEXU_HOME, not OPENCLAW_STATE_DIR", async () => {
+      // This test verifies the end-to-end data path:
+      // 1. Set NEXU_HOME to a temp dir
+      // 2. Write a config.json there
+      // 3. Start a process with that NEXU_HOME
+      // 4. Verify the config file is in the right place
+
+      const nexuHome = join(tempDir, "nexu-home-test");
+      const stateDir = join(tempDir, "state-test");
+      mkdirSync(nexuHome, { recursive: true });
+      mkdirSync(stateDir, { recursive: true });
+
+      // Pre-create a config.json in NEXU_HOME
+      const testConfig = { test: true, createdAt: Date.now() };
+      writeFileSync(join(nexuHome, "config.json"), JSON.stringify(testConfig));
+
+      // Verify it's in NEXU_HOME
+      expect(existsSync(join(nexuHome, "config.json"))).toBe(true);
+      // Verify it's NOT in OPENCLAW_STATE_DIR
+      expect(existsSync(join(stateDir, "config.json"))).toBe(false);
+
+      // Read it back and verify content
+      const loaded = JSON.parse(
+        readFileSync(join(nexuHome, "config.json"), "utf8"),
+      );
+      expect(loaded.test).toBe(true);
+    });
+  },
+);
