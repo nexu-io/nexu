@@ -602,10 +602,13 @@ async function runLaunchdColdStart(): Promise<void> {
     diagnosticsReporter?.markColdStartRunning(
       "waiting for controller readiness",
     );
-    const controllerReady = await launchdResult.controllerReady;
-    if (!controllerReady.ok) {
-      throw controllerReady.error;
-    }
+  }
+
+  const controllerReady = await launchdResult.controllerReady;
+  if (!controllerReady.ok) {
+    throw controllerReady.error;
+  }
+  if (!launchdResult.isAttach) {
     logColdStart("controller ready");
   }
 

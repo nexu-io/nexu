@@ -807,7 +807,7 @@ describe("Launchd Startup Scenarios", () => {
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     // controllerReady should be a promise that resolves (fetch mock returns 200)
-    await expect(result.controllerReady).resolves.toBeUndefined();
+    await expect(result.controllerReady).resolves.toEqual({ ok: true });
   });
 
   // -----------------------------------------------------------------------
@@ -831,7 +831,7 @@ describe("Launchd Startup Scenarios", () => {
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     // controllerReady should resolve immediately (already healthy)
-    await expect(result.controllerReady).resolves.toBeUndefined();
+    await expect(result.controllerReady).resolves.toEqual({ ok: true });
     expect(result.isAttach).toBe(true);
   });
 

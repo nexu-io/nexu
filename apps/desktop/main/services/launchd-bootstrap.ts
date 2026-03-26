@@ -95,9 +95,7 @@ export interface LaunchdBootstrapResult {
   isAttach: boolean;
 }
 
-type ControllerReadyResult =
-  | { ok: true }
-  | { ok: false; error: Error };
+type ControllerReadyResult = { ok: true } | { ok: false; error: Error };
 
 /** Metadata persisted between sessions for attach discovery */
 interface RuntimePortsMetadata {
