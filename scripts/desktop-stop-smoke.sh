@@ -45,7 +45,7 @@ echo ""
 
 echo "--- Process checks ---"
 
-for pattern in "controller/dist/index.js" "openclaw.mjs gateway" "openclaw-gateway"; do
+for pattern in "controller/dist/index.js" "openclaw.mjs gateway" "openclaw-gateway" "apps/web/dist/index.js"; do
   pids=$(pgrep -f "$pattern" 2>/dev/null || true)
   if [ -z "$pids" ]; then
     pass "no processes matching '$pattern'"

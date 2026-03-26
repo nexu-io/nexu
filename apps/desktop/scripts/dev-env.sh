@@ -39,9 +39,12 @@ ensure_dev_electron_lsui_element() {
     # Flush macOS Launch Services cache so the change takes effect immediately.
     # Without this, macOS may use a cached copy of the old plist and still
     # show Dock icons for child processes.
-    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-      -f "$electron_app" 2>/dev/null || true
-    echo "[dev-env] patched Electron LSUIElement=true + flushed LS cache"
+    if /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+      -f "$electron_app" 2>/dev/null; then
+      echo "[dev-env] patched Electron LSUIElement=true + flushed LS cache"
+    else
+      echo "[dev-env] patched Electron LSUIElement=true (LS cache flush skipped)"
+    fi
   else
     echo "[dev-env] warning: failed to patch LSUIElement in $info_plist" >&2
   fi

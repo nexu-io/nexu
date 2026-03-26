@@ -392,11 +392,19 @@ export async function bootstrapWithLaunchd(
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
-  // --- Kill orphan processes from a previous crashed/updated session ---
-  // A failed update install or force-killed Electron can leave controller
-  // and openclaw processes running without a valid launchd registration.
-  // These block port binding and cause "can't open" reports on relaunch.
-  await killOrphanNexuProcesses();
+  // --- Kill orphan processes that are NOT managed by launchd ---
+  // Only kill processes that are NOT currently registered launchd services.
+  // A failed update install or force-killed Electron can leave processes
+  // running without valid launchd registration — those block port binding.
+  const [ctrlStatus, ocStatus] = await Promise.all([
+    launchd.getServiceStatus(labels.controller),
+    launchd.getServiceStatus(labels.openclaw),
+  ]);
+  // Only run orphan cleanup if neither service is registered with launchd.
+  // If services ARE registered, they're legitimate launchd-managed processes.
+  if (ctrlStatus.status === "unknown" && ocStatus.status === "unknown") {
+    await killOrphanNexuProcesses();
+  }
 
   // --- Recover ports from previous session if available ---
   const recovered = await readRuntimePorts(plistDir);

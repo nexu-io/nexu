@@ -137,13 +137,13 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
 
         // Use the shared teardown sequence: bootout each service (with PID-based
         // SIGKILL fallback), delete runtime-ports.json, and kill orphan processes.
-        if (opts.plistDir) {
-          await teardownLaunchdServices({
-            launchd: opts.launchd,
-            labels: opts.labels,
-            plistDir: opts.plistDir,
-          });
-        }
+        // Always run teardown — plistDir is only used for runtime-ports cleanup;
+        // the bootout + process kill sequence works without it.
+        await teardownLaunchdServices({
+          launchd: opts.launchd,
+          labels: opts.labels,
+          plistDir: opts.plistDir ?? "",
+        });
 
         // All services stopped. Force exit immediately — app.quit() alone
         // can hang if dangling handles keep the event loop alive, and a
@@ -197,13 +197,11 @@ export async function quitWithDecision(
   }
 
   if (decision === "quit-completely") {
-    if (opts.plistDir) {
-      await teardownLaunchdServices({
-        launchd: opts.launchd,
-        labels: opts.labels,
-        plistDir: opts.plistDir,
-      });
-    }
+    await teardownLaunchdServices({
+      launchd: opts.launchd,
+      labels: opts.labels,
+      plistDir: opts.plistDir ?? "",
+    });
 
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
     app.exit(0);
