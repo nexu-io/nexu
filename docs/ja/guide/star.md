@@ -3,7 +3,7 @@
 nexu が役に立ったなら、GitHub で ⭐ をお願いします。チームの励みになり、より多くの人にプロジェクトを知ってもらえます。
 
 <div style="text-align: center; margin: 48px 0;">
-  <a href="https://github.com/nexu-io/nexu" target="_blank" style="display: inline-block; padding: 16px 40px; background: #c96f4a; color: #fff; border-radius: 10px; font-size: 18px; font-weight: 600; text-decoration: none; transition: opacity 0.2s;">
+  <a href="https://github.com/nexu-io/nexu" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 16px 40px; background: #c96f4a; color: #fff; border-radius: 10px; font-size: 18px; font-weight: 600; text-decoration: none; transition: opacity 0.2s;">
     ⭐ GitHub で nexu に Star する
   </a>
 </div>

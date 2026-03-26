@@ -12,7 +12,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="$HOME/.nexu/logs"
+DEV_NEXU_HOME="$REPO_ROOT/.tmp/desktop/nexu-home"
+LOG_DIR="$DEV_NEXU_HOME/logs"
 PLIST_DIR="$REPO_ROOT/.tmp/launchd"
 UID_VAL=$(id -u)
 DOMAIN="gui/$UID_VAL"
@@ -29,11 +30,11 @@ OPENCLAW_PORT="${OPENCLAW_PORT:-18789}"
 NODE_BIN="${NODE_BIN:-$(which node)}"
 CONTROLLER_ENTRY="$REPO_ROOT/apps/controller/dist/index.js"
 OPENCLAW_PATH="$REPO_ROOT/openclaw-runtime/node_modules/openclaw/openclaw.mjs"
-# Must match controller defaults in apps/controller/src/app/env.ts
-OPENCLAW_STATE_DIR="$HOME/.nexu/runtime/openclaw/state"
+# Dev state dirs — repo-scoped, isolated from packaged app's ~/.nexu/
+OPENCLAW_STATE_DIR="$DEV_NEXU_HOME/runtime/openclaw/state"
 OPENCLAW_CONFIG="$OPENCLAW_STATE_DIR/openclaw.json"
 
-mkdir -p "$LOG_DIR" "$PLIST_DIR" "$OPENCLAW_STATE_DIR"
+mkdir -p "$LOG_DIR" "$PLIST_DIR" "$OPENCLAW_STATE_DIR" "$DEV_NEXU_HOME"
 
 # Full cleanup - stops and removes all related services and processes
 full_cleanup() {
@@ -52,9 +53,14 @@ full_cleanup() {
 
   sleep 1
 
-  # 3. Kill any remaining orphan processes
+  # 3. Kill any remaining orphan processes (including global openclaw)
   pkill -9 -f "openclaw.mjs gateway" 2>/dev/null || true
   pkill -9 -f "controller/dist/index.js" 2>/dev/null || true
+  # Also stop global openclaw gateway if it's occupying our port
+  if lsof -i ":$OPENCLAW_PORT" -P -n &>/dev/null; then
+    echo "  Port $OPENCLAW_PORT occupied — killing occupying process..."
+    lsof -ti ":$OPENCLAW_PORT" | xargs kill -9 2>/dev/null || true
+  fi
   pkill -9 -f "chrome_crashpad_handler" 2>/dev/null || true
 
   # 4. Wait for ports to be free (with timeout)
@@ -147,13 +153,50 @@ start_services() {
 
   mkdir -p "$LOG_DIR"
 
-  # When this script exits (Electron quit, Ctrl+C, etc), stop launchd services
-  trap 'echo ""; echo "Cleaning up..."; stop_services' EXIT INT TERM
+  # Initialize watcher PIDs (set -u safe)
+  CONTROLLER_WATCH_PID=""
+  WEB_WATCH_PID=""
 
-  # Start Electron desktop with launchd mode (pre-built, no vite watch)
+  # When this script exits (Electron quit, Ctrl+C, etc), stop everything
+  trap 'echo ""; echo "Cleaning up..."; [ -n "$CONTROLLER_WATCH_PID" ] && kill "$CONTROLLER_WATCH_PID" 2>/dev/null; [ -n "$WEB_WATCH_PID" ] && kill "$WEB_WATCH_PID" 2>/dev/null; stop_services' EXIT INT TERM
+
+  # Start controller file watcher in background:
+  # tsc --watch → auto-restart launchd service on successful compile
+  echo "Starting controller watcher..."
+
+  (
+    cd "$REPO_ROOT/apps/controller"
+    pnpm exec tsc --watch --preserveWatchOutput 2>&1 | while IFS= read -r line; do
+      echo "[controller:tsc] $line"
+      if echo "$line" | grep -q "Found 0 errors"; then
+        echo "[controller] Restarting service..."
+        launchctl kickstart -k "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null && echo "[controller] Restarted." || true
+      fi
+    done
+  ) &
+  CONTROLLER_WATCH_PID=$!
+
+  # Web watcher: poll for source changes every 3s, rebuild if detected
+  (
+    last_hash=""
+    while true; do
+      hash=$(find "$REPO_ROOT/apps/web/src" -name '*.ts' -o -name '*.tsx' -o -name '*.css' 2>/dev/null | sort | xargs stat -f '%m' 2>/dev/null | md5)
+      if [ -n "$last_hash" ] && [ "$hash" != "$last_hash" ]; then
+        echo "[web] Changes detected, rebuilding..."
+        (cd "$REPO_ROOT" && pnpm --filter @nexu/web build 2>&1 | tail -1 | sed 's/^/[web] /')
+        echo "[web] Rebuilt. Refresh page to see changes."
+      fi
+      last_hash="$hash"
+      sleep 3
+    done
+  ) &
+  WEB_WATCH_PID=$!
+
+  # Start Electron desktop with launchd mode (blocks until quit)
   echo "Starting Electron desktop (launchd mode)..."
+  echo ""
   cd "$REPO_ROOT"
-  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" pnpm exec electron apps/desktop
+  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" NEXU_HOME="$DEV_NEXU_HOME" pnpm exec electron apps/desktop
 }
 
 show_status() {

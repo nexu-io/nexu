@@ -14,7 +14,7 @@ import type {
 } from "@shared/host";
 function getHostBridge() {
   if (typeof window === "undefined" || !window.nexuHost) {
-    throw new Error("Nexu host bridge is unavailable.");
+    throw new Error("nexu host bridge is unavailable.");
   }
 
   return window.nexuHost;
@@ -132,6 +132,18 @@ export async function updateCloudProfile(
 
 export async function deleteCloudProfile(name: string) {
   return getHostBridge().invoke("desktop:delete-cloud-profile", { name });
+}
+
+export async function getMiniMaxOauthStatus() {
+  return getHostBridge().invoke("desktop:get-minimax-oauth-status", undefined);
+}
+
+export async function startMiniMaxOauth(region: "global" | "cn") {
+  return getHostBridge().invoke("desktop:start-minimax-oauth", { region });
+}
+
+export async function cancelMiniMaxOauth() {
+  return getHostBridge().invoke("desktop:cancel-minimax-oauth", undefined);
 }
 
 export function onDesktopCommand(

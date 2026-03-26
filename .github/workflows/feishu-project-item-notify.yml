@@ -1,0 +1,51 @@
+# Feishu notifications for GitHub Projects (classic "new Projects").
+#
+# Requirements (otherwise this workflow never runs):
+# - Project must be an organization-level project under the same org as this repo
+#   (e.g. nexu-io). User-owned projects do not deliver `projects_v2_item` to org flows.
+# - Link this repository to the project when GitHub offers "Linked repositories"
+#   (Project … menu → Settings), so item activity can target this repo's workflows.
+#
+# Note: dragging a card between columns often emits `reordered`, not `edited`.
+name: Feishu Project Item Notification
+
+on:
+  projects_v2_item:
+    types:
+      [
+        created,
+        edited,
+        reordered,
+        converted,
+        archived,
+        deleted,
+        restored,
+      ]
+
+jobs:
+  notify:
+    name: Notify Feishu on Project Item Change
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/notify
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NEXU_PAL_APP_ID }}
+          private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
+
+      - name: Send Feishu notification
+        env:
+          WEBHOOK_URL: ${{ secrets.ISSUE_SYNC_FEISHU_BOT_WEBHOOK }}
+          ACTION: ${{ github.event.action }}
+          CHANGES_JSON: ${{ toJson(github.event.changes) }}
+          ITEM_NODE_ID: ${{ github.event.projects_v2_item.node_id }}
+          PROJECT_NUMBER: ${{ github.event.projects_v2_item.project_number }}
+          SENDER: ${{ github.event.sender.login }}
+          ORG_OR_USER: ${{ github.event.organization.login || github.event.sender.login }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node scripts/notify/feishu-project-notify.mjs

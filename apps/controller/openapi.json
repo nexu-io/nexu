@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Nexu Controller API",
+    "title": "nexu Controller API",
     "version": "1.0.0"
   },
   "components": {
@@ -2842,7 +2842,9 @@
                               "slack",
                               "discord",
                               "feishu",
-                              "wechat"
+                              "wechat",
+                              "telegram",
+                              "whatsapp"
                             ]
                           },
                           "accountId": {
@@ -3024,7 +3026,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3147,7 +3151,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3274,7 +3280,124 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/telegram/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "botToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected telegram channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3378,7 +3501,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3515,6 +3640,249 @@
         }
       }
     },
+    "/api/v1/channels/whatsapp/qr-start": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "responses": {
+          "200": {
+            "description": "QR code data for WhatsApp login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "qrDataUrl": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "alreadyLinked": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "accountId"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "WhatsApp login unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/whatsapp/qr-wait": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accountId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "accountId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WhatsApp QR login result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "accountId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "message",
+                    "accountId"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "WhatsApp login unavailable or timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/whatsapp/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accountId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "accountId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected whatsapp channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Connection failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/channels/wechat/qr-start": {
       "post": {
         "tags": [
@@ -3572,6 +3940,7 @@
           "Channels"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -3642,6 +4011,7 @@
           "Channels"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -3679,7 +4049,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -4788,8 +5160,30 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "authMode": {
+                            "type": "string",
+                            "enum": [
+                              "apiKey",
+                              "oauth"
+                            ]
+                          },
                           "hasApiKey": {
                             "type": "boolean"
+                          },
+                          "hasOauthCredential": {
+                            "type": "boolean"
+                          },
+                          "oauthRegion": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "global",
+                              "cn"
+                            ]
+                          },
+                          "oauthEmail": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "modelsJson": {
                             "type": "string",
@@ -4832,7 +5226,20 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm",
+                "moonshot",
+                "zai"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -4846,7 +5253,8 @@
                 "type": "object",
                 "properties": {
                   "apiKey": {
-                    "type": "string"
+                    "type": "string",
+                    "nullable": true
                   },
                   "baseUrl": {
                     "type": "string",
@@ -4857,6 +5265,13 @@
                   },
                   "displayName": {
                     "type": "string"
+                  },
+                  "authMode": {
+                    "type": "string",
+                    "enum": [
+                      "apiKey",
+                      "oauth"
+                    ]
                   },
                   "modelsJson": {
                     "type": "string"
@@ -4894,8 +5309,30 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "authMode": {
+                          "type": "string",
+                          "enum": [
+                            "apiKey",
+                            "oauth"
+                          ]
+                        },
                         "hasApiKey": {
                           "type": "boolean"
+                        },
+                        "hasOauthCredential": {
+                          "type": "boolean"
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthEmail": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "modelsJson": {
                           "type": "string",
@@ -4953,8 +5390,30 @@
                           "type": "string",
                           "nullable": true
                         },
+                        "authMode": {
+                          "type": "string",
+                          "enum": [
+                            "apiKey",
+                            "oauth"
+                          ]
+                        },
                         "hasApiKey": {
                           "type": "boolean"
+                        },
+                        "hasOauthCredential": {
+                          "type": "boolean"
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthEmail": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "modelsJson": {
                           "type": "string",
@@ -4994,7 +5453,20 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm",
+                "moonshot",
+                "zai"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -5023,6 +5495,165 @@
         }
       }
     },
+    "/api/v1/providers/minimax/oauth/status": {
+      "get": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "MiniMax OAuth status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/minimax/oauth/login": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "global",
+                      "cn"
+                    ]
+                  }
+                },
+                "required": [
+                  "region"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Start MiniMax OAuth login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "started": {
+                      "type": "boolean"
+                    },
+                    "browserUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress",
+                    "started"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancel MiniMax OAuth login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "inProgress": {
+                      "type": "boolean"
+                    },
+                    "region": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "global",
+                        "cn"
+                      ]
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cancelled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "inProgress",
+                    "cancelled"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/providers/{providerId}/verify": {
       "post": {
         "tags": [
@@ -5031,7 +5662,20 @@
         "parameters": [
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "anthropic",
+                "openai",
+                "google",
+                "siliconflow",
+                "ppio",
+                "openrouter",
+                "minimax",
+                "kimi",
+                "glm",
+                "moonshot",
+                "zai"
+              ]
             },
             "required": true,
             "name": "providerId",
@@ -5081,6 +5725,178 @@
                   },
                   "required": [
                     "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/start": {
+      "post": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth flow started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "browserUrl": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/status": {
+      "get": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current OAuth flow status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "pending",
+                        "completed",
+                        "failed"
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/provider-status": {
+      "get": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth provider connection status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "remainingMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "connected"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/providers/{providerId}/oauth/disconnect": {
+      "post": {
+        "tags": [
+          "Provider OAuth"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth provider disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
                   ]
                 }
               }
@@ -6718,7 +7534,7 @@
                 "properties": {
                   "slug": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
                   }
                 },
                 "required": [
@@ -6785,7 +7601,7 @@
                 "properties": {
                   "slug": {
                     "type": "string",
-                    "minLength": 1
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
                   }
                 },
                 "required": [
@@ -6863,7 +7679,7 @@
           {
             "schema": {
               "type": "string",
-              "minLength": 1
+              "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
             },
             "required": true,
             "name": "slug",

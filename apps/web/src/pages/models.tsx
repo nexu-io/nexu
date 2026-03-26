@@ -1,6 +1,5 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { ModelPickerDropdown } from "@/components/model-picker-dropdown";
 import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
@@ -12,13 +11,14 @@ import {
   ArrowUpRight,
   Camera,
   Check,
-  Cpu,
   ExternalLink,
   FolderOpen,
   Loader2,
+  LogIn,
   Pencil,
   RefreshCw,
   Trash2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,17 +26,24 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   deleteApiV1ProvidersByProviderId,
+  deleteApiV1ProvidersMinimaxOauthLogin,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
   getApiV1Me,
   getApiV1Models,
   getApiV1Providers,
+  getApiV1ProvidersByProviderIdOauthProviderStatus,
+  getApiV1ProvidersByProviderIdOauthStatus,
+  getApiV1ProvidersMinimaxOauthStatus,
   patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
   postApiInternalDesktopCloudRefresh,
+  postApiV1ProvidersByProviderIdOauthDisconnect,
+  postApiV1ProvidersByProviderIdOauthStart,
   postApiV1ProvidersByProviderIdVerify,
+  postApiV1ProvidersMinimaxOauthLogin,
   putApiInternalDesktopDefaultModel,
   putApiV1ProvidersByProviderId,
 } from "../../lib/api/sdk.gen";
@@ -65,8 +72,106 @@ interface DbProvider {
   displayName: string;
   enabled: boolean;
   baseUrl: string | null;
+  authMode?: "apiKey" | "oauth";
   hasApiKey: boolean;
+  hasOauthCredential?: boolean;
+  oauthRegion?: "global" | "cn" | null;
+  oauthEmail?: string | null;
   modelsJson: string;
+}
+
+type MiniMaxDesktopOauthStatus = {
+  connected: boolean;
+  inProgress: boolean;
+  region?: "global" | "cn" | null;
+  error?: string | null;
+};
+
+type MiniMaxDesktopOauthStartResult = MiniMaxDesktopOauthStatus & {
+  started: boolean;
+  browserUrl?: string;
+};
+
+type MiniMaxDesktopOauthCancelResult = MiniMaxDesktopOauthStatus & {
+  cancelled: boolean;
+};
+
+function getDefaultMiniMaxAuthMode(
+  providerId: ByokProviderId,
+  dbProvider?: DbProvider,
+): "apiKey" | "oauth" {
+  if (dbProvider?.authMode) {
+    return dbProvider.authMode;
+  }
+  if (dbProvider?.hasApiKey) {
+    return "apiKey";
+  }
+  if (dbProvider?.hasOauthCredential) {
+    return "oauth";
+  }
+
+  return providerId === "minimax" ? "oauth" : "apiKey";
+}
+
+function setMiniMaxOauthErrorInCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  error: Error,
+) {
+  queryClient.setQueryData<MiniMaxDesktopOauthStatus>(
+    ["minimax-oauth-status"],
+    (previous) => ({
+      connected: previous?.connected ?? false,
+      inProgress: false,
+      region: previous?.region ?? null,
+      error: error.message,
+    }),
+  );
+}
+
+type ModelsHostInvokeBridge = {
+  invoke: {
+    (
+      channel: "desktop:get-minimax-oauth-status",
+      payload: undefined,
+    ): Promise<MiniMaxDesktopOauthStatus>;
+    (
+      channel: "desktop:start-minimax-oauth",
+      payload: { region: "global" | "cn" },
+    ): Promise<MiniMaxDesktopOauthStartResult>;
+    (
+      channel: "desktop:cancel-minimax-oauth",
+      payload: undefined,
+    ): Promise<MiniMaxDesktopOauthCancelResult>;
+    (
+      channel: "shell:open-external",
+      payload: { url: string },
+    ): Promise<{ ok: boolean }>;
+  };
+};
+
+function getModelsHostInvokeBridge(): ModelsHostInvokeBridge | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const candidate = (window as Window & { nexuHost?: unknown }).nexuHost;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+
+  const invoke = Reflect.get(candidate, "invoke");
+  if (typeof invoke !== "function") {
+    return null;
+  }
+
+  return {
+    invoke: ((channel: string, payload: unknown) =>
+      invoke.call(
+        candidate,
+        channel as never,
+        payload as never,
+      )) as ModelsHostInvokeBridge["invoke"],
+  };
 }
 
 function getModelDisplayLabel(modelId: string): string {
@@ -116,7 +221,7 @@ const PROVIDER_META: Record<
   }
 > = {
   nexu: {
-    name: "Nexu Official",
+    name: "nexu Official",
     descriptionKey: "models.provider.nexu.description",
   },
   anthropic: {
@@ -167,7 +272,7 @@ const PROVIDER_META: Record<
     apiDocsUrl:
       "https://platform.minimaxi.com/user-center/basic-information/interface-key",
     apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.minimaxi.com/anthropic",
+    defaultProxyUrl: "https://api.minimax.io/anthropic",
   },
   kimi: {
     name: "Kimi",
@@ -197,11 +302,6 @@ const PROVIDER_META: Record<
     apiKeyPlaceholder: "eyJ...",
     defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
   },
-  custom: {
-    name: "Custom",
-    descriptionKey: "models.provider.custom.description",
-    apiKeyPlaceholder: "your-api-key",
-  },
 };
 
 // Well-known models per provider (shown when no verify result yet)
@@ -212,7 +312,7 @@ const DEFAULT_MODELS: Record<string, string[]> = {
     "claude-sonnet-4-20250514",
     "claude-3-5-haiku-20241022",
   ],
-  openai: ["gpt-5.1", "gpt-5-mini", "gpt-5-nano", "o4-mini"],
+  openai: ["gpt-5.4", "gpt-5.1", "gpt-5-mini", "o4-mini"],
   google: [
     "gemini-3-pro",
     "gemini-2.5-pro",
@@ -236,13 +336,27 @@ const DEFAULT_MODELS: Record<string, string[]> = {
     "MiniMax-M2.7",
     "MiniMax-M2.7-highspeed",
     "MiniMax-M2.5",
-    "MiniMax-VL-01",
+    "MiniMax-M2.5-highspeed",
+    "MiniMax-M2.1",
+    "MiniMax-M2.1-highspeed",
+    "MiniMax-M2",
   ],
   kimi: ["kimi-k2.5"],
   glm: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flash"],
   moonshot: ["kimi-k2.5"],
-  zai: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flashx"],
+  zai: ["glm-5", "glm-4.7", "glm-4.7-flash", "glm-4.7-flashx"],
 };
+
+const ZAI_CODING_PLAN_URLS: Record<string, string> = {
+  global: "https://api.z.ai/api/coding/paas/v4",
+  cn: "https://open.bigmodel.cn/api/coding/paas/v4",
+};
+const ZAI_CODING_PLAN_MODELS = [
+  "glm-5",
+  "glm-4.7",
+  "glm-4.7-flash",
+  "glm-4.7-flashx",
+];
 
 function buildProviders(
   apiModels: Array<{
@@ -289,12 +403,13 @@ async function fetchProviders(): Promise<DbProvider[]> {
 }
 
 async function saveProvider(
-  providerId: string,
+  providerId: ByokProviderId,
   body: {
     apiKey?: string;
     baseUrl?: string | null;
     enabled?: boolean;
     displayName?: string;
+    authMode?: "apiKey" | "oauth";
     modelsJson?: string;
   },
 ): Promise<DbProvider> {
@@ -306,7 +421,7 @@ async function saveProvider(
   return data.provider as DbProvider;
 }
 
-async function deleteProvider(providerId: string): Promise<void> {
+async function deleteProvider(providerId: ByokProviderId): Promise<void> {
   const { error } = await deleteApiV1ProvidersByProviderId({
     path: { providerId },
   });
@@ -314,7 +429,7 @@ async function deleteProvider(providerId: string): Promise<void> {
 }
 
 async function verifyApiKey(
-  providerId: string,
+  providerId: ByokProviderId,
   apiKey: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
@@ -339,8 +454,9 @@ const BYOK_PROVIDER_IDS = [
   "minimax",
   "kimi",
   "glm",
-  "custom",
 ] as const;
+
+type ByokProviderId = (typeof BYOK_PROVIDER_IDS)[number];
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -545,74 +661,11 @@ function _GeneralSettings() {
   );
 }
 
-// ── Current Model Selector ────────────────────────────────────
-
-function _CurrentModelSelector({
-  models,
-  currentModelId,
-  onSelectModel,
-}: {
-  models: Array<{ id: string; name: string; provider: string }>;
-  currentModelId: string;
-  onSelectModel: (modelId: string) => void;
-}) {
-  const { t } = useTranslation();
-  if (models.length === 0) {
-    return (
-      <div className="rounded-xl border border-border bg-surface-0 px-4 py-4 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-2 shrink-0">
-            <Cpu size={16} className="text-text-muted" />
-          </div>
-          <div>
-            <div className="text-[13px] font-medium text-text-primary">
-              {t("models.noModelConfigured")}
-            </div>
-            <div className="text-[11px] text-text-muted">
-              {t("models.configureProviderHint")}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative mb-8">
-      <div className="rounded-xl border border-border bg-surface-1 px-4 py-3.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent/10 to-accent/5 flex items-center justify-center shrink-0">
-              <Cpu size={16} className="text-accent" />
-            </div>
-            <div>
-              <div className="text-[13px] font-semibold text-text-primary">
-                {t("models.currentModel")}
-              </div>
-              <div className="text-[11px] text-text-tertiary">
-                {t("models.configureProviderHint")}
-              </div>
-            </div>
-          </div>
-
-          <ModelPickerDropdown
-            models={models}
-            currentModelId={currentModelId}
-            emptyLabel={t("models.noModelConfigured")}
-            onSelectModel={onSelectModel}
-            dropdownAlign="end"
-            triggerClassName="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface-0 hover:bg-surface-2 hover:border-border-hover transition-all text-[12px] font-medium text-text-primary"
-            dropdownClassName="min-w-[360px]"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+// _CurrentModelSelector removed — model switching now lives inline in each provider's model list
 
 export function ModelsPage() {
   const { t } = useTranslation();
-  const { stars } = useGitHubStars();
+  const { stars: starNexu } = useGitHubStars();
   const isDesktopClient = useMemo(
     () =>
       typeof navigator !== "undefined" &&
@@ -713,7 +766,7 @@ export function ModelsPage() {
         PROVIDER_META[matched?.provider ?? ""]?.name ?? matched?.provider;
       const rawName = matched?.name ?? newId;
       const shortName = rawName.includes("/")
-        ? rawName.split("/").pop()!
+        ? (rawName.split("/").pop() ?? rawName)
         : rawName;
       const label = providerName ? `${shortName} (${providerName})` : shortName;
       toast.info(t("models.autoSwitched", { model: label }));
@@ -737,7 +790,7 @@ export function ModelsPage() {
     const nexuProvider = providers.find((p) => p.id === "nexu");
     items.push({
       id: "nexu",
-      name: "Nexu Official",
+      name: "nexu Official",
       modelCount: nexuProvider?.models.length ?? 0,
       configured: (nexuProvider?.models.length ?? 0) > 0,
       managed: true,
@@ -752,7 +805,8 @@ export function ModelsPage() {
         id: pid,
         name: meta.name,
         modelCount: modProv?.models.length ?? 0,
-        configured: db?.hasApiKey ?? false,
+        configured:
+          (db?.hasApiKey ?? false) || (db?.hasOauthCredential ?? false),
         managed: false,
       });
     }
@@ -824,7 +878,7 @@ export function ModelsPage() {
           <div className="flex items-center gap-2">
             <GitHubStarCta
               label={t("home.starGithub")}
-              stars={stars}
+              stars={starNexu}
               variant="button"
               onClick={() =>
                 track("workspace_github_click", { source: "settings" })
@@ -842,14 +896,6 @@ export function ModelsPage() {
             </button>
           </div>
         </div>
-
-        {models.length > 0 && (
-          <_CurrentModelSelector
-            models={models}
-            currentModelId={currentModelId}
-            onSelectModel={(modelId) => updateModel.mutate(modelId)}
-          />
-        )}
 
         <div>
           {/* Provider sidebar + detail */}
@@ -876,13 +922,15 @@ export function ModelsPage() {
                         isActive ? "bg-surface-3" : "hover:bg-surface-2",
                       )}
                     >
-                      <span className="w-5 h-5 shrink-0 flex items-center justify-center">
-                        <ProviderLogo provider={item.id} size={16} />
+                      <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
+                        <ProviderLogo provider={item.id} size={14} />
                       </span>
                       <span
                         className={cn(
-                          "flex-1 text-[12px] font-medium truncate",
-                          isActive ? "text-accent" : "text-text-primary",
+                          "flex-1 text-[12px] truncate",
+                          isActive
+                            ? "font-semibold text-text-primary"
+                            : "font-medium text-text-primary",
                         )}
                       >
                         {item.name}
@@ -939,17 +987,19 @@ export function ModelsPage() {
                         }
                       }
                       currentModelId={currentModelId}
+                      onSelectModel={(modelId) => updateModel.mutate(modelId)}
                     />
                   )
                 ) : (
                   <ByokProviderDetail
-                    providerId={activeProvider.id}
+                    providerId={activeProvider.id as ByokProviderId}
                     dbProvider={dbProviders.find(
                       (p) => p.providerId === activeProvider.id,
                     )}
                     queryClient={queryClient}
                     currentModelId={currentModelId}
                     onAutoSelectModel={handleAutoSelectModel}
+                    onSelectModel={(modelId) => updateModel.mutate(modelId)}
                   />
                 )
               ) : (
@@ -970,15 +1020,18 @@ export function ModelsPage() {
 function ManagedProviderDetail({
   provider,
   currentModelId,
+  onSelectModel,
 }: {
   provider: ProviderConfig;
   currentModelId: string;
+  onSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [cloudConnected, setCloudConnected] = useState(false);
+  const [cloudDisconnecting, setCloudDisconnecting] = useState(false);
   const queryClient = useQueryClient();
   const refreshCloudModels = useMutation({
     mutationFn: async () => {
@@ -1059,15 +1112,17 @@ function ManagedProviderDetail({
     setLoginError(null);
   };
 
+  const cloudToggleBusy = loginBusy || cloudDisconnecting;
+
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
+      {/* Header + cloud connection text action */}
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
           <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-2 shrink-0">
             <ProviderLogo provider={provider.id} size={20} />
           </span>
-          <div>
+          <div className="min-w-0">
             <div className="text-[14px] font-semibold text-text-primary">
               {provider.name}
             </div>
@@ -1076,68 +1131,48 @@ function ManagedProviderDetail({
             </div>
           </div>
         </div>
-        <div
-          className={cn(
-            "inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium",
-            cloudConnected
-              ? "border border-emerald-500/20 bg-emerald-500/8 text-emerald-600"
-              : "border border-accent/20 bg-accent/8 text-accent",
-          )}
-        >
-          {cloudConnected
-            ? t("models.managed.connected")
-            : t("models.managed.loginRequired")}
-        </div>
-      </div>
-
-      {/* Login / connected card */}
-      {cloudConnected ? (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                <Check size={12} className="text-emerald-500" />
-              </div>
-              <div className="text-[13px] font-semibold text-emerald-600">
-                {t("models.managed.cloudConnected")}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  refreshCloudModels.mutate();
-                }}
-                disabled={refreshCloudModels.isPending}
-                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
-              >
-                <RefreshCw
-                  size={11}
-                  className={cn(refreshCloudModels.isPending && "animate-spin")}
-                />
-                {t("models.managed.refresh")}
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
+        {(cloudConnected || loginBusy) && (
+          <button
+            type="button"
+            disabled={cloudToggleBusy}
+            aria-busy={cloudToggleBusy}
+            aria-label={
+              cloudConnected
+                ? t("models.managed.cloudDisconnectAria")
+                : t("models.managed.cloudConnectAria")
+            }
+            onClick={async () => {
+              if (cloudConnected) {
+                if (cloudDisconnecting) return;
+                setCloudDisconnecting(true);
+                try {
                   await postApiInternalDesktopCloudDisconnect().catch(() => {});
                   setCloudConnected(false);
                   queryClient.invalidateQueries({ queryKey: ["models"] });
                   queryClient.invalidateQueries({
                     queryKey: ["desktop-default-model"],
                   });
-                }}
-                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium text-red-500/70 hover:text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer"
-              >
-                {t("models.managed.disconnect")}
-              </button>
-            </div>
-          </div>
-          <div className="text-[12px] text-text-secondary mt-1.5">
-            {t("models.managed.cloudModelsAvailable")}
-          </div>
-        </div>
-      ) : (
+                } finally {
+                  setCloudDisconnecting(false);
+                }
+              }
+            }}
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium shrink-0 rounded-lg border border-border px-2.5 py-1 transition-colors cursor-pointer text-text-secondary hover:text-text-primary hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {(cloudDisconnecting || loginBusy) && (
+              <Loader2 size={12} className="animate-spin shrink-0" />
+            )}
+            <span className="truncate">
+              {loginBusy
+                ? t("models.managed.waitingLogin")
+                : t("models.managed.connected")}
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/* Login prompt */}
+      {!cloudConnected && (
         <div className="rounded-xl border border-[var(--color-brand-primary)]/25 bg-[var(--color-brand-subtle)] px-4 py-4 mb-6">
           <div className="text-[13px] font-semibold text-[var(--color-brand-primary)]">
             {t("models.managed.loginPrompt")}
@@ -1175,51 +1210,72 @@ function ManagedProviderDetail({
         </div>
       )}
 
-      {/* Connected cloud models (from API) — read-only */}
+      {/* Cloud models — clickable to switch active model */}
       {provider.models.length > 0 && (
-        <div className="mb-6">
-          <div className="text-[13px] font-semibold text-text-primary mb-3">
-            {t("models.managed.availableModels")}
-            <span className="ml-2 text-[11px] font-normal text-text-muted">
-              {t("models.managed.totalCount", {
-                count: provider.models.length,
-              })}
-            </span>
+        <div className="mb-6 pt-5 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
+              {t("models.managed.availableModels")}
+              <span className="ml-1.5 normal-case tracking-normal">
+                ({provider.models.length})
+              </span>
+            </div>
+            {cloudConnected && (
+              <button
+                type="button"
+                onClick={() => {
+                  refreshCloudModels.mutate();
+                }}
+                disabled={refreshCloudModels.isPending}
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
+              >
+                <RefreshCw
+                  size={10}
+                  className={cn(refreshCloudModels.isPending && "animate-spin")}
+                />
+                {t("models.managed.refreshModelList")}
+              </button>
+            )}
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-0.5">
             {provider.models.map((model) => {
               const isSelected = isModelSelected(model.id, currentModelId);
               return (
-                <div
+                <button
                   key={model.id}
+                  type="button"
+                  onClick={() => {
+                    if (!isSelected) onSelectModel(model.id);
+                  }}
                   className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
-                    isSelected
-                      ? "border-accent/30 bg-accent/5"
-                      : "border-border bg-surface-0",
+                    "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
+                    isSelected ? "bg-surface-2" : "hover:bg-surface-2",
                   )}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                      <ModelLogo
-                        model={model.name}
-                        provider={provider.id}
-                        size={16}
-                      />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-medium text-text-primary truncate">
-                        {model.name}
-                      </div>
-                      <div className="text-[10px] text-text-muted">
-                        {model.id}
-                      </div>
-                    </div>
-                  </div>
+                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
+                    <ModelLogo
+                      model={model.name}
+                      provider={provider.id}
+                      size={14}
+                    />
+                  </span>
+                  <span
+                    className={cn(
+                      "flex-1 text-[12px] truncate",
+                      isSelected
+                        ? "font-semibold text-text-primary"
+                        : "font-medium text-text-primary",
+                    )}
+                  >
+                    {model.name}
+                  </span>
                   {isSelected && (
-                    <Check size={14} className="text-accent shrink-0" />
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary shrink-0">
+                      <Check size={12} />
+                      Active
+                    </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -1237,12 +1293,14 @@ function ByokProviderDetail({
   queryClient,
   currentModelId,
   onAutoSelectModel,
+  onSelectModel,
 }: {
-  providerId: string;
+  providerId: ByokProviderId;
   dbProvider?: DbProvider;
   queryClient: ReturnType<typeof useQueryClient>;
   currentModelId: string;
   onAutoSelectModel: (modelId: string) => void;
+  onSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
   const meta = PROVIDER_META[providerId] ?? {
@@ -1257,20 +1315,184 @@ function ByokProviderDetail({
   const [baseUrl, setBaseUrl] = useState(
     dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
   );
+  const [authMode, setAuthMode] = useState<"apiKey" | "oauth">(
+    getDefaultMiniMaxAuthMode(providerId, dbProvider),
+  );
+  const [oauthRegion, setOauthRegion] = useState<"global" | "cn">(
+    dbProvider?.oauthRegion ?? "global",
+  );
+  const [dismissedMiniMaxOauthError, setDismissedMiniMaxOauthError] = useState<
+    string | null
+  >(null);
   const [isEditingApiKey, setIsEditingApiKey] = useState(
     !dbProvider?.hasApiKey,
   );
+  const isMiniMax = providerId === "minimax";
+  const hostBridge = getModelsHostInvokeBridge();
+
+  const { data: minimaxOauthStatus } = useQuery({
+    queryKey: ["minimax-oauth-status"],
+    enabled: isMiniMax,
+    queryFn: async () => {
+      if (hostBridge) {
+        return hostBridge.invoke("desktop:get-minimax-oauth-status", undefined);
+      }
+      const { data } = await getApiV1ProvidersMinimaxOauthStatus();
+      return data;
+    },
+    refetchInterval: (query) => (query.state.data?.inProgress ? 2000 : false),
+  });
+
+  const hasMiniMaxOauthAccess =
+    isMiniMax &&
+    (minimaxOauthStatus?.connected === true || dbProvider?.hasOauthCredential);
+  const hasSavedAccess = Boolean(
+    dbProvider?.hasApiKey || hasMiniMaxOauthAccess,
+  );
+
+  const visibleMiniMaxOauthError =
+    minimaxOauthStatus?.error &&
+    minimaxOauthStatus.error !== dismissedMiniMaxOauthError
+      ? minimaxOauthStatus.error
+      : null;
 
   // Available models from verification
   const [verifiedModels, setVerifiedModels] = useState<string[] | null>(null);
+
+  // ── OAuth state (OpenAI only) ──────────────────────────
+  const isOAuthProvider = providerId === "openai";
+  const [oauthPending, setOauthPending] = useState(false);
+
+  const oauthProviderStatus = useQuery({
+    queryKey: ["oauth-provider-status", providerId],
+    queryFn: async () => {
+      const res = await getApiV1ProvidersByProviderIdOauthProviderStatus({
+        path: { providerId },
+      });
+      return res.data ?? { connected: false };
+    },
+    enabled: isOAuthProvider,
+    refetchInterval: false,
+  });
+
+  const oauthFlowStatus = useQuery({
+    queryKey: ["oauth-flow-status", providerId],
+    queryFn: async () => {
+      const res = await getApiV1ProvidersByProviderIdOauthStatus({
+        path: { providerId },
+      });
+      return res.data ?? { status: "idle" as const };
+    },
+    enabled: isOAuthProvider && oauthPending,
+    refetchInterval: oauthPending ? 2000 : false,
+  });
+
+  // React to flow status changes
+  const flowDataStatus = oauthFlowStatus.data?.status;
+  const flowDataError = oauthFlowStatus.data?.error;
+  useEffect(() => {
+    if (!oauthPending) return;
+    if (flowDataStatus === "completed") {
+      setOauthPending(false);
+      queryClient.invalidateQueries({ queryKey: ["oauth-provider-status"] });
+      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["models"] });
+      toast.success(t("models.byok.oauthSuccess"));
+      markSetupComplete();
+    } else if (flowDataStatus === "failed") {
+      setOauthPending(false);
+      toast.error(flowDataError ?? t("models.byok.oauthFailed"));
+    }
+  }, [flowDataStatus, flowDataError, oauthPending, queryClient, t]);
+
+  const startOAuthMutation = useMutation({
+    mutationFn: async () => {
+      const res = await postApiV1ProvidersByProviderIdOauthStart({
+        path: { providerId },
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      if (data?.browserUrl) {
+        window.open(data.browserUrl, "_blank");
+        setOauthPending(true);
+      } else if (data?.error) {
+        toast.error(data.error);
+      }
+    },
+  });
+
+  const disconnectOAuthMutation = useMutation({
+    mutationFn: async () => {
+      const res = await postApiV1ProvidersByProviderIdOauthDisconnect({
+        path: { providerId },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["oauth-provider-status"] });
+      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["models"] });
+    },
+  });
+
+  const isOAuthConnected =
+    isOAuthProvider && oauthProviderStatus.data?.connected === true;
+
+  // ── Z.AI Coding Plan state ───────────────────────────
+  const isZaiProvider = providerId === "glm";
+  const [codingPlanKey, setCodingPlanKey] = useState("");
+  const [codingPlanRegion, setCodingPlanRegion] = useState<"global" | "cn">(
+    "global",
+  );
+
+  const saveCodingPlanMutation = useMutation({
+    mutationFn: () =>
+      saveProvider(providerId, {
+        apiKey: codingPlanKey,
+        baseUrl: ZAI_CODING_PLAN_URLS[codingPlanRegion],
+        displayName: "GLM",
+        enabled: true,
+        modelsJson: JSON.stringify(ZAI_CODING_PLAN_MODELS),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["models"] });
+      setCodingPlanKey("");
+      markSetupComplete();
+      const preferred = selectPreferredModel(ZAI_CODING_PLAN_MODELS);
+      if (preferred) {
+        onAutoSelectModel(preferred);
+      }
+    },
+  });
 
   // Reset form when provider changes
   useEffect(() => {
     setApiKey("");
     setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
+    setAuthMode(getDefaultMiniMaxAuthMode(providerId, dbProvider));
+    setOauthRegion(dbProvider?.oauthRegion ?? "global");
     setIsEditingApiKey(!dbProvider?.hasApiKey);
     setVerifiedModels(null);
-  }, [dbProvider, meta.defaultProxyUrl]);
+    setOauthPending(false);
+    setCodingPlanKey("");
+    setCodingPlanRegion("global");
+  }, [dbProvider, meta.defaultProxyUrl, providerId]);
+
+  useEffect(() => {
+    if (!isMiniMax) {
+      return;
+    }
+
+    if (authMode !== "oauth") {
+      setVerifiedModels(null);
+      return;
+    }
+
+    const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
+    setVerifiedModels(stored.length > 0 ? stored : null);
+  }, [authMode, dbProvider?.modelsJson, isMiniMax]);
 
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
@@ -1295,7 +1517,7 @@ function ByokProviderDetail({
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Auto-fetch models if none available (e.g. custom provider without verify)
+      // Auto-fetch models if none available yet
       let models = displayModels;
       if (models.length === 0 && apiKey) {
         const result = await verifyApiKey(
@@ -1313,6 +1535,7 @@ function ByokProviderDetail({
         baseUrl: baseUrl || null,
         displayName: meta.name,
         enabled: true,
+        authMode: "apiKey",
         modelsJson: JSON.stringify(models),
       });
     },
@@ -1339,12 +1562,106 @@ function ByokProviderDetail({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["providers"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      if (isMiniMax) {
+        queryClient.setQueryData(["minimax-oauth-status"], {
+          connected: false,
+          inProgress: false,
+          region: oauthRegion,
+          error: null,
+        });
+        queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+      }
       setApiKey("");
       setBaseUrl(meta.defaultProxyUrl ?? "");
       setIsEditingApiKey(true);
       setVerifiedModels(null);
     },
   });
+
+  const minimaxOauthMutation = useMutation({
+    mutationFn: async () => {
+      if (hostBridge) {
+        return hostBridge.invoke("desktop:start-minimax-oauth", {
+          region: oauthRegion,
+        });
+      }
+      const { data, error } = await postApiV1ProvidersMinimaxOauthLogin({
+        body: { region: oauthRegion },
+      });
+      if (error || !data) {
+        throw new Error("Failed to start MiniMax OAuth login");
+      }
+      return data;
+    },
+    onSuccess: (result) => {
+      const browserUrl =
+        "browserUrl" in result && typeof result.browserUrl === "string"
+          ? result.browserUrl
+          : null;
+      if (browserUrl) {
+        window.open(browserUrl, "_blank", "noopener,noreferrer");
+      }
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+      setMiniMaxOauthErrorInCache(
+        queryClient,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    },
+  });
+
+  const cancelMiniMaxOauthMutation = useMutation({
+    mutationFn: async () => {
+      if (hostBridge) {
+        return hostBridge.invoke("desktop:cancel-minimax-oauth", undefined);
+      }
+      const { data, error } = await deleteApiV1ProvidersMinimaxOauthLogin();
+      if (error || !data) {
+        throw new Error("Failed to cancel MiniMax OAuth login");
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
+      setMiniMaxOauthErrorInCache(
+        queryClient,
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    },
+  });
+
+  useEffect(() => {
+    if (!isMiniMax || !minimaxOauthStatus?.connected) {
+      return;
+    }
+
+    const syncOauthModels = async () => {
+      const providers = await queryClient.fetchQuery({
+        queryKey: ["providers"],
+        queryFn: fetchProviders,
+      });
+      const minimaxProvider = providers.find(
+        (provider) => provider.providerId === "minimax",
+      );
+
+      const providerModels: string[] = JSON.parse(
+        minimaxProvider?.modelsJson ?? "[]",
+      );
+      if (providerModels.length > 0) {
+        setVerifiedModels(providerModels);
+      }
+
+      await queryClient.refetchQueries({ queryKey: ["models"] });
+      await queryClient.refetchQueries({ queryKey: ["desktop-default-model"] });
+    };
+
+    void syncOauthModels();
+  }, [isMiniMax, minimaxOauthStatus?.connected, queryClient]);
 
   // Model list to show: verified > DB stored > defaults
   const displayModels = useMemo(() => {
@@ -1386,167 +1703,491 @@ function ByokProviderDetail({
         </div>
       </div>
 
-      {/* API Key + API Proxy URL */}
-      <div className="space-y-4 mb-6">
-        <div>
-          <label
-            htmlFor={`apikey-${providerId}`}
-            className="block text-[12px] font-medium text-text-secondary mb-1.5"
-          >
-            {t("models.byok.apiKey")}
-          </label>
-          {dbProvider?.hasApiKey && !isEditingApiKey ? (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-brand-primary)]/25 bg-[var(--color-brand-subtle)] px-3 py-2.5">
+      {/* OAuth section (OpenAI only) */}
+      {isOAuthProvider && (
+        <div className="mb-6">
+          {isOAuthConnected ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-500/25 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2.5">
               <div className="min-w-0">
-                <div className="text-[12px] font-medium text-text-primary">
-                  {t("models.byok.apiKeySaved")}
+                <div className="text-[12px] font-medium text-emerald-700 dark:text-emerald-400">
+                  {t("models.byok.oauthConnected")}
                 </div>
-                <div className="text-[10px] text-text-muted">
-                  {t("models.byok.apiKeySavedHint")}
+                <div className="text-[10px] text-emerald-600/70 dark:text-emerald-500/70">
+                  {t("models.byok.oauthDescription")}
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsEditingApiKey(true)}
+                disabled={disconnectOAuthMutation.isPending}
+                onClick={() => {
+                  if (confirm(t("models.byok.confirmRemove"))) {
+                    disconnectOAuthMutation.mutate();
+                  }
+                }}
                 className="shrink-0 rounded-lg border border-border px-3 py-2 text-[11px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
               >
-                {t("models.byok.changeApiKey")}
+                {disconnectOAuthMutation.isPending ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  t("models.byok.oauthDisconnect")
+                )}
               </button>
             </div>
+          ) : oauthPending ? (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-1 px-3 py-3">
+              <Loader2 size={14} className="animate-spin text-text-muted" />
+              <span className="text-[12px] text-text-secondary">
+                {t("models.byok.oauthPending")}
+              </span>
+            </div>
           ) : (
+            <button
+              type="button"
+              disabled={startOAuthMutation.isPending}
+              onClick={() => startOAuthMutation.mutate()}
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-2.5 text-[12px] font-medium text-text-primary transition-colors hover:bg-surface-2"
+            >
+              {startOAuthMutation.isPending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <LogIn size={14} />
+              )}
+              {t("models.byok.oauthLoginChatGPT")}
+            </button>
+          )}
+
+          {!isOAuthConnected && (
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 border-t border-border" />
+              <span className="text-[10px] text-text-muted">
+                {t("models.byok.oauthOrApiKey")}
+              </span>
+              <div className="flex-1 border-t border-border" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {isMiniMax && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-border bg-surface-0 p-1">
+          <button
+            type="button"
+            onClick={() => setAuthMode("oauth")}
+            className={cn(
+              "rounded-md px-3 py-2 text-[12px] font-medium transition-colors",
+              authMode === "oauth"
+                ? "bg-accent text-accent-fg"
+                : "text-text-secondary hover:bg-surface-2",
+            )}
+          >
+            {t("models.byok.minimax.authModeOauth")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthMode("apiKey")}
+            className={cn(
+              "rounded-md px-3 py-2 text-[12px] font-medium transition-colors",
+              authMode === "apiKey"
+                ? "bg-accent text-accent-fg"
+                : "text-text-secondary hover:bg-surface-2",
+            )}
+          >
+            {t("models.byok.minimax.authModeApiKey")}
+          </button>
+        </div>
+      )}
+
+      {isMiniMax && authMode === "oauth" ? (
+        <div className="space-y-4 mb-6">
+          <div className="rounded-xl border border-border bg-surface-0 p-4">
+            <div className="mb-3 text-[12px] font-medium text-text-primary">
+              {t("models.byok.minimax.oauthTitle")}
+            </div>
+            <div className="mb-4 text-[11px] leading-6 text-text-secondary">
+              {t("models.byok.minimax.oauthDescription")}
+            </div>
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOauthRegion("global")}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-[11px] font-medium transition-colors",
+                  oauthRegion === "global"
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-border text-text-secondary hover:bg-surface-2",
+                )}
+              >
+                {t("models.byok.minimax.regionGlobal")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOauthRegion("cn")}
+                className={cn(
+                  "rounded-md border px-3 py-1.5 text-[11px] font-medium transition-colors",
+                  oauthRegion === "cn"
+                    ? "border-accent bg-accent/10 text-accent"
+                    : "border-border text-text-secondary hover:bg-surface-2",
+                )}
+              >
+                {t("models.byok.minimax.regionCn")}
+              </button>
+            </div>
+            <div className="mb-4 text-[10px] text-text-muted">
+              {t("models.byok.minimax.endpoint", {
+                endpoint:
+                  oauthRegion === "cn" ? "api.minimaxi.com" : "api.minimax.io",
+              })}
+            </div>
+            {minimaxOauthStatus?.connected || dbProvider?.hasOauthCredential ? (
+              <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-700">
+                {t("models.byok.minimax.connected")}
+                {dbProvider?.oauthEmail ? ` · ${dbProvider.oauthEmail}` : ""}
+              </div>
+            ) : null}
+            {visibleMiniMaxOauthError ? (
+              <div className="mb-4 flex items-start justify-between gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-[11px] text-red-600">
+                <div className="min-w-0 flex-1">{visibleMiniMaxOauthError}</div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDismissedMiniMaxOauthError(visibleMiniMaxOauthError)
+                  }
+                  className="rounded p-0.5 text-red-500/80 transition-colors hover:bg-red-500/10 hover:text-red-600"
+                  aria-label={t("models.byok.minimax.dismissError")}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : null}
+            <div className="flex items-center gap-3">
+              {minimaxOauthStatus?.inProgress ? (
+                <>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-[12px] font-medium text-accent-fg opacity-80"
+                  >
+                    <Loader2 size={13} className="animate-spin" />
+                    {t("models.byok.minimax.waitingLogin")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cancelMiniMaxOauthMutation.mutate()}
+                    className="rounded-lg px-3 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
+                  >
+                    {t("models.byok.minimax.cancel")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => minimaxOauthMutation.mutate()}
+                    disabled={minimaxOauthMutation.isPending}
+                    className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2 disabled:opacity-60"
+                  >
+                    {minimaxOauthMutation.isPending && (
+                      <Loader2 size={13} className="animate-spin" />
+                    )}
+                    {!minimaxOauthMutation.isPending &&
+                      (hasMiniMaxOauthAccess ? (
+                        <RefreshCw size={13} />
+                      ) : (
+                        <LogIn size={13} />
+                      ))}
+                    {hasMiniMaxOauthAccess
+                      ? t("models.byok.minimax.reconnect")
+                      : t("models.byok.minimax.login")}
+                  </button>
+                  {hasSavedAccess && (
+                    <button
+                      type="button"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => {
+                        if (confirm(t("models.byok.confirmRemove"))) {
+                          deleteMutation.mutate();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-[12px] font-medium text-red-500 transition-colors hover:bg-red-500/5"
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={13} />
+                      )}
+                      {t("models.byok.remove")}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Z.AI Coding Plan section (GLM only) */}
+      {isZaiProvider && (
+        <div className="mb-6">
+          <div className="rounded-lg border border-border bg-surface-0 p-4">
+            <div className="text-[12px] font-medium text-text-primary mb-1">
+              {t("models.byok.zaiCodingPlan")}
+            </div>
+            <div className="text-[10px] text-text-muted mb-3">
+              {t("models.byok.zaiCodingPlanDesc")}
+            </div>
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setCodingPlanRegion("global")}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors",
+                  codingPlanRegion === "global"
+                    ? "bg-accent text-accent-fg"
+                    : "bg-surface-2 text-text-secondary hover:bg-surface-3",
+                )}
+              >
+                Global
+              </button>
+              <button
+                type="button"
+                onClick={() => setCodingPlanRegion("cn")}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors",
+                  codingPlanRegion === "cn"
+                    ? "bg-accent text-accent-fg"
+                    : "bg-surface-2 text-text-secondary hover:bg-surface-3",
+                )}
+              >
+                CN
+              </button>
+            </div>
             <div className="flex gap-2">
               <input
-                id={`apikey-${providerId}`}
                 type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={meta.apiKeyPlaceholder}
+                value={codingPlanKey}
+                onChange={(e) => setCodingPlanKey(e.target.value)}
+                placeholder="sk-..."
                 className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
               />
               <button
                 type="button"
-                disabled={!apiKey || verifyMutation.isPending}
-                onClick={() => verifyMutation.mutate()}
+                disabled={!codingPlanKey || saveCodingPlanMutation.isPending}
+                onClick={() => saveCodingPlanMutation.mutate()}
                 className={cn(
-                  "px-3 py-2 rounded-lg border border-border text-[11px] font-medium transition-colors",
-                  apiKey
-                    ? "text-text-secondary hover:bg-surface-2"
-                    : "text-text-muted cursor-not-allowed",
+                  "px-4 py-2 rounded-lg text-[12px] font-medium transition-colors",
+                  codingPlanKey
+                    ? "bg-accent text-accent-fg hover:bg-accent/90"
+                    : "bg-surface-2 text-text-muted cursor-not-allowed",
                 )}
               >
-                {verifyMutation.isPending ? (
+                {saveCodingPlanMutation.isPending ? (
                   <Loader2 size={12} className="animate-spin" />
-                ) : verifyMutation.isSuccess && verifyMutation.data?.valid ? (
-                  <Check size={12} className="text-emerald-600" />
                 ) : (
-                  t("models.byok.verify")
+                  t("models.byok.saveAndEnable")
                 )}
               </button>
             </div>
-          )}
-          {verifyMutation.isSuccess && (
-            <div
+          </div>
+
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 border-t border-border" />
+            <span className="text-[10px] text-text-muted">
+              {t("models.byok.zaiOrGeneralApi")}
+            </span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+        </div>
+      )}
+
+      {!isOAuthConnected && (!isMiniMax || authMode === "apiKey") && (
+        <div className="space-y-4 mb-6">
+          <div>
+            <label
+              htmlFor={`apikey-${providerId}`}
+              className="block text-[12px] font-medium text-text-secondary mb-1.5"
+            >
+              {t("models.byok.apiKey")}
+            </label>
+            {dbProvider?.hasApiKey && !isEditingApiKey ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-brand-primary)]/25 bg-[var(--color-brand-subtle)] px-3 py-2.5">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium text-text-primary">
+                    {t("models.byok.apiKeySaved")}
+                  </div>
+                  <div className="text-[10px] text-text-muted">
+                    {t("models.byok.apiKeySavedHint")}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingApiKey(true)}
+                  className="shrink-0 rounded-lg border border-border px-3 py-2 text-[11px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
+                >
+                  {t("models.byok.changeApiKey")}
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  id={`apikey-${providerId}`}
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={meta.apiKeyPlaceholder}
+                  className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
+                />
+                <button
+                  type="button"
+                  disabled={!apiKey || verifyMutation.isPending}
+                  onClick={() => verifyMutation.mutate()}
+                  className={cn(
+                    "px-3 py-2 rounded-lg border border-border text-[11px] font-medium transition-colors",
+                    apiKey
+                      ? "text-text-secondary hover:bg-surface-2"
+                      : "text-text-muted cursor-not-allowed",
+                  )}
+                >
+                  {verifyMutation.isPending ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : verifyMutation.isSuccess && verifyMutation.data?.valid ? (
+                    <Check size={12} className="text-emerald-600" />
+                  ) : (
+                    t("models.byok.verify")
+                  )}
+                </button>
+              </div>
+            )}
+            {verifyMutation.isSuccess && (
+              <div
+                className={cn(
+                  "mt-1.5 text-[10px]",
+                  verifyMutation.data?.valid
+                    ? "text-emerald-600"
+                    : "text-red-500",
+                )}
+              >
+                {verifyMutation.data?.valid
+                  ? t("models.byok.keyValid", {
+                      count: verifyMutation.data.models?.length ?? 0,
+                    })
+                  : t("models.byok.keyInvalid", {
+                      error:
+                        verifyMutation.data?.error ??
+                        t("models.byok.keyInvalidUnknown"),
+                    })}
+              </div>
+            )}
+          </div>
+          <div>
+            <label
+              htmlFor={`baseurl-${providerId}`}
+              className="block text-[12px] font-medium text-text-secondary mb-1.5"
+            >
+              {t("models.byok.proxyUrl")}
+            </label>
+            {isMiniMax && (
+              <div className="mb-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBaseUrl("https://api.minimax.io/anthropic")}
+                  className="rounded-md border border-border px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface-2"
+                >
+                  {t("models.byok.minimax.regionGlobal")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBaseUrl("https://api.minimaxi.com/anthropic")
+                  }
+                  className="rounded-md border border-border px-2.5 py-1 text-[10px] text-text-secondary transition-colors hover:bg-surface-2"
+                >
+                  {t("models.byok.minimax.regionCn")}
+                </button>
+              </div>
+            )}
+            <input
+              id={`baseurl-${providerId}`}
+              type="text"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder={meta.defaultProxyUrl || "https://api.example.com/v1"}
+              className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
+            />
+          </div>
+        </div>
+      )}
+
+      {!isOAuthConnected && (
+        <div className="flex items-center gap-3 mb-6">
+          {(!isMiniMax || authMode === "apiKey") && (
+            <button
+              type="button"
+              disabled={
+                saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
+              }
+              onClick={() => saveMutation.mutate()}
               className={cn(
-                "mt-1.5 text-[10px]",
-                verifyMutation.data?.valid
-                  ? "text-emerald-600"
-                  : "text-red-500",
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+                !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
+                  ? "bg-accent text-accent-fg hover:bg-accent/90"
+                  : "bg-surface-2 text-text-muted cursor-not-allowed",
               )}
             >
-              {verifyMutation.data?.valid
-                ? t("models.byok.keyValid", {
-                    count: verifyMutation.data.models?.length ?? 0,
-                  })
-                : t("models.byok.keyInvalid", {
-                    error:
-                      verifyMutation.data?.error ??
-                      t("models.byok.keyInvalidUnknown"),
-                  })}
-            </div>
+              {saveMutation.isPending && (
+                <Loader2 size={13} className="animate-spin" />
+              )}
+              {dbProvider?.hasApiKey
+                ? t("models.byok.updateConfig")
+                : t("models.byok.saveAndEnable")}
+            </button>
+          )}
+
+          {hasSavedAccess && (!isMiniMax || authMode !== "oauth") && (
+            <button
+              type="button"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (confirm(t("models.byok.confirmRemove"))) {
+                  deleteMutation.mutate();
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 text-[12px] font-medium text-red-500 transition-colors hover:bg-red-500/5"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Trash2 size={13} />
+              )}
+              {t("models.byok.remove")}
+            </button>
           )}
         </div>
-        <div>
-          <label
-            htmlFor={`baseurl-${providerId}`}
-            className="block text-[12px] font-medium text-text-secondary mb-1.5"
-          >
-            {t("models.byok.proxyUrl")}
-          </label>
-          <input
-            id={`baseurl-${providerId}`}
-            type="text"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder={meta.defaultProxyUrl || "https://api.example.com/v1"}
-            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
-          />
-        </div>
-      </div>
+      )}
 
-      {/* Action buttons — above model list */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          type="button"
-          disabled={
-            saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
-          }
-          onClick={() => saveMutation.mutate()}
-          className={cn(
-            "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-            !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
-              ? "bg-accent text-accent-fg hover:bg-accent/90"
-              : "bg-surface-2 text-text-muted cursor-not-allowed",
-          )}
-        >
-          {saveMutation.isPending && (
-            <Loader2 size={13} className="animate-spin" />
-          )}
-          {dbProvider?.hasApiKey
-            ? t("models.byok.updateConfig")
-            : t("models.byok.saveAndEnable")}
-        </button>
-
-        {dbProvider?.hasApiKey && (
-          <button
-            type="button"
-            disabled={deleteMutation.isPending}
-            onClick={() => {
-              if (confirm(t("models.byok.confirmRemove"))) {
-                deleteMutation.mutate();
-              }
-            }}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-500 hover:bg-red-500/5 transition-colors"
-          >
-            {deleteMutation.isPending ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <Trash2 size={13} />
-            )}
-            {t("models.byok.remove")}
-          </button>
+      {!isOAuthConnected &&
+        (!isMiniMax || authMode === "apiKey") &&
+        saveMutation.isSuccess && (
+          <div className="mb-4 text-[11px] text-[var(--color-success)]">
+            {t("models.byok.saveSuccess")}
+          </div>
         )}
-      </div>
+      {!isOAuthConnected &&
+        (!isMiniMax || authMode === "apiKey") &&
+        saveMutation.isError && (
+          <div className="mb-4 text-[11px] text-red-500">
+            {t("models.byok.saveFailed")}
+          </div>
+        )}
 
-      {saveMutation.isSuccess && (
-        <div className="mb-4 text-[11px] text-emerald-600">
-          {t("models.byok.saveSuccess")}
-        </div>
-      )}
-      {saveMutation.isError && (
-        <div className="mb-4 text-[11px] text-red-500">
-          {t("models.byok.saveFailed")}
-        </div>
-      )}
-
-      {/* Model list — read-only */}
+      {/* Model list — clickable to switch active model */}
       <div>
-        <div className="text-[13px] font-semibold text-text-primary mb-3">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
           {t("models.byok.modelList")}
-          <span className="ml-2 text-[11px] font-normal text-text-muted">
-            {t("models.byok.modelsTotalCount", { count: displayModels.length })}
+          <span className="ml-1.5 normal-case tracking-normal">
+            ({displayModels.length})
           </span>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-0.5">
           {displayModels.length === 0 && (
             <div className="text-[11px] text-text-muted/60 py-3 text-center">
               {t("models.byok.none")}
@@ -1555,36 +2196,37 @@ function ByokProviderDetail({
           {displayModels.map((modelId) => {
             const isSelected = isModelSelected(modelId, currentModelId);
             return (
-              <div
+              <button
                 key={modelId}
+                type="button"
+                onClick={() => {
+                  if (!isSelected) onSelectModel(modelId);
+                }}
                 className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5",
-                  isSelected
-                    ? "border-accent/30 bg-accent/5"
-                    : "border-border bg-surface-0",
+                  "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
+                  isSelected ? "bg-surface-2" : "hover:bg-surface-2",
                 )}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0">
-                    <ModelLogo
-                      model={modelId}
-                      provider={providerId}
-                      size={16}
-                    />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-medium text-text-primary truncate">
-                      {modelId}
-                    </div>
-                    <div className="text-[10px] text-text-muted">
-                      {providerId}
-                    </div>
-                  </div>
-                </div>
+                <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
+                  <ModelLogo model={modelId} provider={providerId} size={14} />
+                </span>
+                <span
+                  className={cn(
+                    "flex-1 text-[12px] truncate",
+                    isSelected
+                      ? "font-semibold text-text-primary"
+                      : "font-medium text-text-primary",
+                  )}
+                >
+                  {modelId}
+                </span>
                 {isSelected && (
-                  <Check size={14} className="text-accent shrink-0" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary shrink-0">
+                    <Check size={12} />
+                    Active
+                  </span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>

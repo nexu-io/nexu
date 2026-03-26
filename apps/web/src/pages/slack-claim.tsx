@@ -80,7 +80,7 @@ function NewWorkspacePanel() {
     <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
       <div className="flex items-center gap-2.5">
         <BrandMark className="w-7 h-7 shrink-0" />
-        <span className="text-[14px] font-semibold text-white/90">Nexu</span>
+        <span className="text-[14px] font-semibold text-white/90">nexu</span>
       </div>
 
       <div>
@@ -127,7 +127,7 @@ function ExistingWorkspacePanel({
     <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
       <div className="flex items-center gap-2.5">
         <BrandMark className="w-7 h-7 shrink-0" />
-        <span className="text-[14px] font-semibold text-white/90">Nexu</span>
+        <span className="text-[14px] font-semibold text-white/90">nexu</span>
       </div>
 
       <div>
@@ -144,7 +144,7 @@ function ExistingWorkspacePanel({
           </p>
         )}
         <div className="flex items-center gap-2.5 mb-6">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[color-mix(in_srgb,var(--color-success)_20%,transparent)] text-[var(--color-success)]">
             <Users className="w-4 h-4" />
           </div>
           <span className="text-[13px] text-white/50">
@@ -154,8 +154,8 @@ function ExistingWorkspacePanel({
             })}
           </span>
         </div>
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-[13px] text-emerald-400/80 leading-relaxed">
+        <div className="rounded-lg border border-[color-mix(in_srgb,var(--color-success)_20%,transparent)] bg-[var(--color-success-subtle)] p-4">
+          <p className="text-[13px] text-[color-mix(in_srgb,var(--color-success)_80%,transparent)] leading-relaxed">
             {t("claim.noConfigNeeded")}
           </p>
         </div>
@@ -401,10 +401,10 @@ export function SlackClaimPage() {
               </div>
 
               {isExisting && (
-                <div className="mb-6 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 lg:hidden">
+                <div className="mb-6 rounded-lg border border-[color-mix(in_srgb,var(--color-success)_20%,transparent)] bg-[var(--color-success-subtle)] p-3 lg:hidden">
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span className="text-[12px] text-emerald-600 dark:text-emerald-400">
+                    <Users className="h-4 w-4 text-[var(--color-success)] shrink-0" />
+                    <span className="text-[12px] text-[var(--color-success)]">
                       {t("claim.teammatesAlready", {
                         count: resolved?.memberCount ?? 0,
                       })}
@@ -590,8 +590,8 @@ export function SlackClaimPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-md rounded-xl border border-border bg-surface-1 p-8 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 mb-5">
-          <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success-muted)] mb-5">
+          <CheckCircle2 className="h-7 w-7 text-[var(--color-success)]" />
         </div>
         <h1 className="text-xl font-bold text-text-primary">
           {t("claim.allSet")}

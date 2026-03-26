@@ -2,9 +2,11 @@ import { selectPreferredModel } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import {
+  type OAuthConnectionState,
   compileOpenClawConfig,
   resolveModelId,
 } from "../lib/openclaw-config-compiler.js";
+import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-store.js";
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
@@ -21,25 +23,26 @@ function resolvePrimaryModelRef(
   config: NexuConfig,
   compiled: ReturnType<typeof compileOpenClawConfig>,
   env: ControllerEnv,
+  oauthState: OAuthConnectionState,
 ): string {
   const availableRuntimeModels = collectRuntimeModelRefs(compiled);
 
   if (typeof model === "string") {
     return resolveAvailableRuntimeModel(
-      resolveModelId(config, env, model),
+      resolveModelId(config, env, model, oauthState),
       availableRuntimeModels,
     );
   }
 
   if (model && typeof model.primary === "string") {
     return resolveAvailableRuntimeModel(
-      resolveModelId(config, env, model.primary),
+      resolveModelId(config, env, model.primary, oauthState),
       availableRuntimeModels,
     );
   }
 
   return resolveAvailableRuntimeModel(
-    resolveModelId(config, env, env.defaultModelId),
+    resolveModelId(config, env, env.defaultModelId, oauthState),
     availableRuntimeModels,
   );
 }
@@ -56,11 +59,21 @@ function collectRuntimeModelRefs(
   );
 }
 
+// OAuth providers whose models are managed via auth-profiles.json,
+// not compiled into models.providers (no apiKey in config).
+const OAUTH_PROVIDER_PREFIXES = ["openai-codex/"];
+
 function resolveAvailableRuntimeModel(
   desiredRef: string,
   availableRuntimeModels: Array<{ id: string; name: string }>,
 ): string {
   if (availableRuntimeModels.some((model) => model.id === desiredRef)) {
+    return desiredRef;
+  }
+
+  // Trust OAuth provider model refs — they're managed by OpenClaw's
+  // auth-profiles.json and won't appear in compiled models.providers.
+  if (OAUTH_PROVIDER_PREFIXES.some((prefix) => desiredRef.startsWith(prefix))) {
     return desiredRef;
   }
 
@@ -86,6 +99,7 @@ export class OpenClawSyncService {
     private readonly compiledStore: CompiledOpenClawStore,
     private readonly configWriter: OpenClawConfigWriter,
     private readonly authProfilesWriter: OpenClawAuthProfilesWriter,
+    private readonly authProfilesStore: OpenClawAuthProfilesStore,
     private readonly runtimePluginWriter: OpenClawRuntimePluginWriter,
     private readonly runtimeModelWriter: OpenClawRuntimeModelWriter,
     private readonly templateWriter: WorkspaceTemplateWriter,
@@ -97,7 +111,8 @@ export class OpenClawSyncService {
     ReturnType<typeof compileOpenClawConfig>
   > {
     const config = await this.configStore.getConfig();
-    return compileOpenClawConfig(config, this.env);
+    const oauthState = await this.authProfilesStore.getOAuthConnectionState();
+    return compileOpenClawConfig(config, this.env, oauthState);
   }
 
   /**
@@ -197,7 +212,8 @@ export class OpenClawSyncService {
   private async doSync(): Promise<{ configPushed: boolean }> {
     const seq = ++this.syncCounter;
     const config = await this.configStore.getConfig();
-    const compiled = compileOpenClawConfig(config, this.env);
+    const oauthState = await this.authProfilesStore.getOAuthConnectionState();
+    const compiled = compileOpenClawConfig(config, this.env, oauthState);
 
     logger.info(
       {
@@ -224,13 +240,14 @@ export class OpenClawSyncService {
 
     // 2. Always write files once (persistence + watcher hot-reload path).
     await this.configWriter.write(compiled);
-    await this.authProfilesWriter.writeForAgents(compiled);
+    await this.authProfilesWriter.writeForAgents(compiled, config.providers);
     this.gatewayService.noteConfigWritten(compiled);
     const runtimeModelRef = resolvePrimaryModelRef(
       compiled.agents.defaults?.model,
       config,
       compiled,
       this.env,
+      oauthState,
     );
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
     await this.runtimeModelWriter.write(runtimeModelRef);

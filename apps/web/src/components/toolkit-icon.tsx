@@ -7,7 +7,10 @@ import { useState } from "react";
 const FALLBACK_PALETTES = [
   { bg: "bg-amber-50", text: "text-amber-700" },
   { bg: "bg-sky-50", text: "text-sky-700" },
-  { bg: "bg-emerald-50", text: "text-emerald-700" },
+  {
+    bg: "bg-[var(--color-success-subtle)]",
+    text: "text-[var(--color-success)]",
+  },
   { bg: "bg-rose-50", text: "text-rose-700" },
   { bg: "bg-violet-50", text: "text-violet-700" },
   { bg: "bg-orange-50", text: "text-orange-700" },

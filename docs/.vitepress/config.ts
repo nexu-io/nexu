@@ -273,7 +273,7 @@ export default defineConfig({
     logo: {
       light: "/favicon/nexu-logo-light.svg",
       dark: "/favicon/nexu-logo-dark.svg",
-      alt: "Nexu",
+      alt: "nexu",
     },
     siteTitle: false,
     socialLinks: [{ icon: "github", link: "https://github.com/nexu-io/nexu" }],

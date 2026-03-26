@@ -111,3 +111,13 @@ export async function openLocalFolderUrl(url: string): Promise<void> {
     await hostBridge.invoke("shell:open-external", { url });
   }
 }
+
+export async function openExternalUrl(url: string): Promise<void> {
+  const hostBridge = getHostInvokeBridge();
+  if (hostBridge) {
+    await hostBridge.invoke("shell:open-external", { url });
+    return;
+  }
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}

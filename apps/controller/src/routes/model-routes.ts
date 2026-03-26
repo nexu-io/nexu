@@ -1,5 +1,9 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  minimaxOauthCancelResponseSchema,
+  minimaxOauthStartBodySchema,
+  minimaxOauthStartResponseSchema,
+  minimaxOauthStatusResponseSchema,
   modelListResponseSchema,
   providerListResponseSchema,
   providerResponseSchema,
@@ -8,9 +12,12 @@ import {
   verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
+import { supportedByokProviderIds } from "../lib/byok-providers.js";
 import type { ControllerBindings } from "../types.js";
 
-const providerIdParamSchema = z.object({ providerId: z.string() });
+const providerIdParamSchema = z.object({
+  providerId: z.enum(supportedByokProviderIds),
+});
 
 export function registerModelRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -137,6 +144,74 @@ export function registerModelRoutes(
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/providers/minimax/oauth/status",
+      tags: ["Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: minimaxOauthStatusResponseSchema },
+          },
+          description: "MiniMax OAuth status",
+        },
+      },
+    }),
+    async (c) =>
+      c.json(await container.modelProviderService.getMiniMaxOauthStatus(), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/providers/minimax/oauth/login",
+      tags: ["Providers"],
+      request: {
+        body: {
+          content: {
+            "application/json": { schema: minimaxOauthStartBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: minimaxOauthStartResponseSchema },
+          },
+          description: "Start MiniMax OAuth login",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.modelProviderService.startMiniMaxOauth(
+        body.region,
+      );
+      return c.json({ ...status, started: true }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/api/v1/providers/minimax/oauth/login",
+      tags: ["Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: minimaxOauthCancelResponseSchema },
+          },
+          description: "Cancel MiniMax OAuth login",
+        },
+      },
+    }),
+    async (c) => {
+      const status = await container.modelProviderService.cancelMiniMaxOauth();
+      return c.json({ ...status, cancelled: true }, 200);
     },
   );
 

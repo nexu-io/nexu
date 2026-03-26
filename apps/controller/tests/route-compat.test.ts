@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
 import type { ControllerEnv } from "../src/app/env.js";
+import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../src/runtime/openclaw-process.js";
@@ -23,6 +24,7 @@ import { DesktopLocalService } from "../src/services/desktop-local-service.js";
 import { IntegrationService } from "../src/services/integration-service.js";
 import { LocalUserService } from "../src/services/local-user-service.js";
 import { ModelProviderService } from "../src/services/model-provider-service.js";
+import { OpenClawAuthService } from "../src/services/openclaw-auth-service.js";
 import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { RuntimeConfigService } from "../src/services/runtime-config-service.js";
@@ -88,7 +90,8 @@ async function createTestContainer(
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);
-  const authProfilesWriter = new OpenClawAuthProfilesWriter();
+  const authProfilesStore = new OpenClawAuthProfilesStore(env);
+  const authProfilesWriter = new OpenClawAuthProfilesWriter(authProfilesStore);
   const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
   const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
@@ -111,6 +114,7 @@ async function createTestContainer(
     compiledStore,
     configWriter,
     authProfilesWriter,
+    authProfilesStore,
     runtimePluginWriter,
     runtimeModelWriter,
     templateWriter,
@@ -143,6 +147,7 @@ async function createTestContainer(
     dispose: vi.fn(),
     start: vi.fn(),
   } as unknown as SkillhubService;
+  const openclawAuthService = new OpenClawAuthService(env, authProfilesStore);
 
   return {
     env,
@@ -173,6 +178,7 @@ async function createTestContainer(
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,
     openclawSyncService,
+    openclawAuthService,
     wsClient,
     gatewayService,
     runtimeState,
@@ -404,7 +410,7 @@ describe("controller route compatibility", () => {
 
   it("returns the default bot workspace path for desktop ready", async () => {
     const bot = await container.configStore.createBot({
-      name: "Nexu Assistant",
+      name: "nexu Assistant",
       slug: "nexu-assistant",
       modelId: "anthropic/claude-sonnet-4",
     });

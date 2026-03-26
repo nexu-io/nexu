@@ -9,6 +9,7 @@ import { registerDesktopRoutes } from "../routes/desktop-routes.js";
 import { registerIntegrationRoutes } from "../routes/integration-routes.js";
 import { registerMiscCompatRoutes } from "../routes/misc-compat-routes.js";
 import { registerModelRoutes } from "../routes/model-routes.js";
+import { registerProviderOAuthRoutes } from "../routes/provider-oauth-routes.js";
 import { registerRuntimeConfigRoutes } from "../routes/runtime-config-routes.js";
 import { registerSessionRoutes } from "../routes/session-routes.js";
 import { registerSkillhubRoutes } from "../routes/skillhub-routes.js";
@@ -39,6 +40,7 @@ export function createApp(container: ControllerContainer) {
   registerChannelRoutes(app, container);
   registerSessionRoutes(app, container);
   registerModelRoutes(app, container);
+  registerProviderOAuthRoutes(app, container);
   registerIntegrationRoutes(app, container);
   registerArtifactRoutes(app, container);
   registerSkillhubRoutes(app, container);

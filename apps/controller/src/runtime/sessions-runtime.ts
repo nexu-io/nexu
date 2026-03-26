@@ -812,6 +812,14 @@ export class SessionsRuntime {
       channelType = "slack";
     } else if (combined.includes("discord")) {
       channelType = "discord";
+    } else if (
+      combined.includes("whatsapp") ||
+      combined.includes("@s.whatsapp.net") ||
+      combined.includes("@g.us")
+    ) {
+      channelType = "whatsapp";
+    } else if (combined.includes("telegram")) {
+      channelType = "telegram";
     }
 
     return {

@@ -25,6 +25,11 @@ const RETRY_DELAY_MS = 2000;
 const PROGRESS_INTERVAL_MS = 400;
 const PROGRESS_DURATION_MS = 40_000;
 
+function isQrImageSource(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.startsWith("data:image/");
+}
+
 function calcFakeProgress(elapsedMs: number): number {
   const ratio = Math.min(elapsedMs / PROGRESS_DURATION_MS, 1);
   // Ease-out: fast start, slow finish, caps at 95%
@@ -131,12 +136,17 @@ export function WechatSetupView({
       }
 
       stopProgress();
+      if (!startData.sessionKey) {
+        setErrorMessage(t("wechatSetup.connectFailed"));
+        setPhase("error");
+        return;
+      }
       setQrUrl(startData.qrDataUrl ?? null);
       setPhase("scanning");
 
       const { data: waitData, error: waitError } =
         await postApiV1ChannelsWechatQrWait({
-          body: { sessionKey: startData.sessionKey ?? "" },
+          body: { sessionKey: startData.sessionKey },
         });
 
       if (controller.signal.aborted) return;
@@ -201,13 +211,13 @@ export function WechatSetupView({
   return (
     <div
       className={
-        showHeader ? "p-5 rounded-xl border bg-surface-1 border-border" : "py-2"
+        showHeader ? "p-5 rounded-xl border bg-surface-1 border-border" : ""
       }
     >
       {showHeader && (
         <div className="flex gap-3 items-start mb-5">
-          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-green-500/10 shrink-0">
-            <Smartphone size={18} className="text-green-600" />
+          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-[var(--color-success-muted)] shrink-0">
+            <Smartphone size={18} className="text-[var(--color-success)]" />
           </div>
           <div>
             <h3 className="text-[14px] font-semibold text-text-primary">
@@ -220,15 +230,29 @@ export function WechatSetupView({
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-4 py-4">
+      <div
+        className={
+          showHeader
+            ? "flex flex-col items-center gap-4 py-4"
+            : "flex flex-col items-center gap-3 py-1"
+        }
+      >
         {/* QR code display area */}
         {qrUrl && phase === "scanning" ? (
           <div className="flex flex-col items-center gap-3">
             <div className="p-3 bg-white rounded-xl shadow-sm border border-border">
-              <QRCodeSVG value={qrUrl} size={208} />
+              {isQrImageSource(qrUrl) ? (
+                <img
+                  src={qrUrl}
+                  alt={t("wechatSetup.title")}
+                  className="block w-[208px] h-[208px] object-contain"
+                />
+              ) : (
+                <QRCodeSVG value={qrUrl} size={208} />
+              )}
             </div>
             <div className="flex items-center gap-2 text-[12px] text-text-muted">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-green-600" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-success)]" />
               {t("wechatSetup.scanning")}
             </div>
             <p className="text-[11px] text-text-muted text-center max-w-xs leading-relaxed">
@@ -237,21 +261,21 @@ export function WechatSetupView({
           </div>
         ) : phase === "waiting-gateway" ? (
           <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-success)]" />
             <span className="text-[12px] text-text-muted">
               {t("wechatSetup.waitingGateway")} {progress}%
             </span>
           </div>
         ) : phase === "loading-qr" ? (
           <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-success)]" />
             <span className="text-[12px] text-text-muted">
               {t("wechatSetup.loadingQr")} {progress}%
             </span>
           </div>
         ) : phase === "connecting" ? (
           <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-success)]" />
             <span className="text-[12px] text-text-muted">
               {t("wechatSetup.connectSuccess")}
             </span>
@@ -267,22 +291,22 @@ export function WechatSetupView({
             <button
               type="button"
               onClick={startQrFlow}
-              className="flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-green-600 hover:bg-green-700 transition-all cursor-pointer"
+              className="flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-accent-fg rounded-lg bg-accent hover:bg-accent-hover transition-all cursor-pointer"
             >
               <RefreshCw size={13} />
               {t("wechatSetup.retry")}
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 py-4">
-            <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/15">
-              <QrCode size={48} className="text-green-600" />
+          <div className="flex flex-col items-center gap-3 py-1">
+            <div className="p-3 rounded-xl bg-[var(--color-success-subtle)] border border-[var(--color-success-border)]">
+              <QrCode size={48} className="text-[var(--color-success)]" />
             </div>
             <button
               type="button"
               onClick={startQrFlow}
               disabled={disabled || isLoading}
-              className="flex gap-1.5 items-center px-5 py-2.5 text-[13px] font-medium text-white rounded-lg bg-green-600 hover:bg-green-700 transition-all disabled:opacity-60 cursor-pointer"
+              className="flex gap-1.5 items-center px-5 py-2.5 text-[13px] font-medium text-accent-fg rounded-lg bg-accent hover:bg-accent-hover transition-all disabled:opacity-60 cursor-pointer"
             >
               <QrCode size={14} />
               {t("wechatSetup.scanQr")}

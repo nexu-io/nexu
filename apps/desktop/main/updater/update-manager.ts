@@ -18,11 +18,22 @@ export interface UpdateManagerOptions {
   initialDelayMs?: number;
 }
 
-const R2_FEED_URLS: Record<UpdateChannelName, string> = {
-  stable: `${R2_BASE_URL}/stable`,
-  beta: `${R2_BASE_URL}/beta`,
-  nightly: `${R2_BASE_URL}/nightly`,
-};
+function getMacFeedArch(arch: string = process.arch): "arm64" | "x64" {
+  if (arch === "x64" || arch === "arm64") {
+    return arch;
+  }
+
+  throw new Error(
+    `[update-manager] Unsupported mac architecture "${arch}". Expected "x64" or "arm64".`,
+  );
+}
+
+function getDefaultR2FeedUrl(
+  channel: UpdateChannelName,
+  arch: string = process.arch,
+): string {
+  return `${R2_BASE_URL}/${channel}/${getMacFeedArch(arch)}`;
+}
 
 function sanitizeFeedUrl(feedUrl: string): string {
   try {
@@ -45,6 +56,7 @@ function resolveUpdateFeedUrl(options: {
   source: UpdateSource;
   channel: UpdateChannelName;
   feedUrl: string | null;
+  arch?: string;
 }): string {
   const overrideUrl = process.env.NEXU_UPDATE_FEED_URL ?? options.feedUrl;
   if (overrideUrl) {
@@ -55,13 +67,14 @@ function resolveUpdateFeedUrl(options: {
     return "github://nexu-io/nexu";
   }
 
-  return R2_FEED_URLS[options.channel];
+  return getDefaultR2FeedUrl(options.channel, options.arch);
 }
 
 export function resolveUpdateFeedUrlForTests(options: {
   source: UpdateSource;
   channel: UpdateChannelName;
   feedUrl: string | null;
+  arch?: string;
 }): string {
   return resolveUpdateFeedUrl(options);
 }
@@ -91,7 +104,7 @@ export class UpdateManager {
     this.feedUrl = options?.feedUrl ?? null;
     this.checkIntervalMs = options?.checkIntervalMs ?? 4 * 60 * 60 * 1000;
     this.initialDelayMs = options?.initialDelayMs ?? 60_000;
-    this.currentFeedUrl = R2_FEED_URLS[this.channel];
+    this.currentFeedUrl = getDefaultR2FeedUrl(this.channel);
 
     autoUpdater.autoDownload = options?.autoDownload ?? false;
     autoUpdater.autoInstallOnAppQuit = true;

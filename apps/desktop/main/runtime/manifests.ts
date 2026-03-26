@@ -4,7 +4,6 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -189,10 +188,24 @@ export function ensurePackagedOpenclawSidecar(
     return extractedSidecarRoot;
   }
 
-  rmSync(extractedSidecarRoot, { recursive: true, force: true });
-  mkdirSync(extractedSidecarRoot, { recursive: true });
-  execFileSync("tar", ["-xzf", archivePath, "-C", extractedSidecarRoot]);
-  writeFileSync(stampPath, archiveStamp);
+  // Clean + extract with retries. Node's rmSync can silently fail on macOS
+  // (ENOTEMPTY race), so use rm -rf and verify deletion before proceeding.
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      if (existsSync(extractedSidecarRoot)) {
+        execFileSync("rm", ["-rf", extractedSidecarRoot]);
+      }
+      mkdirSync(extractedSidecarRoot, { recursive: true });
+      execFileSync("tar", ["-xzf", archivePath, "-C", extractedSidecarRoot]);
+      writeFileSync(stampPath, archiveStamp);
+      break;
+    } catch (err) {
+      if (attempt === MAX_RETRIES - 1) throw err;
+      // Brief pause before retry to let filesystem settle
+      execFileSync("sleep", ["1"]);
+    }
+  }
 
   return extractedSidecarRoot;
 }
@@ -221,7 +234,14 @@ export function createRuntimeUnitManifests(
     path.resolve(openclawRuntimeRoot, "state"),
   );
   const openclawTempDir = ensureDir(path.resolve(openclawRuntimeRoot, "tmp"));
-  ensureDir(getOpenclawSkillsDir(userDataPath));
+  ensureDir(
+    isPackaged
+      ? getOpenclawSkillsDir(userDataPath)
+      : path.resolve(
+          runtimeConfig.paths.nexuHome,
+          "runtime/openclaw/state/skills",
+        ),
+  );
   ensureDir(path.resolve(openclawStateDir, "plugin-docs"));
   ensureDir(path.resolve(openclawStateDir, "agents"));
   const openclawPackageRoot = path.resolve(
@@ -255,7 +275,7 @@ export function createRuntimeUnitManifests(
   return [
     {
       id: "web",
-      label: "Nexu Web Surface",
+      label: "nexu Web Surface",
       kind: "surface",
       launchStrategy: "managed",
       runner: "spawn",
@@ -284,7 +304,7 @@ export function createRuntimeUnitManifests(
     },
     {
       id: "controller",
-      label: "Nexu Controller",
+      label: "nexu Controller",
       kind: "service",
       launchStrategy: "managed",
       // Use spawn instead of utility-process due to Electron bugs:
@@ -309,7 +329,14 @@ export function createRuntimeUnitManifests(
         NEXU_HOME: runtimeConfig.paths.nexuHome,
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
-        OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
+        OPENCLAW_SKILLS_DIR: isPackaged
+          ? getOpenclawSkillsDir(userDataPath)
+          : ensureDir(
+              path.resolve(
+                runtimeConfig.paths.nexuHome,
+                "runtime/openclaw/state/skills",
+              ),
+            ),
         SKILLHUB_STATIC_SKILLS_DIR: isPackaged
           ? path.resolve(electronRoot, "static/bundled-skills")
           : path.resolve(repoRoot, "apps/desktop/static/bundled-skills"),

@@ -312,12 +312,12 @@ function getPlatformConfig(platform: string): PlatformConfig {
 const AVATAR_GRADIENTS = [
   "from-violet-500 to-purple-600",
   "from-blue-500 to-cyan-500",
-  "from-emerald-500 to-teal-500",
+  "from-[var(--color-success)] to-teal-500",
   "from-orange-400 to-rose-500",
   "from-pink-500 to-fuchsia-500",
   "from-amber-400 to-orange-500",
   "from-sky-400 to-indigo-500",
-  "from-lime-400 to-green-500",
+  "from-lime-400 to-[var(--color-success)]",
 ];
 
 function getAvatarGradient(name: string): string {
@@ -411,16 +411,16 @@ function ArtifactCard({ summary }: { summary: string | null }) {
     <div
       data-tool-card={summary ?? undefined}
       data-tool-card-variant="inline-chip"
-      className="mt-0.5 inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-500/12 bg-[rgba(16,185,129,0.06)] px-2.5 py-1.5 text-[12px] shadow-none"
+      className="mt-0.5 inline-flex max-w-full items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--color-success)_12%,transparent)] bg-[rgba(0,163,101,0.06)] px-2.5 py-1.5 text-[12px] shadow-none"
     >
-      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[rgba(16,185,129,0.12)] text-emerald-600">
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-success-muted)] text-[var(--color-success)]">
         <CheckCircle2 className="size-[13px]" />
       </span>
       <span className="min-w-0 max-w-[16rem] truncate font-medium text-text-primary">
         {formattedSummary}
       </span>
       <span className="shrink-0 text-text-muted/70">·</span>
-      <span className="shrink-0 text-[11px] font-medium text-emerald-700">
+      <span className="shrink-0 text-[11px] font-medium text-[var(--color-success)]">
         {t("sessions.chat.toolCompleted")}
       </span>
     </div>

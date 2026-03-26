@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release" /></a>
+  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu?color=blue" alt="Release" /></a>
   <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <a href="https://github.com/nexu-io/nexu/stargazers"><img src="https://img.shields.io/github/stars/nexu-io/nexu?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
@@ -27,26 +28,32 @@
 
 ---
 
-> 🎉 **Beta Perk**: During the beta period, top-tier models like Claude, GPT, Gemini, Kimi, GLM, and more are **completely free with unlimited usage**. [Download and try now →](https://nexu.io)
+> 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
+>
+> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Downloads](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe)
+>
+> 🎉 **Beta Perk**: During the beta period, top-tier models like Gemini and more are **free to use**. [Download and try now →](https://nexu.io)
 
 ---
 
-## 📋 Overview
+## 📋 What is nexu?
 
 **nexu** (next to you) is an open-source desktop client that runs your **OpenClaw 🦞** Agent directly inside WeChat, Feishu, Slack, Discord, and other IM channels.
 
 WeChat + OpenClaw supported — works with WeChat 8.0.7 OpenClaw plugin. Click connect, scan with WeChat, and start chatting with your AI Agent.
 
-Download and go — graphical setup, built-in Feishu Skills, multi-model support (Claude / GPT / Gemini and more), and bring your own API Key.
+Download and go — graphical setup, built-in Feishu Skills, multi-model support (Gemini and more), and bring your own API Key.
 
 Once connected to IM, your Agent is online 24/7 — chat from your phone anytime, anywhere.
 
 All data stays on your machine. Your privacy, fully in your control.
 
+<h3 align="center">🎬 Product Demo</h3>
+
 <p align="center">
-  <img src="site/media/readme-screenshot.png" width="49%" alt="nexu screenshot" />
-  &nbsp;
-  <img src="site/media/readme-wechat-demo.png" width="49%" alt="nexu WeChat scan to connect" />
+  <video src="https://github.com/user-attachments/assets/d7a801e4-6d0c-40f2-aa0c-d28fd78fdcaa" width="100%" autoplay loop muted playsinline>
+    Your browser does not support video playback. <a href="https://github.com/user-attachments/assets/d7a801e4-6d0c-40f2-aa0c-d28fd78fdcaa">Download the video</a> to watch.
+  </video>
 </p>
 
 ---
@@ -55,7 +62,7 @@ All data stays on your machine. Your privacy, fully in your control.
 
 | | OpenClaw (official) | Typical hosted Feishu + agent stacks | **nexu** ✅ |
 |---|---|---|---|
-| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Claude / GPT / Gemini, etc. — one-click switch in GUI** ✅ |
+| **🧠 Models** | BYO, but manual config required ⚠️ | Platform-locked, no switching ❌ | **Pick Gemini, etc. — one-click switch in GUI; MiniMax / Codex / GLM support OAuth** ✅ |
 | **📡 Data path** | Local | Routed through vendor servers, data out of your control ❌ | **Local-first; we don't host your business data** ✅ |
 | **💰 Cost** | Free, but self-deploy required ⚠️ | Subscription / per-seat pricing ❌ | **Client is free; pay providers via your own API keys** ✅ |
 | **📜 Source** | Open source | Closed source, no audit possible ❌ | **MIT — fork and audit** ✅ |
@@ -76,7 +83,11 @@ Native OpenClaw 🦞 Skills and full Feishu Skills ship together. Agents move be
 
 ### 🧠 Top-tier models, out of the box
 
-Use Claude 4.6, ChatGPT 5.4, Minimax 2.5, GLM 5.0, Kimi 2.5, and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
+Use Gemini and more directly via your nexu account. No extra config. Switch to your own API Key anytime.
+
+### 🔐 OAuth login, no key needed
+
+MiniMax, OpenAI Codex, and GLM (Z.AI Coding Plan) support OAuth login—authorize with one click, no need to copy-paste API keys.
 
 ### 🔑 Bring your own API Key, no login
 
@@ -138,18 +149,19 @@ Requirement breakdown, asset search, copywriting, design annotation—free up cr
 
 ### System requirements
 
-- 🍎 **OS**: macOS 12+ (Apple Silicon)
+- 🍎 **macOS**: macOS 12+ (Apple Silicon & Intel)
+- 🪟 **Windows**: Windows 10+
 - 💾 **Storage**: ~500 MB
 
 ### Installation
 
-**Pre-built Mac client (recommended)**
+**Pre-built client (recommended)**
 
-1. Go to the [official site](https://nexu.io) or [Releases](https://github.com/nexu-io/nexu/releases) 📥
-2. Download the Mac installer
-3. Launch nexu 🎉
-
-> ⏳ **Windows & macOS Intel**: In development. Email [support@nexu.ai](mailto:support@nexu.ai) for updates.
+| Platform | Download |
+|----------|----------|
+| 🍎 macOS (Apple Silicon) | [Official site](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🍎 macOS (Intel) | [Download](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
+| 🪟 Windows | [Download](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
 
 ### First launch
 
@@ -207,6 +219,28 @@ Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUT
 - Write tests for new functionality
 - Update documentation as needed
 - Keep commits atomic and descriptive
+
+---
+
+## ❓ FAQ
+
+**Q: Is nexu free?**
+A: The client is completely free and open-source (MIT). Multiple top-tier models are built in for you to use, and you can also bring your own API Key.
+
+**Q: Which operating systems are supported?**
+A: macOS 12+ (Apple Silicon & Intel) and Windows 10+ are supported.
+
+**Q: Which IM platforms are supported?**
+A: WeChat, Feishu, Slack, and Discord are built in and work out of the box.
+
+**Q: Is my data safe?**
+A: All data stays on your machine. nexu does not host your business data. The source code is open for audit.
+
+**Q: Can I use my own API Key?**
+A: Yes. Add your API Key and use the client without creating an account or logging in.
+
+**Q: What do I need to connect WeChat?**
+A: nexu works with the WeChat 8.0.7 OpenClaw plugin. Click connect, scan with WeChat, and you're good to go — no extra setup required.
 
 ---
 

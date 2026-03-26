@@ -82,8 +82,8 @@ function NexuLoader({ size = 48 }: { size?: number }) {
 }
 
 export function SurfaceFrame({
-  title,
-  description,
+  title: _title,
+  description: _description,
   src,
   version,
   preload,
@@ -94,6 +94,8 @@ export function SurfaceFrame({
   version: number;
   preload?: string;
 }) {
+  void _title;
+  void _description;
   const [webviewReady, setWebviewReady] = useState(false);
   const prevSrcRef = useRef<string | null>(null);
 
@@ -145,8 +147,7 @@ export function SurfaceFrame({
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background:
-              "radial-gradient(ellipse at 50% 35%, #f8f6f3 0%, #eee9e2 55%, #e4ddd4 100%)",
+            background: "#ffffff",
             zIndex: 10,
             transition: "opacity 0.3s ease-out",
           }}

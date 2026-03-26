@@ -39,9 +39,9 @@ function useStatusBadgeConfig() {
       ({
         active: {
           label: t("integrations.statusConnected"),
-          dot: "bg-emerald-500",
-          bg: "bg-emerald-500/10",
-          text: "text-emerald-600",
+          dot: "bg-[var(--color-success)]",
+          bg: "bg-[var(--color-success-muted)]",
+          text: "text-[var(--color-success)]",
         },
         initiated: {
           label: t("integrations.statusConnecting"),
@@ -290,7 +290,7 @@ function IntegrationCard({
       className={cn(
         "rounded-xl border bg-surface-1 p-4 transition-all",
         isActive
-          ? "border-emerald-500/25"
+          ? "border-[color-mix(in_srgb,var(--color-success)_25%,transparent)]"
           : "border-border hover:border-accent/25 hover:shadow-md hover:shadow-accent/5",
       )}
     >
@@ -650,7 +650,7 @@ export function IntegrationsPage() {
             </div>
           </div>
           {connectedCount > 0 && (
-            <div className="flex items-center gap-1.5 text-[12px] text-emerald-600">
+            <div className="flex items-center gap-1.5 text-[12px] text-[var(--color-success)]">
               <Check size={14} />
               {t("integrations.connected", { count: connectedCount })}
             </div>

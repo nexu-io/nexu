@@ -76,8 +76,10 @@
   /* ── Functional ── */
   --color-error: #f8672f;
   --color-error-subtle: rgba(248, 103, 47, 0.08);
-  --color-success: #346e58;
-  --color-success-subtle: rgba(52, 110, 88, 0.08);
+  --color-success: #00a365;
+  --color-success-subtle: rgba(0, 163, 101, 0.08);
+  --color-success-muted: rgba(0, 163, 101, 0.1);
+  --color-success-border: rgba(0, 163, 101, 0.15);
   --color-warning: #edc337;
   --color-warning-subtle: rgba(237, 195, 55, 0.08);
   --color-danger: #f93920;
@@ -320,7 +322,7 @@
   border-radius: var(--radius-6);
   font-size: 13px;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   background: transparent;
   transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
@@ -451,13 +453,11 @@
   100% {
     border-color: rgba(61, 185, 206, 0.12);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 0 rgba(61, 185, 206, 0);
-    transform: translateY(0);
   }
   50% {
     border-color: rgba(61, 185, 206, 0.35);
     box-shadow: 0 4px 16px rgba(61, 185, 206, 0.1), 0 0 0 1px
       rgba(61, 185, 206, 0.08);
-    transform: translateY(-1px);
   }
 }
 

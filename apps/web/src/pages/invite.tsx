@@ -104,7 +104,7 @@ export function InvitePage() {
       <div className="hidden lg:flex w-[400px] shrink-0 bg-[#111111] flex-col justify-between p-8 relative overflow-hidden">
         <div className="flex items-center gap-2.5">
           <BrandMark className="w-7 h-7 shrink-0" />
-          <span className="text-[14px] font-semibold text-white/90">Nexu</span>
+          <span className="text-[14px] font-semibold text-white/90">nexu</span>
         </div>
 
         <div>
@@ -167,8 +167,11 @@ export function InvitePage() {
           <div className="w-full max-w-[360px]">
             {success ? (
               <div className="text-center">
-                <div className="flex justify-center items-center mx-auto mb-5 w-16 h-16 rounded-2xl bg-emerald-500/10">
-                  <CheckCircle2 size={32} className="text-emerald-500" />
+                <div className="flex justify-center items-center mx-auto mb-5 w-16 h-16 rounded-2xl bg-[var(--color-success-muted)]">
+                  <CheckCircle2
+                    size={32}
+                    className="text-[var(--color-success)]"
+                  />
                 </div>
                 <h1 className="mb-2 text-2xl font-bold text-text-primary">
                   Welcome to Nexu!

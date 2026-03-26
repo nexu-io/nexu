@@ -138,7 +138,7 @@ export function DesktopShell() {
           <SurfaceFrame
             description="Authenticated workspace surface served by the repo-local web sidecar."
             src={desktopWebUrl}
-            title="Nexu Web"
+            title="nexu Web"
             version={webSurfaceVersion}
             preload={getWebviewPreloadUrl()}
           />
@@ -170,6 +170,7 @@ export function DesktopShell() {
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}
         onInstall={() => void update.install()}
+        onRetry={() => void update.check()}
         percent={update.percent}
         phase={update.phase}
         version={update.version}

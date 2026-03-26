@@ -344,8 +344,8 @@ function SuccessCard({
           providerName={state.toolkitName}
         />
 
-        <div className="w-14 h-14 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-          <Check size={28} className="text-emerald-500" />
+        <div className="w-14 h-14 rounded-full bg-[var(--color-success-muted)] flex items-center justify-center mx-auto mb-4">
+          <Check size={28} className="text-[var(--color-success)]" />
         </div>
 
         <h1 className="text-[18px] font-bold text-text-primary mb-1">

@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -458,6 +458,25 @@ describe("SkillhubService", () => {
     expect(catalog.getCuratedSlugsToEnqueue).not.toHaveBeenCalled();
     expect(queue.enqueue).not.toHaveBeenCalled();
     expect(watcher.start).not.toHaveBeenCalled();
+  });
+
+  it("start() enqueues curated skills even when ledger already exists", async () => {
+    const env = createEnv(rootDir);
+    // Pre-create the ledger so this simulates a second launch
+    mkdirSync(path.dirname(env.skillDbPath), { recursive: true });
+    writeFileSync(env.skillDbPath, JSON.stringify({ skills: [] }));
+
+    const db = createMockSkillDb();
+    mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+
+    const service = await SkillhubService.create(env);
+    const catalog = mocks.catalogManagerInstances[0];
+    catalog.getCuratedSlugsToEnqueue.mockReturnValue(["failed-skill"]);
+
+    service.start();
+
+    const queue = mocks.installQueueInstances[0];
+    expect(queue.enqueue).toHaveBeenCalledWith("failed-skill", "managed");
   });
 
   it("enqueueInstall() delegates to queue with source 'managed'", async () => {

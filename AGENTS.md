@@ -31,7 +31,11 @@ pnpm restart                          # Restart the desktop local runtime stack
 pnpm reset-state                      # Stop desktop runtime and delete repo-local desktop state
 pnpm status                           # Show desktop local runtime status
 pnpm dist:mac                         # Build signed macOS desktop distributables
+pnpm dist:mac:arm64                   # Build signed Apple Silicon macOS desktop distributables
+pnpm dist:mac:x64                     # Build signed Intel macOS desktop distributables
 pnpm dist:mac:unsigned                # Build unsigned macOS desktop distributables
+pnpm dist:mac:unsigned:arm64          # Build unsigned Apple Silicon macOS desktop distributables
+pnpm dist:mac:unsigned:x64            # Build unsigned Intel macOS desktop distributables
 pnpm probe:slack prepare              # Launch Chrome Canary with the dedicated Slack probe profile
 pnpm probe:slack run                  # Run the local Slack reply smoke probe against an authenticated DM
 pnpm --filter @nexu/web dev           # Web only
@@ -55,6 +59,12 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - Prefer merging the latest `main` into long-running feature branches instead of rewriting shared history once a PR is under review.
 - After a PR merges, sync local `main`, then delete the merged feature branch locally and remotely when it is no longer needed.
 
+## Commit & PR conventions
+
+- **No co-author trailer.** Never append `Co-Authored-By:` lines to commit messages.
+- **Conventional commit prefix.** Use `chore:` for changes that are invisible to end users (CI/CD, issue bots, tooling, config). These are excluded from release notes. Use `feat:` / `fix:` / `docs:` etc. for user-visible changes.
+- **PR format.** When creating a pull request, always follow `.github/pull_request_template.md` — fill in What / Why / How / Affected areas / Checklist sections.
+
 ## Desktop local development
 
 - Use `pnpm install` first, then `pnpm start` / `pnpm stop` / `pnpm restart` / `pnpm status` as the standard local desktop workflow.
@@ -63,12 +73,21 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
 - Treat `pnpm start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
-- Desktop local runtime should not depend on PostgreSQL; controller-owned local state lives under `~/.nexu/`, while desktop dev runtime state remains repo-scoped under `.tmp/desktop/`.
-- `tmux` is required for the desktop local-dev workflow.
+- Desktop local runtime should not depend on PostgreSQL. In dev mode, all state (config, OpenClaw state, logs) lives under `.tmp/desktop/nexu-home/`, fully isolated from the packaged app. Launchd plists go to `.tmp/launchd/`, runtime-ports.json also lives there.
+- In packaged mode, data is split across two directories (see table below). Launchd plists go to `~/Library/LaunchAgents/`.
 - Local desktop runtime state is repo-scoped under `.tmp/desktop/` in development.
-- For startup troubleshooting, use `pnpm logs` and `./apps/desktop/dev.sh devlog`.
-- `pnpm reset-state` is a dev-only cleanup shortcut for `./apps/desktop/dev.sh reset-state`; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete controller-owned state in `~/.nexu/`.
-- To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/`.
+
+### Packaged app directory layout
+
+| Directory | Purpose | Survives uninstall |
+|---|---|---|
+| `~/.nexu/` (`NEXU_HOME`) | User config (`config.json`, `cloud-profiles.json`), compiled snapshots, skill ledger, skillhub cache, logs, openclaw-sidecar, `nexu.db` | Yes |
+| `~/Library/Application Support/@nexu/desktop/` (Electron `userData`) | OpenClaw runtime state: `runtime/openclaw/state/agents/` (conversations), `runtime/openclaw/state/extensions/` (channel state), `runtime/openclaw/state/skills/`, `runtime/openclaw/state/openclaw.json`, plus Electron internal data (Cache, IndexedDB, etc.) | No (cleaned by uninstall tools) |
+
+The split is intentional: `NEXU_HOME` holds lightweight user preferences that should persist across reinstalls; Electron `userData` holds heavy runtime state tied to the app lifecycle. `OPENCLAW_STATE_DIR` is explicitly set by the desktop launcher to point to the `userData` path — do not rely on the controller's default fallback.
+- For startup troubleshooting, use `pnpm logs` to tail dev logs.
+- `pnpm reset-state` is a dev-only cleanup shortcut; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete packaged app state.
+- To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/` and `~/Library/Application Support/@nexu/desktop/`.
 - If `pnpm start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
 - Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
 - For deeper desktop runtime inspection, use the existing event/query path (`onRuntimeEvent(...)`, `runtime:query-events`, `queryRuntimeEvents(...)`) instead of rebuilding one-off diagnostics.

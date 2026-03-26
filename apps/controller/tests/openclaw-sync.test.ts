@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import type { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.js";
+import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
@@ -85,12 +86,14 @@ describe("OpenClawSyncService", () => {
   it("writes compiled config and templates from controller state", async () => {
     const configStore = new NexuConfigStore(env);
     const compiledStore = new CompiledOpenClawStore(env);
+    const authProfilesStore = new OpenClawAuthProfilesStore(env);
     const syncService = new OpenClawSyncService(
       env,
       configStore,
       compiledStore,
       new OpenClawConfigWriter(env),
-      new OpenClawAuthProfilesWriter(),
+      new OpenClawAuthProfilesWriter(authProfilesStore),
+      authProfilesStore,
       new OpenClawRuntimePluginWriter(env),
       new OpenClawRuntimeModelWriter(env),
       new WorkspaceTemplateWriter(env),

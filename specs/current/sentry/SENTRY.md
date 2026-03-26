@@ -150,7 +150,7 @@ The same workflow passes:
 
 - `SENTRY_AUTH_TOKEN`
 
-Then `pnpm --filter @nexu/desktop dist:mac` runs `apps/desktop/scripts/dist-mac.mjs`, which calls `apps/desktop/scripts/upload-sourcemaps.mjs` after the desktop build step.
+Then `pnpm --filter @nexu/desktop dist:mac` (or the arch-specific `dist:mac:arm64` / `dist:mac:x64` variants) runs `apps/desktop/scripts/dist-mac.mjs`, which calls `apps/desktop/scripts/upload-sourcemaps.mjs` after the desktop build step.
 
 The uploader maps `nightly-test` to:
 
@@ -190,7 +190,9 @@ Then writes `apps/desktop/build-config.json` with:
 - `NEXU_DESKTOP_BUILD_TIME`
 - `NEXU_DESKTOP_SENTRY_DSN`
 
-Then `dist:mac` runs the sourcemap upload step automatically.
+Then `dist:mac` / `dist:mac:arm64` / `dist:mac:x64` runs the sourcemap upload step automatically.
+
+Release/update artifacts are now published under arch-specific feed prefixes such as `stable/arm64` and `stable/x64`, so each packaged app resolves `latest-mac.yml` from its matching macOS architecture feed.
 
 Uploader target:
 

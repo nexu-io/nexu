@@ -34,7 +34,7 @@ function NexuIcon({ className = "" }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Nexu"
+      aria-label="nexu"
     >
       <path
         d="M193.435 0C300.266 0 386.869 86.6036 386.869 193.435V345.42C386.869 368.312 368.311 386.87 345.419 386.87H41.4502C18.5579 386.87 0 368.311 0 345.419V193.435C0 86.6036 86.6036 0 193.435 0ZM180.539 206.328V386.867H206.331V206.328H180.539Z"
@@ -64,7 +64,7 @@ function NexuLogoWhite({ className = "" }: { className?: string }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Nexu logo"
+      aria-label="nexu logo"
     >
       <path
         d="M20.5645 0C31.9219 0 41.1289 9.20702 41.1289 20.5645V36.7227C41.1288 39.1562 39.1562 41.1287 36.7227 41.1289H21.9355V21.9355H19.1934V41.1289H4.40625C1.97279 41.1287 0.000138274 39.1561 0 36.7227V20.5645C3.84333e-05 9.20704 9.20704 3.19551e-05 20.5645 0Z"

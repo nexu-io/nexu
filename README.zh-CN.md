@@ -9,8 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release" /></a>
+  <a href="https://github.com/nexu-io/nexu/releases"><img src="https://img.shields.io/github/v/release/nexu-io/nexu?color=blue" alt="Release" /></a>
   <a href="https://github.com/nexu-io/nexu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <a href="https://github.com/nexu-io/nexu/stargazers"><img src="https://img.shields.io/github/stars/nexu-io/nexu?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
@@ -27,26 +28,32 @@
 
 ---
 
-> 🎉 **内测福利**：内测期间，Claude、GPT、Gemini、Kimi、GLM 等顶级模型 **全部免费、无限量使用**。[立即下载体验 →](https://nexu.io)
+> 🦞 **最丝滑接入微信 OpenClaw**：扫码即连，开箱即用。
+>
+> 🖥 **已支持平台**：macOS（Apple Silicon）· macOS（Intel）· Windows — [下载地址](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe)
+>
+> 🎉 **内测福利**：内测期间，Gemini 等顶级模型 **免费使用**。[立即下载体验 →](https://nexu.io)
 
 ---
 
-## 📋 概述
+## 📋 nexu（奈苏）是什么？
 
 **nexu**（奈苏，next to you）是一个开源桌面客户端，让你的 **OpenClaw 🦞** Agent 直接运行在微信、飞书、Slack、Discord 等 IM 中。
 
 **已支持微信接入 OpenClaw** —— 适配微信 8.0.7 OpenClaw 插件，点击连接、微信扫码，即可在微信中与 AI Agent 对话。
 
-下载即用，图形化配置，内置飞书 Skills，支持 Claude / GPT / Gemini 等多模型与自带 API Key。
+下载即用，图形化配置，内置飞书 Skills，支持 Gemini 等多模型与自带 API Key。
 
 连接 IM 后，Agent 7×24 小时在线——手机上随时对话，不受桌面限制。
 
 所有数据保存在本机，隐私安全，完全可控。
 
+<h3 align="center">🎬 产品实操演示</h3>
+
 <p align="center">
-  <img src="site/media/readme-screenshot.png" width="49%" alt="nexu 截图" />
-  &nbsp;
-  <img src="site/media/readme-wechat-demo.png" width="49%" alt="nexu 微信扫码连接" />
+  <video src="https://github.com/user-attachments/assets/220170ce-b394-44de-8bb2-d71512b0eee1" width="100%" autoplay loop muted playsinline>
+    您的浏览器不支持视频播放，请 <a href="https://github.com/user-attachments/assets/220170ce-b394-44de-8bb2-d71512b0eee1">点击下载</a> 观看。
+  </video>
 </p>
 
 ---
@@ -55,7 +62,7 @@
 
 | | OpenClaw 官方 | 典型托管飞书龙虾方案 | **nexu** ✅ |
 |---|---|---|---|
-| **🧠 模型** | 自选，但需手动配置 ⚠️ | 平台指定，不可更换 ❌ | **自选 Claude / GPT / Gemini 等，GUI 一键切换** ✅ |
+| **🧠 模型** | 自选，但需手动配置 ⚠️ | 平台指定，不可更换 ❌ | **自选 Gemini 等，GUI 一键切换；MiniMax / Codex / GLM 支持 OAuth** ✅ |
 | **📡 数据路径** | 本地 | 经第三方服务器，数据不可控 ❌ | **本机为主，不托管你的业务数据** ✅ |
 | **💰 费用** | 免费，但需自行部署 ⚠️ | 订阅 / 按席收费 ❌ | **客户端免费，按自备 API Key 计费** ✅ |
 | **📜 源码** | 开源 | 闭源，无法审计 ❌ | **MIT 开源，可 fork、可审计** ✅ |
@@ -76,7 +83,11 @@
 
 ### 🧠 顶级模型，开箱即用
 
-通过 nexu 账号直接使用 Claude 4.6、ChatGPT 5.4、Minimax 2.5、GLM 5.0、Kimi 2.5 等模型，无需额外配置。也可随时切换为自带 API Key。
+通过 nexu 账号直接使用 Gemini 等模型，无需额外配置。也可随时切换为自带 API Key。
+
+### 🔐 OAuth 一键登录，免填 Key
+
+支持 MiniMax、OpenAI Codex、GLM（Z.AI Coding Plan）OAuth 登录——点击授权即可使用，无需手动复制粘贴 API Key。
 
 ### 🔑 支持自带 API Key，无需登录
 
@@ -138,18 +149,19 @@ nexu 面向 **One Person Company** 与小团队，让一个人就能拥有一支
 
 ### 系统要求
 
-- 🍎 **系统**：macOS 12+（Apple Silicon）
+- 🍎 **macOS**：macOS 12+（Apple Silicon & Intel）
+- 🪟 **Windows**：Windows 10+
 - 💾 **磁盘**：约 500 MB
 
 ### 安装
 
-**推荐：直接下载 Mac 客户端**
+**推荐：直接下载客户端**
 
-1. 打开 [官网](https://nexu.io) 或 [Releases](https://github.com/nexu-io/nexu/releases) 📥
-2. 下载 Mac 安装包
-3. 启动 nexu 🎉
-
-> ⏳ **Windows 与 macOS Intel**：开发中。如需进展可邮件 [support@nexu.ai](mailto:support@nexu.ai)。
+| 平台 | 下载 |
+|------|------|
+| 🍎 macOS（Apple Silicon） | [官网](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🍎 macOS（Intel） | [下载](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
+| 🪟 Windows | [下载](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
 
 ### 首次启动
 
@@ -207,6 +219,28 @@ pnpm test
 - 为新功能编写测试
 - 按需更新文档
 - 保持提交原子化且描述清晰
+
+---
+
+## ❓ FAQ
+
+**Q: nexu 免费吗？**
+A: 客户端完全免费且开源（MIT）。内置多款顶级模型供你使用，也可以选择自带 API Key。
+
+**Q: 支持哪些操作系统？**
+A: 支持 macOS 12+（Apple Silicon & Intel）和 Windows 10+。
+
+**Q: 支持哪些 IM 平台？**
+A: 内置支持微信、飞书、Slack、Discord，开箱即用。
+
+**Q: 我的数据安全吗？**
+A: 所有数据保存在本机，nexu 不托管你的业务数据。源码开源可审计。
+
+**Q: 可以使用自己的 API Key 吗？**
+A: 可以。填入你的 API Key 即可使用，无需注册账号或登录。
+
+**Q: 微信接入需要什么条件？**
+A: 适配微信 8.0.7 OpenClaw 插件，点击连接、微信扫码即可，无需额外配置。
 
 ---
 

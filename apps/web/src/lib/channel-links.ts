@@ -61,6 +61,12 @@ export function getChannelChatUrl(
     }
     case "discord":
       return "https://discord.com/channels/@me";
+    case "telegram":
+      return botUserId
+        ? `https://t.me/${botUserId.replace(/^@/, "")}`
+        : "https://web.telegram.org/";
+    case "whatsapp":
+      return "https://web.whatsapp.com/";
     case "web":
       return "";
     default:

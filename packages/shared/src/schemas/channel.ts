@@ -5,6 +5,8 @@ export const channelTypeSchema = z.enum([
   "discord",
   "feishu",
   "wechat",
+  "telegram",
+  "whatsapp",
 ]);
 
 export const channelStatusSchema = z.enum([
@@ -40,6 +42,18 @@ export const connectWechatSchema = z.object({
   accountId: z.string().min(1),
 });
 
+export const connectTelegramSchema = z.object({
+  botToken: z.string().min(1),
+});
+
+export const connectWhatsappSchema = z.object({
+  accountId: z.string().min(1),
+});
+
+export const whatsappQrWaitRequestSchema = z.object({
+  accountId: z.string().min(1),
+});
+
 export const wechatQrStartResponseSchema = z.object({
   qrDataUrl: z.string().optional(),
   message: z.string(),
@@ -50,6 +64,19 @@ export const wechatQrWaitResponseSchema = z.object({
   connected: z.boolean(),
   message: z.string(),
   accountId: z.string().optional(),
+});
+
+export const whatsappQrStartResponseSchema = z.object({
+  qrDataUrl: z.string().optional(),
+  message: z.string(),
+  accountId: z.string(),
+  alreadyLinked: z.boolean().default(false),
+});
+
+export const whatsappQrWaitResponseSchema = z.object({
+  connected: z.boolean(),
+  message: z.string(),
+  accountId: z.string(),
 });
 
 export const channelResponseSchema = z.object({
@@ -80,8 +107,17 @@ export type ConnectSlackInput = z.infer<typeof connectSlackSchema>;
 export type ConnectDiscordInput = z.infer<typeof connectDiscordSchema>;
 export type ConnectFeishuInput = z.infer<typeof connectFeishuSchema>;
 export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
+export type ConnectTelegramInput = z.infer<typeof connectTelegramSchema>;
+export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
+export type WhatsappQrWaitRequest = z.infer<typeof whatsappQrWaitRequestSchema>;
 export type WechatQrStartResponse = z.infer<typeof wechatQrStartResponseSchema>;
 export type WechatQrWaitResponse = z.infer<typeof wechatQrWaitResponseSchema>;
+export type WhatsappQrStartResponse = z.infer<
+  typeof whatsappQrStartResponseSchema
+>;
+export type WhatsappQrWaitResponse = z.infer<
+  typeof whatsappQrWaitResponseSchema
+>;
 export type ChannelResponse = z.infer<typeof channelResponseSchema>;
 export type SlackOAuthUrlResponse = z.infer<typeof slackOAuthUrlResponseSchema>;
 

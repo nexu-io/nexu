@@ -1662,9 +1662,7 @@ body,
   border-radius: 14px;
   background: #fff;
   pointer-events: auto;
-  box-shadow:
-    0 24px 48px rgba(0, 0, 0, 0.18),
-    0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
   animation: dialog-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
   text-align: center;
 }

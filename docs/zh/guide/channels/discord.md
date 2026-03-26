@@ -35,33 +35,19 @@
 
 ![开启 Message Content Intent](/assets/discord/step4-intents.webp)
 
-2. 在左侧菜单进入「OAuth2」→「URL Generator」，勾选 Scopes：
-   - `bot`
-   - `applications.commands`
+2. 在左侧菜单进入「OAuth2」，在 Scopes 中勾选 `bot`，在下方 Bot Permissions 中勾选 `Administrator`。
 
-![选择 Scopes](/assets/discord/step5-scopes.webp)
+![选择 Scopes 与 Bot Permissions](/assets/discord/step5-scopes.webp)
 
-3. 在下方 Bot Permissions 中勾选：
-   - `View Channels`
-   - `Send Messages`
-   - `Read Message History`
-   - `Embed Links`
-   - `Attach Files`
-   - `Add Reactions`
-   - `Use External Emojis`
-   - `Use External Stickers`
-
-![选择 Bot Permissions](/assets/discord/step5-permissions.webp)
-
-4. 复制页面底部生成的 URL，在浏览器中打开。
+3. 复制页面底部生成的 URL，在浏览器中打开。
 
 ![复制生成的 URL](/assets/discord/step5-generated-url.webp)
 
-5. 选择你的服务器，点击「Continue」。
+4. 选择你的服务器，点击「Continue」。
 
 ![选择服务器](/assets/discord/step3-select-server.webp)
 
-6. 确认权限列表，点击「Authorize」，授权机器人加入。
+5. 确认权限列表，点击「Authorize」，授权机器人加入。
 
 ![授权机器人](/assets/discord/step3-authorize.webp)
 

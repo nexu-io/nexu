@@ -62,11 +62,6 @@ const plugin = {
       }
       const providerOverride = state.selectedModelRef.slice(0, slashIndex);
       const modelOverride = state.selectedModelRef.slice(slashIndex + 1);
-      if (providerOverride.startsWith("custom_")) {
-        return {
-          modelOverride,
-        };
-      }
       return {
         providerOverride,
         modelOverride,

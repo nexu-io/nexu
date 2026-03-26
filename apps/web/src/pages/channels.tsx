@@ -1,9 +1,12 @@
 import { DiscordSetupView } from "@/components/channel-setup/discord-setup-view";
 import { FeishuSetupView } from "@/components/channel-setup/feishu-setup-view";
 import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
+import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
+import { WhatsappSetupView } from "@/components/channel-setup/whatsapp-setup-view";
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
+import { getChannelChatUrl } from "@/lib/channel-links";
 import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,10 +35,18 @@ import {
   getApiV1Channels,
 } from "../../lib/api/sdk.gen";
 
-type Platform = "slack" | "discord" | "feishu" | "wechat";
+type Platform =
+  | "slack"
+  | "discord"
+  | "feishu"
+  | "wechat"
+  | "telegram"
+  | "whatsapp";
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
+  { id: "whatsapp", emoji: "\u{1F4DE}", desc: "Personal WhatsApp" },
   { id: "wechat", emoji: "\u{1F4AC}", desc: "Personal WeChat" },
+  { id: "telegram", emoji: "\u{2708}\u{FE0F}", desc: "Telegram Bot" },
   { id: "feishu", emoji: "\u{1F426}", desc: "Feishu Bot" },
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
@@ -46,6 +57,8 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   discord: "Discord",
   feishu: "Feishu",
   wechat: "WeChat",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
 };
 
 // ─── Main page ───────────────────────────────────────────────
@@ -113,7 +126,7 @@ export function ChannelsPage() {
       </div>
 
       {/* Platform selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
         {PLATFORMS.map((p) => {
           const isActive = platform === p.id;
           const connected = channels.some((ch) => ch.channelType === p.id);
@@ -146,7 +159,10 @@ export function ChannelsPage() {
                 </div>
               </div>
               {connected ? (
-                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                <CheckCircle2
+                  size={14}
+                  className="text-[var(--color-success)] shrink-0"
+                />
               ) : (
                 <Circle size={14} className="text-text-muted/30 shrink-0" />
               )}
@@ -185,6 +201,16 @@ export function ChannelsPage() {
           />
         ) : platform === "discord" ? (
           <DiscordSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
+        ) : platform === "telegram" ? (
+          <TelegramSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
+        ) : platform === "whatsapp" ? (
+          <WhatsappSetupView
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
@@ -306,14 +332,23 @@ function ConfiguredView({
   const discordInviteUrl = channel.appId
     ? `https://discord.com/oauth2/authorize?client_id=${channel.appId}&scope=bot&permissions=8`
     : null;
+  const telegramBotUrl =
+    platform === "telegram"
+      ? getChannelChatUrl(
+          "telegram",
+          channel.appId,
+          channel.botUserId,
+          channel.accountId,
+        )
+      : null;
 
   return (
     <>
       <div className="space-y-4 sm:space-y-5">
         {/* Status banner */}
-        <div className="flex flex-col items-start gap-3 p-4 rounded-xl border bg-emerald-500/5 border-emerald-500/15 sm:flex-row sm:items-center">
-          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-emerald-500/10 shrink-0">
-            <CheckCircle2 size={18} className="text-emerald-500" />
+        <div className="flex flex-col items-start gap-3 p-4 rounded-xl border bg-[var(--color-success-subtle)] border-[var(--color-success-border)] sm:flex-row sm:items-center">
+          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-[var(--color-success-muted)] shrink-0">
+            <CheckCircle2 size={18} className="text-[var(--color-success)]" />
           </div>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-text-primary">
@@ -420,6 +455,30 @@ function ConfiguredView({
           </div>
         )}
 
+        {platform === "telegram" && telegramBotUrl && (
+          <div className="p-5 rounded-xl border bg-surface-1 border-border">
+            <div className="flex gap-2 items-center mb-4">
+              <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-sky-500/10 shrink-0">
+                <ExternalLink size={13} className="text-sky-500" />
+              </div>
+              <h3 className="text-[13px] font-semibold text-text-primary">
+                {t("channels.openInTelegram")}
+              </h3>
+            </div>
+            <p className="text-[12px] text-text-muted mb-3 leading-relaxed">
+              {t("channels.openTelegramDesc")}
+            </p>
+            <a
+              href={telegramBotUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-sky-500 hover:bg-sky-600 transition-all"
+            >
+              <ExternalLink size={13} /> {t("channels.openTelegramBot")}
+            </a>
+          </div>
+        )}
+
         {/* Slack: Webhook URL */}
         {platform === "slack" && (
           <div className="p-5 rounded-xl border bg-surface-1 border-border">
@@ -442,7 +501,7 @@ function ConfiguredView({
                 title="Copy"
               >
                 {copied ? (
-                  <Check size={13} className="text-emerald-500" />
+                  <Check size={13} className="text-[var(--color-success)]" />
                 ) : (
                   <Copy size={13} />
                 )}

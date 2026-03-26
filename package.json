@@ -24,17 +24,16 @@
     "restart": "./scripts/dev-launchd.sh restart",
     "status": "./scripts/dev-launchd.sh status",
     "logs": "./scripts/dev-launchd.sh logs",
-    "start:launchd": "./scripts/dev-launchd.sh start",
-    "stop:launchd": "./scripts/dev-launchd.sh stop",
-    "restart:launchd": "./scripts/dev-launchd.sh restart",
-    "status:launchd": "./scripts/dev-launchd.sh status",
-    "logs:launchd": "./scripts/dev-launchd.sh logs",
     "reset-state": "./apps/desktop/dev.sh reset-state",
     "check:dev": "./scripts/desktop-check-dev.sh",
     "check:dist": "./scripts/desktop-check-dist.sh",
     "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
     "dist:mac": "pnpm --filter @nexu/desktop dist:mac",
-    "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned"
+    "dist:mac:arm64": "pnpm --filter @nexu/desktop dist:mac:arm64",
+    "dist:mac:x64": "pnpm --filter @nexu/desktop dist:mac:x64",
+    "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
+    "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
+    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

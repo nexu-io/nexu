@@ -3,7 +3,7 @@
 如果 nexu 对你有帮助，欢迎在 GitHub 上给我们点一颗 ⭐——这对团队意义重大，也能让更多人发现这个项目。
 
 <div style="text-align: center; margin: 48px 0;">
-  <a href="https://github.com/nexu-io/nexu" target="_blank" style="display: inline-block; padding: 16px 40px; background: #c96f4a; color: #fff; border-radius: 10px; font-size: 18px; font-weight: 600; text-decoration: none; transition: opacity 0.2s;">
+  <a href="https://github.com/nexu-io/nexu" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 16px 40px; background: #c96f4a; color: #fff; border-radius: 10px; font-size: 18px; font-weight: 600; text-decoration: none; transition: opacity 0.2s;">
     ⭐ 去 GitHub 点 Star
   </a>
 </div>

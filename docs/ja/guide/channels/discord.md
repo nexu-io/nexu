@@ -26,19 +26,16 @@ nexu クライアントを開き、Discord チャンネル設定に App ID と B
 1. Discord Developer Portal に戻り、「Bot」ページで次の特権ゲートウェイインテントを有効にします：**Message Content Intent**
 ![Enable Message Content Intent](/assets/discord/step4-intents.webp)
 
-2. 左メニューから「OAuth2」→「URL Generator」に移動し、スコープで `bot` と `applications.commands` を選択します。
-![Select Scopes](/assets/discord/step5-scopes.webp)
+2. 左メニューから「OAuth2」に移動し、Scopes で `bot` を選択、Bot Permissions で `Administrator` を選択します。
+![Select Scopes & Bot Permissions](/assets/discord/step5-scopes.webp)
 
-3. Bot Permissions で次を選択します：チャンネルの表示、メッセージの送信、メッセージ履歴の読み取り、リンクの埋め込み、ファイルの添付、リアクションの追加、外部絵文字の使用、外部ステッカーの使用
-![Select Bot Permissions](/assets/discord/step5-permissions.webp)
-
-4. ページ下部に表示された URL をコピーし、ブラウザで開きます。
+3. ページ下部に表示された URL をコピーし、ブラウザで開きます。
 ![Copy generated URL](/assets/discord/step5-generated-url.webp)
 
-5. サーバーを選び、「続行」をクリックします。
+4. サーバーを選び、「続行」をクリックします。
 ![Select server](/assets/discord/step3-select-server.webp)
 
-6. 権限を確認し、「認証」をクリックしてボットを追加します。
+5. 権限を確認し、「認証」をクリックしてボットを追加します。
 ![Authorize bot](/assets/discord/step3-authorize.webp)
 
 ## ステップ 4：テスト

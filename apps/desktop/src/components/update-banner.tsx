@@ -65,12 +65,30 @@ export function UpdateCheckDialog({
     return null;
   }
 
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isUpToDate) return;
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  };
+
+  const handleOverlayKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!isUpToDate) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onClose();
+    }
+  };
+
   return (
     <div
       className="update-dialog-overlay"
-      onClick={isUpToDate ? onClose : undefined}
+      onClick={handleOverlayClick}
+      onKeyDown={handleOverlayKeyDown}
+      role={isUpToDate ? "button" : "presentation"}
+      tabIndex={isUpToDate ? 0 : -1}
     >
-      <div className="update-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="update-dialog">
         <div className="update-dialog-logo">
           <NexuLogo />
         </div>
@@ -258,22 +276,27 @@ export function UpdateBanner({
 
       {/* Error — Retry + Changelog */}
       {isError && (
-        <div className="update-card-actions">
-          <button
-            className="update-card-btn update-card-btn--primary"
-            onClick={onRetry}
-            type="button"
-          >
-            Retry
-          </button>
-          <button
-            type="button"
-            className="update-card-changelog"
-            onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
-          >
-            Changelog
-          </button>
-        </div>
+        <>
+          {errorMessage && (
+            <div className="update-card-error-msg">{errorMessage}</div>
+          )}
+          <div className="update-card-actions">
+            <button
+              className="update-card-btn update-card-btn--primary"
+              onClick={onRetry}
+              type="button"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              className="update-card-changelog"
+              onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
+            >
+              Changelog
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

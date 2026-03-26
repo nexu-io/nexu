@@ -259,7 +259,11 @@ function serializeProvider(
     displayName: provider.displayName,
     enabled: provider.enabled,
     baseUrl: provider.baseUrl,
+    authMode: provider.authMode,
     hasApiKey: provider.apiKey !== null,
+    hasOauthCredential: provider.oauthCredential !== null,
+    oauthRegion: provider.oauthRegion,
+    oauthEmail: provider.oauthCredential?.email ?? null,
     modelsJson: JSON.stringify(provider.models),
     createdAt: provider.createdAt,
     updatedAt: provider.updatedAt,
@@ -563,7 +567,7 @@ export class NexuConfigStore {
 
     const config = await this.getConfig();
     return this.createBot({
-      name: "Nexu Assistant",
+      name: "nexu Assistant",
       slug: "nexu-assistant",
       modelId: config.runtime.defaultModelId,
     });
@@ -827,6 +831,111 @@ export class NexuConfigStore {
     return channel;
   }
 
+  async connectTelegram(input: {
+    botToken: string;
+    telegramBotId: string;
+    botUsername: string | null;
+    displayName: string | null;
+  }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const accountId = `telegram-${input.telegramBotId}`;
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "telegram",
+      accountId,
+      status: "connected",
+      teamName: input.displayName,
+      appId: input.telegramBotId,
+      botUserId: input.botUsername,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      ...(() => {
+        const previous = config.channels.find(
+          (existing) =>
+            existing.channelType === channel.channelType &&
+            existing.accountId === channel.accountId,
+        );
+        const secrets = { ...config.secrets };
+        if (previous) {
+          delete secrets[`channel:${previous.id}:botToken`];
+          delete secrets[`channel:${previous.id}:authDir`];
+        }
+        secrets[`channel:${channel.id}:botToken`] = input.botToken;
+        return { secrets };
+      })(),
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
+  async connectWhatsapp(input: {
+    accountId: string;
+    authDir?: string | null;
+  }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "whatsapp",
+      accountId: input.accountId,
+      status: "connected",
+      teamName: null,
+      appId: null,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      ...(() => {
+        const previous = config.channels.find(
+          (existing) =>
+            existing.channelType === channel.channelType &&
+            existing.accountId === channel.accountId,
+        );
+        const secrets = { ...config.secrets };
+        if (previous) {
+          delete secrets[`channel:${previous.id}:botToken`];
+          delete secrets[`channel:${previous.id}:authDir`];
+        }
+        if (input.authDir) {
+          secrets[`channel:${channel.id}:authDir`] = input.authDir;
+        }
+        return { secrets };
+      })(),
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
   async connectFeishu(input: ConnectFeishuInput): Promise<ChannelResponse> {
     const bot = await this.getOrCreateDefaultBot();
     const connectedAt = now();
@@ -941,9 +1050,14 @@ export class NexuConfigStore {
             ...existing,
             displayName: input.displayName ?? existing.displayName,
             enabled: input.enabled ?? existing.enabled,
+            authMode: input.authMode ?? existing.authMode,
             baseUrl:
               input.baseUrl === undefined ? existing.baseUrl : input.baseUrl,
-            apiKey: input.apiKey ?? existing.apiKey,
+            apiKey: input.apiKey === undefined ? existing.apiKey : input.apiKey,
+            oauthRegion:
+              input.authMode === "apiKey" ? null : existing.oauthRegion,
+            oauthCredential:
+              input.authMode === "apiKey" ? null : existing.oauthCredential,
             models:
               input.modelsJson === undefined
                 ? existing.models
@@ -956,11 +1070,19 @@ export class NexuConfigStore {
             displayName: input.displayName ?? providerId,
             enabled: input.enabled ?? true,
             baseUrl: input.baseUrl ?? null,
+            authMode: input.authMode ?? "apiKey",
             apiKey: input.apiKey ?? null,
+            oauthRegion: null,
+            oauthCredential: null,
             models: parseModelsJson(input.modelsJson),
             createdAt: currentTime,
             updatedAt: currentTime,
           };
+
+      if (nextProvider.authMode === "apiKey") {
+        nextProvider.oauthRegion = null;
+        nextProvider.oauthCredential = null;
+      }
 
       created = existing === undefined;
       result = nextProvider;
@@ -983,6 +1105,78 @@ export class NexuConfigStore {
       provider: serializeProvider(result),
       created,
     };
+  }
+
+  async setProviderOauthCredentials(
+    providerId: string,
+    input: {
+      displayName?: string;
+      enabled?: boolean;
+      baseUrl?: string | null;
+      models: string[];
+      oauthRegion: "global" | "cn";
+      oauthCredential: {
+        provider: string;
+        access: string;
+        refresh?: string;
+        expires?: number;
+        email?: string;
+      };
+    },
+  ): Promise<StoredProviderResponse> {
+    const currentTime = now();
+    let result: ControllerProvider | null = null;
+
+    await this.store.update((config) => {
+      const existing = config.providers.find(
+        (item) => item.providerId === providerId,
+      );
+      const nextProvider: ControllerProvider = existing
+        ? {
+            ...existing,
+            displayName: input.displayName ?? existing.displayName,
+            enabled: input.enabled ?? true,
+            baseUrl:
+              input.baseUrl === undefined ? existing.baseUrl : input.baseUrl,
+            authMode: "oauth",
+            apiKey: null,
+            oauthRegion: input.oauthRegion,
+            oauthCredential: input.oauthCredential,
+            models: [...input.models],
+            updatedAt: currentTime,
+          }
+        : {
+            id: crypto.randomUUID(),
+            providerId,
+            displayName: input.displayName ?? providerId,
+            enabled: input.enabled ?? true,
+            baseUrl: input.baseUrl ?? null,
+            authMode: "oauth",
+            apiKey: null,
+            oauthRegion: input.oauthRegion,
+            oauthCredential: input.oauthCredential,
+            models: [...input.models],
+            createdAt: currentTime,
+            updatedAt: currentTime,
+          };
+
+      result = nextProvider;
+
+      return {
+        ...config,
+        providers: existing
+          ? config.providers.map((item) =>
+              item.providerId === providerId ? nextProvider : item,
+            )
+          : [...config.providers, nextProvider],
+      };
+    });
+
+    if (result === null) {
+      throw new Error(`Failed to set oauth provider ${providerId}`);
+    }
+
+    return serializeProvider(result);
   }
 
   async deleteProvider(providerId: string): Promise<boolean> {

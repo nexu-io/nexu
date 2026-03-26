@@ -103,6 +103,8 @@ export interface EmbeddedWebServerOptions {
 }
 
 export interface EmbeddedWebServer {
+  /** Actual port the server is listening on (may differ from requested if OS-assigned). */
+  port: number;
   close: () => Promise<void>;
 }
 
@@ -219,8 +221,13 @@ export function startEmbeddedWebServer(
     });
 
     server.listen(port, "127.0.0.1", () => {
-      console.log(`Embedded web server listening on http://127.0.0.1:${port}`);
+      const addr = server.address();
+      const actualPort = typeof addr === "object" && addr ? addr.port : port;
+      console.log(
+        `Embedded web server listening on http://127.0.0.1:${actualPort}`,
+      );
       resolve({
+        port: actualPort,
         close: () =>
           new Promise<void>((closeResolve, closeReject) => {
             server.close((err) => {

@@ -58,7 +58,7 @@ export function SlackOAuthCallbackPage() {
       <div className="flex min-h-[50vh] items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
+            <CheckCircle className="mx-auto h-12 w-12 text-[var(--color-success)]" />
             <CardTitle className="mt-4">{t("slackOAuth.connected")}</CardTitle>
             <CardDescription>
               {t("slackOAuth.connectedDesc", { teamName })}

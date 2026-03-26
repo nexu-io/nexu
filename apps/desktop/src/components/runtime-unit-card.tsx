@@ -22,7 +22,8 @@ export function RuntimeUnitCard({
   busy: boolean;
 }) {
   const [logFilter, setLogFilter] = useState<LogFilter>("all");
-  const isManaged = unit.launchStrategy === "managed";
+  const isManaged =
+    unit.launchStrategy === "managed" || unit.launchStrategy === "launchd";
   const canStart =
     isManaged &&
     (unit.phase === "idle" ||

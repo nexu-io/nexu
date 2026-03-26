@@ -61,8 +61,8 @@ export function FeishuBindPage() {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-md rounded-xl border border-border bg-surface-1 p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 mb-5">
-            <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-success-muted)] mb-5">
+            <CheckCircle2 className="h-7 w-7 text-[var(--color-success)]" />
           </div>
           <h1 className="text-xl font-bold text-text-primary">
             {t("feishuBind.linked")}

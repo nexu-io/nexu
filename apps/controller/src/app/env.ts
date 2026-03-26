@@ -43,9 +43,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3010),
   HOST: z.string().default("127.0.0.1"),
   NEXU_HOME: z.string().default("~/.nexu"),
-  OPENCLAW_STATE_DIR: z.string().default("~/.nexu/runtime/openclaw/state"),
+  OPENCLAW_STATE_DIR: z.string().optional(),
   OPENCLAW_CONFIG_PATH: z.string().optional(),
   OPENCLAW_SKILLS_DIR: z.string().optional(),
+  OPENCLAW_EXTENSIONS_DIR: z.string().optional(),
   SKILLHUB_STATIC_SKILLS_DIR: z.string().optional(),
   PLATFORM_TEMPLATES_DIR: z.string().optional(),
   OPENCLAW_GATEWAY_PORT: z.coerce.number().int().positive().default(18789),
@@ -66,7 +67,10 @@ const envSchema = z.object({
 const parsed = envSchema.parse(process.env);
 
 const nexuHomeDir = expandHomeDir(parsed.NEXU_HOME);
-const openclawStateDir = expandHomeDir(parsed.OPENCLAW_STATE_DIR);
+const openclawStateDir = expandHomeDir(
+  parsed.OPENCLAW_STATE_DIR ??
+    path.join(nexuHomeDir, "runtime", "openclaw", "state"),
+);
 
 export const env = {
   nodeEnv: parsed.NODE_ENV,
@@ -87,6 +91,9 @@ export const env = {
   openclawSkillsDir: expandHomeDir(
     parsed.OPENCLAW_SKILLS_DIR ?? path.join(openclawStateDir, "skills"),
   ),
+  openclawBuiltinExtensionsDir: parsed.OPENCLAW_EXTENSIONS_DIR
+    ? expandHomeDir(parsed.OPENCLAW_EXTENSIONS_DIR)
+    : null,
   openclawExtensionsDir: path.join(openclawStateDir, "extensions"),
   runtimePluginTemplatesDir: workspaceRoot
     ? path.join(
