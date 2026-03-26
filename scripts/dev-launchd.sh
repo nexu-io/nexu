@@ -138,6 +138,13 @@ stop_services() {
   pkill -9 -f "controller/dist/index.js" 2>/dev/null || true
   pkill -9 -f "chrome_crashpad_handler" 2>/dev/null || true
 
+  # Kill tsc --watch and web watcher background processes.
+  # These are started by start_services and normally cleaned by the EXIT
+  # trap, but `pnpm stop` calls stop_services directly without triggering
+  # the trap, leaving watchers alive and printing to the terminal.
+  pkill -f "tsc --watch.*apps/controller" 2>/dev/null || true
+  pkill -f "find.*apps/web/src" 2>/dev/null || true
+
   echo "Services stopped."
 }
 

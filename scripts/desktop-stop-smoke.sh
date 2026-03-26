@@ -62,6 +62,14 @@ else
   fail "residual Electron process(es): $electron_pids"
 fi
 
+# Check for tsc watcher (started by dev-launchd.sh, should be killed on stop)
+tsc_pids=$(pgrep -f "tsc --watch.*apps/controller" 2>/dev/null || true)
+if [ -z "$tsc_pids" ]; then
+  pass "no tsc watcher processes"
+else
+  fail "residual tsc watcher process(es): $tsc_pids"
+fi
+
 # ---------------------------------------------------------------------------
 # 2-4. Ports are free
 # ---------------------------------------------------------------------------
