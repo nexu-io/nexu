@@ -19,9 +19,19 @@ Extract the Sentry issue URL or ID from the issue body/comments. The Sentry issu
 ### 2. Load Sentry credentials
 
 ```bash
-source apps/desktop/.env
-# SENTRY_AUTH_TOKEN is now available
+export SENTRY_AUTH_TOKEN="$(python - <<'PY'
+from pathlib import Path
+
+for line in Path("apps/desktop/.env").read_text().splitlines():
+    if line.startswith("SENTRY_AUTH_TOKEN="):
+        print(line.split("=", 1)[1])
+        break
+PY
+)"
+test -n "$SENTRY_AUTH_TOKEN" || { echo "Missing SENTRY_AUTH_TOKEN"; exit 1; }
 ```
+
+This reads only `SENTRY_AUTH_TOKEN` from the dotenv file; it does not execute the rest of `apps/desktop/.env` as shell code.
 
 Sentry org: `refly-ai`. API base: `https://us.sentry.io/api/0`.
 
@@ -59,7 +69,10 @@ This gives you:
 For native crashes, also check `debugmeta` to identify which process crashed:
 
 ```bash
-curl -s ... | jq '[.entries[] | select(.type == "debugmeta") | .data.images[] | select(.code_file | test("nexu|node|electron"; "i")) | {code_file, type, debug_status}]'
+export EVENT_URL="https://us.sentry.io/api/0/issues/{issue_id}/events/latest/"
+curl -s -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+  "$EVENT_URL" \
+  | jq '[.entries[] | select(.type == "debugmeta") | .data.images[] | select(.code_file | test("nexu|node|electron"; "i")) | {code_file, type, debug_status}]'
 ```
 
 ### 5. Optional — compare multiple events for patterns

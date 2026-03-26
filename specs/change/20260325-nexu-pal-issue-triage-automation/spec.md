@@ -76,7 +76,7 @@ issues.labeled (needs-triage)
   -> script: feishu-triage-notify.mjs
   -> route by labels: bug / non-bug webhook
 
-issue_comment.created   [later phase]
+issue_comment.created
   -> workflow: nexu-pal-triage-command
   -> script: process-triage-command.mjs
   -> permission check: write/admin only
@@ -294,7 +294,7 @@ on_issue_comment(event):
 - Chose add-over-remove normalization for conflicting labels in a single plan so final desired state stays deterministic when later detectors or commands evolve.
 - Phase 4 uses the existing GitHub App token flow instead of the default workflow token so all automated label/comment/close mutations are authored consistently as the app.
 - The command parser intentionally keeps the first shipped surface minimal: `/triage accepted`, `/triage declined`, and `/triage duplicated` only, with unsupported comments ignored as no-op.
-- Kept the overall spec status unchanged after completing through Phase 4 because Phases 5-7 remain open in the plan.
+- Kept the overall spec status unchanged after completing through Phase 7 because Phases 5, 6, and 8 remain open in the plan.
 
 ### Verification
 

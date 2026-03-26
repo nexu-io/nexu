@@ -58,8 +58,14 @@ const webhookUrl = hasBugLabel ? bugWebhookUrl : reqWebhookUrl;
 const queueLabel = hasBugLabel ? "Bug triage" : "Issue triage";
 const headerColor = hasBugLabel ? "red" : "blue";
 const labelsText = labels.length > 0 ? labels.join(", ") : "none";
+const bodyCharacters = Array.from(body);
 const bodySnippet =
-  body.length > 300 ? `${body.slice(0, 300)}...` : body || "(no description)";
+  bodyCharacters.length > 300
+    ? `${bodyCharacters.slice(0, 300).join("")}...`
+    : body || "(no description)";
+const fetchTimeoutMs = 30_000;
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), fetchTimeoutMs);
 
 const payload = {
   msg_type: "interactive",
@@ -90,11 +96,27 @@ const payload = {
   },
 };
 
-const response = await fetch(webhookUrl, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(payload),
-});
+let response;
+
+try {
+  response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  });
+} catch (error) {
+  if (error instanceof Error && error.name === "AbortError") {
+    console.error(
+      `Webhook request timed out after ${fetchTimeoutMs}ms for ${webhookUrl}`,
+    );
+    process.exit(1);
+  }
+
+  throw error;
+} finally {
+  clearTimeout(timeoutId);
+}
 
 if (!response.ok) {
   const text = await response.text();

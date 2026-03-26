@@ -1,23 +1,23 @@
 ---
 name: fetch-pr-reviews
-description: Use when the user asks to获取、查看、统计或列出 GitHub PR 里的评审意见。当前内置 workflow 重点支持 CodeRabbit；在该 workflow 里，“真正的评审意见”固定定义为：非 review summary、非 nitpick 的 actionable inline comments。
+description: Use when the user asks to fetch, view, count, or list review feedback in a GitHub PR. The built-in workflow currently focuses on CodeRabbit. In this workflow, “real review feedback” is strictly defined as actionable inline comments that are neither review summaries nor nitpicks.
 ---
 
 # Fetch PR Reviews
 
 ## CodeRabbit Reviews
 
-“真正的评审意见”固定定义为：
+“Real review feedback” is strictly defined as:
 
-- 是 **inline review comments**
-- **不是** review summary
-- **不是** nitpick
+- **inline review comments**
+- **not** a review summary
+- **not** a nitpick
 
-不需要分析评论内容本身。
+There is no need to analyze the comment content itself.
 
 ### Data sources
 
-CodeRabbit workflow 只需要查这两个来源：
+The CodeRabbit workflow only needs these two sources:
 
 1. **PR review comments**
 
@@ -25,7 +25,7 @@ CodeRabbit workflow 只需要查这两个来源：
    gh api --paginate repos/<owner>/<repo>/pulls/<pr_number>/comments
    ```
 
-   这是真正的 inline comments 来源。
+   This is the authoritative source for real inline comments.
 
 2. **PR reviews**
 
@@ -33,66 +33,101 @@ CodeRabbit workflow 只需要查这两个来源：
    gh api repos/<owner>/<repo>/pulls/<pr_number>/reviews
    ```
 
-   只用于识别和排除 review summary / nitpick 汇总，不用于提取最终结果。
+   This is only used to identify and exclude review summaries / nitpick summaries. It is not used to extract the final result.
 
-不要把这些当主来源：
+Do not treat these as primary sources:
 
 - `gh pr view ...`
 - `gh api repos/<owner>/<repo>/issues/<pr_number>/comments`
 
-原因：它们不是 actionable inline comments 的权威来源。
+Reason: they are not the authoritative source for actionable inline comments.
 
 ### Workflow
 
-#### 1. 拉取 inline comments
+#### 0. Optional: fetch review thread IDs early if resolve/dismiss may be needed
+
+If the user may ask you to resolve review conversations after triaging them, fetch review thread IDs as soon as you know the PR number:
+
+```bash
+gh api graphql -f query='query { repository(owner: "<owner>", name: "<repo>") { pullRequest(number: <pr_number>) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 20) { nodes { databaseId path line author { login } body } } } } } } }'
+```
+
+This is not a primary source for actionable review feedback. It is only for mapping inline comments to resolvable thread IDs.
+
+Recommendation:
+
+- If the user only wants to **view/list/count** review feedback, this step is optional.
+- If the user may want to **resolve conversations**, doing this early is usually more convenient because you can map comment `databaseId` / `path` / `line` to thread IDs in one pass.
+
+#### 1. Fetch inline comments
 
 ```bash
 gh api --paginate repos/<owner>/<repo>/pulls/<pr_number>/comments
 ```
 
-只保留满足以下条件的记录：
+Only keep records that satisfy all of the following:
 
-- `user.login` 是 `coderabbitai[bot]` 或 `coderabbitai`
-- `in_reply_to_id == null`（只看顶层 inline comments，不看回复）
+- `user.login` is `coderabbitai[bot]` or `coderabbitai`
+- `in_reply_to_id == null` (only top-level inline comments, not replies)
 
-这是候选集合。
+This is the candidate set.
 
-#### 2. 拉取 reviews，用来排除 review summary / nitpick
+#### 2. Fetch reviews to exclude review summaries / nitpicks
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<pr_number>/reviews
 ```
 
-识别 CodeRabbit review summary。常见特征：
+Identify CodeRabbit review summaries. Common characteristics include:
 
 - `Actionable comments posted: N`
 - `Nitpick comments`
-- 大段汇总文本
+- long summary text
 
-这些 review-level 内容**不是最终结果**，它们只用于帮助确认：
+These review-level contents are **not the final result**. They are only used to help determine:
 
-- 哪些是 summary
-- 哪些 nitpick 不应计入 actionable inline comments
+- which items are summaries
+- which nitpicks should not be counted as actionable inline comments
 
 ### Filtering rule
 
-CodeRabbit workflow 的最终目标始终是：
+The final goal of the CodeRabbit workflow is always:
 
-> **CodeRabbit 在 `pulls/<pr_number>/comments` 中留下的、非 nitpick、非 summary 的顶层 inline comments**
+> **Top-level inline comments left by CodeRabbit in `pulls/<pr_number>/comments` that are neither nitpicks nor summaries**
 
-实践上按下面做：
+In practice, do the following:
 
-1. 从 `pulls/<pr_number>/comments` 拿到 CodeRabbit 顶层 inline comments
-2. 用 `pulls/<pr_number>/reviews` 识别该 PR 是否存在 nitpick 汇总
-3. 输出时只保留你确认属于 actionable 的 inline comments
+1. Get CodeRabbit top-level inline comments from `pulls/<pr_number>/comments`
+2. Use `pulls/<pr_number>/reviews` to determine whether the PR contains nitpick summaries
+3. In the output, keep only the inline comments you confirm are actionable
 
 ### Large output handling
 
-如果 `gh api --paginate ...` 输出太大被截断：
+If the output of `gh api --paginate ...` is too large and gets truncated:
 
-1. 记录工具输出文件路径
-2. 不要手工整段阅读大 JSON
-3. 交给 `@explorer` 提取：
-   - CodeRabbit authored comments
-   - 顶层 inline comments 数量
-   - 每条 comment 的 `path` / `line` / `body`
+1. Record the tool output file path
+2. Do not manually read through the entire large JSON blob
+3. Hand it off to `@explorer` to extract:
+   - CodeRabbit-authored comments
+   - the number of top-level inline comments
+   - each comment’s `path` / `line` / `body`
+
+### Resolving review conversations
+
+If the user asks to resolve a CodeRabbit review conversation:
+
+1. Identify the target inline comment from the actionable comment list.
+2. Map that comment to its review thread ID via `reviewThreads` GraphQL data.
+   - Match using `databaseId` when possible.
+   - If needed, fall back to `path` + `line` + author login.
+3. Resolve the thread with GraphQL:
+
+```bash
+gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<thread_id>"}) { thread { isResolved } } }'
+```
+
+Notes:
+
+- Resolve the **thread**, not the individual comment.
+- `pulls/<pr_number>/comments` remains the source of truth for identifying actionable inline comments.
+- `reviewThreads` is only for thread-level operations such as resolving conversations.

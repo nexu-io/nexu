@@ -112,18 +112,10 @@ export function createGitHubIssueClient({ token, repo, issueNumber }) {
     },
 
     async removeLabel(label) {
-      try {
-        await ghApi(
-          `/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
-          "DELETE",
-        );
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("failed (404)")) {
-          return null;
-        }
-
-        throw error;
-      }
+      return ghApi(
+        `/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
+        "DELETE",
+      );
     },
 
     closeIssue() {

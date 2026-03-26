@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createGitHubIssueClient,
   normalizeTriagePlan,
 } from "../../scripts/nexu-pal/lib/github-client.mjs";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("normalizeTriagePlan", () => {
   it("deduplicates values and preserves add-over-remove label intent", () => {
@@ -67,7 +71,7 @@ describe("createGitHubIssueClient.applyPlan", () => {
     ]);
   });
 
-  it("treats missing labels as a no-op during removal", async () => {
+  it("surfaces label removal 404s instead of swallowing them", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
@@ -82,6 +86,8 @@ describe("createGitHubIssueClient.applyPlan", () => {
       issueNumber: "123",
     });
 
-    await expect(client.removeLabel("needs-triage")).resolves.toBeNull();
+    await expect(client.removeLabel("needs-triage")).rejects.toThrow(
+      "GitHub API DELETE /issues/123/labels/needs-triage failed (404): missing",
+    );
   });
 });
