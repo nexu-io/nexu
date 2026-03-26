@@ -32,6 +32,7 @@ const mockLaunchdManager = {
   startService: vi.fn(),
   stopServiceGracefully: vi.fn(),
   bootoutService: vi.fn(),
+  bootoutAndWaitForExit: vi.fn(),
   waitForExit: vi.fn(),
   isServiceInstalled: vi.fn(),
   hasPlistFile: vi.fn(),

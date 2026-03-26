@@ -72,6 +72,7 @@ const mockLaunchdManager = {
   startService: vi.fn(),
   stopServiceGracefully: vi.fn(),
   bootoutService: vi.fn(),
+  bootoutAndWaitForExit: vi.fn(),
   waitForExit: vi.fn(),
   isServiceInstalled: vi.fn(),
   hasPlistFile: vi.fn(),
@@ -204,6 +205,7 @@ describe("Launchd Startup Scenarios", () => {
     mockLaunchdManager.installService.mockResolvedValue(undefined);
     mockLaunchdManager.startService.mockResolvedValue(undefined);
     mockLaunchdManager.bootoutService.mockResolvedValue(undefined);
+    mockLaunchdManager.bootoutAndWaitForExit.mockResolvedValue(undefined);
     mockLaunchdManager.waitForExit.mockResolvedValue(undefined);
     mockLaunchdManager.rebootstrapFromPlist.mockResolvedValue(undefined);
 

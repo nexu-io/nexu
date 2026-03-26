@@ -9,7 +9,7 @@
 
 import { BrowserWindow, app, dialog } from "electron";
 import type { EmbeddedWebServer } from "./embedded-web-server";
-import { deleteRuntimePorts } from "./launchd-bootstrap";
+import { teardownLaunchdServices } from "./launchd-bootstrap";
 import type { LaunchdManager } from "./launchd-manager";
 
 export interface QuitHandlerOptions {
@@ -135,26 +135,14 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
           console.error("Error closing web server:", err);
         }
 
-        // Bootout first (unregisters from launchd so KeepAlive won't respawn),
-        // then wait for the process to actually exit before proceeding.
-        for (const label of [opts.labels.openclaw, opts.labels.controller]) {
-          try {
-            await opts.launchd.bootoutService(label);
-          } catch (err) {
-            console.error(`Error booting out ${label}:`, err);
-          }
-          try {
-            await opts.launchd.waitForExit(label, 5000);
-          } catch (err) {
-            console.warn(
-              `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        }
-
-        // Clean up runtime-ports.json so next launch does cold start
+        // Use the shared teardown sequence: bootout each service (with PID-based
+        // SIGKILL fallback), delete runtime-ports.json, and kill orphan processes.
         if (opts.plistDir) {
-          await deleteRuntimePorts(opts.plistDir).catch(() => {});
+          await teardownLaunchdServices({
+            launchd: opts.launchd,
+            labels: opts.labels,
+            plistDir: opts.plistDir,
+          });
         }
 
         // All services stopped. Force exit immediately — app.quit() alone
@@ -209,21 +197,12 @@ export async function quitWithDecision(
   }
 
   if (decision === "quit-completely") {
-    for (const label of [opts.labels.openclaw, opts.labels.controller]) {
-      try {
-        await opts.launchd.bootoutService(label);
-      } catch (err) {
-        console.warn(
-          `bootout ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-      try {
-        await opts.launchd.waitForExit(label, 5000);
-      } catch (err) {
-        console.warn(
-          `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+    if (opts.plistDir) {
+      await teardownLaunchdServices({
+        launchd: opts.launchd,
+        labels: opts.labels,
+        plistDir: opts.plistDir,
+      });
     }
 
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;

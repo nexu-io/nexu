@@ -934,6 +934,13 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        launchd: launchdResult
+          ? {
+              manager: launchdResult.launchd,
+              labels: launchdResult.labels,
+              plistDir: getDefaultPlistDir(!app.isPackaged),
+            }
+          : undefined,
       });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
