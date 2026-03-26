@@ -41,8 +41,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
@@ -66,8 +69,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Lint
@@ -91,8 +97,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Build

@@ -25,6 +25,7 @@ const isUnsigned =
   process.env.NEXU_DESKTOP_MAC_UNSIGNED === "1" ||
   process.env.NEXU_DESKTOP_MAC_UNSIGNED?.toLowerCase() === "true";
 const targetMacArch = resolveTargetMacArch();
+const macTargets = resolveMacTargets();
 const dmgBuilderReleaseName = "dmg-builder@1.2.0";
 const dmgBuilderReleaseVersion = "75c8a6c";
 const dmgBuilderArch = targetMacArch === "arm64" ? "arm64" : "x86_64";
@@ -57,6 +58,28 @@ function resolveTargetMacArch() {
   throw new Error(
     `[dist:mac] Unsupported target arch \"${rawArch}\". Expected \"x64\" or \"arm64\".`,
   );
+}
+
+function resolveMacTargets() {
+  const argValue = process.argv.find((arg) => arg.startsWith("--targets="));
+  const rawTargets =
+    argValue?.slice("--targets=".length) ??
+    process.env.NEXU_DESKTOP_MAC_TARGETS;
+
+  if (!rawTargets) {
+    return null;
+  }
+
+  const targets = rawTargets
+    .split(/[\s,]+/u)
+    .map((target) => target.trim())
+    .filter(Boolean);
+
+  if (targets.length === 0) {
+    return null;
+  }
+
+  return targets;
 }
 
 function ensureArchScopedFeedUrl(feedUrl) {
@@ -580,6 +603,7 @@ async function main() {
   await runElectronBuilder(
     [
       "--mac",
+      ...(macTargets ?? []),
       `--${targetMacArch}`,
       "--publish",
       "never",

@@ -1,7 +1,9 @@
-name: Desktop CI Dist PR
+name: Desktop CI Dist Heavy
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
     paths:
       - "apps/desktop/**"
       - "apps/controller/**"
@@ -16,20 +18,29 @@ on:
       - "scripts/desktop-ci-check.mjs"
       - "tsconfig.base.json"
       - ".github/workflows/desktop-ci-dist.yml"
+      - ".github/workflows/desktop-ci-dist-heavy.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-ci-dist-${{ github.event.pull_request.number || github.ref }}
+  group: desktop-ci-dist-heavy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   desktop-ci:
-    runs-on: macos-14
+    strategy:
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
-      NEXU_DESKTOP_MAC_TARGETS: zip
+      NEXU_DESKTOP_MAC_TARGETS: dmg zip
 
     steps:
       - name: Checkout
@@ -51,7 +62,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -64,7 +75,7 @@ jobs:
 
       - name: Build unsigned macOS desktop bundle
         env:
-          NEXU_DESKTOP_TARGET_ARCH: arm64
+          NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
         run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths
@@ -111,7 +122,13 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
+          dmg_artifacts=(apps/desktop/release/*.dmg)
           zip_artifacts=(apps/desktop/release/*.zip)
+
+          if [ "${#dmg_artifacts[@]}" -eq 0 ]; then
+            echo "No desktop DMG artifact was produced" >&2
+            exit 1
+          fi
 
           if [ "${#zip_artifacts[@]}" -eq 0 ]; then
             echo "No desktop ZIP artifact was produced" >&2
@@ -119,6 +136,7 @@ jobs:
           fi
 
           printf 'Built artifacts:\n'
+          printf ' - %s\n' "${dmg_artifacts[@]}"
           printf ' - %s\n' "${zip_artifacts[@]}"
 
           test -d "$PACKAGED_APP"
@@ -128,8 +146,9 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-ci-dist-arm64
+          name: desktop-ci-dist-${{ matrix.arch }}
           path: |
+            apps/desktop/release/*.dmg
             apps/desktop/release/*.zip
           if-no-files-found: error
           retention-days: 3
@@ -163,7 +182,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-ci-logs-arm64
+          name: desktop-ci-logs-${{ matrix.arch }}
           path: ${{ runner.temp }}/desktop-ci
           if-no-files-found: warn
           retention-days: 3

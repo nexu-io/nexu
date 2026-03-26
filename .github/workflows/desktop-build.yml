@@ -86,6 +86,12 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Restore npm cache for runtime installs
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+
       - name: Resolve build metadata
         id: meta
         shell: bash
