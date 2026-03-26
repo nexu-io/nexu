@@ -54,7 +54,6 @@ permissions:
 jobs:
   build:
     strategy:
-      max-parallel: 1
       matrix:
         include:
           - runner: macos-14
