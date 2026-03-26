@@ -83,7 +83,7 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 
 | Directory | Purpose | Survives uninstall |
 |---|---|---|
-| `~/.nexu/` (`NEXU_HOME`) | User config (`config.json`, `cloud-profiles.json`), compiled snapshots, skill ledger, skillhub cache, logs, openclaw-sidecar, `nexu.db` | Yes |
+| `~/.nexu/` (`NEXU_HOME`) | User config (`config.json`, `cloud-profiles.json`), compiled snapshots (`compiled-openclaw.json`), skill ledger (`skill-ledger.json`), skillhub cache, analytics state, logs, openclaw-sidecar | Yes |
 | `~/Library/Application Support/@nexu/desktop/` (Electron `userData`) | OpenClaw runtime state: `runtime/openclaw/state/agents/` (conversations), `runtime/openclaw/state/extensions/` (channel state), `runtime/openclaw/state/skills/`, `runtime/openclaw/state/openclaw.json`, plus Electron internal data (Cache, IndexedDB, etc.) | No (cleaned by uninstall tools) |
 
 The split is intentional: `NEXU_HOME` holds lightweight user preferences that should persist across reinstalls; Electron `userData` holds heavy runtime state tied to the app lifecycle. `OPENCLAW_STATE_DIR` is explicitly set by the desktop launcher to point to the `userData` path — do not rely on the controller's default fallback.
