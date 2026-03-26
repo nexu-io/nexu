@@ -71,6 +71,8 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
 - The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
 - The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
+- `pnpm start` launch chain: `scripts/dev-launchd.sh` → `apps/desktop/scripts/dev-env.sh` → `electron`. `dev-env.sh` patches the dev Electron binary's `LSUIElement` (prevents child processes from creating Dock icons) and exports `NEXU_WORKSPACE_ROOT`. **All Electron launch paths must go through `dev-env.sh`** — bypassing it causes Dock icon proliferation.
+- `pnpm stop` behavior: sends SIGTERM first (triggers `gracefulShutdown` inside Electron → teardown launchd services → dispose orchestrator → kill orphans), waits up to 10 seconds for graceful exit, then SIGKILL as fallback. Also kills tsc watcher and web watcher background processes.
 - Treat `pnpm start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
 - Desktop local runtime should not depend on PostgreSQL. In dev mode, all state (config, OpenClaw state, logs) lives under `.tmp/desktop/nexu-home/`, fully isolated from the packaged app. Launchd plists go to `.tmp/launchd/`, runtime-ports.json also lives there.
@@ -97,6 +99,26 @@ The split is intentional: `NEXU_HOME` holds lightweight user preferences that sh
 - The controller sidecar is packaged by `apps/desktop/scripts/prepare-controller-sidecar.mjs` which deep-copies all controller `dependencies` and their transitive deps into `.dist-runtime/controller/node_modules/`. Keep controller deps minimal to avoid bloating the desktop distributable.
 - SkillHub (catalog, install, uninstall) runs in the controller via HTTP — not in the Electron main process via IPC. The web app always uses HTTP SDK for skill operations.
 - Desktop auto-update is channel-specific. Packaged builds should embed `NEXU_DESKTOP_UPDATE_CHANNEL` (`stable` / `beta` / `nightly`) so the updater checks the matching feed, and update diagnostics should always log the effective feed URL plus remote `version` / `releaseDate` when available.
+
+### Shutdown architecture
+
+All exit paths converge to a single `gracefulShutdown(reason)` function in `apps/desktop/main/index.ts`:
+- **before-quit** (Cmd+Q / Dock Quit in non-launchd mode) → `gracefulShutdown("before-quit")`
+- **SIGTERM** (external kill, `pnpm stop`, system shutdown) → `gracefulShutdown("signal:SIGTERM")`
+- **SIGINT** (Ctrl+C) → `gracefulShutdown("signal:SIGINT")`
+- **Quit dialog "Quit Completely"** (launchd mode) → `teardownLaunchdServices()` via `quit-handler.ts`
+- **Update install** → `teardownLaunchdServices()` + `ensureNexuProcessesDead()` via `update-manager.ts`
+
+`gracefulShutdown` is idempotent (second call is a no-op) and has an 8-second hard timeout (`process.exit(1)` if teardown hangs). Do not add alternative teardown paths — always route through this function or `teardownLaunchdServices`.
+
+### Desktop stability testing
+
+The desktop test suite includes real launchd integration tests that run on macOS CI runners:
+- `tests/desktop/launchd-integration.test.ts` — real `launchctl` commands, real processes (skipped on non-macOS)
+- `scripts/launchd-lifecycle-e2e.sh` — shell-based e2e: bootstrap → verify → teardown → orphan cleanup → re-bootstrap
+- `scripts/desktop-stop-smoke.sh` — post-stop verification: no residual processes, free ports, no stale state
+- `tests/desktop/data-directory-runtime.test.ts` — verifies every plist env var value by calling real `generatePlist()`
+- `tests/desktop/dev-toolchain-invariants.test.ts` — guards against script bypass regressions (all launch paths go through `dev-env.sh`, all spawn calls set `ELECTRON_RUN_AS_NODE`, etc.)
 
 ## Hard rules
 
@@ -176,6 +198,12 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Skill repo & catalog | `nexu-skills/`, `apps/controller/src/services/skillhub/` |
 | File-based skills design | `specs/plans/2026-03-15-skill-repo-design.md` |
 | Feishu channel setup | `apps/web/src/components/channel-setup/feishu-setup-view.tsx` |
+| Desktop shutdown & lifecycle | `apps/desktop/main/index.ts` (`gracefulShutdown`), `apps/desktop/main/services/quit-handler.ts` |
+| Launchd service management | `apps/desktop/main/services/launchd-manager.ts`, `apps/desktop/main/services/launchd-bootstrap.ts` |
+| Desktop auto-updater | `apps/desktop/main/updater/update-manager.ts` |
+| Dev launch scripts | `scripts/dev-launchd.sh`, `apps/desktop/scripts/dev-env.sh`, `apps/desktop/dev.sh` |
+| Launchd stability tests | `tests/desktop/launchd-integration.test.ts`, `scripts/launchd-lifecycle-e2e.sh` |
+| Stop smoke test | `scripts/desktop-stop-smoke.sh` |
 
 ## Documentation maintenance
 
