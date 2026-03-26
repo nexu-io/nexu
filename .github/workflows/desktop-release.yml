@@ -196,11 +196,15 @@ jobs:
             exit 1
           fi
 
-          # New naming: nexu-{version}-{channel}-{arch}.{ext}
-          versioned_dmg="nexu-${VERSION}-${channel}-${ARCH}.dmg"
-          versioned_zip="nexu-${VERSION}-${channel}-${ARCH}.zip"
-          latest_dmg="nexu-latest-${channel}-${ARCH}.dmg"
-          latest_zip="nexu-latest-${channel}-${ARCH}.zip"
+          latest_name_prefix="nexu-latest-mac-${ARCH}"
+          if [ "$channel" != "stable" ]; then
+            latest_name_prefix="nexu-latest-${channel}-mac-${ARCH}"
+          fi
+
+          versioned_dmg="nexu-${VERSION}-mac-${ARCH}.dmg"
+          versioned_zip="nexu-${VERSION}-mac-${ARCH}.zip"
+          latest_dmg="${latest_name_prefix}.dmg"
+          latest_zip="${latest_name_prefix}.zip"
           checksum_file="desktop-${ARCH}-sha256.txt"
 
           cp "${dmg_files[0]}" "apps/desktop/release-artifacts/${versioned_dmg}"
@@ -300,7 +304,7 @@ jobs:
             exit 0
           fi
 
-          # electron-builder generates filenames without channel, we need to patch them
+          # electron-builder generates filenames without the final public naming format.
           original_dmg="nexu-${VERSION}-${ARCH}.dmg"
           original_zip="nexu-${VERSION}-${ARCH}.zip"
 
@@ -329,28 +333,35 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "[r2] uploading to prefix: ${CHANNEL}/${ARCH}/"
+          upload_prefix() {
+            local prefix="$1"
 
-          # Upload patched latest-mac.yml for auto-update
-          if [ -f "apps/desktop/release/latest-mac.yml" ]; then
-            echo "Uploading latest-mac.yml → ${CHANNEL}/${ARCH}/latest-mac.yml"
-            npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${ARCH}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+            echo "[r2] uploading to prefix: ${prefix}/"
+
+            if [ -f "apps/desktop/release/latest-mac.yml" ]; then
+              echo "Uploading latest-mac.yml → ${prefix}/latest-mac.yml"
+              npx wrangler r2 object put "nexu-desktop-releases/${prefix}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+            fi
+
+            echo "Uploading ${VERSIONED_DMG} → ${prefix}/${VERSIONED_DMG}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_DMG}" --file "apps/desktop/release-artifacts/${VERSIONED_DMG}" --remote
+
+            echo "Uploading ${VERSIONED_ZIP} → ${prefix}/${VERSIONED_ZIP}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_ZIP}" --file "apps/desktop/release-artifacts/${VERSIONED_ZIP}" --remote
+
+            echo "Uploading ${LATEST_DMG} → ${prefix}/${LATEST_DMG}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_DMG}" --file "apps/desktop/release-artifacts/${LATEST_DMG}" --remote
+
+            echo "Uploading ${LATEST_ZIP} → ${prefix}/${LATEST_ZIP}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_ZIP}" --file "apps/desktop/release-artifacts/${LATEST_ZIP}" --remote
+
+            echo "Uploading ${{ steps.artifacts.outputs.checksum_file }} → ${prefix}/${{ steps.artifacts.outputs.checksum_file }}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.checksum_file }}" --file "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}" --remote
+          }
+
+          upload_prefix "${CHANNEL}/${ARCH}"
+
+          if [ "${ARCH}" = "arm64" ]; then
+            echo "[r2] uploading legacy arm64 compatibility feed to prefix: ${CHANNEL}/"
+            upload_prefix "${CHANNEL}"
           fi
-
-          # Upload versioned artifacts
-          echo "Uploading ${VERSIONED_DMG} → ${CHANNEL}/${ARCH}/${VERSIONED_DMG}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${ARCH}/${VERSIONED_DMG}" --file "apps/desktop/release-artifacts/${VERSIONED_DMG}" --remote
-
-          echo "Uploading ${VERSIONED_ZIP} → ${CHANNEL}/${ARCH}/${VERSIONED_ZIP}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${ARCH}/${VERSIONED_ZIP}" --file "apps/desktop/release-artifacts/${VERSIONED_ZIP}" --remote
-
-          # Upload latest artifacts (overwrite each time)
-          echo "Uploading ${LATEST_DMG} → ${CHANNEL}/${ARCH}/${LATEST_DMG}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${ARCH}/${LATEST_DMG}" --file "apps/desktop/release-artifacts/${LATEST_DMG}" --remote
-
-          echo "Uploading ${LATEST_ZIP} → ${CHANNEL}/${ARCH}/${LATEST_ZIP}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${ARCH}/${LATEST_ZIP}" --file "apps/desktop/release-artifacts/${LATEST_ZIP}" --remote
-
-          # Upload checksum
-          echo "Uploading ${{ steps.artifacts.outputs.checksum_file }} → ${CHANNEL}/${ARCH}/${{ steps.artifacts.outputs.checksum_file }}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${ARCH}/${{ steps.artifacts.outputs.checksum_file }}" --file "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}" --remote

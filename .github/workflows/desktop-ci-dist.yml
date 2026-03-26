@@ -44,7 +44,6 @@ concurrency:
 jobs:
   desktop-ci:
     strategy:
-      max-parallel: 1
       matrix:
         include:
           - runner: macos-14

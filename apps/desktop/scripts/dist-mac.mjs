@@ -59,6 +59,29 @@ function resolveTargetMacArch() {
   );
 }
 
+function ensureArchScopedFeedUrl(feedUrl) {
+  if (!feedUrl || feedUrl.startsWith("github://")) {
+    return feedUrl;
+  }
+
+  try {
+    const url = new URL(feedUrl);
+    const trimmedPath = url.pathname.replace(/\/+$/u, "");
+
+    if (trimmedPath.endsWith(`/${targetMacArch}`)) {
+      return url.toString();
+    }
+
+    url.pathname = `${trimmedPath}/${targetMacArch}`;
+    return url.toString();
+  } catch {
+    const trimmedFeedUrl = feedUrl.replace(/\/+$/u, "");
+    return trimmedFeedUrl.endsWith(`/${targetMacArch}`)
+      ? trimmedFeedUrl
+      : `${trimmedFeedUrl}/${targetMacArch}`;
+  }
+}
+
 /**
  * Dereference pnpm symlinks for extraResources that electron-builder
  * copies into the bundle. Without this, symlinks point to non-existent
@@ -388,8 +411,9 @@ async function ensureBuildConfig() {
       : {}),
     ...((merged.NEXU_UPDATE_FEED_URL ?? existingConfig.NEXU_UPDATE_FEED_URL)
       ? {
-          NEXU_UPDATE_FEED_URL:
+          NEXU_UPDATE_FEED_URL: ensureArchScopedFeedUrl(
             merged.NEXU_UPDATE_FEED_URL ?? existingConfig.NEXU_UPDATE_FEED_URL,
+          ),
         }
       : {}),
     ...((merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
@@ -455,6 +479,12 @@ async function getElectronVersion() {
 }
 
 async function main() {
+  if (process.platform !== "darwin") {
+    throw new Error(
+      `[dist:mac] mac packaging must run on macOS: platform=${process.platform}, target=${targetMacArch}.`,
+    );
+  }
+
   if (process.arch !== targetMacArch) {
     throw new Error(
       `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead.`,

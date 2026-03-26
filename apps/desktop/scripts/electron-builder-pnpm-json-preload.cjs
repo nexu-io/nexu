@@ -18,6 +18,9 @@ function patchNodeModulesCollector() {
   const collectorPrototype = collectorModule.NodeModulesCollector?.prototype;
 
   if (!collectorPrototype) {
+    console.warn(
+      "[nexu] NodeModulesCollector prototype not found; JSON extractor patch skipped. electron-builder internals may have changed.",
+    );
     return;
   }
 
