@@ -391,18 +391,14 @@ function installApplicationMenu(): void {
               {
                 id: "check-for-updates",
                 label: "Check for Updates…",
+                enabled:
+                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
                 click: () => {
                   if (updateManagerRef?.isDownloaded) {
                     void updateManagerRef.quitAndInstall();
                     return;
                   }
                   triggerUpdateCheck();
-                },
-              },
-              {
-                label: "Release Notes…",
-                click: () => {
-                  void shell.openExternal(NEXU_GITHUB_RELEASES_URL);
                 },
               },
               { type: "separator" },
