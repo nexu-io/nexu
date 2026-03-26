@@ -1,9 +1,9 @@
 ---
-name: fetch-pr-reviews
-description: Use when the user asks to fetch, view, count, or list review feedback in a GitHub PR. The built-in workflow currently focuses on CodeRabbit. In this workflow, “real review feedback” is strictly defined as actionable inline comments that are neither review summaries nor nitpicks.
+name: process-pr-reviews
+description: Use when the user asks to process, triage, fetch, view, count, list, or resolve review feedback in a GitHub PR. The built-in workflow currently focuses on CodeRabbit. In this workflow, “real review feedback” is strictly defined as actionable inline comments that are neither review summaries nor nitpicks.
 ---
 
-# Fetch PR Reviews
+# Process PR Reviews
 
 ## CodeRabbit Reviews
 
