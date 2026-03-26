@@ -392,8 +392,8 @@ export function registerDesktopCompatRoutes(
       },
     }),
     async (c) => {
-      const modelId =
-        await container.runtimeModelStateService.getEffectiveModelId();
+      const config = await container.configStore.getConfig();
+      const modelId = config.runtime.defaultModelId ?? null;
       return c.json({ modelId }, 200);
     },
   );

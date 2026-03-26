@@ -1538,6 +1538,38 @@ function ByokProviderDetail({
     },
   });
 
+  const refreshModelsMutation = useMutation({
+    mutationFn: async () => {
+      const result = await verifyApiKey(
+        providerId,
+        effectiveApiKey,
+        baseUrl || undefined,
+      );
+
+      if (!result.valid) {
+        throw new Error(result.error ?? t("models.byok.keyInvalidUnknown"));
+      }
+
+      const models = result.models ?? [];
+      setVerifiedModels(models);
+
+      if (hasSavedAccess || isOllama) {
+        await saveProvider(providerId, {
+          apiKey: effectiveApiKey || undefined,
+          baseUrl: baseUrl || null,
+          displayName: meta.name,
+          enabled: true,
+          authMode: "apiKey",
+          modelsJson: JSON.stringify(models),
+        });
+        await queryClient.invalidateQueries({ queryKey: ["providers"] });
+        await queryClient.invalidateQueries({ queryKey: ["models"] });
+      }
+
+      return models;
+    },
+  });
+
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -2230,11 +2262,36 @@ function ByokProviderDetail({
 
       {/* Model list — clickable to switch active model */}
       <div>
-        <div className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-          {t("models.byok.modelList")}
-          <span className="ml-1.5 normal-case tracking-normal">
-            ({displayModels.length})
-          </span>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
+            {t("models.byok.modelList")}
+            <span className="ml-1.5 normal-case tracking-normal">
+              ({displayModels.length})
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={
+              refreshModelsMutation.isPending ||
+              (!isOllama && !apiKey && !dbProvider?.hasApiKey)
+            }
+            onClick={() => refreshModelsMutation.mutate()}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[10px] font-medium transition-colors",
+              !refreshModelsMutation.isPending &&
+                (isOllama || apiKey || dbProvider?.hasApiKey)
+                ? "text-text-secondary hover:bg-surface-2"
+                : "text-text-muted cursor-not-allowed",
+            )}
+          >
+            <RefreshCw
+              size={10}
+              className={cn(refreshModelsMutation.isPending && "animate-spin")}
+            />
+            {refreshModelsMutation.isPending
+              ? t("models.byok.fetchingModels")
+              : t("models.byok.refreshModels")}
+          </button>
         </div>
         <div className="space-y-0.5">
           {displayModels.length === 0 && (
