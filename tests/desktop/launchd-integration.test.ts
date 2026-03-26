@@ -855,7 +855,7 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
   // -----------------------------------------------------------------------
   // 25. stopService (SIGTERM via launchctl kill)
   // -----------------------------------------------------------------------
-  it("stopService sends SIGTERM to running service", async () => {
+  it("stopService sends SIGTERM without throwing", async () => {
     const { LaunchdManager } = await import(
       "../../apps/desktop/main/services/launchd-manager"
     );
@@ -865,14 +865,12 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
     await mgr.startService(CONTROLLER_LABEL);
     await waitFor(() => isPortListening(), 15000);
 
-    // stopService sends SIGTERM (service may restart due to KeepAlive)
-    await mgr.stopService(CONTROLLER_LABEL);
+    const pidBefore = getServicePid();
+    expect(pidBefore).not.toBeNull();
 
-    // Port should go down briefly (even if KeepAlive restarts it)
-    const stopped = await waitFor(() => !isPortListening(), 5000);
-    // If KeepAlive restarts it quickly, the port might come back.
-    // The point is stopService didn't throw.
-    expect(stopped || true).toBe(true); // stopService itself succeeded
+    // stopService sends SIGTERM. KeepAlive may restart it immediately,
+    // so we only verify the call itself doesn't throw.
+    await expect(mgr.stopService(CONTROLLER_LABEL)).resolves.toBeUndefined();
   }, 20000);
 
   // -----------------------------------------------------------------------
