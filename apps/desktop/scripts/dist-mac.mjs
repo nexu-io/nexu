@@ -165,6 +165,10 @@ function resolveMacTargets() {
   return targets;
 }
 
+function shouldBootstrapDmgTooling() {
+  return macTargets === null || macTargets.includes("dmg");
+}
+
 function ensureArchScopedFeedUrl(feedUrl) {
   if (!feedUrl || feedUrl.startsWith("github://")) {
     return feedUrl;
@@ -740,11 +744,13 @@ async function main() {
     },
     timings,
   );
-  env.CUSTOM_DMGBUILD_PATH = await timedStep(
-    "ensure dmgbuild bundle",
-    async () => ensureDmgbuildBundle(),
-    timings,
-  );
+  if (shouldBootstrapDmgTooling()) {
+    env.CUSTOM_DMGBUILD_PATH = await timedStep(
+      "ensure dmgbuild bundle",
+      async () => ensureDmgbuildBundle(),
+      timings,
+    );
+  }
 
   await timedStep(
     "dereference pnpm symlinks",
