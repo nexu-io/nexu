@@ -181,11 +181,19 @@ function getModelDisplayLabel(modelId: string): string {
     : modelId;
 }
 
-function isModelSelected(modelId: string, currentModelId: string): boolean {
-  return (
-    modelId === currentModelId ||
-    getModelDisplayLabel(currentModelId) === modelId
-  );
+export function isModelSelected(
+  modelId: string,
+  currentModelId: string,
+): boolean {
+  if (modelId === currentModelId) {
+    return true;
+  }
+
+  if (!currentModelId.includes("/")) {
+    return getModelDisplayLabel(modelId) === currentModelId;
+  }
+
+  return false;
 }
 
 function getProviderIdFromModelId(
