@@ -265,7 +265,7 @@ const zhCN = {
   "models.modelSwitchedAndSynced": "模型已切换，已同步到机器人",
   "models.modelSwitchedSyncFailed": "模型已切换（同步到机器人待确认）",
   "models.modelSwitchFailed": "模型切换失败",
-  "models.autoSwitched": "已自动切换为 {{model}}",
+  "models.autoSwitched": "之前的模型暂不可用，已为你切换到 {{model}}",
   "models.switchingModel": "正在切换模型…",
   "models.provider.nexu.name": "nexu Official",
   "models.provider.nexu.description":

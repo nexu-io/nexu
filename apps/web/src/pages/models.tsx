@@ -789,9 +789,9 @@ export function ModelsPage() {
       const matched = models.find((m) => m.id === newId);
       const providerName =
         PROVIDER_META[matched?.provider ?? ""]?.name ?? matched?.provider;
-      const label = providerName
-        ? `${matched?.name ?? newId} (${providerName})`
-        : (matched?.name ?? newId);
+      const rawName = matched?.name ?? newId;
+      const shortName = getModelDisplayLabel(rawName);
+      const label = providerName ? `${shortName} (${providerName})` : shortName;
       toast.info(t("models.autoSwitched", { model: label }));
     }
     userSwitchRef.current = false;

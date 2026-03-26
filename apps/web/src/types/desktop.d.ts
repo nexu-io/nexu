@@ -42,6 +42,7 @@ export type MinimalSkill = {
   downloads: number;
   stars: number;
   tags: string[];
+  icon: string | null;
   version: string;
   updatedAt: string;
 };

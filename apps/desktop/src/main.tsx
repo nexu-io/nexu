@@ -19,9 +19,14 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { NEXU_GITHUB_RELEASES_URL } from "../shared/product-urls";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { SurfaceFrame } from "./components/surface-frame";
-import { UpdateBanner } from "./components/update-banner";
+import {
+  UpdateBadge,
+  UpdateBanner,
+  UpdateCheckDialog,
+} from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
@@ -32,6 +37,7 @@ import {
   installComponent,
   onDesktopCommand,
   onRuntimeEvent,
+  openExternal,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -1106,8 +1112,34 @@ function DesktopShell() {
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
               </div>
             </dl>
+            <button
+              type="button"
+              className="desktop-changelog-link"
+              onClick={() => {
+                void openExternal(NEXU_GITHUB_RELEASES_URL);
+              }}
+            >
+              Release notes…
+            </button>
           </div>
         ) : null}
+
+        <UpdateBanner
+          dismissed={update.dismissed}
+          errorMessage={update.errorMessage}
+          onDismiss={update.dismiss}
+          onDownload={() => void update.download()}
+          onInstall={() => void update.install()}
+          onRetry={() => void update.check()}
+          percent={update.percent}
+          phase={update.phase}
+          version={update.version}
+        />
+        <UpdateBadge
+          dismissed={update.dismissed}
+          onUndismiss={update.undismiss}
+          phase={update.phase}
+        />
       </aside>
 
       <main className="desktop-shell-stage">
@@ -1153,15 +1185,10 @@ function DesktopShell() {
         </div>
       </main>
 
-      <UpdateBanner
-        dismissed={update.dismissed}
-        errorMessage={update.errorMessage}
-        onDismiss={update.dismiss}
-        onDownload={() => void update.download()}
-        onInstall={() => void update.install()}
-        percent={update.percent}
+      <UpdateCheckDialog
         phase={update.phase}
-        version={update.version}
+        version={runtimeConfig?.buildInfo.version ?? null}
+        onClose={update.closeDialog}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { checkForUpdate, downloadUpdate, installUpdate } from "../lib/host-api";
 
 export type UpdatePhase =
@@ -21,6 +21,7 @@ export type UpdateState = {
 };
 
 export function useAutoUpdate() {
+  const checkInFlightRef = useRef<Promise<void> | null>(null);
   const [state, setState] = useState<UpdateState>({
     phase: "idle",
     version: null,
@@ -43,6 +44,7 @@ export function useAutoUpdate() {
           ...prev,
           phase: prev.userInitiated ? "checking" : prev.phase,
           errorMessage: null,
+          ...(prev.userInitiated ? { dismissed: false } : {}),
         }));
       }),
     );
@@ -55,6 +57,7 @@ export function useAutoUpdate() {
           version: data.version,
           releaseNotes: data.releaseNotes ?? null,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -77,6 +80,7 @@ export function useAutoUpdate() {
           phase: "downloading",
           percent: data.percent,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -89,6 +93,7 @@ export function useAutoUpdate() {
           version: data.version,
           percent: 100,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -100,6 +105,7 @@ export function useAutoUpdate() {
           phase: "error",
           errorMessage: data.message,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -111,25 +117,19 @@ export function useAutoUpdate() {
     };
   }, []);
 
-  useEffect(() => {
-    if (state.phase !== "up-to-date") {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setState((prev) =>
-        prev.phase === "up-to-date"
-          ? { ...prev, phase: "idle", userInitiated: false }
-          : prev,
-      );
-    }, 2800);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [state.phase]);
+  const closeDialog = useCallback(() => {
+    setState((prev) =>
+      prev.phase === "checking" || prev.phase === "up-to-date"
+        ? { ...prev, phase: "idle", userInitiated: false }
+        : prev,
+    );
+  }, []);
 
   const check = useCallback(async () => {
+    if (checkInFlightRef.current) {
+      return checkInFlightRef.current;
+    }
+
     setState((prev) => ({
       ...prev,
       phase: "checking",
@@ -137,11 +137,18 @@ export function useAutoUpdate() {
       dismissed: false,
       userInitiated: true,
     }));
-    try {
-      await checkForUpdate();
-    } catch {
-      // Errors are delivered via the update:error event
-    }
+    const checkPromise = (async () => {
+      try {
+        await checkForUpdate();
+      } catch {
+        // Errors are delivered via the update:error event
+      } finally {
+        checkInFlightRef.current = null;
+      }
+    })();
+
+    checkInFlightRef.current = checkPromise;
+    return checkPromise;
   }, []);
 
   const download = useCallback(async () => {
@@ -174,5 +181,13 @@ export function useAutoUpdate() {
     }));
   }, []);
 
-  return { ...state, check, download, install, dismiss, undismiss };
+  return {
+    ...state,
+    check,
+    download,
+    install,
+    dismiss,
+    undismiss,
+    closeDialog,
+  };
 }

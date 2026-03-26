@@ -170,6 +170,7 @@ export function DesktopShell() {
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}
         onInstall={() => void update.install()}
+        onRetry={() => void update.check()}
         percent={update.percent}
         phase={update.phase}
         version={update.version}

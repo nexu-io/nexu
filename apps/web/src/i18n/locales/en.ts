@@ -272,7 +272,7 @@ const en = {
   "models.configureProviderHint": "Configure a provider below first",
   "models.searchModels": "Search models...",
   "models.modelSwitched": "Model switched",
-  "models.autoSwitched": "Auto-switched to {{model}}",
+  "models.autoSwitched": "Previous model unavailable — switched to {{model}}",
   "models.modelSwitchedAndSynced": "Model switched & synced to bot",
   "models.modelSwitchedSyncFailed": "Model switched (sync to bot pending)",
   "models.modelSwitchFailed": "Failed to switch model",
