@@ -41,6 +41,31 @@ vi.mock("node:fs", () => ({
   statSync: vi.fn(() => ({ size: 0 })),
 }));
 
+// Mock net.Socket for waitForPort tests
+const mockSocketInstances: Array<{
+  onceCbs: Record<string, Array<(...args: unknown[]) => void>>;
+  destroy: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
+}> = [];
+
+vi.mock("node:net", () => {
+  return {
+    Socket: vi.fn(() => {
+      const instance = {
+        onceCbs: {} as Record<string, Array<(...args: unknown[]) => void>>,
+        once(event: string, cb: (...args: unknown[]) => void) {
+          if (!instance.onceCbs[event]) instance.onceCbs[event] = [];
+          instance.onceCbs[event].push(cb);
+        },
+        connect: vi.fn(),
+        destroy: vi.fn(),
+      };
+      mockSocketInstances.push(instance);
+      return instance;
+    }),
+  };
+});
+
 vi.mock("node:os", () => ({
   userInfo: vi.fn(() => ({ uid: 501 })),
 }));
@@ -117,6 +142,7 @@ describe("RuntimeOrchestrator", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockSocketInstances.length = 0;
 
     mockChild = createMockChild();
     mockSpawn.mockReturnValue(mockChild);
@@ -394,5 +420,430 @@ describe("RuntimeOrchestrator", () => {
     // Web should have been stopped before controller
     expect(stopOrder[0]).toBe("web");
     expect(stopOrder[1]).toBe("controller");
+  });
+
+  // -----------------------------------------------------------------------
+  // 11. startUnit when already running returns early
+  // -----------------------------------------------------------------------
+  it("startUnit skips spawn when unit is already running", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+
+    await orchestrator.startOne("controller");
+    expect(mockSpawn).toHaveBeenCalledTimes(1); // no second spawn
+  });
+
+  // -----------------------------------------------------------------------
+  // 12. startUnit failure sets phase to "failed"
+  // -----------------------------------------------------------------------
+  it("sets phase to failed when spawn throws", async () => {
+    mockSpawn.mockImplementationOnce(() => {
+      throw new Error("ENOENT: command not found");
+    });
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    const state = orchestrator.getRuntimeState();
+    const controller = state.units.find((u) => u.id === "controller");
+    expect(controller?.phase).toBe("failed");
+    expect(controller?.lastError).toContain("ENOENT");
+  });
+
+  // -----------------------------------------------------------------------
+  // 13. Auto-restart on unexpected exit with exponential backoff
+  // -----------------------------------------------------------------------
+  it("auto-restarts with exponential backoff on non-zero exit", async () => {
+    const children: MockChildProcess[] = [];
+    mockSpawn.mockImplementation(() => {
+      const child = createMockChild(3000 + children.length);
+      children.push(child);
+      return child;
+    });
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+    expect(children).toHaveLength(1);
+
+    // Simulate unexpected exit (non-zero)
+    children[0].emit("exit", 1, null);
+
+    // First restart delay is 2000ms (2000 * 2^0)
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(children).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(children).toHaveLength(2);
+
+    // After successful restart, autoRestartAttempts resets to 0.
+    // Second crash also gets 2000ms delay (attempt 1 again).
+    children[1].emit("exit", 1, null);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(children).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(children).toHaveLength(3);
+  });
+
+  // -----------------------------------------------------------------------
+  // 14. Auto-restart suppressed when autoRestart is false
+  // -----------------------------------------------------------------------
+  it("does not auto-restart when autoRestart is false", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller", { autoRestart: false }),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+    mockChild.emit("exit", 1, null);
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // 15. No auto-restart on clean exit (code 0)
+  // -----------------------------------------------------------------------
+  it("does not auto-restart on clean exit (code 0)", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+    mockChild.emit("exit", 0, null);
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // 16. Port probe waits for port via Socket
+  // -----------------------------------------------------------------------
+  it("waits for port readiness when manifest.port is set", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller", { port: 50800 }),
+    ] as never[]);
+
+    const startPromise = orchestrator.startAutoStartManagedUnits();
+
+    // Socket connect callback fires after a tick
+    await vi.advanceTimersByTimeAsync(10);
+    if (mockSocketInstances.length > 0) {
+      const sock = mockSocketInstances[0];
+      sock.onceCbs.connect?.[0]?.();
+    }
+
+    await startPromise;
+
+    const state = orchestrator.getRuntimeState();
+    const controller = state.units.find((u) => u.id === "controller");
+    expect(controller?.phase).toBe("running");
+  });
+
+  // -----------------------------------------------------------------------
+  // 17. Port probe timeout sets phase to failed
+  // -----------------------------------------------------------------------
+  it("fails when port probe times out", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller", {
+        port: 50800,
+        startupTimeoutMs: 500,
+      }),
+    ] as never[]);
+
+    const startPromise = orchestrator.startAutoStartManagedUnits();
+
+    // Keep erroring sockets to simulate port not ready
+    for (let i = 0; i < 20; i++) {
+      await vi.advanceTimersByTimeAsync(260);
+      for (const sock of mockSocketInstances) {
+        sock.onceCbs.error?.[0]?.(new Error("ECONNREFUSED"));
+      }
+    }
+
+    await startPromise;
+
+    const state = orchestrator.getRuntimeState();
+    const controller = state.units.find((u) => u.id === "controller");
+    expect(controller?.phase).toBe("failed");
+    expect(controller?.lastError).toContain("Timed out");
+  });
+
+  // -----------------------------------------------------------------------
+  // 18. subscribe receives events and unsubscribe stops
+  // -----------------------------------------------------------------------
+  it("subscribe delivers events and unsubscribe removes listener", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    const events: unknown[] = [];
+    const unsub = orchestrator.subscribe((event) => events.push(event));
+
+    await orchestrator.startAutoStartManagedUnits();
+    expect(events.length).toBeGreaterThan(0);
+
+    const countBefore = events.length;
+    unsub();
+    mockChild.emit("exit", 0, null);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(events.length).toBe(countBefore);
+  });
+
+  // -----------------------------------------------------------------------
+  // 19. refreshDelegatedUnits detects processes via pgrep
+  // -----------------------------------------------------------------------
+  it("refreshDelegatedUnits detects and loses processes via pgrep", async () => {
+    const { execFileSync } = await import("node:child_process");
+    vi.mocked(execFileSync).mockImplementation((cmd: string) => {
+      if (cmd === "pgrep") return "7777 openclaw-runtime\n";
+      return "";
+    });
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeDelegatedManifest("openclaw"),
+    ] as never[]);
+
+    let state = orchestrator.getRuntimeState();
+    expect(state.units.find((u) => u.id === "openclaw")?.phase).toBe("running");
+    expect(state.units.find((u) => u.id === "openclaw")?.pid).toBe(7777);
+
+    // Process gone
+    vi.mocked(execFileSync).mockImplementation((cmd: string) => {
+      if (cmd === "pgrep") throw new Error("no processes");
+      return "";
+    });
+
+    state = orchestrator.getRuntimeState();
+    expect(state.units.find((u) => u.id === "openclaw")?.phase).toBe("stopped");
+  });
+
+  // -----------------------------------------------------------------------
+  // 20. Delegated unit with missing delegatedProcessMatch
+  // -----------------------------------------------------------------------
+  it("sets failed when delegatedProcessMatch is missing", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      {
+        ...makeDelegatedManifest("openclaw"),
+        delegatedProcessMatch: undefined,
+      },
+    ] as never[]);
+
+    const state = orchestrator.getRuntimeState();
+    expect(state.units.find((u) => u.id === "openclaw")?.phase).toBe("failed");
+  });
+
+  // -----------------------------------------------------------------------
+  // 21. stdout/stderr data captured in logTail
+  // -----------------------------------------------------------------------
+  it("captures stdout and stderr in logTail", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    mockChild.stdout?.emit("data", "hello from stdout\n");
+    mockChild.stderr?.emit("data", "error from stderr\n");
+
+    const state = orchestrator.getRuntimeState();
+    const controller = state.units.find((u) => u.id === "controller");
+    expect(
+      controller?.logTail.some(
+        (e: { stream: string; message: string }) =>
+          e.stream === "stdout" && e.message.includes("hello from stdout"),
+      ),
+    ).toBe(true);
+    expect(
+      controller?.logTail.some(
+        (e: { stream: string; message: string }) =>
+          e.stream === "stderr" && e.message.includes("error from stderr"),
+      ),
+    ).toBe(true);
+  });
+
+  // -----------------------------------------------------------------------
+  // 22. startOne on unknown unit throws
+  // -----------------------------------------------------------------------
+  it("startOne throws for unknown unit id", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await expect(orchestrator.startOne("nonexistent")).rejects.toThrow(
+      "Unknown daemon",
+    );
+  });
+
+  // -----------------------------------------------------------------------
+  // 23. restartOne stops dependents, restarts target + dependents
+  // -----------------------------------------------------------------------
+  it("restartOne stops dependents, restarts target, then restarts dependents", async () => {
+    const spawnOrder: string[] = [];
+    mockSpawn.mockImplementation((_cmd: string, args: string[]) => {
+      const id = args[0] === "web.js" ? "web" : "controller";
+      spawnOrder.push(id);
+      const child = createMockChild(6000 + spawnOrder.length);
+      child.kill = vi.fn(() => {
+        setTimeout(() => child.emit("exit", 0, null), 10);
+        return true;
+      });
+      return child;
+    });
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller", {
+        args: ["controller.js"],
+        dependents: ["web"],
+      }),
+      makeManagedManifest("web", { args: ["web.js"] }),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+    await vi.advanceTimersByTimeAsync(100);
+    spawnOrder.length = 0;
+
+    const restartPromise = orchestrator.restartOne("controller");
+    await vi.advanceTimersByTimeAsync(200);
+    await restartPromise;
+
+    expect(spawnOrder).toEqual(["controller", "web"]);
+  });
+
+  // -----------------------------------------------------------------------
+  // 24. getLogFilePath returns manifest value
+  // -----------------------------------------------------------------------
+  it("getLogFilePath returns the manifest logFilePath", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller", { logFilePath: "/tmp/ctrl.log" }),
+    ] as never[]);
+
+    expect(orchestrator.getLogFilePath("controller")).toBe("/tmp/ctrl.log");
+  });
+
+  // -----------------------------------------------------------------------
+  // 25. queryEvents filters by unitId
+  // -----------------------------------------------------------------------
+  it("queryEvents filters by unitId", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+      makeManagedManifest("web", { args: ["web.js"] }),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    const result = orchestrator.queryEvents({ unitId: "controller" });
+    expect(result.entries.length).toBeGreaterThan(0);
+    expect(
+      result.entries.every(
+        (e: { unitId: string }) => e.unitId === "controller",
+      ),
+    ).toBe(true);
+  });
+
+  // -----------------------------------------------------------------------
+  // 26. Spawn with undefined pid handled gracefully
+  // -----------------------------------------------------------------------
+  it("handles spawn returning child with undefined pid", async () => {
+    const noPidChild = createMockChild();
+    Object.defineProperty(noPidChild, "pid", { value: undefined });
+    mockSpawn.mockReturnValueOnce(noPidChild);
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    const state = orchestrator.getRuntimeState();
+    const controller = state.units.find((u) => u.id === "controller");
+    expect(controller?.pid).toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
+  // 27. restartCount increments on restart
+  // -----------------------------------------------------------------------
+  it("increments restartCount on each restart", async () => {
+    const children: MockChildProcess[] = [];
+    mockSpawn.mockImplementation(() => {
+      const child = createMockChild(9000 + children.length);
+      child.kill = vi.fn(() => {
+        setTimeout(() => child.emit("exit", 0, null), 10);
+        return true;
+      });
+      children.push(child);
+      return child;
+    });
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    const restartPromise = orchestrator.restartOne("controller");
+    await vi.advanceTimersByTimeAsync(100);
+    await restartPromise;
+
+    const state = orchestrator.getRuntimeState();
+    expect(state.units.find((u) => u.id === "controller")?.restartCount).toBe(
+      1,
+    );
   });
 });
