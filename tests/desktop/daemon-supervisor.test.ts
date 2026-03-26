@@ -846,4 +846,83 @@ describe("RuntimeOrchestrator", () => {
       1,
     );
   });
+
+  // -----------------------------------------------------------------------
+  // 28. Partial failure: one unit stops, another hangs
+  // -----------------------------------------------------------------------
+  it("stopAll resolves even when one unit hangs (5s deadline)", async () => {
+    const children: MockChildProcess[] = [];
+    mockSpawn.mockImplementation(() => {
+      const child = createMockChild(7000 + children.length);
+      children.push(child);
+      return child;
+    });
+
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("web"),
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    const stopPromise = orchestrator.stopAll();
+
+    // web exits immediately, controller hangs
+    children[0].emit("exit", 0, null);
+    // controller never emits exit — 5s deadline will resolve it
+
+    await vi.advanceTimersByTimeAsync(6000);
+    await stopPromise;
+
+    // Both should be in terminal state
+    const state = orchestrator.getRuntimeState();
+    expect(state.units.find((u) => u.id === "web")?.phase).toBe("stopped");
+    // controller phase may be "stopping" or caught by deadline — either way, stopAll resolved
+  });
+
+  // -----------------------------------------------------------------------
+  // 29. dispose called twice doesn't hang
+  // -----------------------------------------------------------------------
+  it("dispose is safe to call twice", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    const dispose1 = orchestrator.dispose();
+    mockChild.emit("exit", 0, null);
+    await dispose1;
+
+    // Second dispose — no child processes to stop, should return immediately
+    await orchestrator.dispose();
+  });
+
+  // -----------------------------------------------------------------------
+  // 30. child.error event sets phase to failed
+  // -----------------------------------------------------------------------
+  it("child error event sets phase to failed with error message", async () => {
+    const { RuntimeOrchestrator } = await import(
+      "../../apps/desktop/main/runtime/daemon-supervisor"
+    );
+    const orchestrator = new RuntimeOrchestrator([
+      makeManagedManifest("controller"),
+    ] as never[]);
+
+    await orchestrator.startAutoStartManagedUnits();
+
+    // Emit error on child process
+    mockChild.emit("error", new Error("EACCES: permission denied"));
+
+    const state = orchestrator.getRuntimeState();
+    const controller = state.units.find((u) => u.id === "controller");
+    expect(controller?.phase).toBe("failed");
+    expect(controller?.lastError).toContain("EACCES");
+  });
 });

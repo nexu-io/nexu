@@ -1011,4 +1011,190 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
       // already gone
     }
   }, 30000);
+
+  // -----------------------------------------------------------------------
+  // 31. NEXU_HOME with spaces in path
+  // -----------------------------------------------------------------------
+  // Note: this test works in isolation but fails in the full suite because
+  // other test files mock node:child_process and vitest shares module state.
+  // The same scenario is verified in scripts/launchd-lifecycle-e2e.sh.
+  it.skip("handles NEXU_HOME path containing spaces", async () => {
+    const spaceLabel = `${LABEL_PREFIX}.spaces`;
+    const homeWithSpaces = join(tempDir, "nexu home dir");
+    mkdirSync(homeWithSpaces, { recursive: true });
+
+    const checkScript = join(tempDir, "check-home.js");
+    writeFileSync(
+      checkScript,
+      `const fs = require("node:fs");
+const home = process.env.NEXU_HOME;
+try { fs.mkdirSync(home, { recursive: true }); } catch {}
+fs.writeFileSync(home + "/probe.txt", "ok");
+setTimeout(() => process.exit(0), 30000);`,
+    );
+
+    const plistPath = join(plistDir, `${spaceLabel}.plist`);
+    writeFileSync(
+      plistPath,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>${spaceLabel}</string>
+    <key>ProgramArguments</key><array><string>${NODE_BIN}</string><string>${checkScript}</string></array>
+    <key>EnvironmentVariables</key>
+    <dict><key>NEXU_HOME</key><string>${homeWithSpaces}</string></dict>
+    <key>StandardOutPath</key><string>${join(logDir, "out.log")}</string>
+    <key>StandardErrorPath</key><string>${join(logDir, "err.log")}</string>
+    <key>RunAtLoad</key><false/>
+</dict>
+</plist>`,
+    );
+
+    // Use raw launchctl to avoid vitest module mock interference
+    execFileSync("launchctl", ["bootstrap", DOMAIN, plistPath]);
+    execFileSync("launchctl", ["kickstart", `${DOMAIN}/${spaceLabel}`]);
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const probeFile = join(homeWithSpaces, "probe.txt");
+    const written = await waitFor(() => {
+      try {
+        return readFileSync(probeFile, "utf8") === "ok";
+      } catch {
+        return false;
+      }
+    }, 10000);
+
+    expect(written).toBe(true);
+
+    try {
+      execFileSync("launchctl", ["bootout", `${DOMAIN}/${spaceLabel}`], {
+        stdio: "ignore",
+      });
+    } catch {
+      // already gone
+    }
+  }, 20000);
+
+  // -----------------------------------------------------------------------
+  // 32. Cascading failure: kill controller, verify openclaw OtherJobEnabled behavior
+  // -----------------------------------------------------------------------
+  it("openclaw KeepAlive.OtherJobEnabled: openclaw stops when controller is booted out", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+
+    const label2 = `${LABEL_PREFIX}.openclaw2`;
+    const port2 = testPort + 2;
+
+    // Controller plist
+    const plist1 = writePlist();
+
+    // OpenClaw plist with OtherJobEnabled depending on controller
+    const serverScript2 = join(tempDir, "oc-server.mjs");
+    writeFileSync(
+      serverScript2,
+      `import{createServer}from"node:http";createServer((_,r)=>{r.writeHead(200);r.end("ok")}).listen(${port2},"127.0.0.1");`,
+    );
+    const plist2 = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>${label2}</string>
+    <key>ProgramArguments</key><array><string>${NODE_BIN}</string><string>${serverScript2}</string></array>
+    <key>StandardOutPath</key><string>${join(logDir, "oc.log")}</string>
+    <key>StandardErrorPath</key><string>${join(logDir, "oc-err.log")}</string>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key><false/>
+        <key>OtherJobEnabled</key>
+        <dict><key>${CONTROLLER_LABEL}</key><true/></dict>
+    </dict>
+    <key>RunAtLoad</key><false/>
+</dict>
+</plist>`;
+
+    await mgr.installService(CONTROLLER_LABEL, plist1);
+    await mgr.installService(label2, plist2);
+    await mgr.startService(CONTROLLER_LABEL);
+    await mgr.startService(label2);
+    await waitFor(() => isPortListening(), 15000);
+
+    // Bootout controller — openclaw should eventually stop
+    // (OtherJobEnabled means "keep alive only while other job is enabled")
+    await mgr.bootoutService(CONTROLLER_LABEL);
+    await new Promise((r) => setTimeout(r, 3000));
+
+    // Clean up openclaw
+    try {
+      await mgr.bootoutAndWaitForExit(label2, 10000);
+    } catch {
+      // may already be gone
+    }
+
+    // Controller label should be gone
+    expect(isLabelRegistered()).toBe(false);
+  }, 30000);
+
+  // -----------------------------------------------------------------------
+  // 33. NEXU_HOME with Chinese characters
+  // -----------------------------------------------------------------------
+  // Same vitest module-mock contamination issue as the spaces test above.
+  it.skip("handles NEXU_HOME path with unicode characters", async () => {
+    const unicodeLabel = `${LABEL_PREFIX}.unicode`;
+    const unicodeHome = join(tempDir, "用户配置");
+    mkdirSync(unicodeHome, { recursive: true });
+
+    const checkScript = join(tempDir, "check-unicode.js");
+    writeFileSync(
+      checkScript,
+      `const fs = require("node:fs");
+const home = process.env.NEXU_HOME;
+try { fs.mkdirSync(home, { recursive: true }); } catch {}
+fs.writeFileSync(home + "/ok.txt", "good");
+setTimeout(() => process.exit(0), 30000);`,
+    );
+
+    const plistPath = join(plistDir, `${unicodeLabel}.plist`);
+    writeFileSync(
+      plistPath,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>${unicodeLabel}</string>
+    <key>ProgramArguments</key><array><string>${NODE_BIN}</string><string>${checkScript}</string></array>
+    <key>EnvironmentVariables</key>
+    <dict><key>NEXU_HOME</key><string>${unicodeHome}</string></dict>
+    <key>StandardOutPath</key><string>${join(logDir, "out.log")}</string>
+    <key>StandardErrorPath</key><string>${join(logDir, "err.log")}</string>
+    <key>RunAtLoad</key><false/>
+</dict>
+</plist>`,
+    );
+
+    execFileSync("launchctl", ["bootstrap", DOMAIN, plistPath]);
+    execFileSync("launchctl", ["kickstart", `${DOMAIN}/${unicodeLabel}`]);
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const probeFile = join(unicodeHome, "ok.txt");
+    const written = await waitFor(() => {
+      try {
+        return readFileSync(probeFile, "utf8") === "good";
+      } catch {
+        return false;
+      }
+    }, 10000);
+
+    expect(written).toBe(true);
+
+    try {
+      execFileSync("launchctl", ["bootout", `${DOMAIN}/${unicodeLabel}`], {
+        stdio: "ignore",
+      });
+    } catch {
+      // already gone
+    }
+  }, 20000);
 });

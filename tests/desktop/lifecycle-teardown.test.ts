@@ -632,4 +632,84 @@ describe("ensureNexuProcessesDead", () => {
     expect(result.clean).toBe(true);
     expect(result.remainingPids).toEqual([]);
   });
+
+  // -----------------------------------------------------------------------
+  // 7. process.kill throws non-ESRCH error (e.g. EPERM)
+  // -----------------------------------------------------------------------
+  it("handles EPERM from process.kill gracefully (does not crash)", async () => {
+    let round = 0;
+    mockExecFile.mockImplementation(
+      (
+        cmd: string,
+        _args: string[],
+        callback: (
+          error: Error | null,
+          result: { stdout: string; stderr: string },
+        ) => void,
+      ) => {
+        if (cmd === "pgrep") {
+          round++;
+          if (round <= 1) {
+            callback(null, { stdout: "44444\n", stderr: "" });
+          } else {
+            callback(new Error("no matches"), { stdout: "", stderr: "" });
+          }
+          return;
+        }
+        callback(null, { stdout: "", stderr: "" });
+      },
+    );
+
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => {
+      const err = new Error("EPERM") as NodeJS.ErrnoException;
+      err.code = "EPERM";
+      throw err;
+    });
+
+    const { ensureNexuProcessesDead } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    // Should NOT throw even though kill throws EPERM
+    const result = await ensureNexuProcessesDead({
+      timeoutMs: 2000,
+      intervalMs: 50,
+    });
+
+    // Process disappeared in round 2 (pgrep no matches), so clean
+    expect(result.clean).toBe(true);
+    killSpy.mockRestore();
+  });
+
+  // -----------------------------------------------------------------------
+  // 8. Deduplication: same PID from multiple patterns counted once
+  // -----------------------------------------------------------------------
+  it("deduplicates PIDs found across multiple pgrep patterns", async () => {
+    // Same PID 55555 matches both patterns
+    setupPgrepMock({
+      "controller/dist/index.js": [55555],
+      "openclaw.mjs gateway": [55555],
+      "openclaw-gateway": [55555],
+    });
+
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+
+    const { teardownLaunchdServices } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await teardownLaunchdServices({
+      launchd: mockLaunchdManager as never,
+      labels,
+      plistDir: "/tmp/test-plist",
+    });
+
+    // Should kill 55555 only once (deduplicated by findNexuProcessPids)
+    const killCalls = killSpy.mock.calls.filter(
+      (call) => call[0] === 55555 && call[1] === "SIGKILL",
+    );
+    expect(killCalls.length).toBe(1);
+
+    killSpy.mockRestore();
+  });
 });

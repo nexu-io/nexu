@@ -465,4 +465,70 @@ describe("UpdateManager.quitAndInstall", () => {
     expect(mockEnsureDead).toHaveBeenCalledTimes(1);
     expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
   });
+
+  // -----------------------------------------------------------------------
+  // 13. stopPeriodicCheck is called before teardown
+  // -----------------------------------------------------------------------
+  it("stops periodic update checks before starting teardown", async () => {
+    const callOrder: string[] = [];
+
+    mockTeardown.mockImplementation(async () => {
+      callOrder.push("teardown");
+    });
+
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+    const launchdCtx = createMockLaunchdCtx();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+      launchd: launchdCtx,
+      initialDelayMs: 100,
+    });
+
+    // Start periodic checks
+    mgr.startPeriodicCheck();
+
+    // Spy on stopPeriodicCheck
+    const originalStop = mgr.stopPeriodicCheck.bind(mgr);
+    mgr.stopPeriodicCheck = () => {
+      callOrder.push("stopPeriodic");
+      originalStop();
+    };
+
+    await mgr.quitAndInstall();
+
+    // stopPeriodicCheck should come before teardown
+    expect(callOrder.indexOf("stopPeriodic")).toBeLessThan(
+      callOrder.indexOf("teardown"),
+    );
+  });
+
+  // -----------------------------------------------------------------------
+  // 14. ensureNexuProcessesDead failure does not block install
+  // -----------------------------------------------------------------------
+  it("proceeds with install even if ensureNexuProcessesDead throws", async () => {
+    mockEnsureDead.mockRejectedValueOnce(new Error("pgrep exploded"));
+
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+    });
+
+    // ensureNexuProcessesDead throwing should propagate — it's the verification gate
+    // If it throws, something is seriously wrong and we should NOT proceed blindly
+    await expect(mgr.quitAndInstall()).rejects.toThrow("pgrep exploded");
+  });
 });

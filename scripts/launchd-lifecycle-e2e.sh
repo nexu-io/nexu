@@ -423,5 +423,131 @@ else
   fail "controller port $CONTROLLER_PORT not listening after re-bootstrap"
 fi
 
+# ---------------------------------------------------------------------------
+# Phase 6: NEXU_HOME with spaces in path
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "--- Phase 6: NEXU_HOME with spaces ---"
+
+# Bootout from Phase 5
+launchctl bootout "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
+sleep 1
+
+SPACE_LABEL="${CONTROLLER_LABEL}.spaces"
+SPACE_HOME="$PLIST_DIR/nexu home dir"
+mkdir -p "$SPACE_HOME"
+
+# Script that writes probe file to NEXU_HOME
+cat > "$PLIST_DIR/check-spaces.cjs" << 'CHECKEOF'
+const fs = require("node:fs");
+const home = process.env.NEXU_HOME;
+try { fs.mkdirSync(home, { recursive: true }); } catch {}
+fs.writeFileSync(home + "/probe.txt", "ok");
+setTimeout(() => process.exit(0), 30000);
+CHECKEOF
+
+cat > "$PLIST_DIR/$SPACE_LABEL.plist" << SPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$SPACE_LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$NODE_PATH</string>
+        <string>$PLIST_DIR/check-spaces.cjs</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NEXU_HOME</key>
+        <string>$SPACE_HOME</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$LOG_DIR/spaces-out.log</string>
+    <key>StandardErrorPath</key>
+    <string>$LOG_DIR/spaces-err.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+SPLIST
+
+launchctl bootstrap "$DOMAIN" "$PLIST_DIR/$SPACE_LABEL.plist"
+launchctl kickstart "$DOMAIN/$SPACE_LABEL"
+sleep 3
+
+if [ -f "$SPACE_HOME/probe.txt" ] && [ "$(cat "$SPACE_HOME/probe.txt")" = "ok" ]; then
+  pass "NEXU_HOME with spaces: process wrote probe file correctly"
+else
+  fail "NEXU_HOME with spaces: probe file not found (home=$SPACE_HOME)"
+  echo "  stderr: $(cat "$LOG_DIR/spaces-err.log" 2>/dev/null | head -3)"
+  echo "  stdout: $(cat "$LOG_DIR/spaces-out.log" 2>/dev/null | head -3)"
+  echo "  plist NEXU_HOME: $(/usr/libexec/PlistBuddy -c 'Print :EnvironmentVariables:NEXU_HOME' "$PLIST_DIR/$SPACE_LABEL.plist" 2>/dev/null)"
+fi
+
+launchctl bootout "$DOMAIN/$SPACE_LABEL" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Phase 7: NEXU_HOME with Chinese characters
+# ---------------------------------------------------------------------------
+
+echo ""
+echo "--- Phase 7: NEXU_HOME with unicode ---"
+
+UNICODE_LABEL="${CONTROLLER_LABEL}.unicode"
+UNICODE_HOME="$PLIST_DIR/用户配置"
+mkdir -p "$UNICODE_HOME"
+
+cat > "$PLIST_DIR/check-unicode.cjs" << 'CHECKEOF'
+const fs = require("node:fs");
+const home = process.env.NEXU_HOME;
+try { fs.mkdirSync(home, { recursive: true }); } catch {}
+fs.writeFileSync(home + "/ok.txt", "good");
+setTimeout(() => process.exit(0), 30000);
+CHECKEOF
+
+cat > "$PLIST_DIR/$UNICODE_LABEL.plist" << UPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$UNICODE_LABEL</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$NODE_PATH</string>
+        <string>$PLIST_DIR/check-unicode.cjs</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NEXU_HOME</key>
+        <string>$UNICODE_HOME</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$LOG_DIR/unicode-out.log</string>
+    <key>StandardErrorPath</key>
+    <string>$LOG_DIR/unicode-err.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+UPLIST
+
+launchctl bootstrap "$DOMAIN" "$PLIST_DIR/$UNICODE_LABEL.plist"
+launchctl kickstart "$DOMAIN/$UNICODE_LABEL"
+sleep 3
+
+if [ -f "$UNICODE_HOME/ok.txt" ] && [ "$(cat "$UNICODE_HOME/ok.txt")" = "good" ]; then
+  pass "NEXU_HOME with unicode: process wrote probe file correctly"
+else
+  fail "NEXU_HOME with unicode: probe file not found (home=$UNICODE_HOME)"
+  echo "  stderr: $(cat "$LOG_DIR/unicode-err.log" 2>/dev/null | head -3)"
+  echo "  stdout: $(cat "$LOG_DIR/unicode-out.log" 2>/dev/null | head -3)"
+fi
+
+launchctl bootout "$DOMAIN/$UNICODE_LABEL" 2>/dev/null || true
+
 echo ""
 echo "--- Done ---"
