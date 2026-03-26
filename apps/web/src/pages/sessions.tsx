@@ -619,6 +619,9 @@ export function SessionsPage() {
       const { data } = await deleteApiV1SessionsById({
         path: { id: sessionId },
       });
+      if (!data?.ok) {
+        throw new Error("Session delete failed");
+      }
       return data;
     },
     onSuccess: async () => {

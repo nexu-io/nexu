@@ -165,6 +165,7 @@ describe("session routes", () => {
       "delete-me.png",
     );
     const externalImagePath = path.join(rootDir, "outside-delete-me.png");
+    const managedRootMarkerPath = path.join(rootDir, ".nexu", "keep.txt");
 
     const otherManagedImagePath = path.join(
       rootDir,
@@ -176,6 +177,7 @@ describe("session routes", () => {
 
     await mkdir(path.dirname(transcriptPath), { recursive: true });
     await mkdir(path.dirname(managedImagePath), { recursive: true });
+    await writeFile(managedRootMarkerPath, "keep", "utf8");
     await writeFile(transcriptPath, "", "utf8");
     await writeFile(
       metadataPath,
@@ -205,6 +207,14 @@ describe("session routes", () => {
       },
     });
     await container.artifactService.createArtifact({
+      botId: "bot-art",
+      sessionKey: "delete-me",
+      title: "Managed root artifact",
+      metadata: {
+        directoryPath: container.env.nexuHomeDir,
+      },
+    });
+    await container.artifactService.createArtifact({
       botId: "bot-other",
       sessionKey: "delete-me",
       title: "Other bot artifact",
@@ -222,6 +232,7 @@ describe("session routes", () => {
     await expect(stat(transcriptPath)).rejects.toThrow();
     await expect(stat(metadataPath)).rejects.toThrow();
     await expect(stat(managedImagePath)).rejects.toThrow();
+    await expect(readFile(managedRootMarkerPath, "utf8")).resolves.toBe("keep");
     await expect(readFile(externalImagePath, "utf8")).resolves.toBe("external");
     await expect(readFile(otherManagedImagePath, "utf8")).resolves.toBe(
       "other-managed",

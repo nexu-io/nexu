@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { lstat, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CreateArtifactInput, UpdateArtifactInput } from "@nexu/shared";
@@ -62,7 +62,11 @@ export class ArtifactService {
       const filePaths = this.collectManagedFilePaths(artifact);
       for (const filePath of filePaths) {
         try {
-          await rm(filePath, { force: true, recursive: true });
+          const stats = await lstat(filePath);
+          await rm(filePath, {
+            force: true,
+            recursive: stats.isDirectory(),
+          });
           deletedFiles += 1;
         } catch {
           // Ignore per-file cleanup failures so session deletion still completes.
@@ -210,11 +214,12 @@ export class ArtifactService {
     ].map((root) => path.resolve(root));
 
     return managedRoots.some((root) => {
+      if (candidate === root) {
+        return false;
+      }
+
       const relative = path.relative(root, candidate);
-      return (
-        relative === "" ||
-        (!relative.startsWith("..") && !path.isAbsolute(relative))
-      );
+      return !relative.startsWith("..") && !path.isAbsolute(relative);
     });
   }
 }
