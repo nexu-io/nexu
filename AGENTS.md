@@ -102,14 +102,19 @@ The split is intentional: `NEXU_HOME` holds lightweight user preferences that sh
 
 ### Shutdown architecture
 
-All exit paths converge to a single `gracefulShutdown(reason)` function in `apps/desktop/main/index.ts`:
-- **before-quit** (Cmd+Q / Dock Quit in non-launchd mode) → `gracefulShutdown("before-quit")`
+There are two teardown paths depending on mode:
+
+**Non-launchd mode** (orchestrator): `gracefulShutdown(reason)` in `apps/desktop/main/index.ts` is the single entry point:
+- **before-quit** (Cmd+Q / Dock Quit) → `gracefulShutdown("before-quit")`
 - **SIGTERM** (external kill, `pnpm stop`, system shutdown) → `gracefulShutdown("signal:SIGTERM")`
 - **SIGINT** (Ctrl+C) → `gracefulShutdown("signal:SIGINT")`
-- **Quit dialog "Quit Completely"** (launchd mode) → `teardownLaunchdServices()` via `quit-handler.ts`
-- **Update install** → `teardownLaunchdServices()` + `ensureNexuProcessesDead()` via `update-manager.ts`
 
-`gracefulShutdown` is idempotent (second call is a no-op) and has an 8-second hard timeout (`process.exit(1)` if teardown hangs). Do not add alternative teardown paths — always route through this function or `teardownLaunchdServices`.
+**Launchd mode** (packaged / `pnpm start`): teardown goes through `teardownLaunchdServices()` directly:
+- **Quit dialog "Quit Completely"** → `teardownLaunchdServices()` via `quit-handler.ts`
+- **Update install** → `teardownLaunchdServices()` + `ensureNexuProcessesDead()` via `update-manager.ts`
+- **SIGTERM / SIGINT** → `gracefulShutdown()` which also calls `teardownLaunchdServices()` internally
+
+Both paths share `teardownLaunchdServices()` as the authoritative launchd service cleanup function. `gracefulShutdown` is idempotent (second call is a no-op) and has an 8-second hard timeout (`process.exit(1)` if teardown hangs).
 
 ### Desktop stability testing
 
