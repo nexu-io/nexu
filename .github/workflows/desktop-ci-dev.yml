@@ -78,6 +78,12 @@ jobs:
           pnpm exec electron --version
           tmux -V
 
+      - name: Build all
+        run: pnpm build
+
+      - name: Run unit tests (includes real launchd integration tests on macOS)
+        run: pnpm test
+
       - name: Verify desktop runtime unit health
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci

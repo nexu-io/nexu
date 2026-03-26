@@ -393,4 +393,230 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
     const portFree = await waitFor(() => !isPortListening(), 5000);
     expect(portFree).toBe(true);
   }, 30000);
+
+  // -----------------------------------------------------------------------
+  // 9. Full cycle: start → stop → verify clean → re-start (cold start after quit)
+  // -----------------------------------------------------------------------
+  it("full cycle: start → bootout → verify clean → re-start succeeds", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+    const plistContent = writePlist();
+
+    // Start
+    await mgr.installService(CONTROLLER_LABEL, plistContent);
+    await mgr.startService(CONTROLLER_LABEL);
+    await waitFor(() => isPortListening(), 15000);
+
+    // Stop via bootout
+    await mgr.bootoutAndWaitForExit(CONTROLLER_LABEL, 10000);
+    expect(isLabelRegistered()).toBe(false);
+    expect(isPortListening()).toBe(false);
+
+    // Re-start from scratch (simulates next app launch)
+    await mgr.installService(CONTROLLER_LABEL, plistContent);
+    await mgr.startService(CONTROLLER_LABEL);
+    const restarted = await waitFor(() => isPortListening(), 15000);
+    expect(restarted).toBe(true);
+
+    const status = await mgr.getServiceStatus(CONTROLLER_LABEL);
+    expect(status.status).toBe("running");
+  }, 45000);
+
+  // -----------------------------------------------------------------------
+  // 10. Attach scenario: services running, new Electron attaches
+  // -----------------------------------------------------------------------
+  it("attach: detects already-running service from a previous session", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+    const plistContent = writePlist();
+
+    // Simulate previous session: service is running
+    await mgr.installService(CONTROLLER_LABEL, plistContent);
+    await mgr.startService(CONTROLLER_LABEL);
+    await waitFor(() => isPortListening(), 15000);
+
+    // New "Electron" process creates a fresh LaunchdManager and queries status
+    const mgr2 = new LaunchdManager({ plistDir });
+    const status = await mgr2.getServiceStatus(CONTROLLER_LABEL);
+    expect(status.status).toBe("running");
+    expect(status.pid).toBeGreaterThan(0);
+
+    // Verify port is still listening (service was not disrupted)
+    expect(isPortListening()).toBe(true);
+  }, 20000);
+
+  // -----------------------------------------------------------------------
+  // 11. KeepAlive: service auto-restarts after crash
+  // -----------------------------------------------------------------------
+  it("KeepAlive: service auto-restarts after being killed", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+    const plistContent = writePlist();
+
+    await mgr.installService(CONTROLLER_LABEL, plistContent);
+    await mgr.startService(CONTROLLER_LABEL);
+    await waitFor(() => isPortListening(), 15000);
+
+    // Kill the process (simulates crash)
+    const pid = getServicePid();
+    expect(pid).not.toBeNull();
+    process.kill(pid ?? -1, "SIGKILL");
+
+    // Port goes down
+    await waitFor(() => !isPortListening(), 5000);
+
+    // KeepAlive.SuccessfulExit=false should make launchd restart it.
+    // Wait for it to come back (ThrottleInterval=5s in our plist).
+    const restarted = await waitFor(() => isPortListening(), 15000);
+    expect(restarted).toBe(true);
+
+    // PID should be different from the killed one
+    const newPid = getServicePid();
+    expect(newPid).not.toBeNull();
+    expect(newPid).not.toBe(pid);
+  }, 30000);
+
+  // -----------------------------------------------------------------------
+  // 12. Rapid start/stop cycles don't leave orphans
+  // -----------------------------------------------------------------------
+  it("rapid start/stop cycles leave no orphan processes", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+    const plistContent = writePlist();
+
+    // Do 3 rapid cycles
+    for (let i = 0; i < 3; i++) {
+      await mgr.installService(CONTROLLER_LABEL, plistContent);
+      await mgr.startService(CONTROLLER_LABEL);
+      // Brief wait for process to start
+      await new Promise((r) => setTimeout(r, 500));
+      await mgr.bootoutAndWaitForExit(CONTROLLER_LABEL, 10000);
+    }
+
+    // Verify: no service registered, no port occupied
+    expect(isLabelRegistered()).toBe(false);
+    expect(isPortListening()).toBe(false);
+
+    // Also check via pgrep that no orphan node processes are on our port
+    let orphanPid: string | null = null;
+    try {
+      orphanPid = execFileSync(
+        "lsof",
+        [`-iTCP:${testPort}`, "-sTCP:LISTEN", "-t"],
+        { encoding: "utf8" },
+      ).trim();
+    } catch {
+      orphanPid = null;
+    }
+    expect(orphanPid).toBeFalsy();
+  }, 45000);
+
+  // -----------------------------------------------------------------------
+  // 13. Port conflict: service fails to bind, bootout cleans up
+  // -----------------------------------------------------------------------
+  it("port conflict: occupied port prevents service, bootout cleans up", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+
+    // Occupy the port with a dummy process
+    const blocker = spawn(NODE_BIN, [
+      "-e",
+      `require("net").createServer().listen(${testPort}, "127.0.0.1")`,
+    ]);
+    await waitFor(() => isPortListening(), 5000);
+
+    // Now install and start the service — it won't be able to bind the port
+    const plistContent = writePlist();
+    await mgr.installService(CONTROLLER_LABEL, plistContent);
+    await mgr.startService(CONTROLLER_LABEL);
+
+    // Service process starts but the port is taken.
+    // Regardless of whether the service crashes or runs with port error,
+    // bootout should still clean up the registration.
+    await new Promise((r) => setTimeout(r, 2000));
+    await mgr.bootoutAndWaitForExit(CONTROLLER_LABEL, 10000);
+    expect(isLabelRegistered()).toBe(false);
+
+    // Clean up blocker
+    blocker.kill("SIGKILL");
+    await waitFor(() => !isPortListening(), 5000);
+  }, 30000);
+
+  // -----------------------------------------------------------------------
+  // 14. bootout on already-stopped service is idempotent
+  // -----------------------------------------------------------------------
+  it("bootout on non-running/non-registered service does not throw", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+
+    // bootoutAndWaitForExit on a label that was never registered
+    await expect(
+      mgr.bootoutAndWaitForExit(`${LABEL_PREFIX}.ghost`, 3000),
+    ).resolves.toBeUndefined();
+  });
+
+  // -----------------------------------------------------------------------
+  // 15. teardownLaunchdServices with non-existent labels is safe
+  // -----------------------------------------------------------------------
+  it("teardownLaunchdServices with non-existent labels completes without error", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const { teardownLaunchdServices } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+
+    await expect(
+      teardownLaunchdServices({
+        launchd: mgr,
+        labels: {
+          controller: `${LABEL_PREFIX}.nope1`,
+          openclaw: `${LABEL_PREFIX}.nope2`,
+        },
+        plistDir,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  // -----------------------------------------------------------------------
+  // 16. waitForExit with PID that dies during bootout
+  // -----------------------------------------------------------------------
+  it("waitForExit handles process dying exactly during bootout", async () => {
+    const { LaunchdManager } = await import(
+      "../../apps/desktop/main/services/launchd-manager"
+    );
+    const mgr = new LaunchdManager({ plistDir });
+    const plistContent = writePlist();
+
+    await mgr.installService(CONTROLLER_LABEL, plistContent);
+    await mgr.startService(CONTROLLER_LABEL);
+    await waitFor(() => getServicePid() !== null, 10000);
+
+    const pid = getServicePid();
+    expect(pid).not.toBeNull();
+
+    // Kill process manually right before bootout (race condition)
+    process.kill(pid ?? -1, "SIGKILL");
+
+    // bootoutAndWaitForExit should handle this gracefully
+    await expect(
+      mgr.bootoutAndWaitForExit(CONTROLLER_LABEL, 10000),
+    ).resolves.toBeUndefined();
+
+    // Should be clean
+    expect(isPortListening()).toBe(false);
+  }, 20000);
 });
