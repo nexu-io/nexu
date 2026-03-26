@@ -6,8 +6,8 @@
 
 ## Current state
 
-- [x] PR `desktop-ci-dist` 已降级为 fast gate：`arm64` + `dir` + packaged runtime health check
-- [x] PR 上重复的 `build` / `test` 已移出 `desktop-ci-dist`
+- [x] PR `desktop-ci-dist-lite` 已降级为 fast gate：`arm64` + `dir` + packaged runtime health check
+- [x] PR 上重复的 `build` / `test` 已移出 `desktop-ci-dist-lite`
 - [x] `dist-mac.mjs` 已加入 timing，并确认当前主要瓶颈集中在：
   - `prepare runtime sidecars`
   - `run electron-builder`
@@ -16,7 +16,7 @@
 
 ## Success criteria
 
-- [ ] `Desktop CI Dist Heavy` 不再为 `arm64` / `x64` 重复执行完整的 runtime/sidecar prepare
+- [ ] `Desktop CI Dist Full` 不再为 `arm64` / `x64` 重复执行完整的 runtime/sidecar prepare
 - [x] heavy workflow 的共享 build 产物已能被 package matrix 复用
 - [ ] packaging 逻辑为后续 Windows 复用保留清晰边界（common prepare vs platform package）
 - [ ] CI 日志能清晰显示 prepare 和 package 各自耗时
@@ -79,14 +79,14 @@
 ### 5. Keep PR fast gate minimal
 
 - [x] `desktop-ci-dev` 负责 `build` / `test` / `check:dev`
-- [x] `desktop-ci-dist` 只负责 packaged-path correctness
+- [x] `desktop-ci-dist-lite` 只负责 packaged-path correctness
 - [x] PR workflow 不再上传 desktop build artifact
 - [x] PR workflow 不再生成 `zip` / `dmg` / blockmap
-- [ ] 后续改动避免把重复的 `build/test` 再引回 `desktop-ci-dist`
+- [ ] 后续改动避免把重复的 `build/test` 再引回 `desktop-ci-dist-lite`
 
 ## Suggested order
 
-- [ ] 第 1 步：拆 `desktop-ci-dist-heavy.yml` 为 prepare + package matrix
+- [ ] 第 1 步：拆 `desktop-ci-dist-full.yml` 为 prepare + package matrix
 - [ ] 第 2 步：固化 prepare artifact 列表
 - [x] 第 3 步：给 controller sidecar closure copy 增加 timing
 - [ ] 第 4 步：依据 timing 决定是否做 closure fingerprint / 分层复用

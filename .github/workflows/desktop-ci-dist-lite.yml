@@ -1,4 +1,4 @@
-name: Desktop CI Dist PR
+name: Desktop CI Dist Lite
 
 on:
   pull_request:
@@ -23,14 +23,14 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
-      - ".github/workflows/desktop-ci-dist.yml"
-      - ".github/workflows/desktop-ci-dist-heavy.yml"
+      - ".github/workflows/desktop-ci-dist-lite.yml"
+      - ".github/workflows/desktop-ci-dist-full.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-ci-dist-${{ github.event.pull_request.number || github.ref }}
+  group: desktop-ci-dist-lite-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

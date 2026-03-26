@@ -1,4 +1,4 @@
-name: Desktop CI Dist Heavy
+name: Desktop CI Dist Full
 
 on:
   push:
@@ -25,15 +25,15 @@ on:
       - "vitest.config.ts"
       - "tsconfig.base.json"
       - "scripts/postinstall.mjs"
-      - ".github/workflows/desktop-ci-dist.yml"
-      - ".github/workflows/desktop-ci-dist-heavy.yml"
+      - ".github/workflows/desktop-ci-dist-lite.yml"
+      - ".github/workflows/desktop-ci-dist-full.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-ci-dist-heavy-${{ github.ref }}
+  group: desktop-ci-dist-full-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
