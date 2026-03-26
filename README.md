@@ -283,4 +283,12 @@ We believe open source is the future of AI infrastructure. Fork it, contribute, 
 
 ---
 
+<p align="center">
+  <a href="https://github.com/nexu-io/nexu/stargazers">
+    <img src="site/media/star-us.gif" width="600" alt="Star nexu on GitHub" />
+  </a>
+</p>
+
+---
+
 <p align="center">Built with ❤️ by the nexu Team</p>

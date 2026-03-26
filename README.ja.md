@@ -283,4 +283,12 @@ nexu は [MIT License](LICENSE) のもとでオープンソース化されてい
 
 ---
 
+<p align="center">
+  <a href="https://github.com/nexu-io/nexu/stargazers">
+    <img src="site/media/star-us.gif" width="600" alt="Star nexu on GitHub" />
+  </a>
+</p>
+
+---
+
 <p align="center">nexu チームが ❤️ を込めて開発</p>
