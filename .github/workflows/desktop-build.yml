@@ -412,6 +412,15 @@ jobs:
             "${base_url}/latest-mac.yml"
           )
 
+          if [ "${ARCH}" = "arm64" ]; then
+            legacy_base_url="${UPDATE_FEED_URL%/}"
+            urls+=(
+              "${legacy_base_url}/${LATEST_DMG}"
+              "${legacy_base_url}/${LATEST_ZIP}"
+              "${legacy_base_url}/latest-mac.yml"
+            )
+          fi
+
           files_json=$(printf '%s\n' "${urls[@]}" | jq -R . | jq -sc '.')
           echo "[cf-purge] Purging: ${files_json}"
 

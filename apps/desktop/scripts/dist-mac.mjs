@@ -213,6 +213,10 @@ function shellEscape(value) {
   return `'${String(value).replace(/'/gu, `'"'"'`)}'`;
 }
 
+function quoteNodeOptionValue(value) {
+  return `"${String(value).replace(/(["\\])/gu, "\\$1")}"`;
+}
+
 async function runElectronBuilder(args, options = {}) {
   const electronBuilderCli = require.resolve("electron-builder/cli.js", {
     paths: [electronRoot, repoRoot],
@@ -226,7 +230,7 @@ async function runElectronBuilder(args, options = {}) {
   const existingNodeOptions = baseEnv.NODE_OPTIONS?.trim();
   const nodeOptions = [
     existingNodeOptions,
-    `--require=${electronBuilderPreload}`,
+    `--require=${quoteNodeOptionValue(electronBuilderPreload)}`,
   ]
     .filter(Boolean)
     .join(" ");
