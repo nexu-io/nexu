@@ -119,6 +119,10 @@ jobs:
       - name: Run unit tests (includes real launchd integration tests on macOS)
         run: pnpm test
 
+      - name: Launchd lifecycle e2e test
+        shell: bash
+        run: bash scripts/launchd-lifecycle-e2e.sh
+
       - name: Verify desktop runtime unit health
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci

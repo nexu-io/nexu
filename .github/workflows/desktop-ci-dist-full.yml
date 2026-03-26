@@ -90,13 +90,6 @@ jobs:
       - name: Build all (shared prepare)
         run: pnpm build
 
-      - name: Run unit tests (includes real launchd integration tests on macOS)
-        run: pnpm test
-
-      - name: Launchd lifecycle e2e test
-        shell: bash
-        run: bash scripts/launchd-lifecycle-e2e.sh
-
       - name: Upload shared desktop prepare artifacts
         if: success()
         uses: actions/upload-artifact@v4
