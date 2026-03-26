@@ -1,5 +1,5 @@
 import { type ChildProcess, execSync, spawn } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -18,6 +18,24 @@ const RESTART_WINDOW_MS = 120_000;
 const CONTROLLED_RESTART_GRACE_MS = 45_000;
 const CONTROLLED_RESTART_PROBE_INTERVAL_MS = 500;
 const NEXU_EVENT_MARKER = "NEXU_EVENT ";
+
+function findWorkspaceRoot(startDir: string): string | null {
+  let currentDir = path.resolve(startDir);
+
+  for (let index = 0; index < 10; index += 1) {
+    if (existsSync(path.join(currentDir, "pnpm-workspace.yaml"))) {
+      return currentDir;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return null;
+}
 
 export interface OpenClawRuntimeEvent {
   event: string;
@@ -100,16 +118,35 @@ export class OpenClawProcessManager {
     let extraEnv: Record<string, string> = {};
 
     if (electronExec) {
-      // Resolve the openclaw entry point relative to the bin script
-      const binDir = path.dirname(path.resolve(this.env.openclawBin));
-      const entry = path.resolve(
-        binDir,
-        "..",
-        "node_modules/openclaw/openclaw.mjs",
-      );
-      cmd = electronExec;
-      args = [entry, "gateway", "run"];
-      extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+      const workspaceRoot =
+        process.env.NEXU_WORKSPACE_ROOT?.trim() ||
+        findWorkspaceRoot(process.cwd());
+      const runtimeEntryPath = workspaceRoot
+        ? path.join(
+            workspaceRoot,
+            "openclaw-runtime",
+            "node_modules",
+            "openclaw",
+            "openclaw.mjs",
+          )
+        : null;
+
+      if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
+        cmd = electronExec;
+        args = [runtimeEntryPath, "gateway", "run"];
+        extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+      } else {
+        // Resolve the openclaw entry point relative to the bin script
+        const binDir = path.dirname(path.resolve(this.env.openclawBin));
+        const entry = path.resolve(
+          binDir,
+          "..",
+          "node_modules/openclaw/openclaw.mjs",
+        );
+        cmd = electronExec;
+        args = [entry, "gateway", "run"];
+        extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+      }
     } else {
       cmd = this.env.openclawBin;
       args = ["gateway", "run"];

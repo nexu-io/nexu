@@ -201,8 +201,27 @@ function getOpenClawCommandSpec(env: ControllerEnv): {
   argsPrefix: string[];
   extraEnv: Record<string, string>;
 } {
+  const workspaceRoot =
+    process.env.NEXU_WORKSPACE_ROOT?.trim() || findWorkspaceRoot(process.cwd());
+  const runtimeEntryPath = workspaceRoot
+    ? path.join(
+        workspaceRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      )
+    : null;
   const electronExec = process.env.OPENCLAW_ELECTRON_EXECUTABLE;
   if (electronExec) {
+    if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
+      return {
+        command: electronExec,
+        argsPrefix: [runtimeEntryPath],
+        extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
+      };
+    }
+
     const binDir = path.dirname(path.resolve(env.openclawBin));
     const entry = path.resolve(
       binDir,
@@ -224,17 +243,8 @@ function getOpenClawCommandSpec(env: ControllerEnv): {
     };
   }
 
-  const workspaceRoot =
-    process.env.NEXU_WORKSPACE_ROOT?.trim() || findWorkspaceRoot(process.cwd());
   if (workspaceRoot) {
-    const runtimeEntryPath = path.join(
-      workspaceRoot,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    );
-    if (existsSync(runtimeEntryPath)) {
+    if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
       return {
         command: process.execPath,
         argsPrefix: [runtimeEntryPath],
