@@ -154,9 +154,8 @@ jobs:
           name: desktop-ci-dist-${{ matrix.arch }}
           path: |
             apps/desktop/release/*.dmg
-            apps/desktop/release/*.zip
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3
 
       - name: Verify packaged runtime unit health
         env:
@@ -190,4 +189,4 @@ jobs:
           name: desktop-ci-logs-${{ matrix.arch }}
           path: ${{ runner.temp }}/desktop-ci
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3
