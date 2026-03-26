@@ -34,7 +34,6 @@ OPENCLAW_LABEL="io.nexu.openclaw.e2e"
 
 NODE_PATH="$(command -v node)"
 CONTROLLER_ENTRY="$REPO_ROOT/apps/controller/dist/index.js"
-OPENCLAW_ENTRY="$REPO_ROOT/openclaw-runtime/node_modules/openclaw/openclaw.mjs"
 
 # Use high ports to avoid conflicts
 CONTROLLER_PORT=51800
@@ -155,12 +154,6 @@ fi
 if [ ! -f "$CONTROLLER_ENTRY" ]; then
   echo "Building all (controller needs shared)..."
   pnpm build
-fi
-
-if [ ! -f "$OPENCLAW_ENTRY" ]; then
-  echo "ERROR: openclaw entry not found at $OPENCLAW_ENTRY" >&2
-  echo "Run 'pnpm install' first." >&2
-  exit 1
 fi
 
 mkdir -p "$PLIST_DIR" "$LOG_DIR" "$STATE_DIR" "$STATE_DIR/skills" "$STATE_DIR/tmp"
