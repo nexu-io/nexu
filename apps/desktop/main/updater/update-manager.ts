@@ -101,6 +101,7 @@ export class UpdateManager {
   private readonly launchdCtx: UpdateManagerOptions["launchd"];
   private currentFeedUrl: string;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
+  private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -281,6 +282,9 @@ export class UpdateManager {
     // prevents the subsequent steps or the final install from proceeding.
     // The verification gate in phase 2 is the real safety check.
 
+    // 0. Stop periodic update checks so they don't fire during teardown.
+    this.stopPeriodicCheck();
+
     // 1a. Tear down launchd services (bootout + SIGKILL + delete ports file).
     if (this.launchdCtx) {
       try {
@@ -346,11 +350,12 @@ export class UpdateManager {
   }
 
   startPeriodicCheck(): void {
-    if (this.timer) {
+    if (this.timer || this.initialTimer) {
       return;
     }
 
-    setTimeout(() => {
+    this.initialTimer = setTimeout(() => {
+      this.initialTimer = null;
       void this.checkNow();
       this.timer = setInterval(() => {
         void this.checkNow();
@@ -359,6 +364,10 @@ export class UpdateManager {
   }
 
   stopPeriodicCheck(): void {
+    if (this.initialTimer) {
+      clearTimeout(this.initialTimer);
+      this.initialTimer = null;
+    }
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;

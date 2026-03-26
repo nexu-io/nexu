@@ -80,8 +80,11 @@ jobs:
           set -euo pipefail
           pnpm exec electron --version
 
-      - name: Build controller (for launchd e2e)
-        run: pnpm --filter @nexu/controller build
+      - name: Build all (for tests and launchd e2e)
+        run: pnpm build
+
+      - name: Run unit tests (includes real launchd integration tests on macOS)
+        run: pnpm test
 
       - name: Launchd lifecycle e2e test
         shell: bash
