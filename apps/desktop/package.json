@@ -17,7 +17,11 @@
     "prepare:web-sidecar": "node ./scripts/prepare-web-sidecar.mjs",
     "package:sidecars": "node ./scripts/prepare-runtime-sidecars.mjs --release",
     "dist:mac": "node ./scripts/dist-mac.mjs",
+    "dist:mac:arm64": "NEXU_DESKTOP_TARGET_ARCH=arm64 node ./scripts/dist-mac.mjs",
+    "dist:mac:x64": "NEXU_DESKTOP_TARGET_ARCH=x64 node ./scripts/dist-mac.mjs",
     "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
+    "dist:mac:unsigned:arm64": "NEXU_DESKTOP_TARGET_ARCH=arm64 node ./scripts/dist-mac.mjs --unsigned",
+    "dist:mac:unsigned:x64": "NEXU_DESKTOP_TARGET_ARCH=x64 node ./scripts/dist-mac.mjs --unsigned",
     "upload:sourcemaps": "node ./scripts/upload-sourcemaps.mjs",
     "typecheck": "tsc --noEmit"
   },

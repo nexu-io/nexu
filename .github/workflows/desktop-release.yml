@@ -21,7 +21,15 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-14
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout
@@ -117,6 +125,7 @@ jobs:
           CHANNEL: ${{ steps.meta.outputs.channel }}
           SENTRY_ENV: "prod"
           BUILD_COMMIT: ${{ steps.meta.outputs.commit_sha }}
+          BUILD_ARCH: ${{ matrix.arch }}
           SENTRY_DSN_TEST: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_TEST }}
           SENTRY_DSN_PROD: ${{ secrets.SENTRY_DSN_NEXU_DESKTOP_PROD }}
         run: |
@@ -132,8 +141,9 @@ jobs:
               NEXU_CLOUD_URL: "https://nexu.io",
               NEXU_LINK_URL: "https://link.nexu.io",
               NEXU_SENTRY_ENV: process.env.SENTRY_ENV,
-              NEXU_UPDATE_FEED_URL: `https://desktop-releases.nexu.io/${process.env.CHANNEL}`,
+              NEXU_UPDATE_FEED_URL: `https://desktop-releases.nexu.io/${process.env.CHANNEL}/${process.env.BUILD_ARCH}`,
               NEXU_DESKTOP_APP_VERSION: version,
+              NEXU_DESKTOP_UPDATE_CHANNEL: process.env.CHANNEL,
               NEXU_DESKTOP_BUILD_SOURCE: "release",
               NEXU_DESKTOP_BUILD_BRANCH: "",
               NEXU_DESKTOP_BUILD_COMMIT: process.env.BUILD_COMMIT,
@@ -156,6 +166,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
           AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
@@ -167,6 +178,7 @@ jobs:
         env:
           VERSION: ${{ steps.meta.outputs.desktop_version }}
           CHANNEL: ${{ steps.meta.outputs.channel }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -184,11 +196,16 @@ jobs:
             exit 1
           fi
 
-          # New naming: nexu-{version}-{channel}-{arch}.{ext}
-          versioned_dmg="nexu-${VERSION}-${channel}-arm64.dmg"
-          versioned_zip="nexu-${VERSION}-${channel}-arm64.zip"
-          latest_dmg="nexu-latest-${channel}-arm64.dmg"
-          latest_zip="nexu-latest-${channel}-arm64.zip"
+          latest_name_prefix="nexu-latest-mac-${ARCH}"
+          if [ "$channel" != "stable" ]; then
+            latest_name_prefix="nexu-latest-${channel}-mac-${ARCH}"
+          fi
+
+          versioned_dmg="nexu-${VERSION}-mac-${ARCH}.dmg"
+          versioned_zip="nexu-${VERSION}-mac-${ARCH}.zip"
+          latest_dmg="${latest_name_prefix}.dmg"
+          latest_zip="${latest_name_prefix}.zip"
+          checksum_file="desktop-${ARCH}-sha256.txt"
 
           cp "${dmg_files[0]}" "apps/desktop/release-artifacts/${versioned_dmg}"
           cp "${zip_files[0]}" "apps/desktop/release-artifacts/${versioned_zip}"
@@ -198,7 +215,7 @@ jobs:
           shasum -a 256 \
             "apps/desktop/release-artifacts/${versioned_dmg}" \
             "apps/desktop/release-artifacts/${versioned_zip}" \
-            > apps/desktop/release-artifacts/desktop-sha256.txt
+            > "apps/desktop/release-artifacts/${checksum_file}"
 
           {
             echo "channel=$channel"
@@ -206,16 +223,17 @@ jobs:
             echo "versioned_zip=$versioned_zip"
             echo "latest_dmg=$latest_dmg"
             echo "latest_zip=$latest_zip"
+            echo "checksum_file=$checksum_file"
           } >> "$GITHUB_OUTPUT"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-release-${{ steps.meta.outputs.tag_name }}
+          name: desktop-release-${{ steps.meta.outputs.tag_name }}-${{ matrix.arch }}
           path: |
             apps/desktop/release-artifacts/*.dmg
             apps/desktop/release-artifacts/*.zip
-            apps/desktop/release-artifacts/desktop-sha256.txt
+            apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}
           if-no-files-found: error
 
       - name: Check whether GitHub release already exists
@@ -247,13 +265,13 @@ jobs:
           body: |
             Desktop release for `${{ steps.meta.outputs.desktop_version }}`.
 
-            Assets include signed macOS `.dmg` and `.zip` packages plus `desktop-sha256.txt`.
+            Assets include signed macOS `.dmg` and `.zip` packages plus architecture-specific SHA-256 checksum files.
 
             The packaged `Nexu.app` bundle is notarized and stapled during the build before the archives are published.
           files: |
             apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_dmg }}
             apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_zip }}
-            apps/desktop/release-artifacts/desktop-sha256.txt
+            apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}
 
       - name: Upload assets to existing GitHub release
         if: steps.release_check.outputs.exists == 'true'
@@ -267,13 +285,14 @@ jobs:
           gh release upload "$TAG_NAME" \
             "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_dmg }}" \
             "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.versioned_zip }}" \
-            "apps/desktop/release-artifacts/desktop-sha256.txt" \
+            "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}" \
             --clobber
 
       - name: Patch latest-mac.yml for channel naming
         env:
           VERSION: ${{ steps.meta.outputs.desktop_version }}
           CHANNEL: ${{ steps.artifacts.outputs.channel }}
+          ARCH: ${{ matrix.arch }}
           VERSIONED_DMG: ${{ steps.artifacts.outputs.versioned_dmg }}
           VERSIONED_ZIP: ${{ steps.artifacts.outputs.versioned_zip }}
         shell: bash
@@ -285,9 +304,9 @@ jobs:
             exit 0
           fi
 
-          # electron-builder generates filenames without channel, we need to patch them
-          original_dmg="nexu-${VERSION}-arm64.dmg"
-          original_zip="nexu-${VERSION}-arm64.zip"
+          # electron-builder generates filenames without the final public naming format.
+          original_dmg="nexu-${VERSION}-${ARCH}.dmg"
+          original_zip="nexu-${VERSION}-${ARCH}.zip"
 
           echo "Patching latest-mac.yml:"
           echo "  ${original_dmg} → ${VERSIONED_DMG}"
@@ -306,6 +325,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CHANNEL: ${{ steps.artifacts.outputs.channel }}
+          ARCH: ${{ matrix.arch }}
           VERSIONED_DMG: ${{ steps.artifacts.outputs.versioned_dmg }}
           VERSIONED_ZIP: ${{ steps.artifacts.outputs.versioned_zip }}
           LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
@@ -313,28 +333,35 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "[r2] uploading to prefix: ${CHANNEL}/"
+          upload_prefix() {
+            local prefix="$1"
 
-          # Upload patched latest-mac.yml for auto-update
-          if [ -f "apps/desktop/release/latest-mac.yml" ]; then
-            echo "Uploading latest-mac.yml → ${CHANNEL}/latest-mac.yml"
-            npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+            echo "[r2] uploading to prefix: ${prefix}/"
+
+            if [ -f "apps/desktop/release/latest-mac.yml" ]; then
+              echo "Uploading latest-mac.yml → ${prefix}/latest-mac.yml"
+              npx wrangler r2 object put "nexu-desktop-releases/${prefix}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+            fi
+
+            echo "Uploading ${VERSIONED_DMG} → ${prefix}/${VERSIONED_DMG}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_DMG}" --file "apps/desktop/release-artifacts/${VERSIONED_DMG}" --remote
+
+            echo "Uploading ${VERSIONED_ZIP} → ${prefix}/${VERSIONED_ZIP}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_ZIP}" --file "apps/desktop/release-artifacts/${VERSIONED_ZIP}" --remote
+
+            echo "Uploading ${LATEST_DMG} → ${prefix}/${LATEST_DMG}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_DMG}" --file "apps/desktop/release-artifacts/${LATEST_DMG}" --remote
+
+            echo "Uploading ${LATEST_ZIP} → ${prefix}/${LATEST_ZIP}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_ZIP}" --file "apps/desktop/release-artifacts/${LATEST_ZIP}" --remote
+
+            echo "Uploading ${{ steps.artifacts.outputs.checksum_file }} → ${prefix}/${{ steps.artifacts.outputs.checksum_file }}"
+            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.checksum_file }}" --file "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}" --remote
+          }
+
+          upload_prefix "${CHANNEL}/${ARCH}"
+
+          if [ "${ARCH}" = "arm64" ]; then
+            echo "[r2] uploading legacy arm64 compatibility feed to prefix: ${CHANNEL}/"
+            upload_prefix "${CHANNEL}"
           fi
-
-          # Upload versioned artifacts
-          echo "Uploading ${VERSIONED_DMG} → ${CHANNEL}/${VERSIONED_DMG}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${VERSIONED_DMG}" --file "apps/desktop/release-artifacts/${VERSIONED_DMG}" --remote
-
-          echo "Uploading ${VERSIONED_ZIP} → ${CHANNEL}/${VERSIONED_ZIP}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${VERSIONED_ZIP}" --file "apps/desktop/release-artifacts/${VERSIONED_ZIP}" --remote
-
-          # Upload latest artifacts (overwrite each time)
-          echo "Uploading ${LATEST_DMG} → ${CHANNEL}/${LATEST_DMG}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${LATEST_DMG}" --file "apps/desktop/release-artifacts/${LATEST_DMG}" --remote
-
-          echo "Uploading ${LATEST_ZIP} → ${CHANNEL}/${LATEST_ZIP}"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/${LATEST_ZIP}" --file "apps/desktop/release-artifacts/${LATEST_ZIP}" --remote
-
-          # Upload checksum
-          echo "Uploading desktop-sha256.txt → ${CHANNEL}/desktop-sha256.txt"
-          npx wrangler r2 object put "nexu-desktop-releases/${CHANNEL}/desktop-sha256.txt" --file "apps/desktop/release-artifacts/desktop-sha256.txt" --remote

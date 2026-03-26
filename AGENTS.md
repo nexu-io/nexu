@@ -31,7 +31,11 @@ pnpm restart                          # Restart the desktop local runtime stack
 pnpm reset-state                      # Stop desktop runtime and delete repo-local desktop state
 pnpm status                           # Show desktop local runtime status
 pnpm dist:mac                         # Build signed macOS desktop distributables
+pnpm dist:mac:arm64                   # Build signed Apple Silicon macOS desktop distributables
+pnpm dist:mac:x64                     # Build signed Intel macOS desktop distributables
 pnpm dist:mac:unsigned                # Build unsigned macOS desktop distributables
+pnpm dist:mac:unsigned:arm64          # Build unsigned Apple Silicon macOS desktop distributables
+pnpm dist:mac:unsigned:x64            # Build unsigned Intel macOS desktop distributables
 pnpm probe:slack prepare              # Launch Chrome Canary with the dedicated Slack probe profile
 pnpm probe:slack run                  # Run the local Slack reply smoke probe against an authenticated DM
 pnpm --filter @nexu/web dev           # Web only

@@ -24,9 +24,10 @@ const isUnsigned =
   process.argv.includes("--unsigned") ||
   process.env.NEXU_DESKTOP_MAC_UNSIGNED === "1" ||
   process.env.NEXU_DESKTOP_MAC_UNSIGNED?.toLowerCase() === "true";
+const targetMacArch = resolveTargetMacArch();
 const dmgBuilderReleaseName = "dmg-builder@1.2.0";
 const dmgBuilderReleaseVersion = "75c8a6c";
-const dmgBuilderArch = process.arch === "arm64" ? "arm64" : "x86_64";
+const dmgBuilderArch = targetMacArch === "arm64" ? "arm64" : "x86_64";
 const dmgBuilderArchiveName = `dmgbuild-bundle-${dmgBuilderArch}-${dmgBuilderReleaseVersion}.tar.gz`;
 const dmgBuilderChecksum = {
   arm64: "a785f2a385c8c31996a089ef8e26361904b40c772d5ea65a36001212f1fc25e0",
@@ -39,6 +40,47 @@ const rmWithRetriesOptions = {
   maxRetries: 5,
   retryDelay: 200,
 };
+
+function resolveTargetMacArch() {
+  const argValue = process.argv.find((arg) => arg.startsWith("--arch="));
+  const rawArch =
+    argValue?.slice("--arch=".length) ?? process.env.NEXU_DESKTOP_TARGET_ARCH;
+
+  if (!rawArch) {
+    return process.arch === "x64" ? "x64" : "arm64";
+  }
+
+  if (rawArch === "x64" || rawArch === "arm64") {
+    return rawArch;
+  }
+
+  throw new Error(
+    `[dist:mac] Unsupported target arch \"${rawArch}\". Expected \"x64\" or \"arm64\".`,
+  );
+}
+
+function ensureArchScopedFeedUrl(feedUrl) {
+  if (!feedUrl || feedUrl.startsWith("github://")) {
+    return feedUrl;
+  }
+
+  try {
+    const url = new URL(feedUrl);
+    const trimmedPath = url.pathname.replace(/\/+$/u, "");
+
+    if (trimmedPath.endsWith(`/${targetMacArch}`)) {
+      return url.toString();
+    }
+
+    url.pathname = `${trimmedPath}/${targetMacArch}`;
+    return url.toString();
+  } catch {
+    const trimmedFeedUrl = feedUrl.replace(/\/+$/u, "");
+    return trimmedFeedUrl.endsWith(`/${targetMacArch}`)
+      ? trimmedFeedUrl
+      : `${trimmedFeedUrl}/${targetMacArch}`;
+  }
+}
 
 /**
  * Dereference pnpm symlinks for extraResources that electron-builder
@@ -171,13 +213,30 @@ function shellEscape(value) {
   return `'${String(value).replace(/'/gu, `'"'"'`)}'`;
 }
 
+function quoteNodeOptionValue(value) {
+  return `"${String(value).replace(/(["\\])/gu, "\\$1")}"`;
+}
+
 async function runElectronBuilder(args, options = {}) {
   const electronBuilderCli = require.resolve("electron-builder/cli.js", {
     paths: [electronRoot, repoRoot],
   });
+  const electronBuilderPreload = resolve(
+    scriptDir,
+    "electron-builder-pnpm-json-preload.cjs",
+  );
   const targetOpenFiles = process.env.NEXU_DESKTOP_MAX_OPEN_FILES ?? "8192";
+  const baseEnv = options.env ?? process.env;
+  const existingNodeOptions = baseEnv.NODE_OPTIONS?.trim();
+  const nodeOptions = [
+    existingNodeOptions,
+    `--require=${quoteNodeOptionValue(electronBuilderPreload)}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const command = [
     `target=${shellEscape(targetOpenFiles)}`,
+    `export NODE_OPTIONS=${shellEscape(nodeOptions)}`,
     'hard_limit=$(ulimit -Hn 2>/dev/null || printf %s "$target")',
     'if [ "$hard_limit" != "unlimited" ] && [ "$hard_limit" -lt "$target" ]; then target="$hard_limit"; fi',
     'ulimit -n "$target" 2>/dev/null || true',
@@ -252,7 +311,9 @@ async function stapleNotarizedAppBundles() {
     : resolve(electronRoot, "release");
   const releaseEntries = await readdir(releaseRoot, { withFileTypes: true });
   const appBundleDirs = releaseEntries.filter(
-    (entry) => entry.isDirectory() && entry.name.startsWith("mac-"),
+    (entry) =>
+      entry.isDirectory() &&
+      (entry.name === "mac" || entry.name.startsWith("mac-")),
   );
 
   if (appBundleDirs.length === 0) {
@@ -312,6 +373,10 @@ async function ensureBuildConfig() {
   const gitCommit = getGitValue(["rev-parse", "HEAD"]);
 
   const defaultMetadata = {
+    NEXU_DESKTOP_UPDATE_CHANNEL:
+      merged.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      existingConfig.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      "stable",
     NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
     NEXU_DESKTOP_BUILD_BRANCH:
       merged.NEXU_DESKTOP_BUILD_BRANCH ?? (gitBranch || undefined),
@@ -322,6 +387,10 @@ async function ensureBuildConfig() {
   };
 
   const config = {
+    NEXU_DESKTOP_UPDATE_CHANNEL:
+      merged.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      existingConfig.NEXU_DESKTOP_UPDATE_CHANNEL ??
+      defaultMetadata.NEXU_DESKTOP_UPDATE_CHANNEL,
     ...((merged.NEXU_SENTRY_ENV ?? existingConfig.NEXU_SENTRY_ENV)
       ? {
           NEXU_SENTRY_ENV:
@@ -346,8 +415,9 @@ async function ensureBuildConfig() {
       : {}),
     ...((merged.NEXU_UPDATE_FEED_URL ?? existingConfig.NEXU_UPDATE_FEED_URL)
       ? {
-          NEXU_UPDATE_FEED_URL:
+          NEXU_UPDATE_FEED_URL: ensureArchScopedFeedUrl(
             merged.NEXU_UPDATE_FEED_URL ?? existingConfig.NEXU_UPDATE_FEED_URL,
+          ),
         }
       : {}),
     ...((merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED ??
@@ -413,6 +483,18 @@ async function getElectronVersion() {
 }
 
 async function main() {
+  if (process.platform !== "darwin") {
+    throw new Error(
+      `[dist:mac] mac packaging must run on macOS: platform=${process.platform}, target=${targetMacArch}.`,
+    );
+  }
+
+  if (process.arch !== targetMacArch) {
+    throw new Error(
+      `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead.`,
+    );
+  }
+
   await ensureBuildConfig();
 
   const desktopEnv = await loadDesktopEnv();
@@ -498,6 +580,7 @@ async function main() {
   await runElectronBuilder(
     [
       "--mac",
+      `--${targetMacArch}`,
       "--publish",
       "never",
       `--config.electronVersion=${electronVersion}`,

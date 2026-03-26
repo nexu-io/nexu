@@ -43,7 +43,14 @@ concurrency:
 
 jobs:
   desktop-ci:
-    runs-on: macos-14
+    strategy:
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
 
     steps:
@@ -72,12 +79,15 @@ jobs:
           pnpm exec electron --version
 
       - name: Build unsigned macOS desktop bundle
+        env:
+          NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
         run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths
         shell: bash
         run: |
           set -euo pipefail
+          shopt -s nullglob
 
           runner_home="$HOME"
           packaged_home="$RUNNER_TEMP/desktop-home"
@@ -87,7 +97,14 @@ jobs:
           default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
           default_logs_dir="$default_user_data_dir/logs"
           default_runtime_logs_dir="$default_logs_dir/runtime-units"
-          packaged_app="apps/desktop/release/mac-arm64/Nexu.app"
+          packaged_apps=(apps/desktop/release/mac*/Nexu.app)
+
+          if [ "${#packaged_apps[@]}" -eq 0 ]; then
+            echo "No packaged app bundle found under apps/desktop/release/mac*" >&2
+            exit 1
+          fi
+
+          packaged_app="${packaged_apps[0]}"
           packaged_executable="$packaged_app/Contents/MacOS/Nexu"
 
           mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
@@ -130,6 +147,16 @@ jobs:
           test -d "$PACKAGED_APP"
           test -x "$PACKAGED_EXECUTABLE"
 
+      - name: Upload desktop build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-dist-${{ matrix.arch }}
+          path: |
+            apps/desktop/release/*.dmg
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Verify packaged runtime unit health
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
@@ -159,7 +186,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-ci-logs
+          name: desktop-ci-logs-${{ matrix.arch }}
           path: ${{ runner.temp }}/desktop-ci
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3
