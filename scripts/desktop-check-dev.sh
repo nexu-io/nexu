@@ -23,4 +23,14 @@ if [ "$exit_code" -eq 0 ] && [ "$stop_code" -ne 0 ]; then
   exit_code=$stop_code
 fi
 
+# Verify clean shutdown: no residual processes, free ports, no stale state
+if [ "$exit_code" -eq 0 ]; then
+  sleep 2  # Brief wait for async cleanup to settle
+  bash scripts/desktop-stop-smoke.sh
+  smoke_code=$?
+  if [ "$smoke_code" -ne 0 ]; then
+    exit_code=$smoke_code
+  fi
+fi
+
 exit "$exit_code"
