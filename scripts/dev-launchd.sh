@@ -88,11 +88,30 @@ full_cleanup() {
 stop_services() {
   echo "Stopping services..."
 
-  # Kill Electron with SIGKILL to bypass quit handler
-  pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
-  pkill -f "vite.*apps/desktop" 2>/dev/null || true
+  # Try graceful SIGTERM first — this triggers the unified gracefulShutdown()
+  # handler in the Electron main process, which does proper teardown.
+  echo "  Sending SIGTERM to Electron..."
+  pkill -TERM -f "Electron.*apps/desktop" 2>/dev/null || true
 
-  # Bootout launchd services (sends SIGTERM + unregisters)
+  # Wait up to 10 seconds for Electron + children to exit gracefully
+  local max_graceful=10
+  local waited=0
+  while [ $waited -lt $max_graceful ]; do
+    if ! pgrep -f "Electron.*apps/desktop" &>/dev/null; then
+      echo "  Electron exited gracefully after ${waited}s"
+      break
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  # If Electron is still alive, escalate to SIGKILL
+  if pgrep -f "Electron.*apps/desktop" &>/dev/null; then
+    echo "  Electron did not exit, sending SIGKILL..."
+    pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
+  fi
+
+  # Bootout launchd services (in case graceful shutdown didn't do it)
   if launchctl print "$DOMAIN/$OPENCLAW_LABEL" &>/dev/null; then
     echo "  Stopping $OPENCLAW_LABEL..."
     launchctl bootout "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null || true
@@ -102,9 +121,9 @@ stop_services() {
     launchctl bootout "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
   fi
 
-  # Wait for ports to be freed (OpenClaw graceful shutdown can take a few seconds)
+  # Wait for ports to be freed
   local max_wait=8
-  local waited=0
+  waited=0
   while [ $waited -lt $max_wait ]; do
     local port_busy=0
     lsof -i ":$CONTROLLER_PORT" -P -n &>/dev/null && port_busy=1

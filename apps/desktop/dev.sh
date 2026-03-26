@@ -72,20 +72,32 @@ session_exists() {
 
 kill_residual_processes() {
   log "killing residual processes"
-  while IFS= read -r pid; do
-    [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
-  done < <(pgrep -f "$ROOT_DIR/node_modules/.pnpm/electron@.*/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron \\.$" 2>/dev/null || true)
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/controller/dist/index.js" 2>/dev/null || true
-  pkill -9 -f "$ELECTRON_DIR/node_modules/openclaw/openclaw.mjs" 2>/dev/null || true
-  pkill -9 -f "openclaw-gateway" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/openclaw/bin/openclaw" 2>/dev/null || true
-  pkill -9 -f "$ROOT_DIR/.tmp/sidecars/web/index.js" 2>/dev/null || true
 
+  # Kill Electron main process (matches both dev.sh and dev-launchd.sh launch patterns)
+  pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
+
+  # Kill controller — match current and legacy paths
+  pkill -9 -f "controller/dist/index.js" 2>/dev/null || true
+
+  # Kill openclaw processes
+  pkill -9 -f "openclaw.mjs gateway" 2>/dev/null || true
+  pkill -9 -f "openclaw-gateway" 2>/dev/null || true
+
+  # Kill web sidecar
+  pkill -9 -f "apps/web/dist/index.js" 2>/dev/null || true
+
+  # Kill crashpad handler
+  pkill -9 -f "chrome_crashpad_handler" 2>/dev/null || true
+
+  # Fallback: kill anything on our ports
   for port in 18789 50800 50810; do
     while IFS= read -r pid; do
       [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
     done < <(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
   done
+
+  # Brief wait for processes to die
+  sleep 1
 }
 
 build_runtime() {

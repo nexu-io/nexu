@@ -288,4 +288,51 @@ describe("Shutdown safety", () => {
     expect(updateManager).toContain("import");
     expect(updateManager).toContain("ensureNexuProcessesDead");
   });
+
+  // -----------------------------------------------------------------------
+  // 15. P0-2: index.ts has gracefulShutdown function
+  // -----------------------------------------------------------------------
+  it("index.ts defines a single gracefulShutdown function", () => {
+    const indexTs = readFile("apps/desktop/main/index.ts");
+    expect(indexTs).toContain("async function gracefulShutdown(");
+    // Must have idempotent guard
+    expect(indexTs).toContain("shutdownInProgress");
+    // Must have hard timeout
+    expect(indexTs).toContain("SHUTDOWN_HARD_TIMEOUT_MS");
+  });
+
+  // -----------------------------------------------------------------------
+  // 16. P0-2: SIGTERM and SIGINT handlers exist
+  // -----------------------------------------------------------------------
+  it("index.ts registers SIGTERM and SIGINT handlers", () => {
+    const indexTs = readFile("apps/desktop/main/index.ts");
+    expect(indexTs).toContain('"SIGTERM"');
+    expect(indexTs).toContain('"SIGINT"');
+    expect(indexTs).toContain("process.on(signal");
+  });
+
+  // -----------------------------------------------------------------------
+  // 17. P1-2: before-quit uses removeListener, not removeAllListeners
+  // -----------------------------------------------------------------------
+  it("index.ts uses removeListener instead of removeAllListeners for before-quit", () => {
+    const indexTs = readFile("apps/desktop/main/index.ts");
+    expect(indexTs).toContain('app.removeListener("before-quit"');
+    expect(indexTs).not.toContain("removeAllListeners");
+  });
+
+  // -----------------------------------------------------------------------
+  // 18. dev-launchd.sh stop sends SIGTERM before SIGKILL
+  // -----------------------------------------------------------------------
+  it("dev-launchd.sh stop_services sends SIGTERM before SIGKILL", () => {
+    const devLaunchdSh = readFile("scripts/dev-launchd.sh");
+    // Extract stop_services function body
+    const stopStart = devLaunchdSh.indexOf("stop_services()");
+    const stopBody = devLaunchdSh.slice(stopStart, stopStart + 2000);
+    // SIGTERM must appear in stop_services
+    expect(stopBody).toContain("pkill -TERM");
+    // SIGKILL must appear AFTER SIGTERM in the same function
+    const termIdx = stopBody.indexOf("pkill -TERM");
+    const killIdx = stopBody.indexOf("pkill -9");
+    expect(termIdx).toBeLessThan(killIdx);
+  });
 });
