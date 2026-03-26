@@ -24,6 +24,7 @@ on:
       - "scripts/kill-all.sh"
       - "vitest.config.ts"
       - "tsconfig.base.json"
+      - "scripts/postinstall.mjs"
       - ".github/workflows/desktop-ci-dist.yml"
       - ".github/workflows/desktop-ci-dist-heavy.yml"
   workflow_dispatch:
@@ -70,6 +71,9 @@ jobs:
         with:
           path: ~/.npm
           key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          restore-keys: |
+            desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-
+            desktop-npm-cache-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

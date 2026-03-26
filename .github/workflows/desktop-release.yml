@@ -55,6 +55,9 @@ jobs:
         with:
           path: ~/.npm
           key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          restore-keys: |
+            desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-
+            desktop-npm-cache-${{ runner.os }}-
 
       - name: Resolve release metadata
         id: meta

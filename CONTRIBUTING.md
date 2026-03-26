@@ -68,8 +68,8 @@ Run from the repo root unless noted.
 | `pnpm dev:controller` | Controller only |
 | `pnpm build` | Production build (all packages) |
 | `pnpm typecheck` | TypeScript checks across the workspace |
-| `pnpm lint` | Biome check + `typecheck` (matches CI intent) |
-| `pnpm lint:fix` | Auto-fix where safe + typecheck |
+| `pnpm lint` | Biome check only |
+| `pnpm lint:fix` | Auto-fix where safe with Biome only |
 | `pnpm format` | Format/write with Biome |
 | `pnpm test` | Root Vitest suite (`vitest run`) |
 | `pnpm check:esm-imports` | ESM specifier verification (also run in CI) |
@@ -86,6 +86,7 @@ Run before pushing:
 
 ```bash
 pnpm lint
+pnpm typecheck
 pnpm test
 ```
 

@@ -17,6 +17,7 @@ on:
       - 'scripts/kill-all.sh'
       - 'vitest.config.ts'
       - 'tsconfig.base.json'
+      - 'scripts/postinstall.mjs'
       - '.npmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -40,6 +41,7 @@ on:
       - 'scripts/kill-all.sh'
       - 'vitest.config.ts'
       - 'tsconfig.base.json'
+      - 'scripts/postinstall.mjs'
       - '.npmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -79,6 +81,9 @@ jobs:
         with:
           path: ~/.npm
           key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          restore-keys: |
+            desktop-npm-cache-${{ runner.os }}-arm64-
+            desktop-npm-cache-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
