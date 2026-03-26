@@ -8,6 +8,7 @@ GitHub issue/discussion automation around **nexu-pal** issue processing and Feis
 |----------|---------|--------|
 | `nexu-pal: issue opened` | `issues: [opened]` | `scripts/nexu-pal/process-issue-opened.mjs` |
 | `nexu-pal: issue assigned` | `issues: [assigned]` | `scripts/nexu-pal/process-issue-assignment.mjs` |
+| `nexu-pal: triage command` | `issue_comment: [created]` (issues only) | `scripts/nexu-pal/process-triage-command.mjs` |
 | `Feishu Issue Notification` | `issues: [opened]` | `scripts/notify/feishu-notify.mjs` |
 | `nexu-pal: needs-triage notify` | `issues: [labeled]` (when label is `needs-triage`) | `scripts/notify/feishu-triage-notify.mjs` |
 | `Feishu Discussion Notification` | `discussion: [created]` | `scripts/notify/feishu-notify.mjs` |
@@ -41,6 +42,20 @@ Current Phase 3 behavior keeps roadmap and duplicate detection as no-op stubs, b
 
 Removes the `needs-triage` label (no-op if the label is already absent) via the same shared GitHub issue client used by the main triage pipeline.
 
+## On `/triage` issue comment
+
+Runs on `issue_comment: [created]` for issues only.
+
+1. **Command parsing** — Supports `/triage accepted`, `/triage declined`, and `/triage duplicated`.
+2. **Permission check** — Looks up collaborator permission through the GitHub API and only executes for `write` or `admin` users.
+3. **State transition** — Applies the resulting `TriagePlan` via the shared GitHub issue client, using the GitHub App token so all mutations are authored by the app.
+
+Current transitions:
+
+- `/triage accepted` — add `triage:accepted`, remove `needs-triage`, add acceptance comment.
+- `/triage declined` — add `triage:declined`, remove `needs-triage`, add decline comment, close the issue.
+- `/triage duplicated` — add `triage:duplicated`, remove `needs-triage` and `possible-duplicate`, add duplicate comment, close the issue.
+
 ## Feishu notifications
 
 Three GitHub Actions send Feishu webhook notifications for GitHub content:
@@ -57,10 +72,13 @@ The legacy issue/discussion workflows continue to run `node scripts/notify/feish
 |-------|-----------|--------------|
 | `bug` | LLM classifies as bug | — |
 | `needs-triage` | Issue opened with no assignee | Issue is assigned |
+| `triage:accepted` | `/triage accepted` by a `write` / `admin` collaborator | superseded by a later `/triage` terminal action |
+| `triage:declined` | `/triage declined` by a `write` / `admin` collaborator | superseded by a later `/triage` terminal action |
+| `triage:duplicated` | `/triage duplicated` by a `write` / `admin` collaborator | superseded by a later `/triage` terminal action |
 
 ## Authentication
 
-The two **nexu-pal** workflows create a short-lived token via `actions/create-github-app-token@v1` using secrets `NEXU_PAL_APP_ID` and `NEXU_PAL_PRIVATE_KEY_PEM`. All GitHub API calls and the first-interaction action use this App token.
+The three **nexu-pal** workflows create a short-lived token via `actions/create-github-app-token@v1` using secrets `NEXU_PAL_APP_ID` and `NEXU_PAL_PRIVATE_KEY_PEM`. All GitHub API calls and the first-interaction action use this App token.
 
 The Feishu notification workflows do not use the GitHub App. They use the default GitHub Actions context plus Feishu incoming-webhook secrets.
 
@@ -82,14 +100,18 @@ The Feishu notification workflows do not use the GitHub App. They use the defaul
 .github/workflows/
   nexu-pal-issue-opened.yml
   nexu-pal-issue-assigned.yml
+  nexu-pal-triage-command.yml
   feishu-issue-notify.yml
   nexu-pal-needs-triage-notify.yml
   feishu-discussion-notify.yml
 scripts/nexu-pal/
   process-issue-opened.mjs # opened-issue triage pipeline with bug-only labeling
   process-issue-assignment.mjs  # remove needs-triage on assignment via shared client
+  process-triage-command.mjs    # parse /triage comments, check permission, and apply terminal transitions
   lib/github-client.mjs         # shared GitHub issue executor for comments/labels/close actions
+  lib/permission-checker.mjs    # collaborator permission lookup for command gating
   lib/triage-opened-engine.mjs  # builds the stable opened-issue TriagePlan
+  lib/triage-command-engine.mjs # parses /triage commands and builds terminal triage plans
   lib/signals/roadmap-matcher.mjs     # roadmap matcher stub
   lib/signals/duplicate-detector.mjs  # duplicate detector stub
 scripts/notify/

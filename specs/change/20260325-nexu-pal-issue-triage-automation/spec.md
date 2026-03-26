@@ -246,7 +246,7 @@ on_issue_comment(event):
 - [x] Phase 1: Refactor issue-opened automation to a runnable label-only triage flow with bug-only auto-labeling and stubbed roadmap/duplicate detectors.
 - [x] Phase 2: Add `needs-triage`-driven Feishu dual-webhook routing while keeping roadmap and duplicate detection as stub-only no-op implementations.
 - [x] Phase 3: Stabilize the triage pipeline interfaces and executor behavior around the stubbed flow so later detectors can be swapped in without changing entrypoints.
-- [ ] Phase 4: Add permission-gated `/triage accepted|declined|duplicated` command handling and complete the label-state-machine transitions.
+- [x] Phase 4: Add permission-gated `/triage accepted|declined|duplicated` command handling and complete the label-state-machine transitions.
 - [ ] Phase 5: Replace the roadmap matcher stub with a real implementation.
 - [ ] Phase 6: Replace the duplicate detector stub with a real implementation.
 - [ ] Phase 7: Add `needs-information` handling and define the issue edit/reopen re-entry flow.
@@ -258,10 +258,16 @@ on_issue_comment(event):
 - `.github/workflows/nexu-pal-issue-opened.yml` - switched issue-opened automation to the new Phase 1 entry script.
 - `scripts/nexu-pal/process-issue-opened.mjs` - added the new opened-issue triage entrypoint.
 - `scripts/nexu-pal/process-issue-assignment.mjs` - switched the assignment flow to reuse the shared GitHub issue client so label removal semantics match the main triage executor.
+- `.github/workflows/nexu-pal-triage-command.yml` - added the issue-comment workflow that uses the GitHub App token and dispatches `/triage` commands for issues only.
+- `scripts/nexu-pal/process-triage-command.mjs` - added the Phase 4 command entrypoint that parses `/triage`, checks collaborator permission, and applies the resulting plan as the GitHub App.
+- `scripts/nexu-pal/lib/permission-checker.mjs` - added GitHub collaborator permission lookup with `write` / `admin` gating for command execution.
+- `scripts/nexu-pal/lib/triage-command-engine.mjs` - added `/triage accepted|declined|duplicated` parsing and plan generation for label, comment, and close transitions.
 - `scripts/nexu-pal/lib/github-client.mjs` - added shared GitHub issue helpers and ordered label application.
 - `tests/nexu-pal/github-client.test.ts` - added executor normalization and ordered apply-plan coverage for add/remove/close behavior.
+- `tests/nexu-pal/permission-checker.test.ts` - added permission-gating coverage for `/triage` execution.
 - `scripts/nexu-pal/lib/triage-opened-engine.mjs` - added `TriagePlan` generation with bug-only classification and `needs-triage` planning.
 - `tests/nexu-pal/triage-opened-engine.test.ts` - added coverage for the stable triage plan shape and stub-backed opened-issue planning.
+- `tests/nexu-pal/triage-command-engine.test.ts` - added parsing and plan-shape coverage for Phase 4 command actions.
 - `scripts/nexu-pal/lib/signals/roadmap-matcher.mjs` - added Phase 1 roadmap matcher stub.
 - `scripts/nexu-pal/lib/signals/duplicate-detector.mjs` - added Phase 1 duplicate detector stub.
 - `.github/workflows/nexu-pal-needs-triage-notify.yml` - added a label-triggered Feishu workflow that runs only when `needs-triage` is added.
@@ -274,19 +280,24 @@ on_issue_comment(event):
 - Deviated from the original replacement plan to keep the legacy issue-opened Feishu chain intact and add the triage notify flow in parallel, per updated requirement.
 - Stabilized the shared `TriagePlan` contract with a dedicated factory plus executor-side normalization so later phases can add comments, label removals, and issue closing without changing the workflow entry scripts.
 - Chose add-over-remove normalization for conflicting labels in a single plan so final desired state stays deterministic when later detectors or commands evolve.
-- Kept the overall spec status unchanged after completing through Phase 3 because Phases 4-7 remain open in the plan.
+- Phase 4 uses the existing GitHub App token flow instead of the default workflow token so all automated label/comment/close mutations are authored consistently as the app.
+- The command parser intentionally keeps the first shipped surface minimal: `/triage accepted`, `/triage declined`, and `/triage duplicated` only, with unsupported comments ignored as no-op.
+- Kept the overall spec status unchanged after completing through Phase 4 because Phases 5-7 remain open in the plan.
 
 ### Verification
 
 - `node --check scripts/nexu-pal/lib/github-client.mjs && node --check scripts/nexu-pal/lib/triage-opened-engine.mjs && node --check scripts/nexu-pal/process-issue-opened.mjs` ✅
 - `node --check scripts/notify/feishu-triage-notify.mjs` ✅
 - `node --check scripts/nexu-pal/lib/github-client.mjs && node --check scripts/nexu-pal/lib/triage-opened-engine.mjs && node --check scripts/nexu-pal/process-issue-assignment.mjs` ✅
+- `node --check scripts/nexu-pal/lib/permission-checker.mjs && node --check scripts/nexu-pal/lib/triage-command-engine.mjs && node --check scripts/nexu-pal/process-triage-command.mjs` ✅
 - `pnpm exec vitest run tests/nexu-pal/github-client.test.ts tests/nexu-pal/triage-opened-engine.test.ts` ✅
+- `pnpm exec vitest run tests/nexu-pal/github-client.test.ts tests/nexu-pal/triage-opened-engine.test.ts tests/nexu-pal/permission-checker.test.ts tests/nexu-pal/triage-command-engine.test.ts` ✅
 - `pnpm lint` ✅
 - `pnpm test` ⚠️ failed due to a pre-existing unrelated test: `tests/desktop/openclaw-auth-profiles-writer.test.ts` (`this.authProfilesStore.authProfilesPathForWorkspace is not a function`).
 - `pnpm test -- tests/nexu-pal/github-client.test.ts tests/nexu-pal/triage-opened-engine.test.ts` ⚠️ Vitest still ran the full suite from the root script and hit pre-existing unrelated failures in `tests/desktop/openclaw-auth-profiles-writer.test.ts` and `tests/desktop/skill-dir-watcher.test.ts`.
 - Manual implementation review confirmed Phase 1 now applies labels only, keeps auto-labeling to `bug`, and leaves roadmap/duplicate detection as no-op stubs.
 - Manual review confirms Phase 2 routes `needs-triage` notifications by current labels while preserving the old `issues.opened` issue notification path.
 - Manual review confirms Phase 3 now supports the full planned executor surface (`commentsToAdd`, `labelsToAdd`, `labelsToRemove`, `closeIssue`) while keeping the current opened-issue entrypoint unchanged.
+- Manual review confirms Phase 4 now ignores PR comments, executes supported `/triage` commands only for `write` / `admin` collaborators, and performs comment/label/close transitions through the shared GitHub App-backed executor.
 
 <!-- Optional: Alternatives considered, open questions, etc. -->
