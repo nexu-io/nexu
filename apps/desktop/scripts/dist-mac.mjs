@@ -42,6 +42,17 @@ const rmWithRetriesOptions = {
   retryDelay: 200,
 };
 
+const shouldReuseExistingBuildArtifacts =
+  process.env.NEXU_DESKTOP_USE_EXISTING_BUILDS === "1" ||
+  process.env.NEXU_DESKTOP_USE_EXISTING_BUILDS?.toLowerCase() === "true";
+const shouldReuseExistingRuntimeInstall =
+  process.env.NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL === "1" ||
+  process.env.NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL?.toLowerCase() ===
+    "true";
+const isFastCiMode =
+  process.env.NEXU_DESKTOP_ELECTRON_BUILDER_FAST_MODE === "1" ||
+  process.env.NEXU_DESKTOP_ELECTRON_BUILDER_FAST_MODE?.toLowerCase() === "true";
+
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(3)}s`;
 }
@@ -54,6 +65,50 @@ async function appendTimingSummary(lines) {
   }
 
   await writeFile(summaryPath, `${lines.join("\n")}\n`, { flag: "a" });
+}
+
+async function ensureExistingPath(path, label) {
+  try {
+    await lstat(path);
+  } catch {
+    throw new Error(`[dist:mac] Missing ${label}: ${path}`);
+  }
+}
+
+async function ensureExistingBuildArtifacts() {
+  await Promise.all([
+    ensureExistingPath(
+      resolve(repoRoot, "packages/shared/dist"),
+      "shared build",
+    ),
+    ensureExistingPath(
+      resolve(repoRoot, "apps/controller/dist"),
+      "controller build",
+    ),
+    ensureExistingPath(resolve(repoRoot, "apps/web/dist"), "web build"),
+    ensureExistingPath(resolve(electronRoot, "dist"), "desktop renderer build"),
+    ensureExistingPath(
+      resolve(electronRoot, "dist-electron/main"),
+      "desktop main build",
+    ),
+    ensureExistingPath(
+      resolve(electronRoot, "dist-electron/preload"),
+      "desktop preload build",
+    ),
+  ]);
+}
+
+async function ensureExistingRuntimeInstall() {
+  await Promise.all([
+    ensureExistingPath(
+      resolve(repoRoot, "openclaw-runtime/node_modules"),
+      "openclaw-runtime install",
+    ),
+    ensureExistingPath(
+      resolve(repoRoot, "openclaw-runtime/.postinstall-cache.json"),
+      "openclaw-runtime cache",
+    ),
+  ]);
 }
 
 async function timedStep(stepName, fn, timings) {
@@ -593,6 +648,11 @@ async function main() {
   await timedStep(
     "build @nexu/shared",
     async () => {
+      if (shouldReuseExistingBuildArtifacts) {
+        await ensureExistingBuildArtifacts();
+        console.log("[dist:mac] reusing existing workspace build artifacts");
+        return;
+      }
       await run(
         "pnpm",
         ["--dir", repoRoot, "--filter", "@nexu/shared", "build"],
@@ -606,6 +666,9 @@ async function main() {
   await timedStep(
     "build @nexu/controller",
     async () => {
+      if (shouldReuseExistingBuildArtifacts) {
+        return;
+      }
       await run(
         "pnpm",
         ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
@@ -617,6 +680,11 @@ async function main() {
   await timedStep(
     "install openclaw-runtime",
     async () => {
+      if (shouldReuseExistingRuntimeInstall) {
+        await ensureExistingRuntimeInstall();
+        console.log("[dist:mac] reusing existing openclaw-runtime install");
+        return;
+      }
       await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
         env,
       });
@@ -626,6 +694,9 @@ async function main() {
   await timedStep(
     "build @nexu/web",
     async () => {
+      if (shouldReuseExistingBuildArtifacts) {
+        return;
+      }
       await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
         env,
       });
@@ -635,6 +706,9 @@ async function main() {
   await timedStep(
     "build @nexu/desktop",
     async () => {
+      if (shouldReuseExistingBuildArtifacts) {
+        return;
+      }
       await run("pnpm", ["run", "build"], { cwd: electronRoot, env });
     },
     timings,
@@ -693,34 +767,35 @@ async function main() {
   await timedStep(
     "run electron-builder",
     async () => {
-      await runElectronBuilder(
-        [
-          "--mac",
-          ...(macTargets ?? []),
-          `--${targetMacArch}`,
-          "--publish",
-          "never",
-          `--config.electronVersion=${electronVersion}`,
-          `--config.buildVersion=${buildVersion}`,
-          `--config.directories.output=${releaseRoot}`,
-          ...(isUnsigned
-            ? [
-                "--config.mac.identity=null",
-                "--config.mac.hardenedRuntime=false",
-              ]
-            : []),
-        ],
-        {
-          cwd: electronRoot,
-          env: isUnsigned
-            ? {
-                ...notarizeEnv,
-                CSC_IDENTITY_AUTO_DISCOVERY: "false",
-                NEXU_DESKTOP_MAC_UNSIGNED: "true",
-              }
-            : notarizeEnv,
-        },
+      const electronBuilderArgs = [
+        "--mac",
+        ...(macTargets ?? []),
+        `--${targetMacArch}`,
+        "--publish",
+        "never",
+        `--config.electronVersion=${electronVersion}`,
+        `--config.buildVersion=${buildVersion}`,
+        `--config.directories.output=${releaseRoot}`,
+        ...(isFastCiMode
+          ? ["--config.npmRebuild=false", "--config.nodeGypRebuild=false"]
+          : []),
+        ...(isUnsigned
+          ? ["--config.mac.identity=null", "--config.mac.hardenedRuntime=false"]
+          : []),
+      ];
+      console.log(
+        `[dist:mac] electron-builder mode targets=${(macTargets ?? ["default"]).join(",")} fastCi=${isFastCiMode}`,
       );
+      await runElectronBuilder(electronBuilderArgs, {
+        cwd: electronRoot,
+        env: isUnsigned
+          ? {
+              ...notarizeEnv,
+              CSC_IDENTITY_AUTO_DISCOVERY: "false",
+              NEXU_DESKTOP_MAC_UNSIGNED: "true",
+            }
+          : notarizeEnv,
+      });
     },
     timings,
   );

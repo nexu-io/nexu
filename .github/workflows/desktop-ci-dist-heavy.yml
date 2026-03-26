@@ -109,6 +109,8 @@ jobs:
       - name: Build unsigned macOS desktop bundle
         env:
           NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
+          NEXU_DESKTOP_USE_EXISTING_BUILDS: "1"
+          NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL: "1"
         run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths

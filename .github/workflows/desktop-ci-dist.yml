@@ -38,7 +38,8 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 45
     env:
-      NEXU_DESKTOP_MAC_TARGETS: zip
+      NEXU_DESKTOP_MAC_TARGETS: dir
+      NEXU_DESKTOP_ELECTRON_BUILDER_FAST_MODE: "1"
 
     steps:
       - name: Checkout
@@ -99,6 +100,8 @@ jobs:
       - name: Build unsigned macOS desktop bundle
         env:
           NEXU_DESKTOP_TARGET_ARCH: arm64
+          NEXU_DESKTOP_USE_EXISTING_BUILDS: "1"
+          NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL: "1"
         run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths
@@ -145,15 +148,15 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
-          zip_artifacts=(apps/desktop/release/*.zip)
+          packaged_apps=(apps/desktop/release/mac*/Nexu.app)
 
-          if [ "${#zip_artifacts[@]}" -eq 0 ]; then
-            echo "No desktop ZIP artifact was produced" >&2
+          if [ "${#packaged_apps[@]}" -eq 0 ]; then
+            echo "No packaged desktop app bundle was produced" >&2
             exit 1
           fi
 
           printf 'Built artifacts:\n'
-          printf ' - %s\n' "${zip_artifacts[@]}"
+          printf ' - %s\n' "${packaged_apps[@]}"
 
           test -d "$PACKAGED_APP"
           test -x "$PACKAGED_EXECUTABLE"
@@ -164,7 +167,7 @@ jobs:
         with:
           name: desktop-ci-dist-arm64
           path: |
-            apps/desktop/release/*.zip
+            apps/desktop/release/mac*/Nexu.app
           if-no-files-found: error
           retention-days: 3
 
