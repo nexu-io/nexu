@@ -4,32 +4,46 @@ on:
   pull_request:
     paths:
       - 'apps/desktop/**'
+      - 'apps/controller/**'
       - 'apps/web/**'
       - 'packages/shared/**'
       - 'openclaw-runtime/**'
+      - 'tests/desktop/**'
+      - 'scripts/dev-launchd.sh'
+      - 'scripts/desktop-check-dev.sh'
+      - 'scripts/desktop-stop-smoke.sh'
+      - 'scripts/desktop-ci-check.mjs'
+      - 'scripts/launchd-lifecycle-e2e.sh'
+      - 'scripts/kill-all.sh'
+      - 'vitest.config.ts'
+      - 'tsconfig.base.json'
       - '.npmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'scripts/desktop-check-dev.sh'
-      - 'scripts/desktop-ci-check.mjs'
-      - 'tsconfig.base.json'
       - '.github/workflows/desktop-ci-dev.yml'
   push:
     branches:
       - main
     paths:
       - 'apps/desktop/**'
+      - 'apps/controller/**'
       - 'apps/web/**'
       - 'packages/shared/**'
       - 'openclaw-runtime/**'
+      - 'tests/desktop/**'
+      - 'scripts/dev-launchd.sh'
+      - 'scripts/desktop-check-dev.sh'
+      - 'scripts/desktop-stop-smoke.sh'
+      - 'scripts/desktop-ci-check.mjs'
+      - 'scripts/launchd-lifecycle-e2e.sh'
+      - 'scripts/kill-all.sh'
+      - 'vitest.config.ts'
+      - 'tsconfig.base.json'
       - '.npmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'scripts/desktop-check-dev.sh'
-      - 'scripts/desktop-ci-check.mjs'
-      - 'tsconfig.base.json'
       - '.github/workflows/desktop-ci-dev.yml'
 
 permissions:
@@ -81,6 +95,12 @@ jobs:
           set -euo pipefail
           pnpm exec electron --version
           tmux -V
+
+      - name: Build all
+        run: pnpm build
+
+      - name: Run unit tests (includes real launchd integration tests on macOS)
+        run: pnpm test
 
       - name: Verify desktop runtime unit health
         env:

@@ -10,12 +10,19 @@ on:
       - "apps/web/**"
       - "packages/shared/**"
       - "openclaw-runtime/**"
+      - "tests/desktop/**"
+      - "scripts/dev-launchd.sh"
+      - "scripts/desktop-check-dev.sh"
       - ".npmrc"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-stop-smoke.sh"
       - "scripts/desktop-ci-check.mjs"
+      - "scripts/launchd-lifecycle-e2e.sh"
+      - "scripts/kill-all.sh"
+      - "vitest.config.ts"
       - "tsconfig.base.json"
       - ".github/workflows/desktop-ci-dist.yml"
       - ".github/workflows/desktop-ci-dist-heavy.yml"
@@ -72,6 +79,16 @@ jobs:
         run: |
           set -euo pipefail
           pnpm exec electron --version
+
+      - name: Build all (for tests and launchd e2e)
+        run: pnpm build
+
+      - name: Run unit tests (includes real launchd integration tests on macOS)
+        run: pnpm test
+
+      - name: Launchd lifecycle e2e test
+        shell: bash
+        run: bash scripts/launchd-lifecycle-e2e.sh
 
       - name: Build unsigned macOS desktop bundle
         env:

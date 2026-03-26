@@ -1004,9 +1004,19 @@ export class RuntimeOrchestrator {
   private launchManagedUnit(
     manifest: RuntimeUnitManifest,
   ): ManagedChildProcess {
+    // Always force ELECTRON_RUN_AS_NODE=1 when spawning with the Electron
+    // binary (process.execPath). Without this, child processes create extra
+    // macOS Dock icons. The manifest.env should already set it, but this is
+    // a safety net in case a manifest omits it.
+    const isElectronBinary =
+      manifest.command === process.execPath ||
+      manifest.command?.endsWith("/Electron") ||
+      manifest.command?.endsWith("/electron");
+
     const env = {
       ...process.env,
       ...manifest.env,
+      ...(isElectronBinary ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
     };
 
     if (manifest.runner === "utility-process") {

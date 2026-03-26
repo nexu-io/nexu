@@ -48,6 +48,7 @@ import {
   installLaunchdQuitHandler,
   isLaunchdBootstrapEnabled,
   resolveLaunchdPaths,
+  teardownLaunchdServices,
 } from "./services";
 import {
   getLegacyNexuHomeStateDir,
@@ -243,6 +244,60 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
+
+// ---------------------------------------------------------------------------
+// Unified graceful shutdown — single authoritative teardown path.
+// Called by: before-quit, SIGTERM, SIGINT, quit-handler, system shutdown.
+// Idempotent: safe to call multiple times (second call is a no-op).
+// ---------------------------------------------------------------------------
+
+let shutdownInProgress = false;
+const SHUTDOWN_HARD_TIMEOUT_MS = 8_000;
+
+async function gracefulShutdown(reason: string): Promise<void> {
+  if (shutdownInProgress) return;
+  shutdownInProgress = true;
+
+  writeDesktopMainLog({
+    source: "shutdown",
+    stream: "system",
+    kind: "lifecycle",
+    message: `graceful shutdown started: ${reason}`,
+    logFilePath: null,
+    windowId: null,
+  });
+
+  // Hard timeout: if teardown hangs, force exit after 8 seconds.
+  const hardTimer = setTimeout(() => {
+    writeDesktopMainLog({
+      source: "shutdown",
+      stream: "system",
+      kind: "lifecycle",
+      message: `graceful shutdown hard timeout (${SHUTDOWN_HARD_TIMEOUT_MS}ms), forcing exit`,
+      logFilePath: null,
+      windowId: null,
+    });
+    process.exit(1);
+  }, SHUTDOWN_HARD_TIMEOUT_MS);
+
+  try {
+    sleepGuard?.dispose(reason);
+    await diagnosticsReporter?.flushNow().catch(() => undefined);
+    flushRuntimeLoggers();
+
+    if (launchdResult) {
+      await teardownLaunchdServices({
+        launchd: launchdResult.launchd,
+        labels: launchdResult.labels,
+        plistDir: getDefaultPlistDir(!app.isPackaged),
+      });
+    }
+
+    await orchestrator.dispose().catch(() => undefined);
+  } finally {
+    clearTimeout(hardTimer);
+  }
+}
 
 // Cold-start gate: IPC handler for `env:get-runtime-config` waits for this
 // promise to resolve before returning, ensuring the renderer always gets the
@@ -937,6 +992,13 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        launchd: launchdResult
+          ? {
+              manager: launchdResult.launchd,
+              labels: launchdResult.labels,
+              plistDir: getDefaultPlistDir(!app.isPackaged),
+            }
+          : undefined,
       });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
@@ -968,27 +1030,42 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", (event) => {
-  sleepGuard?.dispose("app-before-quit");
-  void diagnosticsReporter?.flushNow().catch(() => undefined);
-  flushRuntimeLoggers();
+// ---------------------------------------------------------------------------
+// Signal handlers — route to unified gracefulShutdown.
+// SIGTERM: sent by launchctl stop, systemd, Docker, Activity Monitor "Quit".
+// SIGINT: sent by Ctrl+C in terminal.
+// ---------------------------------------------------------------------------
 
-  // If using launchd mode, the quit handler is installed separately
-  // and shows a dialog for quit options
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    void gracefulShutdown(`signal:${signal}`).finally(() => {
+      (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+      app.exit(0);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// before-quit handler — uses gracefulShutdown for non-launchd mode.
+// In launchd mode, quit-handler.ts intercepts window close and calls
+// gracefulShutdown via teardownLaunchdServices directly.
+// ---------------------------------------------------------------------------
+
+const beforeQuitHandler = (event: Electron.Event) => {
+  // If using launchd mode, the quit handler (quit-handler.ts) manages
+  // the quit flow via window close dialog. This handler only does
+  // lightweight cleanup.
   if (launchdResult) {
-    // Launchd quit handler is already installed via installLaunchdQuitHandler
-    // This handler just does cleanup; actual quit logic is in quit-handler.ts
     return;
   }
 
-  // Legacy orchestrator mode: clean up child processes
+  // Legacy orchestrator mode: run unified shutdown, then quit.
   event.preventDefault();
-  orchestrator
-    .dispose()
-    .catch(() => undefined)
-    .finally(() => {
-      // Remove this handler so the next quit attempt goes through.
-      app.removeAllListeners("before-quit");
-      app.quit();
-    });
-});
+  void gracefulShutdown("before-quit").finally(() => {
+    // P1-2: Remove only this specific handler (not all before-quit listeners).
+    app.removeListener("before-quit", beforeQuitHandler);
+    app.quit();
+  });
+};
+
+app.on("before-quit", beforeQuitHandler);

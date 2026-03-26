@@ -344,4 +344,231 @@ describe("LaunchdManager", () => {
       expect(result).toBe(false);
     });
   });
+
+  describe("uninstallService", () => {
+    it("bootouts and deletes plist file", async () => {
+      setupExecFile({ "launchctl bootout": { stdout: "" } });
+
+      const fs = await import("node:fs/promises");
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.uninstallService("io.nexu.controller");
+
+      expect(fs.unlink).toHaveBeenCalledWith(
+        "/tmp/test/io.nexu.controller.plist",
+      );
+    });
+
+    it("still deletes plist when bootout fails", async () => {
+      setupExecFile({
+        "launchctl bootout": { error: new Error("not registered") },
+      });
+
+      const fs = await import("node:fs/promises");
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.uninstallService("io.nexu.controller");
+
+      expect(fs.unlink).toHaveBeenCalled();
+    });
+  });
+
+  describe("stopServiceGracefully", () => {
+    it("stops service and returns when status becomes stopped", async () => {
+      let callCount = 0;
+      mockExecFile.mockImplementation(
+        (
+          _cmd: string,
+          args: string[],
+          callback: (
+            error: Error | null,
+            result: { stdout: string; stderr: string },
+          ) => void,
+        ) => {
+          if (args[0] === "kill") {
+            callback(null, { stdout: "", stderr: "" });
+            return;
+          }
+          if (args[0] === "print") {
+            callCount++;
+            if (callCount <= 1) {
+              callback(null, {
+                stdout: "state = running\npid = 123",
+                stderr: "",
+              });
+            } else {
+              callback(null, {
+                stdout: "state = waiting",
+                stderr: "",
+              });
+            }
+            return;
+          }
+          callback(null, { stdout: "", stderr: "" });
+        },
+      );
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.stopServiceGracefully("io.nexu.controller", 5000);
+      // Should have polled until stopped
+      expect(callCount).toBeGreaterThanOrEqual(2);
+    });
+
+    it("sends SIGKILL after timeout", async () => {
+      // Service stays running forever
+      mockExecFile.mockImplementation(
+        (
+          _cmd: string,
+          args: string[],
+          callback: (
+            error: Error | null,
+            result: { stdout: string; stderr: string },
+          ) => void,
+        ) => {
+          if (args[0] === "print") {
+            callback(null, {
+              stdout: "state = running\npid = 456",
+              stderr: "",
+            });
+            return;
+          }
+          callback(null, { stdout: "", stderr: "" });
+        },
+      );
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.stopServiceGracefully("io.nexu.controller", 500);
+
+      // Should have sent SIGKILL
+      const sigkillCalls = mockExecFile.mock.calls.filter(
+        (call: unknown[]) =>
+          Array.isArray(call[1]) && (call[1] as string[]).includes("SIGKILL"),
+      );
+      expect(sigkillCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("returns immediately when stopService fails (already stopped)", async () => {
+      setupExecFile({
+        "launchctl kill": { error: new Error("no such process") },
+      });
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      // Should not throw
+      await mgr.stopServiceGracefully("io.nexu.controller");
+    });
+  });
+
+  describe("restartService", () => {
+    it("calls launchctl kickstart -k", async () => {
+      setupExecFile({});
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.restartService("io.nexu.controller");
+
+      const kickstartCalls = mockExecFile.mock.calls.filter(
+        (call: unknown[]) =>
+          Array.isArray(call[1]) && (call[1] as string[]).includes("-k"),
+      );
+      expect(kickstartCalls.length).toBe(1);
+    });
+  });
+
+  describe("rebootstrapFromPlist", () => {
+    it("bootstraps from existing plist file", async () => {
+      setupExecFile({});
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await mgr.rebootstrapFromPlist("io.nexu.controller");
+
+      const bootstrapCalls = mockExecFile.mock.calls.filter(
+        (call: unknown[]) =>
+          Array.isArray(call[1]) && (call[1] as string[]).includes("bootstrap"),
+      );
+      expect(bootstrapCalls.length).toBe(1);
+    });
+
+    it("throws when bootstrap fails", async () => {
+      setupExecFile({
+        "launchctl bootstrap": { error: new Error("bootstrap failed") },
+      });
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      await expect(
+        mgr.rebootstrapFromPlist("io.nexu.controller"),
+      ).rejects.toThrow("bootstrap failed");
+    });
+  });
+
+  describe("hasPlistFile", () => {
+    it("returns true when plist file exists", async () => {
+      const fs = await import("node:fs/promises");
+      (fs.access as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
+
+      mockExecFile.mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          callback: (
+            error: Error | null,
+            result: { stdout: string; stderr: string },
+          ) => void,
+        ) => {
+          callback(new Error("no"), { stdout: "", stderr: "" });
+        },
+      );
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      const result = await mgr.hasPlistFile("io.nexu.controller");
+      expect(result).toBe(true);
+    });
+
+    it("returns false when plist file does not exist", async () => {
+      const fs = await import("node:fs/promises");
+      (fs.access as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("ENOENT"),
+      );
+
+      const { LaunchdManager } = await import(
+        "../../apps/desktop/main/services/launchd-manager"
+      );
+      const mgr = new LaunchdManager({ plistDir: "/tmp/test" });
+
+      const result = await mgr.hasPlistFile("io.nexu.controller");
+      expect(result).toBe(false);
+    });
+  });
 });

@@ -30,7 +30,7 @@
 
 > 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
 >
-> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Downloads](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe)
+> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Downloads](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf)
 >
 > 🎉 **Beta Perk**: During the beta period, top-tier models like Gemini and more are **free to use**. [Download and try now →](https://nexu.io)
 
@@ -160,8 +160,8 @@ Requirement breakdown, asset search, copywriting, design annotation—free up cr
 | Platform | Download |
 |----------|----------|
 | 🍎 macOS (Apple Silicon) | [Official site](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
-| 🍎 macOS (Intel) | [Download](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
-| 🪟 Windows | [Download](https://powerformer.feishu.cn/wiki/VgIvwDqxgiBSXhkGp7gc4z8rnPe) |
+| 🍎 macOS (Intel) | [Download](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf) |
+| 🪟 Windows | [Download](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf) |
 
 ### First launch
 
@@ -280,6 +280,14 @@ We use GitHub as the primary hub for community interaction. Before opening a new
 nexu is open-sourced under the [MIT License](LICENSE) — free to use, modify, distribute, and build upon for any purpose, including commercial use.
 
 We believe open source is the future of AI infrastructure. Fork it, contribute, or build your own product on top of nexu.
+
+---
+
+<p align="center">
+  <a href="https://github.com/nexu-io/nexu/stargazers">
+    <img src="https://github.com/user-attachments/assets/a44df6d4-7056-4cd0-b778-32248a7fd26b" width="600" alt="Star nexu on GitHub" />
+  </a>
+</p>
 
 ---
 

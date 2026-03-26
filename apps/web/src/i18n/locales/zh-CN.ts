@@ -273,6 +273,7 @@ const zhCN = {
   "models.provider.anthropic.description": "Claude 系列 AI 模型",
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
+  "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
   "models.managed.connected": "退出登录",
