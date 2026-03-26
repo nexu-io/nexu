@@ -40,6 +40,7 @@ jobs:
     env:
       NEXU_DESKTOP_MAC_TARGETS: dir
       NEXU_DESKTOP_ELECTRON_BUILDER_FAST_MODE: "1"
+      NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR: "0"
 
     steps:
       - name: Checkout
