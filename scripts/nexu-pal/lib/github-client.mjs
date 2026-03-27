@@ -155,6 +155,7 @@ export async function checkOrganizationMembership({ token, org, username }) {
     `https://api.github.com/orgs/${encodeURIComponent(org)}/members/${encodeURIComponent(username)}`,
     {
       method: "GET",
+      redirect: "manual",
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
@@ -168,6 +169,15 @@ export async function checkOrganizationMembership({ token, org, username }) {
   }
 
   if (response.status === 404) {
+    return false;
+  }
+
+  if (
+    response.status === 301 ||
+    response.status === 302 ||
+    response.status === 307 ||
+    response.status === 308
+  ) {
     return false;
   }
 

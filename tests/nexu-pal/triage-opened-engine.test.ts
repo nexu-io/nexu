@@ -22,7 +22,7 @@ describe("buildOpenedIssueTriagePlan", () => {
       .fn()
       .mockResolvedValueOnce(
         JSON.stringify({
-          is_non_english: true,
+          should_translate: true,
           detected_language: "Chinese",
           translated_title: "Cannot choose install directory on Windows",
           translated_body:
@@ -52,13 +52,15 @@ describe("buildOpenedIssueTriagePlan", () => {
     expect(plan.labelsToAdd).toEqual(["ai-translated", "needs-triage"]);
     expect(plan.commentsToAdd).toEqual([
       [
-        "# AI Translation:",
+        "# AI Translation",
         "",
-        "---",
+        "Only the non-English parts are translated below.",
         "",
         "**Title:**",
         "",
         "Cannot choose install directory on Windows",
+        "",
+        "**Translated sections:**",
         "",
         "**Body:**",
         "",
@@ -78,7 +80,7 @@ describe("buildOpenedIssueTriagePlan", () => {
       .fn()
       .mockResolvedValueOnce(
         JSON.stringify({
-          is_non_english: true,
+          should_translate: true,
           detected_language: "   ",
           translated_title: "Translated title",
           translated_body: "Translated body",
@@ -116,7 +118,7 @@ describe("buildOpenedIssueTriagePlan", () => {
       .fn()
       .mockResolvedValueOnce(
         JSON.stringify({
-          is_non_english: true,
+          should_translate: true,
           detected_language: "Chinese",
           translated_title: "Translated title",
           translated_body: "A".repeat(70000),
@@ -152,7 +154,7 @@ describe("buildOpenedIssueTriagePlan", () => {
       .fn()
       .mockResolvedValueOnce(
         JSON.stringify({
-          is_non_english: false,
+          should_translate: false,
           detected_language: null,
           translated_title: "App crashes on launch",
           translated_body: "Steps to reproduce...",
@@ -199,7 +201,7 @@ describe("buildOpenedIssueTriagePlan", () => {
       .fn()
       .mockResolvedValueOnce(
         JSON.stringify({
-          is_non_english: false,
+          should_translate: false,
           detected_language: null,
           translated_title: "It broke",
           translated_body: "Please fix",
