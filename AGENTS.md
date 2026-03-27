@@ -83,10 +83,15 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 
 | Directory | Purpose | Survives uninstall |
 |---|---|---|
-| `~/.nexu/` (`NEXU_HOME`) | User config (`config.json`, `cloud-profiles.json`), compiled snapshots (`compiled-openclaw.json`), skill ledger (`skill-ledger.json`), skillhub cache, analytics state, logs, openclaw-sidecar | Yes |
+| `~/.nexu/` (`NEXU_HOME`) | User config (`config.json`, `cloud-profiles.json`), compiled snapshots (`compiled-openclaw.json`), skill ledger (`skill-ledger.json`), skillhub cache, analytics state, logs | Yes |
+| `~/.nexu/runtime/nexu-runner.app/` | APFS-cloned Electron binary + Frameworks for launchd services (avoids locking .app bundle during reinstall). Version-stamped; re-clones on app update. | Yes |
+| `~/.nexu/runtime/controller-sidecar/` | APFS-cloned controller sidecar (dist + node_modules). Same reason as runner. | Yes |
+| `~/.nexu/runtime/openclaw-sidecar/` | Extracted OpenClaw sidecar from .app payload. | Yes |
 | `~/Library/Application Support/@nexu/desktop/` (Electron `userData`) | OpenClaw runtime state: `runtime/openclaw/state/agents/` (conversations), `runtime/openclaw/state/extensions/` (channel state), `runtime/openclaw/state/skills/`, `runtime/openclaw/state/openclaw.json`, plus Electron internal data (Cache, IndexedDB, etc.) | No (cleaned by uninstall tools) |
 
-The split is intentional: `NEXU_HOME` holds lightweight user preferences that should persist across reinstalls; Electron `userData` holds heavy runtime state tied to the app lifecycle. `OPENCLAW_STATE_DIR` is explicitly set by the desktop launcher to point to the `userData` path — do not rely on the controller's default fallback.
+The split is intentional: `NEXU_HOME` holds lightweight user preferences and extracted runtime sidecars that should persist across reinstalls; Electron `userData` holds heavy runtime state tied to the app lifecycle. `OPENCLAW_STATE_DIR` is explicitly set by the desktop launcher to point to the `userData` path — do not rely on the controller's default fallback.
+
+Launchd services reference ONLY paths under `~/.nexu/runtime/` (never inside the `.app` bundle), so the packaged app can be replaced by Finder drag-and-drop while services run in the background.
 - For startup troubleshooting, use `pnpm logs` to tail dev logs.
 - `pnpm reset-state` is a dev-only cleanup shortcut; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete packaged app state.
 - To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/` and `~/Library/Application Support/@nexu/desktop/`.
@@ -102,24 +107,51 @@ The split is intentional: `NEXU_HOME` holds lightweight user preferences that sh
 
 ### Shutdown architecture
 
-There are two teardown paths depending on mode:
+All quit/exit paths converge to `runTeardownAndExit()` in `quit-handler.ts`, which wraps cleanup in `try/finally` to guarantee `app.exit(0)` even if teardown throws.
 
 **Non-launchd mode** (orchestrator): `gracefulShutdown(reason)` in `apps/desktop/main/index.ts` is the single entry point:
 - **before-quit** (Cmd+Q / Dock Quit) → `gracefulShutdown("before-quit")`
 - **SIGTERM** (external kill, `pnpm stop`, system shutdown) → `gracefulShutdown("signal:SIGTERM")`
 - **SIGINT** (Ctrl+C) → `gracefulShutdown("signal:SIGINT")`
 
-**Launchd mode** (packaged / `pnpm start`): teardown goes through `teardownLaunchdServices()` directly:
-- **Quit dialog "Quit Completely"** → `teardownLaunchdServices()` via `quit-handler.ts`
-- **Update install** → `teardownLaunchdServices()` + `ensureNexuProcessesDead()` via `update-manager.ts`
+**Launchd mode** (packaged / `pnpm start`): all exit triggers flow through `runTeardownAndExit()`:
+- **Dev window close** → `runTeardownAndExit("dev-close")`
+- **Dev Cmd+Q / app.quit()** → `runTeardownAndExit("dev-before-quit")`
+- **Packaged "Quit Completely" dialog** → `runTeardownAndExit("packaged-quit")`
+- **Packaged no-window exit** (renderer crash) → `runTeardownAndExit("packaged-no-window")`
+- **Update install** → `teardownLaunchdServices()` + `ensureNexuProcessesDead()` + `checkCriticalPathsLocked()` via `update-manager.ts`
 - **SIGTERM / SIGINT** → `gracefulShutdown()` which also calls `teardownLaunchdServices()` internally
 
 Both paths share `teardownLaunchdServices()` as the authoritative launchd service cleanup function. `gracefulShutdown` is idempotent (second call is a no-op) and has an 8-second hard timeout (`process.exit(1)` if teardown hangs).
+
+### Startup attach and version detection
+
+On startup, `bootstrapWithLaunchd()` reads `runtime-ports.json` to decide whether to attach to already-running services or do a fresh cold start. The attach decision uses a multi-field identity check:
+- `appVersion` — refuse attach if the app was updated (missing field = mismatch, conservative)
+- `userDataPath` — refuse attach across different Electron userData roots
+- `buildSource` — refuse attach across packaged/dev/beta builds
+- `openclawStateDir` — refuse attach across different state directories
+- `NEXU_HOME` — refuse attach across different home directories
+
+If any identity field mismatches, stale services are auto-booted-out and a fresh cold start is performed (transparent to the user, ~2-3s slower).
+
+### Update install safety
+
+`update-manager.ts` uses an evidence-based install decision:
+1. `teardownLaunchdServices()` — bootout launchd services, kill orphans
+2. `orchestrator.dispose()` — stop managed child processes
+3. `ensureNexuProcessesDead()` — two sweeps of SIGKILL (15s + 5s), using both launchd labels and pgrep
+4. `checkCriticalPathsLocked()` — `lsof +D` check on .app bundle, runner, and sidecar dirs
+5. Decision: no critical locks → install; critical paths locked → skip this attempt (electron-updater retries next launch)
 
 ### Desktop stability testing
 
 The desktop test suite includes real launchd integration tests that run on macOS CI runners:
 - `tests/desktop/launchd-integration.test.ts` — real `launchctl` commands, real processes (skipped on non-macOS)
+- `tests/desktop/entitlements-plist.test.ts` — V8 JIT entitlement regression guard (value-level assertions)
+- `tests/desktop/daemon-supervisor-restart.test.ts` — circuit breaker logic (MAX_CONSECUTIVE_RESTARTS=10)
+- `tests/desktop/launchd-bootstrap-lifecycle.test.ts` — stale session detection, web port retry
+- `tests/desktop/launchd-manager-bootout.test.ts` — bootoutService error tolerance
 - `scripts/launchd-lifecycle-e2e.sh` — shell-based e2e: bootstrap → verify → teardown → orphan cleanup → re-bootstrap
 - `scripts/desktop-stop-smoke.sh` — post-stop verification: no residual processes, free ports, no stale state
 - `tests/desktop/data-directory-runtime.test.ts` — verifies every plist env var value by calling real `generatePlist()`
@@ -203,11 +235,14 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Skill repo & catalog | `nexu-skills/`, `apps/controller/src/services/skillhub/` |
 | File-based skills design | `specs/plans/2026-03-15-skill-repo-design.md` |
 | Feishu channel setup | `apps/web/src/components/channel-setup/feishu-setup-view.tsx` |
-| Desktop shutdown & lifecycle | `apps/desktop/main/index.ts` (`gracefulShutdown`), `apps/desktop/main/services/quit-handler.ts` |
+| Desktop shutdown & lifecycle | `apps/desktop/main/index.ts` (`gracefulShutdown`), `apps/desktop/main/services/quit-handler.ts` (`runTeardownAndExit`) |
 | Launchd service management | `apps/desktop/main/services/launchd-manager.ts`, `apps/desktop/main/services/launchd-bootstrap.ts` |
-| Desktop auto-updater | `apps/desktop/main/updater/update-manager.ts` |
+| External runner extraction | `apps/desktop/main/services/launchd-bootstrap.ts` (`ensureExternalNodeRunner`, `ensureExternalControllerSidecar`) |
+| Desktop auto-updater | `apps/desktop/main/updater/update-manager.ts` (`checkCriticalPathsLocked`, `ensureNexuProcessesDead`) |
+| Entitlements (V8 JIT) | `apps/desktop/build/entitlements.mac.plist`, `apps/desktop/build/entitlements.mac.inherit.plist` |
 | Dev launch scripts | `scripts/dev-launchd.sh`, `apps/desktop/scripts/dev-env.sh`, `apps/desktop/dev.sh` |
 | Launchd stability tests | `tests/desktop/launchd-integration.test.ts`, `scripts/launchd-lifecycle-e2e.sh` |
+| Entitlements regression tests | `tests/desktop/entitlements-plist.test.ts` |
 | Stop smoke test | `scripts/desktop-stop-smoke.sh` |
 
 ## Documentation maintenance
