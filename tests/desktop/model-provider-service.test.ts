@@ -54,7 +54,7 @@ function createEnv(homeDir: string): ControllerEnv {
     gatewayProbeEnabled: true,
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
-    defaultModelId: "anthropic/claude-sonnet-4",
+    defaultModelId: "link/gemini-3-flash-preview",
     analyticsStatePath: resolve(homeDir, "analytics-state.json"),
   };
 }
@@ -94,7 +94,7 @@ describe("ModelProviderService", () => {
     const config = await store.getConfig();
 
     expect(result.changed).toBe(false);
-    expect(config.runtime.defaultModelId).toBe("anthropic/claude-sonnet-4");
+    expect(config.runtime.defaultModelId).toBe("link/gemini-3-flash-preview");
   });
 
   it("reads cached cloud models without mutating config on read", async () => {

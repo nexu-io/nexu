@@ -8105,7 +8105,7 @@
                         },
                         "defaultModelId": {
                           "type": "string",
-                          "default": "anthropic/claude-sonnet-4"
+                          "default": "link/gemini-3-flash-preview"
                         }
                       }
                     }
@@ -8164,7 +8164,7 @@
                   },
                   "defaultModelId": {
                     "type": "string",
-                    "default": "anthropic/claude-sonnet-4"
+                    "default": "link/gemini-3-flash-preview"
                   }
                 }
               }
@@ -8217,7 +8217,7 @@
                         },
                         "defaultModelId": {
                           "type": "string",
-                          "default": "anthropic/claude-sonnet-4"
+                          "default": "link/gemini-3-flash-preview"
                         }
                       }
                     }
