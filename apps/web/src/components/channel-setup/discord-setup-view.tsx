@@ -2,16 +2,15 @@ import { Input } from "@/components/ui/input";
 import { identify, track } from "@/lib/tracking";
 import {
   ArrowLeft,
-  BookOpen,
+  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronRight,
-  ExternalLink,
   Loader2,
   Lock,
 } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { postApiV1ChannelsDiscordConnect } from "../../../lib/api/sdk.gen";
 
@@ -116,7 +115,7 @@ export function DiscordSetupView({
               }`}
             />
             <div
-              className={`text-[11px] font-semibold mt-2 transition-all ${
+              className={`text-[12px] font-semibold mt-2 transition-all ${
                 i === activeStep
                   ? "text-[#5865F2]"
                   : i < activeStep
@@ -127,7 +126,7 @@ export function DiscordSetupView({
               {t("discordSetup.step", { number: i + 1 })}
             </div>
             <div
-              className={`text-[10px] mt-0.5 leading-tight transition-all ${
+              className={`text-[12px] mt-0.5 leading-tight transition-all ${
                 i === activeStep ? "text-text-secondary" : "text-text-muted/40"
               }`}
             >
@@ -177,7 +176,7 @@ export function DiscordSetupView({
               rel="noopener noreferrer"
               className="inline-flex gap-1.5 items-center px-3.5 py-2 text-[12px] font-medium rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover hover:bg-surface-3 transition-all"
             >
-              <ExternalLink size={12} />
+              <ArrowUpRight size={12} />
               {t("discordSetup.openPortal")}
             </a>
           </div>
@@ -424,20 +423,19 @@ export function DiscordSetupView({
       </div>
 
       {/* Help link */}
-      <div className="flex gap-3 items-center p-4 mt-5 rounded-xl border bg-surface-1 border-border">
-        <BookOpen size={14} className="text-[#5865F2] shrink-0" />
-        <p className="text-[11px] text-text-muted leading-relaxed">
-          {t("discordSetup.helpText")}{" "}
-          <a
-            href="https://discord.com/developers/docs/getting-started"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#5865F2] hover:underline underline-offset-2 font-medium"
-          >
-            {t("discordSetup.helpLinkText")}
-          </a>{" "}
-          {t("discordSetup.helpSuffix")}
-        </p>
+      <div className="mt-5">
+        <a
+          href="https://discord.com/developers/docs/getting-started"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-link text-[12px]"
+        >
+          <Trans i18nKey="discordSetup.helpCta">
+            Need help? Read the <span>Discord Getting Started Guide</span> for
+            detailed instructions.
+          </Trans>
+          <ArrowUpRight size={12} />
+        </a>
       </div>
     </div>
   );

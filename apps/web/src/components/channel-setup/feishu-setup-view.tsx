@@ -2,10 +2,10 @@ import { Input } from "@/components/ui/input";
 import { identify, track } from "@/lib/tracking";
 import {
   ArrowLeft,
+  ArrowUpRight,
   Check,
   ChevronRight,
   Copy,
-  ExternalLink,
   Loader2,
   Lock,
 } from "lucide-react";
@@ -186,7 +186,7 @@ export function FeishuSetupView({
               }`}
             />
             <div
-              className={`text-[11px] font-semibold mt-2 transition-all ${
+              className={`text-[12px] font-semibold mt-2 transition-all ${
                 i === activeStep
                   ? "text-[#3370FF]"
                   : i < activeStep
@@ -197,7 +197,7 @@ export function FeishuSetupView({
               {t("feishuSetup.step", { number: i + 1 })}
             </div>
             <div
-              className={`text-[10px] mt-0.5 leading-tight transition-all ${
+              className={`text-[12px] mt-0.5 leading-tight transition-all ${
                 i === activeStep ? "text-text-secondary" : "text-text-muted/40"
               }`}
             >
@@ -247,7 +247,7 @@ export function FeishuSetupView({
               rel="noopener noreferrer"
               className="inline-flex gap-1.5 items-center px-3.5 py-2 text-[12px] font-medium rounded-lg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover hover:bg-surface-3 transition-all"
             >
-              <ExternalLink size={12} />
+              <ArrowUpRight size={12} />
               {t("feishuSetup.openConsole")}
             </a>
           </div>
@@ -279,7 +279,7 @@ export function FeishuSetupView({
                 <button
                   type="button"
                   onClick={handleCopyJson}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md text-text-muted hover:text-text-primary hover:bg-surface-2 transition-all cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-1 text-[12px] font-medium rounded-md text-text-muted hover:text-text-primary hover:bg-surface-2 transition-all cursor-pointer"
                 >
                   {jsonCopied ? (
                     <>
@@ -434,11 +434,11 @@ export function FeishuSetupView({
           href="https://open.feishu.cn/document/home/introduction-to-custom-app-development/self-built-application-development-process"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-link text-[11px]"
+          className="text-link text-[12px]"
         >
           {t("feishuSetup.helpText")} {t("feishuSetup.helpLinkText")}{" "}
           {t("feishuSetup.helpSuffix")}
-          <ExternalLink size={10} />
+          <ArrowUpRight size={12} />
         </a>
       </div>
     </div>

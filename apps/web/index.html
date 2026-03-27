@@ -6,20 +6,11 @@
     <meta name="x-commit-hash" content="%VITE_COMMIT_HASH%" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link id="app-favicon" rel="icon" type="image/svg+xml" href="/favicon/favicon-light.svg" />
-    <script>
-      (() => {
-        const media = window.matchMedia("(prefers-color-scheme: dark)");
-        const updateFavicon = () => {
-          const link = document.getElementById("app-favicon");
-          if (!(link instanceof HTMLLinkElement)) return;
-          link.href = media.matches ? "/favicon/favicon-dark.svg" : "/favicon/favicon-light.svg";
-        };
-        updateFavicon();
-        media.addEventListener("change", updateFavicon);
-      })();
-    </script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
     <title>nexu</title>
   </head>
   <body>

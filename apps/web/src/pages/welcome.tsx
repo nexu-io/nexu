@@ -305,7 +305,7 @@ export function WelcomePage() {
                 className="flex items-center cursor-pointer text-accent"
               >
                 <img
-                  src="/logo.svg"
+                  src="/favicon/favicon-light.svg"
                   alt="nexu"
                   className="h-5 w-auto object-contain"
                 />
@@ -322,10 +322,7 @@ export function WelcomePage() {
               <FadeIn delay={120}>
                 <div className="rounded-[32px] border border-black/10 bg-white/88 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-7">
                   <div className="border-b border-black/8 pb-6">
-                    <h2
-                      className="text-[34px] leading-[0.98] tracking-tight text-[#181816] sm:text-[42px]"
-                      style={{ fontFamily: "Georgia, Times New Roman, serif" }}
-                    >
+                    <h2 className="font-sans text-[34px] leading-[0.98] tracking-tight text-[#181816] sm:text-[42px]">
                       {t("welcome.title")}
                     </h2>
                   </div>
@@ -397,21 +394,17 @@ export function WelcomePage() {
                                   <option.icon size={18} />
                                 </div>
                                 <div
-                                  className={`text-[22px] leading-none tracking-tight ${
+                                  className={`font-sans text-[22px] leading-none tracking-tight ${
                                     option.tone === "primary"
                                       ? "text-white"
                                       : "text-[#1b1b19]"
                                   }`}
-                                  style={{
-                                    fontFamily:
-                                      "Georgia, Times New Roman, serif",
-                                  }}
                                 >
                                   {option.title}
                                 </div>
                               </div>
                               <span
-                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] shrink-0 ${
+                                className={`rounded-full px-2.5 py-1 text-[12px] font-semibold uppercase tracking-[0.14em] shrink-0 ${
                                   option.tone === "primary"
                                     ? "bg-white/[0.08] text-white/75"
                                     : "border border-black/10 bg-white/70 text-text-secondary"
@@ -443,7 +436,7 @@ export function WelcomePage() {
                               {option.highlights.map((tag) => (
                                 <span
                                   key={tag}
-                                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] ${
+                                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] ${
                                     option.tone === "primary"
                                       ? "border border-white/10 bg-white/[0.06] text-white/78"
                                       : "border border-black/8 bg-white/70 text-text-secondary"
@@ -459,7 +452,7 @@ export function WelcomePage() {
                             </div>
 
                             <div
-                              className={`mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${
+                              className={`mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[12px] ${
                                 option.tone === "primary"
                                   ? "text-white/44"
                                   : "text-text-muted"
@@ -517,10 +510,7 @@ export function WelcomePage() {
                       <Key size={11} />
                       BYOK
                     </div>
-                    <h2
-                      className="mt-4 text-[32px] leading-[0.98] tracking-tight text-[#181816]"
-                      style={{ fontFamily: "Georgia, Times New Roman, serif" }}
-                    >
+                    <h2 className="mt-4 font-sans text-[32px] leading-[0.98] tracking-tight text-[#181816]">
                       {t("welcome.byok.title")}
                     </h2>
                     <p className="mt-3 text-[14px] leading-[1.75] text-text-secondary">

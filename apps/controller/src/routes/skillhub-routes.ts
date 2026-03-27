@@ -11,6 +11,7 @@ const minimalSkillSchema = z.object({
   downloads: z.number(),
   stars: z.number(),
   tags: z.array(z.string()),
+  icon: z.string().nullable(),
   version: z.string(),
   updatedAt: z.string(),
 });

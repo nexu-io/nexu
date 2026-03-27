@@ -1,4 +1,3 @@
-import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
@@ -477,23 +476,6 @@ export function HomePage() {
     return new Map(entries.map((entry) => [entry.channelId, entry]));
   }, [liveStatus]);
 
-  const agentIndicator = useMemo(() => {
-    if (!hasChannel || !liveStatus?.agent) {
-      return null;
-    }
-    return liveStatus.agent.alive
-      ? {
-          colorClass: "bg-[var(--color-success)]",
-          pulse: false,
-          label: t("home.agent.alive"),
-        }
-      : {
-          colorClass: "bg-[var(--color-warning)]",
-          pulse: true,
-          label: t("home.agent.starting"),
-        };
-  }, [hasChannel, liveStatus, t]);
-
   const handleChannelCreated = useCallback(
     (channelId: string) => {
       setPendingChannelId(channelId);
@@ -676,7 +658,7 @@ export function HomePage() {
                         <div className="text-[13px] font-medium text-text-primary">
                           {ch.name}
                         </div>
-                        <div className="mt-0.5 text-[11px] text-text-muted">
+                        <div className="mt-0.5 text-[12px] text-text-muted">
                           Add nexu Bot
                         </div>
                       </div>
@@ -796,17 +778,6 @@ export function HomePage() {
             </div>
             <div className="flex items-center gap-2 mt-1.5">
               <InlineModelSelector />
-              {agentIndicator && (
-                <span
-                  className="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                  title={agentIndicator.label}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${agentIndicator.colorClass} ${agentIndicator.pulse ? "animate-pulse" : ""}`}
-                  />
-                  {agentIndicator.label}
-                </span>
-              )}
               <div className="flex items-center gap-2 text-[11px] text-text-muted ml-3">
                 <span>
                   {sessionsData
@@ -991,9 +962,6 @@ export function HomePage() {
             )}
           </div>
         </div>
-
-        {/* Activity Feed */}
-        <ActivityFeed />
 
         <GitHubStarCta
           label={t("home.starNexu")}

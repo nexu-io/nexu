@@ -505,7 +505,7 @@ function ChatBubble({
     <div
       data-chat-message={msg.id}
       data-chat-role={msg.role}
-      className={`flex gap-3 ${isBot ? "items-start" : "flex-row-reverse items-end"}`}
+      className={`flex gap-3 ${isBot ? "items-start" : "flex-row-reverse items-start"}`}
     >
       {isBot ? (
         <img
@@ -651,10 +651,8 @@ export function SessionsPage() {
     (session?.metadata as Record<string, unknown> | null)?.isGroup === true ||
     (session?.title ?? "").includes("(group)");
 
-  const buttonClassName = cn(
-    "inline-flex h-12 items-center justify-center gap-3 rounded-[18px] border bg-white px-5 text-[13px] font-medium text-text-primary shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-colors",
-    "border-[rgba(15,23,42,0.1)] hover:bg-[rgba(248,250,252,0.9)]",
-  );
+  const buttonClassName =
+    "inline-flex items-center justify-center gap-2 rounded-[8px] border border-border px-[14px] py-[5px] text-[12px] font-medium text-text-primary hover:bg-surface-2 hover:border-border-hover transition-colors";
 
   const handleOpenFolder = async (): Promise<void> => {
     if (!sessionFolderUrl) {

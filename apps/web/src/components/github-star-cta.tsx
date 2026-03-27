@@ -92,7 +92,7 @@ export function GitHubStarCta({
         />
         <span>{label}</span>
         {stars && stars > 0 ? (
-          <span className="tabular-nums text-[10px] text-text-muted">
+          <span className="tabular-nums text-[12px] text-text-muted">
             ({stars.toLocaleString()})
           </span>
         ) : null}
@@ -115,7 +115,7 @@ export function GitHubStarCta({
       />
       <span>{label}</span>
       {stars && stars > 0 ? (
-        <span className="tabular-nums text-[10px] text-text-muted">
+        <span className="tabular-nums text-[12px] text-text-muted">
           ({stars.toLocaleString()})
         </span>
       ) : null}

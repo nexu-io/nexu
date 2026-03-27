@@ -51,6 +51,7 @@ const mockGetAllWebContents = vi.fn(
 vi.mock("electron", () => ({
   app: mockApp,
   BrowserWindow: vi.fn(),
+  Menu: { getApplicationMenu: vi.fn(() => null) },
   webContents: { getAllWebContents: mockGetAllWebContents },
 }));
 
@@ -794,15 +795,15 @@ describe("send (via event handlers)", () => {
 // ===========================================================================
 
 describe("constructor", () => {
-  it("sets autoDownload to false by default", async () => {
-    mockAutoUpdater.autoDownload = true; // reset
+  it("sets autoDownload to true by default", async () => {
+    mockAutoUpdater.autoDownload = false; // reset
     await createManager();
-    expect(mockAutoUpdater.autoDownload).toBe(false);
+    expect(mockAutoUpdater.autoDownload).toBe(true);
   });
 
-  it("sets autoDownload to true when option is provided", async () => {
-    await createManager(undefined, { autoDownload: true });
-    expect(mockAutoUpdater.autoDownload).toBe(true);
+  it("sets autoDownload to false when option is provided", async () => {
+    await createManager(undefined, { autoDownload: false });
+    expect(mockAutoUpdater.autoDownload).toBe(false);
   });
 
   it("sets autoInstallOnAppQuit to true", async () => {

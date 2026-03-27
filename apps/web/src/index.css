@@ -84,7 +84,7 @@
   --color-warning-subtle: rgba(237, 195, 55, 0.08);
   --color-danger: #f93920;
   --color-danger-subtle: rgba(249, 57, 32, 0.08);
-  --color-link: #2657bb;
+  --color-link: #1f68fe;
   --color-info: #2657bb;
   --color-info-subtle: rgba(38, 87, 187, 0.08);
   --color-pink: #d999f7;
@@ -134,7 +134,7 @@
   --color-destructive: #f93920;
   --color-destructive-foreground: #ffffff;
   --color-input: rgba(0, 0, 0, 0.08);
-  --color-ring: #1c1f23;
+  --color-ring: rgba(61, 185, 206, 0.25);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -170,8 +170,20 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Typography — heading levels
+   Interactive typography floor
+   Any clickable surface (button, a, [role="button"], elements inside
+   a click target) must use font-size >= 12px.
+   Rationale: sub-12px text on tap/click targets hurts readability
+   and fails touch-target accessibility heuristics.
    ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   Page header — consistent title + subtitle + spacing for all pages
+   ═══════════════════════════════════════════════════════════════════ */
+
+.page-header {
+  margin-bottom: 32px;
+}
 
 .heading-page {
   font-size: 24px;
@@ -258,7 +270,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--color-brand-primary);
+  color: var(--color-link);
   text-decoration: none;
   transition: text-decoration 0.15s ease;
 }

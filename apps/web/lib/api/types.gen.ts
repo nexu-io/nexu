@@ -2682,6 +2682,7 @@ export type GetApiV1SkillhubCatalogResponses = {
             downloads: number;
             stars: number;
             tags: Array<string>;
+            icon: string;
             version: string;
             updatedAt: string;
         }>;

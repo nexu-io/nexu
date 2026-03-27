@@ -61,35 +61,12 @@ function mapDbSession(s: {
   };
 }
 
-type Platform =
-  | "slack"
-  | "discord"
-  | "whatsapp"
-  | "telegram"
-  | "feishu"
-  | "openclaw-weixin"
-  | "web";
-
-const PLATFORM_LABELS: Record<Platform, string> = {
-  discord: "Discord",
-  slack: "Slack",
-  feishu: "Feishu",
-  "openclaw-weixin": "WeChat",
-  whatsapp: "WhatsApp",
-  telegram: "Telegram",
-  web: "Web",
-};
-
 function SidebarPlatformIcon({ platform }: { platform: string }) {
   return (
     <span className="flex justify-center items-center w-7 h-7 rounded-xl border border-border bg-surface-1 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
       <PlatformIcon platform={platform} size={15} />
     </span>
   );
-}
-
-function getPlatformLabel(platform: string): string {
-  return PLATFORM_LABELS[platform as Platform] ?? "Web";
 }
 
 function formatTime(iso: string | null): string {
@@ -279,7 +256,7 @@ function UpdateFloatCard({
           <button
             type="button"
             onClick={onInstall}
-            className="rounded-[6px] px-2.5 py-1 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
+            className="rounded-[6px] px-2.5 py-1 text-[12px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
           >
             {t("layout.update.install")}
           </button>
@@ -289,14 +266,14 @@ function UpdateFloatCard({
           <button
             type="button"
             onClick={onDownload}
-            className="rounded-[6px] px-2.5 py-1 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
+            className="rounded-[6px] px-2.5 py-1 text-[12px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
           >
             {t("layout.update.download")}
           </button>
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-[6px] px-2 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary transition-colors"
+            className="rounded-[6px] px-2 py-1 text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors"
           >
             {t("layout.update.later")}
           </button>
@@ -525,7 +502,7 @@ function WorkspaceLayoutInner() {
       : isModelsPage
         ? t("layout.mobile.settingsSubtitle")
         : selectedSession
-          ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
+          ? formatTime(selectedSession.lastTime)
           : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
   const desktopGlassTint = "rgba(255, 255, 255, 0.08)";
   const updateFloatWidth = Math.max(140, sidebarWidth - 20);
@@ -602,7 +579,7 @@ function WorkspaceLayoutInner() {
                 <button
                   type="button"
                   onClick={() => setUpdateDismissed(false)}
-                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[var(--color-brand-primary)] text-white hover:opacity-85 transition-opacity"
+                  className="rounded-full px-2 py-0.5 text-[12px] font-semibold bg-[var(--color-brand-primary)] text-white hover:opacity-85 transition-opacity"
                 >
                   {t("layout.update.badge")}
                 </button>
@@ -666,7 +643,7 @@ function WorkspaceLayoutInner() {
               <Sparkles size={16} className="shrink-0" />
               {t("layout.nav.skills")}
               {installedSkillsCount > 0 && (
-                <span className="ml-auto text-[10px] text-text-tertiary font-normal">
+                <span className="ml-auto text-[12px] text-text-tertiary font-normal">
                   {installedSkillsCount}
                 </span>
               )}
@@ -729,22 +706,27 @@ function WorkspaceLayoutInner() {
                         >
                           {s.title}
                         </div>
-                        {s.status === "active" && (
-                          <span className="shrink-0 rounded-full bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-success)]">
-                            Live
-                          </span>
-                        )}
                       </div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-text-muted truncate whitespace-nowrap">
-                        <span>{getPlatformLabel(s.channelType ?? "web")}</span>
-                        <span className="text-border">·</span>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted truncate whitespace-nowrap">
                         <span>{formatTime(s.lastTime)}</span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      {s.status === "active" && (
-                        <div className="w-2 h-2 rounded-full bg-[var(--color-success)] shrink-0" />
-                      )}
+                      <span
+                        role="img"
+                        aria-label={`Status: ${s.status === "active" ? "active" : "inactive"}`}
+                        className="shrink-0"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "block w-2 h-2 rounded-full",
+                            s.status === "active"
+                              ? "bg-[var(--color-success)]"
+                              : "bg-[var(--color-warning)]",
+                          )}
+                        />
+                      </span>
                     </div>
                   </button>
                 );
@@ -864,7 +846,7 @@ function WorkspaceLayoutInner() {
                     >
                       <span>{option.label}</span>
                       {locale === option.value && (
-                        <span className="text-[10px] text-text-muted">✓</span>
+                        <span className="text-[12px] text-text-muted">✓</span>
                       )}
                     </button>
                   ))}
@@ -878,7 +860,7 @@ function WorkspaceLayoutInner() {
                 setShowHelpMenu(false);
               }}
               className={cn(
-                "h-7 inline-flex items-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors cursor-pointer",
+                "h-7 inline-flex items-center gap-1.5 rounded-md px-2 text-[12px] font-medium transition-colors cursor-pointer",
                 showLangMenu
                   ? "text-text-primary bg-black/5"
                   : "text-text-secondary hover:text-text-primary hover:bg-black/5",
@@ -929,7 +911,7 @@ function WorkspaceLayoutInner() {
                     className="w-7 h-7 rounded-md object-cover ring-1 ring-accent/10 shrink-0"
                   />
                 ) : (
-                  <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[10px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
+                  <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[12px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
                     {userInitial}
                   </div>
                 )}
@@ -937,7 +919,7 @@ function WorkspaceLayoutInner() {
                   <div className="text-[12px] text-text-primary truncate font-medium whitespace-nowrap">
                     {userName}
                   </div>
-                  <div className="text-[10px] text-text-muted truncate whitespace-nowrap">
+                  <div className="text-[12px] text-text-muted truncate whitespace-nowrap">
                     {userEmail}
                   </div>
                 </div>
@@ -1088,25 +1070,26 @@ function WorkspaceLayoutInner() {
                               <div className="text-[13px] truncate font-medium">
                                 {s.title}
                               </div>
-                              {s.status === "active" && (
-                                <span className="shrink-0 rounded-full bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--color-success)]">
-                                  Live
-                                </span>
-                              )}
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-text-muted truncate">
-                              <span>
-                                {getPlatformLabel(s.channelType ?? "web")}
-                              </span>
-                              <span className="text-border">·</span>
+                            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted truncate">
                               <span>{formatTime(s.lastTime)}</span>
                             </div>
                           </div>
-                          {s.status === "active" ? (
-                            <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--color-success)]" />
-                          ) : (
-                            <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-text-muted/30" />
-                          )}
+                          <span
+                            role="img"
+                            aria-label={`Status: ${s.status === "active" ? "active" : "inactive"}`}
+                            className="shrink-0"
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "block w-1.5 h-1.5 rounded-full",
+                                s.status === "active"
+                                  ? "bg-[var(--color-success)]"
+                                  : "bg-[var(--color-warning)]",
+                              )}
+                            />
+                          </span>
                         </button>
                       );
                     })}
@@ -1150,7 +1133,7 @@ function WorkspaceLayoutInner() {
                   onClick={() => setShowLogoutConfirm(!showLogoutConfirm)}
                   className="flex gap-2.5 items-center w-full px-2 py-2 rounded-lg transition-all hover:bg-surface-3 cursor-pointer"
                 >
-                  <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[10px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
+                  <div className="flex justify-center items-center w-7 h-7 rounded-md bg-gradient-to-br from-accent/20 to-accent/5 text-[12px] font-bold text-accent ring-1 ring-accent/10 shrink-0">
                     {userInitial}
                   </div>
                   <div className="flex-1 min-w-0 text-left">

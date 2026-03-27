@@ -4,8 +4,8 @@ import { track } from "@/lib/tracking";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowUpRight,
   CheckCircle2,
-  ExternalLink,
   Loader2,
   Users,
 } from "lucide-react";
@@ -342,7 +342,7 @@ export function SlackClaimPage() {
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
             >
               {t("claim.open", { platform: platformCfg.label })}
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
             <Link
               to="/"
@@ -620,7 +620,7 @@ export function SlackClaimPage() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
           >
             {t("claim.backTo", { platform: platformCfg.label })}
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </a>
           <Link
             to="/workspace"

@@ -1,5 +1,5 @@
 import { identify, track } from "@/lib/tracking";
-import { ExternalLink, Eye, EyeOff, FileText, X } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -331,11 +331,10 @@ export function ChannelConnectModal({
             href={config.docUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-[12px] text-accent hover:underline mt-1"
+            className="text-link text-[12px] mt-1"
           >
-            <FileText size={13} />
             {t("modal.viewDocs", { name: config.name })}
-            <ExternalLink size={12} />
+            <ArrowUpRight size={12} />
           </a>
         </div>
 

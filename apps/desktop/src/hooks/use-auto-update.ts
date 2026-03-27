@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { checkForUpdate, downloadUpdate, installUpdate } from "../lib/host-api";
+import { checkForUpdate, installUpdate } from "../lib/host-api";
 
-export type UpdatePhase =
-  | "idle"
-  | "checking"
-  | "up-to-date"
-  | "available"
-  | "downloading"
-  | "ready"
-  | "error";
+export type UpdatePhase = "idle" | "ready" | "error";
 
 export type UpdateState = {
   phase: UpdatePhase;
@@ -39,11 +32,7 @@ export function useAutoUpdate() {
 
     disposers.push(
       updater.onEvent("update:checking", () => {
-        setState((prev) => ({
-          ...prev,
-          phase: prev.userInitiated ? "checking" : prev.phase,
-          errorMessage: null,
-        }));
+        setState((prev) => ({ ...prev, errorMessage: null }));
       }),
     );
 
@@ -51,10 +40,8 @@ export function useAutoUpdate() {
       updater.onEvent("update:available", (data) => {
         setState((prev) => ({
           ...prev,
-          phase: "available",
           version: data.version,
           releaseNotes: data.releaseNotes ?? null,
-          userInitiated: false,
         }));
       }),
     );
@@ -63,7 +50,6 @@ export function useAutoUpdate() {
       updater.onEvent("update:up-to-date", () => {
         setState((prev) => ({
           ...prev,
-          phase: prev.userInitiated ? "up-to-date" : "idle",
           errorMessage: null,
           userInitiated: false,
         }));
@@ -72,12 +58,7 @@ export function useAutoUpdate() {
 
     disposers.push(
       updater.onEvent("update:progress", (data) => {
-        setState((prev) => ({
-          ...prev,
-          phase: "downloading",
-          percent: data.percent,
-          userInitiated: false,
-        }));
+        setState((prev) => ({ ...prev, percent: data.percent }));
       }),
     );
 
@@ -89,6 +70,7 @@ export function useAutoUpdate() {
           version: data.version,
           percent: 100,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -100,6 +82,7 @@ export function useAutoUpdate() {
           phase: "error",
           errorMessage: data.message,
           userInitiated: false,
+          dismissed: false,
         }));
       }),
     );
@@ -111,42 +94,14 @@ export function useAutoUpdate() {
     };
   }, []);
 
-  useEffect(() => {
-    if (state.phase !== "up-to-date") {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setState((prev) =>
-        prev.phase === "up-to-date"
-          ? { ...prev, phase: "idle", userInitiated: false }
-          : prev,
-      );
-    }, 2800);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [state.phase]);
-
   const check = useCallback(async () => {
     setState((prev) => ({
       ...prev,
-      phase: "checking",
       errorMessage: null,
-      dismissed: false,
       userInitiated: true,
     }));
     try {
       await checkForUpdate();
-    } catch {
-      // Errors are delivered via the update:error event
-    }
-  }, []);
-
-  const download = useCallback(async () => {
-    try {
-      await downloadUpdate();
     } catch {
       // Errors are delivered via the update:error event
     }
@@ -174,5 +129,5 @@ export function useAutoUpdate() {
     }));
   }, []);
 
-  return { ...state, check, download, install, dismiss, undismiss };
+  return { ...state, check, install, dismiss, undismiss };
 }

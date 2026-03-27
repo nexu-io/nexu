@@ -21,11 +21,51 @@ import {
 import { mapInstalledSkillSource, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
-import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
+import {
+  Bot,
+  Calendar,
+  CheckSquare,
+  Compass,
+  FileEdit,
+  FilePlus,
+  FileSearch,
+  Globe,
+  Loader2,
+  type LucideIcon,
+  MessageSquare,
+  Plus,
+  Search,
+  Settings2,
+  Sparkles,
+  Table2,
+  Wrench,
+  Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+
+const SKILL_ICON_MAP: Record<string, LucideIcon> = {
+  Table2,
+  Calendar,
+  FilePlus,
+  FileSearch,
+  MessageSquare,
+  CheckSquare,
+  Wrench,
+  FileEdit,
+  Sparkles,
+  Bot,
+  Globe,
+  Search,
+  Zap,
+};
+
+function SkillIcon({ name, size }: { name: string | null; size: number }) {
+  const Icon = (name && SKILL_ICON_MAP[name]) || Zap;
+  return <Icon size={size} className="text-text-primary" />;
+}
 
 const PAGE_SIZE = 50;
 
@@ -139,14 +179,14 @@ function SkillCard({
       {/* Header: Icon + Name + Category */}
       <div className="flex items-center gap-3 mb-2">
         <div className="w-9 h-9 rounded-[10px] bg-white border border-border flex items-center justify-center shrink-0">
-          <Zap size={18} className="text-text-primary" />
+          <SkillIcon name={skill.icon} size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-text-heading truncate">
             {skill.name}
           </div>
           {categoryLabel && (
-            <span className="text-[11px] text-text-muted">{categoryLabel}</span>
+            <span className="text-[12px] text-text-muted">{categoryLabel}</span>
           )}
         </div>
       </div>
@@ -384,6 +424,7 @@ export function SkillsPage() {
           downloads: 0,
           stars: 0,
           tags: [],
+          icon: null,
           version: "",
           updatedAt: "",
         }
@@ -401,6 +442,7 @@ export function SkillsPage() {
           downloads: 0,
           stars: 0,
           tags: [],
+          icon: null,
           version: "",
           updatedAt: "",
         },
@@ -577,7 +619,7 @@ export function SkillsPage() {
         style={{ paddingTop: isDesktopClient ? "2rem" : "0.5rem" }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-10">
+        <div className="page-header flex items-center justify-between">
           <div>
             <h1 className="heading-page">{t("skills.pageTitle")}</h1>
             <p className="heading-page-desc">{t("skills.pageSubtitle")}</p>
@@ -705,7 +747,7 @@ export function SkillsPage() {
                     });
                   }}
                   className={cn(
-                    "shrink-0 inline-flex items-center justify-center rounded-full h-7 px-3 text-[11px] leading-none font-medium transition-all",
+                    "shrink-0 inline-flex items-center justify-center rounded-full h-7 px-3 text-[12px] leading-none font-medium transition-all",
                     active
                       ? "bg-[var(--color-accent)] text-white"
                       : "border border-border bg-surface-1 text-text-secondary hover:text-text-primary hover:border-border-hover",
@@ -748,7 +790,7 @@ export function SkillsPage() {
                       })
                     }
                     className={cn(
-                      "shrink-0 inline-flex items-center justify-center rounded-full h-7 px-3 text-[11px] leading-none font-medium transition-all",
+                      "shrink-0 inline-flex items-center justify-center rounded-full h-7 px-3 text-[12px] leading-none font-medium transition-all",
                       active
                         ? "bg-[var(--color-accent)] text-white"
                         : "border border-border bg-surface-1 text-text-secondary hover:text-text-primary hover:border-border-hover",
@@ -783,7 +825,7 @@ export function SkillsPage() {
             href="https://github.com/nexu-io/nexu/issues"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[var(--color-accent)] hover:underline"
+            className="text-[var(--color-link)] hover:underline"
           >
             GitHub Issues
           </a>{" "}

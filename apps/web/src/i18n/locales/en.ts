@@ -272,7 +272,7 @@ const en = {
   "models.configureProviderHint": "Configure a provider below first",
   "models.searchModels": "Search models...",
   "models.modelSwitched": "Model switched",
-  "models.autoSwitched": "Auto-switched to {{model}}",
+  "models.autoSwitched": "Previous model unavailable — switched to {{model}}",
   "models.modelSwitchedAndSynced": "Model switched & synced to bot",
   "models.modelSwitchedSyncFailed": "Model switched (sync to bot pending)",
   "models.modelSwitchFailed": "Failed to switch model",
@@ -312,7 +312,7 @@ const en = {
   "models.byok.apiKeySaved": "API key saved",
   "models.byok.apiKeySavedHint":
     "For security, the saved key is not shown. Enter a new key only if you want to replace it.",
-  "models.byok.changeApiKey": "Replace key",
+  "models.byok.changeApiKey": "Replace",
   "models.byok.verify": "Check",
   "models.byok.keyValid": "Key valid — {{count}} models detected",
   "models.byok.keyInvalid": "Key invalid: {{error}}",
@@ -328,7 +328,10 @@ const en = {
   "models.byok.fetchingModels": "Fetching models...",
   "models.byok.updateConfig": "Update configuration",
   "models.byok.saveAndEnable": "Save",
+  "models.byok.regionLabel": "Region",
   "models.byok.remove": "Remove",
+  "models.byok.removeSuccess": "Provider removed",
+  "models.byok.removeFailed": "Failed to remove provider",
   "models.byok.confirmRemove":
     "Are you sure you want to remove this provider configuration?",
   "models.byok.saveSuccess": "Saved successfully",
@@ -340,12 +343,15 @@ const en = {
   "models.byok.oauthSuccess": "ChatGPT connected successfully",
   "models.byok.oauthFailed": "ChatGPT login failed",
   "models.byok.oauthOrApiKey": "Or enter an API key manually",
+  "models.byok.oauthTab": "OAuth Login",
+  "models.byok.apiKeyTab": "API Key",
   "models.byok.oauthDescription": "Use your ChatGPT Plus/Pro subscription",
   "models.byok.minimax.authModeOauth": "OAuth Login",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
   "models.byok.minimax.oauthDescription":
     "Use MiniMax OAuth for Coding Plan access without manually pasting an API key.",
+  "models.byok.minimax.regionLabel": "Region",
   "models.byok.minimax.regionGlobal": "Global",
   "models.byok.minimax.regionCn": "CN",
   "models.byok.minimax.endpoint": "Endpoint: {{endpoint}}",
@@ -356,8 +362,10 @@ const en = {
   "models.byok.minimax.reconnect": "Reconnect",
   "models.byok.minimax.login": "Login with MiniMax",
   "models.byok.zaiCodingPlan": "Z.AI Coding Plan",
+  "models.byok.zaiCodingPlanToggleHint": "Optional subscription plan",
   "models.byok.zaiCodingPlanDesc":
     "Free models with your Z.AI Coding Plan subscription",
+  "models.byok.zaiCodingPlanKeyLabel": "Coding Plan Key",
   "models.byok.zaiOrGeneralApi": "Or use General API key",
 
   // ── Channels Page ──
@@ -440,7 +448,7 @@ const en = {
   "skills.yours": "Yours",
   "skills.clawhubDisclaimer":
     "Skills come from ClawHub \u2014 network or service may occasionally be unstable. If you encounter issues, please report on",
-  "skills.clawhubDisclaimerAfterLink": ".",
+  "skills.clawhubDisclaimerAfterLink": "",
   "skills.recommended": "Recommended",
   "skills.installed": "Installed",
   "skills.installQueued": "Skill queued for installation",
@@ -797,9 +805,8 @@ const en = {
   "slackSetup.back": "Back",
   "slackSetup.previous": "Previous",
   "slackSetup.next": "Next",
-  "slackSetup.helpText": "Need help? Read the",
-  "slackSetup.helpLinkText": "Slack Authentication Guide",
-  "slackSetup.helpSuffix": "for detailed instructions.",
+  "slackSetup.helpCta":
+    "Need help? Read the <0>Slack Authentication Guide</0> for detailed instructions.",
   "slackSetup.authNotCompleted": "Authorization was not completed",
   "slackSetup.connectFailed": "Failed to connect Slack",
   "slackSetup.connectSuccess": 'Slack workspace "{{teamName}}" connected!',
@@ -845,9 +852,8 @@ const en = {
   "discordSetup.verifyConnect": "Verify & Connect",
   "discordSetup.previous": "Previous",
   "discordSetup.next": "Next",
-  "discordSetup.helpText": "Need help? Read the",
-  "discordSetup.helpLinkText": "Discord Getting Started Guide",
-  "discordSetup.helpSuffix": "for detailed instructions.",
+  "discordSetup.helpCta":
+    "Need help? Read the <0>Discord Getting Started Guide</0> for detailed instructions.",
   "discordSetup.connectSuccess": 'Discord server "{{teamName}}" connected!',
   "discordSetup.connectFailed": "Failed to connect Discord",
 

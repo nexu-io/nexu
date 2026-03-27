@@ -2,8 +2,8 @@ import { BrandMark } from "@/components/brand-mark";
 import { authClient } from "@/lib/auth-client";
 import {
   AlertTriangle,
+  ArrowUpRight,
   CheckCircle2,
-  ExternalLink,
   Loader2,
 } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -79,7 +79,7 @@ export function FeishuBindPage() {
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-fg hover:bg-accent-hover transition-colors"
             >
               {t("feishuBind.backToFeishu")}
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
             <Link
               to="/workspace"

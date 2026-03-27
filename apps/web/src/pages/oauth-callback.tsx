@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowUpRight,
   Check,
-  ExternalLink,
   Shield,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -387,7 +387,7 @@ function SuccessCard({
               >
                 <SlackIcon size={16} />
                 {t("oauth.returnSlack")}
-                <ExternalLink size={12} className="opacity-60" />
+                <ArrowUpRight size={12} className="opacity-60" />
               </button>
             )}
             {state.chatChannels.includes("discord") && (
@@ -401,7 +401,7 @@ function SuccessCard({
               >
                 <DiscordIcon size={16} />
                 {t("oauth.returnDiscord")}
-                <ExternalLink size={12} className="opacity-60 ml-0.5" />
+                <ArrowUpRight size={12} className="opacity-60 ml-0.5" />
               </a>
             )}
           </div>

@@ -36,7 +36,18 @@ export const hostInvokeChannels = [
   "update:set-source",
   "component:check",
   "component:install",
+  "dev:preview-update-ui",
 ] as const;
+
+export const devUpdatePreviewScenarios = [
+  "available",
+  "downloading",
+  "ready",
+  "error",
+] as const;
+
+export type DevUpdatePreviewScenario =
+  (typeof devUpdatePreviewScenarios)[number];
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
 
@@ -132,6 +143,7 @@ export type HostInvokePayloadMap = {
   "update:set-source": { source: UpdateSource };
   "component:check": undefined;
   "component:install": { id: string };
+  "dev:preview-update-ui": { scenario: DevUpdatePreviewScenario };
 };
 
 export type HostInvokeResultMap = {
@@ -392,6 +404,7 @@ export type HostInvokeResultMap = {
     }>;
   };
   "component:install": { ok: boolean };
+  "dev:preview-update-ui": { ok: boolean };
 };
 
 export type AppInfo = {

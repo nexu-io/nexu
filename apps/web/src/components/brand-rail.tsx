@@ -137,10 +137,7 @@ export function BrandRail({
 
         <div>
           <FadeIn delay={220}>
-            <h1
-              className="max-w-[560px] text-[40px] leading-[0.96] tracking-tight text-white sm:text-[52px] lg:text-[64px]"
-              style={{ fontFamily: "Georgia, Times New Roman, serif" }}
-            >
+            <h1 className="max-w-[560px] font-sans text-[40px] leading-[0.96] tracking-tight text-white sm:text-[52px] lg:text-[64px]">
               {t("brand.title.line1")}
               <br />
               {t("brand.title.line2")}

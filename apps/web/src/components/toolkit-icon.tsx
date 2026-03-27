@@ -37,7 +37,7 @@ const SIZE_CLASSES: Record<ToolkitIconSize, string> = {
 };
 
 const FONT_CLASSES: Record<ToolkitIconSize, string> = {
-  sm: "text-[11px]",
+  sm: "text-[12px]",
   md: "text-[13px]",
   lg: "text-[15px]",
 };

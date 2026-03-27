@@ -45,6 +45,7 @@ After any API route/schema change: `pnpm generate-types` then `pnpm typecheck`.
 - **Toasts:** sonner. **Icons:** lucide-react.
 - **Styling:** Tailwind CSS + Ant Design components.
 - **Components:** Reusable UI components in `src/components/ui/` (Radix UI primitives).
+- **Clickable min font-size:** Any text inside a clickable surface (`<button>`, `<a>`, `<Link>`, `cursor-pointer`, or child of a click target) must use `font-size >= 12px`. Never use `text-[10px]` or `text-[11px]` on interactive elements.
 
 ## Key files
 

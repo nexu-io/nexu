@@ -68,7 +68,7 @@ export function CommunitySkillCard({
           <span className="text-[13px] font-semibold text-text-primary truncate block">
             {skill.name}
           </span>
-          <span className="text-[11px] text-text-muted font-mono">
+          <span className="text-[12px] text-text-muted font-mono">
             {skill.slug}
           </span>
         </div>
@@ -103,13 +103,13 @@ export function CommunitySkillCard({
           {skill.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium truncate"
+              className="text-[12px] px-1.5 py-0.5 rounded bg-surface-3 text-text-muted font-medium truncate"
             >
               {getTagLabel(tag, locale)}
             </span>
           ))}
         </div>
-        <div className="flex items-center gap-3 shrink-0 text-[11px] text-text-muted">
+        <div className="flex items-center gap-3 shrink-0 text-[12px] text-text-muted">
           <span className="flex items-center gap-0.5">
             <Download size={10} />
             {formatDownloads(skill.downloads)}

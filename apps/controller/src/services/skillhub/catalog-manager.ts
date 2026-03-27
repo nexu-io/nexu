@@ -698,6 +698,10 @@ export class CatalogManager {
 
         const rawDownloads = Number(stats.downloads ?? entry.downloads ?? 0);
 
+        const rawIcon = entry.icon;
+        const icon =
+          typeof rawIcon === "string" && rawIcon.length > 0 ? rawIcon : null;
+
         return {
           slug: String(entry.slug ?? ""),
           name: String(entry.name ?? entry.slug ?? ""),
@@ -705,6 +709,7 @@ export class CatalogManager {
           downloads: rawDownloads > 0 ? rawDownloads : DEFAULT_DOWNLOAD_COUNT,
           stars: Number(stats.stars ?? entry.stars ?? 0),
           tags: Array.isArray(entry.tags) ? entry.tags.slice(0, 5) : [],
+          icon,
           version: String(entry.version ?? "0.0.0"),
           updatedAt,
         };

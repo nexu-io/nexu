@@ -14,12 +14,14 @@ import {
 } from "electron";
 import { getOpenclawSkillsDir } from "../shared/desktop-paths";
 import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
+import { NEXU_GITHUB_RELEASES_URL } from "../shared/product-urls";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import {
+  broadcastDevUpdatePreview,
   registerIpcHandlers,
   setComponentUpdater,
   setUpdateManager,
@@ -65,6 +67,11 @@ const __dirname = dirname(__filename);
 // Set display name early (matches productName in package.json).
 app.setName("nexu");
 nativeTheme.themeSource = "light";
+
+// Expose app.isPackaged to preload/renderer via env.  process.defaultApp is
+// unreliable when launched through launchd in dev, so the preload reads this
+// env var instead.
+process.env.NEXU_DESKTOP_IS_PACKAGED = String(app.isPackaged);
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -244,6 +251,7 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
+let updateManagerRef: UpdateManager | null = null;
 
 // ---------------------------------------------------------------------------
 // Unified graceful shutdown — single authoritative teardown path.
@@ -338,39 +346,83 @@ function triggerUpdateCheck(): void {
 }
 
 function installApplicationMenu(): void {
-  const developMenu: MenuItemConstructorOptions = {
-    label: "Develop",
-    submenu: [
-      {
-        label: "Focus Web Surface",
-        accelerator: "CmdOrCtrl+Shift+1",
-        click: () => sendDesktopCommand("web", "immersive"),
-      },
-      {
-        label: "Focus OpenClaw Surface",
-        accelerator: "CmdOrCtrl+Shift+2",
-        click: () => sendDesktopCommand("openclaw", "immersive"),
-      },
+  const developSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: "Focus Web Surface",
+      accelerator: "CmdOrCtrl+Shift+1",
+      click: () => sendDesktopCommand("web", "immersive"),
+    },
+    {
+      label: "Focus OpenClaw Surface",
+      accelerator: "CmdOrCtrl+Shift+2",
+      click: () => sendDesktopCommand("openclaw", "immersive"),
+    },
+    { type: "separator" },
+    {
+      label: "Show Desktop Shell",
+      accelerator: "CmdOrCtrl+Shift+0",
+      click: () => sendDesktopCommand("control", "full"),
+    },
+    {
+      label: "Show Web In Shell",
+      click: () => sendDesktopCommand("web", "full"),
+    },
+    {
+      label: "Show OpenClaw In Shell",
+      click: () => sendDesktopCommand("openclaw", "full"),
+    },
+  ];
+
+  if (!app.isPackaged) {
+    developSubmenu.push(
       { type: "separator" },
       {
-        label: "Show Desktop Shell",
-        accelerator: "CmdOrCtrl+Shift+0",
-        click: () => sendDesktopCommand("control", "full"),
+        label: "Preview Update Card",
+        submenu: [
+          {
+            label: "New version available…",
+            click: () => {
+              broadcastDevUpdatePreview("available");
+            },
+          },
+          {
+            label: "Downloading…",
+            click: () => {
+              broadcastDevUpdatePreview("downloading");
+            },
+          },
+          {
+            label: "Ready to restart…",
+            click: () => {
+              broadcastDevUpdatePreview("ready");
+            },
+          },
+          {
+            label: "Update failed…",
+            click: () => {
+              broadcastDevUpdatePreview("error");
+            },
+          },
+        ],
       },
-      {
-        label: "Show Web In Shell",
-        click: () => sendDesktopCommand("web", "full"),
-      },
-      {
-        label: "Show OpenClaw In Shell",
-        click: () => sendDesktopCommand("openclaw", "full"),
-      },
-    ],
+    );
+  }
+
+  const developMenu: MenuItemConstructorOptions = {
+    label: "Develop",
+    submenu: developSubmenu,
   };
 
   const helpMenu: MenuItemConstructorOptions = {
     role: "help",
     submenu: [
+      {
+        label: "Release Notes…",
+        click: () => {
+          void shell.openExternal(NEXU_GITHUB_RELEASES_URL);
+        },
+      },
+      { type: "separator" },
       {
         label: "Export Diagnostics…",
         click: () => {
@@ -396,7 +448,13 @@ function installApplicationMenu(): void {
                 label: "Check for Updates…",
                 enabled:
                   app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-                click: () => triggerUpdateCheck(),
+                click: () => {
+                  if (updateManagerRef?.isDownloaded) {
+                    void updateManagerRef.quitAndInstall();
+                    return;
+                  }
+                  triggerUpdateCheck();
+                },
               },
               { type: "separator" },
               { role: "services" },
@@ -1009,6 +1067,7 @@ app.whenReady().then(async () => {
             }
           : undefined,
       });
+      updateManagerRef = updateMgr;
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
     } else {

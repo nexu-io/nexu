@@ -11,6 +11,7 @@ import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  ArrowUpRight,
   BookOpen,
   Check,
   CheckCircle2,
@@ -116,13 +117,9 @@ export function ChannelsPage() {
   return (
     <div className="px-4 py-4 sm:px-6 sm:py-6 md:p-8 mx-auto max-w-4xl">
       {/* Page header */}
-      <div className="mb-6">
-        <h1 className="text-lg font-bold text-text-primary">
-          {t("channels.pageTitle")}
-        </h1>
-        <p className="text-[13px] text-text-muted mt-1">
-          {t("channels.pageSubtitle")}
-        </p>
+      <div className="page-header">
+        <h1 className="heading-page">{t("channels.pageTitle")}</h1>
+        <p className="heading-page-desc">{t("channels.pageSubtitle")}</p>
       </div>
 
       {/* Platform selector */}
@@ -154,7 +151,7 @@ export function ChannelsPage() {
                 >
                   {PLATFORM_LABELS[p.id]}
                 </div>
-                <div className="text-[10px] text-text-muted mt-0.5">
+                <div className="text-[12px] text-text-muted mt-0.5">
                   {p.desc}
                 </div>
               </div>
@@ -370,7 +367,7 @@ function ConfiguredView({
               track("workspace_change_config_click");
               onShowGuide();
             }}
-            className="flex gap-1.5 items-center px-3 py-1.5 text-[11px] text-text-muted rounded-lg border border-border hover:border-border-hover hover:text-text-secondary transition-all shrink-0"
+            className="flex gap-1.5 items-center px-3 py-1.5 text-[12px] text-text-muted rounded-lg border border-border hover:border-border-hover hover:text-text-secondary transition-all shrink-0"
           >
             <BookOpen size={11} /> {t("channels.setupGuide")}
           </button>
@@ -381,7 +378,7 @@ function ConfiguredView({
           <div className="p-5 rounded-xl border bg-surface-1 border-border">
             <div className="flex gap-2 items-center mb-4">
               <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-indigo-500/10 shrink-0">
-                <ExternalLink size={13} className="text-indigo-500" />
+                <ArrowUpRight size={13} className="text-indigo-500" />
               </div>
               <h3 className="text-[13px] font-semibold text-text-primary">
                 {t("channels.addToServer")}
@@ -396,7 +393,7 @@ function ConfiguredView({
               rel="noopener noreferrer"
               className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-accent hover:bg-accent-hover transition-all"
             >
-              <ExternalLink size={13} /> {t("channels.addBotToServer")}
+              <ArrowUpRight size={13} /> {t("channels.addBotToServer")}
             </a>
           </div>
         )}
@@ -406,7 +403,7 @@ function ConfiguredView({
           <div className="p-5 rounded-xl border bg-surface-1 border-border">
             <div className="flex gap-2 items-center mb-4">
               <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-blue-500/10 shrink-0">
-                <ExternalLink size={13} className="text-blue-500" />
+                <ArrowUpRight size={13} className="text-blue-500" />
               </div>
               <h3 className="text-[13px] font-semibold text-text-primary">
                 {t("channels.openInSlack")}
@@ -422,7 +419,7 @@ function ConfiguredView({
               onClick={handleOpenSlack}
               className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-accent hover:bg-accent-hover transition-all"
             >
-              <ExternalLink size={13} />{" "}
+              <ArrowUpRight size={13} />{" "}
               {channel.botUserId
                 ? t("channels.messageBotSlack")
                 : t("channels.openWorkspace")}
@@ -435,7 +432,7 @@ function ConfiguredView({
           <div className="p-5 rounded-xl border bg-surface-1 border-border">
             <div className="flex gap-2 items-center mb-4">
               <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-[#3370FF]/10 shrink-0">
-                <ExternalLink size={13} className="text-[#3370FF]" />
+                <ArrowUpRight size={13} className="text-[#3370FF]" />
               </div>
               <h3 className="text-[13px] font-semibold text-text-primary">
                 {t("channels.openInFeishu")}
@@ -450,7 +447,7 @@ function ConfiguredView({
               rel="noopener noreferrer"
               className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#3370FF] hover:bg-[#2860E6] transition-all"
             >
-              <ExternalLink size={13} /> {t("channels.messageBotFeishu")}
+              <ArrowUpRight size={13} /> {t("channels.messageBotFeishu")}
             </a>
           </div>
         )}

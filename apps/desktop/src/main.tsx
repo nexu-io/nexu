@@ -19,6 +19,7 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../shared/host";
+import { NEXU_GITHUB_RELEASES_URL } from "../shared/product-urls";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { SurfaceFrame } from "./components/surface-frame";
 import { UpdateBanner } from "./components/update-banner";
@@ -32,6 +33,7 @@ import {
   installComponent,
   onDesktopCommand,
   onRuntimeEvent,
+  openExternal,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -966,6 +968,7 @@ function DesktopShell() {
   useEffect(() => {
     return onDesktopCommand((command) => {
       if (command.type === "desktop:check-for-updates") {
+        update.undismiss();
         void update.check();
         return;
       }
@@ -1106,6 +1109,15 @@ function DesktopShell() {
                 <dd>{formatBuildTimestamp(runtimeConfig.buildInfo.builtAt)}</dd>
               </div>
             </dl>
+            <button
+              type="button"
+              className="desktop-changelog-link"
+              onClick={() => {
+                void openExternal(NEXU_GITHUB_RELEASES_URL);
+              }}
+            >
+              Release notes…
+            </button>
           </div>
         ) : null}
       </aside>
@@ -1157,9 +1169,8 @@ function DesktopShell() {
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
         onDismiss={update.dismiss}
-        onDownload={() => void update.download()}
         onInstall={() => void update.install()}
-        percent={update.percent}
+        onRetry={() => void update.check()}
         phase={update.phase}
         version={update.version}
       />

@@ -1,19 +1,19 @@
+import { NEXU_GITHUB_RELEASES_URL } from "../../shared/product-urls";
 import type { UpdatePhase } from "../hooks/use-auto-update";
+import { openExternal } from "../lib/host-api";
 
 interface UpdateBannerProps {
   phase: UpdatePhase;
   version: string | null;
-  percent: number;
   errorMessage: string | null;
   dismissed: boolean;
-  onDownload: () => void;
   onInstall: () => void;
   onDismiss: () => void;
+  onRetry: () => void;
 }
 
 /**
- * Small pill badge shown in the brand area when the update banner is dismissed.
- * Clicking it re-opens the full banner.
+ * Small pill badge shown in the brand area when the update card is dismissed.
  */
 export function UpdateBadge({
   phase,
@@ -24,9 +24,7 @@ export function UpdateBadge({
   dismissed: boolean;
   onUndismiss: () => void;
 }) {
-  const hasUpdate =
-    phase === "available" || phase === "downloading" || phase === "ready";
-  if (!hasUpdate || !dismissed) return null;
+  if (phase !== "ready" || !dismissed) return null;
 
   return (
     <button className="update-badge" onClick={onUndismiss} type="button">
@@ -36,33 +34,27 @@ export function UpdateBadge({
 }
 
 /**
- * Sidebar-embedded update card — 1:1 replica of the design-system prototype.
- * Light frosted-glass card that floats inside the dark sidebar.
+ * Sidebar update card — only shown when update is downloaded and ready,
+ * or when an error occurred. No download progress state.
  */
 export function UpdateBanner({
   phase,
   version,
-  percent,
   errorMessage,
   dismissed,
-  onDownload,
   onInstall,
   onDismiss,
+  onRetry,
 }: UpdateBannerProps) {
-  if (phase === "idle" || dismissed) {
+  const isReady = phase === "ready";
+  const isError = phase === "error";
+
+  if ((!isReady && !isError) || dismissed) {
     return null;
   }
 
-  const isChecking = phase === "checking";
-  const isUpToDate = phase === "up-to-date";
-  const isDownloading = phase === "downloading";
-  const isReady = phase === "ready";
-  const isError = phase === "error";
-  const isAvailable = phase === "available";
-
   return (
     <div className={`update-card${isError ? " update-card--error" : ""}`}>
-      {/* Header row: status dot + title | close button */}
       <div className="update-card-header">
         <div className="update-card-status">
           <span
@@ -72,85 +64,29 @@ export function UpdateBanner({
             <span className="update-dot" />
           </span>
           <span className="update-card-title">
-            {isChecking && "Checking for updates..."}
-            {isUpToDate && "You're up to date"}
-            {isDownloading && "Downloading update\u2026"}
-            {isAvailable && `v${version} available`}
             {isReady && `v${version} ready`}
             {isError && "Update failed"}
           </span>
         </div>
-        {!isDownloading && !isChecking && (
-          <button
-            className="update-card-close"
-            onClick={onDismiss}
-            type="button"
+        <button className="update-card-close" onClick={onDismiss} type="button">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            role="img"
+            aria-label="Close"
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              role="img"
-              aria-label="Close"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        )}
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
-      {(isChecking || isUpToDate) && (
-        <div className="update-card-message">
-          {isChecking
-            ? "Contacting the update feed and comparing the latest release..."
-            : "This channel is already on the latest available version."}
-        </div>
-      )}
-
-      {/* Downloading — percentage + progress bar */}
-      {isDownloading && (
-        <>
-          <div className="update-card-percent">
-            <span>{Math.round(percent)}%</span>
-          </div>
-          <div className="update-card-progress-wrap">
-            <div className="update-card-progress-track">
-              <div
-                className="update-card-progress-fill"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Available — Download / Later */}
-      {isAvailable && (
-        <div className="update-card-actions">
-          <button
-            className="update-card-btn update-card-btn--primary"
-            onClick={onDownload}
-            type="button"
-          >
-            Download
-          </button>
-          <button
-            className="update-card-btn update-card-btn--ghost"
-            onClick={onDismiss}
-            type="button"
-          >
-            Later
-          </button>
-        </div>
-      )}
-
-      {/* Ready — Restart / Later */}
       {isReady && (
         <div className="update-card-actions">
           <button
@@ -158,34 +94,35 @@ export function UpdateBanner({
             onClick={onInstall}
             type="button"
           >
-            Restart
+            Install
           </button>
           <button
-            className="update-card-btn update-card-btn--ghost"
-            onClick={onDismiss}
             type="button"
+            className="update-card-changelog"
+            onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
           >
-            Later
+            Changelog
           </button>
         </div>
       )}
 
-      {/* Error — message + Dismiss */}
       {isError && (
-        <>
-          <div className="update-card-error-msg">
-            {errorMessage ?? "Unknown error"}
-          </div>
-          <div className="update-card-actions">
-            <button
-              className="update-card-btn update-card-btn--ghost"
-              onClick={onDismiss}
-              type="button"
-            >
-              Dismiss
-            </button>
-          </div>
-        </>
+        <div className="update-card-actions">
+          <button
+            className="update-card-btn update-card-btn--primary"
+            onClick={onRetry}
+            type="button"
+          >
+            Retry
+          </button>
+          <button
+            type="button"
+            className="update-card-changelog"
+            onClick={() => void openExternal(NEXU_GITHUB_RELEASES_URL)}
+          >
+            Changelog
+          </button>
+        </div>
       )}
     </div>
   );
