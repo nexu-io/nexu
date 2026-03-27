@@ -101,7 +101,12 @@ export async function createContainer(): Promise<ControllerContainer> {
       getLocale: () => configStore.getDesktopLocale(),
     },
   );
-  const skillhubService = await SkillhubService.create(env);
+  let syncService: OpenClawSyncService | null = null;
+  const skillhubService = await SkillhubService.create(env, {
+    onSyncNeeded: () => {
+      void syncService?.syncAll().catch(() => {});
+    },
+  });
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -116,6 +121,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     gatewayService,
     skillhubService.skillDb,
   );
+  syncService = openclawSyncService;
   const openclawAuthService = new OpenClawAuthService(env, authProfilesStore);
   const analyticsService = new AnalyticsService(
     env,

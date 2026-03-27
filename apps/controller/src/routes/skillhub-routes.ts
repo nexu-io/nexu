@@ -191,6 +191,7 @@ export function registerSkillhubRoutes(
       container.skillhubService.cancelInstall(slug);
       const result =
         await container.skillhubService.catalog.uninstallSkill(slug);
+      await container.openclawSyncService.syncAll();
       return c.json(result, 200);
     },
   );
@@ -346,6 +347,10 @@ export function registerSkillhubRoutes(
       const buffer = Buffer.from(arrayBuffer);
       const result =
         await container.skillhubService.catalog.importSkillZip(buffer);
+
+      if (result.ok) {
+        await container.openclawSyncService.syncAll();
+      }
 
       return c.json(result, 200);
     },

@@ -7,6 +7,10 @@ import { SkillDb } from "./skillhub/skill-db.js";
 import { SkillDirWatcher } from "./skillhub/skill-dir-watcher.js";
 import type { QueueItem } from "./skillhub/types.js";
 
+export interface SkillhubServiceOptions {
+  onSyncNeeded?: () => void;
+}
+
 export class SkillhubService {
   private readonly catalogManager: CatalogManager;
   private readonly installQueue: InstallQueue;
@@ -28,7 +32,10 @@ export class SkillhubService {
     this.db = db;
   }
 
-  static async create(env: ControllerEnv): Promise<SkillhubService> {
+  static async create(
+    env: ControllerEnv,
+    options?: SkillhubServiceOptions,
+  ): Promise<SkillhubService> {
     const skillDb = await SkillDb.create(env.skillDbPath);
     const log = (level: "info" | "error" | "warn", message: string) => {
       console[level === "error" ? "error" : "log"](`[skillhub] ${message}`);
@@ -47,12 +54,14 @@ export class SkillhubService {
       },
       onComplete: (slug, source) => {
         skillDb.recordInstall(slug, source);
+        options?.onSyncNeeded?.();
       },
       onCancelled: async (slug) => {
         const result = await catalogManager.uninstallSkill(slug);
         if (!result.ok) {
           throw new Error(result.error ?? `Cancel cleanup failed for ${slug}`);
         }
+        options?.onSyncNeeded?.();
       },
       log,
     });
