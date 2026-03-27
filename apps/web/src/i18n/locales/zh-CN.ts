@@ -300,7 +300,7 @@ const zhCN = {
   "models.byok.apiKeySaved": "API Key 已保存",
   "models.byok.apiKeySavedHint":
     "出于安全原因，不会回显已保存的密钥。只有在你想替换时才需要重新输入。",
-  "models.byok.changeApiKey": "替换",
+  "models.byok.changeApiKey": "编辑",
   "models.byok.verify": "检查",
   "models.byok.keyValid": "密钥有效 — 检测到 {{count}} 个模型",
   "models.byok.keyInvalid": "密钥无效: {{error}}",

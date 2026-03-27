@@ -312,7 +312,7 @@ const en = {
   "models.byok.apiKeySaved": "API key saved",
   "models.byok.apiKeySavedHint":
     "For security, the saved key is not shown. Enter a new key only if you want to replace it.",
-  "models.byok.changeApiKey": "Replace",
+  "models.byok.changeApiKey": "Edit",
   "models.byok.verify": "Check",
   "models.byok.keyValid": "Key valid — {{count}} models detected",
   "models.byok.keyInvalid": "Key invalid: {{error}}",
