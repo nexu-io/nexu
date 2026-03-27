@@ -16,6 +16,10 @@ export const cacheInputs = [
 
 export async function computeFingerprint(runtimeDir) {
   const hash = createHash("sha256");
+  hash.update(process.platform);
+  hash.update("\0");
+  hash.update(process.arch);
+  hash.update("\0");
   hash.update(process.version);
   hash.update("\0");
 

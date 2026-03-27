@@ -9,15 +9,15 @@
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
-    "lint": "biome check . && pnpm -r typecheck",
-    "lint:fix": "biome check --write --unsafe . && pnpm -r typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write --unsafe .",
     "format": "biome check --write .",
     "test": "vitest run",
     "generate-types": "pnpm --filter @nexu/controller generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:cached",
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
-    "postinstall": "npm --prefix ./openclaw-runtime run install:pruned && npm --prefix ./apps/controller/static/runtime-plugins/openclaw-weixin install --production --ignore-scripts",
+    "postinstall": "node scripts/postinstall.mjs",
     "prepare": "cp scripts/pre-commit .git/hooks/pre-commit 2>/dev/null; chmod +x .git/hooks/pre-commit 2>/dev/null; true",
     "start": "./scripts/dev-launchd.sh start",
     "stop": "./scripts/dev-launchd.sh stop",
@@ -45,8 +45,9 @@
     "vitest": "^3.0.7"
   },
   "engines": {
-    "node": ">=20",
-    "pnpm": ">=9"
+    "node": ">=24",
+    "pnpm": ">=10.26.0",
+    "npm": ">=11"
   },
   "packageManager": "pnpm@10.26.0",
   "pnpm": {

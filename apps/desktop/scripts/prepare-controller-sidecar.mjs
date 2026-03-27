@@ -23,6 +23,10 @@ const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const controllerNodeModules = resolve(controllerRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
 async function ensureBuildArtifacts() {
   const missing = [];
 
@@ -46,6 +50,7 @@ async function ensureBuildArtifacts() {
 }
 
 async function prepareControllerSidecar() {
+  const startedAt = performance.now();
   await ensureBuildArtifacts();
   await resetDir(sidecarRoot);
 
@@ -77,10 +82,20 @@ async function prepareControllerSidecar() {
       packageRoot: controllerRoot,
       targetNodeModules: sidecarNodeModules,
     });
+    console.log(
+      `[controller-sidecar][timing] prepareControllerSidecar duration=${formatDurationMs(
+        performance.now() - startedAt,
+      )}`,
+    );
     return;
   }
 
   await linkOrCopyDirectory(controllerNodeModules, sidecarNodeModules);
+  console.log(
+    `[controller-sidecar][timing] prepareControllerSidecar duration=${formatDurationMs(
+      performance.now() - startedAt,
+    )}`,
+  );
 }
 
 await prepareControllerSidecar();
