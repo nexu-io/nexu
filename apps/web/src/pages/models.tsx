@@ -106,15 +106,9 @@ function getDefaultAuthMode(
   if (dbProvider?.authMode) {
     return dbProvider.authMode;
   }
-  if (dbProvider?.hasApiKey) {
-    return "apiKey";
-  }
-  if (dbProvider?.hasOauthCredential) {
+  if (MULTI_AUTH_PROVIDERS.has(providerId)) {
     return "oauth";
   }
-
-  if (providerId === "minimax") return "oauth";
-  if (providerId === "openai") return "oauth";
   return "apiKey";
 }
 
@@ -2100,67 +2094,107 @@ function ByokProviderDetail({
         )}
 
         {/* API Key mode inputs */}
-        {!isOAuthConnected && (!isMiniMax || authMode === "apiKey") && (
-          <div className="space-y-4">
-            {!isOllama && (
+        {!isOAuthConnected &&
+          (!hasMultipleAuthModes || authMode === "apiKey") && (
+            <div className="space-y-4">
+              {!isOllama && (
+                <div>
+                  <label
+                    htmlFor={`apikey-${providerId}`}
+                    className="block text-[12px] font-medium text-text-secondary mb-1.5"
+                  >
+                    {t("models.byok.apiKey")}
+                  </label>
+                  {dbProvider?.hasApiKey && !isEditingApiKey ? (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        readOnly
+                        value="sk-••••••••••••••••"
+                        className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[80px] text-[12px] text-text-muted cursor-default focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingApiKey(true)}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-primary transition-colors hover:bg-surface-2"
+                      >
+                        {t("models.byok.changeApiKey")}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        id={`apikey-${providerId}`}
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder={meta.apiKeyPlaceholder}
+                        className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[72px] text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
+                      />
+                      <button
+                        type="button"
+                        disabled={!apiKey || verifyMutation.isPending}
+                        onClick={() => verifyMutation.mutate()}
+                        className={cn(
+                          "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                          verifyMutation.isSuccess && verifyMutation.data?.valid
+                            ? "text-emerald-600"
+                            : apiKey
+                              ? "text-text-secondary hover:bg-surface-2"
+                              : "text-text-muted cursor-not-allowed",
+                        )}
+                      >
+                        {verifyMutation.isPending ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : verifyMutation.isSuccess &&
+                          verifyMutation.data?.valid ? (
+                          <Check size={12} />
+                        ) : (
+                          t("models.byok.verify")
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  {verifyMutation.isSuccess && (
+                    <div
+                      className={cn(
+                        "mt-1.5 text-[10px]",
+                        verifyMutation.data?.valid
+                          ? "text-emerald-600"
+                          : "text-red-500",
+                      )}
+                    >
+                      {verifyMutation.data?.valid
+                        ? t("models.byok.keyValid", {
+                            count: verifyMutation.data.models?.length ?? 0,
+                          })
+                        : t("models.byok.keyInvalid", {
+                            error:
+                              verifyMutation.data?.error ??
+                              t("models.byok.keyInvalidUnknown"),
+                          })}
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
                 <label
-                  htmlFor={`apikey-${providerId}`}
+                  htmlFor={`baseurl-${providerId}`}
                   className="block text-[12px] font-medium text-text-secondary mb-1.5"
                 >
-                  {t("models.byok.apiKey")}
+                  {t("models.byok.proxyUrl")}
                 </label>
-                {dbProvider?.hasApiKey && !isEditingApiKey ? (
-                  <div className="relative">
-                    <input
-                      type="text"
-                      readOnly
-                      value="sk-••••••••••••••••"
-                      className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[80px] text-[12px] text-text-muted cursor-default focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingApiKey(true)}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-primary transition-colors hover:bg-surface-2"
-                    >
-                      {t("models.byok.changeApiKey")}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <input
-                      id={`apikey-${providerId}`}
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={meta.apiKeyPlaceholder}
-                      className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[72px] text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
-                    />
-                    <button
-                      type="button"
-                      disabled={!apiKey || verifyMutation.isPending}
-                      onClick={() => verifyMutation.mutate()}
-                      className={cn(
-                        "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
-                        verifyMutation.isSuccess && verifyMutation.data?.valid
-                          ? "text-emerald-600"
-                          : apiKey
-                            ? "text-text-secondary hover:bg-surface-2"
-                            : "text-text-muted cursor-not-allowed",
-                      )}
-                    >
-                      {verifyMutation.isPending ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : verifyMutation.isSuccess &&
-                        verifyMutation.data?.valid ? (
-                        <Check size={12} />
-                      ) : (
-                        t("models.byok.verify")
-                      )}
-                    </button>
-                  </div>
-                )}
-                {verifyMutation.isSuccess && (
+                <input
+                  id={`baseurl-${providerId}`}
+                  type="text"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder={
+                    meta.defaultProxyUrl || "https://api.example.com/v1"
+                  }
+                  className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
+                />
+                {isOllama && verifyMutation.isSuccess && (
                   <div
                     className={cn(
                       "mt-1.5 text-[10px]",
@@ -2181,73 +2215,34 @@ function ByokProviderDetail({
                   </div>
                 )}
               </div>
-            )}
-            <div>
-              <label
-                htmlFor={`baseurl-${providerId}`}
-                className="block text-[12px] font-medium text-text-secondary mb-1.5"
-              >
-                {t("models.byok.proxyUrl")}
-              </label>
-              <input
-                id={`baseurl-${providerId}`}
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={
-                  meta.defaultProxyUrl || "https://api.example.com/v1"
-                }
-                className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
-              />
-              {isOllama && verifyMutation.isSuccess && (
-                <div
+
+              {/* Action bar */}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  disabled={
+                    saveMutation.isPending ||
+                    (!isOllama && !apiKey && !dbProvider?.hasApiKey)
+                  }
+                  onClick={() => saveMutation.mutate()}
                   className={cn(
-                    "mt-1.5 text-[10px]",
-                    verifyMutation.data?.valid
-                      ? "text-emerald-600"
-                      : "text-red-500",
+                    "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+                    !saveMutation.isPending &&
+                      (isOllama || apiKey || dbProvider?.hasApiKey)
+                      ? "bg-accent text-accent-fg hover:bg-accent/90"
+                      : "bg-surface-2 text-text-muted cursor-not-allowed",
                   )}
                 >
-                  {verifyMutation.data?.valid
-                    ? t("models.byok.keyValid", {
-                        count: verifyMutation.data.models?.length ?? 0,
-                      })
-                    : t("models.byok.keyInvalid", {
-                        error:
-                          verifyMutation.data?.error ??
-                          t("models.byok.keyInvalidUnknown"),
-                      })}
-                </div>
-              )}
+                  {saveMutation.isPending && (
+                    <Loader2 size={13} className="animate-spin" />
+                  )}
+                  {dbProvider?.hasApiKey
+                    ? t("models.byok.updateConfig")
+                    : t("models.byok.saveAndEnable")}
+                </button>
+              </div>
             </div>
-
-            {/* Action bar */}
-            <div className="flex justify-end pt-1">
-              <button
-                type="button"
-                disabled={
-                  saveMutation.isPending ||
-                  (!isOllama && !apiKey && !dbProvider?.hasApiKey)
-                }
-                onClick={() => saveMutation.mutate()}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-                  !saveMutation.isPending &&
-                    (isOllama || apiKey || dbProvider?.hasApiKey)
-                    ? "bg-accent text-accent-fg hover:bg-accent/90"
-                    : "bg-surface-2 text-text-muted cursor-not-allowed",
-                )}
-              >
-                {saveMutation.isPending && (
-                  <Loader2 size={13} className="animate-spin" />
-                )}
-                {dbProvider?.hasApiKey
-                  ? t("models.byok.updateConfig")
-                  : t("models.byok.saveAndEnable")}
-              </button>
-            </div>
-          </div>
-        )}
+          )}
       </div>
 
       {/* Model list — clickable to switch active model */}

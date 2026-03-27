@@ -330,10 +330,10 @@ const zhCN = {
   "models.byok.oauthSuccess": "ChatGPT 连接成功",
   "models.byok.oauthFailed": "ChatGPT 登录失败",
   "models.byok.oauthOrApiKey": "或手动输入 API Key",
-  "models.byok.oauthTab": "OAuth 登录",
+  "models.byok.oauthTab": "OAuth",
   "models.byok.apiKeyTab": "API Key",
   "models.byok.oauthDescription": "使用你的 ChatGPT Plus/Pro 订阅",
-  "models.byok.minimax.authModeOauth": "OAuth 登录",
+  "models.byok.minimax.authModeOauth": "OAuth",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
   "models.byok.minimax.oauthDescription":

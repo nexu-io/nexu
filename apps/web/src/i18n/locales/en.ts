@@ -343,10 +343,10 @@ const en = {
   "models.byok.oauthSuccess": "ChatGPT connected successfully",
   "models.byok.oauthFailed": "ChatGPT login failed",
   "models.byok.oauthOrApiKey": "Or enter an API key manually",
-  "models.byok.oauthTab": "OAuth Login",
+  "models.byok.oauthTab": "OAuth",
   "models.byok.apiKeyTab": "API Key",
   "models.byok.oauthDescription": "Use your ChatGPT Plus/Pro subscription",
-  "models.byok.minimax.authModeOauth": "OAuth Login",
+  "models.byok.minimax.authModeOauth": "OAuth",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
   "models.byok.minimax.oauthDescription":
