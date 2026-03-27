@@ -1,9 +1,15 @@
 import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
+import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
+import { WhatsappSetupView } from "@/components/channel-setup/whatsapp-setup-view";
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
-import { WechatIcon } from "@/components/platform-icons";
+import {
+  TelegramIcon,
+  WechatIcon,
+  WhatsAppIcon,
+} from "@/components/platform-icons";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { normalizeChannel, track } from "@/lib/tracking";
@@ -13,6 +19,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -110,6 +117,9 @@ const FEISHU_ICON = (
     style={{ objectFit: "contain" }}
   />
 );
+
+const TELEGRAM_ICON = <TelegramIcon size={16} />;
+const WHATSAPP_ICON = <WhatsAppIcon size={16} />;
 /** WeChat mark uses a wide viewBox; bump px so it matches visual weight of 16px square logos. */
 type HomeChannelIconBox = "standard" | "compact";
 
@@ -128,6 +138,18 @@ const ONBOARDING_CHANNELS = [
     id: "wechat",
     name: "WeChat",
     recommended: true,
+  },
+  {
+    id: "whatsapp",
+    name: "WhatsApp",
+    icon: WHATSAPP_ICON,
+    recommended: false,
+  },
+  {
+    id: "telegram",
+    name: "Telegram",
+    icon: TELEGRAM_ICON,
+    recommended: false,
   },
   {
     id: "feishu",
@@ -155,6 +177,18 @@ function getChannelOptions(t: (key: string) => string) {
       id: "wechat",
       name: t("home.channel.wechat"),
       recommended: true,
+    },
+    {
+      id: "whatsapp",
+      name: t("home.channel.whatsapp"),
+      icon: WHATSAPP_ICON,
+      recommended: false,
+    },
+    {
+      id: "telegram",
+      name: t("home.channel.telegram"),
+      icon: TELEGRAM_ICON,
+      recommended: false,
     },
     {
       id: "feishu",
@@ -234,6 +268,8 @@ export function HomePage() {
     "feishu" | "slack" | "discord" | null
   >(null);
   const [wechatQrOpen, setWechatQrOpen] = useState(false);
+  const [telegramOpen, setTelegramOpen] = useState(false);
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoHover, setVideoHover] = useState(false);
@@ -618,6 +654,10 @@ export function HomePage() {
                     onClick={() => {
                       if (ch.id === "wechat") {
                         setWechatQrOpen(true);
+                      } else if (ch.id === "telegram") {
+                        setTelegramOpen(true);
+                      } else if (ch.id === "whatsapp") {
+                        setWhatsappOpen(true);
                       } else {
                         setModalChannel(
                           ch.id as "feishu" | "slack" | "discord",
@@ -669,6 +709,26 @@ export function HomePage() {
               handleConnected();
             }}
             gatewayReady={runtimeData?.status === "active"}
+          />
+        )}
+
+        {telegramOpen && (
+          <TelegramModal
+            onClose={() => setTelegramOpen(false)}
+            onConnected={() => {
+              setTelegramOpen(false);
+              void handleConnected();
+            }}
+          />
+        )}
+
+        {whatsappOpen && (
+          <WhatsappModal
+            onClose={() => setWhatsappOpen(false)}
+            onConnected={() => {
+              setWhatsappOpen(false);
+              void handleConnected();
+            }}
           />
         )}
       </div>
@@ -902,6 +962,10 @@ export function HomePage() {
                         }
                         if (ch.id === "wechat") {
                           setWechatQrOpen(true);
+                        } else if (ch.id === "telegram") {
+                          setTelegramOpen(true);
+                        } else if (ch.id === "whatsapp") {
+                          setWhatsappOpen(true);
                         } else {
                           setModalChannel(
                             ch.id as "feishu" | "slack" | "discord",
@@ -958,6 +1022,26 @@ export function HomePage() {
           onConnected={() => {
             setWechatQrOpen(false);
             handleConnected();
+          }}
+        />
+      )}
+
+      {telegramOpen && (
+        <TelegramModal
+          onClose={() => setTelegramOpen(false)}
+          onConnected={() => {
+            setTelegramOpen(false);
+            void handleConnected();
+          }}
+        />
+      )}
+
+      {whatsappOpen && (
+        <WhatsappModal
+          onClose={() => setWhatsappOpen(false)}
+          onConnected={() => {
+            setWhatsappOpen(false);
+            void handleConnected();
           }}
         />
       )}
@@ -1030,6 +1114,196 @@ function WechatQrModal({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function useModalDialog(onClose: () => void) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+
+  useEffect(() => {
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+
+    const getFocusableElements = () => {
+      const dialog = dialogRef.current;
+      if (!dialog) {
+        return [] as HTMLElement[];
+      }
+      return Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled"));
+    };
+
+    const getFocusBoundary = () => {
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {
+        return null;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (!firstElement || !lastElement) {
+        return null;
+      }
+
+      return { firstElement, lastElement };
+    };
+
+    const focusableElements = getFocusableElements();
+    const initialFocusTarget = focusableElements[0] ?? dialogRef.current;
+    initialFocusTarget?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusBoundary = getFocusBoundary();
+      if (!focusBoundary) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+
+      const { firstElement, lastElement } = focusBoundary;
+      const activeElement =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+
+      if (event.shiftKey) {
+        if (
+          activeElement === firstElement ||
+          activeElement === dialogRef.current
+        ) {
+          event.preventDefault();
+          lastElement.focus();
+        }
+        return;
+      }
+
+      if (activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousActiveElement?.focus();
+    };
+  }, [onClose]);
+
+  return dialogRef;
+}
+
+function TelegramModal({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const dialogRef = useModalDialog(onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-[560px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div
+            id={titleId}
+            className="text-[14px] font-semibold text-text-primary"
+          >
+            {t("telegramSetup.title")}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.closeDialog")}
+            className="text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          <TelegramSetupView onConnected={onConnected} />
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
+function WhatsappModal({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const dialogRef = useModalDialog(onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-[560px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div
+            id={titleId}
+            className="text-[14px] font-semibold text-text-primary"
+          >
+            {t("whatsappSetup.title")}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.closeDialog")}
+            className="text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          <WhatsappSetupView onConnected={onConnected} />
+        </div>
+      </dialog>
     </div>
   );
 }

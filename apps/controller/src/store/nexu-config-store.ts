@@ -831,6 +831,111 @@ export class NexuConfigStore {
     return channel;
   }
 
+  async connectTelegram(input: {
+    botToken: string;
+    telegramBotId: string;
+    botUsername: string | null;
+    displayName: string | null;
+  }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const accountId = `telegram-${input.telegramBotId}`;
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "telegram",
+      accountId,
+      status: "connected",
+      teamName: input.displayName,
+      appId: input.telegramBotId,
+      botUserId: input.botUsername,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      ...(() => {
+        const previous = config.channels.find(
+          (existing) =>
+            existing.channelType === channel.channelType &&
+            existing.accountId === channel.accountId,
+        );
+        const secrets = { ...config.secrets };
+        if (previous) {
+          delete secrets[`channel:${previous.id}:botToken`];
+          delete secrets[`channel:${previous.id}:authDir`];
+        }
+        secrets[`channel:${channel.id}:botToken`] = input.botToken;
+        return { secrets };
+      })(),
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
+  async connectWhatsapp(input: {
+    accountId: string;
+    authDir?: string | null;
+  }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "whatsapp",
+      accountId: input.accountId,
+      status: "connected",
+      teamName: null,
+      appId: null,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      ...(() => {
+        const previous = config.channels.find(
+          (existing) =>
+            existing.channelType === channel.channelType &&
+            existing.accountId === channel.accountId,
+        );
+        const secrets = { ...config.secrets };
+        if (previous) {
+          delete secrets[`channel:${previous.id}:botToken`];
+          delete secrets[`channel:${previous.id}:authDir`];
+        }
+        if (input.authDir) {
+          secrets[`channel:${channel.id}:authDir`] = input.authDir;
+        }
+        return { secrets };
+      })(),
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
   async connectFeishu(input: ConnectFeishuInput): Promise<ChannelResponse> {
     const bot = await this.getOrCreateDefaultBot();
     const connectedAt = now();

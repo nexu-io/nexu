@@ -13,7 +13,6 @@ export class SkillhubService {
   private readonly dirWatcher: SkillDirWatcher;
   private readonly db: SkillDb;
   private readonly env: ControllerEnv;
-  private readonly isFirstLaunch: boolean;
 
   private constructor(
     env: ControllerEnv,
@@ -21,20 +20,15 @@ export class SkillhubService {
     installQueue: InstallQueue,
     dirWatcher: SkillDirWatcher,
     db: SkillDb,
-    isFirstLaunch: boolean,
   ) {
     this.env = env;
     this.catalogManager = catalogManager;
     this.installQueue = installQueue;
     this.dirWatcher = dirWatcher;
     this.db = db;
-    this.isFirstLaunch = isFirstLaunch;
   }
 
   static async create(env: ControllerEnv): Promise<SkillhubService> {
-    // Check if ledger exists BEFORE SkillDb.create() (which creates it)
-    const isFirstLaunch = !existsSync(env.skillDbPath);
-
     const skillDb = await SkillDb.create(env.skillDbPath);
     const log = (level: "info" | "error" | "warn", message: string) => {
       console[level === "error" ? "error" : "log"](`[skillhub] ${message}`);
@@ -76,7 +70,6 @@ export class SkillhubService {
       installQueue,
       dirWatcher,
       skillDb,
-      isFirstLaunch,
     );
   }
 
@@ -84,22 +77,23 @@ export class SkillhubService {
     this.catalogManager.start();
     if (process.env.CI) return;
 
-    // Always reconcile disk state with ledger FIRST on every startup.
+    // Reconcile disk state with ledger FIRST on every startup.
     // This ensures on-disk skills are recorded before curated enqueue
     // checks the ledger, preventing unnecessary re-downloads.
     this.dirWatcher.syncNow();
 
-    if (this.isFirstLaunch) {
-      this.initialize();
-    }
+    // Copy static skills + enqueue missing curated skills (idempotent)
+    this.initialize();
 
     // Always start watching for external skill changes (agent installs)
     this.dirWatcher.start();
   }
 
   /**
-   * First-launch initialization: copy static skills, enqueue curated skills.
-   * Only runs when the skill ledger did not exist (fresh install or reinstall).
+   * Copy static skills and enqueue missing curated skills.
+   * Runs on every non-CI startup. Both operations are idempotent:
+   * - copyStaticSkills skips when SKILL.md exists on disk OR slug is known in ledger
+   * - getCuratedSlugsToEnqueue filters against all known slugs in ledger
    */
   private initialize(): void {
     // Step 1: Copy static bundled skills to skills dir + record in DB

@@ -234,7 +234,14 @@ export function createRuntimeUnitManifests(
     path.resolve(openclawRuntimeRoot, "state"),
   );
   const openclawTempDir = ensureDir(path.resolve(openclawRuntimeRoot, "tmp"));
-  ensureDir(getOpenclawSkillsDir(userDataPath));
+  ensureDir(
+    isPackaged
+      ? getOpenclawSkillsDir(userDataPath)
+      : path.resolve(
+          runtimeConfig.paths.nexuHome,
+          "runtime/openclaw/state/skills",
+        ),
+  );
   ensureDir(path.resolve(openclawStateDir, "plugin-docs"));
   ensureDir(path.resolve(openclawStateDir, "agents"));
   const openclawPackageRoot = path.resolve(
@@ -322,7 +329,14 @@ export function createRuntimeUnitManifests(
         NEXU_HOME: runtimeConfig.paths.nexuHome,
         OPENCLAW_STATE_DIR: openclawStateDir,
         OPENCLAW_CONFIG_PATH: path.resolve(openclawConfigDir, "openclaw.json"),
-        OPENCLAW_SKILLS_DIR: getOpenclawSkillsDir(userDataPath),
+        OPENCLAW_SKILLS_DIR: isPackaged
+          ? getOpenclawSkillsDir(userDataPath)
+          : ensureDir(
+              path.resolve(
+                runtimeConfig.paths.nexuHome,
+                "runtime/openclaw/state/skills",
+              ),
+            ),
         SKILLHUB_STATIC_SKILLS_DIR: isPackaged
           ? path.resolve(electronRoot, "static/bundled-skills")
           : path.resolve(repoRoot, "apps/desktop/static/bundled-skills"),

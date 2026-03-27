@@ -83,8 +83,8 @@ export interface LaunchdBootstrapResult {
     controller: string;
     openclaw: string;
   };
-  /** Promise that resolves when controller is ready (for optional awaiting) */
-  controllerReady: Promise<void>;
+  /** Promise that always settles with controller readiness outcome. */
+  controllerReady: Promise<ControllerReadyResult>;
   /** Actual ports used (may differ from requested if OS-assigned or recovered) */
   effectivePorts: {
     controllerPort: number;
@@ -94,6 +94,8 @@ export interface LaunchdBootstrapResult {
   /** True if services were already running and we attached to them */
   isAttach: boolean;
 }
+
+type ControllerReadyResult = { ok: true } | { ok: false; error: Error };
 
 /** Metadata persisted between sessions for attach discovery */
 interface RuntimePortsMetadata {
@@ -609,11 +611,20 @@ export async function bootstrapWithLaunchd(
   );
 
   // Controller readiness
-  const controllerReady = needsControllerReady
-    ? waitForControllerReadiness(effectivePorts.controllerPort).then(() =>
-        console.log("Controller is ready"),
-      )
-    : Promise.resolve();
+  const controllerReady: Promise<ControllerReadyResult> = needsControllerReady
+    ? waitForControllerReadiness(effectivePorts.controllerPort)
+        .then(() => {
+          console.log("Controller is ready");
+          return { ok: true } as const;
+        })
+        .catch((error: unknown) => ({
+          ok: false,
+          error:
+            error instanceof Error
+              ? error
+              : new Error(`Controller readiness failed: ${String(error)}`),
+        }))
+    : Promise.resolve({ ok: true });
 
   // Persist port metadata
   await writeRuntimePorts(plistDir, {
@@ -863,6 +874,8 @@ export function resolveLaunchdPaths(
   openclawPath: string;
   controllerCwd: string;
   openclawCwd: string;
+  openclawBinPath: string;
+  openclawExtensionsDir: string;
 } {
   if (isPackaged) {
     // Packaged app: extract openclaw sidecar from tar archive if needed,
@@ -889,6 +902,13 @@ export function resolveLaunchdPaths(
       ),
       controllerCwd: path.join(runtimeDir, "controller"),
       openclawCwd: openclawSidecarRoot,
+      openclawBinPath: path.join(openclawSidecarRoot, "bin", "openclaw"),
+      openclawExtensionsDir: path.join(
+        openclawSidecarRoot,
+        "node_modules",
+        "openclaw",
+        "extensions",
+      ),
     };
   }
 
@@ -912,5 +932,22 @@ export function resolveLaunchdPaths(
     ),
     controllerCwd: path.join(repoRoot, "apps", "controller"),
     openclawCwd: repoRoot,
+    openclawBinPath: path.join(
+      repoRoot,
+      ".tmp",
+      "sidecars",
+      "openclaw",
+      "bin",
+      "openclaw",
+    ),
+    openclawExtensionsDir: path.join(
+      repoRoot,
+      ".tmp",
+      "sidecars",
+      "openclaw",
+      "node_modules",
+      "openclaw",
+      "extensions",
+    ),
   };
 }

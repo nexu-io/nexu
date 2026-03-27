@@ -45,5 +45,4 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_ASSIGNEE: ${{ github.event.issue.assignee.login }}
-        run: node scripts/nexu-pal/process-issue.mjs
+        run: node scripts/nexu-pal/process-issue-opened.mjs

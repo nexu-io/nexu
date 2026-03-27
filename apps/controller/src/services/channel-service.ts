@@ -1,21 +1,563 @@
+import { randomUUID } from "node:crypto";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import type {
   BotQuotaResponse,
   ChannelResponse,
   ConnectDiscordInput,
   ConnectFeishuInput,
   ConnectSlackInput,
+  ConnectTelegramInput,
 } from "@nexu/shared";
+import type { ControllerEnv } from "../app/env.js";
+import { logger } from "../lib/logger.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
+import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
 
 function timeoutSignal(ms: number): AbortSignal {
   return AbortSignal.timeout(ms);
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const DEFAULT_WHATSAPP_ACCOUNT_ID = "default";
+const DEFAULT_WECHAT_BASE_URL = "https://ilinkai.weixin.qq.com";
+const DEFAULT_WECHAT_BOT_TYPE = "3";
+const WECHAT_LOGIN_TTL_MS = 5 * 60_000;
+const WECHAT_QR_POLL_TIMEOUT_MS = 35_000;
+const WECHAT_QR_FETCH_TIMEOUT_MS = 10_000;
+const WECHAT_QR_POLL_BACKOFF_MS = 1_000;
+const WHATSAPP_LOGIN_TTL_MS = 3 * 60_000;
+const WHATSAPP_QR_TIMEOUT_MS = 45_000;
+const WHATSAPP_WAIT_TIMEOUT_MS = 120_000;
+const WHATSAPP_LOGGED_OUT_STATUS = 401;
+
+type ActiveWechatLogin = {
+  sessionKey: string;
+  qrcode: string;
+  qrcodeUrl: string;
+  startedAt: number;
+};
+
+type TelegramGetMeResponse = {
+  ok: boolean;
+  description?: string;
+  result?: {
+    id?: number;
+    username?: string;
+    first_name?: string;
+  };
+};
+
+type WechatQrCodeResponse = {
+  qrcode: string;
+  qrcode_img_content: string;
+};
+
+type WechatQrStatusResponse = {
+  status: "wait" | "scaned" | "confirmed" | "expired";
+  bot_token?: string;
+  ilink_bot_id?: string;
+  baseurl?: string;
+  ilink_user_id?: string;
+};
+
+type WechatStoredAccount = {
+  token?: string;
+  savedAt?: string;
+  baseUrl?: string;
+  userId?: string;
+};
+
+const activeWechatLogins = new Map<string, ActiveWechatLogin>();
+
+type WaSocket = {
+  ws?: { close?: () => void };
+  ev: {
+    on: (event: string, listener: (...args: unknown[]) => void) => void;
+    off?: (event: string, listener: (...args: unknown[]) => void) => void;
+  };
+};
+
+type ActiveWhatsappLogin = {
+  accountId: string;
+  authDir: string;
+  startedAt: number;
+  sock: WaSocket;
+  waitPromise: Promise<void>;
+  qr?: string;
+  qrDataUrl?: string;
+  connected: boolean;
+  error?: string;
+  errorStatus?: number;
+  restartAttempted: boolean;
+  preserveAuthDirOnReset?: boolean;
+};
+
+type WhatsappRuntimeModules = {
+  createWaSocket: (
+    printQr: boolean,
+    verbose: boolean,
+    opts?: { authDir?: string; onQr?: (qr: string) => void },
+  ) => Promise<WaSocket>;
+  waitForWaConnection: (sock: WaSocket) => Promise<void>;
+  getStatusCode: (error: unknown) => number | undefined;
+  formatError: (error: unknown) => string;
+};
+
+const activeWhatsappLogins = new Map<string, ActiveWhatsappLogin>();
+
+function extractWhatsappStatusCode(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const directOutput = (error as { output?: unknown }).output;
+  if (directOutput && typeof directOutput === "object") {
+    const directStatusCode = (directOutput as { statusCode?: unknown })
+      .statusCode;
+    if (typeof directStatusCode === "number") {
+      return directStatusCode;
+    }
+  }
+
+  const nestedError = (error as { error?: unknown }).error;
+  if (nestedError && typeof nestedError === "object") {
+    const nestedOutput = (nestedError as { output?: unknown }).output;
+    if (nestedOutput && typeof nestedOutput === "object") {
+      const nestedStatusCode = (nestedOutput as { statusCode?: unknown })
+        .statusCode;
+      if (typeof nestedStatusCode === "number") {
+        return nestedStatusCode;
+      }
+    }
+  }
+
+  const directStatus = (error as { status?: unknown }).status;
+  return typeof directStatus === "number" ? directStatus : undefined;
+}
+
+function normalizeAccountId(accountId: string): string {
+  return accountId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
+function resolveWeChatPluginStateDir(env: ControllerEnv): string {
+  const stateDir =
+    process.env.OPENCLAW_STATE_DIR?.trim() ||
+    process.env.CLAWDBOT_STATE_DIR?.trim() ||
+    env.openclawStateDir ||
+    path.join(os.homedir(), ".openclaw");
+  return path.join(stateDir, "openclaw-weixin");
+}
+
+function resolveWeChatAccountsDir(env: ControllerEnv): string {
+  return path.join(resolveWeChatPluginStateDir(env), "accounts");
+}
+
+function resolveWeChatAccountIndexPath(env: ControllerEnv): string {
+  return path.join(resolveWeChatPluginStateDir(env), "accounts.json");
+}
+
+function resolveWhatsAppAccountDir(
+  env: ControllerEnv,
+  accountId: string,
+): string {
+  return path.join(
+    env.openclawStateDir,
+    "credentials",
+    "whatsapp",
+    normalizeAccountId(accountId),
+  );
+}
+
+function resolveWhatsAppLoginSessionDir(
+  env: ControllerEnv,
+  sessionId: string,
+): string {
+  return path.join(env.openclawStateDir, "whatsapp-login", sessionId);
+}
+
+function isTemporaryWhatsAppAuthDir(authDir: string): boolean {
+  return authDir.includes(`${path.sep}whatsapp-login${path.sep}`);
+}
+
+function resolveWhatsAppLoginSessionRoot(authDir: string): string {
+  return path.dirname(path.dirname(authDir));
+}
+
+function writeWeChatAccount(
+  env: ControllerEnv,
+  accountId: string,
+  data: WechatStoredAccount,
+): void {
+  const dir = resolveWeChatAccountsDir(env);
+  mkdirSync(dir, { recursive: true });
+  const filePath = path.join(dir, `${accountId}.json`);
+  writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  try {
+    chmodSync(filePath, 0o600);
+  } catch {
+    // best-effort
+  }
+}
+
+function registerWeChatAccount(env: ControllerEnv, accountId: string): void {
+  const stateDir = resolveWeChatPluginStateDir(env);
+  mkdirSync(stateDir, { recursive: true });
+  const indexPath = resolveWeChatAccountIndexPath(env);
+  const existing = existsSync(indexPath)
+    ? (() => {
+        try {
+          const parsed = JSON.parse(
+            readFileSync(indexPath, "utf-8"),
+          ) as unknown;
+          return Array.isArray(parsed)
+            ? parsed.filter(
+                (value): value is string => typeof value === "string",
+              )
+            : [];
+        } catch {
+          return [];
+        }
+      })()
+    : [];
+
+  if (existing.includes(accountId)) {
+    return;
+  }
+
+  writeFileSync(
+    indexPath,
+    JSON.stringify([...existing, accountId], null, 2),
+    "utf-8",
+  );
+}
+
+function purgeExpiredWechatLogins(): void {
+  const now = Date.now();
+  for (const [sessionKey, login] of activeWechatLogins) {
+    if (now - login.startedAt >= WECHAT_LOGIN_TTL_MS) {
+      activeWechatLogins.delete(sessionKey);
+    }
+  }
+}
+
+function closeWhatsappSocket(sock: WaSocket): void {
+  try {
+    sock.ws?.close?.();
+  } catch {
+    // ignore
+  }
+}
+
+function isWhatsappLoginFresh(login: ActiveWhatsappLogin): boolean {
+  return Date.now() - login.startedAt < WHATSAPP_LOGIN_TTL_MS;
+}
+
+async function resetActiveWhatsappLogin(
+  accountId: string,
+  reason?: string,
+): Promise<void> {
+  const login = activeWhatsappLogins.get(accountId);
+  if (login) {
+    closeWhatsappSocket(login.sock);
+    if (
+      !login.preserveAuthDirOnReset &&
+      isTemporaryWhatsAppAuthDir(login.authDir)
+    ) {
+      rmSync(resolveWhatsAppLoginSessionRoot(login.authDir), {
+        recursive: true,
+        force: true,
+      });
+    }
+    activeWhatsappLogins.delete(accountId);
+  }
+  if (reason) {
+    logger.info({ accountId, reason }, "whatsapp_login_reset");
+  }
+}
+
+function attachWhatsappLoginWaiter(
+  login: ActiveWhatsappLogin,
+  runtime: WhatsappRuntimeModules,
+): void {
+  logger.info(
+    {
+      accountId: login.accountId,
+      authDir: login.authDir,
+      restartAttempted: login.restartAttempted,
+    },
+    "whatsapp_login_wait_started",
+  );
+  login.waitPromise = runtime
+    .waitForWaConnection(login.sock)
+    .then(() => {
+      const current = activeWhatsappLogins.get(login.accountId);
+      if (current?.startedAt === login.startedAt) {
+        current.connected = true;
+        logger.info(
+          {
+            accountId: current.accountId,
+            authDir: current.authDir,
+            restartAttempted: current.restartAttempted,
+          },
+          "whatsapp_login_wait_connected",
+        );
+      }
+    })
+    .catch((error) => {
+      const current = activeWhatsappLogins.get(login.accountId);
+      if (current?.startedAt !== login.startedAt) {
+        return;
+      }
+      current.error = runtime.formatError(error);
+      current.errorStatus = extractWhatsappStatusCode(error);
+      logger.warn(
+        {
+          accountId: current.accountId,
+          authDir: current.authDir,
+          restartAttempted: current.restartAttempted,
+          error: current.error,
+          errorStatus: current.errorStatus,
+        },
+        "whatsapp_login_wait_failed",
+      );
+    });
+}
+
+async function restartWhatsappLoginSocket(
+  login: ActiveWhatsappLogin,
+  runtime: WhatsappRuntimeModules,
+): Promise<boolean> {
+  if (login.restartAttempted) {
+    return false;
+  }
+  login.restartAttempted = true;
+  logger.info(
+    { accountId: login.accountId, authDir: login.authDir },
+    "whatsapp_login_retry_after_515",
+  );
+  closeWhatsappSocket(login.sock);
+  try {
+    const sock = await runtime.createWaSocket(false, false, {
+      authDir: login.authDir,
+    });
+    login.sock = sock;
+    login.connected = false;
+    login.error = undefined;
+    login.errorStatus = undefined;
+    logger.info(
+      { accountId: login.accountId, authDir: login.authDir },
+      "whatsapp_login_retry_socket_created",
+    );
+    attachWhatsappLoginWaiter(login, runtime);
+    return true;
+  } catch (error) {
+    login.error = runtime.formatError(error);
+    login.errorStatus = extractWhatsappStatusCode(error);
+    logger.warn(
+      {
+        accountId: login.accountId,
+        authDir: login.authDir,
+        error: login.error,
+        errorStatus: login.errorStatus,
+      },
+      "whatsapp_login_retry_socket_failed",
+    );
+    return false;
+  }
+}
+
+function resolveOpenClawPackageDir(env: ControllerEnv): string {
+  const candidates = [
+    env.openclawBuiltinExtensionsDir
+      ? path.dirname(env.openclawBuiltinExtensionsDir)
+      : null,
+    path.join(
+      env.openclawStateDir,
+      "..",
+      "..",
+      "..",
+      "..",
+      "sidecars",
+      "openclaw",
+      "node_modules",
+      "openclaw",
+    ),
+    path.join(
+      process.cwd(),
+      "..",
+      "..",
+      "openclaw-runtime",
+      "node_modules",
+      "openclaw",
+    ),
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    if (existsSync(path.join(candidate, "package.json"))) {
+      return path.resolve(candidate);
+    }
+  }
+  throw new Error("OpenClaw package root not found for WhatsApp login");
+}
+
+function findDistModuleFile(
+  distDir: string,
+  matcher: (name: string) => boolean,
+  contentPattern: RegExp,
+  errorMessage: string,
+): string {
+  const files = readdirSync(distDir).filter(matcher).sort();
+  for (const file of files) {
+    try {
+      const source = readFileSync(path.join(distDir, file), "utf-8");
+      if (contentPattern.test(source)) {
+        return file;
+      }
+    } catch {
+      // ignore unreadable candidates
+    }
+  }
+  throw new Error(errorMessage);
+}
+
+async function loadWhatsappRuntimeModules(
+  env: ControllerEnv,
+): Promise<WhatsappRuntimeModules> {
+  const packageDir = resolveOpenClawPackageDir(env);
+  const distDir = path.join(packageDir, "dist");
+  const sessionFile = findDistModuleFile(
+    distDir,
+    (name) => /^session-[^.]+\.js$/.test(name),
+    /createWaSocket[\s\S]*waitForWaConnection[\s\S]*getStatusCode[\s\S]*formatError/,
+    "OpenClaw WhatsApp session module not found",
+  );
+  const sessionModule = (await import(
+    pathToFileURL(path.join(distDir, sessionFile)).href
+  )) as Record<string, unknown> & {
+    t: WhatsappRuntimeModules["createWaSocket"];
+    i: WhatsappRuntimeModules["waitForWaConnection"];
+    r: WhatsappRuntimeModules["getStatusCode"];
+    n: WhatsappRuntimeModules["formatError"];
+  };
+
+  const invalidExports: string[] = [];
+  if (typeof sessionModule.t !== "function") {
+    invalidExports.push("t:createWaSocket");
+  }
+  if (typeof sessionModule.i !== "function") {
+    invalidExports.push("i:waitForWaConnection");
+  }
+  if (typeof sessionModule.r !== "function") {
+    invalidExports.push("r:getStatusCode");
+  }
+  if (typeof sessionModule.n !== "function") {
+    invalidExports.push("n:formatError");
+  }
+  if (invalidExports.length > 0) {
+    throw new Error(
+      `Invalid OpenClaw WhatsApp session module exports: missing or non-function ${invalidExports.join(
+        ", ",
+      )}; available keys: ${Object.keys(sessionModule).sort().join(", ")}`,
+    );
+  }
+
+  return {
+    createWaSocket: sessionModule.t,
+    waitForWaConnection: sessionModule.i,
+    getStatusCode: sessionModule.r,
+    formatError: sessionModule.n,
+  };
+}
+
+async function fetchWechatQrCode(
+  apiBaseUrl: string,
+  botType: string,
+): Promise<WechatQrCodeResponse> {
+  const base = apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`;
+  const url = new URL(
+    `ilink/bot/get_bot_qrcode?bot_type=${encodeURIComponent(botType)}`,
+    base,
+  );
+  try {
+    const response = await fetch(url.toString(), {
+      signal: timeoutSignal(WECHAT_QR_FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch QR code: ${response.status} ${response.statusText}`,
+      );
+    }
+    return (await response.json()) as WechatQrCodeResponse;
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
+      throw new Error("Timed out fetching WeChat QR code");
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Timed out fetching WeChat QR code");
+    }
+    throw error;
+  }
+}
+
+async function pollWechatQrStatus(
+  apiBaseUrl: string,
+  qrcode: string,
+): Promise<WechatQrStatusResponse> {
+  const base = apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`;
+  const url = new URL(
+    `ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qrcode)}`,
+    base,
+  );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WECHAT_QR_POLL_TIMEOUT_MS);
+  try {
+    const response = await fetch(url.toString(), {
+      headers: { "iLink-App-ClientVersion": "1" },
+      signal: controller.signal,
+    });
+    const rawText = await response.text();
+    if (!response.ok) {
+      throw new Error(
+        `Failed to poll QR status: ${response.status} ${response.statusText}`,
+      );
+    }
+    return JSON.parse(rawText) as WechatQrStatusResponse;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { status: "wait" };
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class ChannelService {
   constructor(
+    private readonly env: ControllerEnv,
     private readonly configStore: NexuConfigStore,
     private readonly syncService: OpenClawSyncService,
+    private readonly gatewayService: OpenClawGatewayService,
   ) {}
 
   async listChannels() {
@@ -131,6 +673,344 @@ export class ChannelService {
     return channel;
   }
 
+  async wechatQrStart() {
+    const sessionKey = randomUUID();
+    purgeExpiredWechatLogins();
+
+    const qrResponse = await fetchWechatQrCode(
+      DEFAULT_WECHAT_BASE_URL,
+      DEFAULT_WECHAT_BOT_TYPE,
+    );
+
+    activeWechatLogins.set(sessionKey, {
+      sessionKey,
+      qrcode: qrResponse.qrcode,
+      qrcodeUrl: qrResponse.qrcode_img_content,
+      startedAt: Date.now(),
+    });
+
+    return {
+      qrDataUrl: qrResponse.qrcode_img_content,
+      message: "使用微信扫描以下二维码，以完成连接。",
+      sessionKey,
+    };
+  }
+
+  async wechatQrWait(sessionKey: string) {
+    const activeLogin = activeWechatLogins.get(sessionKey);
+    if (!activeLogin) {
+      return {
+        connected: false,
+        message: "当前没有进行中的登录，请先发起登录。",
+      };
+    }
+
+    if (Date.now() - activeLogin.startedAt >= WECHAT_LOGIN_TTL_MS) {
+      activeWechatLogins.delete(sessionKey);
+      return {
+        connected: false,
+        message: "二维码已过期，请重新生成。",
+      };
+    }
+
+    const deadline = Date.now() + 500_000;
+    while (Date.now() < deadline) {
+      const status = await pollWechatQrStatus(
+        DEFAULT_WECHAT_BASE_URL,
+        activeLogin.qrcode,
+      );
+
+      if (status.status === "wait" || status.status === "scaned") {
+        await sleep(WECHAT_QR_POLL_BACKOFF_MS);
+        continue;
+      }
+
+      if (status.status === "expired") {
+        activeWechatLogins.delete(sessionKey);
+        return {
+          connected: false,
+          message: "二维码已过期，请重新生成。",
+        };
+      }
+
+      if (
+        status.status === "confirmed" &&
+        status.bot_token &&
+        status.ilink_bot_id
+      ) {
+        const normalizedAccountId = normalizeAccountId(status.ilink_bot_id);
+        writeWeChatAccount(this.env, normalizedAccountId, {
+          token: status.bot_token,
+          savedAt: new Date().toISOString(),
+          baseUrl: status.baseurl || DEFAULT_WECHAT_BASE_URL,
+          userId: status.ilink_user_id,
+        });
+        registerWeChatAccount(this.env, normalizedAccountId);
+        activeWechatLogins.delete(sessionKey);
+        return {
+          connected: true,
+          message: "微信连接成功。",
+          accountId: normalizedAccountId,
+        };
+      }
+    }
+
+    activeWechatLogins.delete(sessionKey);
+    return {
+      connected: false,
+      message: "等待扫码超时，请重新生成二维码。",
+    };
+  }
+
+  async connectTelegram(input: ConnectTelegramInput) {
+    const response = await fetch(
+      `https://api.telegram.org/bot${encodeURIComponent(input.botToken)}/getMe`,
+      {
+        signal: timeoutSignal(5000),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        response.status === 401
+          ? "Invalid Telegram bot token"
+          : `Telegram API error (${response.status})`,
+      );
+    }
+
+    const payload = (await response.json()) as TelegramGetMeResponse;
+    if (!payload.ok || !payload.result?.id) {
+      throw new Error(payload.description ?? "Invalid Telegram bot token");
+    }
+
+    const channel = await this.configStore.connectTelegram({
+      botToken: input.botToken,
+      telegramBotId: String(payload.result.id),
+      botUsername: payload.result.username ?? null,
+      displayName:
+        payload.result.username?.trim() ||
+        payload.result.first_name?.trim() ||
+        null,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
+  async whatsappQrStart() {
+    // Force a clean auth dir before creating a new QR login session.
+    // This avoids stale or corrupted default credentials from mismatching the
+    // new socket/auth state; the user-visible consequence is that QR login
+    // always requires a fresh scan for DEFAULT_WHATSAPP_ACCOUNT_ID.
+    await this.resetWhatsAppDefaultLoginState(DEFAULT_WHATSAPP_ACCOUNT_ID);
+    const existing = activeWhatsappLogins.get(DEFAULT_WHATSAPP_ACCOUNT_ID);
+    if (existing && isWhatsappLoginFresh(existing) && existing.qrDataUrl) {
+      return {
+        qrDataUrl: existing.qrDataUrl,
+        message: "QR already active. Scan it in WhatsApp -> Linked Devices.",
+        accountId: DEFAULT_WHATSAPP_ACCOUNT_ID,
+        alreadyLinked: false,
+      };
+    }
+
+    await resetActiveWhatsappLogin(DEFAULT_WHATSAPP_ACCOUNT_ID);
+
+    const runtime = await loadWhatsappRuntimeModules(this.env);
+    let resolveQr: ((qr: string) => void) | null = null;
+    let rejectQr: ((error: Error) => void) | null = null;
+    const qrPromise = new Promise<string>((resolve, reject) => {
+      resolveQr = resolve;
+      rejectQr = reject;
+    });
+    const qrTimer = setTimeout(() => {
+      rejectQr?.(new Error("Timed out waiting for WhatsApp QR"));
+    }, WHATSAPP_QR_TIMEOUT_MS);
+
+    const loginSessionId = randomUUID();
+    const loginSessionDir = resolveWhatsAppLoginSessionDir(
+      this.env,
+      loginSessionId,
+    );
+    const authDir = path.join(loginSessionDir, "credentials", "whatsapp");
+    mkdirSync(authDir, { recursive: true });
+
+    let sock: WaSocket;
+    let pendingQr: string | null = null;
+    try {
+      sock = await runtime.createWaSocket(false, false, {
+        authDir,
+        onQr: (qr) => {
+          if (pendingQr) {
+            return;
+          }
+          pendingQr = qr;
+          const current = activeWhatsappLogins.get(DEFAULT_WHATSAPP_ACCOUNT_ID);
+          if (current && !current.qr) {
+            current.qr = qr;
+          }
+          clearTimeout(qrTimer);
+          resolveQr?.(qr);
+        },
+      });
+    } catch (error) {
+      clearTimeout(qrTimer);
+      await resetActiveWhatsappLogin(DEFAULT_WHATSAPP_ACCOUNT_ID);
+      throw new Error(`Failed to start WhatsApp login: ${String(error)}`);
+    }
+
+    const login: ActiveWhatsappLogin = {
+      accountId: DEFAULT_WHATSAPP_ACCOUNT_ID,
+      authDir,
+      startedAt: Date.now(),
+      sock,
+      waitPromise: Promise.resolve(),
+      connected: false,
+      restartAttempted: false,
+    };
+    activeWhatsappLogins.set(DEFAULT_WHATSAPP_ACCOUNT_ID, login);
+    if (pendingQr && !login.qr) {
+      login.qr = pendingQr;
+    }
+    attachWhatsappLoginWaiter(login, runtime);
+
+    let qr: string;
+    try {
+      qr = await qrPromise;
+    } catch (error) {
+      clearTimeout(qrTimer);
+      await resetActiveWhatsappLogin(DEFAULT_WHATSAPP_ACCOUNT_ID);
+      throw new Error(`Failed to get QR: ${String(error)}`);
+    }
+
+    login.qrDataUrl = qr;
+    return {
+      qrDataUrl: login.qrDataUrl,
+      message: "Scan this QR in WhatsApp -> Linked Devices.",
+      accountId: DEFAULT_WHATSAPP_ACCOUNT_ID,
+      alreadyLinked: false,
+    };
+  }
+
+  async whatsappQrWait(accountId: string) {
+    const login = activeWhatsappLogins.get(accountId);
+    if (!login) {
+      return {
+        connected: false,
+        message: "No active WhatsApp login in progress.",
+        accountId,
+      };
+    }
+    if (!isWhatsappLoginFresh(login)) {
+      await resetActiveWhatsappLogin(accountId);
+      return {
+        connected: false,
+        message: "The login QR expired. Generate a new one.",
+        accountId,
+      };
+    }
+
+    const runtime = await loadWhatsappRuntimeModules(this.env);
+    const deadline = Date.now() + WHATSAPP_WAIT_TIMEOUT_MS;
+
+    while (true) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        return {
+          connected: false,
+          message:
+            "Still waiting for the QR scan. Let me know when you've scanned it.",
+          accountId,
+        };
+      }
+
+      const timeout = new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), remaining),
+      );
+      const result = await Promise.race([
+        login.waitPromise.then(() => "done" as const),
+        timeout,
+      ]);
+
+      if (result === "timeout") {
+        return {
+          connected: false,
+          message:
+            "Still waiting for the QR scan. Let me know when you've scanned it.",
+          accountId,
+        };
+      }
+
+      if (login.error) {
+        logger.warn(
+          {
+            accountId,
+            authDir: login.authDir,
+            error: login.error,
+            errorStatus: login.errorStatus,
+            restartAttempted: login.restartAttempted,
+          },
+          "whatsapp_qr_wait_observed_login_error",
+        );
+        if (login.errorStatus === WHATSAPP_LOGGED_OUT_STATUS) {
+          rmSync(login.authDir, { recursive: true, force: true });
+          const message =
+            "WhatsApp reported the session is logged out. Cleared cached web session; please scan a new QR.";
+          await resetActiveWhatsappLogin(accountId, message);
+          return { connected: false, message, accountId };
+        }
+        if (login.errorStatus === 515) {
+          const restarted = await restartWhatsappLoginSocket(login, runtime);
+          if (restarted && isWhatsappLoginFresh(login)) {
+            continue;
+          }
+        }
+        const message = `WhatsApp login failed: ${login.error}`;
+        await resetActiveWhatsappLogin(accountId, message);
+        return { connected: false, message, accountId };
+      }
+
+      if (login.connected) {
+        login.preserveAuthDirOnReset = true;
+        return {
+          connected: true,
+          message: "Linked! WhatsApp is ready.",
+          accountId,
+        };
+      }
+
+      return {
+        connected: false,
+        message: "Login ended without a connection.",
+        accountId,
+      };
+    }
+  }
+
+  async connectWhatsapp(accountId: string) {
+    const login = activeWhatsappLogins.get(accountId);
+    if (!login || !login.connected) {
+      throw new Error("WhatsApp login is not complete yet.");
+    }
+    const channel = await this.configStore.connectWhatsapp({
+      accountId,
+      authDir: login.authDir,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    const readiness = await this.waitForWhatsappReady(accountId);
+    if (!readiness.ready) {
+      await this.configStore.disconnectChannel(channel.id);
+      await this.syncService.syncAll();
+      login.preserveAuthDirOnReset = false;
+      await resetActiveWhatsappLogin(accountId);
+      throw new Error(
+        readiness.lastError ??
+          "WhatsApp linked, but the runtime failed to start the listener.",
+      );
+    }
+    await resetActiveWhatsappLogin(accountId);
+    return channel;
+  }
+
   async connectFeishu(input: ConnectFeishuInput) {
     const response = await fetch(
       "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
@@ -158,10 +1038,49 @@ export class ChannelService {
   }
 
   async disconnectChannel(channelId: string) {
+    // Align with OpenClaw's "remove" semantics: disconnect only unbinds the
+    // channel from Nexu config and leaves the linked session intact. Explicit
+    // logout remains a separate operation.
     const removed = await this.configStore.disconnectChannel(channelId);
     if (removed) {
       await this.syncService.syncAll();
     }
     return removed;
+  }
+
+  private async waitForWhatsappReady(accountId: string) {
+    const deadline = Date.now() + 45_000;
+    let lastReadiness = await this.gatewayService.getChannelReadiness(
+      "whatsapp",
+      accountId,
+    );
+    while (Date.now() < deadline) {
+      if (lastReadiness.ready) {
+        return lastReadiness;
+      }
+      await sleep(1500);
+      lastReadiness = await this.gatewayService.getChannelReadiness(
+        "whatsapp",
+        accountId,
+      );
+    }
+    return lastReadiness;
+  }
+
+  private async resetWhatsAppDefaultLoginState(accountId: string) {
+    const authDir = resolveWhatsAppAccountDir(this.env, accountId);
+    if (!existsSync(authDir)) {
+      logger.info(
+        { channelType: "whatsapp", accountId, authDir },
+        "whatsapp_qr_start_no_auth_dir",
+      );
+      return;
+    }
+
+    rmSync(authDir, { recursive: true, force: true });
+    logger.info(
+      { channelType: "whatsapp", accountId, authDir },
+      "whatsapp_qr_start_auth_dir_cleared",
+    );
   }
 }

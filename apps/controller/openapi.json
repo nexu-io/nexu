@@ -2842,7 +2842,9 @@
                               "slack",
                               "discord",
                               "feishu",
-                              "wechat"
+                              "wechat",
+                              "telegram",
+                              "whatsapp"
                             ]
                           },
                           "accountId": {
@@ -3024,7 +3026,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3147,7 +3151,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3274,7 +3280,124 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/telegram/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "botToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected telegram channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3378,7 +3501,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -3515,6 +3640,249 @@
         }
       }
     },
+    "/api/v1/channels/whatsapp/qr-start": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "responses": {
+          "200": {
+            "description": "QR code data for WhatsApp login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "qrDataUrl": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "alreadyLinked": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "accountId"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "WhatsApp login unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/whatsapp/qr-wait": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accountId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "accountId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WhatsApp QR login result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connected": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "accountId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "connected",
+                    "message",
+                    "accountId"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "WhatsApp login unavailable or timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/whatsapp/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accountId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "accountId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected whatsapp channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Connection failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/channels/wechat/qr-start": {
       "post": {
         "tags": [
@@ -3572,6 +3940,7 @@
           "Channels"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -3642,6 +4011,7 @@
           "Channels"
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -3679,7 +4049,9 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wechat"
+                        "wechat",
+                        "telegram",
+                        "whatsapp"
                       ]
                     },
                     "accountId": {
@@ -4859,6 +5231,7 @@
                 "anthropic",
                 "openai",
                 "google",
+                "ollama",
                 "siliconflow",
                 "ppio",
                 "openrouter",
@@ -5086,6 +5459,7 @@
                 "anthropic",
                 "openai",
                 "google",
+                "ollama",
                 "siliconflow",
                 "ppio",
                 "openrouter",
@@ -5295,6 +5669,7 @@
                 "anthropic",
                 "openai",
                 "google",
+                "ollama",
                 "siliconflow",
                 "ppio",
                 "openrouter",

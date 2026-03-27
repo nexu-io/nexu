@@ -170,6 +170,8 @@ const zhCN = {
   "home.channel.slack": "Slack",
   "home.channel.discord": "Discord",
   "home.channel.wechat": "微信",
+  "home.channel.telegram": "Telegram",
+  "home.channel.whatsapp": "WhatsApp",
   "home.channel.addBot": "添加 nexu Bot",
   "home.tab.channels": "渠道",
   "home.tab.models": "模型 & Key",
@@ -271,6 +273,7 @@ const zhCN = {
   "models.provider.anthropic.description": "Claude 系列 AI 模型",
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
+  "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
   "models.managed.connected": "退出登录",
@@ -346,7 +349,7 @@ const zhCN = {
   // ── Channels Page ──
   "channels.pageTitle": "渠道",
   "channels.pageSubtitle": "连接你的消息平台，让 nexu 🦞 加入你的工作区",
-  "channels.comingSoon": "Telegram、Microsoft Teams、Line 等更多平台即将支持",
+  "channels.comingSoon": "Microsoft Teams、Line 等更多平台即将支持",
   "channels.backToConfig": "返回配置",
   "channels.statusConnected": "{{platform}} Bot 已连接",
   "channels.configuredDate": "配置于 {{date}}",
@@ -363,6 +366,10 @@ const zhCN = {
   "channels.openInFeishu": "在飞书中打开",
   "channels.openFeishuDM": "在飞书中打开与 Bot 的私信。",
   "channels.messageBotFeishu": "在飞书中发送消息",
+  "channels.openInTelegram": "在 Telegram 中打开",
+  "channels.openTelegramDesc":
+    "打开你的 Bot 主页，发起私聊，或将它加入群组。群内只有在 @ 提及时才会回复。",
+  "channels.openTelegramBot": "打开 Bot",
   "channels.webhookUrl": "Webhook URL",
   "channels.credentials": "凭证",
   "channels.accountId": "账号 ID",
@@ -689,6 +696,28 @@ const zhCN = {
   "wechatSetup.waitingGateway": "等待网关启动中...",
   "wechatSetup.waitingGatewayHint": "第 {{attempt}}/{{total}} 次尝试",
   "wechatSetup.loadingQr": "正在获取二维码...",
+
+  // ── Telegram Setup ──
+  "telegramSetup.title": "连接 Telegram",
+  "telegramSetup.desc":
+    "在 BotFather 中创建 Bot，把 token 粘贴到这里，然后将 Bot 添加到你希望它回复的群组。Nexu 仅会在群内被提及时回复。",
+  "telegramSetup.quickSetup": "快速配置",
+  "telegramSetup.step1": "打开 Telegram，并与 BotFather 对话。",
+  "telegramSetup.step2": "使用 `/newbot` 创建一个 Bot。",
+  "telegramSetup.step3": "复制 HTTP API token 并粘贴到下方。",
+  "telegramSetup.step4": "如果你希望群聊回复，请把 Bot 加入群组。",
+  "telegramSetup.botTokenLabel": "Bot Token",
+  "telegramSetup.botTokenPlaceholder": "1234567890:AA...",
+  "telegramSetup.connect": "连接 Telegram",
+  "telegramSetup.tokenRequired": "请输入 Telegram Bot token",
+  "telegramSetup.connectFailed": "连接 Telegram 失败",
+  "telegramSetup.connectSuccess": "Telegram 已连接",
+
+  // ── WhatsApp Setup ──
+  "whatsappSetup.title": "连接 WhatsApp",
+
+  // ── Common UI ──
+  "common.closeDialog": "关闭对话框",
 
   // ── Slack Setup ──
   "slackSetup.stepCreateApp": "创建 Slack App",

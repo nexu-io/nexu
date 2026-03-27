@@ -46,6 +46,7 @@ const envSchema = z.object({
   OPENCLAW_STATE_DIR: z.string().optional(),
   OPENCLAW_CONFIG_PATH: z.string().optional(),
   OPENCLAW_SKILLS_DIR: z.string().optional(),
+  OPENCLAW_EXTENSIONS_DIR: z.string().optional(),
   SKILLHUB_STATIC_SKILLS_DIR: z.string().optional(),
   PLATFORM_TEMPLATES_DIR: z.string().optional(),
   OPENCLAW_GATEWAY_PORT: z.coerce.number().int().positive().default(18789),
@@ -90,6 +91,9 @@ export const env = {
   openclawSkillsDir: expandHomeDir(
     parsed.OPENCLAW_SKILLS_DIR ?? path.join(openclawStateDir, "skills"),
   ),
+  openclawBuiltinExtensionsDir: parsed.OPENCLAW_EXTENSIONS_DIR
+    ? expandHomeDir(parsed.OPENCLAW_EXTENSIONS_DIR)
+    : null,
   openclawExtensionsDir: path.join(openclawStateDir, "extensions"),
   runtimePluginTemplatesDir: workspaceRoot
     ? path.join(
