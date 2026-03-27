@@ -125,17 +125,19 @@ function hasSameCloudModels(
     provider?: string | null;
   }>,
 ): boolean {
+  const toStableKey = (model: {
+    id: string;
+    name?: string | null;
+    provider?: string | null;
+  }): string =>
+    `${model.id}\u0000${model.name ?? ""}\u0000${model.provider ?? ""}`;
+
+  const currentKeys = current.map(toStableKey).sort();
+  const nextKeys = next.map(toStableKey).sort();
+
   return (
-    current.length === next.length &&
-    current.every((model, index) => {
-      const other = next[index];
-      return (
-        other !== undefined &&
-        model.id === other.id &&
-        (model.name ?? null) === (other.name ?? null) &&
-        (model.provider ?? null) === (other.provider ?? null)
-      );
-    })
+    currentKeys.length === nextKeys.length &&
+    currentKeys.every((key, index) => key === nextKeys[index])
   );
 }
 

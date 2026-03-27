@@ -179,6 +179,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     configStore,
     runtimeState,
     startBackgroundLoops: () => {
+      let isRefreshingNexuOfficialModels = false;
       const stopHealthLoop = startHealthLoop({
         env,
         state: runtimeState,
@@ -191,14 +192,24 @@ export async function createContainer(): Promise<ControllerContainer> {
         analyticsService,
       });
       const nexuOfficialModelRefreshInterval = setInterval(() => {
-        void modelProviderService.refreshNexuOfficialModels().catch((error) => {
-          logger.warn(
-            {
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "nexu_official_model_refresh_failed",
-          );
-        });
+        if (isRefreshingNexuOfficialModels) {
+          return;
+        }
+
+        isRefreshingNexuOfficialModels = true;
+        void modelProviderService
+          .refreshNexuOfficialModels()
+          .catch((error) => {
+            logger.warn(
+              {
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "nexu_official_model_refresh_failed",
+            );
+          })
+          .finally(() => {
+            isRefreshingNexuOfficialModels = false;
+          });
       }, NEXU_OFFICIAL_MODEL_REFRESH_INTERVAL_MS);
       nexuOfficialModelRefreshInterval.unref?.();
       skillhubService.start();
