@@ -1,0 +1,19 @@
+---
+description: Workspace growth / rewards (#106) — nexu web parity with design-system shell
+---
+
+# Workspace growth (digital #106)
+
+- **Hook:** `apps/web/src/hooks/use-budget.ts` — reward channels, localStorage claims, merged budget demo state; `useBotQuota()` selects healthy vs depleted scenario.
+- **Sidebar:** `apps/web/src/components/workspace-growth-sidebar.tsx` — gift CTA + usage popover; do not restyle without matching the tuned workspace shell.
+- **Footer:** `workspace-layout.tsx` shows GitHub star count via `use-github-stars.ts` (public `api.github.com/repos/nexu-io/nexu`, cached in `localStorage`).
+- **Route:** `/workspace/rewards` → `apps/web/src/pages/workspace-rewards.tsx`.
+- **Design tokens note:** `apps/web/src/index.css` header comment documents this surface for sync with the external design-system `index.css`.
+
+When changing copy, update `apps/web/src/i18n/locales/en.ts` and `zh-CN.ts` (`budget.*`, `rewards.*`, `reward.*`).
+
+## Regression guards (workspace shell)
+
+- Keep **`min-h-0`** on the sidebar scroll column (`flex-1 min-h-0 overflow-y-auto` in `workspace-layout.tsx`) and **`shrink-0`** around `WorkspaceGrowthSidebar`; otherwise Electron can hide the usage row.
+- Before merging unrelated features that touch `workspace-layout.tsx`, `workspace-growth-sidebar.tsx`, or `index.css`, **diff against** `chore/web-client-style-snapshot-20260327` (nexu) or `clone/nexu-web-client-snapshot-2026-03-27/` (digital repo snapshot).
+- GitHub issue **#107** (or similar) may track the same work as **digital #106** in comments — use the branches/snapshot as the source of truth for visuals, not only the issue number.

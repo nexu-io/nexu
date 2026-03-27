@@ -32,11 +32,24 @@ After any API route/schema change: `pnpm generate-types` then `pnpm typecheck`.
 | `/workspace/oauth-callback/:integrationId` | OAuth Callback | Handles Composio OAuth redirect |
 | `/workspace/skills` | Skills | Skill catalog |
 | `/workspace/skills/:slug` | Skill Detail | Individual skill info and actions |
+| `/workspace/home` | Home | Controller-first home / channels overview |
+| `/workspace/settings` | Settings | Models, providers, profile |
+| `/workspace/models` | Settings | Same shell as settings (models tab) |
+| `/workspace/rewards` | Rewards | Growth / rewards tasks (digital #106) |
 
 ## Layouts
 
 - **`AuthLayout`** — Requires authenticated session, wraps all workspace routes.
 - **`WorkspaceLayout`** — Sidebar + main content area.
+
+## Workspace shell — UI baseline (do not regress)
+
+Tuned layout and tokens for the desktop sidebar (growth card, usage meter, GitHub stars, flex behavior) are easy to break when adding features.
+
+- **Frozen reference (nexu):** branch `chore/web-client-style-snapshot-20260327` (includes commit `432cc7acd6c4340a9211f41b092d938dbfd3f164` and ancestors). Branch `fix/ui-design-polish` must stay aligned with the same UI polish commits when used for PRs.
+- **Frozen export (digital cowork repo):** `clone/nexu-web-client-snapshot-2026-03-27/` — see [agent-digital-cowork PR #110](https://github.com/refly-ai/agent-digital-cowork/pull/110) (merge when ready).
+- **Code comments** refer to **digital #106** for the growth/rewards surface; GitHub issue numbers may differ (e.g. #107) — always diff against the branches above, not only the issue id.
+- **Layout guardrails:** the main nav + conversations column keeps `flex-1 min-h-0 overflow-y-auto`; the growth block stays in a **`shrink-0`** wrapper so the usage row is not collapsed by flex. Do not remove these without re-checking Electron sidebar height.
 
 ## Conventions
 
