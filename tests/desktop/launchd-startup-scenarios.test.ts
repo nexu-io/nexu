@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:os", () => ({
   homedir: vi.fn(() => "/Users/testuser"),
+  userInfo: vi.fn(() => ({ uid: 501 })),
 }));
 
 vi.mock("node:child_process", () => ({
@@ -44,6 +45,7 @@ vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
   readFile: vi.fn().mockRejectedValue(new Error("ENOENT")),
   unlink: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("node:net", () => ({
@@ -195,9 +197,20 @@ function mockUnknownService() {
 // ---------------------------------------------------------------------------
 
 describe("Launchd Startup Scenarios", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockWebServer.port = 50810;
+
+    // Restore embedded web server mock (some tests override it)
+    const webServerMod = await import(
+      "../../apps/desktop/main/services/embedded-web-server"
+    );
+    (
+      webServerMod.startEmbeddedWebServer as ReturnType<typeof vi.fn>
+    ).mockImplementation((opts: { port: number }) => {
+      mockWebServer.port = opts.port === 0 ? 59999 : opts.port;
+      return Promise.resolve(mockWebServer);
+    });
 
     // Defaults: no services, not installed
     mockLaunchdManager.getServiceStatus.mockResolvedValue(mockUnknownService());
@@ -247,6 +260,8 @@ describe("Launchd Startup Scenarios", () => {
       .mockRejectedValueOnce(new Error("ENOENT"))
       // cleanup phase reads openclaw plist — not found
       .mockRejectedValueOnce(new Error("ENOENT"))
+      // stale session detection reads runtime-ports.json
+      .mockResolvedValueOnce(makeRuntimePorts())
       // recover phase reads runtime-ports.json
       .mockResolvedValueOnce(makeRuntimePorts());
 
@@ -282,7 +297,8 @@ describe("Launchd Startup Scenarios", () => {
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
-      .mockResolvedValueOnce(makeRuntimePorts());
+      .mockResolvedValueOnce(makeRuntimePorts()) // stale session detection
+      .mockResolvedValueOnce(makeRuntimePorts()); // recover phase
 
     // Both services report running
     mockLaunchdManager.getServiceStatus.mockResolvedValue(
@@ -310,7 +326,7 @@ describe("Launchd Startup Scenarios", () => {
   // -----------------------------------------------------------------------
   // Scenario 5: Web port occupied → fallback to OS-assigned port
   // -----------------------------------------------------------------------
-  it("Scenario 5: web port occupied falls back to OS-assigned port", async () => {
+  it("Scenario 5: web port occupied falls back to next port", async () => {
     const webServerMock = await import(
       "../../apps/desktop/main/services/embedded-web-server"
     );
@@ -318,14 +334,17 @@ describe("Launchd Startup Scenarios", () => {
     let callCount = 0;
     (
       webServerMock.startEmbeddedWebServer as ReturnType<typeof vi.fn>
-    ).mockImplementation((_opts: { port: number }) => {
+    ).mockImplementation((opts: { port: number }) => {
       callCount++;
       if (callCount === 1) {
         // First call fails (port occupied)
-        return Promise.reject(new Error("EADDRINUSE"));
+        const err = Object.assign(new Error("EADDRINUSE"), {
+          code: "EADDRINUSE",
+        });
+        return Promise.reject(err);
       }
-      // Second call with port=0 succeeds
-      mockWebServer.port = 59999;
+      // Second call with port+1 succeeds
+      mockWebServer.port = opts.port;
       return Promise.resolve(mockWebServer);
     });
 
@@ -335,15 +354,15 @@ describe("Launchd Startup Scenarios", () => {
 
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
-    // Should have tried port=0 on fallback
+    // Should have tried the next adjacent port after the first failure
     expect(webServerMock.startEmbeddedWebServer).toHaveBeenCalledTimes(2);
     const secondCall = (
       webServerMock.startEmbeddedWebServer as ReturnType<typeof vi.fn>
     ).mock.calls[1][0];
-    expect(secondCall.port).toBe(0);
+    expect(secondCall.port).toBe(50811); // webPort + 1
 
     // effectivePorts should reflect the actual bound port
-    expect(result.effectivePorts.webPort).toBe(59999);
+    expect(result.effectivePorts.webPort).toBe(50811);
   });
 
   // -----------------------------------------------------------------------
@@ -384,9 +403,10 @@ describe("Launchd Startup Scenarios", () => {
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
+      .mockResolvedValueOnce(makeRuntimePorts({ nexuHome: "/wrong/nexu-home" })) // stale session detection
       .mockResolvedValueOnce(
         makeRuntimePorts({ nexuHome: "/wrong/nexu-home" }),
-      );
+      ); // recover phase
 
     mockLaunchdManager.getServiceStatus.mockResolvedValue(
       mockRunningService({ NEXU_HOME: "/wrong/nexu-home" }),
@@ -430,15 +450,15 @@ describe("Launchd Startup Scenarios", () => {
   // -----------------------------------------------------------------------
   it("Scenario 9: dead Electron PID uses fresh web port instead of recovered", async () => {
     const fsMock = await import("node:fs/promises");
+    const portsData = makeRuntimePorts({
+      electronPid: 999999, // PID that doesn't exist
+      webPort: 55555,
+    });
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
-      .mockResolvedValueOnce(
-        makeRuntimePorts({
-          electronPid: 999999, // PID that doesn't exist
-          webPort: 55555,
-        }),
-      );
+      .mockResolvedValueOnce(portsData) // stale session detection
+      .mockResolvedValueOnce(portsData); // recover phase
 
     mockLaunchdManager.getServiceStatus.mockResolvedValue(
       mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
@@ -480,7 +500,8 @@ describe("Launchd Startup Scenarios", () => {
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
-      .mockResolvedValueOnce(makeRuntimePorts());
+      .mockResolvedValueOnce(makeRuntimePorts()) // stale session detection
+      .mockResolvedValueOnce(makeRuntimePorts()); // recover phase
 
     mockLaunchdManager.getServiceStatus.mockResolvedValue(
       mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
@@ -599,7 +620,7 @@ describe("Launchd Startup Scenarios", () => {
   it("Scenario 15: controller port conflict resolved via findFreePort", async () => {
     const cpMock = await import("node:child_process");
     let lsofCallCount = 0;
-    (cpMock.execFile as ReturnType<typeof vi.fn>).mockImplementation(
+    (cpMock.execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       (
         _cmd: string,
         args: string[],
@@ -634,7 +655,7 @@ describe("Launchd Startup Scenarios", () => {
   // -----------------------------------------------------------------------
   it("Scenario 16: openclaw port conflict resolved via findFreePort", async () => {
     const cpMock = await import("node:child_process");
-    (cpMock.execFile as ReturnType<typeof vi.fn>).mockImplementation(
+    (cpMock.execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       (
         _cmd: string,
         args: string[],
@@ -665,12 +686,12 @@ describe("Launchd Startup Scenarios", () => {
   // -----------------------------------------------------------------------
   it("Scenario 17: isDev mismatch skips port recovery", async () => {
     const fsMock = await import("node:fs/promises");
+    const prodPorts = makeRuntimePorts({ isDev: false, controllerPort: 44444 });
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
-      .mockResolvedValueOnce(
-        makeRuntimePorts({ isDev: false, controllerPort: 44444 }),
-      );
+      .mockResolvedValueOnce(prodPorts) // stale session detection
+      .mockResolvedValueOnce(prodPorts); // recover phase
 
     // Services running (from a prod session)
     mockLaunchdManager.getServiceStatus.mockResolvedValue(
@@ -691,14 +712,92 @@ describe("Launchd Startup Scenarios", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Scenario 18: Partial attach — only controller running
+  // Scenario 18: App version mismatch tears down stale services
   // -----------------------------------------------------------------------
-  it("Scenario 18: partial attach with only controller running still recovers ports", async () => {
+  it("Scenario 18: app version mismatch tears down stale services instead of attaching", async () => {
+    const fsMock = await import("node:fs/promises");
+    const ports = makeRuntimePorts({
+      appVersion: "0.9.0",
+      openclawStateDir: "/tmp/state",
+      userDataPath: "/tmp/user-data",
+      buildSource: "packaged",
+    });
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(ports)
+      .mockResolvedValueOnce(ports);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        appVersion: "1.0.0",
+        userDataPath: "/tmp/user-data",
+        buildSource: "packaged",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 19: Build identity mismatch tears down stale services
+  // -----------------------------------------------------------------------
+  it("Scenario 19: build identity mismatch refuses cross-attach", async () => {
+    const fsMock = await import("node:fs/promises");
+    const ports = makeRuntimePorts({
+      appVersion: "1.0.0",
+      openclawStateDir: "/tmp/other-state",
+      userDataPath: "/tmp/other-user-data",
+      buildSource: "beta",
+    });
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(ports)
+      .mockResolvedValueOnce(ports);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        appVersion: "1.0.0",
+        openclawStateDir: "/tmp/state",
+        userDataPath: "/tmp/user-data",
+        buildSource: "stable",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 20: Partial attach — only controller running
+  // -----------------------------------------------------------------------
+  it("Scenario 20: partial attach with only controller running still recovers ports", async () => {
     const fsMock = await import("node:fs/promises");
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
-      .mockResolvedValueOnce(makeRuntimePorts());
+      .mockResolvedValueOnce(makeRuntimePorts()) // stale session detection
+      .mockResolvedValueOnce(makeRuntimePorts()); // recover phase
 
     // Controller running, openclaw stopped
     mockLaunchdManager.getServiceStatus
@@ -730,9 +829,12 @@ describe("Launchd Startup Scenarios", () => {
     const webServerMock = await import(
       "../../apps/desktop/main/services/embedded-web-server"
     );
-    (webServerMock.startEmbeddedWebServer as ReturnType<typeof vi.fn>)
-      .mockRejectedValueOnce(new Error("EADDRINUSE"))
-      .mockRejectedValueOnce(new Error("EADDRINUSE"));
+    // All attempts fail with EADDRINUSE (5 adjacent ports + port 0 fallback)
+    (
+      webServerMock.startEmbeddedWebServer as ReturnType<typeof vi.fn>
+    ).mockRejectedValue(
+      Object.assign(new Error("EADDRINUSE"), { code: "EADDRINUSE" }),
+    );
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -740,7 +842,7 @@ describe("Launchd Startup Scenarios", () => {
 
     await expect(
       bootstrapWithLaunchd(makeBootstrapEnv() as never),
-    ).rejects.toThrow("EADDRINUSE");
+    ).rejects.toThrow("all port attempts exhausted");
   });
 
   // -----------------------------------------------------------------------
@@ -820,7 +922,8 @@ describe("Launchd Startup Scenarios", () => {
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT"))
       .mockRejectedValueOnce(new Error("ENOENT"))
-      .mockResolvedValueOnce(makeRuntimePorts());
+      .mockResolvedValueOnce(makeRuntimePorts()) // stale session detection
+      .mockResolvedValueOnce(makeRuntimePorts()); // recover phase
 
     mockLaunchdManager.getServiceStatus.mockResolvedValue(
       mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
@@ -845,7 +948,8 @@ describe("Launchd Startup Scenarios", () => {
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
-      .mockResolvedValueOnce("{{invalid json!!!"); // runtime-ports.json
+      .mockResolvedValueOnce("{{invalid json!!!") // stale session detection
+      .mockResolvedValueOnce("{{invalid json!!!"); // recover phase
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -856,5 +960,80 @@ describe("Launchd Startup Scenarios", () => {
     // Should fall back to cold start with default ports
     expect(result.isAttach).toBe(false);
     expect(result.effectivePorts.controllerPort).toBe(50800);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 25: Upgrade from pre-version runtime-ports forces clean restart
+  // -----------------------------------------------------------------------
+  it("Scenario 25: missing appVersion in recovered ports triggers clean cold start", async () => {
+    const fsMock = await import("node:fs/promises");
+    const legacyPorts = JSON.stringify({
+      writtenAt: new Date().toISOString(),
+      electronPid: 12345,
+      controllerPort: 50800,
+      openclawPort: 18789,
+      webPort: 50810,
+      nexuHome: "/tmp/nexu-home",
+      isDev: true,
+      userDataPath: "/tmp/user-data",
+      buildSource: "stable",
+    });
+
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(JSON.stringify(legacyPorts))
+      .mockResolvedValueOnce(JSON.stringify(legacyPorts));
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        appVersion: "1.0.0",
+        userDataPath: "/tmp/user-data",
+        buildSource: "stable",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(result.effectivePorts.controllerPort).toBe(50800);
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 26: stale force-quit session cleans runtime-ports and services
+  // -----------------------------------------------------------------------
+  it("Scenario 26: stale dead-electron session older than threshold is cleaned before restart", async () => {
+    const fsMock = await import("node:fs/promises");
+    const stalePorts = makeRuntimePorts({
+      electronPid: 999999,
+      writtenAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    });
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(stalePorts);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(result.isAttach).toBe(false);
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(fsMock.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("runtime-ports.json"),
+    );
   });
 });

@@ -10,6 +10,23 @@ const repoRoot =
 const releaseRuntimeRoot = resolve(electronRoot, ".dist-runtime");
 const isRelease = process.argv.includes("--release");
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
+async function timedStep(stepName, fn) {
+  const startedAt = performance.now();
+  console.log(`[prepare-runtime-sidecars][timing] start ${stepName}`);
+  try {
+    return await fn();
+  } finally {
+    const durationMs = performance.now() - startedAt;
+    console.log(
+      `[prepare-runtime-sidecars][timing] done ${stepName} duration=${formatDurationMs(durationMs)}`,
+    );
+  }
+}
+
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
     const child = spawn(command, args, {
@@ -41,7 +58,9 @@ async function main() {
   };
 
   if (isRelease) {
-    await resetDir(releaseRuntimeRoot);
+    await timedStep("reset release runtime root", async () => {
+      await resetDir(releaseRuntimeRoot);
+    });
     env.NEXU_DESKTOP_SIDECAR_OUT_DIR = releaseRuntimeRoot;
     env.NEXU_DESKTOP_COPY_RUNTIME_DEPS = "true";
   }
@@ -53,9 +72,11 @@ async function main() {
   ];
 
   for (const script of scripts) {
-    await run("pnpm", ["run", script], {
-      cwd: electronRoot,
-      env,
+    await timedStep(script, async () => {
+      await run("pnpm", ["run", script], {
+        cwd: electronRoot,
+        env,
+      });
     });
   }
 }

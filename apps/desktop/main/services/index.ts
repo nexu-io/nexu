@@ -18,6 +18,7 @@ export {
 
 export {
   bootstrapWithLaunchd,
+  checkCriticalPathsLocked,
   stopAllServices,
   teardownLaunchdServices,
   ensureNexuProcessesDead,

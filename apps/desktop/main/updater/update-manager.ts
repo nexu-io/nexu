@@ -8,6 +8,7 @@ import type {
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
 import { writeDesktopMainLog } from "../runtime/runtime-logger";
 import {
+  checkCriticalPathsLocked,
   ensureNexuProcessesDead,
   teardownLaunchdServices,
 } from "../services/launchd-bootstrap";
@@ -314,13 +315,21 @@ export class UpdateManager {
       );
     }
 
-    // --- Phase 2: Verification gate ---
-    // Poll until all Nexu sidecar processes are confirmed dead. This is the
-    // hard guarantee that prevents the macOS "app is still running" dialog.
-    // If processes survive 15 seconds of repeated SIGKILL, we proceed anyway
-    // — the installer may still succeed, and the next launch has its own
-    // orphan cleanup as a final fallback.
-    const { clean, remainingPids } = await ensureNexuProcessesDead();
+    // --- Phase 2: Process verification ---
+    // Two sweeps of SIGKILL to clear all Nexu sidecar processes. Uses both
+    // authoritative sources (launchd labels, runtime-ports.json) and pgrep.
+    let { clean, remainingPids } = await ensureNexuProcessesDead();
+
+    if (!clean) {
+      this.logCheck(
+        `quit-and-install: ${remainingPids.length} process(es) survived first sweep, retrying`,
+        this.getDiagnostic(),
+      );
+      ({ clean, remainingPids } = await ensureNexuProcessesDead({
+        timeoutMs: 5_000,
+        intervalMs: 200,
+      }));
+    }
 
     if (clean) {
       this.logCheck(
@@ -329,7 +338,33 @@ export class UpdateManager {
       );
     } else {
       this.logCheck(
-        `quit-and-install: ${remainingPids.length} process(es) still alive (${remainingPids.join(", ")}), proceeding with install anyway`,
+        `quit-and-install: ${remainingPids.length} process(es) survived both sweeps (${remainingPids.join(", ")})`,
+        this.getDiagnostic(),
+      );
+    }
+
+    // --- Phase 3: Evidence-based install decision ---
+    // Even with surviving processes, the update may be safe if those
+    // processes don't hold file handles to critical update paths. Use
+    // lsof to check whether the .app bundle or extracted sidecar dirs
+    // are actually locked.
+    const { locked, lockedPaths } = await checkCriticalPathsLocked();
+
+    if (locked) {
+      // Critical paths are held open — installing now would fail or
+      // corrupt the app. Skip this attempt; electron-updater will
+      // re-detect the pending update on next launch.
+      this.logCheck(
+        `quit-and-install: ABORTING — critical paths still locked: ${lockedPaths.join(", ")}`,
+        this.getDiagnostic(),
+      );
+      return;
+    }
+
+    if (!clean) {
+      // Processes alive but no critical file handles — safe to proceed.
+      this.logCheck(
+        "quit-and-install: residual processes exist but no critical path locks, proceeding",
         this.getDiagnostic(),
       );
     }

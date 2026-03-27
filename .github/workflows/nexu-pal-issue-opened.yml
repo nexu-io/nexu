@@ -45,4 +45,5 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association }}
         run: node scripts/nexu-pal/process-issue-opened.mjs

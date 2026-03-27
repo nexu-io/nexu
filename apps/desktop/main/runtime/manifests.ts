@@ -188,17 +188,44 @@ export function ensurePackagedOpenclawSidecar(
     return extractedSidecarRoot;
   }
 
-  // Clean + extract with retries. Node's rmSync can silently fail on macOS
-  // (ENOTEMPTY race), so use rm -rf and verify deletion before proceeding.
+  // Atomic extraction via staging directory: extract to a temporary location,
+  // verify the critical entry point, then atomically swap into the final path.
+  // This prevents half-extracted directories if the process is killed mid-extract.
+  const stagingRoot = `${extractedSidecarRoot}.staging`;
   const MAX_RETRIES = 3;
+
+  // Clean up any leftover staging directory from a previous interrupted attempt
+  if (existsSync(stagingRoot)) {
+    execFileSync("rm", ["-rf", stagingRoot]);
+  }
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
+      if (existsSync(stagingRoot)) {
+        execFileSync("rm", ["-rf", stagingRoot]);
+      }
+      mkdirSync(stagingRoot, { recursive: true });
+      execFileSync("tar", ["-xzf", archivePath, "-C", stagingRoot]);
+
+      // Verify critical entry point exists in staging
+      const stagingEntry = path.resolve(
+        stagingRoot,
+        "node_modules/openclaw/openclaw.mjs",
+      );
+      if (!existsSync(stagingEntry)) {
+        throw new Error(
+          `Extraction verification failed: ${stagingEntry} not found`,
+        );
+      }
+
+      // Write stamp inside staging
+      writeFileSync(path.resolve(stagingRoot, ".archive-stamp"), archiveStamp);
+
+      // Atomic swap: remove old → rename staging to final
       if (existsSync(extractedSidecarRoot)) {
         execFileSync("rm", ["-rf", extractedSidecarRoot]);
       }
-      mkdirSync(extractedSidecarRoot, { recursive: true });
-      execFileSync("tar", ["-xzf", archivePath, "-C", extractedSidecarRoot]);
-      writeFileSync(stampPath, archiveStamp);
+      execFileSync("mv", [stagingRoot, extractedSidecarRoot]);
       break;
     } catch (err) {
       if (attempt === MAX_RETRIES - 1) throw err;

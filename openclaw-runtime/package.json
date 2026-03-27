@@ -2,7 +2,7 @@
   "name": "openclaw-runtime",
   "private": true,
   "type": "module",
-  "packageManager": "npm@11",
+  "packageManager": "npm@11.6.2",
   "scripts": {
     "clean": "node ./clean-node-modules.mjs",
     "install:cached": "node ./postinstall.mjs",

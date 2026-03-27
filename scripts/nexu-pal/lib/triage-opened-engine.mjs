@@ -116,6 +116,10 @@ function sanitizeJsonResponse(raw) {
   return raw.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "");
 }
 
+function isInternalIssueAuthor(authorAssociation) {
+  return authorAssociation === "MEMBER" || authorAssociation === "OWNER";
+}
+
 async function detectAndTranslate({ chat, issueTitle, issueBody }) {
   const content = `Title: ${issueTitle}\n\nBody:\n${issueBody}`;
 
@@ -249,6 +253,7 @@ function buildNeedsInformationComment({ missingItems, reason }) {
 export async function buildOpenedIssueTriagePlan({
   issueTitle,
   issueBody,
+  issueAuthorAssociation,
   chat,
 }) {
   const plan = createTriagePlan();
@@ -298,6 +303,31 @@ export async function buildOpenedIssueTriagePlan({
     plan.diagnostics.push(...translation.diagnostics);
   }
 
+  const classification = await classifyBugOnly({
+    chat,
+    englishTitle,
+    englishBody,
+  });
+
+  if (classification.is_bug === true) {
+    plan.labelsToAdd.push("bug");
+  }
+
+  plan.diagnostics.push(
+    `bug classification: ${classification.reason ?? "no reason provided"}`,
+  );
+
+  plan.diagnostics.push(
+    `author association: ${issueAuthorAssociation ?? "unknown"}`,
+  );
+
+  if (isInternalIssueAuthor(issueAuthorAssociation)) {
+    plan.diagnostics.push(
+      "internal author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
+    );
+    return plan;
+  }
+
   const roadmap = await matchRoadmap({
     title: englishTitle,
     body: englishBody,
@@ -314,20 +344,6 @@ export async function buildOpenedIssueTriagePlan({
   if (Array.isArray(duplicate.diagnostics)) {
     plan.diagnostics.push(...duplicate.diagnostics);
   }
-
-  const classification = await classifyBugOnly({
-    chat,
-    englishTitle,
-    englishBody,
-  });
-
-  if (classification.is_bug === true) {
-    plan.labelsToAdd.push("bug");
-  }
-
-  plan.diagnostics.push(
-    `bug classification: ${classification.reason ?? "no reason provided"}`,
-  );
 
   const completeness = await assessInformationCompleteness({
     chat,
