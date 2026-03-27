@@ -223,6 +223,7 @@ const zhCN = {
   // ── Models Page ──
   "models.pageTitle": "设置",
   "models.pageSubtitle": "管理 AI 模型服务商",
+  "models.currentModel": "当前模型",
   "settings.pageSubtitle": "管理资料、语言偏好与 AI 模型服务商",
   "settings.tabGeneral": "通用设置",
   "settings.tabProviders": "AI 模型服务商",
@@ -273,6 +274,7 @@ const zhCN = {
   "models.provider.anthropic.description": "Claude 系列 AI 模型",
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
+  "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
   "models.managed.connected": "退出登录",

@@ -228,6 +228,7 @@ const en = {
   // ── Models Page ──
   "models.pageTitle": "Settings",
   "models.pageSubtitle": "Manage AI model providers",
+  "models.currentModel": "Active model",
   "settings.pageSubtitle": "Manage profile, language, and AI model providers",
   "settings.tabGeneral": "General",
   "settings.tabProviders": "AI Model Providers",
@@ -283,6 +284,8 @@ const en = {
   "models.provider.anthropic.description": "Claude series AI models",
   "models.provider.openai.description": "GPT series AI models",
   "models.provider.google.description": "Gemini series AI models",
+  "models.provider.ollama.description":
+    "Use local Ollama models running on your machine",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
   "models.managed.connected": "Log out",

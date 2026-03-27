@@ -47,6 +47,7 @@ import {
   putApiInternalDesktopDefaultModel,
   putApiV1ProvidersByProviderId,
 } from "../../lib/api/sdk.gen";
+import type { PutApiV1ProvidersByProviderIdData } from "../../lib/api/types.gen";
 import { markSetupComplete } from "./welcome";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -184,11 +185,19 @@ function getModelDisplayLabel(modelId: string): string {
     : modelId;
 }
 
-function isModelSelected(modelId: string, currentModelId: string): boolean {
-  return (
-    modelId === currentModelId ||
-    getModelDisplayLabel(currentModelId) === modelId
-  );
+export function isModelSelected(
+  modelId: string,
+  currentModelId: string,
+): boolean {
+  if (modelId === currentModelId) {
+    return true;
+  }
+
+  if (getModelDisplayLabel(modelId) !== getModelDisplayLabel(currentModelId)) {
+    return false;
+  }
+
+  return modelId.includes("/") !== currentModelId.includes("/");
 }
 
 function getProviderIdFromModelId(
@@ -248,6 +257,13 @@ const PROVIDER_META: Record<
     apiDocsUrl: "https://aistudio.google.com/app/apikey",
     apiKeyPlaceholder: "AIza...",
     defaultProxyUrl: "https://generativelanguage.googleapis.com/v1beta",
+  },
+  ollama: {
+    name: "Ollama",
+    descriptionKey: "models.provider.ollama.description",
+    apiDocsUrl: "https://ollama.com/download",
+    apiKeyPlaceholder: "ollama-local",
+    defaultProxyUrl: "http://127.0.0.1:11434",
   },
   siliconflow: {
     name: "SiliconFlow",
@@ -323,6 +339,7 @@ const DEFAULT_MODELS: Record<string, string[]> = {
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
   ],
+  ollama: [],
   siliconflow: [
     "deepseek-ai/DeepSeek-R1",
     "deepseek-ai/DeepSeek-V3",
@@ -452,6 +469,7 @@ const BYOK_PROVIDER_IDS = [
   "anthropic",
   "openai",
   "google",
+  "ollama",
   "siliconflow",
   "ppio",
   "openrouter",
@@ -460,7 +478,14 @@ const BYOK_PROVIDER_IDS = [
   "glm",
 ] as const;
 
-type ByokProviderId = (typeof BYOK_PROVIDER_IDS)[number];
+const OLLAMA_DUMMY_API_KEY = "ollama-local";
+
+type ConfigurableProviderId =
+  PutApiV1ProvidersByProviderIdData["path"]["providerId"];
+type ByokProviderId = Extract<
+  (typeof BYOK_PROVIDER_IDS)[number],
+  ConfigurableProviderId
+>;
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -900,6 +925,29 @@ export function ModelsPage() {
         </div>
 
         <div>
+          {/* Current active model indicator */}
+          {currentModelId && (
+            <div className="mb-4 flex items-center gap-3 rounded-lg border border-border bg-surface-0 px-4 py-2.5">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
+                {t("models.currentModel")}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-md flex items-center justify-center bg-white border border-border-subtle">
+                  <ModelLogo
+                    model={currentModelId}
+                    provider={
+                      getProviderIdFromModelId(models, currentModelId) ?? ""
+                    }
+                    size={12}
+                  />
+                </span>
+                <span className="text-[13px] font-semibold text-text-primary">
+                  {currentModelId}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Provider sidebar + detail */}
           <div
             className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
@@ -1335,7 +1383,9 @@ function ByokProviderDetail({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const isMiniMax = providerId === "minimax";
+  const isOllama = providerId === "ollama";
   const hostBridge = getModelsHostInvokeBridge();
+  const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey;
 
   const { data: minimaxOauthStatus } = useQuery({
     queryKey: ["minimax-oauth-status"],
@@ -1527,7 +1577,8 @@ function ByokProviderDetail({
 
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
-    mutationFn: () => verifyApiKey(providerId, apiKey, baseUrl || undefined),
+    mutationFn: () =>
+      verifyApiKey(providerId, effectiveApiKey, baseUrl || undefined),
     onSuccess: (result) => {
       track("workspace_provider_check", {
         provider_name: providerId,
@@ -1545,15 +1596,47 @@ function ByokProviderDetail({
     },
   });
 
+  const refreshModelsMutation = useMutation({
+    mutationFn: async () => {
+      const result = await verifyApiKey(
+        providerId,
+        effectiveApiKey,
+        baseUrl || undefined,
+      );
+
+      if (!result.valid) {
+        throw new Error(result.error ?? t("models.byok.keyInvalidUnknown"));
+      }
+
+      const models = result.models ?? [];
+      setVerifiedModels(models);
+
+      if (hasSavedAccess || isOllama) {
+        await saveProvider(providerId, {
+          apiKey: effectiveApiKey || undefined,
+          baseUrl: baseUrl || null,
+          displayName: meta.name,
+          enabled: true,
+          authMode: "apiKey",
+          modelsJson: JSON.stringify(models),
+        });
+        await queryClient.invalidateQueries({ queryKey: ["providers"] });
+        await queryClient.invalidateQueries({ queryKey: ["models"] });
+      }
+
+      return models;
+    },
+  });
+
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
       // Auto-fetch models if none available yet
       let models = displayModels;
-      if (models.length === 0 && apiKey) {
+      if (models.length === 0 && effectiveApiKey) {
         const result = await verifyApiKey(
           providerId,
-          apiKey,
+          effectiveApiKey,
           baseUrl || undefined,
         );
         if (result.valid && result.models && result.models.length > 0) {
@@ -1562,7 +1645,7 @@ function ByokProviderDetail({
         }
       }
       return saveProvider(providerId, {
-        apiKey: apiKey || undefined,
+        apiKey: effectiveApiKey || undefined,
         baseUrl: baseUrl || null,
         displayName: meta.name,
         enabled: true,
@@ -2005,67 +2088,118 @@ function ByokProviderDetail({
           </div>
         )}
 
+        {/* Z.AI "or general API" divider */}
+        {isZaiProvider && authMode === "oauth" && (
+          <div className="flex items-center gap-3 my-1">
+            <div className="flex-1 border-t border-border" />
+            <span className="text-[10px] text-text-muted">
+              {t("models.byok.zaiOrGeneralApi")}
+            </span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+        )}
+
         {/* API Key mode inputs */}
-        {!isOAuthConnected && authMode === "apiKey" && (
+        {!isOAuthConnected && (!isMiniMax || authMode === "apiKey") && (
           <div className="space-y-4">
+            {!isOllama && (
+              <div>
+                <label
+                  htmlFor={`apikey-${providerId}`}
+                  className="block text-[12px] font-medium text-text-secondary mb-1.5"
+                >
+                  {t("models.byok.apiKey")}
+                </label>
+                {dbProvider?.hasApiKey && !isEditingApiKey ? (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      value="sk-••••••••••••••••"
+                      className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[80px] text-[12px] text-text-muted cursor-default focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingApiKey(true)}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-primary transition-colors hover:bg-surface-2"
+                    >
+                      {t("models.byok.changeApiKey")}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      id={`apikey-${providerId}`}
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={meta.apiKeyPlaceholder}
+                      className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[72px] text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
+                    />
+                    <button
+                      type="button"
+                      disabled={!apiKey || verifyMutation.isPending}
+                      onClick={() => verifyMutation.mutate()}
+                      className={cn(
+                        "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        verifyMutation.isSuccess && verifyMutation.data?.valid
+                          ? "text-emerald-600"
+                          : apiKey
+                            ? "text-text-secondary hover:bg-surface-2"
+                            : "text-text-muted cursor-not-allowed",
+                      )}
+                    >
+                      {verifyMutation.isPending ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : verifyMutation.isSuccess &&
+                        verifyMutation.data?.valid ? (
+                        <Check size={12} />
+                      ) : (
+                        t("models.byok.verify")
+                      )}
+                    </button>
+                  </div>
+                )}
+                {verifyMutation.isSuccess && (
+                  <div
+                    className={cn(
+                      "mt-1.5 text-[10px]",
+                      verifyMutation.data?.valid
+                        ? "text-emerald-600"
+                        : "text-red-500",
+                    )}
+                  >
+                    {verifyMutation.data?.valid
+                      ? t("models.byok.keyValid", {
+                          count: verifyMutation.data.models?.length ?? 0,
+                        })
+                      : t("models.byok.keyInvalid", {
+                          error:
+                            verifyMutation.data?.error ??
+                            t("models.byok.keyInvalidUnknown"),
+                        })}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label
-                htmlFor={`apikey-${providerId}`}
+                htmlFor={`baseurl-${providerId}`}
                 className="block text-[12px] font-medium text-text-secondary mb-1.5"
               >
-                {t("models.byok.apiKey")}
+                {t("models.byok.proxyUrl")}
               </label>
-              {dbProvider?.hasApiKey && !isEditingApiKey ? (
-                <div className="relative">
-                  <input
-                    type="text"
-                    readOnly
-                    value="sk-••••••••••••••••"
-                    className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[80px] text-[12px] text-text-muted cursor-default focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingApiKey(true)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium text-text-primary transition-colors hover:bg-surface-2"
-                  >
-                    {t("models.byok.changeApiKey")}
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <input
-                    id={`apikey-${providerId}`}
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={meta.apiKeyPlaceholder}
-                    className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 pr-[72px] text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
-                  />
-                  <button
-                    type="button"
-                    disabled={!apiKey || verifyMutation.isPending}
-                    onClick={() => verifyMutation.mutate()}
-                    className={cn(
-                      "absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
-                      verifyMutation.isSuccess && verifyMutation.data?.valid
-                        ? "text-emerald-600"
-                        : apiKey
-                          ? "text-text-secondary hover:bg-surface-2"
-                          : "text-text-muted cursor-not-allowed",
-                    )}
-                  >
-                    {verifyMutation.isPending ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : verifyMutation.isSuccess &&
-                      verifyMutation.data?.valid ? (
-                      <Check size={12} />
-                    ) : (
-                      t("models.byok.verify")
-                    )}
-                  </button>
-                </div>
-              )}
-              {verifyMutation.isSuccess && (
+              <input
+                id={`baseurl-${providerId}`}
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder={
+                  meta.defaultProxyUrl || "https://api.example.com/v1"
+                }
+                className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
+              />
+              {isOllama && verifyMutation.isSuccess && (
                 <div
                   className={cn(
                     "mt-1.5 text-[10px]",
@@ -2086,36 +2220,20 @@ function ByokProviderDetail({
                 </div>
               )}
             </div>
-            <div>
-              <label
-                htmlFor={`baseurl-${providerId}`}
-                className="block text-[12px] font-medium text-text-secondary mb-1.5"
-              >
-                {t("models.byok.proxyUrl")}
-              </label>
-              <input
-                id={`baseurl-${providerId}`}
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={
-                  meta.defaultProxyUrl || "https://api.example.com/v1"
-                }
-                className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
-              />
-            </div>
 
             {/* Action bar */}
             <div className="flex justify-end pt-1">
               <button
                 type="button"
                 disabled={
-                  saveMutation.isPending || (!apiKey && !dbProvider?.hasApiKey)
+                  saveMutation.isPending ||
+                  (!isOllama && !apiKey && !dbProvider?.hasApiKey)
                 }
                 onClick={() => saveMutation.mutate()}
                 className={cn(
                   "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-                  !saveMutation.isPending && (apiKey || dbProvider?.hasApiKey)
+                  !saveMutation.isPending &&
+                    (isOllama || apiKey || dbProvider?.hasApiKey)
                     ? "bg-accent text-accent-fg hover:bg-accent/90"
                     : "bg-surface-2 text-text-muted cursor-not-allowed",
                 )}
@@ -2134,11 +2252,32 @@ function ByokProviderDetail({
 
       {/* Model list — clickable to switch active model */}
       <div>
-        <div className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
-          {t("models.byok.modelList")}
-          <span className="ml-1.5 normal-case tracking-normal">
-            ({displayModels.length})
-          </span>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
+            {t("models.byok.modelList")}
+            <span className="ml-1.5 normal-case tracking-normal">
+              ({displayModels.length})
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={refreshModelsMutation.isPending || (!isOllama && !apiKey)}
+            onClick={() => refreshModelsMutation.mutate()}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[10px] font-medium transition-colors",
+              !refreshModelsMutation.isPending && (isOllama || apiKey)
+                ? "text-text-secondary hover:bg-surface-2"
+                : "text-text-muted cursor-not-allowed",
+            )}
+          >
+            <RefreshCw
+              size={10}
+              className={cn(refreshModelsMutation.isPending && "animate-spin")}
+            />
+            {refreshModelsMutation.isPending
+              ? t("models.byok.fetchingModels")
+              : t("models.byok.refreshModels")}
+          </button>
         </div>
         <div className="space-y-0.5">
           {displayModels.length === 0 && (

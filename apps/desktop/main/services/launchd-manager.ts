@@ -274,8 +274,16 @@ export class LaunchdManager {
    * Wait for a service to exit after bootout.
    * Polls status until the service is no longer running or timeout is reached.
    * If still running after timeout, sends SIGKILL as last resort.
+   *
+   * @param knownPid - PID captured *before* bootout. After bootout, launchctl
+   *   print may return "unknown" even though the process is still exiting.
+   *   Passing the PID lets the fallback SIGKILL work reliably.
    */
-  async waitForExit(label: string, timeoutMs = 5000): Promise<void> {
+  async waitForExit(
+    label: string,
+    timeoutMs = 5000,
+    knownPid?: number,
+  ): Promise<void> {
     const startTime = Date.now();
     let consecutiveUnknown = 0;
 
@@ -284,8 +292,15 @@ export class LaunchdManager {
       if (status.status === "stopped") return;
       if (status.status === "unknown") {
         consecutiveUnknown++;
-        // After 3 consecutive "unknown" reads, treat as exited
-        if (consecutiveUnknown >= 3) return;
+        // After 3 consecutive "unknown" reads, the label is unregistered.
+        // If we have a known PID, verify the process is actually gone.
+        if (consecutiveUnknown >= 3) {
+          if (knownPid && isProcessAlive(knownPid)) {
+            // Label gone but process still alive — break to SIGKILL path
+            break;
+          }
+          return;
+        }
         await new Promise((r) => setTimeout(r, 200));
         continue;
       }
@@ -294,23 +309,53 @@ export class LaunchdManager {
     }
 
     // Last resort: force kill by PID, then verify
+    const targetPid = knownPid ?? (await this.getServiceStatus(label)).pid;
+    if (!targetPid) return;
+
     console.warn(
-      `Service ${label} still running after bootout + ${timeoutMs}ms, force killing`,
+      `Service ${label} (pid=${targetPid}) still running after bootout + ${timeoutMs}ms, sending SIGKILL`,
     );
-    const status = await this.getServiceStatus(label);
-    if (status.pid) {
-      try {
-        process.kill(status.pid, "SIGKILL");
-      } catch {
-        // Process may have exited between check and kill
-      }
-      // Re-poll briefly to confirm kill took effect
-      for (let i = 0; i < 5; i++) {
-        await new Promise((r) => setTimeout(r, 200));
-        const recheck = await this.getServiceStatus(label);
-        if (recheck.status !== "running") return;
-      }
+    try {
+      process.kill(targetPid, "SIGKILL");
+    } catch {
+      // Process may have exited between check and kill (ESRCH)
+      return;
     }
+    // Re-poll briefly to confirm kill took effect
+    for (let i = 0; i < 5; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      if (!isProcessAlive(targetPid)) return;
+    }
+  }
+
+  /**
+   * Bootout a service and wait for the process to fully exit.
+   * Captures the PID before bootout so the fallback SIGKILL works even after
+   * the label is unregistered from launchd.
+   */
+  async bootoutAndWaitForExit(label: string, timeoutMs = 5000): Promise<void> {
+    // Capture PID before bootout — after bootout, launchctl print may fail
+    const status = await this.getServiceStatus(label);
+    const pid = status.pid;
+
+    try {
+      await this.bootoutService(label);
+    } catch {
+      // Service may not be registered — if we have a PID, still try to kill it
+      if (pid && isProcessAlive(pid)) {
+        console.warn(
+          `Bootout failed for ${label} but pid=${pid} is alive, sending SIGKILL`,
+        );
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          // ESRCH — already gone
+        }
+      }
+      return;
+    }
+
+    await this.waitForExit(label, timeoutMs, pid);
   }
 
   /**
@@ -365,3 +410,15 @@ export const SERVICE_LABELS = {
   openclaw: (isDev: boolean) =>
     isDev ? "io.nexu.openclaw.dev" : "io.nexu.openclaw",
 } as const;
+
+/**
+ * Check if a process is still alive (signal 0 = existence check).
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -27,8 +27,9 @@ Thank you for helping improve nexu. The sections below cover **code**, **documen
 ### Prerequisites
 
 - **Git**
-- **Node.js** 22+ (LTS recommended; minimum in `package.json` is 20+)
-- **pnpm** 10+ (repo pins `pnpm@10.26.0` via `packageManager`)
+- **Node.js** 24+ (LTS recommended; enforced via `package.json` `engines`)
+- **pnpm** 10.26+ (repo pins `pnpm@10.26.0` via `packageManager`)
+- **npm** 11+ (required for `openclaw-runtime` maintenance flows)
 
 ### Clone and install
 
@@ -68,8 +69,8 @@ Run from the repo root unless noted.
 | `pnpm dev:controller` | Controller only |
 | `pnpm build` | Production build (all packages) |
 | `pnpm typecheck` | TypeScript checks across the workspace |
-| `pnpm lint` | Biome check + `typecheck` (matches CI intent) |
-| `pnpm lint:fix` | Auto-fix where safe + typecheck |
+| `pnpm lint` | Biome check only |
+| `pnpm lint:fix` | Auto-fix where safe with Biome only |
 | `pnpm format` | Format/write with Biome |
 | `pnpm test` | Root Vitest suite (`vitest run`) |
 | `pnpm check:esm-imports` | ESM specifier verification (also run in CI) |
@@ -86,6 +87,7 @@ Run before pushing:
 
 ```bash
 pnpm lint
+pnpm typecheck
 pnpm test
 ```
 

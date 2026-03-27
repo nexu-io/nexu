@@ -394,6 +394,20 @@ export async function bootstrapWithLaunchd(
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
+  // --- Kill orphan processes that are NOT managed by launchd ---
+  // Only kill processes that are NOT currently registered launchd services.
+  // A failed update install or force-killed Electron can leave processes
+  // running without valid launchd registration — those block port binding.
+  const [ctrlStatus, ocStatus] = await Promise.all([
+    launchd.getServiceStatus(labels.controller),
+    launchd.getServiceStatus(labels.openclaw),
+  ]);
+  // Only run orphan cleanup if neither service is registered with launchd.
+  // If services ARE registered, they're legitimate launchd-managed processes.
+  if (ctrlStatus.status === "unknown" && ocStatus.status === "unknown") {
+    await killOrphanNexuProcesses();
+  }
+
   // --- Recover ports from previous session if available ---
   const recovered = await readRuntimePorts(plistDir);
   const [controllerStatus, openclawStatus] = await Promise.all([
@@ -647,6 +661,174 @@ export async function stopAllServices(
   await launchd.stopServiceGracefully(labels.controller);
 
   console.log("All services stopped");
+}
+
+/**
+ * Fully tear down launchd services for a clean app exit.
+ *
+ * This is the single, authoritative shutdown sequence used by both the quit
+ * handler ("Quit Completely") and the auto-updater ("Install Update").
+ *
+ * The sequence:
+ * 1. Bootout each service (unregisters from launchd so KeepAlive cannot
+ *    respawn it), then wait for the process to actually exit. If the process
+ *    survives the timeout, SIGKILL is sent using the PID captured *before*
+ *    the bootout (after bootout, `launchctl print` may no longer see it).
+ * 2. Delete runtime-ports.json so the next launch does a clean cold start.
+ * 3. As a last resort, scan for orphan Nexu processes by name pattern and
+ *    kill them — this handles edge cases where a previous crashed session
+ *    left processes that are no longer managed by any launchd label.
+ */
+export async function teardownLaunchdServices(opts: {
+  launchd: LaunchdManager;
+  labels: { controller: string; openclaw: string };
+  plistDir: string;
+  /** Per-service bootout timeout in ms (default 5000) */
+  timeoutMs?: number;
+}): Promise<void> {
+  const { launchd, labels, plistDir, timeoutMs = 5000 } = opts;
+
+  // Bootout openclaw first (it depends on controller), then controller
+  for (const label of [labels.openclaw, labels.controller]) {
+    try {
+      await launchd.bootoutAndWaitForExit(label, timeoutMs);
+    } catch (err) {
+      console.error(
+        `teardown: error stopping ${label}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // Delete runtime-ports.json so next launch does a clean cold start
+  await deleteRuntimePorts(plistDir).catch(() => {});
+
+  // Final safety net: kill any orphan Nexu processes that survived bootout
+  // (e.g. from a previous crashed session with stale launchd registrations).
+  await killOrphanNexuProcesses();
+}
+
+/**
+ * Kill orphan Nexu-related processes that are not managed by launchd.
+ *
+ * This catches processes left behind by a crashed Electron session, a failed
+ * update install, or manual launchd manipulation. Uses the shared
+ * findNexuProcessPids() to match against NEXU_PROCESS_PATTERNS.
+ */
+async function killOrphanNexuProcesses(): Promise<void> {
+  const pids = await findNexuProcessPids();
+  for (const pid of pids) {
+    console.warn(`teardown: killing orphan process pid=${pid}`);
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // ESRCH — already gone
+    }
+  }
+}
+
+/**
+ * Process patterns used for detecting Nexu sidecar processes.
+ * Shared between killOrphanNexuProcesses and ensureNexuProcessesDead so
+ * they agree on what constitutes a "Nexu process".
+ */
+const NEXU_PROCESS_PATTERNS = [
+  "controller/dist/index.js",
+  "openclaw.mjs gateway",
+  "openclaw-gateway",
+] as const;
+
+/**
+ * Find all PIDs matching Nexu sidecar process patterns.
+ * Returns deduplicated PIDs excluding the current process.
+ */
+async function findNexuProcessPids(): Promise<number[]> {
+  const allPids = new Set<number>();
+
+  for (const pattern of NEXU_PROCESS_PATTERNS) {
+    try {
+      const { stdout } = await execFileAsync("pgrep", ["-f", pattern]);
+      for (const line of stdout.trim().split("\n")) {
+        const pid = Number.parseInt(line, 10);
+        if (pid > 0 && pid !== process.pid) {
+          allPids.add(pid);
+        }
+      }
+    } catch {
+      // pgrep exits 1 when no matches — expected
+    }
+  }
+
+  return Array.from(allPids);
+}
+
+/**
+ * Verification gate: confirm all Nexu sidecar processes are dead.
+ *
+ * This is the final safety check before an update install. It polls for
+ * surviving Nexu processes (via pgrep) and sends SIGKILL to any it finds,
+ * looping until either:
+ * - No matching processes remain (success), or
+ * - The timeout is reached (proceeds anyway — the installer may still
+ *   succeed if file handles were released, and the next launch has its
+ *   own orphan cleanup as a fallback).
+ *
+ * Call this AFTER teardownLaunchdServices + orchestrator.dispose, as a
+ * belt-and-suspenders check before autoUpdater.quitAndInstall().
+ */
+export async function ensureNexuProcessesDead(opts?: {
+  /** Maximum time to wait in ms (default 15000) */
+  timeoutMs?: number;
+  /** Polling interval in ms (default 500) */
+  intervalMs?: number;
+}): Promise<{ clean: boolean; remainingPids: number[] }> {
+  const timeoutMs = opts?.timeoutMs ?? 15_000;
+  const intervalMs = opts?.intervalMs ?? 500;
+  const startTime = Date.now();
+
+  let remainingPids: number[] = [];
+  let round = 0;
+
+  while (Date.now() - startTime < timeoutMs) {
+    remainingPids = await findNexuProcessPids();
+
+    if (remainingPids.length === 0) {
+      if (round > 0) {
+        console.log(
+          `ensureNexuProcessesDead: all processes confirmed dead after ${round} round(s)`,
+        );
+      }
+      return { clean: true, remainingPids: [] };
+    }
+
+    // Send SIGKILL to every survivor
+    for (const pid of remainingPids) {
+      console.warn(
+        `ensureNexuProcessesDead: round ${round + 1} — killing pid=${pid}`,
+      );
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // ESRCH — already gone between pgrep and kill
+      }
+    }
+
+    round++;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+
+  // Final check after timeout
+  remainingPids = await findNexuProcessPids();
+  if (remainingPids.length === 0) {
+    console.log(
+      "ensureNexuProcessesDead: all processes confirmed dead after timeout",
+    );
+    return { clean: true, remainingPids: [] };
+  }
+
+  console.error(
+    `ensureNexuProcessesDead: ${remainingPids.length} process(es) still alive after ${timeoutMs}ms: ${remainingPids.join(", ")}`,
+  );
+  return { clean: false, remainingPids };
 }
 
 /**

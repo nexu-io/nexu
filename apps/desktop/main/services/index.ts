@@ -19,6 +19,8 @@ export {
 export {
   bootstrapWithLaunchd,
   stopAllServices,
+  teardownLaunchdServices,
+  ensureNexuProcessesDead,
   isLaunchdBootstrapEnabled,
   getDefaultPlistDir,
   getLogDir,

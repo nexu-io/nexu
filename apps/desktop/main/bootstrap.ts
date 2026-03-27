@@ -59,7 +59,12 @@ function configureLocalDevPaths(): void {
   mkdirSync(logsPath, { recursive: true });
   mkdirSync(nexuHomePath, { recursive: true });
 
-  process.env.NEXU_HOME = nexuHomePath;
+  // Only set NEXU_HOME if not already provided externally (e.g. by
+  // dev-launchd.sh). Unconditionally overwriting it breaks the data
+  // directory when the caller explicitly sets NEXU_HOME to a custom path.
+  if (!process.env.NEXU_HOME) {
+    process.env.NEXU_HOME = nexuHomePath;
+  }
 
   app.setPath("userData", userDataPath);
   app.setPath("sessionData", sessionDataPath);

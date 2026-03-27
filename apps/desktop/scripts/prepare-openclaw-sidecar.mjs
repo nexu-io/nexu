@@ -236,9 +236,26 @@ const inheritEntitlementsPath = resolve(
   electronRoot,
   "build/entitlements.mac.inherit.plist",
 );
+const shouldArchiveOpenclawSidecar =
+  process.env.NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR !== "0" &&
+  process.env.NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR?.toLowerCase() !== "false";
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(2)}s`;
+}
+
+async function timedStep(stepName, fn) {
+  const startedAt = performance.now();
+  console.log(`[openclaw-sidecar][timing] start ${stepName}`);
+  try {
+    return await fn();
+  } finally {
+    console.log(
+      `[openclaw-sidecar][timing] done ${stepName} duration=${formatDurationMs(
+        performance.now() - startedAt,
+      )}`,
+    );
+  }
 }
 
 function run(command, args, options = {}) {
@@ -758,14 +775,25 @@ async function prepareOpenclawSidecar() {
     );
   }
 
-  await resetDir(sidecarRoot);
-  await mkdir(sidecarBinDir, { recursive: true });
-  const { stageRoot, stagedOpenclawRoot } = await stagePatchedOpenclawPackage();
+  await timedStep("reset sidecar root", async () => {
+    await resetDir(sidecarRoot);
+    await mkdir(sidecarBinDir, { recursive: true });
+  });
+  const { stageRoot, stagedOpenclawRoot } = await timedStep(
+    "stage patched openclaw package",
+    async () => stagePatchedOpenclawPackage(),
+  );
   try {
-    await linkOrCopyDirectory(openclawRuntimeNodeModules, sidecarNodeModules, {
-      excludeNames: ["openclaw"],
+    await timedStep("copy openclaw runtime node_modules", async () => {
+      await linkOrCopyDirectory(
+        openclawRuntimeNodeModules,
+        sidecarNodeModules,
+        {
+          excludeNames: ["openclaw"],
+        },
+      );
+      await rename(stagedOpenclawRoot, resolve(sidecarNodeModules, "openclaw"));
     });
-    await rename(stagedOpenclawRoot, resolve(sidecarNodeModules, "openclaw"));
   } finally {
     await removePathIfExists(stageRoot);
   }
@@ -832,32 +860,40 @@ exit 127
 `,
   );
   await chmod(wrapperPath, 0o755);
-  await signOpenclawNativeBinaries();
+  await timedStep("sign native binaries", async () =>
+    signOpenclawNativeBinaries(),
+  );
 
-  if (shouldCopyRuntimeDependencies()) {
+  if (shouldCopyRuntimeDependencies() && shouldArchiveOpenclawSidecar) {
     const archivePath = resolve(
       dirname(sidecarRoot),
       "openclaw-sidecar.tar.gz",
     );
-    await removePathIfExists(archivePath);
-    await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
-    await resetDir(sidecarRoot);
-    await writeFile(
-      resolve(sidecarRoot, "archive.json"),
-      `${JSON.stringify(
-        {
-          format: "tar.gz",
-          path: "payload.tar.gz",
-        },
-        null,
-        2,
-      )}\n`,
+    await timedStep("archive openclaw sidecar", async () => {
+      await removePathIfExists(archivePath);
+      await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
+      await resetDir(sidecarRoot);
+      await writeFile(
+        resolve(sidecarRoot, "archive.json"),
+        `${JSON.stringify(
+          {
+            format: "tar.gz",
+            path: "payload.tar.gz",
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      await writeFile(
+        resolve(sidecarRoot, "package.json"),
+        '{\n  "name": "openclaw-sidecar",\n  "private": true\n}\n',
+      );
+      await rename(archivePath, resolve(sidecarRoot, "payload.tar.gz"));
+    });
+  } else if (shouldCopyRuntimeDependencies()) {
+    console.log(
+      "[openclaw-sidecar] skipping archive packaging for fast CI mode",
     );
-    await writeFile(
-      resolve(sidecarRoot, "package.json"),
-      '{\n  "name": "openclaw-sidecar",\n  "private": true\n}\n',
-    );
-    await rename(archivePath, resolve(sidecarRoot, "payload.tar.gz"));
   }
 }
 

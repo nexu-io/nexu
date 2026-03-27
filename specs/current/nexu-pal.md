@@ -22,9 +22,11 @@ Runs in order:
 
 3. **Intent classification** — Sends the normalized English title and body to the LLM and assigns only the `bug` label when the issue clearly describes broken behavior.
 
-4. **Completeness check** — Uses the LLM to decide whether the issue is too incomplete to continue triage. If so, adds `needs-information`, posts a follow-up comment, and pauses there.
+4. **Internal-member short-circuit** — If `issue.author_association` is `MEMBER` or `OWNER`, the opened-issue flow stops after translation + bug classification. Internal issues skip known-issue matching, completeness checks, and `needs-triage` labeling.
 
-5. **Triage label** — If the issue is not roadmap-matched and does not need more information, adds the `needs-triage` label.
+5. **Completeness check** — For non-internal authors, uses the LLM to decide whether the issue is too incomplete to continue triage. If so, adds `needs-information`, posts a follow-up comment, and pauses there.
+
+6. **Triage label** — For non-internal authors, if the issue is not roadmap-matched and does not need more information, adds the `needs-triage` label.
 
 The opened-issue flow is split into a small pipeline:
 
