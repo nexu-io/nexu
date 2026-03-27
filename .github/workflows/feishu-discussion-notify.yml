@@ -4,18 +4,30 @@ on:
   discussion:
     types: [created]
 
+permissions:
+  contents: read
+
 jobs:
   notify:
     name: Notify Feishu
     runs-on: ubuntu-latest
     steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NEXU_PAL_APP_ID }}
+          private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
+
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts/notify
+          sparse-checkout: scripts
       - name: Send Feishu notification
         env:
           WEBHOOK_URL: ${{ secrets.ISSUE_SYNC_FEISHU_BOT_WEBHOOK }}
           EVENT_TYPE: discussion
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           TITLE: ${{ github.event.discussion.title }}
           URL: ${{ github.event.discussion.html_url }}
           NUMBER: ${{ github.event.discussion.number }}

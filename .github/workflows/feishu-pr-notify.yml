@@ -1,7 +1,7 @@
-name: Feishu Issue Notification
+name: Feishu Pull Request Notification
 
 on:
-  issues:
+  pull_request:
     types: [opened]
 
 permissions:
@@ -22,17 +22,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: scripts
+
       - name: Send Feishu notification
         env:
           WEBHOOK_URL: ${{ secrets.ISSUE_SYNC_FEISHU_BOT_WEBHOOK }}
-          EVENT_TYPE: issue
+          EVENT_TYPE: pull_request
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-          TITLE: ${{ github.event.issue.title }}
-          URL: ${{ github.event.issue.html_url }}
-          NUMBER: ${{ github.event.issue.number }}
-          AUTHOR: ${{ github.event.issue.user.login }}
-          BODY: ${{ github.event.issue.body }}
-          LABELS_OR_CATEGORY: ${{ join(github.event.issue.labels.*.name, ', ') }}
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BODY: ${{ github.event.pull_request.body }}
+          LABELS_OR_CATEGORY: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
           REPO: ${{ github.repository }}
         run: node scripts/notify/feishu-notify.mjs

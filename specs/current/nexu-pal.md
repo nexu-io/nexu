@@ -11,6 +11,7 @@ GitHub issue/discussion automation around **nexu-pal** issue processing and Feis
 | `Feishu Issue Notification` | `issues: [opened]` | `scripts/notify/feishu-notify.mjs` |
 | `nexu-pal: needs-triage notify` | `issues: [labeled]` (when label is `needs-triage`) | `scripts/notify/feishu-triage-notify.mjs` |
 | `Feishu Discussion Notification` | `discussion: [created]` | `scripts/notify/feishu-notify.mjs` |
+| `Feishu Pull Request Notification` | `pull_request: [opened]` | `scripts/notify/feishu-notify.mjs` |
 
 ## On issue opened
 
@@ -57,13 +58,14 @@ Current transitions:
 
 ## Feishu notifications
 
-Three GitHub Actions send Feishu webhook notifications for GitHub content:
+Four GitHub Actions send Feishu webhook notifications for GitHub content:
 
-1. **Issue notification** — On `issues: [opened]`, sends the existing issue card to the legacy webhook without changing the current chain.
+1. **Issue notification** — On `issues: [opened]`, sends the existing issue card to the legacy webhook, but skips notifications when the author is a repository-owner organization member.
 2. **Needs-triage issue notification** — On `issues: [labeled]`, when the added label is `needs-triage`, sends a triage card to either the bug or non-bug webhook based on the issue's current labels. The workflow maps GitHub secrets to internal env vars `BUG_WEBHOOK` and `REQ_WEBHOOK`.
-3. **Discussion notification** — On `discussion: [created]`, sends the existing discussion card format using the discussion category in place of labels.
+3. **Discussion notification** — On `discussion: [created]`, sends the existing discussion card format using the discussion category in place of labels, but skips notifications when the author is a repository-owner organization member.
+4. **Pull request notification** — On `pull_request: [opened]`, sends the existing card format using pull request labels, but skips notifications when the author is a repository-owner organization member.
 
-The legacy issue/discussion workflows continue to run `node scripts/notify/feishu-notify.mjs`. The new triage workflow runs `node scripts/notify/feishu-triage-notify.mjs`.
+The issue/discussion/pull-request workflows run `node scripts/notify/feishu-notify.mjs`. The triage workflow runs `node scripts/notify/feishu-triage-notify.mjs`.
 
 ## Labels managed
 
@@ -81,7 +83,7 @@ The legacy issue/discussion workflows continue to run `node scripts/notify/feish
 
 The three **nexu-pal** workflows create a short-lived token via `actions/create-github-app-token@v1` using secrets `NEXU_PAL_APP_ID` and `NEXU_PAL_PRIVATE_KEY_PEM`. All GitHub API calls and the first-interaction action use this App token.
 
-The Feishu notification workflows do not use the GitHub App. They use the default GitHub Actions context plus Feishu incoming-webhook secrets.
+The issue / discussion / pull-request Feishu notification workflows also create a short-lived GitHub App token so they can reuse the org-membership check and suppress notifications for internal authors. The `needs-triage` Feishu workflow continues to use GitHub Actions event data plus Feishu incoming-webhook secrets.
 
 ## Secrets
 
@@ -91,7 +93,7 @@ The Feishu notification workflows do not use the GitHub App. They use the defaul
 | `NEXU_PAL_PRIVATE_KEY_PEM` | GitHub App private key |
 | `OPENAI_BASE_URL` | OpenRouter base URL |
 | `OPENAI_API_KEY` | OpenRouter API key |
-| `ISSUE_SYNC_FEISHU_BOT_WEBHOOK` | Feishu incoming webhook URL for the existing issue-opened and discussion notifications |
+| `ISSUE_SYNC_FEISHU_BOT_WEBHOOK` | Feishu incoming webhook URL for the issue-opened, discussion-created, and pull-request-opened notifications |
 | `ISSUE_TRIAGE_BUG_FEISHU_WEBHOOK` | Feishu incoming webhook URL for bug triage notifications |
 | `ISSUE_TRIAGE_REQ_FEISHU_WEBHOOK` | Feishu incoming webhook URL for non-bug triage notifications |
 
@@ -104,6 +106,7 @@ The Feishu notification workflows do not use the GitHub App. They use the defaul
   feishu-issue-notify.yml
   nexu-pal-needs-triage-notify.yml
   feishu-discussion-notify.yml
+  feishu-pr-notify.yml
 scripts/nexu-pal/
   process-issue-opened.mjs # opened-issue triage pipeline with bug-only labeling + needs-information pause
   process-triage-command.mjs    # parse /triage comments, check permission, and apply terminal transitions
@@ -115,5 +118,5 @@ scripts/nexu-pal/
   lib/signals/duplicate-detector.mjs  # duplicate detector stub
 scripts/notify/
   feishu-triage-notify.mjs # route needs-triage issue notifications via BUG_WEBHOOK / REQ_WEBHOOK
-  feishu-notify.mjs        # legacy issue-opened and discussion Feishu webhook card notification
+  feishu-notify.mjs        # issue / discussion / pull-request Feishu webhook card notification with internal-author suppression
 ```
