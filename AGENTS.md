@@ -220,7 +220,6 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Config schema & pitfalls | `specs/references/openclaw-config-schema.md` |
 | API coding patterns | `specs/references/api-patterns.md` |
 | Workspace templates | `specs/guides/workspace-templates.md` |
-| Local Slack testing | `specs/references/local-slack-testing.md` |
 | Local Slack smoke probe | `scripts/probe/README.md`, `scripts/probe/slack-reply-probe.mjs` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
@@ -237,7 +236,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Feishu channel setup | `apps/web/src/components/channel-setup/feishu-setup-view.tsx` |
 | Desktop shutdown & lifecycle | `apps/desktop/main/index.ts` (`gracefulShutdown`), `apps/desktop/main/services/quit-handler.ts` (`runTeardownAndExit`) |
 | Launchd service management | `apps/desktop/main/services/launchd-manager.ts`, `apps/desktop/main/services/launchd-bootstrap.ts` |
-| External runner extraction | `apps/desktop/main/services/launchd-bootstrap.ts` (`ensureExternalNodeRunner`, `ensureExternalControllerSidecar`) |
+| External runner extraction | `apps/desktop/main/services/launchd-bootstrap.ts` (`ensureExternalNodeRunner`, `resolveLaunchdPaths`) |
 | Desktop auto-updater | `apps/desktop/main/updater/update-manager.ts` (`checkCriticalPathsLocked`, `ensureNexuProcessesDead`) |
 | Entitlements (V8 JIT) | `apps/desktop/build/entitlements.mac.plist`, `apps/desktop/build/entitlements.mac.inherit.plist` |
 | Dev launch scripts | `scripts/dev-launchd.sh`, `apps/desktop/scripts/dev-env.sh`, `apps/desktop/dev.sh` |
