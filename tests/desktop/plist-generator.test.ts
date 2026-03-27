@@ -124,6 +124,176 @@ describe("generatePlist", () => {
     );
   });
 
+  // -----------------------------------------------------------------------
+  // ProgramArguments ordering — controller
+  // -----------------------------------------------------------------------
+  it("controller ProgramArguments: [nodePath, controllerEntryPath] in exact order", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("controller", mockEnv);
+
+    // Extract ProgramArguments array content
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/controller/dist/index.js",
+    ]);
+  });
+
+  // -----------------------------------------------------------------------
+  // ProgramArguments ordering — openclaw
+  // -----------------------------------------------------------------------
+  it("openclaw ProgramArguments: [nodePath, openclawPath, gateway, run] in exact order", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/openclaw/openclaw.mjs",
+      "gateway",
+      "run",
+    ]);
+  });
+
+  it("openclaw dev mode inserts --auth none after gateway run", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", { ...mockEnv, isDev: true });
+
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/openclaw/openclaw.mjs",
+      "gateway",
+      "run",
+      "--auth",
+      "none",
+    ]);
+  });
+
+  // -----------------------------------------------------------------------
+  // Openclaw plist completeness — WorkingDirectory, error log, KeepAlive
+  // -----------------------------------------------------------------------
+  it("openclaw plist has correct WorkingDirectory", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    expect(plist).toContain(
+      "<key>WorkingDirectory</key>\n    <string>/app</string>",
+    );
+  });
+
+  it("openclaw plist has StandardErrorPath", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    expect(plist).toContain(
+      "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
+    );
+  });
+
+  it("openclaw plist KeepAlive restarts on non-zero exit", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    // SuccessfulExit=false means launchd restarts when exit code != 0
+    expect(plist).toContain("<key>SuccessfulExit</key>");
+    expect(plist).toMatch(/<key>SuccessfulExit<\/key>\s*<false\/>/);
+  });
+
+  it("openclaw plist has ThrottleInterval to prevent rapid respawn", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    expect(plist).toContain("<key>ThrottleInterval</key>");
+    expect(plist).toMatch(
+      /<key>ThrottleInterval<\/key>\s*<integer>\d+<\/integer>/,
+    );
+  });
+
+  it("controller plist has correct WorkingDirectory", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("controller", mockEnv);
+
+    expect(plist).toContain(
+      "<key>WorkingDirectory</key>\n    <string>/app/controller</string>",
+    );
+  });
+
+  it("both plists have RunAtLoad=false (explicit start only)", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const controller = generatePlist("controller", mockEnv);
+    const openclaw = generatePlist("openclaw", mockEnv);
+
+    expect(controller).toMatch(/<key>RunAtLoad<\/key>\s*<false\/>/);
+    expect(openclaw).toMatch(/<key>RunAtLoad<\/key>\s*<false\/>/);
+  });
+
+  // -----------------------------------------------------------------------
+  // XML escaping robustness
+  // -----------------------------------------------------------------------
+  it("escapes ampersand, angle brackets, quotes, and apostrophes in all path fields", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const nastEnv = {
+      ...mockEnv,
+      nodePath: "/usr/bin/node's",
+      controllerCwd: '/app/"controller"',
+      openclawPath: "/path/with&special<chars>.mjs",
+      openclawConfigPath: "/Users/test'user/.nexu/config",
+    };
+
+    const controller = generatePlist("controller", nastEnv);
+    const openclaw = generatePlist("openclaw", nastEnv);
+
+    // Verify escaped forms present, raw forms absent
+    expect(controller).toContain("node&apos;s");
+    expect(controller).not.toContain("node's</string>");
+    expect(controller).toContain("&quot;controller&quot;");
+    expect(openclaw).toContain("&amp;special&lt;chars&gt;");
+    expect(openclaw).toContain("test&apos;user");
+  });
+
   it("sets ELECTRON_RUN_AS_NODE=1 for both services", async () => {
     const { generatePlist } = await import(
       "../../apps/desktop/main/services/plist-generator"

@@ -1,4 +1,4 @@
-import { execFile, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -8,13 +8,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import * as path from "node:path";
-import { promisify } from "node:util";
 import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import type { RuntimeUnitManifest } from "./types";
-
-const execFileAsync = promisify(execFile);
 
 function ensureDir(path: string): string {
   mkdirSync(path, { recursive: true });
@@ -161,140 +158,83 @@ export function buildSkillNodePath(
   );
 }
 
-/**
- * Resolve the openclaw sidecar root path and check whether extraction is needed,
- * WITHOUT actually performing the extraction. This allows the main process to
- * create manifests (path-only) before the window exists, then extract async later.
- */
-export function resolvePackagedOpenclawSidecar(
-  runtimeSidecarBaseRoot: string,
-  runtimeRoot: string,
-): { sidecarRoot: string; needsExtraction: boolean } {
-  const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
-  const archivePath = path.resolve(packagedSidecarRoot, "payload.tar.gz");
-
-  if (!existsSync(archivePath)) {
-    return { sidecarRoot: packagedSidecarRoot, needsExtraction: false };
-  }
-
-  const extractedSidecarRoot = path.resolve(runtimeRoot, "openclaw-sidecar");
-
-  try {
-    const stampPath = path.resolve(extractedSidecarRoot, ".archive-stamp");
-    const archiveStat = statSync(archivePath);
-    const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
-    const extractedOpenclawEntry = path.resolve(
-      extractedSidecarRoot,
-      "node_modules/openclaw/openclaw.mjs",
-    );
-
-    if (
-      existsSync(stampPath) &&
-      existsSync(extractedOpenclawEntry) &&
-      readFileSync(stampPath, "utf8") === archiveStamp
-    ) {
-      return { sidecarRoot: extractedSidecarRoot, needsExtraction: false };
-    }
-  } catch {
-    // Stamp check failed — needs extraction
-  }
-
-  return { sidecarRoot: extractedSidecarRoot, needsExtraction: true };
-}
-
-/**
- * Check if the packaged openclaw sidecar archive needs extraction.
- * Fast, synchronous, filesystem-read-only.
- */
-export function checkOpenclawExtractionNeeded(
-  electronRoot: string,
-  userDataPath: string,
-  isPackaged: boolean,
-): boolean {
-  if (!isPackaged) return false;
-
-  const runtimeSidecarBaseRoot = path.resolve(electronRoot, "runtime");
-  const runtimeRoot = path.resolve(userDataPath, "runtime");
-  return resolvePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
-    .needsExtraction;
-}
-
-/**
- * Extract the openclaw sidecar archive asynchronously with retries.
- * Must be called before the controller unit starts.
- */
-export async function extractOpenclawSidecarAsync(
-  electronRoot: string,
-  userDataPath: string,
-): Promise<void> {
-  const runtimeSidecarBaseRoot = path.resolve(electronRoot, "runtime");
-  const runtimeRoot = path.resolve(userDataPath, "runtime");
-  const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
-  const archivePath = path.resolve(packagedSidecarRoot, "payload.tar.gz");
-  const extractedSidecarRoot = path.resolve(runtimeRoot, "openclaw-sidecar");
-  const stampPath = path.resolve(extractedSidecarRoot, ".archive-stamp");
-  const archiveStat = statSync(archivePath);
-  const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
-
-  const MAX_RETRIES = 3;
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      if (existsSync(extractedSidecarRoot)) {
-        await execFileAsync("rm", ["-rf", extractedSidecarRoot]);
-      }
-      mkdirSync(extractedSidecarRoot, { recursive: true });
-      await execFileAsync("tar", [
-        "-xzf",
-        archivePath,
-        "-C",
-        extractedSidecarRoot,
-      ]);
-      writeFileSync(stampPath, archiveStamp);
-      return;
-    } catch (err) {
-      if (attempt === MAX_RETRIES - 1) throw err;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-}
-
-/** @deprecated Use resolvePackagedOpenclawSidecar + extractOpenclawSidecarAsync instead */
 export function ensurePackagedOpenclawSidecar(
   runtimeSidecarBaseRoot: string,
   runtimeRoot: string,
 ): string {
-  const { sidecarRoot, needsExtraction } = resolvePackagedOpenclawSidecar(
-    runtimeSidecarBaseRoot,
-    runtimeRoot,
-  );
-
-  if (!needsExtraction) {
-    return sidecarRoot;
-  }
-
   const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const archivePath = path.resolve(packagedSidecarRoot, "payload.tar.gz");
-  const stampPath = path.resolve(sidecarRoot, ".archive-stamp");
+
+  if (!existsSync(archivePath)) {
+    return packagedSidecarRoot;
+  }
+
+  const extractedSidecarRoot = ensureDir(
+    path.resolve(runtimeRoot, "openclaw-sidecar"),
+  );
+  const stampPath = path.resolve(extractedSidecarRoot, ".archive-stamp");
   const archiveStat = statSync(archivePath);
   const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
+  const extractedOpenclawEntry = path.resolve(
+    extractedSidecarRoot,
+    "node_modules/openclaw/openclaw.mjs",
+  );
 
+  if (
+    existsSync(stampPath) &&
+    existsSync(extractedOpenclawEntry) &&
+    readFileSync(stampPath, "utf8") === archiveStamp
+  ) {
+    return extractedSidecarRoot;
+  }
+
+  // Atomic extraction via staging directory: extract to a temporary location,
+  // verify the critical entry point, then atomically swap into the final path.
+  // This prevents half-extracted directories if the process is killed mid-extract.
+  const stagingRoot = `${extractedSidecarRoot}.staging`;
   const MAX_RETRIES = 3;
+
+  // Clean up any leftover staging directory from a previous interrupted attempt
+  if (existsSync(stagingRoot)) {
+    execFileSync("rm", ["-rf", stagingRoot]);
+  }
+
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      if (existsSync(sidecarRoot)) {
-        execFileSync("rm", ["-rf", sidecarRoot]);
+      if (existsSync(stagingRoot)) {
+        execFileSync("rm", ["-rf", stagingRoot]);
       }
-      mkdirSync(sidecarRoot, { recursive: true });
-      execFileSync("tar", ["-xzf", archivePath, "-C", sidecarRoot]);
-      writeFileSync(stampPath, archiveStamp);
+      mkdirSync(stagingRoot, { recursive: true });
+      execFileSync("tar", ["-xzf", archivePath, "-C", stagingRoot]);
+
+      // Verify critical entry point exists in staging
+      const stagingEntry = path.resolve(
+        stagingRoot,
+        "node_modules/openclaw/openclaw.mjs",
+      );
+      if (!existsSync(stagingEntry)) {
+        throw new Error(
+          `Extraction verification failed: ${stagingEntry} not found`,
+        );
+      }
+
+      // Write stamp inside staging
+      writeFileSync(path.resolve(stagingRoot, ".archive-stamp"), archiveStamp);
+
+      // Atomic swap: remove old → rename staging to final
+      if (existsSync(extractedSidecarRoot)) {
+        execFileSync("rm", ["-rf", extractedSidecarRoot]);
+      }
+      execFileSync("mv", [stagingRoot, extractedSidecarRoot]);
       break;
     } catch (err) {
       if (attempt === MAX_RETRIES - 1) throw err;
+      // Brief pause before retry to let filesystem settle
       execFileSync("sleep", ["1"]);
     }
   }
 
-  return sidecarRoot;
+  return extractedSidecarRoot;
 }
 
 export function createRuntimeUnitManifests(
@@ -310,8 +250,7 @@ export function createRuntimeUnitManifests(
     : path.resolve(repoRoot, ".tmp/sidecars");
   const runtimeRoot = ensureDir(path.resolve(userDataPath, "runtime"));
   const openclawSidecarRoot = isPackaged
-    ? resolvePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
-        .sidecarRoot
+    ? ensurePackagedOpenclawSidecar(runtimeSidecarBaseRoot, runtimeRoot)
     : path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));
   const openclawRuntimeRoot = ensureDir(path.resolve(runtimeRoot, "openclaw"));

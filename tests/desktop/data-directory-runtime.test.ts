@@ -300,9 +300,7 @@ describe.skipIf(!IS_MACOS)(
     });
 
     it("running controller service has correct NEXU_HOME from plist", async () => {
-      const { generatePlist } = await import(
-        "../../apps/desktop/main/services/plist-generator"
-      );
+      await import("../../apps/desktop/main/services/plist-generator");
 
       const nexuHome = join(tempDir, "nexu-home");
       const stateDir = join(tempDir, "openclaw-state");

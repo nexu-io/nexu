@@ -29,6 +29,11 @@ import type { RuntimeUnitManifest, RuntimeUnitRecord } from "./types";
 
 const LOG_TAIL_LIMIT = 200;
 const RECENT_EVENT_LIMIT = 500;
+
+/** Maximum consecutive auto-restart attempts before giving up. */
+const MAX_CONSECUTIVE_RESTARTS = 10;
+/** If the process ran longer than this before crashing, reset the restart counter. */
+const RESTART_WINDOW_MS = 120_000;
 let nextRuntimeLogEntryId = 0;
 let nextRuntimeActionId = 0;
 let nextRuntimeEventCursor = 0;
@@ -362,7 +367,30 @@ export class RuntimeOrchestrator {
       if (record.manifest.autoRestart === false) return;
       if (record.stoppedByUser) return;
 
+      // If the process ran longer than RESTART_WINDOW_MS, it was stable —
+      // reset the consecutive restart counter.
+      if (record.startedAt) {
+        const uptimeMs = Date.now() - new Date(record.startedAt).getTime();
+        if (uptimeMs > RESTART_WINDOW_MS) {
+          record.autoRestartAttempts = 0;
+        }
+      }
+
       record.autoRestartAttempts += 1;
+
+      // Circuit breaker: stop restarting after too many consecutive failures
+      if (record.autoRestartAttempts > MAX_CONSECUTIVE_RESTARTS) {
+        setRecordPhase(record, "failed");
+        record.lastError = `Exceeded ${MAX_CONSECUTIVE_RESTARTS} consecutive restart attempts`;
+        this.logStateChange(record, {
+          kind: "lifecycle",
+          actionId: ensureActionId(record, "auto-restart"),
+          reasonCode: "max_restarts_exceeded",
+          message: `auto-restart halted after ${record.autoRestartAttempts} consecutive failures within ${RESTART_WINDOW_MS}ms window`,
+        });
+        return;
+      }
+
       const delayMs = Math.min(
         2000 * 2 ** (record.autoRestartAttempts - 1),
         MAX_BACKOFF_MS,

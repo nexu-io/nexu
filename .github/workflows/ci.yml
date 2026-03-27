@@ -39,10 +39,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
@@ -64,10 +67,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Lint
@@ -89,14 +95,34 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Test
         run: pnpm test
+
+  # ── openclaw-runtime lockfile sync ─────────────────────────────────────────
+  openclaw-runtime-lockfile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify openclaw-runtime lockfile is in sync
+        run: corepack npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: openclaw-runtime
 
   # ── Build + ESM check ─────────────────────────────────────────────────────
   build:
@@ -114,10 +140,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
       - name: Build

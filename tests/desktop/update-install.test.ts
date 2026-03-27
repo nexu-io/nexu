@@ -57,10 +57,15 @@ const mockTeardown = vi.fn().mockResolvedValue(undefined);
 const mockEnsureDead = vi
   .fn()
   .mockResolvedValue({ clean: true, remainingPids: [] });
+const mockCheckPaths = vi.fn().mockResolvedValue({
+  locked: false,
+  lockedPaths: [],
+});
 
 vi.mock("../../apps/desktop/main/services/launchd-bootstrap", () => ({
   teardownLaunchdServices: mockTeardown,
   ensureNexuProcessesDead: mockEnsureDead,
+  checkCriticalPathsLocked: mockCheckPaths,
 }));
 
 vi.mock("../../apps/desktop/main/services/launchd-manager", () => ({
@@ -113,6 +118,7 @@ describe("UpdateManager.quitAndInstall", () => {
     Object.defineProperty(process, "platform", { value: "darwin" });
     mockTeardown.mockResolvedValue(undefined);
     mockEnsureDead.mockResolvedValue({ clean: true, remainingPids: [] });
+    mockCheckPaths.mockResolvedValue({ locked: false, lockedPaths: [] });
   });
 
   afterEach(() => {
@@ -261,6 +267,58 @@ describe("UpdateManager.quitAndInstall", () => {
   });
 
   // -----------------------------------------------------------------------
+  // 5b. Critical path check still runs even when processes are already clean
+  // -----------------------------------------------------------------------
+  it("checks critical paths before install even when no processes remain", async () => {
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+    });
+
+    await mgr.quitAndInstall();
+
+    expect(mockEnsureDead).toHaveBeenCalledTimes(1);
+    expect(mockCheckPaths).toHaveBeenCalledTimes(1);
+    expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // 5c. Clean processes but locked critical paths still abort install
+  // -----------------------------------------------------------------------
+  it("aborts install when critical paths stay locked even if process verification is clean", async () => {
+    mockCheckPaths.mockResolvedValueOnce({
+      locked: true,
+      lockedPaths: ["/Users/testuser/.nexu/runtime/controller-sidecar"],
+    });
+
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+    });
+
+    await mgr.quitAndInstall();
+
+    expect(mockEnsureDead).toHaveBeenCalledTimes(1);
+    expect(mockCheckPaths).toHaveBeenCalledTimes(1);
+    expect(mockAutoUpdater.quitAndInstall).not.toHaveBeenCalled();
+    expect((mockApp as Record<string, unknown>).__nexuForceQuit).toBe(false);
+  });
+
+  // -----------------------------------------------------------------------
   // 6. teardownLaunchdServices receives correct context
   // -----------------------------------------------------------------------
   it("passes correct launchd context to teardownLaunchdServices", async () => {
@@ -405,12 +463,43 @@ describe("UpdateManager.quitAndInstall", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 11. Install proceeds even when verification reports survivors
+  // 11. Survivors but no critical path locks → proceeds with install
   // -----------------------------------------------------------------------
-  it("proceeds with install even when ensureNexuProcessesDead reports survivors", async () => {
-    mockEnsureDead.mockResolvedValueOnce({
-      clean: false,
-      remainingPids: [99999],
+  it("proceeds with install when processes survive but no critical paths locked", async () => {
+    mockEnsureDead
+      .mockResolvedValueOnce({ clean: false, remainingPids: [99999] })
+      .mockResolvedValueOnce({ clean: false, remainingPids: [99999] });
+    mockCheckPaths.mockResolvedValueOnce({ locked: false, lockedPaths: [] });
+
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+    });
+
+    await mgr.quitAndInstall();
+
+    expect(mockEnsureDead).toHaveBeenCalledTimes(2);
+    expect(mockCheckPaths).toHaveBeenCalled();
+    expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // 11b. Survivors with critical path locks → aborts install
+  // -----------------------------------------------------------------------
+  it("aborts install when critical paths are locked", async () => {
+    mockEnsureDead
+      .mockResolvedValueOnce({ clean: false, remainingPids: [99999] })
+      .mockResolvedValueOnce({ clean: false, remainingPids: [99999] });
+    mockCheckPaths.mockResolvedValueOnce({
+      locked: true,
+      lockedPaths: ["/Applications/Nexu.app"],
     });
 
     const orchestrator = createMockOrchestrator();
@@ -425,11 +514,9 @@ describe("UpdateManager.quitAndInstall", () => {
       feedUrl: null,
     });
 
-    // Should NOT throw — survivors are logged but don't block install
     await mgr.quitAndInstall();
 
-    expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
-    expect((mockApp as Record<string, unknown>).__nexuForceQuit).toBe(true);
+    expect(mockAutoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------

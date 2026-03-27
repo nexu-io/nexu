@@ -94,9 +94,28 @@ export class LaunchdManager {
 
   /**
    * Bootout a launchd service (stop + unregister, but keep plist on disk).
+   * Tolerates "not found" errors — the service may already be unregistered.
    */
   async bootoutService(label: string): Promise<void> {
-    await execFileAsync("launchctl", ["bootout", `${this.domain}/${label}`]);
+    try {
+      await execFileAsync("launchctl", ["bootout", `${this.domain}/${label}`]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      // launchctl returns non-zero when the service is already gone.
+      // These patterns cover the known macOS launchctl error messages.
+      const isAlreadyGone =
+        /could not find specified service/i.test(message) ||
+        /no such process/i.test(message) ||
+        /service not found/i.test(message) ||
+        /not bootstrapped/i.test(message);
+      if (isAlreadyGone) {
+        console.debug(
+          `bootoutService: ${label} already unregistered (${message.trim()})`,
+        );
+        return;
+      }
+      throw err;
+    }
   }
 
   /**
