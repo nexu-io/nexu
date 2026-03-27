@@ -1,27 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="450" viewBox="0 0 960 450">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="396" viewBox="0 0 960 396">
 <defs><style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}</style></defs>
-<rect width="960" height="450" fill="#fff"/>
-
-<!-- Title -->
-<g transform="translate(32, 22)">
-    <rect x="0" y="10" width="7" height="20" rx="1.5" fill="#1a7f37"/>
-    <rect x="10" y="2" width="7" height="28" rx="1.5" fill="#cf222e"/>
-    <rect x="20" y="6" width="7" height="24" rx="1.5" fill="#0969da"/>
-  </g>
-<text x="66" y="48" font-size="28" font-weight="800" fill="#1f2328">GitHub Stats</text>
+<rect width="960" height="396" fill="#fff"/>
 
 <!-- Contributions row -->
-<g transform="translate(32, 64)">
+<g transform="translate(32, 16)">
   <rect width="896" height="42" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
   <g transform="translate(14, 11)">
     <rect x="0" y="0" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="0" y="6" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="0" y="12" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="6" y="0" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="6" y="6" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="6" y="12" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="12" y="0" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="12" y="6" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="12" y="12" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="18" y="0" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="18" y="6" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/><rect x="18" y="12" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/>
   </g>
-  <text x="42" y="28" font-size="14" font-weight="600" fill="#c9184a">1008 Contributions in the Last 30 Days</text>
+  <text x="42" y="28" font-size="14" font-weight="600" fill="#c9184a">1012 Contributions in the Last 30 Days</text>
   <g transform="translate(462, 16)"><rect x="0" y="0" width="10" height="10" rx="2" fill="#c9184a"/><rect x="14" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="28" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="42" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="56" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="70" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="84" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="98" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="112" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="126" y="0" width="10" height="10" rx="2" fill="#ebedf0"/><rect x="140" y="0" width="10" height="10" rx="2" fill="#ebedf0"/><rect x="154" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="168" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="182" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="196" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="210" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="224" y="0" width="10" height="10" rx="2" fill="#ebedf0"/><rect x="238" y="0" width="10" height="10" rx="2" fill="#ebedf0"/><rect x="252" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="266" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="280" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="294" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="308" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="322" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/><rect x="336" y="0" width="10" height="10" rx="2" fill="#e8457a"/><rect x="350" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="364" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="378" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="392" y="0" width="10" height="10" rx="2" fill="#ff7096"/><rect x="406" y="0" width="10" height="10" rx="2" fill="#ffb3c6"/></g>
 </g>
 
 <!-- KPI cards row -->
-<g transform="translate(32, 122)">
+<g transform="translate(32, 74)">
   <g transform="translate(0, 0)"><g>
       <rect width="289" height="76" rx="10" fill="white" stroke="#d0d7de" stroke-width="1"/>
       <text x="16" y="30" font-size="15" font-weight="700" fill="#1f2328">1.76 Opened/Closed Issue Ratio</text>
@@ -30,27 +22,27 @@
     </g></g>
   <g transform="translate(303, 0)"><g>
       <rect width="289" height="76" rx="10" fill="white" stroke="#d0d7de" stroke-width="1"/>
-      <text x="16" y="30" font-size="15" font-weight="700" fill="#8250df">429 Pull Requests Opened</text>
-      <text x="16" y="54" font-size="12.5" fill="#656d76">+428 (42800.00%)</text>
+      <text x="16" y="30" font-size="15" font-weight="700" fill="#8250df">432 Pull Requests Opened</text>
+      <text x="16" y="54" font-size="12.5" fill="#656d76">+431 (43100.00%)</text>
       <text x="273" y="54" text-anchor="end" font-size="12.5" font-weight="600" fill="#1a7f37">↑ past month</text>
     </g></g>
   <g transform="translate(606, 0)"><g>
       <rect width="289" height="76" rx="10" fill="white" stroke="#d0d7de" stroke-width="1"/>
-      <text x="16" y="30" font-size="15" font-weight="700" fill="#bc4c00">352 Pushes</text>
-      <text x="16" y="54" font-size="12.5" fill="#656d76">+241 (217.12%)</text>
+      <text x="16" y="30" font-size="15" font-weight="700" fill="#bc4c00">353 Pushes</text>
+      <text x="16" y="54" font-size="12.5" fill="#656d76">+242 (218.02%)</text>
       <text x="273" y="54" text-anchor="end" font-size="12.5" font-weight="600" fill="#1a7f37">↑ past month</text>
     </g></g>
 </g>
 
 <!-- Bar charts row -->
-<g transform="translate(32, 216)">
+<g transform="translate(32, 168)">
   <g transform="translate(0, 0)"><g>
       <rect width="289" height="148" rx="10" fill="white" stroke="#d0d7de" stroke-width="1"/>
       <circle cx="22" cy="18" r="8" fill="none" stroke="#0969da" stroke-width="2"/>
     <circle cx="22" cy="18" r="2.5" fill="#0969da"/>
       <text x="38" y="23" font-size="14" font-weight="600" fill="#1f2328">Issues</text>
       <circle cx="216" cy="18" r="4" fill="#0969da"/><text x="226" y="22" font-size="11" fill="#656d76">Closed</text><circle cx="159" cy="18" r="4" fill="#54aeff"/><text x="169" y="22" font-size="11" fill="#656d76">Opened</text>
-      <rect x="18" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="29" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="43" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="54" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="68" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="79" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="93" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="104" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="118" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="129" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="143" y="40" width="10" height="90" fill="#54aeff" rx="2"/><rect x="154" y="125.9090909090909" width="10" height="4.090909090909091" fill="#0969da" rx="2"/><rect x="168" y="56.36363636363636" width="10" height="73.63636363636364" fill="#54aeff" rx="2"/><rect x="179" y="66.5909090909091" width="10" height="63.409090909090914" fill="#0969da" rx="2"/><rect x="193" y="105.45454545454545" width="10" height="24.545454545454543" fill="#54aeff" rx="2"/><rect x="204" y="107.5" width="10" height="22.5" fill="#0969da" rx="2"/><rect x="218" y="103.4090909090909" width="10" height="26.590909090909093" fill="#54aeff" rx="2"/><rect x="229" y="115.68181818181819" width="10" height="14.318181818181818" fill="#0969da" rx="2"/><rect x="243" y="89.0909090909091" width="10" height="40.90909090909091" fill="#54aeff" rx="2"/><rect x="254" y="89.0909090909091" width="10" height="40.90909090909091" fill="#0969da" rx="2"/>
+      <rect x="18" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="29" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="43" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="54" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="68" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="79" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="93" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="104" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="118" y="130" width="10" height="0" fill="#54aeff" rx="2"/><rect x="129" y="130" width="10" height="0" fill="#0969da" rx="2"/><rect x="143" y="40" width="10" height="90" fill="#54aeff" rx="2"/><rect x="154" y="123.86363636363636" width="10" height="6.136363636363636" fill="#0969da" rx="2"/><rect x="168" y="56.36363636363636" width="10" height="73.63636363636364" fill="#54aeff" rx="2"/><rect x="179" y="68.63636363636364" width="10" height="61.36363636363636" fill="#0969da" rx="2"/><rect x="193" y="105.45454545454545" width="10" height="24.545454545454543" fill="#54aeff" rx="2"/><rect x="204" y="107.5" width="10" height="22.5" fill="#0969da" rx="2"/><rect x="218" y="103.4090909090909" width="10" height="26.590909090909093" fill="#54aeff" rx="2"/><rect x="229" y="115.68181818181819" width="10" height="14.318181818181818" fill="#0969da" rx="2"/><rect x="243" y="89.0909090909091" width="10" height="40.90909090909091" fill="#54aeff" rx="2"/><rect x="254" y="89.0909090909091" width="10" height="40.90909090909091" fill="#0969da" rx="2"/>
     </g></g>
   <g transform="translate(303, 0)"><g>
       <rect width="289" height="148" rx="10" fill="white" stroke="#d0d7de" stroke-width="1"/>
@@ -63,7 +55,7 @@
   </g>
       <text x="38" y="23" font-size="14" font-weight="600" fill="#1f2328">Pull Requests</text>
       <circle cx="216" cy="18" r="4" fill="#8250df"/><text x="226" y="22" font-size="11" fill="#656d76">Closed</text><circle cx="159" cy="18" r="4" fill="#e085d0"/><text x="169" y="22" font-size="11" fill="#656d76">Opened</text>
-      <rect x="18" y="40" width="10" height="90" fill="#e085d0" rx="2"/><rect x="29" y="45.294117647058826" width="10" height="84.70588235294117" fill="#8250df" rx="2"/><rect x="43" y="66.47058823529412" width="10" height="63.529411764705884" fill="#e085d0" rx="2"/><rect x="54" y="71.76470588235293" width="10" height="58.235294117647065" fill="#8250df" rx="2"/><rect x="68" y="55.88235294117648" width="10" height="74.11764705882352" fill="#e085d0" rx="2"/><rect x="79" y="45.294117647058826" width="10" height="84.70588235294117" fill="#8250df" rx="2"/><rect x="93" y="92.94117647058823" width="10" height="37.05882352941176" fill="#e085d0" rx="2"/><rect x="104" y="98.23529411764706" width="10" height="31.764705882352942" fill="#8250df" rx="2"/><rect x="118" y="106.17647058823529" width="10" height="23.823529411764707" fill="#e085d0" rx="2"/><rect x="129" y="103.52941176470588" width="10" height="26.47058823529412" fill="#8250df" rx="2"/><rect x="143" y="58.529411764705884" width="10" height="71.47058823529412" fill="#e085d0" rx="2"/><rect x="154" y="58.529411764705884" width="10" height="71.47058823529412" fill="#8250df" rx="2"/><rect x="168" y="85" width="10" height="45" fill="#e085d0" rx="2"/><rect x="179" y="85" width="10" height="45" fill="#8250df" rx="2"/><rect x="193" y="74.41176470588235" width="10" height="55.58823529411765" fill="#e085d0" rx="2"/><rect x="204" y="85" width="10" height="45" fill="#8250df" rx="2"/><rect x="218" y="79.70588235294117" width="10" height="50.294117647058826" fill="#e085d0" rx="2"/><rect x="229" y="87.64705882352942" width="10" height="42.35294117647059" fill="#8250df" rx="2"/><rect x="243" y="74.41176470588235" width="10" height="55.58823529411765" fill="#e085d0" rx="2"/><rect x="254" y="74.41176470588235" width="10" height="55.58823529411765" fill="#8250df" rx="2"/>
+      <rect x="18" y="40" width="10" height="90" fill="#e085d0" rx="2"/><rect x="29" y="50.28571428571429" width="10" height="79.71428571428571" fill="#8250df" rx="2"/><rect x="43" y="70.85714285714286" width="10" height="59.142857142857146" fill="#e085d0" rx="2"/><rect x="54" y="70.85714285714286" width="10" height="59.142857142857146" fill="#8250df" rx="2"/><rect x="68" y="60.57142857142857" width="10" height="69.42857142857143" fill="#e085d0" rx="2"/><rect x="79" y="50.28571428571429" width="10" height="79.71428571428571" fill="#8250df" rx="2"/><rect x="93" y="94" width="10" height="36" fill="#e085d0" rx="2"/><rect x="104" y="99.14285714285714" width="10" height="30.857142857142858" fill="#8250df" rx="2"/><rect x="118" y="106.85714285714286" width="10" height="23.14285714285714" fill="#e085d0" rx="2"/><rect x="129" y="104.28571428571429" width="10" height="25.71428571428571" fill="#8250df" rx="2"/><rect x="143" y="60.57142857142857" width="10" height="69.42857142857143" fill="#e085d0" rx="2"/><rect x="154" y="55.42857142857143" width="10" height="74.57142857142857" fill="#8250df" rx="2"/><rect x="168" y="86.28571428571428" width="10" height="43.714285714285715" fill="#e085d0" rx="2"/><rect x="179" y="91.42857142857143" width="10" height="38.57142857142857" fill="#8250df" rx="2"/><rect x="193" y="76" width="10" height="54" fill="#e085d0" rx="2"/><rect x="204" y="83.71428571428572" width="10" height="46.28571428571428" fill="#8250df" rx="2"/><rect x="218" y="81.14285714285714" width="10" height="48.857142857142854" fill="#e085d0" rx="2"/><rect x="229" y="88.85714285714286" width="10" height="41.14285714285714" fill="#8250df" rx="2"/><rect x="243" y="68.28571428571428" width="10" height="61.714285714285715" fill="#e085d0" rx="2"/><rect x="254" y="76" width="10" height="54" fill="#8250df" rx="2"/>
     </g></g>
   <g transform="translate(606, 0)"><g>
       <rect width="289" height="148" rx="10" fill="white" stroke="#d0d7de" stroke-width="1"/>
@@ -73,12 +65,12 @@
   </g>
       <text x="38" y="23" font-size="14" font-weight="600" fill="#1f2328">Pushes</text>
       <circle cx="216" cy="18" r="4" fill="#f97316"/><text x="226" y="22" font-size="11" fill="#656d76">Pushes</text>
-      <rect x="28" y="40" width="20" height="90" fill="#f97316" rx="2"/><rect x="53" y="83.63636363636364" width="20" height="46.36363636363636" fill="#f97316" rx="2"/><rect x="78" y="53.63636363636364" width="20" height="76.36363636363636" fill="#f97316" rx="2"/><rect x="103" y="126" width="20" height="4" fill="#f97316" rx="2"/><rect x="128" y="61.81818181818181" width="20" height="68.18181818181819" fill="#f97316" rx="2"/><rect x="153" y="86.36363636363636" width="20" height="43.63636363636364" fill="#f97316" rx="2"/><rect x="178" y="89.0909090909091" width="20" height="40.90909090909091" fill="#f97316" rx="2"/><rect x="203" y="94.54545454545455" width="20" height="35.45454545454545" fill="#f97316" rx="2"/><rect x="228" y="89.0909090909091" width="20" height="40.90909090909091" fill="#f97316" rx="2"/><rect x="253" y="113.63636363636364" width="20" height="16.363636363636363" fill="#f97316" rx="2"/>
+      <rect x="28" y="40" width="20" height="90" fill="#f97316" rx="2"/><rect x="53" y="83.63636363636364" width="20" height="46.36363636363636" fill="#f97316" rx="2"/><rect x="78" y="53.63636363636364" width="20" height="76.36363636363636" fill="#f97316" rx="2"/><rect x="103" y="126" width="20" height="4" fill="#f97316" rx="2"/><rect x="128" y="61.81818181818181" width="20" height="68.18181818181819" fill="#f97316" rx="2"/><rect x="153" y="86.36363636363636" width="20" height="43.63636363636364" fill="#f97316" rx="2"/><rect x="178" y="89.0909090909091" width="20" height="40.90909090909091" fill="#f97316" rx="2"/><rect x="203" y="94.54545454545455" width="20" height="35.45454545454545" fill="#f97316" rx="2"/><rect x="228" y="89.0909090909091" width="20" height="40.90909090909091" fill="#f97316" rx="2"/><rect x="253" y="110.9090909090909" width="20" height="19.09090909090909" fill="#f97316" rx="2"/>
     </g></g>
 </g>
 
 <!-- Top Contributors -->
-<g transform="translate(32, 382)">
+<g transform="translate(32, 334)">
   <rect width="896" height="42" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
   <g transform="translate(14, 16)">
     <text font-size="13" font-weight="600" fill="#1a7f37">
@@ -105,5 +97,5 @@
 </g>
 
 <!-- Footer -->
-<text x="480" y="440" text-anchor="middle" font-size="10" fill="#8b949e">Updated 2026-03-27 · nexu-io/nexu</text>
+<text x="480" y="390" text-anchor="middle" font-size="10" fill="#8b949e">Updated 2026-03-27 · nexu-io/nexu</text>
 </svg>

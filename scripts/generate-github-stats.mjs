@@ -290,12 +290,6 @@ function render(d) {
   }
 
   // Icons (SVG paths mimicking the reference)
-  const titleIcon = `<g transform="translate(${pad}, 22)">
-    <rect x="0" y="10" width="7" height="20" rx="1.5" fill="#1a7f37"/>
-    <rect x="10" y="2" width="7" height="28" rx="1.5" fill="#cf222e"/>
-    <rect x="20" y="6" width="7" height="24" rx="1.5" fill="#0969da"/>
-  </g>`;
-
   const contribIcon = `<g transform="translate(14, 11)">
     ${[0, 6, 12, 18].map((x) => [0, 6, 12].map((y) => `<rect x="${x}" y="${y}" width="4" height="4" rx="0.5" fill="#c9184a" opacity="0.7"/>`).join("")).join("")}
   </g>`;
@@ -329,18 +323,14 @@ function render(d) {
     </g>`;
   }
 
-  const H = 450;
+  const H = 396;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <defs><style>text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}</style></defs>
 <rect width="${W}" height="${H}" fill="#fff"/>
 
-<!-- Title -->
-${titleIcon}
-<text x="${pad + 34}" y="${48}" font-size="28" font-weight="800" fill="#1f2328">GitHub Stats</text>
-
 <!-- Contributions row -->
-<g transform="translate(${pad}, 64)">
+<g transform="translate(${pad}, 16)">
   <rect width="${cw}" height="42" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
   ${contribIcon}
   <text x="42" y="28" font-size="14" font-weight="600" fill="#c9184a">${d.totalContrib} Contributions in the Last 30 Days</text>
@@ -348,14 +338,14 @@ ${titleIcon}
 </g>
 
 <!-- KPI cards row -->
-<g transform="translate(${pad}, 122)">
+<g transform="translate(${pad}, 74)">
   <g transform="translate(0, 0)">${kpi("Opened/Closed Issue Ratio", d.ratio.toFixed(2), d.ratioDelta, d.ratioPct, "#1f2328")}</g>
   <g transform="translate(${cardW + cardGap}, 0)">${kpi("Pull Requests Opened", d.prCur, d.prDelta, d.prPct, "#8250df")}</g>
   <g transform="translate(${(cardW + cardGap) * 2}, 0)">${kpi("Pushes", d.pushCur, d.pushDelta, d.pushPct, "#bc4c00")}</g>
 </g>
 
 <!-- Bar charts row -->
-<g transform="translate(${pad}, 216)">
+<g transform="translate(${pad}, 168)">
   <g transform="translate(0, 0)">${bars(
     d.dIO,
     d.dIC,
@@ -384,7 +374,7 @@ ${titleIcon}
 </g>
 
 <!-- Top Contributors -->
-<g transform="translate(${pad}, 382)">
+<g transform="translate(${pad}, 334)">
   <rect width="${cw}" height="42" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
   <g transform="translate(14, 16)">
     <text font-size="13" font-weight="600" fill="#1a7f37">
@@ -396,7 +386,7 @@ ${titleIcon}
 </g>
 
 <!-- Footer -->
-<text x="${W / 2}" y="${H - 10}" text-anchor="middle" font-size="10" fill="#8b949e">Updated ${new Date().toISOString().slice(0, 10)} · ${OWNER}/${REPO}</text>
+<text x="${W / 2}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#8b949e">Updated ${new Date().toISOString().slice(0, 10)} · ${OWNER}/${REPO}</text>
 </svg>`;
 }
 
