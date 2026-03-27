@@ -1,3 +1,4 @@
+import { logger } from "../lib/logger.js";
 import { GatewayClient } from "../runtime/gateway-client.js";
 import { startHealthLoop } from "../runtime/loops.js";
 import { startAnalyticsLoop } from "../runtime/loops.js";
@@ -65,6 +66,8 @@ export interface ControllerContainer {
   runtimeState: ControllerRuntimeState;
   startBackgroundLoops: () => () => void;
 }
+
+const NEXU_OFFICIAL_MODEL_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export async function createContainer(): Promise<ControllerContainer> {
   const configStore = new NexuConfigStore(env);
@@ -187,11 +190,23 @@ export async function createContainer(): Promise<ControllerContainer> {
         env,
         analyticsService,
       });
+      const nexuOfficialModelRefreshInterval = setInterval(() => {
+        void modelProviderService.refreshNexuOfficialModels().catch((error) => {
+          logger.warn(
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "nexu_official_model_refresh_failed",
+          );
+        });
+      }, NEXU_OFFICIAL_MODEL_REFRESH_INTERVAL_MS);
+      nexuOfficialModelRefreshInterval.unref?.();
       skillhubService.start();
 
       return () => {
         stopHealthLoop();
         stopAnalyticsLoop();
+        clearInterval(nexuOfficialModelRefreshInterval);
         skillhubService.dispose();
         openclawAuthService.dispose();
         channelFallbackService.stop();
