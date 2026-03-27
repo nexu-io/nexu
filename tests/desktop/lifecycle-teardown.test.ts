@@ -712,4 +712,69 @@ describe("ensureNexuProcessesDead", () => {
 
     killSpy.mockRestore();
   });
+
+  // -----------------------------------------------------------------------
+  // 9. Authoritative launchd PID detection works without pgrep matches
+  // -----------------------------------------------------------------------
+  it("kills packaged runner processes discovered only via launchctl labels", async () => {
+    let launchdPidAlive = true;
+
+    mockExecFile.mockImplementation(
+      (
+        cmd: string,
+        args: string[],
+        callback: (
+          error: Error | null,
+          result: { stdout: string; stderr: string },
+        ) => void,
+      ) => {
+        if (cmd === "launchctl") {
+          if (launchdPidAlive && args[1]?.includes("io.nexu.controller")) {
+            callback(null, { stdout: "pid = 45678\n", stderr: "" });
+          } else {
+            callback(new Error("service not found"), {
+              stdout: "",
+              stderr: "",
+            });
+          }
+          return;
+        }
+
+        if (cmd === "pgrep") {
+          callback(new Error("no matches"), { stdout: "", stderr: "" });
+          return;
+        }
+
+        callback(null, { stdout: "", stderr: "" });
+      },
+    );
+
+    const originalKill = process.kill;
+    const killSpy = vi
+      .spyOn(process, "kill")
+      .mockImplementation((pid: number, signal?: string | number) => {
+        if (signal === 0) {
+          return true;
+        }
+        if (pid === 45678 && signal === "SIGKILL") {
+          launchdPidAlive = false;
+          return true;
+        }
+        return originalKill(pid, signal as never);
+      });
+
+    const { ensureNexuProcessesDead } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await ensureNexuProcessesDead({
+      timeoutMs: 500,
+      intervalMs: 10,
+    });
+
+    expect(result.clean).toBe(true);
+    expect(killSpy).toHaveBeenCalledWith(45678, "SIGKILL");
+
+    killSpy.mockRestore();
+  });
 });

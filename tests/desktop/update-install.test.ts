@@ -267,6 +267,58 @@ describe("UpdateManager.quitAndInstall", () => {
   });
 
   // -----------------------------------------------------------------------
+  // 5b. Critical path check still runs even when processes are already clean
+  // -----------------------------------------------------------------------
+  it("checks critical paths before install even when no processes remain", async () => {
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+    });
+
+    await mgr.quitAndInstall();
+
+    expect(mockEnsureDead).toHaveBeenCalledTimes(1);
+    expect(mockCheckPaths).toHaveBeenCalledTimes(1);
+    expect(mockAutoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // 5c. Clean processes but locked critical paths still abort install
+  // -----------------------------------------------------------------------
+  it("aborts install when critical paths stay locked even if process verification is clean", async () => {
+    mockCheckPaths.mockResolvedValueOnce({
+      locked: true,
+      lockedPaths: ["/Users/testuser/.nexu/runtime/controller-sidecar"],
+    });
+
+    const orchestrator = createMockOrchestrator();
+    const win = createMockWindow();
+
+    const { UpdateManager } = await import(
+      "../../apps/desktop/main/updater/update-manager"
+    );
+
+    const mgr = new UpdateManager(win as never, orchestrator as never, {
+      channel: "stable",
+      feedUrl: null,
+    });
+
+    await mgr.quitAndInstall();
+
+    expect(mockEnsureDead).toHaveBeenCalledTimes(1);
+    expect(mockCheckPaths).toHaveBeenCalledTimes(1);
+    expect(mockAutoUpdater.quitAndInstall).not.toHaveBeenCalled();
+    expect((mockApp as Record<string, unknown>).__nexuForceQuit).toBe(false);
+  });
+
+  // -----------------------------------------------------------------------
   // 6. teardownLaunchdServices receives correct context
   // -----------------------------------------------------------------------
   it("passes correct launchd context to teardownLaunchdServices", async () => {

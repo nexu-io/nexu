@@ -248,6 +248,110 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     expect(paths.nodePath).not.toBe(process.execPath);
     expect(paths.nodePath).toContain("nexu-runner.app/Contents/MacOS/Nexu");
   });
+
+  it("falls back to in-bundle runner/controller paths when external extraction fails", async () => {
+    mockExecFile.mockImplementationOnce(
+      (
+        cmd: string,
+        _args: string[],
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "cp" && cb) {
+          cb(new Error("disk full"), "", "");
+          return { stdout: "", stderr: "disk full" };
+        }
+        if (cb) cb(null, "", "");
+        return { stdout: "", stderr: "" };
+      },
+    );
+
+    const { resolveLaunchdPaths } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const paths = await resolveLaunchdPaths(
+      true,
+      "/App.app/Contents/Resources",
+      "1.0.0",
+    );
+
+    expect(paths.nodePath).toBe(process.execPath);
+    expect(paths.controllerEntryPath).toBe(
+      "/App.app/Contents/Resources/runtime/controller/dist/index.js",
+    );
+    expect(paths.controllerCwd).toBe(
+      "/App.app/Contents/Resources/runtime/controller",
+    );
+    expect(paths.openclawCwd).toBe("/Users/testuser/.nexu/openclaw-sidecar");
+  });
+});
+
+describe("checkCriticalPathsLocked", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns locked=true when lsof finds a foreign process holding a critical path", async () => {
+    mockExecFile.mockImplementation(
+      (
+        cmd: string,
+        args: string[],
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "lsof" && args[1]?.includes("controller-sidecar") && cb) {
+          cb(
+            null,
+            `COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\nnode 99999 me txt REG 1,4 0 0 ${args[1]}/dist/index.js\n`,
+            "",
+          );
+          return { stdout: "", stderr: "" };
+        }
+        if (cb) cb(new Error("exit 1"), "", "");
+        return { stdout: "", stderr: "" };
+      },
+    );
+
+    const { checkCriticalPathsLocked } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await checkCriticalPathsLocked();
+
+    expect(result.locked).toBe(true);
+    expect(result.lockedPaths).toContain(
+      "/Users/testuser/.nexu/runtime/controller-sidecar",
+    );
+  });
+
+  it("ignores lsof lines from the current process and reports unlocked", async () => {
+    mockExecFile.mockImplementation(
+      (
+        cmd: string,
+        _args: string[],
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "lsof" && cb) {
+          cb(
+            null,
+            `COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\nElectron ${process.pid} me txt REG 1,4 0 0 /Users/testuser/.nexu/runtime/nexu-runner.app/Contents/MacOS/Nexu\n`,
+            "",
+          );
+          return { stdout: "", stderr: "" };
+        }
+        if (cb) cb(new Error("exit 1"), "", "");
+        return { stdout: "", stderr: "" };
+      },
+    );
+
+    const { checkCriticalPathsLocked } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await checkCriticalPathsLocked();
+
+    expect(result.locked).toBe(false);
+    expect(result.lockedPaths).toEqual([]);
+  });
 });
 
 describe("ensureNexuProcessesDead", () => {

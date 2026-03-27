@@ -617,7 +617,7 @@ describe("Launchd Startup Scenarios", () => {
   it("Scenario 15: controller port conflict resolved via findFreePort", async () => {
     const cpMock = await import("node:child_process");
     let lsofCallCount = 0;
-    (cpMock.execFile as ReturnType<typeof vi.fn>).mockImplementation(
+    (cpMock.execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       (
         _cmd: string,
         args: string[],
@@ -652,7 +652,7 @@ describe("Launchd Startup Scenarios", () => {
   // -----------------------------------------------------------------------
   it("Scenario 16: openclaw port conflict resolved via findFreePort", async () => {
     const cpMock = await import("node:child_process");
-    (cpMock.execFile as ReturnType<typeof vi.fn>).mockImplementation(
+    (cpMock.execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
       (
         _cmd: string,
         args: string[],
@@ -709,9 +709,86 @@ describe("Launchd Startup Scenarios", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Scenario 18: Partial attach — only controller running
+  // Scenario 18: App version mismatch tears down stale services
   // -----------------------------------------------------------------------
-  it("Scenario 18: partial attach with only controller running still recovers ports", async () => {
+  it("Scenario 18: app version mismatch tears down stale services instead of attaching", async () => {
+    const fsMock = await import("node:fs/promises");
+    const ports = makeRuntimePorts({
+      appVersion: "0.9.0",
+      openclawStateDir: "/tmp/state",
+      userDataPath: "/tmp/user-data",
+      buildSource: "packaged",
+    });
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(ports)
+      .mockResolvedValueOnce(ports);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        appVersion: "1.0.0",
+        userDataPath: "/tmp/user-data",
+        buildSource: "packaged",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 19: Build identity mismatch tears down stale services
+  // -----------------------------------------------------------------------
+  it("Scenario 19: build identity mismatch refuses cross-attach", async () => {
+    const fsMock = await import("node:fs/promises");
+    const ports = makeRuntimePorts({
+      appVersion: "1.0.0",
+      openclawStateDir: "/tmp/other-state",
+      userDataPath: "/tmp/other-user-data",
+      buildSource: "beta",
+    });
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(ports)
+      .mockResolvedValueOnce(ports);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        appVersion: "1.0.0",
+        openclawStateDir: "/tmp/state",
+        userDataPath: "/tmp/user-data",
+        buildSource: "stable",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 20: Partial attach — only controller running
+  // -----------------------------------------------------------------------
+  it("Scenario 20: partial attach with only controller running still recovers ports", async () => {
     const fsMock = await import("node:fs/promises");
     (fsMock.readFile as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
