@@ -84,14 +84,13 @@ verify_structure "packaged app" "$packaged_app" "$packaged_executable"
 # we can verify the bundle integrity.
 if [ ! -d "$runner_app" ]; then
   echo "[runner-check] extracted runner not found, triggering extraction"
-  app_version="$(HOME="$packaged_home" TMPDIR="$tmp_dir" ELECTRON_RUN_AS_NODE=1 \
-    "$packaged_executable" -e 'const p=require("fs").readFileSync(require("path").join(__dirname,"..","package.json"),"utf8");process.stdout.write(JSON.parse(p).version)')"
+  app_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$packaged_app/Contents/Info.plist" 2>/dev/null || echo "unknown")"
   nexu_home="$packaged_home/.nexu"
   mkdir -p "$nexu_home/runtime"
-  echo "[runner-check] cloning $packaged_app → $runner_app"
+  echo "[runner-check] cloning $packaged_app → $runner_app (version=$app_version)"
   cp -Rc "$packaged_app" "$runner_app"
   echo "$app_version" > "$nexu_home/runtime/.nexu-runner-version"
-  echo "[runner-check] extraction complete (version=$app_version)"
+  echo "[runner-check] extraction complete"
 fi
 
 verify_structure "extracted runner" "$runner_app" "$runner_executable"
