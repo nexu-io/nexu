@@ -321,6 +321,69 @@ describe("compileOpenClawConfig", () => {
     );
   });
 
+  describe("agent skill assignment", () => {
+    it("includes skills on agents when installedSlugs is provided", () => {
+      const config = createConfig();
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env, undefined, [
+        "git",
+        "npm",
+      ]);
+      expect(compiled.agents.list[0].skills).toEqual(["git", "npm"]);
+    });
+
+    it("omits skills field when installedSlugs is empty (legacy fallback)", () => {
+      const config = createConfig();
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env, undefined, []);
+      expect(compiled.agents.list[0]).not.toHaveProperty("skills");
+    });
+
+    it("omits skills field when installedSlugs is undefined", () => {
+      const config = createConfig();
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env);
+      expect(compiled.agents.list[0]).not.toHaveProperty("skills");
+    });
+
+    it("assigns same skills to all active agents", () => {
+      const now = new Date().toISOString();
+      const config = createConfig({
+        bots: [
+          {
+            id: "bot-1",
+            name: "Bot A",
+            slug: "bot-a",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "bot-2",
+            name: "Bot B",
+            slug: "bot-b",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env, undefined, [
+        "calendar",
+      ]);
+      expect(compiled.agents.list).toHaveLength(2);
+      expect(compiled.agents.list[0].skills).toEqual(["calendar"]);
+      expect(compiled.agents.list[1].skills).toEqual(["calendar"]);
+    });
+  });
+
   it("remaps openai models to OAuth provider ids when persisted OAuth state is connected", () => {
     const oauthState: OAuthConnectionState = {
       connectedProviderIds: ["openai"],

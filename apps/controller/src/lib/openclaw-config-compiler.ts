@@ -353,7 +353,13 @@ function compileAgentList(
   config: NexuConfig,
   env: ControllerEnv,
   oauthState: OAuthConnectionState,
+  installedSkillSlugs?: readonly string[],
 ): OpenClawConfig["agents"]["list"] {
+  const skills =
+    installedSkillSlugs && installedSkillSlugs.length > 0
+      ? [...installedSkillSlugs]
+      : undefined;
+
   return config.bots
     .filter((bot) => bot.status === "active")
     .sort((left, right) => left.slug.localeCompare(right.slug))
@@ -365,6 +371,7 @@ function compileAgentList(
       model: bot.modelId
         ? { primary: resolveModelId(config, env, bot.modelId, oauthState) }
         : undefined,
+      ...(skills ? { skills } : {}),
     }));
 }
 
@@ -409,6 +416,7 @@ export function compileOpenClawConfig(
   config: NexuConfig,
   env: ControllerEnv,
   oauthState: OAuthConnectionState = EMPTY_OAUTH_CONNECTION_STATE,
+  installedSkillSlugs?: readonly string[],
 ): OpenClawConfig {
   const activeBots = config.bots.filter((bot) => bot.status === "active");
   const firstBotModel = activeBots[0]?.modelId ?? null;
@@ -461,7 +469,7 @@ export function compileOpenClawConfig(
         },
         verboseDefault: "off",
       },
-      list: compileAgentList(config, env, oauthState),
+      list: compileAgentList(config, env, oauthState, installedSkillSlugs),
     },
     tools: {
       exec: {
