@@ -546,7 +546,11 @@ async function runLaunchdColdStart(): Promise<void> {
   logColdStart("starting launchd bootstrap");
 
   const isDev = !app.isPackaged;
-  const paths = resolveLaunchdPaths(app.isPackaged, electronRoot);
+  const paths = await resolveLaunchdPaths(
+    app.isPackaged,
+    electronRoot,
+    app.getVersion(),
+  );
 
   const nexuHome = runtimeConfig.paths.nexuHome.replace(
     /^~/,
@@ -620,6 +624,11 @@ async function runLaunchdColdStart(): Promise<void> {
     openclawExtensionsDir,
     skillNodePath,
     openclawTmpDir,
+    appVersion: app.getVersion(),
+    userDataPath: app.getPath("userData"),
+    buildSource:
+      process.env.NEXU_DESKTOP_BUILD_SOURCE ??
+      (app.isPackaged ? "packaged" : "local-dev"),
   });
 
   // Wire launchd-managed units into the orchestrator so the control plane

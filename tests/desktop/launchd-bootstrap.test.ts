@@ -13,6 +13,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:os", () => ({
   homedir: vi.fn(() => "/Users/testuser"),
+  userInfo: vi.fn(() => ({ uid: 501 })),
+}));
+
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn(() => true),
+  readFileSync: vi.fn(() => ""),
+  writeFileSync: vi.fn(),
+}));
+
+vi.mock("node:child_process", () => ({
+  execFile: vi.fn(
+    (
+      _cmd: string,
+      _args: string[],
+      cb?: (err: Error | null, stdout: string, stderr: string) => void,
+    ) => {
+      if (cb) cb(null, "", "");
+      return { stdout: "", stderr: "" };
+    },
+  ),
 }));
 
 vi.mock("node:fs/promises", () => ({
@@ -20,6 +40,7 @@ vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
   readFile: vi.fn().mockRejectedValue(new Error("ENOENT")),
   unlink: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("node:net", () => ({
@@ -181,7 +202,7 @@ describe("resolveLaunchdPaths", () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
-    const paths = resolveLaunchdPaths(false, "/ignored");
+    const paths = await resolveLaunchdPaths(false, "/ignored");
 
     expect(paths.controllerEntryPath).toContain(
       "apps/controller/dist/index.js",
@@ -192,17 +213,20 @@ describe("resolveLaunchdPaths", () => {
     expect(paths.controllerCwd).toContain("apps/controller");
   });
 
-  it("resolves packaged paths from resources", async () => {
+  it("resolves packaged paths to external locations outside .app", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
-    const paths = resolveLaunchdPaths(true, "/Resources");
+    const paths = await resolveLaunchdPaths(true, "/Resources", "1.0.0");
 
-    expect(paths.controllerEntryPath).toBe(
-      "/Resources/runtime/controller/dist/index.js",
+    // Node runner should be outside .app (in ~/.nexu/runtime/nexu-runner.app/)
+    expect(paths.nodePath).toContain(".nexu/runtime/nexu-runner.app");
+    expect(paths.nodePath).not.toContain("/Resources");
+    // Controller should be outside .app (in ~/.nexu/runtime/controller-sidecar/)
+    expect(paths.controllerEntryPath).toContain(
+      ".nexu/runtime/controller-sidecar/dist/index.js",
     );
-    expect(paths.controllerCwd).toBe("/Resources/runtime/controller");
-    expect(paths.nodePath).toBe(process.execPath);
+    expect(paths.controllerCwd).toContain(".nexu/runtime/controller-sidecar");
   });
 });
 

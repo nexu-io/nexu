@@ -94,9 +94,33 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
       // If a force-quit is in progress, let the window close
       if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
 
-      // Dev mode: let the window close normally (no dialog, no hide).
-      // Services are stopped by `pnpm stop` / dev-launchd.sh.
+      // Dev mode: teardown launchd services before letting the window close.
+      // Without this, `pnpm start` -> close window -> `pnpm start` may have
+      // stale launchd services still running and holding ports.
       if (!app.isPackaged) {
+        event.preventDefault();
+        void (async () => {
+          try {
+            await opts.onBeforeQuit?.();
+          } catch (err) {
+            console.error("Error in onBeforeQuit (dev):", err);
+          }
+
+          try {
+            await opts.webServer?.close();
+          } catch (err) {
+            console.error("Error closing web server (dev):", err);
+          }
+
+          await teardownLaunchdServices({
+            launchd: opts.launchd,
+            labels: opts.labels,
+            plistDir: opts.plistDir ?? "",
+          });
+
+          (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+          app.exit(0);
+        })();
         return;
       }
 
@@ -161,18 +185,64 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
     interceptWindowClose(mainWin);
   }
 
-  // Intercept Cmd+Q / Dock "Quit" — redirect to window close handler
-  // which shows the quit dialog (packaged only).
+  // Intercept Cmd+Q / Dock "Quit" — ensure teardown in both dev and packaged.
   app.on("before-quit", (event) => {
     if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
-    // Dev mode: let quit proceed normally
-    if (!app.isPackaged) return;
+
+    // Dev mode: Cmd+Q / app.quit() must also teardown launchd services,
+    // otherwise `pnpm start` → Cmd+Q → `pnpm start` leaves stale services.
+    if (!app.isPackaged) {
+      event.preventDefault();
+      void (async () => {
+        try {
+          await opts.onBeforeQuit?.();
+        } catch {
+          // best effort
+        }
+        try {
+          await opts.webServer?.close();
+        } catch {
+          // best effort
+        }
+        await teardownLaunchdServices({
+          launchd: opts.launchd,
+          labels: opts.labels,
+          plistDir: opts.plistDir ?? "",
+        });
+        (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+        app.exit(0);
+      })();
+      return;
+    }
+
     // Packaged: prevent quit, show dialog via window close
     event.preventDefault();
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
       if (!win.isVisible()) win.show();
       win.close();
+    } else {
+      // No window (renderer crashed or already destroyed) — teardown
+      // and force quit to avoid a zombie app.
+      void (async () => {
+        try {
+          await opts.onBeforeQuit?.();
+        } catch {
+          // best effort
+        }
+        try {
+          await opts.webServer?.close();
+        } catch {
+          // best effort
+        }
+        await teardownLaunchdServices({
+          launchd: opts.launchd,
+          labels: opts.labels,
+          plistDir: opts.plistDir ?? "",
+        });
+        (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+        app.exit(0);
+      })();
     }
   });
 }

@@ -162,22 +162,29 @@ describe("installLaunchdQuitHandler", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 3. Window close in dev mode does NOT show dialog
+  // 3. Window close in dev mode prevents default, runs teardown, and exits
   // -------------------------------------------------------------------------
-  it("allows close without dialog in dev mode", async () => {
+  it("runs teardown and exits in dev mode without dialog", async () => {
     mockApp.isPackaged = false;
 
     const { installLaunchdQuitHandler } = await import(
       "../../apps/desktop/main/services/quit-handler"
     );
 
-    installLaunchdQuitHandler(createQuitOpts() as never);
+    const opts = createQuitOpts();
+    installLaunchdQuitHandler(opts as never);
 
     const event = simulateClose();
 
-    expect(event.preventDefault).not.toHaveBeenCalled();
+    // Dev mode now prevents default to run async teardown
+    expect(event.preventDefault).toHaveBeenCalled();
     await flush();
+    // No dialog shown in dev mode
     expect(mockDialog.showMessageBox).not.toHaveBeenCalled();
+    // Teardown should have been called
+    expect(mockTeardown).toHaveBeenCalled();
+    // App should exit after teardown
+    expect(mockApp.exit).toHaveBeenCalledWith(0);
   });
 
   // -------------------------------------------------------------------------
@@ -327,9 +334,9 @@ describe("installLaunchdQuitHandler", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 10. before-quit in dev mode allows quit
+  // 10. before-quit in dev mode teardowns then exits
   // -------------------------------------------------------------------------
-  it("before-quit in dev mode does not prevent quit", async () => {
+  it("before-quit in dev mode prevents default and runs teardown", async () => {
     mockApp.isPackaged = false;
 
     const { installLaunchdQuitHandler } = await import(
@@ -342,7 +349,8 @@ describe("installLaunchdQuitHandler", () => {
     const event = { preventDefault: vi.fn() };
     handler(event);
 
-    expect(event.preventDefault).not.toHaveBeenCalled();
+    // Dev mode now prevents default to do async teardown before exiting
+    expect(event.preventDefault).toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------

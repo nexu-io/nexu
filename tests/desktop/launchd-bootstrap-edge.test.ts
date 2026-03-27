@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:os", () => ({
   homedir: vi.fn(() => "/Users/testuser"),
+  userInfo: vi.fn(() => ({ uid: 501 })),
 }));
 
 vi.mock("node:fs/promises", () => ({
@@ -19,15 +20,31 @@ vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
   readFile: vi.fn().mockRejectedValue(new Error("ENOENT")),
   unlink: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("node:net", () => ({
   createConnection: vi.fn(),
 }));
 
-const mockExecFile = vi.fn();
+const mockExecFile = vi.fn(
+  (
+    _cmd: string,
+    _args: string[],
+    cb?: (err: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    if (cb) cb(null, "", "");
+    return { stdout: "", stderr: "" };
+  },
+);
 vi.mock("node:child_process", () => ({
   execFile: mockExecFile,
+}));
+
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn(() => true),
+  readFileSync: vi.fn(() => ""),
+  writeFileSync: vi.fn(),
 }));
 
 const mockLaunchdManager = {
@@ -184,20 +201,25 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
 });
 
 describe("resolveLaunchdPaths — packaged mode details", () => {
-  it("resolves packaged paths from resourcesPath", async () => {
+  it("resolves all paths outside .app bundle in packaged mode", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
 
-    const paths = resolveLaunchdPaths(true, "/App.app/Contents/Resources");
+    const paths = await resolveLaunchdPaths(
+      true,
+      "/App.app/Contents/Resources",
+      "1.0.0",
+    );
 
-    expect(paths.controllerEntryPath).toBe(
-      "/App.app/Contents/Resources/runtime/controller/dist/index.js",
+    // Node runner extracted to ~/.nexu/runtime/nexu-runner.app/
+    expect(paths.nodePath).toContain(".nexu/runtime/nexu-runner.app");
+    expect(paths.nodePath).not.toContain("/App.app/Contents");
+    // Controller extracted to ~/.nexu/runtime/controller-sidecar/
+    expect(paths.controllerEntryPath).toContain(
+      ".nexu/runtime/controller-sidecar/dist/index.js",
     );
-    expect(paths.controllerCwd).toBe(
-      "/App.app/Contents/Resources/runtime/controller",
-    );
-    expect(paths.nodePath).toBe(process.execPath);
+    expect(paths.controllerCwd).toContain(".nexu/runtime/controller-sidecar");
   });
 
   it("resolves openclaw path from sidecar extraction", async () => {
@@ -205,7 +227,7 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
 
-    const paths = resolveLaunchdPaths(true, "/Resources");
+    const paths = await resolveLaunchdPaths(true, "/Resources", "1.0.0");
 
     // ensurePackagedOpenclawSidecar returns `${nexuHome}/openclaw-sidecar`
     // where nexuHome = /Users/testuser/.nexu
@@ -215,14 +237,16 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     expect(paths.openclawCwd).toBe("/Users/testuser/.nexu/openclaw-sidecar");
   });
 
-  it("uses process.execPath as nodePath in packaged mode", async () => {
+  it("uses external node runner (not process.execPath) in packaged mode", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
 
-    const paths = resolveLaunchdPaths(true, "/Resources");
+    const paths = await resolveLaunchdPaths(true, "/Resources", "1.0.0");
 
-    expect(paths.nodePath).toBe(process.execPath);
+    // Should NOT be process.execPath (which points inside .app)
+    expect(paths.nodePath).not.toBe(process.execPath);
+    expect(paths.nodePath).toContain("nexu-runner.app/Contents/MacOS/Nexu");
   });
 });
 
