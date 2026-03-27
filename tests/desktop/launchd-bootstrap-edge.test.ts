@@ -201,6 +201,18 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
 });
 
 describe("resolveLaunchdPaths — packaged mode details", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    existsSync.mockImplementation(() => true);
+    readFileSync.mockImplementation(() => "");
+  });
+
   it("resolves all paths outside .app bundle in packaged mode", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -250,17 +262,24 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
   });
 
   it("falls back to in-bundle runner/controller paths when external extraction fails", async () => {
-    mockExecFile.mockImplementationOnce(
-      (
-        cmd: string,
-        _args: string[],
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
-      ) => {
-        if (cmd === "cp" && cb) {
-          cb(new Error("disk full"), "", "");
+    mockExecFile.mockImplementation(
+      (cmd: string, _args: string[], cb?: unknown) => {
+        const callback = cb as
+          | ((
+              err: Error | null,
+              result: { stdout: string; stderr: string },
+            ) => void)
+          | undefined;
+
+        if (cmd === "cp") {
+          callback?.(new Error("disk full"), {
+            stdout: "",
+            stderr: "disk full",
+          });
           return { stdout: "", stderr: "disk full" };
         }
-        if (cb) cb(null, "", "");
+
+        callback?.(null, { stdout: "", stderr: "" });
         return { stdout: "", stderr: "" };
       },
     );
@@ -284,6 +303,91 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     );
     expect(paths.openclawCwd).toBe("/Users/testuser/.nexu/openclaw-sidecar");
   });
+
+  it("reuses an existing version-stamped external node runner without recloning", async () => {
+    vi.clearAllMocks();
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith(".version-stamp")) return true;
+      if (target.includes("nexu-runner.app/Contents/MacOS/Nexu")) return true;
+      return target.endsWith("Info.plist");
+    });
+    readFileSync.mockImplementation((target: string) => {
+      if (target.endsWith(".version-stamp")) return "1.2.3";
+      return "";
+    });
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const runnerPath = await ensureExternalNodeRunner(
+      "/App.app/Contents",
+      "/Users/testuser/.nexu",
+      "1.2.3",
+    );
+
+    expect(runnerPath).toBe(
+      "/Users/testuser/.nexu/runtime/nexu-runner.app/Contents/MacOS/Nexu",
+    );
+    expect(mockExecFile).not.toHaveBeenCalled();
+  });
+
+  it("cleans interrupted runner staging directories before extracting again", async () => {
+    vi.clearAllMocks();
+    const fsMock = await import("node:fs");
+    const fsPromisesMock = await import("node:fs/promises");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    const rename = fsPromisesMock.rename as unknown as ReturnType<typeof vi.fn>;
+
+    mockExecFile.mockImplementation(
+      (_cmd: string, _args: string[], cb?: unknown) => {
+        const callback = cb as
+          | ((
+              err: Error | null,
+              result: { stdout: string; stderr: string },
+            ) => void)
+          | undefined;
+        callback?.(null, { stdout: "", stderr: "" });
+        return { stdout: "", stderr: "" };
+      },
+    );
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith("nexu-runner.app.staging")) return true;
+      if (target.endsWith("Info.plist")) return true;
+      return false;
+    });
+    readFileSync.mockReturnValue("");
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await ensureExternalNodeRunner(
+      "/App.app/Contents",
+      "/Users/testuser/.nexu",
+      "1.0.0",
+    );
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "rm",
+      ["-rf", "/Users/testuser/.nexu/runtime/nexu-runner.app.staging"],
+      expect.any(Function),
+    );
+    expect(rename).toHaveBeenCalledWith(
+      "/Users/testuser/.nexu/runtime/nexu-runner.app.staging",
+      "/Users/testuser/.nexu/runtime/nexu-runner.app",
+    );
+  });
 });
 
 describe("checkCriticalPathsLocked", () => {
@@ -296,17 +400,26 @@ describe("checkCriticalPathsLocked", () => {
       (
         cmd: string,
         args: string[],
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        maybeOptions?: unknown,
+        maybeCb?: unknown,
       ) => {
-        if (cmd === "lsof" && args[1]?.includes("controller-sidecar") && cb) {
-          cb(
-            null,
-            `COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\nnode 99999 me txt REG 1,4 0 0 ${args[1]}/dist/index.js\n`,
-            "",
-          );
+        const callback = (
+          typeof maybeCb === "function" ? maybeCb : maybeOptions
+        ) as
+          | ((
+              err: Error | null,
+              result: { stdout: string; stderr: string },
+            ) => void)
+          | undefined;
+
+        if (cmd === "lsof" && args[1]?.includes("controller-sidecar")) {
+          callback?.(null, {
+            stdout: `COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\nnode 99999 me txt REG 1,4 0 0 ${args[1]}/dist/index.js\n`,
+            stderr: "",
+          });
           return { stdout: "", stderr: "" };
         }
-        if (cb) cb(new Error("exit 1"), "", "");
+        callback?.(new Error("exit 1"), { stdout: "", stderr: "" });
         return { stdout: "", stderr: "" };
       },
     );
@@ -328,17 +441,26 @@ describe("checkCriticalPathsLocked", () => {
       (
         cmd: string,
         _args: string[],
-        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+        maybeOptions?: unknown,
+        maybeCb?: unknown,
       ) => {
-        if (cmd === "lsof" && cb) {
-          cb(
-            null,
-            `COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\nElectron ${process.pid} me txt REG 1,4 0 0 /Users/testuser/.nexu/runtime/nexu-runner.app/Contents/MacOS/Nexu\n`,
-            "",
-          );
+        const callback = (
+          typeof maybeCb === "function" ? maybeCb : maybeOptions
+        ) as
+          | ((
+              err: Error | null,
+              result: { stdout: string; stderr: string },
+            ) => void)
+          | undefined;
+
+        if (cmd === "lsof") {
+          callback?.(null, {
+            stdout: `COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\nElectron ${process.pid} me txt REG 1,4 0 0 /Users/testuser/.nexu/runtime/nexu-runner.app/Contents/MacOS/Nexu\n`,
+            stderr: "",
+          });
           return { stdout: "", stderr: "" };
         }
-        if (cb) cb(new Error("exit 1"), "", "");
+        callback?.(new Error("exit 1"), { stdout: "", stderr: "" });
         return { stdout: "", stderr: "" };
       },
     );
@@ -371,32 +493,29 @@ describe("ensureNexuProcessesDead", () => {
   function setupPgrepSequence(pidSequences: number[][]): void {
     let callIndex = 0;
     mockExecFile.mockImplementation(
-      (
-        cmd: string,
-        _args: string[],
-        callback: (
-          error: Error | null,
-          result: { stdout: string; stderr: string },
-        ) => void,
-      ) => {
+      (cmd: string, _args: string[], cb?: unknown) => {
+        const callback = cb as
+          | ((
+              err: Error | null,
+              result: { stdout: string; stderr: string },
+            ) => void)
+          | undefined;
         if (cmd === "pgrep") {
           const pids = pidSequences[callIndex] ?? [];
           callIndex++;
           if (pids.length === 0) {
-            callback(Object.assign(new Error("exit 1"), { code: 1 }), {
+            callback?.(Object.assign(new Error("exit 1"), { code: 1 }), {
               stdout: "",
               stderr: "",
             });
           } else {
-            callback(null, {
-              stdout: pids.join("\n"),
-              stderr: "",
-            });
+            callback?.(null, { stdout: pids.join("\n"), stderr: "" });
           }
-          return;
+          return { stdout: "", stderr: "" };
         }
         // lsof or other commands
-        callback(null, { stdout: "", stderr: "" });
+        callback?.(null, { stdout: "", stderr: "" });
+        return { stdout: "", stderr: "" };
       },
     );
   }
@@ -473,14 +592,13 @@ describe("ensureNexuProcessesDead", () => {
     try {
       let pgrepCallCount = 0;
       mockExecFile.mockImplementation(
-        (
-          cmd: string,
-          _args: string[],
-          callback: (
-            error: Error | null,
-            result: { stdout: string; stderr: string },
-          ) => void,
-        ) => {
+        (cmd: string, _args: string[], cb?: unknown) => {
+          const callback = cb as
+            | ((
+                err: Error | null,
+                result: { stdout: string; stderr: string },
+              ) => void)
+            | undefined;
           if (cmd === "pgrep") {
             pgrepCallCount++;
             // Return processes for the first many calls (inside the timeout loop),
@@ -491,16 +609,17 @@ describe("ensureNexuProcessesDead", () => {
             // We'll make the first 6 calls return PIDs (2 rounds of 3 patterns),
             // and anything after return empty.
             if (pgrepCallCount <= 6) {
-              callback(null, { stdout: "88001\n", stderr: "" });
+              callback?.(null, { stdout: "88001\n", stderr: "" });
             } else {
-              callback(Object.assign(new Error("exit 1"), { code: 1 }), {
+              callback?.(Object.assign(new Error("exit 1"), { code: 1 }), {
                 stdout: "",
                 stderr: "",
               });
             }
-            return;
+            return { stdout: "", stderr: "" };
           }
-          callback(null, { stdout: "", stderr: "" });
+          callback?.(null, { stdout: "", stderr: "" });
+          return { stdout: "", stderr: "" };
         },
       );
 
@@ -528,19 +647,19 @@ describe("ensureNexuProcessesDead", () => {
     try {
       // All pgrep calls return processes (they never die)
       mockExecFile.mockImplementation(
-        (
-          cmd: string,
-          _args: string[],
-          callback: (
-            error: Error | null,
-            result: { stdout: string; stderr: string },
-          ) => void,
-        ) => {
+        (cmd: string, _args: string[], cb?: unknown) => {
+          const callback = cb as
+            | ((
+                err: Error | null,
+                result: { stdout: string; stderr: string },
+              ) => void)
+            | undefined;
           if (cmd === "pgrep") {
-            callback(null, { stdout: "77001\n", stderr: "" });
-            return;
+            callback?.(null, { stdout: "77001\n", stderr: "" });
+            return { stdout: "", stderr: "" };
           }
-          callback(null, { stdout: "", stderr: "" });
+          callback?.(null, { stdout: "", stderr: "" });
+          return { stdout: "", stderr: "" };
         },
       );
 
