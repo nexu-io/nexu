@@ -338,7 +338,10 @@ describe("Launchd Startup Scenarios", () => {
       callCount++;
       if (callCount === 1) {
         // First call fails (port occupied)
-        return Promise.reject(new Error("EADDRINUSE"));
+        const err = Object.assign(new Error("EADDRINUSE"), {
+          code: "EADDRINUSE",
+        });
+        return Promise.reject(err);
       }
       // Second call with port+1 succeeds
       mockWebServer.port = opts.port;
@@ -826,10 +829,12 @@ describe("Launchd Startup Scenarios", () => {
     const webServerMock = await import(
       "../../apps/desktop/main/services/embedded-web-server"
     );
-    // All 6 attempts fail (5 adjacent ports + port 0 fallback)
+    // All attempts fail with EADDRINUSE (5 adjacent ports + port 0 fallback)
     (
       webServerMock.startEmbeddedWebServer as ReturnType<typeof vi.fn>
-    ).mockRejectedValue(new Error("EADDRINUSE"));
+    ).mockRejectedValue(
+      Object.assign(new Error("EADDRINUSE"), { code: "EADDRINUSE" }),
+    );
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"

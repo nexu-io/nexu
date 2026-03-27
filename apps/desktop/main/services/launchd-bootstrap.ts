@@ -695,7 +695,15 @@ export async function bootstrapWithLaunchd(
         controllerPort: effectivePorts.controllerPort,
       });
       break;
-    } catch {
+    } catch (err: unknown) {
+      // Only retry on port-occupied errors; re-throw other failures immediately
+      const code =
+        err instanceof Error && "code" in err
+          ? (err as { code: string }).code
+          : undefined;
+      if (code !== "EADDRINUSE") {
+        throw err;
+      }
       console.log(
         `Web port ${tryPort} occupied, trying next${offset === WEB_PORT_ATTEMPTS - 2 ? " (then OS-assigned fallback)" : ""}`,
       );
@@ -1027,15 +1035,15 @@ export async function checkCriticalPathsLocked(): Promise<{
       const { stdout } = await execFileAsync("lsof", ["+D", criticalPath], {
         timeout: 5_000,
       });
-      // Filter out our own process
-      const lines = stdout
-        .split("\n")
-        .filter((line) => !line.includes(String(process.pid)));
-      if (
-        lines.some(
-          (line) => line.trim().length > 0 && !line.startsWith("COMMAND"),
-        )
-      ) {
+      // Parse lsof output by PID column (2nd field) to avoid false
+      // positives when our PID digits appear elsewhere in the line.
+      const hasOtherHolder = stdout.split("\n").some((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("COMMAND")) return false;
+        const [, pidToken] = trimmed.split(/\s+/, 3);
+        return Number(pidToken) !== process.pid;
+      });
+      if (hasOtherHolder) {
         lockedPaths.push(criticalPath);
       }
     } catch {
