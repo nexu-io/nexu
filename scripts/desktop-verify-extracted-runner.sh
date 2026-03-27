@@ -6,6 +6,7 @@ release_dir="${PACKAGED_RELEASE_DIR:-${NEXU_DESKTOP_RELEASE_DIR:-apps/desktop/re
 packaged_home="${PACKAGED_HOME:-.tmp/desktop-dist-home}"
 tmp_dir="${NEXU_DESKTOP_CHECK_TMPDIR:-${TMPDIR:-/tmp}/desktop-tmp}"
 require_spctl="${NEXU_DESKTOP_REQUIRE_SPCTL:-0}"
+require_codesign="${NEXU_DESKTOP_REQUIRE_CODESIGN:-$require_spctl}"
 
 absolutize_path() {
   case "$1" in
@@ -46,13 +47,16 @@ verify_structure() {
   local label="$1"
   local app_path="$2"
   local executable_path="$3"
+  local require_signature_artifacts="${4:-1}"
 
   echo "[runner-check] verifying $label structure: $app_path"
   test -d "$app_path"
   test -f "$app_path/Contents/Info.plist"
   test -d "$app_path/Contents/Frameworks"
   test -d "$app_path/Contents/Resources"
-  test -f "$app_path/Contents/_CodeSignature/CodeResources"
+  if [ "$require_signature_artifacts" = "1" ]; then
+    test -f "$app_path/Contents/_CodeSignature/CodeResources"
+  fi
   test -x "$executable_path"
 }
 
@@ -77,7 +81,7 @@ verify_spctl() {
   /usr/sbin/spctl --assess --type execute -vv "$target_path"
 }
 
-verify_structure "packaged app" "$packaged_app" "$packaged_executable"
+verify_structure "packaged app" "$packaged_app" "$packaged_executable" "$require_codesign"
 
 # The runner is normally extracted during launchd bootstrap, which does not
 # run in CI (check:dist uses orchestrator mode).  Extract it explicitly so
@@ -93,10 +97,14 @@ if [ ! -d "$runner_app" ]; then
   echo "[runner-check] extraction complete"
 fi
 
-verify_structure "extracted runner" "$runner_app" "$runner_executable"
+verify_structure "extracted runner" "$runner_app" "$runner_executable" "$require_codesign"
 
-verify_codesign "packaged app" "$packaged_app"
-verify_codesign "extracted runner" "$runner_app"
+if [ "$require_codesign" = "1" ]; then
+  verify_codesign "packaged app" "$packaged_app"
+  verify_codesign "extracted runner" "$runner_app"
+else
+  echo "[runner-check] skipping codesign verify for unsigned build artifacts"
+fi
 
 verify_spctl "packaged app" "$packaged_app"
 verify_spctl "extracted runner" "$runner_app"
