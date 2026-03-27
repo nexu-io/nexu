@@ -156,16 +156,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/desktop-ci"
-          if [ -d "$PACKAGED_LOGS_DIR" ]; then
+          if [ -n "${PACKAGED_LOGS_DIR:-}" ] && [ -d "$PACKAGED_LOGS_DIR" ]; then
             cp -R "$PACKAGED_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/packaged-logs"
           fi
-          if [ -d "$PACKAGED_RUNTIME_LOGS_DIR" ]; then
+          if [ -n "${PACKAGED_RUNTIME_LOGS_DIR:-}" ] && [ -d "$PACKAGED_RUNTIME_LOGS_DIR" ]; then
             cp -R "$PACKAGED_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/runtime-unit-logs"
           fi
-          if [ -d "$DEFAULT_LOGS_DIR" ]; then
+          if [ -n "${DEFAULT_LOGS_DIR:-}" ] && [ -d "$DEFAULT_LOGS_DIR" ]; then
             cp -R "$DEFAULT_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-logs"
           fi
-          if [ -d "$DEFAULT_RUNTIME_LOGS_DIR" ]; then
+          if [ -n "${DEFAULT_RUNTIME_LOGS_DIR:-}" ] && [ -d "$DEFAULT_RUNTIME_LOGS_DIR" ]; then
             cp -R "$DEFAULT_RUNTIME_LOGS_DIR" "$RUNNER_TEMP/desktop-ci/default-runtime-unit-logs"
           fi
 

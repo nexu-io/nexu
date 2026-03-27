@@ -141,7 +141,7 @@ jobs:
           if [ -d .tmp/desktop/electron/logs ]; then
             cp -R .tmp/desktop/electron/logs "$RUNNER_TEMP/desktop-ci/electron-logs"
           fi
-          if tmux has-session -t nexu-desktop 2>/dev/null; then
+          if command -v tmux >/dev/null 2>&1 && tmux has-session -t nexu-desktop 2>/dev/null; then
             tmux capture-pane -pt nexu-desktop -S -400 > "$RUNNER_TEMP/desktop-ci/tmux.log"
           fi
 
