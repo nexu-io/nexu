@@ -459,7 +459,7 @@ export function compileOpenClawConfig(
         humanDelay: {
           mode: "off",
         },
-        verboseDefault: "on",
+        verboseDefault: "off",
       },
       list: compileAgentList(config, env, oauthState),
     },
