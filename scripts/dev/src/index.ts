@@ -1,45 +1,59 @@
+import { isSupportedDevCommand } from "@nexu/dev-utils";
+import { cac } from "cac";
+
 import {
   getCurrentControllerDevSnapshot,
-  getCurrentWebDevSnapshot,
-  isSupportedDevCommand,
   readControllerDevLog,
-  readWebDevLog,
   restartControllerDevProcess,
-  restartWebDevProcess,
   startControllerDevProcess,
-  startWebDevProcess,
   stopControllerDevProcess,
+} from "./controller-dev.js";
+import { createDevSessionId } from "./dev-trace.js";
+import {
+  getCurrentWebDevSnapshot,
+  readWebDevLog,
+  restartWebDevProcess,
+  startWebDevProcess,
   stopWebDevProcess,
-} from "@nexu/dev-utils";
-import { cac } from "cac";
+} from "./web-dev.js";
 
 const cli = cac("scripts-dev");
 
 cli.command("start", "Start the local dev flow").action(async () => {
-  const controllerFact = await startControllerDevProcess();
+  const sessionId = createDevSessionId();
+  const controllerFact = await startControllerDevProcess({ sessionId });
   console.log(`[scripts-dev] controller started (${controllerFact.pid})`);
   console.log(`[scripts-dev] controller run id: ${controllerFact.runId}`);
+  console.log(
+    `[scripts-dev] controller session id: ${controllerFact.sessionId}`,
+  );
   console.log(
     `[scripts-dev] controller log file: ${controllerFact.logFilePath}`,
   );
 
-  const webFact = await startWebDevProcess();
+  const webFact = await startWebDevProcess({ sessionId });
   console.log(`[scripts-dev] web started (${webFact.pid})`);
   console.log(`[scripts-dev] web run id: ${webFact.runId}`);
+  console.log(`[scripts-dev] web session id: ${webFact.sessionId}`);
   console.log(`[scripts-dev] web log file: ${webFact.logFilePath}`);
 });
 
 cli.command("restart", "Restart the local dev flow").action(async () => {
-  const controllerFact = await restartControllerDevProcess();
+  const sessionId = createDevSessionId();
+  const controllerFact = await restartControllerDevProcess({ sessionId });
   console.log(`[scripts-dev] controller restarted (${controllerFact.pid})`);
   console.log(`[scripts-dev] controller run id: ${controllerFact.runId}`);
+  console.log(
+    `[scripts-dev] controller session id: ${controllerFact.sessionId}`,
+  );
   console.log(
     `[scripts-dev] controller log file: ${controllerFact.logFilePath}`,
   );
 
-  const webFact = await restartWebDevProcess();
+  const webFact = await restartWebDevProcess({ sessionId });
   console.log(`[scripts-dev] web restarted (${webFact.pid})`);
   console.log(`[scripts-dev] web run id: ${webFact.runId}`);
+  console.log(`[scripts-dev] web session id: ${webFact.sessionId}`);
   console.log(`[scripts-dev] web log file: ${webFact.logFilePath}`);
 });
 
@@ -71,6 +85,11 @@ cli.command("status", "Show the local dev status").action(async () => {
   if (controllerSnapshot.runId) {
     console.log(`[scripts-dev] controller run id: ${controllerSnapshot.runId}`);
   }
+  if (controllerSnapshot.sessionId) {
+    console.log(
+      `[scripts-dev] controller session id: ${controllerSnapshot.sessionId}`,
+    );
+  }
   if (controllerSnapshot.logFilePath) {
     console.log(
       `[scripts-dev] controller log file: ${controllerSnapshot.logFilePath}`,
@@ -86,6 +105,9 @@ cli.command("status", "Show the local dev status").action(async () => {
   }
   if (webSnapshot.runId) {
     console.log(`[scripts-dev] web run id: ${webSnapshot.runId}`);
+  }
+  if (webSnapshot.sessionId) {
+    console.log(`[scripts-dev] web session id: ${webSnapshot.sessionId}`);
   }
   if (webSnapshot.logFilePath) {
     console.log(`[scripts-dev] web log file: ${webSnapshot.logFilePath}`);

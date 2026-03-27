@@ -1,86 +1,50 @@
 import { type ChildProcess, spawn } from "node:child_process";
 
 import {
-  removeWebDevLock,
+  createNodeOptions,
+  removeDevLock,
   resolveViteBinPath,
-  webWorkingDirectoryPath,
-  writeWebDevLock,
+  terminateProcess,
+  writeDevLock,
 } from "@nexu/dev-utils";
 
+import { waitForChildExit } from "./children.js";
+import { webDevLockPath, webWorkingDirectoryPath } from "./dev-paths.js";
+import { createDevTraceEnv } from "./dev-trace.js";
+
 const runId = process.env.NEXU_DEV_WEB_RUN_ID;
+const sessionId = process.env.NEXU_DEV_SESSION_ID;
 
 if (!runId) {
   throw new Error("NEXU_DEV_WEB_RUN_ID is required");
 }
 
-const webRunId = runId;
-
-function createNodeOptions(): string {
-  const existing = process.env.NODE_OPTIONS?.trim();
-
-  if (existing) {
-    return `${existing} --conditions=development`;
-  }
-
-  return "--conditions=development";
+if (!sessionId) {
+  throw new Error("NEXU_DEV_SESSION_ID is required");
 }
+
+const webRunId = runId;
+const webSessionId = sessionId;
 
 function createWebWorkerCommand(): { command: string; args: string[] } {
   return {
     command: process.execPath,
-    args: [resolveViteBinPath(), "--strictPort"],
+    args: [resolveViteBinPath(webWorkingDirectoryPath), "--strictPort"],
   };
-}
-
-async function terminateProcess(pid: number): Promise<void> {
-  if (process.platform === "win32") {
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true,
-      });
-
-      child.once("error", reject);
-      child.once("exit", (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-
-        reject(new Error(`taskkill exited with code ${code ?? 1}`));
-      });
-    });
-
-    return;
-  }
-
-  try {
-    process.kill(-pid, "SIGTERM");
-    return;
-  } catch {
-    process.kill(pid, "SIGTERM");
-  }
-}
-
-async function waitForWorkerExit(child: ChildProcess): Promise<void> {
-  await new Promise<void>((resolve) => {
-    child.once("exit", () => {
-      resolve();
-    });
-  });
 }
 
 let workerChild: ChildProcess | null = null;
 
 async function writeRunningLock(): Promise<void> {
-  await writeWebDevLock({
+  await writeDevLock(webDevLockPath, {
     pid: process.pid,
     runId: webRunId,
+    sessionId: webSessionId,
   });
 }
 
 async function removeRunningLock(): Promise<void> {
-  await removeWebDevLock();
+  await removeDevLock(webDevLockPath);
 }
 
 async function startWorker(): Promise<void> {
@@ -90,6 +54,11 @@ async function startWorker(): Promise<void> {
     env: {
       ...process.env,
       NODE_OPTIONS: createNodeOptions(),
+      ...createDevTraceEnv({
+        sessionId: webSessionId,
+        service: "web",
+        role: "worker",
+      }),
     },
     stdio: "inherit",
     windowsHide: true,
@@ -109,7 +78,7 @@ async function startWorker(): Promise<void> {
 process.on("SIGINT", async () => {
   if (workerChild?.pid) {
     await terminateProcess(workerChild.pid);
-    await waitForWorkerExit(workerChild);
+    await waitForChildExit(workerChild);
   }
 
   await removeRunningLock();
@@ -119,7 +88,7 @@ process.on("SIGINT", async () => {
 process.on("SIGTERM", async () => {
   if (workerChild?.pid) {
     await terminateProcess(workerChild.pid);
-    await waitForWorkerExit(workerChild);
+    await waitForChildExit(workerChild);
   }
 
   await removeRunningLock();

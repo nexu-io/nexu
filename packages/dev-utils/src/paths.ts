@@ -10,41 +10,8 @@ export const repoRootPath = fileURLToPath(
   new URL("../../../", import.meta.url),
 );
 
-export const scriptsDevPath = join(repoRootPath, "scripts", "dev");
-export const scriptsDevSourcePath = join(scriptsDevPath, "src");
-
-export const controllerWorkingDirectoryPath = join(
-  repoRootPath,
-  "apps",
-  "controller",
-);
-export const webWorkingDirectoryPath = join(repoRootPath, "apps", "web");
-
-export const controllerSupervisorPath = join(
-  scriptsDevSourcePath,
-  "controller-supervisor.ts",
-);
-export const webSupervisorPath = join(
-  scriptsDevSourcePath,
-  "web-supervisor.ts",
-);
-export const controllerSourceDirectoryPath = join(
-  controllerWorkingDirectoryPath,
-  "src",
-);
-
 export const devTmpPath = join(repoRootPath, ".tmp", "dev");
 export const devLogsPath = join(devTmpPath, "logs");
-export const webDevLockPath = join(devTmpPath, "web.pid");
-export const controllerDevLockPath = join(devTmpPath, "controller.pid");
-
-export function getWebDevLogPath(runId: string): string {
-  return join(devLogsPath, runId, "web.log");
-}
-
-export function getControllerDevLogPath(runId: string): string {
-  return join(devLogsPath, runId, "controller.log");
-}
 
 export function getWindowsLauncherBatchPath(
   launcherDirectoryPath: string,
@@ -79,9 +46,9 @@ export function resolveTsxPaths(resolveFromPath: string = repoRootPath): {
   };
 }
 
-export function resolveViteBinPath(): string {
+export function resolveViteBinPath(resolveFromPath: string): string {
   const vitePackageJsonPath = require.resolve("vite/package.json", {
-    paths: [webWorkingDirectoryPath],
+    paths: [resolveFromPath],
   });
 
   return join(dirname(vitePackageJsonPath), "bin", "vite.js");

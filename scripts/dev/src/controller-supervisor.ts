@@ -2,16 +2,26 @@ import { type ChildProcess, spawn } from "node:child_process";
 import chokidar from "chokidar";
 
 import {
+  createNodeOptions,
+  removeDevLock,
+  resolveTsxPaths,
+  terminateProcess,
+  waitFor,
+  writeDevLock,
+} from "@nexu/dev-utils";
+
+import { waitForChildExit } from "./children.js";
+import { getControllerPortPid } from "./controller-dev.js";
+import {
+  controllerDevLockPath,
   controllerSourceDirectoryPath,
   controllerWorkingDirectoryPath,
-  getControllerPortPid,
-  removeControllerDevLock,
-  resolveTsxPaths,
-  writeControllerDevLock,
-} from "@nexu/dev-utils";
+} from "./dev-paths.js";
+import { createDevTraceEnv } from "./dev-trace.js";
 
 const runId = process.env.NEXU_DEV_CONTROLLER_RUN_ID;
 const logFilePath = process.env.NEXU_DEV_CONTROLLER_LOG_PATH;
+const sessionId = process.env.NEXU_DEV_SESSION_ID;
 
 if (!runId) {
   throw new Error("NEXU_DEV_CONTROLLER_RUN_ID is required");
@@ -21,16 +31,12 @@ if (!logFilePath) {
   throw new Error("NEXU_DEV_CONTROLLER_LOG_PATH is required");
 }
 
-const controllerRunId = runId;
-function createNodeOptions(): string {
-  const existing = process.env.NODE_OPTIONS?.trim();
-
-  if (existing) {
-    return `${existing} --conditions=development`;
-  }
-
-  return "--conditions=development";
+if (!sessionId) {
+  throw new Error("NEXU_DEV_SESSION_ID is required");
 }
+
+const controllerRunId = runId;
+const controllerSessionId = sessionId;
 
 function createControllerWorkerCommand(): { command: string; args: string[] } {
   const { loaderUrl, preflightPath } = resolveTsxPaths();
@@ -41,80 +47,43 @@ function createControllerWorkerCommand(): { command: string; args: string[] } {
   };
 }
 
-async function terminateProcess(pid: number): Promise<void> {
-  if (process.platform === "win32") {
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-        stdio: "ignore",
-        windowsHide: true,
-      });
-
-      child.once("error", reject);
-      child.once("exit", (code) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-
-        reject(new Error(`taskkill exited with code ${code ?? 1}`));
-      });
-    });
-
-    return;
-  }
-
-  try {
-    process.kill(-pid, "SIGTERM");
-    return;
-  } catch {
-    process.kill(pid, "SIGTERM");
-  }
-}
-
 async function waitForControllerPortRelease(): Promise<void> {
-  for (let index = 0; index < 20; index += 1) {
-    try {
-      await getControllerPortPid();
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    } catch {
-      return;
-    }
-  }
+  await waitFor(
+    async () => {
+      try {
+        await getControllerPortPid();
+      } catch {
+        return;
+      }
 
-  throw new Error("controller dev server did not release port 3010");
+      throw new Error("controller dev server is still listening on port 3010");
+    },
+    () => new Error("controller dev server did not release port 3010"),
+  );
 }
 
 async function waitForControllerPortPid(): Promise<number> {
-  for (let index = 0; index < 30; index += 1) {
-    try {
-      return await getControllerPortPid();
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-  }
-
-  throw new Error("controller dev server did not open port 3010");
+  return waitFor(
+    () => getControllerPortPid(),
+    () => new Error("controller dev server did not open port 3010"),
+    {
+      attempts: 30,
+    },
+  );
 }
 
 let workerChild: ChildProcess | null = null;
 
-async function waitForWorkerExit(child: ChildProcess): Promise<void> {
-  await new Promise<void>((resolve) => {
-    child.once("exit", () => {
-      resolve();
-    });
-  });
-}
-
 async function writeRunningLock(): Promise<void> {
-  await writeControllerDevLock({
+  await writeDevLock(controllerDevLockPath, {
     pid: process.pid,
     runId: controllerRunId,
+    sessionId: controllerSessionId,
   });
 }
 
 async function removeRunningLock(): Promise<void> {
-  await removeControllerDevLock();
+  await removeDevLock(controllerDevLockPath);
 }
 
 async function startWorker(): Promise<void> {
@@ -124,6 +93,11 @@ async function startWorker(): Promise<void> {
     env: {
       ...process.env,
       NODE_OPTIONS: createNodeOptions(),
+      ...createDevTraceEnv({
+        sessionId: controllerSessionId,
+        service: "controller",
+        role: "worker",
+      }),
     },
     stdio: "inherit",
     windowsHide: true,
@@ -144,7 +118,7 @@ async function startWorker(): Promise<void> {
 async function restartWorker(): Promise<void> {
   if (workerChild?.pid) {
     await terminateProcess(workerChild.pid);
-    await waitForWorkerExit(workerChild);
+    await waitForChildExit(workerChild);
     await waitForControllerPortRelease();
   }
 
@@ -169,7 +143,7 @@ process.on("SIGINT", async () => {
 
   if (workerChild?.pid) {
     await terminateProcess(workerChild.pid);
-    await waitForWorkerExit(workerChild);
+    await waitForChildExit(workerChild);
   }
 
   await removeRunningLock();
@@ -181,7 +155,7 @@ process.on("SIGTERM", async () => {
 
   if (workerChild?.pid) {
     await terminateProcess(workerChild.pid);
-    await waitForWorkerExit(workerChild);
+    await waitForChildExit(workerChild);
   }
 
   await removeRunningLock();
