@@ -4,9 +4,6 @@ on:
   pull_request:
     paths:
       - "apps/desktop/**"
-      - "apps/controller/**"
-      - "apps/web/**"
-      - "packages/shared/**"
       - "openclaw-runtime/**"
       - "openclaw-runtime-patches/**"
       - ".npmrc"
@@ -23,9 +20,6 @@ on:
       - main
     paths:
       - "apps/desktop/**"
-      - "apps/controller/**"
-      - "apps/web/**"
-      - "packages/shared/**"
       - "openclaw-runtime/**"
       - "openclaw-runtime-patches/**"
       - ".npmrc"
