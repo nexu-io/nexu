@@ -1,0 +1,51 @@
+# Generates a repository infographic (SVG) with real GitHub data from nexu-io/nexu (upstream).
+# See https://github.com/lowlighter/metrics — uses the stock "repository" template.
+name: GitHub metrics
+on:
+  schedule: [{ cron: "20 2 * * *" }]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-metrics
+  cancel-in-progress: true
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate metrics SVG
+        uses: lowlighter/metrics@latest
+        with:
+          template: repository
+          filename: docs/github-metrics.svg
+          token: ${{ github.token }}
+          user: nexu-io
+          repo: nexu
+          base: header
+          config_display: large
+          plugins_errors_fatal: no
+          plugin_followup: yes
+          plugin_followup_indepth: yes
+          plugin_lines: yes
+          plugin_languages: yes
+          plugin_languages_limit: 4
+          plugin_stargazers: yes
+          plugin_stargazers_days: 30
+          plugin_contributors: yes
+          plugin_contributors_contributions: yes
+          plugin_activity: yes
+          plugin_activity_days: 14
+          plugin_activity_limit: 8
+          plugin_activity_filter: issue, pr, push
+          plugin_traffic: yes
+          output_action: commit
+          committer_branch: ${{ github.event.repository.default_branch }}
+          committer_message: "chore: refresh docs/github-metrics.svg"
