@@ -228,7 +228,6 @@ const en = {
   // ── Models Page ──
   "models.pageTitle": "Settings",
   "models.pageSubtitle": "Manage AI model providers",
-  "models.currentModel": "Active model",
   "settings.pageSubtitle": "Manage profile, language, and AI model providers",
   "settings.tabGeneral": "General",
   "settings.tabProviders": "AI Model Providers",

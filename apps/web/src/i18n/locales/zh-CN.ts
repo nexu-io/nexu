@@ -223,7 +223,6 @@ const zhCN = {
   // ── Models Page ──
   "models.pageTitle": "设置",
   "models.pageSubtitle": "管理 AI 模型服务商",
-  "models.currentModel": "当前模型",
   "settings.pageSubtitle": "管理资料、语言偏好与 AI 模型服务商",
   "settings.tabGeneral": "通用设置",
   "settings.tabProviders": "AI 模型服务商",
