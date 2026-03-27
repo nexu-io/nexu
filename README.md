@@ -263,6 +263,14 @@ We use GitHub as the primary hub for community interaction. Before opening a new
 
 ---
 
+## 📊 GitHub Stats
+
+<picture>
+  <img alt="GitHub Stats" src="docs/github-metrics.svg" />
+</picture>
+
+---
+
 ## ⭐ Star History
 
 <a href="https://star-history.com/#nexu-io/nexu&Date">
