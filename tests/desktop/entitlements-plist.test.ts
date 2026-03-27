@@ -32,6 +32,29 @@ function plistHasKey(plistContent: string, key: string): boolean {
   return plistContent.includes(`<key>${key}</key>`);
 }
 
+/**
+ * Extract all key-value pairs from a flat plist <dict>.
+ * Returns a map of key → value string (e.g. "true" for <true/>).
+ */
+function parsePlistDict(plistContent: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const keyRegex = /<key>([^<]+)<\/key>\s*<([^/> ]+)\s*\/?>([^<]*)/g;
+  let match = keyRegex.exec(plistContent);
+  while (match !== null) {
+    const key = match[1];
+    const tag = match[2];
+    if (tag === "true") {
+      result.set(key, "true");
+    } else if (tag === "false") {
+      result.set(key, "false");
+    } else if (tag === "string") {
+      result.set(key, match[3]);
+    }
+    match = keyRegex.exec(plistContent);
+  }
+  return result;
+}
+
 describe("macOS Entitlements — V8 JIT requirements", () => {
   const parentPlist = readPlist("entitlements.mac.plist");
   const inheritPlist = readPlist("entitlements.mac.inherit.plist");
@@ -131,5 +154,89 @@ describe("macOS Entitlements — V8 JIT requirements", () => {
         "com.apple.security.cs.disable-library-validation",
       ),
     ).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // 8. Value-level: all required keys are set to <true/>
+  // -------------------------------------------------------------------------
+  it("parent plist sets all required entitlements to true (not just key presence)", () => {
+    const dict = parsePlistDict(parentPlist);
+    expect(dict.get("com.apple.security.cs.allow-jit")).toBe("true");
+    expect(
+      dict.get("com.apple.security.cs.allow-unsigned-executable-memory"),
+    ).toBe("true");
+    expect(dict.get("com.apple.security.cs.disable-library-validation")).toBe(
+      "true",
+    );
+  });
+
+  it("inherit plist sets all required entitlements to true", () => {
+    const dict = parsePlistDict(inheritPlist);
+    expect(dict.get("com.apple.security.inherit")).toBe("true");
+    expect(dict.get("com.apple.security.cs.allow-jit")).toBe("true");
+    expect(
+      dict.get("com.apple.security.cs.allow-unsigned-executable-memory"),
+    ).toBe("true");
+  });
+
+  // -------------------------------------------------------------------------
+  // 9. No dangerous entitlements that would weaken security unnecessarily
+  // -------------------------------------------------------------------------
+  it("neither plist grants com.apple.security.cs.disable-executable-page-protection", () => {
+    expect(
+      plistHasKey(
+        parentPlist,
+        "com.apple.security.cs.disable-executable-page-protection",
+      ),
+    ).toBe(false);
+    expect(
+      plistHasKey(
+        inheritPlist,
+        "com.apple.security.cs.disable-executable-page-protection",
+      ),
+    ).toBe(false);
+  });
+
+  it("neither plist grants com.apple.security.get-task-allow in production", () => {
+    // get-task-allow is for debugging only; must not ship in release builds
+    expect(plistHasKey(parentPlist, "com.apple.security.get-task-allow")).toBe(
+      false,
+    );
+    expect(plistHasKey(inheritPlist, "com.apple.security.get-task-allow")).toBe(
+      false,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // 10. No duplicate keys (malformed plist)
+  // -------------------------------------------------------------------------
+  it("parent plist has no duplicate keys", () => {
+    const keys = [...parentPlist.matchAll(/<key>([^<]+)<\/key>/g)].map(
+      (m) => m[1],
+    );
+    const unique = new Set(keys);
+    expect(keys.length).toBe(unique.size);
+  });
+
+  it("inherit plist has no duplicate keys", () => {
+    const keys = [...inheritPlist.matchAll(/<key>([^<]+)<\/key>/g)].map(
+      (m) => m[1],
+    );
+    const unique = new Set(keys);
+    expect(keys.length).toBe(unique.size);
+  });
+
+  // -------------------------------------------------------------------------
+  // 11. electron-builder hardenedRuntime must be enabled
+  // -------------------------------------------------------------------------
+  it("electron-builder config enables hardenedRuntime", () => {
+    const packageJson = readFileSync(
+      resolve(DESKTOP_ROOT, "package.json"),
+      "utf8",
+    );
+    const config = JSON.parse(packageJson) as Record<string, unknown>;
+    const build = config.build as Record<string, unknown>;
+    const mac = build.mac as Record<string, unknown>;
+    expect(mac.hardenedRuntime).toBe(true);
   });
 });

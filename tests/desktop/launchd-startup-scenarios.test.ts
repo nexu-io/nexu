@@ -956,4 +956,79 @@ describe("Launchd Startup Scenarios", () => {
     expect(result.isAttach).toBe(false);
     expect(result.effectivePorts.controllerPort).toBe(50800);
   });
+
+  // -----------------------------------------------------------------------
+  // Scenario 25: Upgrade from pre-version runtime-ports forces clean restart
+  // -----------------------------------------------------------------------
+  it("Scenario 25: missing appVersion in recovered ports triggers clean cold start", async () => {
+    const fsMock = await import("node:fs/promises");
+    const legacyPorts = JSON.stringify({
+      writtenAt: new Date().toISOString(),
+      electronPid: 12345,
+      controllerPort: 50800,
+      openclawPort: 18789,
+      webPort: 50810,
+      nexuHome: "/tmp/nexu-home",
+      isDev: true,
+      userDataPath: "/tmp/user-data",
+      buildSource: "stable",
+    });
+
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(JSON.stringify(legacyPorts))
+      .mockResolvedValueOnce(JSON.stringify(legacyPorts));
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        appVersion: "1.0.0",
+        userDataPath: "/tmp/user-data",
+        buildSource: "stable",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(result.effectivePorts.controllerPort).toBe(50800);
+    expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 26: stale force-quit session cleans runtime-ports and services
+  // -----------------------------------------------------------------------
+  it("Scenario 26: stale dead-electron session older than threshold is cleaned before restart", async () => {
+    const fsMock = await import("node:fs/promises");
+    const stalePorts = makeRuntimePorts({
+      electronPid: 999999,
+      writtenAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    });
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockRejectedValueOnce(new Error("ENOENT"))
+      .mockResolvedValueOnce(stalePorts);
+
+    mockLaunchdManager.getServiceStatus.mockResolvedValue(
+      mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(result.isAttach).toBe(false);
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(fsMock.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("runtime-ports.json"),
+    );
+  });
 });
