@@ -48,6 +48,7 @@ type SanitizedUserMessageText = {
 };
 type SessionHints = {
   senderName?: string;
+  groupName?: string;
   channelType?: string;
   metadata?: SessionMetadataRecord;
   feishuMessageId?: string;
@@ -124,16 +125,20 @@ export class SessionsRuntime {
           if (!channelType && hints.channelType) {
             channelType = hints.channelType;
           }
-          if (
-            this.shouldReplaceInferredTitle(title, sessionKey) &&
-            hints.senderName
-          ) {
-            title =
-              channelType === "openclaw-weixin"
-                ? hints.senderName
-                : channelType
-                  ? `${hints.senderName} · ${channelType}`
-                  : hints.senderName;
+          if (this.shouldReplaceInferredTitle(title, sessionKey)) {
+            if (hints.groupName) {
+              title =
+                channelType && channelType !== "openclaw-weixin"
+                  ? `${hints.groupName} · ${channelType}`
+                  : hints.groupName;
+            } else if (hints.senderName) {
+              title =
+                channelType === "openclaw-weixin"
+                  ? hints.senderName
+                  : channelType
+                    ? `${hints.senderName} · ${channelType}`
+                    : hints.senderName;
+            }
           }
           if (
             this.shouldReplaceInferredTitle(title, sessionKey) &&
@@ -787,6 +792,17 @@ export class SessionsRuntime {
       this.readStringValue(conversationMeta, "sender") ??
       undefined;
 
+    const rawGroupName =
+      this.readStringValue(conversationMeta, "group_name") ??
+      this.readStringValue(conversationMeta, "chat_name") ??
+      this.readStringValue(conversationMeta, "group_subject") ??
+      this.readStringValue(conversationMeta, "conversation_label") ??
+      undefined;
+    const isIdLike =
+      rawGroupName !== undefined &&
+      /^(?:oc_|ou_|C[A-Z0-9]{8,})[a-f0-9]*$/i.test(rawGroupName);
+    const groupName = isIdLike ? undefined : rawGroupName;
+
     let channelType: string | undefined;
     const combined = [
       this.readStringValue(senderMeta, "label") ?? "",
@@ -824,6 +840,7 @@ export class SessionsRuntime {
 
     return {
       senderName,
+      groupName,
       channelType,
       metadata: this.extractExactChatTargetMetadata(
         senderMeta,
