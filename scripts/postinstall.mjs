@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 
 const repoRoot = process.cwd();
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const corepackCommand =
+  process.platform === "win32" ? "corepack.cmd" : "corepack";
 
 function isTruthy(value) {
   if (!value) {
@@ -48,7 +50,8 @@ async function run(command, args) {
 }
 
 async function installOpenClawRuntime() {
-  await run(npmCommand, [
+  await run(corepackCommand, [
+    "npm",
     "--prefix",
     "./openclaw-runtime",
     "run",

@@ -27,8 +27,9 @@ Thank you for helping improve nexu. The sections below cover **code**, **documen
 ### Prerequisites
 
 - **Git**
-- **Node.js** 22+ (LTS recommended; minimum in `package.json` is 20+)
-- **pnpm** 10+ (repo pins `pnpm@10.26.0` via `packageManager`)
+- **Node.js** 24+ (LTS recommended; enforced via `package.json` `engines`)
+- **pnpm** 10.26+ (repo pins `pnpm@10.26.0` via `packageManager`)
+- **npm** 11+ (required for `openclaw-runtime` maintenance flows)
 
 ### Clone and install
 

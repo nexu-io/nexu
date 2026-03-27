@@ -4,8 +4,9 @@ on:
   pull_request:
     paths:
       - "apps/desktop/**"
-      - "apps/controller/package.json"
-      - "apps/controller/static/runtime-plugins/**"
+      - "apps/controller/**"
+      - "apps/web/**"
+      - "packages/shared/**"
       - "openclaw-runtime/**"
       - "openclaw-runtime-patches/**"
       - "scripts/desktop-check-dist.sh"
@@ -46,7 +47,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
