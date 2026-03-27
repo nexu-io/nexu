@@ -107,6 +107,23 @@ jobs:
       - name: Test
         run: pnpm test
 
+  # ── openclaw-runtime lockfile sync ─────────────────────────────────────────
+  openclaw-runtime-lockfile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify openclaw-runtime lockfile is in sync
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: openclaw-runtime
+
   # ── Build + ESM check ─────────────────────────────────────────────────────
   build:
     runs-on: ubuntu-latest
