@@ -1,7 +1,7 @@
 import type { MinimalSkill } from "@/types/desktop";
 
 export type TopTab = "explore" | "yours";
-export type YoursSubTab = "all" | "recommended" | "installed";
+export type YoursSubTab = "all" | "recommended" | "installed" | "agent";
 
 export type SkillsViewState = {
   topTab: TopTab;
@@ -34,7 +34,12 @@ function isTopTab(value: string | null): value is TopTab {
 }
 
 function isYoursSubTab(value: string | null): value is YoursSubTab {
-  return value === "all" || value === "recommended" || value === "installed";
+  return (
+    value === "all" ||
+    value === "recommended" ||
+    value === "installed" ||
+    value === "agent"
+  );
 }
 
 function normalizeSearch(search: string): string {

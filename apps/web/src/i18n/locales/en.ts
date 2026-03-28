@@ -499,6 +499,11 @@ const en = {
   "skills.uninstallAction": "Uninstall",
   "skills.installingAction": "Installing…",
   "skills.uninstallingAction": "Uninstalling…",
+  "skills.agentSkills": "Agent Skills",
+  "skills.installedByAgent": "Installed by {{agentName}}",
+  "skills.noAgentSkills": "No agent-installed skills yet",
+  "skills.agentSkillsDescription":
+    "Skills installed by agents during conversations",
 
   // ── Skill Detail Page ──
   "skillDetail.backToSkills": "Back to Skills",

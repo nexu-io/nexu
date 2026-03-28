@@ -20,7 +20,11 @@ import {
 } from "@/lib/skills-view-state";
 import { mapInstalledSkillSource, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
+import type {
+  InstalledSkill,
+  MinimalSkill,
+  SkillSource,
+} from "@/types/desktop";
 import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -332,7 +336,7 @@ export function SkillsPage() {
     return map;
   }, [data?.queue]);
   const queueSourceBySlug = useMemo(() => {
-    const map = new Map<string, "curated" | "managed" | "custom">();
+    const map = new Map<string, SkillSource>();
     for (const item of data?.queue ?? []) {
       map.set(item.slug, item.source);
     }
@@ -439,6 +443,14 @@ export function SkillsPage() {
         ...installed.filter((s) => customSlugs.has(s.slug)),
       ];
     }
+    if (yoursSubTab === "agent") {
+      const workspaceSlugs = new Set(
+        installedSkills
+          .filter((is) => is.source === "workspace")
+          .map((is) => is.slug),
+      );
+      return installed.filter((s) => workspaceSlugs.has(s.slug));
+    }
     return [...downloadingWithSource.map((d) => d.skill), ...installed];
   }, [installedSkills, allSkills, yoursSubTab, activeQueueItems]);
 
@@ -494,6 +506,22 @@ export function SkillsPage() {
 
   const visibleSkills = filteredSkills.slice(0, visibleCount);
 
+  // Group workspace skills by agent for the "agent" sub-tab
+  const workspaceSkillsByAgent = useMemo(() => {
+    if (yoursSubTab !== "agent") return new Map<string, InstalledSkill[]>();
+    const workspaceSkills = installedSkills.filter(
+      (is) => is.source === "workspace",
+    );
+    return workspaceSkills.reduce((acc, skill) => {
+      const key = skill.agentName ?? skill.agentId ?? "Unknown";
+      const existing = acc.get(key);
+      if (existing) {
+        return new Map(acc).set(key, [...existing, skill]);
+      }
+      return new Map(acc).set(key, [skill]);
+    }, new Map<string, InstalledSkill[]>());
+  }, [yoursSubTab, installedSkills]);
+
   // Category tabs for pills
   const categoryTabs = useMemo(() => {
     const base =
@@ -529,6 +557,9 @@ export function SkillsPage() {
   const customCount =
     installedSkills.filter((is) => is.source === "custom").length +
     activeQueueItems.filter((qi) => qi.source === "custom").length;
+  const workspaceCount = installedSkills.filter(
+    (is) => is.source === "workspace",
+  ).length;
   const totalYoursCount = installedSkills.length + activeQueueItems.length;
 
   if (isLoading) {
@@ -694,6 +725,11 @@ export function SkillsPage() {
                   label: t("skills.installed"),
                   count: customCount,
                 },
+                {
+                  id: "agent" as const,
+                  label: t("skills.agentSkills"),
+                  count: workspaceCount,
+                },
               ] as const
             ).map((tab) => {
               const active = yoursSubTab === tab.id;
@@ -793,53 +829,125 @@ export function SkillsPage() {
           {t("skills.clawhubDisclaimerAfterLink")}
         </p>
 
-        {/* Skill Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {visibleSkills.map((skill) => {
-            const firstTag = skill.tags[0];
-            return (
-              <SkillCard
-                key={skill.slug}
-                skill={skill}
-                isInstalled={installedSlugs.has(skill.slug)}
-                queueStatus={queueBySlug.get(skill.slug)}
-                detailTo={createSkillDetailPath(skill.slug, location.search)}
-                isDetailAvailable={!unavailableDetailSlugs.has(skill.slug)}
-                skillSource={
-                  topTab === "explore"
-                    ? "explore"
-                    : mapInstalledSkillSource(
-                        installedSkills.find((item) => item.slug === skill.slug)
-                          ?.source ??
-                          queueSourceBySlug.get(skill.slug) ??
-                          "managed",
-                      )
-                }
-                categoryLabel={
-                  firstTag ? getTagLabel(firstTag, locale) : undefined
-                }
-              />
-            );
-          })}
-        </div>
-
-        {/* Sentinel for infinite scroll */}
-        {visibleCount < filteredSkills.length && (
-          <div ref={sentinelRef} className="flex justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-text-muted" />
-          </div>
-        )}
-
-        {/* Empty state */}
-        {filteredSkills.length === 0 && (
-          <div className="text-center py-12">
-            <Search size={24} className="mx-auto text-text-muted mb-3" />
-            <div className="text-[13px] text-text-muted">
-              {topTab === "yours" && !debouncedQuery.trim()
-                ? t("skills.noInstalledSkills")
-                : t("skills.noMatchingSkills")}
+        {/* Agent Skills grouped view */}
+        {yoursSubTab === "agent" ? (
+          workspaceSkillsByAgent.size === 0 ? (
+            <div className="text-center py-12">
+              <Zap size={24} className="mx-auto text-text-muted mb-3" />
+              <div className="text-[13px] text-text-muted">
+                {t("skills.noAgentSkills")}
+              </div>
+              <div className="text-[12px] text-text-tertiary mt-1">
+                {t("skills.agentSkillsDescription")}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              {[...workspaceSkillsByAgent.entries()].map(
+                ([agentName, skills]) => (
+                  <div key={agentName}>
+                    <h3 className="text-[13px] font-semibold text-text-heading mb-3">
+                      {t("skills.installedByAgent", { agentName })}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {skills.map((skill) => {
+                        const catalogEntry = allSkills.find(
+                          (s) => s.slug === skill.slug,
+                        );
+                        const minimalSkill: MinimalSkill = catalogEntry ?? {
+                          slug: skill.slug,
+                          name: skill.name || skill.slug,
+                          description: skill.description || "",
+                          downloads: 0,
+                          stars: 0,
+                          tags: [],
+                          version: "",
+                          updatedAt: "",
+                        };
+                        const firstTag = minimalSkill.tags[0];
+                        return (
+                          <SkillCard
+                            key={skill.slug}
+                            skill={minimalSkill}
+                            isInstalled={true}
+                            queueStatus={queueBySlug.get(skill.slug)}
+                            detailTo={createSkillDetailPath(
+                              skill.slug,
+                              location.search,
+                            )}
+                            isDetailAvailable={
+                              !unavailableDetailSlugs.has(skill.slug)
+                            }
+                            skillSource="builtin"
+                            categoryLabel={
+                              firstTag
+                                ? getTagLabel(firstTag, locale)
+                                : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
+          )
+        ) : (
+          <>
+            {/* Skill Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {visibleSkills.map((skill) => {
+                const firstTag = skill.tags[0];
+                return (
+                  <SkillCard
+                    key={skill.slug}
+                    skill={skill}
+                    isInstalled={installedSlugs.has(skill.slug)}
+                    queueStatus={queueBySlug.get(skill.slug)}
+                    detailTo={createSkillDetailPath(
+                      skill.slug,
+                      location.search,
+                    )}
+                    isDetailAvailable={!unavailableDetailSlugs.has(skill.slug)}
+                    skillSource={
+                      topTab === "explore"
+                        ? "explore"
+                        : mapInstalledSkillSource(
+                            installedSkills.find(
+                              (item) => item.slug === skill.slug,
+                            )?.source ??
+                              queueSourceBySlug.get(skill.slug) ??
+                              "managed",
+                          )
+                    }
+                    categoryLabel={
+                      firstTag ? getTagLabel(firstTag, locale) : undefined
+                    }
+                  />
+                );
+              })}
+            </div>
+
+            {/* Sentinel for infinite scroll */}
+            {visibleCount < filteredSkills.length && (
+              <div ref={sentinelRef} className="flex justify-center py-8">
+                <Loader2 size={20} className="animate-spin text-text-muted" />
+              </div>
+            )}
+
+            {/* Empty state */}
+            {filteredSkills.length === 0 && (
+              <div className="text-center py-12">
+                <Search size={24} className="mx-auto text-text-muted mb-3" />
+                <div className="text-[13px] text-text-muted">
+                  {topTab === "yours" && !debouncedQuery.trim()
+                    ? t("skills.noInstalledSkills")
+                    : t("skills.noMatchingSkills")}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

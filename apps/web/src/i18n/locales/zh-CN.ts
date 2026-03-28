@@ -476,6 +476,10 @@ const zhCN = {
   "skills.uninstallAction": "卸载",
   "skills.installingAction": "安装中…",
   "skills.uninstallingAction": "卸载中…",
+  "skills.agentSkills": "代理技能",
+  "skills.installedByAgent": "由 {{agentName}} 安装",
+  "skills.noAgentSkills": "暂无代理安装的技能",
+  "skills.agentSkillsDescription": "代理在对话中安装的技能",
 
   // ── Skill Detail Page ──
   "skillDetail.backToSkills": "返回技能列表",
