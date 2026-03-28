@@ -17,7 +17,7 @@ const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
   ollama: "http://127.0.0.1:11434",
-  siliconflow: "https://api.siliconflow.com/v1",
+  siliconflow: "https://api.siliconflow.cn/v1",
   ppio: "https://api.ppinfra.com/v3/openai",
   openrouter: "https://openrouter.ai/api/v1",
   minimax: "https://api.minimax.io/anthropic",

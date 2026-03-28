@@ -257,6 +257,55 @@ describe("compileOpenClawConfig", () => {
     });
   });
 
+  it("uses SiliconFlow's cn API base URL by default", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+        },
+        providers: [
+          {
+            id: "provider-siliconflow",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: null,
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.siliconflow?.baseUrl).toBe(
+      "https://api.siliconflow.cn/v1",
+    );
+    expect(result.models?.providers.siliconflow?.models[0]?.id).toBe(
+      "Pro/MiniMaxAI/MiniMax-M2.5",
+    );
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+    });
+  });
+
   it("ignores unsupported custom providers in compiled model config", () => {
     const result = compileOpenClawConfig(
       createConfig({

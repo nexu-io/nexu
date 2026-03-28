@@ -266,7 +266,7 @@ const PROVIDER_META: Record<
     descriptionKey: "models.provider.openaiCompatible.description",
     apiDocsUrl: "https://cloud.siliconflow.cn/account/ak",
     apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.siliconflow.com/v1",
+    defaultProxyUrl: "https://api.siliconflow.cn/v1",
   },
   ppio: {
     name: "PPIO",
