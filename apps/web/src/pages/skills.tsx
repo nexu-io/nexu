@@ -265,9 +265,16 @@ function AgentSkillGroups({
     <div className="space-y-6">
       {[...groups.entries()].map(([agentName, skills]) => (
         <div key={agentName}>
-          <h3 className="text-[13px] font-semibold text-text-heading mb-3">
-            {t("skills.installedByAgent", { agentName })}
-          </h3>
+          <div className="mb-3">
+            <h3 className="text-[13px] font-semibold text-text-heading">
+              {t("skills.installedByAgent", { agentName })}
+            </h3>
+            {skills[0]?.agentId && (
+              <p className="text-[11px] text-text-tertiary mt-0.5">
+                ID: {skills[0].agentId}
+              </p>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {skills.map((skill) => {
               const catalogEntry = allSkills.find((s) => s.slug === skill.slug);
@@ -492,9 +499,9 @@ export function SkillsPage() {
       ];
     }
     if (yoursSubTab === "installed") {
-      const customOrWsSlugs = new Set(
+      const customSlugs = new Set(
         installedSkills
-          .filter((is) => is.source === "custom" || is.source === "workspace")
+          .filter((is) => is.source === "custom")
           .map((is) => is.slug),
       );
       const filteredDownloading = downloadingWithSource
@@ -502,16 +509,8 @@ export function SkillsPage() {
         .map((d) => d.skill);
       return [
         ...filteredDownloading,
-        ...installed.filter((s) => customOrWsSlugs.has(s.slug)),
+        ...installed.filter((s) => customSlugs.has(s.slug)),
       ];
-    }
-    if (yoursSubTab === "agent") {
-      const workspaceSlugs = new Set(
-        installedSkills
-          .filter((is) => is.source === "workspace")
-          .map((is) => is.slug),
-      );
-      return installed.filter((s) => workspaceSlugs.has(s.slug));
     }
     return [...downloadingWithSource.map((d) => d.skill), ...installed];
   }, [installedSkills, allSkills, yoursSubTab, activeQueueItems]);
@@ -568,10 +567,9 @@ export function SkillsPage() {
 
   const visibleSkills = filteredSkills.slice(0, visibleCount);
 
-  // Group workspace skills by agent for the "agent" and "installed" sub-tabs
+  // Group workspace skills by agent for the "installed" sub-tab
   const workspaceSkillsByAgent = useMemo(() => {
-    if (yoursSubTab !== "agent" && yoursSubTab !== "installed")
-      return new Map<string, InstalledSkill[]>();
+    if (yoursSubTab !== "installed") return new Map<string, InstalledSkill[]>();
     const workspaceSkills = installedSkills.filter(
       (is) => is.source === "workspace",
     );
@@ -618,9 +616,8 @@ export function SkillsPage() {
       (qi) => qi.source === "curated" || qi.source === "managed",
     ).length;
   const customCount =
-    installedSkills.filter(
-      (is) => is.source === "custom" || is.source === "workspace",
-    ).length + activeQueueItems.filter((qi) => qi.source === "custom").length;
+    installedSkills.filter((is) => is.source === "custom").length +
+    activeQueueItems.filter((qi) => qi.source === "custom").length;
   const workspaceCount = installedSkills.filter(
     (is) => is.source === "workspace",
   ).length;
@@ -787,12 +784,7 @@ export function SkillsPage() {
                 {
                   id: "installed" as const,
                   label: t("skills.installed"),
-                  count: customCount,
-                },
-                {
-                  id: "agent" as const,
-                  label: t("skills.agentSkills"),
-                  count: workspaceCount,
+                  count: customCount + workspaceCount,
                 },
               ] as const
             ).map((tab) => {
@@ -893,29 +885,7 @@ export function SkillsPage() {
           {t("skills.clawhubDisclaimerAfterLink")}
         </p>
 
-        {/* Agent Skills grouped view (agent-only tab) */}
-        {yoursSubTab === "agent" ? (
-          workspaceSkillsByAgent.size === 0 ? (
-            <div className="text-center py-12">
-              <Zap size={24} className="mx-auto text-text-muted mb-3" />
-              <div className="text-[13px] text-text-muted">
-                {t("skills.noAgentSkills")}
-              </div>
-              <div className="text-[12px] text-text-tertiary mt-1">
-                {t("skills.agentSkillsDescription")}
-              </div>
-            </div>
-          ) : (
-            <AgentSkillGroups
-              groups={workspaceSkillsByAgent}
-              allSkills={allSkills}
-              queueBySlug={queueBySlug}
-              unavailableDetailSlugs={unavailableDetailSlugs}
-              locationSearch={location.search}
-              locale={locale}
-            />
-          )
-        ) : (
+        {
           <>
             {/* Skill Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -985,7 +955,7 @@ export function SkillsPage() {
                 </div>
               )}
           </>
-        )}
+        }
       </div>
     </div>
   );
