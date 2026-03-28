@@ -7,6 +7,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  globalShortcut,
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
@@ -242,6 +243,9 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+
+/** When true, the Develop menu and reload shortcuts are visible in production. */
+let productionDebugMode = false;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
 
@@ -417,7 +421,8 @@ function installApplicationMenu(): void {
       submenu: [
         // Reload shortcuts are dev-only — in production they expose
         // internal "starting local service" screens (see #399).
-        ...(!app.isPackaged
+        // They can be unlocked at runtime via Cmd+Shift+Alt+D.
+        ...(!app.isPackaged || productionDebugMode
           ? ([
               { role: "reload" },
               { role: "forceReload" },
@@ -433,7 +438,7 @@ function installApplicationMenu(): void {
         { role: "togglefullscreen" },
       ],
     },
-    ...(!app.isPackaged ? [developMenu] : []),
+    ...(!app.isPackaged || productionDebugMode ? [developMenu] : []),
     { role: "windowMenu" },
     helpMenu,
   ];
@@ -891,8 +896,10 @@ app.on("web-contents-created", (_event, contents) => {
 
   // In production, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R, F5)
   // at the webContents level to prevent exposing internal startup screens (#399).
+  // Unlockable at runtime via Cmd+Shift+Alt+D (toggles productionDebugMode).
   if (app.isPackaged) {
     contents.on("before-input-event", (event, input) => {
+      if (productionDebugMode) return;
       if (input.type !== "keyDown") return;
       const isReload =
         (input.key === "r" && (input.meta || input.control)) ||
@@ -992,6 +999,15 @@ logLaunchTimeline("electron main module evaluated");
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
   installApplicationMenu();
+
+  // Hidden shortcut to toggle debug mode in production (Develop menu + reload).
+  // Harmless in dev since those items are always visible.
+  if (app.isPackaged) {
+    globalShortcut.register("CommandOrControl+Shift+Alt+D", () => {
+      productionDebugMode = !productionDebugMode;
+      installApplicationMenu();
+    });
+  }
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   diagnosticsReporter.recordStartupProbe({
     source: "main",
