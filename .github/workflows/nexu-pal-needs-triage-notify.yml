@@ -1,0 +1,28 @@
+name: "nexu-pal: needs-triage notify"
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  notify:
+    if: ${{ github.event.label.name == 'needs-triage' }}
+    name: Notify Feishu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/notify
+      - name: Send triage notification
+        env:
+          BUG_WEBHOOK: ${{ secrets.ISSUE_TRIAGE_BUG_FEISHU_WEBHOOK }}
+          REQ_WEBHOOK: ${{ secrets.ISSUE_TRIAGE_REQ_FEISHU_WEBHOOK }}
+          TRIGGER_LABEL: ${{ github.event.label.name }}
+          TITLE: ${{ github.event.issue.title }}
+          URL: ${{ github.event.issue.html_url }}
+          NUMBER: ${{ github.event.issue.number }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+          BODY: ${{ github.event.issue.body }}
+          LABELS_JSON: ${{ toJson(github.event.issue.labels.*.name) }}
+          REPO: ${{ github.repository }}
+        run: node scripts/notify/feishu-triage-notify.mjs

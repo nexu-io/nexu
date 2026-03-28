@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ControllerContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
 import type { ControllerEnv } from "../src/app/env.js";
-import { SessionsRuntime } from "../src/runtime/sessions-runtime.js";
+import {
+  FeishuCardDeliveryError,
+  SessionsRuntime,
+} from "../src/runtime/sessions-runtime.js";
 import { createRuntimeState } from "../src/runtime/state.js";
 import { SessionService } from "../src/services/session-service.js";
 
@@ -343,6 +346,85 @@ describe("session routes", () => {
     );
 
     expect(updateResponse.status).toBe(500);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      message: expect.stringContaining("messageId=om_missing"),
+    });
+  });
+
+  it("returns 502 for Feishu card delivery upstream errors", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-session-routes-"));
+    const container = createTestContainer(rootDir);
+    const app = createApp(container);
+
+    vi.spyOn(container.sessionService, "sendFeishuCard").mockRejectedValueOnce(
+      new FeishuCardDeliveryError(
+        502,
+        "sendFeishuCard upstream failure for botId=bot-feishu",
+        {
+          botId: "bot-feishu",
+        },
+      ),
+    );
+    vi.spyOn(
+      container.sessionService,
+      "updateFeishuCard",
+    ).mockRejectedValueOnce(
+      new FeishuCardDeliveryError(
+        502,
+        "updateFeishuCard upstream failure for messageId=om_missing",
+        {
+          messageId: "om_missing",
+        },
+      ),
+    );
+
+    const sendResponse = await app.request(
+      "/api/internal/channels/feishu/send-card",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          botId: "bot-feishu",
+          to: "ou_target",
+          receiveIdType: "open_id",
+          card: {
+            elements: [
+              {
+                tag: "markdown",
+                content: "hello",
+              },
+            ],
+          },
+        }),
+      },
+    );
+
+    expect(sendResponse.status).toBe(502);
+    await expect(sendResponse.json()).resolves.toMatchObject({
+      message: expect.stringContaining("botId=bot-feishu"),
+    });
+
+    const updateResponse = await app.request(
+      "/api/internal/channels/feishu/update-card",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          botId: "bot-feishu",
+          messageId: "om_missing",
+          card: {
+            elements: [
+              {
+                tag: "markdown",
+                content: "hello",
+              },
+            ],
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(502);
     await expect(updateResponse.json()).resolves.toMatchObject({
       message: expect.stringContaining("messageId=om_missing"),
     });

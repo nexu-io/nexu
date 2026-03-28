@@ -27,8 +27,9 @@
 ### 前置要求
 
 - **Git**
-- **Node.js** 22+（推荐 LTS；`package.json` 中 `engines` 最低为 20+）
-- **pnpm** 10+（仓库通过 `packageManager` 固定为 `pnpm@10.26.0`）
+- **Node.js** 24+（推荐 LTS；通过 `package.json` 中 `engines` 强制）
+- **pnpm** 10.26+（仓库通过 `packageManager` 固定为 `pnpm@10.26.0`）
+- **npm** 11+（`openclaw-runtime` 维护流程需要）
 
 ### 克隆与安装
 

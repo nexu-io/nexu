@@ -2,7 +2,13 @@ import * as amplitude from "@amplitude/unified";
 import { Identify } from "@amplitude/unified";
 
 export type AnalyticsAuthSource = "welcome_page" | "settings";
-export type AnalyticsChannel = "wechat" | "feishu" | "slack" | "discord";
+export type AnalyticsChannel =
+  | "wechat"
+  | "feishu"
+  | "slack"
+  | "discord"
+  | "telegram"
+  | "whatsapp";
 export type AnalyticsSidebarTarget =
   | "home"
   | "conversations"
@@ -48,7 +54,13 @@ export function normalizeChannel(
   if (channel === "openclaw-weixin" || channel === "wechat") {
     return "wechat";
   }
-  if (channel === "feishu" || channel === "slack" || channel === "discord") {
+  if (
+    channel === "feishu" ||
+    channel === "slack" ||
+    channel === "discord" ||
+    channel === "telegram" ||
+    channel === "whatsapp"
+  ) {
     return channel;
   }
   return null;

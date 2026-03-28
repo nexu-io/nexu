@@ -304,4 +304,23 @@ describe("nexu-feishu-card plugin", () => {
       },
     });
   });
+
+  it("defaults build_feishu_text to markdown when is_markdown is omitted", async () => {
+    const buildTextTool = collectTools({
+      sessionKey: "agent:bot-1:workspace:feishu:dm:ou_test",
+    }).find((tool) => tool.name === "build_feishu_text");
+
+    expect(buildTextTool?.execute).toBeTypeOf("function");
+
+    const result = await buildTextTool?.execute?.("tool-call-3", {
+      content: "默认 markdown",
+    });
+
+    expect(result).toMatchObject({
+      details: {
+        tag: "markdown",
+        content: "默认 markdown",
+      },
+    });
+  });
 });

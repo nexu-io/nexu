@@ -24,6 +24,88 @@ This guide covers desktop-specific working rules, structure, and troubleshooting
 - `apps/controller/src/services/skillhub/` — SkillHub catalog/install/uninstall logic. Runs in the controller process, served via HTTP. The web app uses the HTTP SDK — never IPC.
 - Keep process-management logic out of renderer files; keep presentation logic out of `main/`; keep cross-boundary DTOs out of feature-local files when they are shared by IPC.
 
+## External runtime extraction (packaged mode)
+
+In packaged mode, launchd services must NOT reference files inside the `.app` bundle — otherwise macOS Finder reports "app is in use" and blocks drag-and-drop reinstall. The solution: APFS-clone the Electron runtime and sidecars to `~/.nexu/runtime/` on first launch.
+
+### What gets extracted
+
+| Source (inside .app) | Destination (outside .app) | Method |
+|---|---|---|
+| `Contents/MacOS/<binary>` + `Contents/Frameworks/` | `~/.nexu/runtime/nexu-runner.app/Contents/` | APFS clone (`cp -Rc`), near-zero disk |
+| `Contents/Resources/runtime/controller/` | `~/.nexu/runtime/controller-sidecar/` | APFS clone (`cp -Rc`) |
+| `Contents/Resources/runtime/openclaw/payload.tar.gz` | `~/.nexu/runtime/openclaw-sidecar/` | tar extract (existing logic) |
+
+### Version stamping
+
+Each extracted directory has a `.version-stamp` file containing the app version. On startup, `resolveLaunchdPaths()` compares the stamp against `app.getVersion()`:
+- Match → fast path, use existing extraction
+- Mismatch → re-extract via staging dir + atomic rename
+- Missing stamp → treat as mismatch (conservative)
+
+### Extraction flow
+
+1. Clone to `${targetDir}.staging` (temp directory)
+2. Verify critical entry point exists in staging
+3. Write version stamp inside staging
+4. `rm -rf` old target directory
+5. `mv` staging to final location (atomic on same filesystem)
+6. On startup, any leftover `.staging` directories are cleaned up
+
+### Fallback
+
+If extraction fails (disk full, permissions), `resolveLaunchdPaths()` falls back to in-bundle paths (`process.execPath` for node runner, `Contents/Resources/runtime/controller/` for controller). The app will work but Finder will report "app is in use" during reinstall.
+
+### Binary name detection
+
+The Electron binary name is read from `Info.plist` (`CFBundleExecutable`) instead of being hardcoded, so the extraction works even if the product is renamed.
+
+## Launchd service management (packaged mode)
+
+Packaged desktop uses macOS launchd to manage controller and openclaw as independent system services. This means services survive Electron crashes and can be reattached on next launch.
+
+### Service labels
+- Production: `io.nexu.controller`, `io.nexu.openclaw`
+- Dev mode: `io.nexu.controller.dev`, `io.nexu.openclaw.dev`
+
+### Session attach
+
+On startup, `bootstrapWithLaunchd()` checks `runtime-ports.json` for a previous session. Attach is only allowed if ALL identity fields match:
+- `appVersion` — prevents attaching to services from an older build
+- `userDataPath` — prevents cross-environment attach
+- `buildSource` — prevents stable/beta/dev cross-attach
+- `openclawStateDir` — prevents state directory mismatch
+- `NEXU_HOME` — prevents home directory mismatch
+
+If any field mismatches (or is missing from the previous session), stale services are auto-booted-out and a fresh cold start is performed. This is transparent to the user (~2-3s slower).
+
+### Stale session detection
+
+If the previous Electron PID is dead AND `runtime-ports.json` is older than 5 minutes, all services are auto-booted-out before proceeding (handles Force Quit scenarios).
+
+### runtime-ports.json
+
+Written atomically (tmp + rename) after each successful bootstrap. Contains port assignments, identity fields, and the Electron PID for stale detection.
+
+## Update install safety
+
+`update-manager.ts` uses an evidence-based install decision:
+
+1. **teardownLaunchdServices()** — bootout launchd services, kill orphan processes
+2. **orchestrator.dispose()** — stop managed child processes
+3. **ensureNexuProcessesDead()** — two sweeps of SIGKILL (15s + 5s), using both launchd labels and pgrep pattern matching
+4. **checkCriticalPathsLocked()** — `lsof +D` check on `.app` bundle, runner, and sidecar directories
+5. **Decision**:
+   - No processes, no locks → install
+   - Processes alive but no critical file locks → install (harmless residual)
+   - Critical paths locked → skip this attempt; electron-updater retries next launch
+
+### Orphan cleanup hierarchy
+
+1. **Authoritative**: launchd label lookup (`launchctl print`) + stored PIDs from `runtime-ports.json`
+2. **Fallback**: `pgrep -f` with `node.*` prefix patterns, excluding current process tree
+3. Pattern matching is a last resort — prefer label-based cleanup
+
 ## Controller sidecar packaging
 
 The controller is bundled into the desktop distributable as a sidecar. The script `apps/desktop/scripts/prepare-controller-sidecar.mjs` uses `copyRuntimeDependencyClosure` to recursively deep-copy every `dependency` from `apps/controller/package.json` (and all their transitive deps) into `.dist-runtime/controller/node_modules/`.
@@ -82,6 +164,11 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 - OpenClaw native log: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
 - Desktop-scoped Nexu home: `~/Library/Application Support/@nexu/desktop/.nexu`
 - Controller `NEXU_HOME`: points to the desktop-scoped path above when launched from the packaged app
+- External node runner: `~/.nexu/runtime/nexu-runner.app/` (APFS-cloned Electron binary + Frameworks)
+- External controller sidecar: `~/.nexu/runtime/controller-sidecar/` (APFS-cloned controller dist + node_modules)
+- External openclaw sidecar: `~/.nexu/runtime/openclaw-sidecar/` (extracted from .app payload)
+- Launchd plist directory: `~/Library/LaunchAgents/` (`io.nexu.controller.plist`, `io.nexu.openclaw.plist`)
+- Runtime ports metadata: `~/Library/LaunchAgents/runtime-ports.json` (session identity + port assignments)
 
 ### How to use the logs
 
@@ -103,8 +190,8 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 ### Full local wipe checklist
 
 - For a normal dev reset, run `pnpm reset-state`
-- For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` if you also want to discard controller-owned or legacy local state outside the desktop-scoped `userData`
-- Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, and any leftover controller state from earlier local runs
+- For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` (includes extracted runtime sidecars and runner) and `~/Library/Application Support/@nexu/desktop/` if you also want to discard all packaged-app state
+- Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, extracted runtime, and any leftover controller state from earlier local runs
 
 - `a locally packaged app needs build-time overrides`
   - Put local-only packaged-app settings in `apps/desktop/.env` and keep that file untracked.

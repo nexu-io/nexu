@@ -32,6 +32,7 @@ import {
   installComponent,
   onDesktopCommand,
   onRuntimeEvent,
+  reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -46,6 +47,42 @@ const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
 
 let rendererSentryInitialized = false;
+let amplitudeTelemetryInitialized = false;
+let rendererCommitReported = false;
+
+function sendRendererStartupProbe(
+  stage: string,
+  status: "ok" | "error",
+  detail?: string | null,
+): void {
+  try {
+    reportStartupProbe({
+      source: "renderer",
+      stage,
+      status,
+      detail: detail ?? null,
+    });
+  } catch (error) {
+    console.error("[desktop] failed to report startup probe", error);
+  }
+}
+
+sendRendererStartupProbe("renderer:module-start", "ok");
+
+window.addEventListener("error", (event) => {
+  const detail =
+    event.error instanceof Error
+      ? (event.error.stack ?? event.error.message)
+      : event.message;
+  sendRendererStartupProbe("renderer:window-error", "error", detail);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  const detail =
+    reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+  sendRendererStartupProbe("renderer:unhandled-rejection", "error", detail);
+});
 
 function initializeRendererSentry(dsn: string): void {
   if (rendererSentryInitialized) {
@@ -68,8 +105,19 @@ function initializeRendererSentry(dsn: string): void {
   rendererSentryInitialized = true;
 }
 
-if (rendererSentryDsn) {
-  initializeRendererSentry(rendererSentryDsn);
+function initializeAmplitudeTelemetry(): void {
+  if (amplitudeTelemetryInitialized || !amplitudeApiKey) {
+    return;
+  }
+
+  amplitude.initAll(amplitudeApiKey, {
+    analytics: { autocapture: true },
+    sessionReplay: { sampleRate: 1 },
+  });
+  const env = new Identify();
+  env.set("environment", import.meta.env.MODE);
+  amplitude.identify(env);
+  amplitudeTelemetryInitialized = true;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -126,16 +174,6 @@ function formatBuildCommit(value: string | null | undefined): string {
   }
 
   return value.slice(0, 7);
-}
-
-if (amplitudeApiKey) {
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
-  });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
 }
 
 const queryClient = new QueryClient({
@@ -1171,16 +1209,76 @@ function RootApp() {
   return <DesktopShell />;
 }
 
+function RendererTelemetryBootstrap() {
+  useEffect(() => {
+    if (rendererSentryDsn && !rendererSentryInitialized) {
+      sendRendererStartupProbe("renderer:sentry-init:start", "ok");
+      try {
+        initializeRendererSentry(rendererSentryDsn);
+        sendRendererStartupProbe("renderer:sentry-init:success", "ok");
+      } catch (error) {
+        sendRendererStartupProbe(
+          "renderer:sentry-init:error",
+          "error",
+          error instanceof Error
+            ? (error.stack ?? error.message)
+            : String(error),
+        );
+        console.error("[desktop] renderer Sentry init failed", error);
+      }
+    }
+
+    if (!amplitudeApiKey || amplitudeTelemetryInitialized) {
+      return;
+    }
+
+    sendRendererStartupProbe("renderer:amplitude-init:start", "ok");
+    try {
+      initializeAmplitudeTelemetry();
+      sendRendererStartupProbe("renderer:amplitude-init:success", "ok");
+    } catch (error) {
+      sendRendererStartupProbe(
+        "renderer:amplitude-init:error",
+        "error",
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      );
+      console.error("[desktop] renderer Amplitude init failed", error);
+    }
+  }, []);
+
+  return null;
+}
+
+function RendererStartupSentinel() {
+  useEffect(() => {
+    if (rendererCommitReported) {
+      return;
+    }
+
+    rendererCommitReported = true;
+    sendRendererStartupProbe("renderer:react-render:committed", "ok");
+  }, []);
+
+  return null;
+}
+
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
+  sendRendererStartupProbe("renderer:root-element-missing", "error");
   throw new Error("Root element not found");
 }
+
+sendRendererStartupProbe("renderer:react-render:start", "ok");
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <RendererStartupSentinel />
+      <RendererTelemetryBootstrap />
       <RootApp />
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+sendRendererStartupProbe("renderer:react-render:scheduled", "ok");

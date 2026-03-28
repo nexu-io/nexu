@@ -151,4 +151,50 @@ describe("WorkspaceLayout", () => {
     expect(markup).toContain("<title>Slack</title>");
     expect(markup).toContain("Design sync thread");
   });
+
+  it("renders WhatsApp sessions with the correct sidebar icon and label", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(
+      ["sidebar-sessions"],
+      [
+        {
+          id: "sess-wa",
+          title: "Alice",
+          channelType: "whatsapp",
+          lastTime: "2026-03-20T08:57:00.000Z",
+          status: "active",
+        },
+      ],
+    );
+    queryClient.setQueryData(["me"], {
+      email: "alice@example.com",
+      name: "Alice",
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/workspace/sessions/sess-wa"]}>
+          <Routes>
+            <Route element={<WorkspaceLayout />}>
+              <Route
+                path="/workspace/sessions/:id"
+                element={<div>Session body</div>}
+              />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('data-session-channel-type="whatsapp"');
+    expect(markup).toContain("<title>WhatsApp</title>");
+    expect(markup).toContain("WhatsApp");
+  });
 });

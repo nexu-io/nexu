@@ -16,6 +16,7 @@ const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  ollama: "http://127.0.0.1:11434",
   siliconflow: "https://api.siliconflow.com/v1",
   ppio: "https://api.ppinfra.com/v3/openai",
   openrouter: "https://openrouter.ai/api/v1",
@@ -66,6 +67,8 @@ function resolveOpenClawProviderApi(providerId: string): string {
   switch (resolveOpenClawProviderId(providerId)) {
     case "minimax":
       return "anthropic-messages";
+    case "ollama":
+      return "ollama";
     default:
       return "openai-completions";
   }
@@ -450,6 +453,8 @@ export function compileOpenClawConfig(
           mode: "safeguard",
           maxHistoryShare: 0.5,
           keepRecentTokens: 20000,
+          recentTurnsPreserve: 5,
+          qualityGuard: { enabled: true },
           memoryFlush: {
             enabled: true,
           },
@@ -457,7 +462,7 @@ export function compileOpenClawConfig(
         humanDelay: {
           mode: "off",
         },
-        verboseDefault: "on",
+        verboseDefault: "off",
       },
       list: compileAgentList(config, env, oauthState),
     },
@@ -491,6 +496,13 @@ export function compileOpenClawConfig(
     },
     session: {
       dmScope: "per-peer",
+      // Disable automatic session reset. OpenClaw defaults to daily reset at
+      // 4 AM which silently drops conversation history — unexpected for a
+      // desktop chat app where users expect persistent sessions.
+      reset: {
+        mode: "idle",
+        idleMinutes: 525_600, // 1 year
+      },
     },
     cron: {
       enabled: true,

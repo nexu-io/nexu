@@ -86,6 +86,9 @@ const MINI_MAX_MAX_POLL_INTERVAL_MS = 10000;
 const MINI_MAX_OAUTH_REQUEST_TIMEOUT_MS = 15000;
 const MINI_MAX_OAUTH_TOKEN_REQUEST_TIMEOUT_MS = 15000;
 const OPENCLAW_COMMAND_TIMEOUT_MS = 30000;
+const NEXU_OFFICIAL_PROVIDER_ID = "nexu";
+const OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434";
+const OLLAMA_DUMMY_API_KEY = "ollama-local";
 
 function durationSecondsToMs(valueInSeconds: number): number {
   return valueInSeconds * 1000;
@@ -110,10 +113,39 @@ function hasSameModels(current: string[], expected: string[]): boolean {
   );
 }
 
+function hasSameCloudModels(
+  current: ReadonlyArray<{
+    id: string;
+    name?: string | null;
+    provider?: string | null;
+  }>,
+  next: ReadonlyArray<{
+    id: string;
+    name?: string | null;
+    provider?: string | null;
+  }>,
+): boolean {
+  const toStableKey = (model: {
+    id: string;
+    name?: string | null;
+    provider?: string | null;
+  }): string =>
+    `${model.id}\u0000${model.name ?? ""}\u0000${model.provider ?? ""}`;
+
+  const currentKeys = current.map(toStableKey).sort();
+  const nextKeys = next.map(toStableKey).sort();
+
+  return (
+    currentKeys.length === nextKeys.length &&
+    currentKeys.every((key, index) => key === nextKeys[index])
+  );
+}
+
 const PROVIDER_BASE_URLS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1",
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
+  ollama: OLLAMA_DEFAULT_BASE_URL,
   siliconflow: "https://api.siliconflow.com/v1",
   ppio: "https://api.ppinfra.com/v3/openai",
   openrouter: "https://openrouter.ai/api/v1",
@@ -198,8 +230,27 @@ function getOpenClawCommandSpec(env: ControllerEnv): {
   argsPrefix: string[];
   extraEnv: Record<string, string>;
 } {
+  const workspaceRoot =
+    process.env.NEXU_WORKSPACE_ROOT?.trim() || findWorkspaceRoot(process.cwd());
+  const runtimeEntryPath = workspaceRoot
+    ? path.join(
+        workspaceRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      )
+    : null;
   const electronExec = process.env.OPENCLAW_ELECTRON_EXECUTABLE;
   if (electronExec) {
+    if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
+      return {
+        command: electronExec,
+        argsPrefix: [runtimeEntryPath],
+        extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
+      };
+    }
+
     const binDir = path.dirname(path.resolve(env.openclawBin));
     const entry = path.resolve(
       binDir,
@@ -221,17 +272,8 @@ function getOpenClawCommandSpec(env: ControllerEnv): {
     };
   }
 
-  const workspaceRoot =
-    process.env.NEXU_WORKSPACE_ROOT?.trim() || findWorkspaceRoot(process.cwd());
   if (workspaceRoot) {
-    const runtimeEntryPath = path.join(
-      workspaceRoot,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    );
-    if (existsSync(runtimeEntryPath)) {
+    if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
       return {
         command: process.execPath,
         argsPrefix: [runtimeEntryPath],
@@ -387,10 +429,62 @@ export class ModelProviderService {
     };
   }
 
+  async refreshNexuOfficialModels(): Promise<{
+    connected: boolean;
+    refreshed: boolean;
+    changed: boolean;
+    modelCount: number;
+  }> {
+    const before = await this.configStore.getDesktopCloudStatus();
+    if (!before.connected) {
+      return {
+        connected: false,
+        refreshed: false,
+        changed: false,
+        modelCount: before.models.length,
+      };
+    }
+
+    const next = await this.configStore.refreshDesktopCloudModels();
+    const changed = !hasSameCloudModels(before.models, next.models);
+
+    if (changed) {
+      await this.ensureValidDefaultModel();
+      await this.openclawSyncService.syncAll();
+      logger.info(
+        {
+          provider: NEXU_OFFICIAL_PROVIDER_ID,
+          previousModelCount: before.models.length,
+          modelCount: next.models.length,
+        },
+        "nexu_official_models_refreshed",
+      );
+    }
+
+    return {
+      connected: true,
+      refreshed: true,
+      changed,
+      modelCount: next.models.length,
+    };
+  }
+
   async upsertProvider(
     providerId: string,
     input: Parameters<NexuConfigStore["upsertProvider"]>[1],
   ) {
+    if (providerId === "ollama") {
+      const normalizedApiKey = input.apiKey?.trim();
+      return this.configStore.upsertProvider(providerId, {
+        ...input,
+        authMode: "apiKey",
+        apiKey:
+          normalizedApiKey && normalizedApiKey.length > 0
+            ? normalizedApiKey
+            : OLLAMA_DUMMY_API_KEY,
+      });
+    }
+
     return this.configStore.upsertProvider(providerId, input);
   }
 
@@ -480,6 +574,39 @@ export class ModelProviderService {
     }
 
     try {
+      if (providerId === "ollama") {
+        const headers: Record<string, string> = {};
+        if (input.apiKey && input.apiKey !== OLLAMA_DUMMY_API_KEY) {
+          headers.Authorization = `Bearer ${input.apiKey}`;
+        }
+
+        const response = await fetch(
+          buildProviderUrl(
+            input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
+            "/api/tags",
+          ) ?? verifyUrl,
+          {
+            headers: Object.keys(headers).length > 0 ? headers : undefined,
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        if (!response.ok) {
+          return { valid: false, error: `HTTP ${response.status}` };
+        }
+
+        const payload = (await response.json()) as {
+          models?: Array<{ name?: string }>;
+        };
+        return {
+          valid: true,
+          models: Array.isArray(payload.models)
+            ? payload.models
+                .map((item) => item.name?.trim() ?? "")
+                .filter((item) => item.length > 0)
+            : [],
+        };
+      }
+
       const headers: Record<string, string> =
         providerId === "anthropic"
           ? {

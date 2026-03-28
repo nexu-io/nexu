@@ -1,5 +1,19 @@
 // Baseline installed size: 665M.
 
+const clipboardNativeTargets = [
+  "node_modules/@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
+  "node_modules/@mariozechner/clipboard-darwin-x64/clipboard.darwin-x64.node",
+  "node_modules/@mariozechner/clipboard-darwin-universal/clipboard.darwin-universal.node",
+];
+
+const daveyNativeTargets = [
+  "node_modules/@snazzah/davey-darwin-arm64/davey.darwin-arm64.node",
+  "node_modules/@snazzah/davey-darwin-x64/davey.darwin-x64.node",
+  "node_modules/@snazzah/davey-darwin-universal/davey.darwin-universal.node",
+];
+
+const shouldPruneDavey = process.env.NEXU_OPENCLAW_PRUNE_DAVEY === "1";
+
 export const pruneDependencyTargets = [
   // Round 1: actual savings 191M; actual pruned size 474M.
   // - Why these targets:
@@ -61,11 +75,11 @@ export const pruneDependencyTargets = [
   "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.17.3.dylib",
   "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/pty.node",
   "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/spawn-helper",
-  "node_modules/@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
-  "node_modules/@mariozechner/clipboard-darwin-universal/clipboard.darwin-universal.node",
+  ...clipboardNativeTargets,
   "node_modules/@reflink/reflink-darwin-arm64/reflink.darwin-arm64.node",
-  // Keep davey - required for OpenClaw Discord DAVE protocol
-  // "node_modules/@snazzah/davey-darwin-arm64/davey.darwin-arm64.node",
+  // Keep davey by default - required for OpenClaw Discord DAVE protocol.
+  // Set NEXU_OPENCLAW_PRUNE_DAVEY=1 only for builds that never enable Discord voice.
+  ...(shouldPruneDavey ? daveyNativeTargets : []),
   "node_modules/sqlite-vec-darwin-arm64/vec0.dylib",
 ];
 

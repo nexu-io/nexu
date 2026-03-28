@@ -9,7 +9,7 @@
 
 import { BrowserWindow, app, dialog } from "electron";
 import type { EmbeddedWebServer } from "./embedded-web-server";
-import { deleteRuntimePorts } from "./launchd-bootstrap";
+import { teardownLaunchdServices } from "./launchd-bootstrap";
 import type { LaunchdManager } from "./launchd-manager";
 
 export interface QuitHandlerOptions {
@@ -85,6 +85,43 @@ async function showQuitDialog(): Promise<QuitDecision> {
  * Uses the window "close" event (synchronous) as the entry point instead of
  * "before-quit" (which doesn't reliably support async operations in Electron).
  */
+/**
+ * Shared teardown sequence: flush logs, close web server, stop launchd
+ * services, then force-exit. Used by all quit paths (dev close, dev Cmd+Q,
+ * packaged quit-completely, packaged no-window). Extracted to avoid the
+ * "changed two of three" drift bug.
+ *
+ * Always ends with `app.exit(0)` in `finally`, so even if teardown throws,
+ * the app won't hang.
+ */
+async function runTeardownAndExit(
+  opts: QuitHandlerOptions,
+  logLabel: string,
+): Promise<void> {
+  try {
+    try {
+      await opts.onBeforeQuit?.();
+    } catch (err) {
+      console.warn(`[${logLabel}] onBeforeQuit failed:`, err);
+    }
+    try {
+      await opts.webServer?.close();
+    } catch (err) {
+      console.warn(`[${logLabel}] webServer.close failed:`, err);
+    }
+    await teardownLaunchdServices({
+      launchd: opts.launchd,
+      labels: opts.labels,
+      plistDir: opts.plistDir ?? "",
+    });
+  } catch (err) {
+    console.error(`[${logLabel}] teardown failed:`, err);
+  } finally {
+    (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+    app.exit(0);
+  }
+}
+
 export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
   let dialogOpen = false;
 
@@ -94,9 +131,12 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
       // If a force-quit is in progress, let the window close
       if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
 
-      // Dev mode: let the window close normally (no dialog, no hide).
-      // Services are stopped by `pnpm stop` / dev-launchd.sh.
+      // Dev mode: teardown launchd services before letting the window close.
+      // Without this, `pnpm start` -> close window -> `pnpm start` may have
+      // stale launchd services still running and holding ports.
       if (!app.isPackaged) {
+        event.preventDefault();
+        void runTeardownAndExit(opts, "dev-close");
         return;
       }
 
@@ -122,47 +162,9 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
           return;
         }
 
-        // "quit-completely"
-        try {
-          await opts.onBeforeQuit?.();
-        } catch (err) {
-          console.error("Error in onBeforeQuit:", err);
-        }
-
-        try {
-          await opts.webServer?.close();
-        } catch (err) {
-          console.error("Error closing web server:", err);
-        }
-
-        // Bootout first (unregisters from launchd so KeepAlive won't respawn),
-        // then wait for the process to actually exit before proceeding.
-        for (const label of [opts.labels.openclaw, opts.labels.controller]) {
-          try {
-            await opts.launchd.bootoutService(label);
-          } catch (err) {
-            console.error(`Error booting out ${label}:`, err);
-          }
-          try {
-            await opts.launchd.waitForExit(label, 5000);
-          } catch (err) {
-            console.warn(
-              `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        }
-
-        // Clean up runtime-ports.json so next launch does cold start
-        if (opts.plistDir) {
-          await deleteRuntimePorts(opts.plistDir).catch(() => {});
-        }
-
-        // All services stopped. Force exit immediately — app.quit() alone
-        // can hang if dangling handles keep the event loop alive, and a
-        // delayed exit leaves stale SingletonLock files that block relaunch.
-        (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+        // "quit-completely" — onForceQuit only fires on explicit user choice
         opts.onForceQuit?.();
-        app.exit(0);
+        await runTeardownAndExit(opts, "packaged-quit");
       })();
     });
   };
@@ -173,18 +175,26 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
     interceptWindowClose(mainWin);
   }
 
-  // Intercept Cmd+Q / Dock "Quit" — redirect to window close handler
-  // which shows the quit dialog (packaged only).
+  // Intercept Cmd+Q / Dock "Quit" — ensure teardown in both dev and packaged.
   app.on("before-quit", (event) => {
     if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
-    // Dev mode: let quit proceed normally
-    if (!app.isPackaged) return;
-    // Packaged: prevent quit, show dialog via window close
+
+    // Dev mode: Cmd+Q / app.quit() must also teardown launchd services.
+    if (!app.isPackaged) {
+      event.preventDefault();
+      void runTeardownAndExit(opts, "dev-before-quit");
+      return;
+    }
+
+    // Packaged: redirect to window close handler for dialog.
     event.preventDefault();
     const win = BrowserWindow.getAllWindows()[0];
     if (win) {
       if (!win.isVisible()) win.show();
       win.close();
+    } else {
+      // No window (renderer crashed or already destroyed).
+      void runTeardownAndExit(opts, "packaged-no-window");
     }
   });
 }
@@ -209,22 +219,11 @@ export async function quitWithDecision(
   }
 
   if (decision === "quit-completely") {
-    for (const label of [opts.labels.openclaw, opts.labels.controller]) {
-      try {
-        await opts.launchd.bootoutService(label);
-      } catch (err) {
-        console.warn(
-          `bootout ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-      try {
-        await opts.launchd.waitForExit(label, 5000);
-      } catch (err) {
-        console.warn(
-          `waitForExit ${label} failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
+    await teardownLaunchdServices({
+      launchd: opts.launchd,
+      labels: opts.labels,
+      plistDir: opts.plistDir ?? "",
+    });
 
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
     app.exit(0);

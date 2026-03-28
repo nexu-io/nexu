@@ -733,8 +733,9 @@ const plugin = {
         description: "构建飞书卡片文本元素",
         parameters: buildFeishuTextParameters,
         async execute(_toolCallId, params) {
+          const isMarkdown = params.is_markdown !== false;
           return json({
-            tag: params.is_markdown ? "markdown" : "plain_text",
+            tag: isMarkdown ? "markdown" : "plain_text",
             content: params.content,
           });
         },

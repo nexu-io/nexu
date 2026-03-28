@@ -1,0 +1,36 @@
+# Generates a "GitHub Stats" SVG with real data from nexu-io/nexu.
+# Runs daily via cron and can be triggered manually.
+name: GitHub metrics
+on:
+  schedule: [{ cron: "20 2 * * *" }]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-metrics
+  cancel-in-progress: true
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate metrics SVG
+        run: node scripts/generate-github-stats.mjs nexu-io/nexu docs/github-metrics.svg
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Commit SVG
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: refresh docs/github-metrics.svg"
+          file_pattern: docs/github-metrics.svg

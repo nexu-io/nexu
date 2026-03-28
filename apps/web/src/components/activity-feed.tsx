@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { getApiV1Sessions } from "../../lib/api/sdk.gen";
+import { PlatformIcon } from "./platform-icons";
 
 /**
  * Activity Feed component showing recent session activity.
@@ -39,6 +40,10 @@ const CHANNEL_LABELS: Record<string, string> = {
   feishu: "飞书",
   slack: "Slack",
   discord: "Discord",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
+  wechat: "WeChat",
+  "openclaw-weixin": "openclaw-weixin",
   web: "Web",
 };
 
@@ -135,7 +140,8 @@ export function ActivityFeed() {
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
                   {session.channelType && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-2 text-text-muted">
+                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-surface-2 text-text-muted">
+                      <PlatformIcon platform={session.channelType} size={12} />
                       {CHANNEL_LABELS[session.channelType] ??
                         session.channelType}
                     </span>

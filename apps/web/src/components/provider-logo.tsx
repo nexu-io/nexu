@@ -10,6 +10,7 @@ import Kimi from "@lobehub/icons/es/Kimi";
 import LLaVA from "@lobehub/icons/es/LLaVA";
 import Minimax from "@lobehub/icons/es/Minimax";
 import Mistral from "@lobehub/icons/es/Mistral";
+import Ollama from "@lobehub/icons/es/Ollama";
 import OpenAI from "@lobehub/icons/es/OpenAI";
 import OpenRouter from "@lobehub/icons/es/OpenRouter";
 import PPIO from "@lobehub/icons/es/PPIO";
@@ -36,6 +37,7 @@ const LOBE_PROVIDER_ICONS: Record<string, LobeIconModule> = {
   google: Gemini as unknown as LobeIconModule,
   kimi: Kimi as unknown as LobeIconModule,
   minimax: Minimax as unknown as LobeIconModule,
+  ollama: Ollama as unknown as LobeIconModule,
   moonshot: Kimi as unknown as LobeIconModule,
   openai: OpenAI as unknown as LobeIconModule,
   openrouter: OpenRouter as unknown as LobeIconModule,

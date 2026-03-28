@@ -48,6 +48,7 @@ import {
   installLaunchdQuitHandler,
   isLaunchdBootstrapEnabled,
   resolveLaunchdPaths,
+  teardownLaunchdServices,
 } from "./services";
 import {
   getLegacyNexuHomeStateDir,
@@ -243,6 +244,60 @@ let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
+
+// ---------------------------------------------------------------------------
+// Unified graceful shutdown — single authoritative teardown path.
+// Called by: before-quit, SIGTERM, SIGINT, quit-handler, system shutdown.
+// Idempotent: safe to call multiple times (second call is a no-op).
+// ---------------------------------------------------------------------------
+
+let shutdownInProgress = false;
+const SHUTDOWN_HARD_TIMEOUT_MS = 8_000;
+
+async function gracefulShutdown(reason: string): Promise<void> {
+  if (shutdownInProgress) return;
+  shutdownInProgress = true;
+
+  writeDesktopMainLog({
+    source: "shutdown",
+    stream: "system",
+    kind: "lifecycle",
+    message: `graceful shutdown started: ${reason}`,
+    logFilePath: null,
+    windowId: null,
+  });
+
+  // Hard timeout: if teardown hangs, force exit after 8 seconds.
+  const hardTimer = setTimeout(() => {
+    writeDesktopMainLog({
+      source: "shutdown",
+      stream: "system",
+      kind: "lifecycle",
+      message: `graceful shutdown hard timeout (${SHUTDOWN_HARD_TIMEOUT_MS}ms), forcing exit`,
+      logFilePath: null,
+      windowId: null,
+    });
+    process.exit(1);
+  }, SHUTDOWN_HARD_TIMEOUT_MS);
+
+  try {
+    sleepGuard?.dispose(reason);
+    await diagnosticsReporter?.flushNow().catch(() => undefined);
+    flushRuntimeLoggers();
+
+    if (launchdResult) {
+      await teardownLaunchdServices({
+        launchd: launchdResult.launchd,
+        labels: launchdResult.labels,
+        plistDir: getDefaultPlistDir(!app.isPackaged),
+      });
+    }
+
+    await orchestrator.dispose().catch(() => undefined);
+  } finally {
+    clearTimeout(hardTimer);
+  }
+}
 
 // Cold-start gate: IPC handler for `env:get-runtime-config` waits for this
 // promise to resolve before returning, ensuring the renderer always gets the
@@ -491,7 +546,11 @@ async function runLaunchdColdStart(): Promise<void> {
   logColdStart("starting launchd bootstrap");
 
   const isDev = !app.isPackaged;
-  const paths = resolveLaunchdPaths(app.isPackaged, electronRoot);
+  const paths = await resolveLaunchdPaths(
+    app.isPackaged,
+    electronRoot,
+    app.getVersion(),
+  );
 
   const nexuHome = runtimeConfig.paths.nexuHome.replace(
     /^~/,
@@ -531,11 +590,8 @@ async function runLaunchdColdStart(): Promise<void> {
   const openclawSkillsDir = getOpenclawSkillsDir(userDataPath);
   const openclawTmpDir = resolve(openclawRuntimeRoot, "tmp");
   const openclawBinPath =
-    process.env.NEXU_OPENCLAW_BIN ?? resolve(paths.openclawCwd, "bin/openclaw");
-  const openclawPackageRoot = resolve(
-    paths.openclawCwd,
-    "node_modules/openclaw",
-  );
+    process.env.NEXU_OPENCLAW_BIN ?? paths.openclawBinPath;
+  const openclawPackageRoot = dirname(paths.openclawPath);
   const openclawExtensionsDir = resolve(openclawPackageRoot, "extensions");
   const skillhubStaticSkillsDir = app.isPackaged
     ? resolve(electronRoot, "static/bundled-skills")
@@ -568,6 +624,11 @@ async function runLaunchdColdStart(): Promise<void> {
     openclawExtensionsDir,
     skillNodePath,
     openclawTmpDir,
+    appVersion: app.getVersion(),
+    userDataPath: app.getPath("userData"),
+    buildSource:
+      process.env.NEXU_DESKTOP_BUILD_SOURCE ??
+      (app.isPackaged ? "packaged" : "local-dev"),
   });
 
   // Wire launchd-managed units into the orchestrator so the control plane
@@ -602,7 +663,13 @@ async function runLaunchdColdStart(): Promise<void> {
     diagnosticsReporter?.markColdStartRunning(
       "waiting for controller readiness",
     );
-    await launchdResult.controllerReady;
+  }
+
+  const controllerReady = await launchdResult.controllerReady;
+  if (!controllerReady.ok) {
+    throw controllerReady.error;
+  }
+  if (!launchdResult.isAttach) {
     logColdStart("controller ready");
   }
 
@@ -694,6 +761,12 @@ function createMainWindow(): BrowserWindow {
   window.webContents.on(
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedUrl) => {
+      diagnosticsReporter?.recordStartupProbe({
+        source: "main",
+        stage: "main:renderer-did-fail-load",
+        status: "error",
+        detail: `${errorCode} ${errorDescription} ${validatedUrl}`,
+      });
       diagnosticsReporter?.recordRendererDidFailLoad({
         errorCode,
         errorDescription,
@@ -710,6 +783,12 @@ function createMainWindow(): BrowserWindow {
   );
 
   window.webContents.on("did-finish-load", () => {
+    diagnosticsReporter?.recordStartupProbe({
+      source: "main",
+      stage: "main:renderer-did-finish-load",
+      status: "ok",
+      detail: window.webContents.getURL(),
+    });
     diagnosticsReporter?.recordRendererDidFinishLoad(
       window.webContents.getURL(),
     );
@@ -723,6 +802,12 @@ function createMainWindow(): BrowserWindow {
   });
 
   window.webContents.on("render-process-gone", (_event, details) => {
+    diagnosticsReporter?.recordStartupProbe({
+      source: "main",
+      stage: "main:renderer-process-gone",
+      status: "error",
+      detail: `reason=${details.reason} exitCode=${details.exitCode}`,
+    });
     diagnosticsReporter?.recordRendererProcessGone({
       reason: details.reason,
       exitCode: details.exitCode,
@@ -737,6 +822,12 @@ function createMainWindow(): BrowserWindow {
   });
 
   window.once("ready-to-show", () => {
+    diagnosticsReporter?.recordStartupProbe({
+      source: "main",
+      stage: "main:window-ready-to-show",
+      status: "ok",
+      detail: window.webContents.getURL(),
+    });
     logLaunchTimeline("main window ready-to-show");
     if (isMacOS) {
       window.setBackgroundColor("#00000000");
@@ -753,6 +844,12 @@ function createMainWindow(): BrowserWindow {
   });
 
   void window.loadFile(resolve(__dirname, "../../dist/index.html"));
+  diagnosticsReporter?.recordStartupProbe({
+    source: "main",
+    stage: "main:window-load-dispatched",
+    status: "ok",
+    detail: resolve(__dirname, "../../dist/index.html"),
+  });
   logLaunchTimeline("main window loadFile dispatched");
   mainWindow = window;
   return window;
@@ -861,8 +958,19 @@ logLaunchTimeline("electron main module evaluated");
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
   installApplicationMenu();
-  registerIpcHandlers(orchestrator, runtimeConfig, coldStartReady);
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
+  diagnosticsReporter.recordStartupProbe({
+    source: "main",
+    stage: "main:app-when-ready",
+    status: "ok",
+    detail: app.getVersion(),
+  });
+  registerIpcHandlers(
+    orchestrator,
+    runtimeConfig,
+    diagnosticsReporter,
+    coldStartReady,
+  );
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   sleepGuard = new SleepGuard({
     powerMonitor,
@@ -934,6 +1042,13 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        launchd: launchdResult
+          ? {
+              manager: launchdResult.launchd,
+              labels: launchdResult.labels,
+              plistDir: getDefaultPlistDir(!app.isPackaged),
+            }
+          : undefined,
       });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();
@@ -965,27 +1080,42 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", (event) => {
-  sleepGuard?.dispose("app-before-quit");
-  void diagnosticsReporter?.flushNow().catch(() => undefined);
-  flushRuntimeLoggers();
+// ---------------------------------------------------------------------------
+// Signal handlers — route to unified gracefulShutdown.
+// SIGTERM: sent by launchctl stop, systemd, Docker, Activity Monitor "Quit".
+// SIGINT: sent by Ctrl+C in terminal.
+// ---------------------------------------------------------------------------
 
-  // If using launchd mode, the quit handler is installed separately
-  // and shows a dialog for quit options
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => {
+    void gracefulShutdown(`signal:${signal}`).finally(() => {
+      (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+      app.exit(0);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// before-quit handler — uses gracefulShutdown for non-launchd mode.
+// In launchd mode, quit-handler.ts intercepts window close and calls
+// gracefulShutdown via teardownLaunchdServices directly.
+// ---------------------------------------------------------------------------
+
+const beforeQuitHandler = (event: Electron.Event) => {
+  // If using launchd mode, the quit handler (quit-handler.ts) manages
+  // the quit flow via window close dialog. This handler only does
+  // lightweight cleanup.
   if (launchdResult) {
-    // Launchd quit handler is already installed via installLaunchdQuitHandler
-    // This handler just does cleanup; actual quit logic is in quit-handler.ts
     return;
   }
 
-  // Legacy orchestrator mode: clean up child processes
+  // Legacy orchestrator mode: run unified shutdown, then quit.
   event.preventDefault();
-  orchestrator
-    .dispose()
-    .catch(() => undefined)
-    .finally(() => {
-      // Remove this handler so the next quit attempt goes through.
-      app.removeAllListeners("before-quit");
-      app.quit();
-    });
-});
+  void gracefulShutdown("before-quit").finally(() => {
+    // P1-2: Remove only this specific handler (not all before-quit listeners).
+    app.removeListener("before-quit", beforeQuitHandler);
+    app.quit();
+  });
+};
+
+app.on("before-quit", beforeQuitHandler);

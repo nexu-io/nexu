@@ -246,6 +246,7 @@ export function registerSessionRoutes(
       tags: ["Internal", "Channels"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": {
               schema: z.object({
@@ -296,9 +297,10 @@ export function registerSessionRoutes(
       } catch (error) {
         const prefix = `Failed to send Feishu card for botId=${botId} to=${to} receiveIdType=${receiveIdType ?? "chat_id"}`;
         if (error instanceof FeishuCardDeliveryError) {
+          const statusCode = error.statusCode === 502 ? 502 : 500;
           const message = getRouteErrorMessage(prefix, error);
-          throw new HTTPException(error.statusCode, {
-            res: c.json({ message }, error.statusCode),
+          throw new HTTPException(statusCode, {
+            res: c.json({ message }, statusCode),
           });
         }
         const message = getRouteErrorMessage(prefix, error);
@@ -316,6 +318,7 @@ export function registerSessionRoutes(
       tags: ["Internal", "Channels"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": {
               schema: z.object({
@@ -363,9 +366,10 @@ export function registerSessionRoutes(
       } catch (error) {
         const prefix = `Failed to update Feishu card for botId=${botId} messageId=${messageId}`;
         if (error instanceof FeishuCardDeliveryError) {
+          const statusCode = error.statusCode === 502 ? 502 : 500;
           const message = getRouteErrorMessage(prefix, error);
-          throw new HTTPException(error.statusCode, {
-            res: c.json({ message }, error.statusCode),
+          throw new HTTPException(statusCode, {
+            res: c.json({ message }, statusCode),
           });
         }
         const message = getRouteErrorMessage(prefix, error);

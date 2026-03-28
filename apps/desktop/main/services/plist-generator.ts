@@ -119,7 +119,7 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>OPENCLAW_BIN</key>
         <string>${escapeXml(env.openclawBinPath)}</string>
         <key>OPENCLAW_ELECTRON_EXECUTABLE</key>
-        <string>${escapeXml(process.execPath)}</string>
+        <string>${escapeXml(env.nodePath)}</string>
         <key>OPENCLAW_EXTENSIONS_DIR</key>
         <string>${escapeXml(env.openclawExtensionsDir)}</string>
         <key>NODE_PATH</key>

@@ -23,7 +23,7 @@
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "dependencies": {
     "qrcode-terminal": "0.12.0",
