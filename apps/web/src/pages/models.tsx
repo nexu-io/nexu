@@ -1463,6 +1463,13 @@ function ByokProviderDetail({
 
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
+  const canSubmitApiKeyConfig = Boolean(
+    isOllama || apiKey || dbProvider?.hasApiKey,
+  );
+  const canRefreshModels = Boolean(isOllama || apiKey || hasSavedAccess);
+  const isProviderConfigured = Boolean(
+    isOllama || hasSavedAccess || isOAuthConnected,
+  );
 
   // ── Z.AI Coding Plan state ───────────────────────────
   const isZaiProvider = providerId === "glm";
@@ -2209,15 +2216,11 @@ function ByokProviderDetail({
           {(!isMiniMax || authMode === "apiKey") && (
             <button
               type="button"
-              disabled={
-                saveMutation.isPending ||
-                (!isOllama && !apiKey && !dbProvider?.hasApiKey)
-              }
+              disabled={saveMutation.isPending || !canSubmitApiKeyConfig}
               onClick={() => saveMutation.mutate()}
               className={cn(
                 "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-                !saveMutation.isPending &&
-                  (isOllama || apiKey || dbProvider?.hasApiKey)
+                !saveMutation.isPending && canSubmitApiKeyConfig
                   ? "bg-accent text-accent-fg hover:bg-accent/90"
                   : "bg-surface-2 text-text-muted cursor-not-allowed",
               )}
@@ -2279,11 +2282,11 @@ function ByokProviderDetail({
           </div>
           <button
             type="button"
-            disabled={refreshModelsMutation.isPending || (!isOllama && !apiKey)}
+            disabled={refreshModelsMutation.isPending || !canRefreshModels}
             onClick={() => refreshModelsMutation.mutate()}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[10px] font-medium transition-colors",
-              !refreshModelsMutation.isPending && (isOllama || apiKey)
+              !refreshModelsMutation.isPending && canRefreshModels
                 ? "text-text-secondary hover:bg-surface-2"
                 : "text-text-muted cursor-not-allowed",
             )}
@@ -2309,12 +2312,16 @@ function ByokProviderDetail({
               <button
                 key={modelId}
                 type="button"
+                disabled={!isProviderConfigured}
                 onClick={() => {
-                  if (!isSelected) onSelectModel(modelId);
+                  if (!isProviderConfigured || isSelected) return;
+                  onSelectModel(modelId);
                 }}
                 className={cn(
                   "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
                   isSelected ? "bg-surface-2" : "hover:bg-surface-2",
+                  !isProviderConfigured &&
+                    "cursor-not-allowed opacity-60 hover:bg-transparent",
                 )}
               >
                 <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
