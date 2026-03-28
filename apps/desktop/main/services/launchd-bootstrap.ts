@@ -510,7 +510,9 @@ export async function bootstrapWithLaunchd(
       const reason = versionMismatch
         ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
         : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)";
-      console.log(`${reason}, tearing down stale services`);
+      console.log(
+        `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
+      );
       await Promise.allSettled([
         controllerRunning
           ? launchd.bootoutService(labels.controller)
@@ -572,7 +574,7 @@ export async function bootstrapWithLaunchd(
     // corrupted). We can't know the ports they're using, so tear them down
     // and do a clean cold start with fresh ports.
     console.log(
-      "Services running but no runtime-ports.json found, tearing down for clean start",
+      `[bootstrap] teardown: no runtime-ports.json but services running (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
     );
     await Promise.allSettled([
       controllerRunning
@@ -587,6 +589,9 @@ export async function bootstrapWithLaunchd(
   // --- Per-service: validate running ones, start missing ones ---
 
   // Health check running services
+  console.log(
+    `[bootstrap] health check: controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"} useRecoveredPorts=${useRecoveredPorts}`,
+  );
   let controllerHealthy = false;
   let openclawHealthy = false;
   let needsControllerReady = true;
@@ -660,25 +665,37 @@ export async function bootstrapWithLaunchd(
     label: string,
     type: "controller" | "openclaw",
   ) => {
+    console.log(`[bootstrap] ${type} installService begin label=${label}`);
     const plist = generatePlist(type, plistEnv);
     await launchd.installService(label, plist);
+    console.log(`[bootstrap] ${type} installService done label=${label}`);
   };
 
-  const ensureRunning = async (label: string) => {
+  const ensureRunning = async (label: string, type: string) => {
     const status = await launchd.getServiceStatus(label);
+    console.log(
+      `[bootstrap] ${type} ensureRunning status=${status.status} pid=${status.pid ?? "none"} label=${label}`,
+    );
     if (status.status !== "running") {
       await launchd.startService(label);
-      console.log(`Started ${label}`);
+      const afterStatus = await launchd.getServiceStatus(label);
+      console.log(
+        `[bootstrap] ${type} kickstart done status=${afterStatus.status} pid=${afterStatus.pid ?? "none"} label=${label}`,
+      );
     }
   };
 
   if (!controllerHealthy) {
     await ensureService(labels.controller, "controller");
-    await ensureRunning(labels.controller);
+    await ensureRunning(labels.controller, "controller");
+  } else {
+    console.log("[bootstrap] controller already healthy, skipping");
   }
   if (!openclawHealthy) {
     await ensureService(labels.openclaw, "openclaw");
-    await ensureRunning(labels.openclaw);
+    await ensureRunning(labels.openclaw, "openclaw");
+  } else {
+    console.log("[bootstrap] openclaw already healthy, skipping");
   }
 
   // Start embedded web server with port retry.
@@ -1279,6 +1296,7 @@ export async function ensureExternalNodeRunner(
     "MacOS",
     binaryName,
   );
+  await fs.mkdir(path.dirname(stagingRoot), { recursive: true });
 
   // Clone the full app bundle so the runner keeps a valid macOS app layout,
   // including signed resources like _CodeSignature and Resources.
