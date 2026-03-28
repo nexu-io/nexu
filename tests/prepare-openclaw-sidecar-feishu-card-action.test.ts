@@ -79,28 +79,28 @@ async function ensureFakeOpenclawRuntime() {
       "monitor.account.ts",
     ),
     `const handlers = {
-  "card.action.trigger": async (data: unknown) => {
-    try {
-      const event = data as unknown as FeishuCardActionEvent;
-      const promise = handleFeishuCardAction({
-        cfg,
-        event,
-        botOpenId: botOpenIds.get(accountId),
-        runtime,
-        accountId,
-      });
-      if (fireAndForget) {
-        promise.catch((err) => {
-          error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
+    "card.action.trigger": async (data: unknown) => {
+      try {
+        const event = data as unknown as FeishuCardActionEvent;
+        const promise = handleFeishuCardAction({
+          cfg,
+          event,
+          botOpenId: botOpenIds.get(accountId),
+          runtime,
+          accountId,
         });
-      } else {
-        await promise;
+        if (fireAndForget) {
+          promise.catch((err) => {
+            error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
+          });
+        } else {
+          await promise;
+        }
+      } catch (err) {
+        error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
       }
-    } catch (err) {
-      error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
-    }
-  },
-};
+    },
+  };
 `,
     "utf8",
   );
