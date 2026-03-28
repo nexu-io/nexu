@@ -95,6 +95,7 @@ The split is intentional: `NEXU_HOME` holds lightweight user preferences and ext
 
 Launchd services reference ONLY paths under `~/.nexu/runtime/` (never inside the `.app` bundle), so the packaged app can be replaced by Finder drag-and-drop while services run in the background.
 - For startup troubleshooting, use `pnpm logs` to tail dev logs.
+- For proxy troubleshooting, inspect `desktop-diagnostics.json` and check `proxy.source`, redacted proxy env values, normalized bypass entries, and `resolveProxy(...)` results for controller/OpenClaw/external URLs.
 - `pnpm reset-state` is a dev-only cleanup shortcut; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete packaged app state.
 - To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/` and `~/Library/Application Support/@nexu/desktop/`.
 - If `pnpm start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
@@ -322,6 +323,7 @@ This note should track:
 ## Local quick reference
 
 - Controller env path: `apps/controller/.env`
+- Desktop proxy env vars: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (desktop normalizes mixed-case inputs, always merges `localhost,127.0.0.1,::1` into `NO_PROXY`, and propagates uppercase values to child processes)
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI

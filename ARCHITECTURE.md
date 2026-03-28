@@ -57,7 +57,11 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 
 **Desktop runtime boot:** Electron desktop starts the controller sidecar, waits for controller readiness/auth bootstrap, starts the web sidecar, and delegates OpenClaw process management to `apps/controller`.
 
+**Proxy policy:** Desktop bootstrap computes one normalized proxy policy from `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`, applies it to Electron networking, propagates the normalized uppercase env into controller/web/OpenClaw child processes, and always merges loopback bypass entries (`localhost`, `127.0.0.1`, `::1`).
+
 **Channel connection flows:** Frontend calls controller routes → controller validates and stores local credentials/config → controller recompiles OpenClaw config → runtime writers materialize the updated state → OpenClaw reloads.
+
+**Outbound HTTP:** Controller outbound HTTP goes through a shared proxy-aware fetch layer. Local desktop/controller/OpenClaw loopback traffic remains direct; external traffic uses env-derived proxy settings when present.
 
 **Slack events:** Slack messages are handled through the current controller-compiled OpenClaw runtime path rather than a separate Nexu gateway sidecar.
 
