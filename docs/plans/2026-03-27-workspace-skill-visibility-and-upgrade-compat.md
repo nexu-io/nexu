@@ -35,7 +35,7 @@ The critical upgrade scenario:
 
 ## Manual Verification Addendum
 
-Use [2026-03-27-skill-config-sync-manual-test.md](/Users/alche/Documents/digit-sutando/nexu/docs/plans/2026-03-27-skill-config-sync-manual-test.md) as the executable checklist. For this bugfix specifically, the minimum acceptance set is:
+Use [2026-03-27-skill-config-sync-manual-test.md](./2026-03-27-skill-config-sync-manual-test.md) as the executable checklist. For this bugfix specifically, the minimum acceptance set is:
 
 1. Live workspace add without restart
    - Create a workspace skill on disk while the app is running.
