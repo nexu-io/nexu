@@ -314,6 +314,8 @@ const zhCN = {
   "models.byok.none": "暂无",
   "models.byok.refreshModels": "刷新",
   "models.byok.fetchingModels": "正在获取模型列表...",
+  "models.byok.refreshSuccess": "模型列表已刷新，共 {{count}} 个模型",
+  "models.byok.refreshFailed": "刷新模型列表失败，请重试",
   "models.byok.updateConfig": "更新配置",
   "models.byok.saveAndEnable": "保存",
   "models.byok.remove": "移除",

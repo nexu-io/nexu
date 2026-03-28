@@ -326,6 +326,9 @@ const en = {
   "models.byok.none": "None",
   "models.byok.refreshModels": "Refresh",
   "models.byok.fetchingModels": "Fetching models...",
+  "models.byok.refreshSuccess": "Model list refreshed: {{count}} models",
+  "models.byok.refreshFailed":
+    "Failed to refresh model list. Please try again.",
   "models.byok.updateConfig": "Update configuration",
   "models.byok.saveAndEnable": "Save",
   "models.byok.remove": "Remove",

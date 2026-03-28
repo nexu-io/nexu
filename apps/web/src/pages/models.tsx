@@ -1570,6 +1570,12 @@ function ByokProviderDetail({
 
       return models;
     },
+    onSuccess: (models) => {
+      toast.success(t("models.byok.refreshSuccess", { count: models.length }));
+    },
+    onError: (error) => {
+      toast.error(error.message || t("models.byok.refreshFailed"));
+    },
   });
 
   // ── Save mutation ────────────────────────────────────
