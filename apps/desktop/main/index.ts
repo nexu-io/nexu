@@ -412,8 +412,28 @@ function installApplicationMenu(): void {
       : []),
     { role: "fileMenu" },
     { role: "editMenu" },
-    { role: "viewMenu" },
-    developMenu,
+    {
+      label: "View",
+      submenu: [
+        // Reload shortcuts are dev-only — in production they expose
+        // internal "starting local service" screens (see #399).
+        ...(!app.isPackaged
+          ? ([
+              { role: "reload" },
+              { role: "forceReload" },
+              { type: "separator" },
+            ] satisfies MenuItemConstructorOptions[])
+          : []),
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    ...(!app.isPackaged ? [developMenu] : []),
     { role: "windowMenu" },
     helpMenu,
   ];
@@ -868,6 +888,20 @@ app.on("web-contents-created", (_event, contents) => {
     }
     return { action: "deny" };
   });
+
+  // In production, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R, F5)
+  // at the webContents level to prevent exposing internal startup screens (#399).
+  if (app.isPackaged) {
+    contents.on("before-input-event", (event, input) => {
+      if (input.type !== "keyDown") return;
+      const isReload =
+        (input.key === "r" && (input.meta || input.control)) ||
+        input.key === "F5";
+      if (isReload) {
+        event.preventDefault();
+      }
+    });
+  }
 
   if (contentType !== "webview") {
     return;
