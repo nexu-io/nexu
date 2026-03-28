@@ -384,6 +384,101 @@ describe("compileOpenClawConfig", () => {
     });
   });
 
+  describe("per-agent workspace skill merge", () => {
+    it("merges shared and workspace skills for each agent", () => {
+      const now = new Date().toISOString();
+      const config = createConfig({
+        bots: [
+          {
+            id: "bot-1",
+            name: "Bot A",
+            slug: "bot-a",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "bot-2",
+            name: "Bot B",
+            slug: "bot-b",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+      const wsMap = new Map<string, readonly string[]>([
+        ["bot-1", ["agent-tool"]],
+      ]);
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        ["shared-skill"],
+        wsMap,
+      );
+
+      const botA = compiled.agents.list.find((a) => a.id === "bot-1");
+      expect(botA?.skills).toEqual(
+        expect.arrayContaining(["shared-skill", "agent-tool"]),
+      );
+      expect(botA?.skills).toHaveLength(2);
+
+      const botB = compiled.agents.list.find((a) => a.id === "bot-2");
+      expect(botB?.skills).toEqual(["shared-skill"]);
+    });
+
+    it("deduplicates when same slug in shared and workspace", () => {
+      const config = createConfig();
+      const wsMap = new Map<string, readonly string[]>([
+        ["bot-1", ["shared-skill"]],
+      ]);
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        ["shared-skill"],
+        wsMap,
+      );
+      const agent = compiled.agents.list[0];
+      expect(agent.skills).toEqual(["shared-skill"]);
+    });
+
+    it("workspace-only skills still activate allowlist", () => {
+      const config = createConfig();
+      const wsMap = new Map<string, readonly string[]>([
+        ["bot-1", ["ws-only"]],
+      ]);
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        [],
+        wsMap,
+      );
+      expect(compiled.agents.list[0].skills).toEqual(["ws-only"]);
+    });
+
+    it("omits skills when both shared and workspace are empty", () => {
+      const config = createConfig();
+      const wsMap = new Map<string, readonly string[]>();
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        [],
+        wsMap,
+      );
+      expect(compiled.agents.list[0]).not.toHaveProperty("skills");
+    });
+  });
+
   it("remaps openai models to OAuth provider ids when persisted OAuth state is connected", () => {
     const oauthState: OAuthConnectionState = {
       connectedProviderIds: ["openai"],

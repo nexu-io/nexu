@@ -354,25 +354,28 @@ function compileAgentList(
   env: ControllerEnv,
   oauthState: OAuthConnectionState,
   installedSkillSlugs?: readonly string[],
+  workspaceSkillsByAgent?: ReadonlyMap<string, readonly string[]>,
 ): OpenClawConfig["agents"]["list"] {
-  const skills =
-    installedSkillSlugs && installedSkillSlugs.length > 0
-      ? [...installedSkillSlugs]
-      : undefined;
+  const sharedSlugs = installedSkillSlugs ?? [];
 
   return config.bots
     .filter((bot) => bot.status === "active")
     .sort((left, right) => left.slug.localeCompare(right.slug))
-    .map((bot, index) => ({
-      id: bot.id,
-      name: bot.name,
-      workspace: `${env.openclawStateDir}/agents/${bot.id}`,
-      default: index === 0,
-      model: bot.modelId
-        ? { primary: resolveModelId(config, env, bot.modelId, oauthState) }
-        : undefined,
-      ...(skills ? { skills } : {}),
-    }));
+    .map((bot, index) => {
+      const workspaceSlugs = workspaceSkillsByAgent?.get(bot.id) ?? [];
+      const merged = [...new Set([...sharedSlugs, ...workspaceSlugs])];
+
+      return {
+        id: bot.id,
+        name: bot.name,
+        workspace: `${env.openclawStateDir}/agents/${bot.id}`,
+        default: index === 0,
+        model: bot.modelId
+          ? { primary: resolveModelId(config, env, bot.modelId, oauthState) }
+          : undefined,
+        ...(merged.length > 0 ? { skills: merged } : {}),
+      };
+    });
 }
 
 function compilePlugins(
@@ -417,6 +420,7 @@ export function compileOpenClawConfig(
   env: ControllerEnv,
   oauthState: OAuthConnectionState = EMPTY_OAUTH_CONNECTION_STATE,
   installedSkillSlugs?: readonly string[],
+  workspaceSkillsByAgent?: ReadonlyMap<string, readonly string[]>,
 ): OpenClawConfig {
   const activeBots = config.bots.filter((bot) => bot.status === "active");
   const firstBotModel = activeBots[0]?.modelId ?? null;
@@ -469,7 +473,13 @@ export function compileOpenClawConfig(
         },
         verboseDefault: "off",
       },
-      list: compileAgentList(config, env, oauthState, installedSkillSlugs),
+      list: compileAgentList(
+        config,
+        env,
+        oauthState,
+        installedSkillSlugs,
+        workspaceSkillsByAgent,
+      ),
     },
     tools: {
       exec: {
