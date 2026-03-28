@@ -15,14 +15,16 @@ const skillRecordSchema = z.object({
   slug: z.string(),
   // Accept "curated" from legacy ledgers, convert to "managed"
   source: z
-    .enum(["curated", "managed", "custom"])
+    .enum(["curated", "managed", "custom", "workspace"])
     .transform(
-      (v) => (v === "curated" ? "managed" : v) as "managed" | "custom",
+      (v) =>
+        (v === "curated" ? "managed" : v) as "managed" | "custom" | "workspace",
     ),
   status: z.enum(["installed", "uninstalled"]),
   version: z.string().nullable().default(null),
   installedAt: z.string().nullable().default(null),
   uninstalledAt: z.string().nullable().default(null),
+  agentId: z.string().nullable().default(null),
 });
 
 const skillLedgerSchema = z.object({
@@ -84,6 +86,15 @@ export class SkillDb {
     );
   }
 
+  getInstalledByAgent(agentId: string): readonly SkillRecord[] {
+    return this.current().skills.filter(
+      (skill) =>
+        skill.status === "installed" &&
+        skill.source === "workspace" &&
+        skill.agentId === agentId,
+    );
+  }
+
   /**
    * Returns all slugs that have any record in the ledger (installed or uninstalled).
    * Used by getCuratedSlugsToEnqueue to skip slugs the user previously uninstalled.
@@ -100,11 +111,19 @@ export class SkillDb {
     return [];
   }
 
-  recordInstall(slug: string, source: SkillSource, version?: string): void {
+  recordInstall(
+    slug: string,
+    source: SkillSource,
+    version?: string,
+    agentId?: string | null,
+  ): void {
     const now = new Date().toISOString();
     const current = this.current();
     const existing = current.skills.find(
-      (skill) => skill.slug === slug && skill.source === source,
+      (skill) =>
+        skill.slug === slug &&
+        skill.source === source &&
+        (source !== "workspace" || skill.agentId === (agentId ?? null)),
     );
     const nextRecord: SkillRecord = {
       slug,
@@ -113,6 +132,7 @@ export class SkillDb {
       version: version ?? existing?.version ?? null,
       installedAt: now,
       uninstalledAt: null,
+      agentId: agentId ?? existing?.agentId ?? null,
     };
 
     this.db.data = {
@@ -134,6 +154,7 @@ export class SkillDb {
       version: existing?.version ?? null,
       installedAt: existing?.installedAt ?? null,
       uninstalledAt: now,
+      agentId: existing?.agentId ?? null,
     };
 
     this.db.data = {
@@ -175,6 +196,7 @@ export class SkillDb {
         version: existing?.version ?? null,
         installedAt: now,
         uninstalledAt: null,
+        agentId: existing?.agentId ?? null,
       };
       skills = this.upsertRecord(skills, nextRecord);
     }
@@ -238,7 +260,10 @@ export class SkillDb {
   ): SkillRecord[] {
     const index = records.findIndex(
       (record) =>
-        record.slug === nextRecord.slug && record.source === nextRecord.source,
+        record.slug === nextRecord.slug &&
+        record.source === nextRecord.source &&
+        (nextRecord.source !== "workspace" ||
+          record.agentId === nextRecord.agentId),
     );
 
     if (index === -1) {
@@ -279,6 +304,7 @@ export class SkillDb {
           version: null,
           installedAt: null,
           uninstalledAt: new Date().toISOString(),
+          agentId: null,
         })),
       };
     } catch {

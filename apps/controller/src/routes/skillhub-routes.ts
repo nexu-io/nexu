@@ -17,7 +17,7 @@ const minimalSkillSchema = z.object({
 
 const installedSkillSchema = z.object({
   slug: z.string(),
-  source: z.enum(["managed", "custom"]),
+  source: z.enum(["managed", "custom", "workspace"]),
   name: z.string(),
   description: z.string(),
   installedAt: z.string().nullable(),
@@ -31,7 +31,7 @@ const catalogMetaSchema = z.object({
 
 const queueItemSchema = z.object({
   slug: z.string(),
-  source: z.enum(["managed", "custom"]),
+  source: z.enum(["managed", "custom", "workspace"]),
   status: z.enum([
     "queued",
     "downloading",
