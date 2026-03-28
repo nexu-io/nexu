@@ -453,6 +453,7 @@ export type RuntimeUnitKind = "surface" | "service" | "runtime";
 export type RuntimeUnitLaunchStrategy =
   | "embedded"
   | "managed"
+  | "external"
   | "delegated"
   | "launchd";
 
@@ -486,7 +487,9 @@ export type RuntimeReasonCode =
   | "launchd_stopped"
   | "launchd_start_requested"
   | "launchd_stop_requested"
-  | "launchd_log_line";
+  | "launchd_log_line"
+  | "external_available"
+  | "external_unavailable";
 
 export type RuntimeLogEntry = {
   id: string;
@@ -541,6 +544,7 @@ export type HostBootstrap = {
   buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
   isPackaged: boolean;
+  webviewPreloadUrl: string;
 };
 
 export type UpdateSource = "r2" | "github";

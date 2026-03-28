@@ -78,6 +78,7 @@ export class RuntimeOrchestrator {
           manifest.launchStrategy === "embedded"
             ? "running"
             : manifest.launchStrategy === "delegated" ||
+                manifest.launchStrategy === "external" ||
                 manifest.launchStrategy === "launchd"
               ? "stopped"
               : "idle",
@@ -121,6 +122,7 @@ export class RuntimeOrchestrator {
   }
 
   getRuntimeState(): RuntimeState {
+    this.refreshExternalUnits();
     this.refreshDelegatedUnits();
     this.refreshLaunchdUnits();
 
@@ -609,9 +611,11 @@ export class RuntimeOrchestrator {
           ? [record.manifest.command, ...record.manifest.args].join(" ")
           : record.manifest.launchStrategy === "launchd"
             ? `launchd service: ${record.manifest.launchdLabel ?? "unknown"}`
-            : record.manifest.launchStrategy === "delegated"
-              ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
-              : null,
+            : record.manifest.launchStrategy === "external"
+              ? `external port: ${record.manifest.port ?? "unknown"}`
+              : record.manifest.launchStrategy === "delegated"
+                ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
+                : null,
       binaryPath: record.manifest.binaryPath ?? null,
       logFilePath: record.logFilePath,
       logTail: record.logTail,
@@ -914,6 +918,78 @@ export class RuntimeOrchestrator {
       }
 
       this.refreshDelegatedUnit(record);
+    }
+  }
+
+  private refreshExternalUnits(): void {
+    for (const record of this.units.values()) {
+      if (record.manifest.launchStrategy !== "external") {
+        continue;
+      }
+
+      this.refreshExternalUnit(record);
+    }
+  }
+
+  private refreshExternalUnit(record: RuntimeUnitRecord): void {
+    const port = record.manifest.port;
+    const previousPhase = record.phase;
+    const previousPid = record.pid;
+    const previousError = record.lastError;
+
+    if (port === null) {
+      setRecordPhase(record, "failed");
+      record.lastError = "Missing external runtime port.";
+      markProbeFailure(record);
+
+      if (
+        previousPhase !== record.phase ||
+        previousError !== record.lastError
+      ) {
+        const actionId = beginAction(record, "probe");
+        this.logStateChange(record, {
+          kind: "probe",
+          actionId,
+          reasonCode: "external_unavailable",
+          message: `external runtime ${record.manifest.id} is misconfigured: ${record.lastError}`,
+        });
+      }
+      return;
+    }
+
+    const pid = getListeningPidByPort(port);
+
+    if (pid !== null) {
+      setRecordPhase(record, "running");
+      record.pid = pid;
+      record.startedAt ??= this.startedAt;
+      record.exitedAt = null;
+      record.exitCode = null;
+      record.lastError = null;
+      markProbeSuccess(record);
+    } else {
+      setRecordPhase(record, "stopped");
+      record.pid = null;
+      record.lastError = null;
+      markProbeFailure(record);
+    }
+
+    if (
+      previousPhase !== record.phase ||
+      previousPid !== record.pid ||
+      previousError !== record.lastError
+    ) {
+      const actionId = beginAction(record, "probe");
+      this.logStateChange(record, {
+        kind: "probe",
+        actionId,
+        reasonCode:
+          pid !== null ? "external_available" : "external_unavailable",
+        message:
+          pid !== null
+            ? `external runtime ${record.manifest.id} detected on port ${port} (pid=${pid})`
+            : `external runtime ${record.manifest.id} unavailable on port ${port}`,
+      });
     }
   }
 
@@ -1251,6 +1327,56 @@ function markProbeFailure(record: RuntimeUnitRecord): void {
 
 function ensureActionId(record: RuntimeUnitRecord, verb: string): string {
   return record.currentActionId ?? beginAction(record, verb);
+}
+
+function getListeningPidByPort(port: number): number | null {
+  try {
+    if (process.platform === "win32") {
+      const output = execFileSync("netstat", ["-ano", "-p", "tcp"], {
+        encoding: "utf-8",
+      });
+
+      for (const rawLine of output.split(/\r?\n/u)) {
+        const line = rawLine.trim();
+        if (!line.startsWith("TCP")) {
+          continue;
+        }
+
+        const columns = line.split(/\s+/u);
+        if (columns.length < 5 || columns[3] !== "LISTENING") {
+          continue;
+        }
+
+        const localAddress = columns[1] ?? "";
+        const localPort = Number.parseInt(
+          localAddress.split(":").at(-1) ?? "",
+          10,
+        );
+        if (localPort !== port) {
+          continue;
+        }
+
+        const pid = Number.parseInt(columns[4] ?? "", 10);
+        return Number.isInteger(pid) && pid > 0 ? pid : null;
+      }
+
+      return null;
+    }
+
+    const output = execFileSync(
+      "lsof",
+      [`-tiTCP:${String(port)}`, "-sTCP:LISTEN"],
+      {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim();
+
+    const pid = Number.parseInt(output.split(/\r?\n/u).find(Boolean) ?? "", 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
 }
 
 function onManagedError(

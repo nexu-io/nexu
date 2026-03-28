@@ -1,11 +1,11 @@
-import type { DesktopRuntimePlatformAdapter } from "../types";
-import {
-  PortAllocationError,
-  allocateDesktopRuntimePorts,
-} from "../../runtime/port-allocation";
+import type {
+  DesktopPlatformCapabilities,
+  DesktopRuntimePlatformAdapter,
+} from "../types";
 
 export async function prepareManagedRuntimeConfig(
   adapterId: DesktopRuntimePlatformAdapter["id"],
+  capabilities: DesktopPlatformCapabilities,
   {
     baseRuntimeConfig,
     env,
@@ -14,18 +14,11 @@ export async function prepareManagedRuntimeConfig(
 ) {
   logStartupStep(`${adapterId}:prepareRuntimeConfig:start`);
   try {
-    const result = await allocateDesktopRuntimePorts(env, baseRuntimeConfig).catch(
-      (error: unknown) => {
-        if (error instanceof PortAllocationError) {
-          throw new Error(
-            `[desktop:ports] ${error.code} purpose=${error.purpose} ` +
-              `preferredPort=${error.preferredPort ?? "n/a"} ${error.message}`,
-          );
-        }
-
-        throw error;
-      },
-    );
+    const result = await capabilities.portStrategy.allocateRuntimePorts({
+      baseRuntimeConfig,
+      env,
+      logStartupStep,
+    });
     logStartupStep(`${adapterId}:prepareRuntimeConfig:done`);
     return result;
   } catch (error) {
@@ -68,13 +61,63 @@ export async function runManagedColdStart({
   };
 }
 
+export async function runExternalColdStart({
+  diagnosticsReporter,
+  logColdStart,
+  logStartupStep,
+  rotateDesktopLogSession,
+  waitForControllerReadiness,
+}: Parameters<DesktopRuntimePlatformAdapter["runColdStart"]>[0]) {
+  logStartupStep("externalColdStart:start");
+  diagnosticsReporter?.markColdStartRunning("attaching to external runtime");
+  logColdStart("attaching to external runtime");
+
+  diagnosticsReporter?.markColdStartRunning(
+    "waiting for external controller readiness",
+  );
+  logColdStart("waiting for external controller readiness");
+  await waitForControllerReadiness();
+
+  const sessionId = rotateDesktopLogSession();
+  logColdStart(`external runtime session ready sessionId=${sessionId}`);
+  logColdStart("external runtime attach complete");
+  diagnosticsReporter?.markColdStartSucceeded();
+  logStartupStep("externalColdStart:done");
+
+  return {
+    launchdResult: null,
+  };
+}
+
 export function createManagedRuntimePlatformAdapter(
   id: DesktopRuntimePlatformAdapter["id"],
+  capabilities: DesktopPlatformCapabilities,
 ): DesktopRuntimePlatformAdapter {
   return {
     id,
     mode: "managed",
-    prepareRuntimeConfig: (args) => prepareManagedRuntimeConfig(id, args),
+    capabilities,
+    prepareRuntimeConfig: (args) =>
+      prepareManagedRuntimeConfig(id, capabilities, args),
     runColdStart: (args) => runManagedColdStart(args),
+  };
+}
+
+export function createExternalRuntimePlatformAdapter(
+  id: DesktopRuntimePlatformAdapter["id"],
+  capabilities: DesktopPlatformCapabilities,
+): DesktopRuntimePlatformAdapter {
+  return {
+    id,
+    mode: "external",
+    capabilities,
+    prepareRuntimeConfig: async ({ baseRuntimeConfig, logStartupStep }) => {
+      logStartupStep(`${id}:prepareRuntimeConfig:external`);
+      return {
+        allocations: [],
+        runtimeConfig: baseRuntimeConfig,
+      };
+    },
+    runColdStart: (args) => runExternalColdStart(args),
   };
 }

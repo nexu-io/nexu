@@ -36,6 +36,10 @@ export class OpenClawProcessManager {
 
   constructor(private readonly env: ControllerEnv) {}
 
+  managesProcess(): boolean {
+    return this.env.manageOpenclawProcess;
+  }
+
   async prepare(): Promise<void> {
     if (!this.env.manageOpenclawProcess) {
       return;

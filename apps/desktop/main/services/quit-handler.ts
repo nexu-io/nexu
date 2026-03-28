@@ -95,7 +95,7 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
       if ((app as unknown as Record<string, unknown>).__nexuForceQuit) return;
 
       // Dev mode: let the window close normally (no dialog, no hide).
-      // Services are stopped by `pnpm stop` / dev-launchd.sh.
+      // Service cleanup is handled by the explicit `pnpm dev stop <service>` flow.
       if (!app.isPackaged) {
         return;
       }

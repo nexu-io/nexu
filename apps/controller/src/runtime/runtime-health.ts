@@ -10,7 +10,7 @@ export class RuntimeHealth {
 
     try {
       const response = await fetch(
-        `http://127.0.0.1:${this.env.openclawGatewayPort}/health`,
+        new URL("/health", this.env.openclawBaseUrl),
       );
       return {
         ok: response.ok,

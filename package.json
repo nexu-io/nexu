@@ -3,9 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ./scripts/dev.mjs",
-    "dev:controller": "pnpm --filter @nexu/controller dev",
-    "dev:desktop": "pnpm --filter @nexu/desktop dev",
+    "dev": "pnpm --dir ./scripts/dev exec tsx ./src/index.ts",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
@@ -19,12 +17,6 @@
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
     "postinstall": "npm --prefix ./openclaw-runtime run install:pruned && npm --prefix ./apps/controller/static/runtime-plugins/openclaw-weixin install --production --ignore-scripts && node ./scripts/clean-runtime-plugin-installs.mjs",
     "prepare": "node ./scripts/setup-git-hooks.mjs",
-    "start": "node ./scripts/desktop-dev.mjs start",
-    "stop": "node ./scripts/desktop-dev.mjs stop",
-    "restart": "node ./scripts/desktop-dev.mjs restart",
-    "reset-state": "node ./scripts/desktop-dev.mjs reset-state",
-    "status": "node ./scripts/desktop-dev.mjs status",
-    "logs": "node ./scripts/desktop-dev.mjs logs",
     "check:dev": "node ./scripts/desktop-check-dev.mjs",
     "check:dist": "node ./scripts/desktop-check-dist.mjs",
     "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
@@ -36,11 +28,12 @@
     "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.58.2",
     "@types/node": "^25.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.2.1",
+    "tsx": "^4.21.0",
     "vitest": "^3.0.7"
   },
   "engines": {
@@ -53,7 +46,8 @@
       "@biomejs/biome",
       "better-sqlite3",
       "electron",
-      "esbuild"
+      "esbuild",
+      "sharp"
     ],
     "overrides": {
       "react": "^19.2.4",

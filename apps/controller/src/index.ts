@@ -23,9 +23,28 @@ async function main(): Promise<void> {
     },
   );
 
+  let shuttingDown = false;
+
+  const closeServer = () =>
+    new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+
   const shutdown = async () => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
     stopBackgroundLoops();
-    server.close();
+    await closeServer();
     await container.openclawProcess.stop();
     process.exit(0);
   };

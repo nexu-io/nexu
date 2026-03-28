@@ -36,6 +36,40 @@ const booleanSchema = z
   .enum(["true", "false", "1", "0"])
   .transform((value) => value === "true" || value === "1");
 
+const openclawOwnershipModeSchema = z.enum(["external", "internal"]);
+
+function parseUrlPort(value: string): number | null {
+  try {
+    const url = new URL(value);
+    if (url.port.length > 0) {
+      return Number.parseInt(url.port, 10);
+    }
+
+    if (url.protocol === "https:") {
+      return 443;
+    }
+
+    if (url.protocol === "http:") {
+      return 80;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function readOpenclawOwnershipMode(input: {
+  explicitMode?: "external" | "internal";
+  legacyManageProcess: boolean;
+}): "external" | "internal" {
+  if (input.explicitMode) {
+    return input.explicitMode;
+  }
+
+  return input.legacyManageProcess ? "internal" : "external";
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -43,8 +77,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3010),
   HOST: z.string().default("127.0.0.1"),
   NEXU_HOME: z.string().default("~/.nexu"),
+  NEXU_CONTROLLER_OPENCLAW_MODE: openclawOwnershipModeSchema.optional(),
+  OPENCLAW_BASE_URL: z.string().url().optional(),
   OPENCLAW_STATE_DIR: z.string().optional(),
   OPENCLAW_CONFIG_PATH: z.string().optional(),
+  OPENCLAW_LOG_DIR: z.string().optional(),
   OPENCLAW_SKILLS_DIR: z.string().optional(),
   SKILLHUB_STATIC_SKILLS_DIR: z.string().optional(),
   PLATFORM_TEMPLATES_DIR: z.string().optional(),
@@ -64,6 +101,15 @@ const envSchema = z.object({
 });
 
 const parsed = envSchema.parse(process.env);
+const openclawOwnershipMode = readOpenclawOwnershipMode({
+  explicitMode: parsed.NEXU_CONTROLLER_OPENCLAW_MODE,
+  legacyManageProcess: parsed.RUNTIME_MANAGE_OPENCLAW_PROCESS,
+});
+const openclawBaseUrl =
+  parsed.OPENCLAW_BASE_URL ??
+  `http://127.0.0.1:${String(parsed.OPENCLAW_GATEWAY_PORT)}`;
+const openclawGatewayPort =
+  parseUrlPort(openclawBaseUrl) ?? parsed.OPENCLAW_GATEWAY_PORT;
 
 const nexuHomeDir = expandHomeDir(parsed.NEXU_HOME);
 const openclawStateDir = expandHomeDir(
@@ -119,12 +165,17 @@ export const env = {
     openclawStateDir,
     "workspace-templates",
   ),
+  openclawOwnershipMode,
+  openclawBaseUrl,
   openclawBin: parsed.OPENCLAW_BIN,
+  openclawLogDir: expandHomeDir(
+    parsed.OPENCLAW_LOG_DIR ?? path.join(nexuHomeDir, "logs", "openclaw"),
+  ),
   litellmBaseUrl: parsed.LITELLM_BASE_URL ?? null,
   litellmApiKey: parsed.LITELLM_API_KEY ?? null,
-  openclawGatewayPort: parsed.OPENCLAW_GATEWAY_PORT,
+  openclawGatewayPort,
   openclawGatewayToken: parsed.OPENCLAW_GATEWAY_TOKEN,
-  manageOpenclawProcess: parsed.RUNTIME_MANAGE_OPENCLAW_PROCESS,
+  manageOpenclawProcess: openclawOwnershipMode === "internal",
   gatewayProbeEnabled: parsed.RUNTIME_GATEWAY_PROBE_ENABLED,
   runtimeSyncIntervalMs: parsed.RUNTIME_SYNC_INTERVAL_MS,
   runtimeHealthIntervalMs: parsed.RUNTIME_HEALTH_INTERVAL_MS,

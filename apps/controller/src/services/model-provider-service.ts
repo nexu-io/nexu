@@ -925,6 +925,14 @@ export class ModelProviderService {
   }
 
   private async restartRuntime(): Promise<void> {
+    if (!this.openclawProcess.managesProcess()) {
+      logger.info(
+        {},
+        "model_provider_runtime_restart_skipped_external_openclaw",
+      );
+      return;
+    }
+
     await this.openclawProcess.stop();
     this.openclawProcess.enableAutoRestart();
     this.openclawProcess.start();

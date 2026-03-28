@@ -39,9 +39,19 @@ function run(command, args) {
 async function main() {
   let exitCode = 0;
 
-  const startResult = await run("pnpm", ["start"]);
-  if (startResult.code !== 0) {
-    exitCode = startResult.code;
+  const startCommands = [
+    ["dev", "start", "openclaw"],
+    ["dev", "start", "controller"],
+    ["dev", "start", "web"],
+    ["dev", "start", "desktop"],
+  ];
+
+  for (const args of startCommands) {
+    const startResult = await run("pnpm", args);
+    if (startResult.code !== 0) {
+      exitCode = startResult.code;
+      break;
+    }
   }
 
   if (exitCode === 0) {
@@ -54,9 +64,16 @@ async function main() {
     exitCode = checkResult.code;
   }
 
-  const stopResult = await run("pnpm", ["stop"]);
-  if (exitCode === 0 && stopResult.code !== 0) {
-    exitCode = stopResult.code;
+  for (const args of [
+    ["dev", "stop", "desktop"],
+    ["dev", "stop", "web"],
+    ["dev", "stop", "controller"],
+    ["dev", "stop", "openclaw"],
+  ]) {
+    const stopResult = await run("pnpm", args);
+    if (exitCode === 0 && stopResult.code !== 0) {
+      exitCode = stopResult.code;
+    }
   }
 
   process.exit(exitCode);

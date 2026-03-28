@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start:electron": "node -e \"console.error('Use pnpm start from the nexu project root.'); process.exit(1)\"",
+    "start:electron": "node -e \"console.error('Use pnpm dev start desktop from the nexu project root after starting openclaw/controller/web as needed.'); process.exit(1)\"",
     "prepare:controller-sidecar": "node ./scripts/prepare-controller-sidecar.mjs",
     "prepare:openclaw-sidecar": "node ./scripts/prepare-openclaw-sidecar.mjs",
     "prepare:runtime-sidecars": "node ./scripts/prepare-runtime-sidecars.mjs",

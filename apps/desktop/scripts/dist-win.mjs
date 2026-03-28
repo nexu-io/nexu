@@ -3,6 +3,11 @@ import { cp, lstat, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createWindowsBuildCapabilities } from "./platforms/win/build-capabilities.mjs";
+import {
+  createDesktopBuildContext,
+  getSharedBuildSteps,
+} from "./platforms/shared/build-capabilities.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
@@ -11,13 +16,6 @@ const repoRoot =
 const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const require = createRequire(import.meta.url);
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-
-function createWebBuildEnv(baseEnv) {
-  return {
-    ...baseEnv,
-    VITE_DESKTOP_PLATFORM: process.platform,
-  };
-}
 
 function createCommandSpec(command, args) {
   if (
@@ -251,35 +249,29 @@ async function getWindowsBuildVersion() {
 async function main() {
   const rawArgs = new Set(process.argv.slice(2));
   const dirOnly = rawArgs.has("--dir-only") || rawArgs.has("--target=dir");
-  const env = {
-    ...process.env,
-    NEXU_WORKSPACE_ROOT: repoRoot,
-  };
-  const webBuildEnv = createWebBuildEnv(env);
-  const releaseRoot = process.env.NEXU_DESKTOP_RELEASE_DIR
-    ? resolve(process.env.NEXU_DESKTOP_RELEASE_DIR)
-    : resolve(electronRoot, "release");
+  const buildContext = createDesktopBuildContext({
+    electronRoot,
+    repoRoot,
+    processEnv: process.env,
+  });
+  const env = buildContext.env;
+  const releaseRoot = buildContext.resolveReleaseRoot();
+  const buildCapabilities = createWindowsBuildCapabilities({
+    env,
+    releaseRoot,
+    processPlatform: process.platform,
+  });
 
   await rm(releaseRoot, rmWithRetriesOptions);
-  await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
+  await rm(buildContext.resolveRuntimeDistRoot(), rmWithRetriesOptions);
 
-  await run(
-    pnpmCommand,
-    ["--dir", repoRoot, "--filter", "@nexu/shared", "build"],
-    { env },
-  );
-  await run(
-    pnpmCommand,
-    ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
-    { env },
-  );
-  await run(pnpmCommand, ["--dir", repoRoot, "openclaw-runtime:install"], {
-    env,
-  });
+  for (const [command, args] of getSharedBuildSteps({ repoRoot })) {
+    await run(command === "pnpm" ? pnpmCommand : command, args, { env });
+  }
   await run(
     pnpmCommand,
     ["--dir", repoRoot, "--filter", "@nexu/web", "build"],
-    { env: webBuildEnv },
+    { env: buildCapabilities.webBuildEnv },
   );
   await run(pnpmCommand, ["run", "build"], { cwd: electronRoot, env });
   await run(
@@ -287,7 +279,7 @@ async function main() {
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
     {
       cwd: electronRoot,
-      env,
+      env: buildCapabilities.sidecarReleaseEnv,
     },
   );
   await ensureBuildConfig();
@@ -297,22 +289,14 @@ async function main() {
   const buildVersion = await getWindowsBuildVersion();
 
   await runElectronBuilder(
-    [
-      "--win",
-      ...(dirOnly ? ["dir"] : ["nsis", "dir"]),
-      "--publish",
-      "never",
-      `--config.electronVersion=${electronVersion}`,
-      `--config.buildVersion=${buildVersion}`,
-      `--config.directories.output=${releaseRoot}`,
-      ...(dirOnly ? ["--config.win.signAndEditExecutable=false"] : []),
-    ],
+    buildCapabilities.createElectronBuilderArgs({
+      electronVersion,
+      buildVersion,
+      dirOnly,
+    }),
     {
       cwd: electronRoot,
-      env: {
-        ...env,
-        CSC_IDENTITY_AUTO_DISCOVERY: "false",
-      },
+      env: buildCapabilities.createElectronBuilderEnv(),
     },
   );
 }

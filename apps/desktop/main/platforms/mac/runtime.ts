@@ -4,23 +4,24 @@ import { getWorkspaceRoot } from "../../../shared/workspace-paths";
 import {
   SERVICE_LABELS,
   bootstrapWithLaunchd,
-  getLogDir,
   getDefaultPlistDir,
+  getLogDir,
   isLaunchdBootstrapEnabled,
   resolveLaunchdPaths,
 } from "../../services";
-import {
-  getLegacyNexuHomeStateDir,
-  migrateOpenclawState,
-} from "../../services/state-migration";
-import { buildSkillNodePath } from "../../runtime/manifests";
 import { createManagedRuntimePlatformAdapter } from "../shared/runtime-common";
 import type { DesktopRuntimePlatformAdapter } from "../types";
+import {
+  createMacLaunchdCapabilities,
+  createMacManagedCapabilities,
+} from "./capabilities";
 
 export function createMacRuntimePlatformAdapter(): DesktopRuntimePlatformAdapter {
+  const capabilities = createMacLaunchdCapabilities();
   return {
     id: "mac",
     mode: "launchd",
+    capabilities,
     prepareRuntimeConfig: ({ baseRuntimeConfig, logStartupStep }) => {
       logStartupStep("mac:prepareRuntimeConfig:launchd");
       return Promise.resolve({
@@ -42,38 +43,31 @@ export function createMacRuntimePlatformAdapter(): DesktopRuntimePlatformAdapter
 
       const isDev = !app.isPackaged;
       const paths = resolveLaunchdPaths(app.isPackaged, electronRoot);
-      const nexuHome = runtimeConfig.paths.nexuHome.replace(
-        /^~/,
-        process.env.HOME ?? "",
-      );
-      const openclawRuntimeRoot = isDev
-        ? resolve(nexuHome, "runtime", "openclaw")
-        : resolve(app.getPath("userData"), "runtime", "openclaw");
-      const openclawStateDir = resolve(openclawRuntimeRoot, "state");
-      const openclawConfigPath = resolve(openclawStateDir, "openclaw.json");
+      const runtimeRoots = capabilities.resolveRuntimeRoots({
+        app,
+        electronRoot,
+        runtimeConfig,
+      });
+      const nexuHome = runtimeRoots.nexuHome;
+      const openclawRuntimeRoot = runtimeRoots.openclawRuntimeRoot;
+      const openclawStateDir = runtimeRoots.openclawStateDir;
+      const openclawConfigPath = runtimeRoots.openclawConfigPath;
 
-      if (!isDev) {
-        const legacyStateDir = getLegacyNexuHomeStateDir(
-          runtimeConfig.paths.nexuHome,
-        );
-        if (legacyStateDir !== openclawStateDir) {
-          migrateOpenclawState({
-            targetStateDir: openclawStateDir,
-            sourceStateDir: legacyStateDir,
-            log: (message) => logColdStart(`state-migration: ${message}`),
-          });
-        }
-      }
+      capabilities.stateMigrationPolicy.run({
+        runtimeConfig,
+        runtimeRoots,
+        isPackaged: app.isPackaged,
+        log: logColdStart,
+      });
 
-      const webRoot = isDev
-        ? resolve(getWorkspaceRoot(), "apps", "web", "dist")
-        : resolve(electronRoot, "runtime", "web", "dist");
+      const webRoot = runtimeRoots.webRoot;
       const repoRoot = getWorkspaceRoot();
       const userDataPath = app.getPath("userData");
       const openclawSkillsDir = getOpenclawSkillsDir(userDataPath);
-      const openclawTmpDir = resolve(openclawRuntimeRoot, "tmp");
+      const openclawTmpDir = runtimeRoots.openclawTmpDir;
       const openclawBinPath =
-        process.env.NEXU_OPENCLAW_BIN ?? resolve(paths.openclawCwd, "bin/openclaw");
+        process.env.NEXU_OPENCLAW_BIN ??
+        resolve(paths.openclawCwd, "bin/openclaw");
       const openclawPackageRoot = resolve(
         paths.openclawCwd,
         "node_modules/openclaw",
@@ -85,7 +79,12 @@ export function createMacRuntimePlatformAdapter(): DesktopRuntimePlatformAdapter
       const platformTemplatesDir = app.isPackaged
         ? resolve(electronRoot, "static/platform-templates")
         : resolve(repoRoot, "apps/controller/static/platform-templates");
-      const skillNodePath = buildSkillNodePath(electronRoot, app.isPackaged);
+      const skillNodePath =
+        capabilities.runtimeExecutables.resolveSkillNodePath({
+          electronRoot,
+          isPackaged: app.isPackaged,
+          openclawSidecarRoot: paths.openclawCwd,
+        });
 
       const launchdResult = await bootstrapWithLaunchd({
         isDev,
@@ -133,7 +132,9 @@ export function createMacRuntimePlatformAdapter(): DesktopRuntimePlatformAdapter
           `attached to running services (controller=${controllerPort} openclaw=${openclawPort} web=${webPort})`,
         );
       } else {
-        logColdStart("launchd services started, waiting for controller readiness");
+        logColdStart(
+          "launchd services started, waiting for controller readiness",
+        );
         diagnosticsReporter?.markColdStartRunning(
           "waiting for controller readiness",
         );
@@ -157,5 +158,8 @@ export function shouldUseMacLaunchdRuntime(): boolean {
 }
 
 export function createFallbackMacRuntimePlatformAdapter() {
-  return createManagedRuntimePlatformAdapter("mac");
+  return createManagedRuntimePlatformAdapter(
+    "mac",
+    createMacManagedCapabilities(),
+  );
 }

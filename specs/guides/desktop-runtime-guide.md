@@ -44,7 +44,7 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 
 ## Local State Map
 
-### Dev desktop (`pnpm start` / `pnpm restart`)
+### Dev desktop (`pnpm dev start` / `pnpm dev restart` / explicit per-service commands)
 
 - Electron `userData`: `<repo>/.tmp/desktop/electron`
 - Desktop logs: `<repo>/.tmp/desktop/electron/logs`
@@ -55,8 +55,7 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 - Runtime unit logs: `<repo>/.tmp/desktop/electron/logs/runtime-units`
 - Controller unit log: `<repo>/.tmp/desktop/electron/logs/runtime-units/controller.log`
 - Other managed unit logs: `<repo>/.tmp/desktop/electron/logs/runtime-units/<unit>.log`
-- Desktop wrapper log: `<repo>/.tmp/logs/desktop-dev.log`
-- Desktop startup timeline log: `<repo>/.tmp/logs/desktop-startup-timeline.log`
+- Desktop session log: `<repo>/.tmp/dev/logs/<run_id>/desktop.log`
 - Prepared sidecar cache root: `<repo>/.tmp/sidecars`
 - OpenClaw sidecar cache metadata: `<repo>/.tmp/sidecars/openclaw/prepare-cache.json`
 - OpenClaw runtime root: `<repo>/.tmp/desktop/electron/runtime/openclaw`
@@ -65,7 +64,7 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 - OpenClaw native log: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
 - Desktop-scoped Nexu home: `<repo>/.tmp/desktop/electron/.nexu`
 - Controller `NEXU_HOME`: points to the desktop-scoped path above when launched by desktop dev
-- Repo-local reset command: `pnpm reset-state` or `./apps/desktop/dev.sh reset-state`
+- There is no repo-local desktop reset wrapper anymore; stop services explicitly and delete state paths manually when needed.
 
 ### Packaged desktop (DMG-installed app)
 
@@ -87,52 +86,14 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 
 ### How to use the logs
 
-- Start with the desktop wrapper log in dev when `pnpm start` fails before Electron is fully up: `<repo>/.tmp/logs/desktop-dev.log`
+- Start with `pnpm dev logs desktop` in dev when desktop fails before Electron is fully up.
 - Check `cold-start.log` for boot milestones and early main-process startup sequencing
 - Check `desktop-main.log` for main-process runtime behavior, auth recovery, renderer-side forwarded events, and desktop lifecycle diagnostics
 - Check `logs/runtime-units/*.log` for sidecar process logs, especially `controller.log`
 - Check `/tmp/openclaw/openclaw-YYYY-MM-DD.log` for OpenClaw-native channel traffic, agent dispatch, config reloads, hook activity, and model override behavior
 - When exporting diagnostics, the app bundles `desktop-main.log`, `cold-start.log`, `logs/runtime-units/*`, `desktop-diagnostics.json`, `startup-health.json`, and `/tmp/openclaw/openclaw-*.log`
 
-### Startup optimization defaults
-
-- `pnpm start` is optimized by default. It reuses existing desktop build artifacts when the expected output files already exist.
-- `pnpm start` also reuses the prepared OpenClaw sidecar when its cache fingerprint still matches.
-- Build reuse is intentionally conservative: if any required artifact is missing, start falls back to a full rebuild automatically.
-- OpenClaw sidecar reuse is content-hash based and falls back to a full rebuild automatically when the cache metadata is missing, invalid, or out of date.
-
-### Temporary escape hatches
-
-- `NEXU_DESKTOP_FORCE_FULL_START=1 pnpm start` — disable all startup optimizations for a single run and force the full build path.
-- `NEXU_DESKTOP_DISABLE_BUILD_REUSE=1 pnpm start` — keep normal start behavior but always rebuild workspace/desktop artifacts.
-- `NEXU_DESKTOP_DISABLE_OPENCLAW_SIDECAR_CACHE=1 pnpm start` — keep normal start behavior but always rebuild the prepared OpenClaw sidecar.
-- These flags are intentionally temporary debugging tools; prefer unsetting them after the suspicious run is complete.
-
-### OpenClaw sidecar cache invalidation
-
-- The prepared OpenClaw sidecar cache lives under `.tmp/sidecars/openclaw/` and records its cache key in `prepare-cache.json`.
-- The cache key includes:
-  - `openclaw-runtime/package.json`
-  - `openclaw-runtime/package-lock.json`
-  - all files under `openclaw-runtime-patches/openclaw/`
-  - `apps/desktop/scripts/prepare-openclaw-sidecar.mjs`
-  - whether runtime dependencies are being copied instead of linked
-- If any of those inputs change, the cache is invalidated and the sidecar is rebuilt automatically.
-- If Windows symlink creation fails during sidecar assembly, the launcher falls back to copying the affected files/directories.
-
-### What `reset-state` actually does
-
-- `pnpm reset-state` is a dev-only command that runs the Node-based desktop launcher reset flow
-- It stops the local desktop stack and removes `$NEXU_DESKTOP_RUNTIME_ROOT`, which is the repo-local desktop runtime root in dev
-- It also removes the prepared sidecar cache under `.tmp/sidecars/` and clears launcher lock/state files used by the optimized startup path
-- In practice this clears repo-local desktop runtime data such as desktop `userData`, generated OpenClaw config/state, agent workspaces, runtime sessions, desktop logs under `.tmp/desktop/`, and repo-scoped startup caches under `.tmp/sidecars/`
-- It does not touch packaged-app data under `~/Library/Application Support/@nexu/desktop`
-- It does not touch any separately managed `~/.nexu/` state from non-desktop workflows or older local setups
-
-### Full local wipe checklist
-
-- For a normal dev reset, run `pnpm reset-state`
-- For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` if you also want to discard controller-owned or legacy local state outside the desktop-scoped `userData`
+- For a full local wipe, stop each service explicitly, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` if you also want to discard controller-owned or legacy local state outside the desktop-scoped `userData`
 - Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, and any leftover controller state from earlier local runs
 
 - `a locally packaged app needs build-time overrides`
@@ -143,12 +104,11 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
   - Use `NEXU_DESKTOP_RELEASE_DIR=/absolute/output/path` when you want packaged artifacts written somewhere other than `apps/desktop/release`.
 
 - `desktop won't cold start`
-  - Start with `pnpm logs` and `node apps/desktop/scripts/dev-cli.mjs devlog`.
+  - Start with `pnpm dev logs desktop`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.
   - If the issue looks power-management related, inspect `desktop-diagnostics.json` `sleepGuard` plus `desktop-main.log` entries with `source=sleep-guard` to confirm the blocker type, power-source transitions, and whether a `suspend` was still observed.
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
-  - If the optimized start path looks suspicious, retry once with `NEXU_DESKTOP_FORCE_FULL_START=1 pnpm start` to separate cache/reuse issues from real build/runtime issues.
-  - If `pnpm exec electron` works but the desktop launcher still fails to boot, rebuild from the standard `pnpm start` path and inspect `desktop-dev.log` around `run:start` / `run:done` markers to identify the slow or failing phase.
+  - If `pnpm exec electron` works but `pnpm dev start desktop` still fails to boot, rebuild `@nexu/desktop` explicitly and inspect the current session `desktop.log`.
 
 - `a runtime unit looks running but behavior is broken`
   - Check the unit's structured lifecycle/probe logs in `apps/desktop/main/runtime/` outputs before changing UI.

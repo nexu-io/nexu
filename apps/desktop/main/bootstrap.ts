@@ -52,7 +52,9 @@ function configureLocalDevPaths(): void {
   const userDataPath = resolve(electronRoot, "user-data");
   const sessionDataPath = resolve(electronRoot, "session-data");
   const logsPath = resolve(userDataPath, "logs");
-  const nexuHomePath = getDesktopNexuHomeDir(userDataPath);
+  const nexuHomePath = process.env.NEXU_HOME
+    ? resolve(process.env.NEXU_HOME)
+    : getDesktopNexuHomeDir(userDataPath);
 
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(sessionDataPath, { recursive: true });

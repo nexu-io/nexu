@@ -20,12 +20,14 @@ const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: process.defaultApp ? undefined : process.resourcesPath,
   useBuildConfig: !process.defaultApp,
 });
+const webviewPreloadUrl = new URL("./webview-preload.js", import.meta.url).href;
 
 const hostBridge: HostBridge = {
   bootstrap: {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
+    webviewPreloadUrl,
   },
 
   invoke<TChannel extends HostInvokeChannel>(

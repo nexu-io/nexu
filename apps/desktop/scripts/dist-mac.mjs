@@ -13,6 +13,11 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createMacBuildCapabilities } from "./platforms/mac/build-capabilities.mjs";
+import {
+  createDesktopBuildContext,
+  getSharedBuildSteps,
+} from "./platforms/shared/build-capabilities.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
@@ -498,51 +503,31 @@ async function main() {
   await ensureBuildConfig();
 
   const desktopEnv = await loadDesktopEnv();
-  const env = {
-    ...process.env,
-    ...desktopEnv,
-    NEXU_WORKSPACE_ROOT: repoRoot,
-  };
-  const releaseRoot = env.NEXU_DESKTOP_RELEASE_DIR
-    ? resolve(env.NEXU_DESKTOP_RELEASE_DIR)
-    : resolve(electronRoot, "release");
-  const {
-    APPLE_ID: appleId,
-    APPLE_APP_SPECIFIC_PASSWORD: appleAppSpecificPassword,
-    APPLE_TEAM_ID: appleTeamId,
-    ...notarizeEnv
-  } = env;
-
-  if (appleId) {
-    notarizeEnv.NEXU_APPLE_ID = appleId;
-  }
-
-  if (appleAppSpecificPassword) {
-    notarizeEnv.NEXU_APPLE_APP_SPECIFIC_PASSWORD = appleAppSpecificPassword;
-  }
-
-  if (appleTeamId) {
-    notarizeEnv.NEXU_APPLE_TEAM_ID = appleTeamId;
-  }
+  const buildContext = createDesktopBuildContext({
+    electronRoot,
+    repoRoot,
+    processEnv: {
+      ...process.env,
+      ...desktopEnv,
+    },
+  });
+  const env = buildContext.env;
+  const releaseRoot = buildContext.resolveReleaseRoot();
+  const buildCapabilities = createMacBuildCapabilities({
+    env,
+    releaseRoot,
+    targetMacArch,
+    isUnsigned,
+  });
 
   await rm(releaseRoot, rmWithRetriesOptions);
-  await rm(resolve(electronRoot, ".dist-runtime"), rmWithRetriesOptions);
+  await rm(buildContext.resolveRuntimeDistRoot(), rmWithRetriesOptions);
 
-  await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"], {
-    env,
-  });
-  await run(
-    "pnpm",
-    ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
-    {
-      env,
-    },
-  );
-  await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
-    env,
-  });
+  for (const [command, args] of getSharedBuildSteps({ repoRoot })) {
+    await run(command, args, { env });
+  }
   await run("pnpm", ["--dir", repoRoot, "--filter", "@nexu/web", "build"], {
-    env,
+    env: buildCapabilities.webBuildEnv,
   });
   await run("pnpm", ["run", "build"], { cwd: electronRoot, env });
   await run("node", [resolve(scriptDir, "upload-sourcemaps.mjs")], {
@@ -554,10 +539,7 @@ async function main() {
     [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
     {
       cwd: electronRoot,
-      env: {
-        ...env,
-        ...(isUnsigned ? { NEXU_DESKTOP_MAC_UNSIGNED: "true" } : {}),
-      },
+      env: buildCapabilities.sidecarReleaseEnv,
     },
   );
   env.CUSTOM_DMGBUILD_PATH = await ensureDmgbuildBundle();
@@ -578,27 +560,13 @@ async function main() {
   }
 
   await runElectronBuilder(
-    [
-      "--mac",
-      `--${targetMacArch}`,
-      "--publish",
-      "never",
-      `--config.electronVersion=${electronVersion}`,
-      `--config.buildVersion=${buildVersion}`,
-      `--config.directories.output=${releaseRoot}`,
-      ...(isUnsigned
-        ? ["--config.mac.identity=null", "--config.mac.hardenedRuntime=false"]
-        : []),
-    ],
+    buildCapabilities.createElectronBuilderArgs({
+      electronVersion,
+      buildVersion,
+    }),
     {
       cwd: electronRoot,
-      env: isUnsigned
-        ? {
-            ...notarizeEnv,
-            CSC_IDENTITY_AUTO_DISCOVERY: "false",
-            NEXU_DESKTOP_MAC_UNSIGNED: "true",
-          }
-        : notarizeEnv,
+      env: buildCapabilities.createElectronBuilderEnv(),
     },
   );
   await stapleNotarizedAppBundles();

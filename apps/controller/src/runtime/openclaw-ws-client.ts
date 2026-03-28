@@ -141,6 +141,12 @@ function buildDeviceAuthPayloadV3(params: {
   ].join("|");
 }
 
+function toGatewayWsUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString().replace(/\/$/, "");
+}
+
 // ---------------------------------------------------------------------------
 // Protocol types (subset of openclaw/src/gateway/protocol)
 // ---------------------------------------------------------------------------
@@ -204,7 +210,7 @@ export class OpenClawWsClient {
   private readonly deviceIdentity: DeviceIdentity;
 
   constructor(env: ControllerEnv) {
-    this.url = `ws://127.0.0.1:${env.openclawGatewayPort}`;
+    this.url = toGatewayWsUrl(env.openclawBaseUrl);
     this.token = env.openclawGatewayToken ?? "";
     this.deviceIdentity = loadOrCreateDeviceIdentity(
       path.join(env.openclawStateDir, "identity", "device.json"),

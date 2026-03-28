@@ -12,6 +12,7 @@ Nexu is a desktop-first OpenClaw platform. Users create AI bots, connect them to
 - `apps/web` — React + Ant Design + Vite
 - `openclaw-runtime` — Repo-local packaged OpenClaw runtime for local dev and desktop packaging; replaces global `openclaw` CLI
 - `packages/shared` — Shared Zod schemas
+- `packages/dev-utils` — TS-first reusable utilities for local script tooling
 
 ## Project overview
 
@@ -23,13 +24,16 @@ All commands use pnpm. Target a single app with `pnpm --filter <package>`.
 
 ```bash
 pnpm install                          # Install
-pnpm dev                              # Local controller-first web stack (Controller + Web)
-pnpm dev:controller                   # Controller only
-pnpm start                            # Build and launch the desktop local runtime stack
-pnpm stop                             # Stop the desktop local runtime stack
-pnpm restart                          # Restart the desktop local runtime stack
-pnpm reset-state                      # Stop desktop runtime and delete repo-local desktop state
-pnpm status                           # Show desktop local runtime status
+pnpm --filter @nexu/shared build      # Build shared dist required by cold-start dev flows
+pnpm dev start                        # Start the lightweight local stack: openclaw -> controller -> web -> desktop
+pnpm dev start <service>              # Start one local-dev service: desktop|openclaw|controller|web
+pnpm dev restart                      # Restart the lightweight local stack
+pnpm dev stop                         # Stop the lightweight local stack in reverse order
+pnpm dev stop <service>               # Stop one local-dev service
+pnpm dev restart <service>            # Restart one local-dev service
+pnpm dev status <service>             # Show status for one local-dev service
+pnpm dev logs <service>               # Show active-session log tail (max 200 lines) for one local-dev service
+pnpm dev:controller                   # Legacy controller-only direct dev entrypoint
 pnpm dist:mac                         # Build signed macOS desktop distributables
 pnpm dist:mac:arm64                   # Build signed Apple Silicon macOS desktop distributables
 pnpm dist:mac:x64                     # Build signed Intel macOS desktop distributables
@@ -67,15 +71,16 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 
 ## Desktop local development
 
-- Use `pnpm install` first, then `pnpm start` / `pnpm stop` / `pnpm restart` / `pnpm status` as the standard local desktop workflow.
-- `pnpm start` is the canonical local desktop entrypoint and now applies safe startup optimizations by default: it reuses existing build artifacts when present and reuses the prepared OpenClaw sidecar cache when its inputs have not changed.
-- Temporary escape hatches exist for debugging or suspicious cache behavior: `NEXU_DESKTOP_FORCE_FULL_START=1` disables the optimized start path, `NEXU_DESKTOP_DISABLE_BUILD_REUSE=1` disables build artifact reuse only, and `NEXU_DESKTOP_DISABLE_OPENCLAW_SIDECAR_CACHE=1` disables the OpenClaw sidecar cache only.
-- `pnpm reset-state` is the reset button for the optimized path too: it stops the desktop runtime and clears repo-local runtime state plus cached sidecars under `.tmp/sidecars/`.
+- Minimal cold-start setup on a fresh machine is: `pnpm install` -> `pnpm --filter @nexu/shared build` -> copy `scripts/dev/.env.example` to `scripts/dev/.env` only if you need dev-only overrides.
+- Default daily flow is: `pnpm dev start` -> `pnpm dev status <service>` / `pnpm dev logs <service>` as needed -> `pnpm dev stop`.
+- Use `pnpm dev restart` for a clean full-stack recycle; use `pnpm dev restart <service>` only when you are intentionally touching one service.
+- Explicit single-service control remains available through `pnpm dev start <desktop|openclaw|controller|web>`, `pnpm dev stop <service>`, `pnpm dev restart <service>`, `pnpm dev status <service>`, and `pnpm dev logs <service>`.
+- `pnpm dev` intentionally does not support `all`; the full local stack order remains `openclaw` -> `controller` -> `web` -> `desktop`.
+- `pnpm dev logs <service>` is session-scoped, prints a fixed header, and tails at most the last 200 lines from the active service session.
+- `scripts/dev/.env.example` is the source-of-truth template for dev-only overrides. Copy it to `scripts/dev/.env` only when you need to override ports, URLs, state paths, or the shared OpenClaw gateway token for local development.
 - Keep the detailed startup optimization rules, cache invalidation behavior, and troubleshooting notes in `specs/guides/desktop-runtime-guide.md`; keep only the core workflow expectations here.
 - The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
 - The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
-- The desktop dev launcher is `apps/desktop/scripts/dev-cli.mjs`; `apps/desktop/dev.sh` is only a thin compatibility wrapper.
-- Treat `pnpm start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
 - Desktop local runtime should not depend on PostgreSQL. In dev mode, all state (config, OpenClaw state, logs) lives under `.tmp/desktop/nexu-home/`, fully isolated from the packaged app. Launchd plists go to `.tmp/launchd/`, runtime-ports.json also lives there.
 - In packaged mode, data is split across two directories (see table below). Launchd plists go to `~/Library/LaunchAgents/`.
@@ -90,14 +95,10 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 
 The split is intentional: `NEXU_HOME` holds lightweight user preferences that should persist across reinstalls; Electron `userData` holds heavy runtime state tied to the app lifecycle. `OPENCLAW_STATE_DIR` is explicitly set by the desktop launcher to point to the `userData` path — do not rely on the controller's default fallback.
 - `tmux` is no longer required for the desktop local-dev workflow; process state is tracked by the platform-aware launcher entrypoints.
-- For startup troubleshooting, use `pnpm logs` and `node apps/desktop/scripts/dev-cli.mjs devlog` when you need the raw dev-cli timeline.
-- `pnpm reset-state` is a dev-only cleanup shortcut; it stops the stack and removes repo-local desktop runtime state under `.tmp/desktop/`, but it does not delete packaged app state.
 - To fully reset local desktop + controller state, stop the stack, remove `.tmp/desktop/`, then remove `~/.nexu/` and `~/Library/Application Support/@nexu/desktop/`.
-- If `pnpm start` exits immediately because `electron/cli.js` cannot be resolved from `apps/desktop`, validate `pnpm -C apps/desktop exec electron --version` and consult `specs/guides/desktop-runtime-guide.md` before changing the launcher flow.
 - Desktop already exposes an agent-friendly runtime observability surface; prefer subscribing/querying before adding temporary UI or ad hoc debug logging.
 - For deeper desktop runtime inspection, use the existing event/query path (`onRuntimeEvent(...)`, `runtime:query-events`, `queryRuntimeEvents(...)`) instead of rebuilding one-off diagnostics.
 - Use `actionId`, `reasonCode`, and `cursor` / `nextCursor` as the primary correlation and incremental-fetch primitives for desktop runtime debugging.
-- To fully clear local desktop runtime state, use `node apps/desktop/scripts/dev-cli.mjs reset-state`.
 - Desktop runtime guide: `specs/guides/desktop-runtime-guide.md`.
 - The controller sidecar is packaged by `apps/desktop/scripts/prepare-controller-sidecar.mjs` which deep-copies all controller `dependencies` and their transitive deps into `.dist-runtime/controller/node_modules/`. Keep controller deps minimal to avoid bloating the desktop distributable.
 - SkillHub (catalog, install, uninstall) runs in the controller via HTTP — not in the Electron main process via IPC. The web app always uses HTTP SDK for skill operations.
@@ -105,6 +106,7 @@ The split is intentional: `NEXU_HOME` holds lightweight user preferences that sh
 
 ## Hard rules
 
+- **Debugging first principle: binary isolate, don't guess.** For UI/runtime regressions, start with overall bisection and add tiny reversible `quick return` / `quick fail` probes at key boundaries. Prefer changes that create obvious UI/log differences, narrow the fault domain quickly, and can be reverted immediately after verification. Do not start by rewriting route guards, state flows, or core logic based on intuition.
 - **Never use `any`.** Use `unknown` with narrowing or `z.infer<typeof schema>`.
 - No foreign keys in Drizzle schema — application-level joins only.
 - Credentials (bot tokens, signing secrets) must never appear in logs or errors.
@@ -168,6 +170,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Workspace templates | `specs/guides/workspace-templates.md` |
 | Local Slack testing | `specs/references/local-slack-testing.md` |
 | Local Slack smoke probe | `scripts/probe/README.md`, `scripts/probe/slack-reply-probe.mjs` |
+| Local dev CLI guidance | `scripts/dev/AGENTS.md` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
 | Security posture | `specs/SECURITY.md` |
@@ -258,9 +261,12 @@ This note should track:
 ## Local quick reference
 
 - Controller env path: `apps/controller/.env`
+- Fresh local-dev cold start: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy scripts/dev/.env.example scripts/dev/.env` (Windows) or `cp scripts/dev/.env.example scripts/dev/.env` (POSIX) -> `pnpm dev start`
+- Daily local-dev flow: `pnpm dev start` -> `pnpm dev logs <service>` / `pnpm dev status <service>` when needed -> `pnpm dev restart` for a clean recycle -> `pnpm dev stop`
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
+- Full-stack startup order is `openclaw` -> `controller` -> `web` -> `desktop`; shutdown order is the reverse
 - Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
 - When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/controller` to avoid launching a second OpenClaw process
 - If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by the running controller process.

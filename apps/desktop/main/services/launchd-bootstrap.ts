@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
-import { ensurePackagedOpenclawSidecarSync } from "../runtime/manifests";
+import { createMacLaunchdCapabilities } from "../platforms/mac/capabilities";
 import {
   type EmbeddedWebServer,
   startEmbeddedWebServer,
@@ -687,10 +687,13 @@ export function resolveLaunchdPaths(
     // then resolve paths to the extracted location.
     const runtimeDir = path.join(resourcesPath, "runtime");
     const nexuHome = path.join(os.homedir(), ".nexu");
-    const openclawSidecarRoot = ensurePackagedOpenclawSidecarSync(
-      runtimeDir,
-      nexuHome,
-    );
+    const openclawSidecarRoot =
+      createMacLaunchdCapabilities().sidecarMaterializer.materializePackagedOpenclawSidecarSync?.(
+        {
+          runtimeSidecarBaseRoot: runtimeDir,
+          runtimeRoot: nexuHome,
+        },
+      ) ?? path.join(runtimeDir, "openclaw");
     return {
       nodePath: process.execPath,
       controllerEntryPath: path.join(
