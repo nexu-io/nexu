@@ -30,13 +30,6 @@ if (!sessionId) {
 const openclawRunId = runId;
 const openclawSessionId = sessionId;
 const runtimeConfig = getScriptsDevRuntimeConfig();
-const supervisorStartedAt = Date.now();
-
-function logSupervisorTiming(stage: string): void {
-  console.log(
-    `[scripts-dev][openclaw-supervisor] ${stage} elapsedMs=${Date.now() - supervisorStartedAt}`,
-  );
-}
 
 function createOpenclawWorkerCommand(): { command: string; args: string[] } {
   return {
@@ -72,7 +65,6 @@ async function removeRunningLock(): Promise<void> {
 
 async function startWorker(): Promise<void> {
   const commandSpec = createOpenclawWorkerCommand();
-  logSupervisorTiming("worker-spawn:start");
   const child = spawn(commandSpec.command, commandSpec.args, {
     cwd: getOpenclawWorkingDirectoryPath(),
     env: {
@@ -94,10 +86,8 @@ async function startWorker(): Promise<void> {
   }
 
   workerChild = child;
-  logSupervisorTiming(`worker-spawn:pid=${child.pid}`);
 
   child.once("exit", () => {
-    logSupervisorTiming("worker-exit");
     workerChild = null;
   });
 }
@@ -121,8 +111,5 @@ process.on("SIGTERM", async () => {
   process.exit(0);
 });
 
-logSupervisorTiming("module-started");
 await writeRunningLock();
-logSupervisorTiming("lock-written");
 await startWorker();
-logSupervisorTiming("worker-start-dispatched");

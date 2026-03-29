@@ -6,6 +6,8 @@ import { devTmpPath, repoRootPath } from "@nexu/dev-utils";
 import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
 
 type ScriptsDevRuntimeConfig = {
+  devLogLevel: string;
+  devLogPretty: boolean;
   controllerPort: number;
   webPort: number;
   openclawPort: number;
@@ -71,6 +73,14 @@ function readNumber(value: string | undefined, fallback: number): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function readBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  return value === "1" || value.toLowerCase() === "true";
+}
+
 function resolvePath(value: string | undefined, fallback: string): string {
   if (!value?.trim()) {
     return fallback;
@@ -121,6 +131,8 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
   );
 
   cachedConfig = {
+    devLogLevel: mergedEnv.NEXU_DEV_LOG_LEVEL ?? "info",
+    devLogPretty: readBoolean(mergedEnv.NEXU_DEV_LOG_PRETTY, false),
     controllerPort,
     webPort,
     openclawPort,

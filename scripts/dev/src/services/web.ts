@@ -19,6 +19,7 @@ import {
   createWebInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
+import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getWebDevLogPath,
@@ -91,6 +92,12 @@ export async function startWebDevProcess(options: {
   const sessionId = options.sessionId;
   const logFilePath = getWebDevLogPath(runId);
   const commandSpec = createWebCommand(sessionId);
+  const logger = getScriptsDevLogger({
+    component: "web-service",
+    service: "web",
+    runId,
+    sessionId,
+  });
 
   await ensureParentDirectory(logFilePath);
   await ensureDirectory(repoRootPath);
@@ -109,6 +116,7 @@ export async function startWebDevProcess(options: {
       NEXU_DEV_ROLE: "supervisor",
     },
     logFilePath,
+    logger,
   });
 
   try {

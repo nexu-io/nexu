@@ -1,4 +1,6 @@
 export { waitFor } from "./conditions.js";
+export { createDevLogger } from "./logger.js";
+export type { DevLogger } from "./logger.js";
 export {
   createNodeOptions,
   getListeningPortPid,

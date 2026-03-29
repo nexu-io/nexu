@@ -33,10 +33,15 @@ import {
   startWebDevProcess,
   stopWebDevProcess,
 } from "./services/web.js";
+import { getScriptsDevLogger } from "./shared/logger.js";
 import { defaultLogTailLineCount } from "./shared/logs.js";
 import { createDevSessionId } from "./shared/trace.js";
 
 const cli = cac("scripts-dev");
+
+function getCliLogger() {
+  return getScriptsDevLogger({ component: "cli" });
+}
 
 function readTargetOrThrow(target: string | undefined): DevTarget {
   if (!target) {
@@ -66,7 +71,7 @@ async function stopDefaultStack(): Promise<void> {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("is not running")) {
-        console.log(`[scripts-dev] ${target} already stopped`);
+        getCliLogger().info(`${target} already stopped`, { target });
         continue;
       }
 
@@ -86,42 +91,25 @@ async function startTarget(
 ): Promise<void> {
   if (target === "desktop") {
     const desktopFact = await startDesktopDevProcess({ sessionId });
-    console.log(`[scripts-dev] desktop started (${desktopFact.pid})`);
-    console.log(`[scripts-dev] desktop launch id: ${desktopFact.launchId}`);
-    console.log(`[scripts-dev] desktop run id: ${desktopFact.runId}`);
-    console.log(`[scripts-dev] desktop session id: ${desktopFact.sessionId}`);
-    console.log(`[scripts-dev] desktop log file: ${desktopFact.logFilePath}`);
+    getCliLogger().info("desktop started", desktopFact);
     return;
   }
 
   if (target === "openclaw") {
     const openclawFact = await startOpenclawDevProcess({ sessionId });
-    console.log(`[scripts-dev] openclaw started (${openclawFact.pid})`);
-    console.log(`[scripts-dev] openclaw run id: ${openclawFact.runId}`);
-    console.log(`[scripts-dev] openclaw session id: ${openclawFact.sessionId}`);
-    console.log(`[scripts-dev] openclaw log file: ${openclawFact.logFilePath}`);
+    getCliLogger().info("openclaw started", openclawFact);
     return;
   }
 
   if (target === "controller") {
     const controllerFact = await startControllerDevProcess({ sessionId });
-    console.log(`[scripts-dev] controller started (${controllerFact.pid})`);
-    console.log(`[scripts-dev] controller run id: ${controllerFact.runId}`);
-    console.log(
-      `[scripts-dev] controller session id: ${controllerFact.sessionId}`,
-    );
-    console.log(
-      `[scripts-dev] controller log file: ${controllerFact.logFilePath}`,
-    );
+    getCliLogger().info("controller started", controllerFact);
     return;
   }
 
   if (target === "web") {
     const webFact = await startWebDevProcess({ sessionId });
-    console.log(`[scripts-dev] web started (${webFact.pid})`);
-    console.log(`[scripts-dev] web run id: ${webFact.runId}`);
-    console.log(`[scripts-dev] web session id: ${webFact.sessionId}`);
-    console.log(`[scripts-dev] web log file: ${webFact.logFilePath}`);
+    getCliLogger().info("web started", webFact);
     return;
   }
 
@@ -131,31 +119,25 @@ async function startTarget(
 async function stopTarget(target: DevTarget): Promise<void> {
   if (target === "desktop") {
     const desktopFact = await stopDesktopDevProcess();
-    console.log(`[scripts-dev] desktop stopped (${desktopFact.pid})`);
-    console.log(`[scripts-dev] desktop last run id: ${desktopFact.runId}`);
+    getCliLogger().info("desktop stopped", desktopFact);
     return;
   }
 
   if (target === "openclaw") {
     const openclawFact = await stopOpenclawDevProcess();
-    console.log(`[scripts-dev] openclaw stopped (${openclawFact.pid})`);
-    console.log(`[scripts-dev] openclaw last run id: ${openclawFact.runId}`);
+    getCliLogger().info("openclaw stopped", openclawFact);
     return;
   }
 
   if (target === "controller") {
     const controllerFact = await stopControllerDevProcess();
-    console.log(`[scripts-dev] controller stopped (${controllerFact.pid})`);
-    console.log(
-      `[scripts-dev] controller last run id: ${controllerFact.runId}`,
-    );
+    getCliLogger().info("controller stopped", controllerFact);
     return;
   }
 
   if (target === "web") {
     const webFact = await stopWebDevProcess();
-    console.log(`[scripts-dev] web stopped (${webFact.pid})`);
-    console.log(`[scripts-dev] web last run id: ${webFact.runId}`);
+    getCliLogger().info("web stopped", webFact);
     return;
   }
 
@@ -168,42 +150,25 @@ async function restartTarget(
 ): Promise<void> {
   if (target === "desktop") {
     const desktopFact = await restartDesktopDevProcess({ sessionId });
-    console.log(`[scripts-dev] desktop restarted (${desktopFact.pid})`);
-    console.log(`[scripts-dev] desktop launch id: ${desktopFact.launchId}`);
-    console.log(`[scripts-dev] desktop run id: ${desktopFact.runId}`);
-    console.log(`[scripts-dev] desktop session id: ${desktopFact.sessionId}`);
-    console.log(`[scripts-dev] desktop log file: ${desktopFact.logFilePath}`);
+    getCliLogger().info("desktop restarted", desktopFact);
     return;
   }
 
   if (target === "openclaw") {
     const openclawFact = await restartOpenclawDevProcess({ sessionId });
-    console.log(`[scripts-dev] openclaw restarted (${openclawFact.pid})`);
-    console.log(`[scripts-dev] openclaw run id: ${openclawFact.runId}`);
-    console.log(`[scripts-dev] openclaw session id: ${openclawFact.sessionId}`);
-    console.log(`[scripts-dev] openclaw log file: ${openclawFact.logFilePath}`);
+    getCliLogger().info("openclaw restarted", openclawFact);
     return;
   }
 
   if (target === "controller") {
     const controllerFact = await restartControllerDevProcess({ sessionId });
-    console.log(`[scripts-dev] controller restarted (${controllerFact.pid})`);
-    console.log(`[scripts-dev] controller run id: ${controllerFact.runId}`);
-    console.log(
-      `[scripts-dev] controller session id: ${controllerFact.sessionId}`,
-    );
-    console.log(
-      `[scripts-dev] controller log file: ${controllerFact.logFilePath}`,
-    );
+    getCliLogger().info("controller restarted", controllerFact);
     return;
   }
 
   if (target === "web") {
     const webFact = await restartWebDevProcess({ sessionId });
-    console.log(`[scripts-dev] web restarted (${webFact.pid})`);
-    console.log(`[scripts-dev] web run id: ${webFact.runId}`);
-    console.log(`[scripts-dev] web session id: ${webFact.sessionId}`);
-    console.log(`[scripts-dev] web log file: ${webFact.logFilePath}`);
+    getCliLogger().info("web restarted", webFact);
     return;
   }
 
@@ -213,111 +178,25 @@ async function restartTarget(
 async function printStatus(target: DevTarget): Promise<void> {
   if (target === "desktop") {
     const desktopSnapshot = await getCurrentDesktopDevSnapshot();
-    console.log(`[scripts-dev] desktop status: ${desktopSnapshot.status}`);
-    if (desktopSnapshot.pid) {
-      console.log(`[scripts-dev] desktop pid: ${desktopSnapshot.pid}`);
-    }
-    if (desktopSnapshot.launchId) {
-      console.log(
-        `[scripts-dev] desktop launch id: ${desktopSnapshot.launchId}`,
-      );
-    }
-    if (desktopSnapshot.runId) {
-      console.log(`[scripts-dev] desktop run id: ${desktopSnapshot.runId}`);
-    }
-    if (desktopSnapshot.sessionId) {
-      console.log(
-        `[scripts-dev] desktop session id: ${desktopSnapshot.sessionId}`,
-      );
-    }
-    if (desktopSnapshot.logFilePath) {
-      console.log(
-        `[scripts-dev] desktop log file: ${desktopSnapshot.logFilePath}`,
-      );
-    }
+    getCliLogger().info("desktop status", desktopSnapshot);
     return;
   }
 
   if (target === "openclaw") {
     const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
-    console.log(`[scripts-dev] openclaw status: ${openclawSnapshot.status}`);
-    if (openclawSnapshot.pid) {
-      console.log(
-        `[scripts-dev] openclaw supervisor pid: ${openclawSnapshot.pid}`,
-      );
-    }
-    if (openclawSnapshot.listenerPid) {
-      console.log(
-        `[scripts-dev] openclaw listener pid: ${openclawSnapshot.listenerPid}`,
-      );
-    }
-    if (openclawSnapshot.runId) {
-      console.log(`[scripts-dev] openclaw run id: ${openclawSnapshot.runId}`);
-    }
-    if (openclawSnapshot.sessionId) {
-      console.log(
-        `[scripts-dev] openclaw session id: ${openclawSnapshot.sessionId}`,
-      );
-    }
-    if (openclawSnapshot.logFilePath) {
-      console.log(
-        `[scripts-dev] openclaw log file: ${openclawSnapshot.logFilePath}`,
-      );
-    }
+    getCliLogger().info("openclaw status", openclawSnapshot);
     return;
   }
 
   if (target === "controller") {
     const controllerSnapshot = await getCurrentControllerDevSnapshot();
-    console.log(
-      `[scripts-dev] controller status: ${controllerSnapshot.status}`,
-    );
-    if (controllerSnapshot.pid) {
-      console.log(
-        `[scripts-dev] controller supervisor pid: ${controllerSnapshot.pid}`,
-      );
-    }
-    if (controllerSnapshot.workerPid) {
-      console.log(
-        `[scripts-dev] controller worker pid: ${controllerSnapshot.workerPid}`,
-      );
-    }
-    if (controllerSnapshot.runId) {
-      console.log(
-        `[scripts-dev] controller run id: ${controllerSnapshot.runId}`,
-      );
-    }
-    if (controllerSnapshot.sessionId) {
-      console.log(
-        `[scripts-dev] controller session id: ${controllerSnapshot.sessionId}`,
-      );
-    }
-    if (controllerSnapshot.logFilePath) {
-      console.log(
-        `[scripts-dev] controller log file: ${controllerSnapshot.logFilePath}`,
-      );
-    }
+    getCliLogger().info("controller status", controllerSnapshot);
     return;
   }
 
   if (target === "web") {
     const webSnapshot = await getCurrentWebDevSnapshot();
-    console.log(`[scripts-dev] web status: ${webSnapshot.status}`);
-    if (webSnapshot.pid) {
-      console.log(`[scripts-dev] web pid: ${webSnapshot.pid}`);
-    }
-    if (webSnapshot.listenerPid) {
-      console.log(`[scripts-dev] web listener pid: ${webSnapshot.listenerPid}`);
-    }
-    if (webSnapshot.runId) {
-      console.log(`[scripts-dev] web run id: ${webSnapshot.runId}`);
-    }
-    if (webSnapshot.sessionId) {
-      console.log(`[scripts-dev] web session id: ${webSnapshot.sessionId}`);
-    }
-    if (webSnapshot.logFilePath) {
-      console.log(`[scripts-dev] web log file: ${webSnapshot.logFilePath}`);
-    }
+    getCliLogger().info("web status", webSnapshot);
     return;
   }
 
@@ -325,11 +204,11 @@ async function printStatus(target: DevTarget): Promise<void> {
 }
 
 function printLogHeader(logFilePath: string, totalLineCount: number): void {
-  console.log(
-    `[scripts-dev] showing current session log tail (last ${defaultLogTailLineCount} lines max)`,
-  );
-  console.log(`[scripts-dev] total lines: ${totalLineCount}`);
-  console.log(`[scripts-dev] log file: ${logFilePath}`);
+  getCliLogger().info("showing current session log tail", {
+    totalLines: totalLineCount,
+    maxLines: defaultLogTailLineCount,
+    logFilePath,
+  });
 }
 
 cli
@@ -453,7 +332,7 @@ cli.help();
 const fallbackCommand = process.argv[2];
 
 if (fallbackCommand && !isSupportedDevCommand(fallbackCommand)) {
-  console.error(`[scripts-dev] Unknown command: ${fallbackCommand}`);
+  getCliLogger().error("unknown command", { command: fallbackCommand });
   process.exit(1);
 }
 

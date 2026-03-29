@@ -132,7 +132,6 @@ async function restartWorker(): Promise<void> {
     await waitForControllerPortRelease();
   }
 
-  console.log("[scripts-dev] controller watcher restarting worker");
   await startWorker();
 }
 
@@ -143,9 +142,7 @@ const watcher = chokidar.watch(controllerSourceDirectoryPath, {
 watcher.on("all", async () => {
   try {
     await restartWorker();
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-  }
+  } catch {}
 });
 
 process.on("SIGINT", async () => {

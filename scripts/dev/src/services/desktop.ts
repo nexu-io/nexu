@@ -14,6 +14,7 @@ import {
 import { ensure } from "@nexu/shared";
 
 import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
+import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   desktopDevLockPath,
@@ -123,6 +124,12 @@ export async function startDesktopDevProcess(options: {
   const logFilePath = getDesktopDevLogPath(runId);
   const commandSpec = createDesktopCommand(sessionId);
   const desktopLaunch = createDesktopLaunchEnv();
+  const logger = getScriptsDevLogger({
+    component: "desktop-service",
+    service: "desktop",
+    runId,
+    sessionId,
+  });
 
   await ensureParentDirectory(logFilePath);
 
@@ -138,6 +145,7 @@ export async function startDesktopDevProcess(options: {
       NEXU_DEV_ROLE: "supervisor",
     },
     logFilePath,
+    logger,
   });
 
   try {

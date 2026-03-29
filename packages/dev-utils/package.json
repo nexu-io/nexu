@@ -12,6 +12,10 @@
       "default": "./src/index.ts"
     }
   },
+  "dependencies": {
+    "pino": "^9.9.4",
+    "pino-pretty": "^13.1.2"
+  },
   "devDependencies": {
     "@nexu/shared": "workspace:*",
     "typescript": "^5.7.3"

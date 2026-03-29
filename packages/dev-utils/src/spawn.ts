@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 
 import { ensure } from "@nexu/shared";
 
+import type { DevLogger } from "./logger.js";
 import {
   getDevLauncherTempPrefix,
   getWindowsLauncherBatchPath,
@@ -16,6 +17,7 @@ type SpawnHiddenProcessArgs = {
   cwd: string;
   env: NodeJS.ProcessEnv;
   logFilePath: string;
+  logger?: DevLogger;
 };
 
 type HiddenProcessHandle = {
@@ -34,9 +36,14 @@ async function spawnWindowsHiddenProcess({
   cwd,
   env,
   logFilePath,
+  logger,
 }: SpawnHiddenProcessArgs): Promise<HiddenProcessHandle> {
   const startedAt = Date.now();
   const service = env.NEXU_DEV_SERVICE ?? "unknown";
+  const scopedLogger = logger?.child({
+    component: "spawn-hidden",
+    service,
+  });
   const launcherDirectory = await mkdtemp(getDevLauncherTempPrefix());
   const batchPath = getWindowsLauncherBatchPath(launcherDirectory);
   const launcherPath = getWindowsLauncherScriptPath(launcherDirectory);
@@ -56,9 +63,10 @@ async function spawnWindowsHiddenProcess({
   await writeFile(batchPath, `${batchSource}\r\n`, "utf8");
   await writeFile(launcherPath, `${launcherSource}\r\n`, "utf8");
 
-  console.log(
-    `[scripts-dev][spawn-hidden] service=${service} stage=launcher-prepared elapsedMs=${Date.now() - startedAt} dir=${launcherDirectory}`,
-  );
+  scopedLogger?.debug("hidden launcher prepared", {
+    elapsedMs: Date.now() - startedAt,
+    launcherDirectory,
+  });
 
   const child = spawn(
     "wscript.exe",
@@ -81,9 +89,10 @@ async function spawnWindowsHiddenProcess({
   );
   const pid = child.pid as number;
 
-  console.log(
-    `[scripts-dev][spawn-hidden] service=${service} stage=wscript-spawned elapsedMs=${Date.now() - startedAt} pid=${pid}`,
-  );
+  scopedLogger?.debug("hidden launcher spawned", {
+    elapsedMs: Date.now() - startedAt,
+    pid,
+  });
 
   child.once("exit", () => {
     void rm(launcherDirectory, { recursive: true, force: true });

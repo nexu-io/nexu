@@ -19,6 +19,7 @@ import {
   createOpenclawInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
+import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getOpenclawDevLogPath,
@@ -38,9 +39,13 @@ export type OpenclawDevSnapshot = {
 };
 
 function logOpenclawTiming(stage: string, startedAt: number): void {
-  console.log(
-    `[scripts-dev][openclaw-timing] ${stage} elapsedMs=${Date.now() - startedAt}`,
-  );
+  getScriptsDevLogger({
+    component: "openclaw-service",
+    service: "openclaw",
+  }).debug("openclaw timing", {
+    stage,
+    elapsedMs: Date.now() - startedAt,
+  });
 }
 
 function createOpenclawCommand(sessionId: string): {
@@ -101,6 +106,12 @@ export async function startOpenclawDevProcess(options: {
   const logFilePath = getOpenclawDevLogPath(runId);
   const commandSpec = createOpenclawCommand(sessionId);
   const runtimeConfig = getScriptsDevRuntimeConfig();
+  const logger = getScriptsDevLogger({
+    component: "openclaw-service",
+    service: "openclaw",
+    runId,
+    sessionId,
+  });
 
   logOpenclawTiming("start:entered", startedAt);
 
@@ -126,6 +137,7 @@ export async function startOpenclawDevProcess(options: {
       NEXU_DEV_ROLE: "supervisor",
     },
     logFilePath,
+    logger,
   });
 
   logOpenclawTiming("spawn-hidden-process-returned", startedAt);
