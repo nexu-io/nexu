@@ -145,6 +145,37 @@
 - confirm that the new seam is ready for future Windows adapter work rather than still encoding launchd assumptions in shared APIs
 - only after mac behavior is stable, evaluate follow-up extraction work for other platforms
 
+### Current progress snapshot
+
+- Phase 1 and Phase 2 are substantially complete:
+  - desktop runtime now routes through a shared lifecycle contract in `packages/shared/src/lifecycle/`
+  - `apps/desktop/main/index.ts` is now mostly a lightweight dispatcher that calls `platform.lifecycle.*`
+  - mac launchd lifecycle orchestration has been split into platform-local modules under `apps/desktop/main/platforms/mac/`
+- platform identity has been tightened:
+  - `default` platform identity was removed
+  - supported runtime platforms are now only `mac` and `win`
+  - unsupported platforms fail fast instead of silently falling back
+- platform compatibility logic is now being encoded behind explicit `platform.xxx` surfaces:
+  - `platform.lifecycle`
+  - `platform.process`
+  - `platform.network`
+  - `platform.supervisor`
+- sidecar/filesystem compatibility logic has started moving from raw `process.platform` checks into platform-facing capability helpers
+- pure platform atomics are now being elevated into `packages/shared/src/platform/`
+  - keep promoting only pure platform decision helpers and constants there
+  - do not move lifecycle orchestration, launchd supervisor code, or business-specific flows into shared
+
+### Remaining follow-up areas
+
+- continue reviewing whether more pure platform atomics can move into `packages/shared/src/platform/`
+- keep desktop-specific lifecycle/backends in `apps/desktop/main/platforms/` and `apps/desktop/main/services/`
+- validate the mac packaged runtime end-to-end after the refactor:
+  - cold start
+  - attach to existing services
+  - background run vs quit completely
+  - update-install teardown
+  - stale-session recovery
+
 ## Quick Validation Commands
 
 - `pnpm --dir ./scripts/dev exec tsc --noEmit`

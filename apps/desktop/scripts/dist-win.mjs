@@ -3,11 +3,13 @@ import { cp, lstat, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createWindowsBuildCapabilities } from "./platforms/win/build-capabilities.mjs";
+import { resolvePnpmCommand } from "./platforms/filesystem-compat.mjs";
+import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 import {
   createDesktopBuildContext,
   getSharedBuildSteps,
 } from "./platforms/shared/build-capabilities.mjs";
+import { createWindowsBuildCapabilities } from "./platforms/win/build-capabilities.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
@@ -15,11 +17,18 @@ const repoRoot =
   process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const desktopPackageJsonPath = resolve(electronRoot, "package.json");
 const require = createRequire(import.meta.url);
-const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const buildTargetPlatform = resolveBuildTargetPlatform({
+  env: process.env,
+  platform: process.platform,
+});
+const pnpmCommand = resolvePnpmCommand({
+  env: process.env,
+  platform: process.platform,
+});
 
 function createCommandSpec(command, args) {
   if (
-    process.platform === "win32" &&
+    buildTargetPlatform === "win" &&
     (command === "pnpm" || command === "pnpm.cmd")
   ) {
     return {
@@ -224,7 +233,9 @@ async function getElectronVersion() {
 }
 
 async function getWindowsBuildVersion() {
-  const desktopPackage = JSON.parse(await readFile(desktopPackageJsonPath, "utf8"));
+  const desktopPackage = JSON.parse(
+    await readFile(desktopPackageJsonPath, "utf8"),
+  );
   const rawVersion =
     typeof desktopPackage.version === "string"
       ? desktopPackage.version
@@ -249,6 +260,11 @@ async function getWindowsBuildVersion() {
 async function main() {
   const rawArgs = new Set(process.argv.slice(2));
   const dirOnly = rawArgs.has("--dir-only") || rawArgs.has("--target=dir");
+  if (buildTargetPlatform !== "win") {
+    throw new Error(
+      `[dist:win] Windows packaging must run with target platform "win": host=${process.platform}, target=${buildTargetPlatform}.`,
+    );
+  }
   const buildContext = createDesktopBuildContext({
     electronRoot,
     repoRoot,

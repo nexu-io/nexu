@@ -14,6 +14,7 @@ import {
   teardownLaunchdServices,
 } from "../../services";
 import { deleteRuntimePorts } from "../../services/launchd-bootstrap";
+import { resolveRuntimePlatform } from "../platform-resolver";
 import type {
   DesktopRuntimePlatformAdapter,
   InstallShutdownCoordinatorArgs,
@@ -348,5 +349,5 @@ export function shouldUseMacLaunchdRuntime(): boolean {
   if (process.env.NEXU_USE_LAUNCHD === "1") return true;
   if (process.env.CI) return false;
   const isPackaged = !process.execPath.includes("node_modules");
-  return isPackaged && process.platform === "darwin";
+  return isPackaged && resolveRuntimePlatform() === "mac";
 }

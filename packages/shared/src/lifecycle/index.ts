@@ -1,4 +1,4 @@
-export type DesktopRuntimePlatformId = "mac" | "win" | "default";
+export type DesktopRuntimePlatformId = "mac" | "win";
 
 export type DesktopRuntimeResidency = "managed" | "launchd" | "external";
 

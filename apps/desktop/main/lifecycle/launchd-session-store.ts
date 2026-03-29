@@ -3,7 +3,7 @@ import * as path from "node:path";
 import type {
   DesktopRuntimePortBindings,
   DesktopRuntimeSessionSnapshot,
-} from "../../../../packages/shared/src/lifecycle/index.js";
+} from "@nexu/shared";
 
 export interface LaunchdRuntimeSessionMetadata {
   writtenAt: string;

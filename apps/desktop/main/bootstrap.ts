@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, renameSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { app } from "electron";
 import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
+import { resolveRuntimePlatform } from "./platforms/platform-resolver";
 
 function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   if (stream.destroyed || !stream.writable) {
@@ -86,11 +87,12 @@ function configurePackagedPaths(): void {
   const appDataPath = app.getPath("appData");
   const overrideUserDataPath = process.env.NEXU_DESKTOP_USER_DATA_ROOT;
   const defaultUserDataPath = app.getPath("userData");
+  const runtimePlatform = resolveRuntimePlatform();
   const legacyWindowsUserDataPath = join(appDataPath, "@nexu", "desktop");
   const standardWindowsUserDataPath = join(appDataPath, "nexu-desktop");
   const userDataPath = overrideUserDataPath
     ? resolve(overrideUserDataPath)
-    : process.platform === "win32"
+    : runtimePlatform === "win"
       ? standardWindowsUserDataPath
       : join(appDataPath, "@nexu", "desktop");
   const sessionDataPath = join(userDataPath, "session");
@@ -98,7 +100,7 @@ function configurePackagedPaths(): void {
   const nexuHomePath = getDesktopNexuHomeDir(userDataPath);
 
   if (
-    process.platform === "win32" &&
+    runtimePlatform === "win" &&
     !overrideUserDataPath &&
     userDataPath !== legacyWindowsUserDataPath &&
     !existsSync(userDataPath) &&

@@ -7,6 +7,7 @@ import { deflateRawSync } from "node:zlib";
 import { app, dialog } from "electron";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopDiagnosticsFilePath } from "./desktop-diagnostics";
+import { resolveRuntimePlatform } from "./platforms/platform-resolver";
 import { redactJsonValue, scrubUrlTokens } from "./redaction";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 
@@ -271,8 +272,11 @@ function runCommand(
 }
 
 function readMacOsProductVersion(): string | null {
-  if (process.platform !== "darwin") {
-    return null;
+  switch (resolveRuntimePlatform()) {
+    case "win":
+      return null;
+    case "mac":
+      break;
   }
 
   const result = runCommand("/usr/bin/sw_vers", ["-productVersion"]);
@@ -280,13 +284,14 @@ function readMacOsProductVersion(): string | null {
 }
 
 function buildMachineSummary(runtimeConfig: DesktopRuntimeConfig): object {
+  const runtimePlatform = resolveRuntimePlatform();
   const rosettaCheck =
-    process.platform === "darwin"
+    runtimePlatform === "mac"
       ? runCommand("/usr/sbin/sysctl", ["-n", "sysctl.proc_translated"])
       : null;
 
   const unameMachine =
-    process.platform === "darwin" ? runCommand("/usr/bin/uname", ["-m"]) : null;
+    runtimePlatform === "mac" ? runCommand("/usr/bin/uname", ["-m"]) : null;
 
   return {
     buildInfo: runtimeConfig.buildInfo,
@@ -319,8 +324,11 @@ function buildMachineSummary(runtimeConfig: DesktopRuntimeConfig): object {
 }
 
 function buildAppSigningSummary(): object | null {
-  if (process.platform !== "darwin") {
-    return null;
+  switch (resolveRuntimePlatform()) {
+    case "win":
+      return null;
+    case "mac":
+      break;
   }
 
   const appExecutablePath = app.getPath("exe");

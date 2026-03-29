@@ -11,6 +11,7 @@ import {
 import { createRequire } from "node:module";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as platformFilesystem from "../platforms/filesystem-compat.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 export const electronRoot = resolve(scriptDir, "../..");
@@ -70,10 +71,18 @@ export async function linkOrCopyDirectory(
       await symlink(
         sourcePath,
         targetPath,
-        process.platform === "win32" ? "junction" : "dir",
+        platformFilesystem.resolveDirectoryLinkKind({
+          env: process.env,
+          platform: process.platform,
+        }),
       );
     } catch (error) {
-      if (process.platform !== "win32") {
+      if (
+        !platformFilesystem.shouldRetryLinkFailureWithCopy({
+          env: process.env,
+          platform: process.platform,
+        })
+      ) {
         throw error;
       }
 
@@ -103,14 +112,19 @@ export async function linkOrCopyDirectory(
       await symlink(
         sourceEntryPath,
         targetEntryPath,
-        process.platform === "win32"
-          ? sourceEntryStats.isDirectory()
-            ? "junction"
-            : "file"
-          : undefined,
+        platformFilesystem.resolveEntryLinkKind({
+          env: process.env,
+          platform: process.platform,
+          isDirectory: sourceEntryStats.isDirectory(),
+        }),
       );
     } catch (error) {
-      if (process.platform !== "win32") {
+      if (
+        !platformFilesystem.shouldRetryLinkFailureWithCopy({
+          env: process.env,
+          platform: process.platform,
+        })
+      ) {
         throw error;
       }
 

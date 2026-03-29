@@ -28,9 +28,6 @@ export class LaunchdManager {
   private readonly domain: string;
 
   constructor(opts?: { plistDir?: string }) {
-    if (process.platform !== "darwin") {
-      throw new Error("LaunchdManager only works on macOS");
-    }
     this.plistDir =
       opts?.plistDir ?? path.join(os.homedir(), "Library/LaunchAgents");
     this.uid = os.userInfo().uid;

@@ -22,6 +22,7 @@ import {
   resetDir,
   shouldCopyRuntimeDependencies,
 } from "./lib/sidecar-paths.mjs";
+import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
 const openclawRuntimeNodeModules = resolve(openclawRuntimeRoot, "node_modules");
@@ -462,7 +463,12 @@ async function ensureCodesignIdentity() {
 }
 
 async function signOpenclawNativeBinaries() {
-  if (process.platform !== "darwin") {
+  if (
+    resolveBuildTargetPlatform({
+      env: process.env,
+      platform: process.platform,
+    }) !== "mac"
+  ) {
     return;
   }
 

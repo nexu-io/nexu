@@ -17,4 +17,5 @@ export {
 export * from "./schemas/composio.js";
 export * from "./schemas/provider.js";
 export * from "./lifecycle/index.js";
+export * from "./platform/index.js";
 export { ensure } from "./ensure/index.js";

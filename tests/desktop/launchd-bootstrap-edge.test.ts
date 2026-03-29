@@ -122,11 +122,11 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
     Reflect.deleteProperty(process.env, "NEXU_USE_LAUNCHD");
     Reflect.deleteProperty(process.env, "CI");
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
 
-    expect(isLaunchdBootstrapEnabled()).toBe(true);
+    expect(shouldUseMacLaunchdRuntime()).toBe(true);
   });
 
   it("returns false for dev mode (execPath contains node_modules)", async () => {
@@ -141,11 +141,11 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
     Reflect.deleteProperty(process.env, "NEXU_USE_LAUNCHD");
     Reflect.deleteProperty(process.env, "CI");
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
 
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 
   it("returns false for packaged non-macOS app", async () => {
@@ -160,11 +160,11 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
     Reflect.deleteProperty(process.env, "NEXU_USE_LAUNCHD");
     Reflect.deleteProperty(process.env, "CI");
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
 
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 
   it("env NEXU_USE_LAUNCHD=1 overrides packaged detection", async () => {
@@ -174,11 +174,11 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
     });
     process.env.NEXU_USE_LAUNCHD = "1";
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
 
-    expect(isLaunchdBootstrapEnabled()).toBe(true);
+    expect(shouldUseMacLaunchdRuntime()).toBe(true);
   });
 
   it("env NEXU_USE_LAUNCHD=0 overrides even on packaged macOS", async () => {
@@ -192,11 +192,11 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
     });
     process.env.NEXU_USE_LAUNCHD = "0";
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
 
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 });
 

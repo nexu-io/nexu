@@ -13,6 +13,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
@@ -26,6 +27,10 @@ const isUnsigned =
   process.env.NEXU_DESKTOP_MAC_UNSIGNED?.toLowerCase() === "true";
 const targetMacArch = resolveTargetMacArch();
 const macTargets = resolveMacTargets();
+const buildTargetPlatform = resolveBuildTargetPlatform({
+  env: process.env,
+  platform: process.platform,
+});
 const dmgBuilderReleaseName = "dmg-builder@1.2.0";
 const dmgBuilderReleaseVersion = "75c8a6c";
 const dmgBuilderArch = targetMacArch === "arm64" ? "arm64" : "x86_64";
@@ -594,9 +599,9 @@ async function getElectronVersion() {
 
 async function main() {
   const timings = [];
-  if (process.platform !== "darwin") {
+  if (buildTargetPlatform !== "mac") {
     throw new Error(
-      `[dist:mac] mac packaging must run on macOS: platform=${process.platform}, target=${targetMacArch}.`,
+      `[dist:mac] mac packaging must run with target platform "mac": host=${process.platform}, target=${buildTargetPlatform}, arch=${targetMacArch}.`,
     );
   }
 

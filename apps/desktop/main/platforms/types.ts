@@ -1,12 +1,12 @@
-import type { App } from "electron";
-import type { BrowserWindow } from "electron";
 import type {
   DesktopRuntimeLifecycleContract,
   DesktopRuntimePlatformId,
   DesktopRuntimeResidency,
   DesktopRuntimeSessionSnapshot,
   DesktopRuntimeTeardownReason,
-} from "../../../../packages/shared/src/lifecycle/index.js";
+} from "@nexu/shared";
+import type { App } from "electron";
+import type { BrowserWindow } from "electron";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import type { DesktopDiagnosticsReporter } from "../desktop-diagnostics";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";

@@ -24,6 +24,7 @@ import {
   setUpdateManager,
 } from "./ipc";
 import { getDesktopRuntimePlatformAdapter } from "./platforms";
+import { resolveRuntimePlatform } from "./platforms/platform-resolver";
 import type { DesktopRuntimeResidencyContext } from "./platforms/types";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
@@ -257,6 +258,7 @@ function triggerUpdateCheck(): void {
 }
 
 function installApplicationMenu(): void {
+  const runtimePlatform = resolveRuntimePlatform();
   const developMenu: MenuItemConstructorOptions = {
     label: "Develop",
     submenu: [
@@ -304,7 +306,7 @@ function installApplicationMenu(): void {
   };
 
   const template: MenuItemConstructorOptions[] = [
-    ...(process.platform === "darwin"
+    ...(runtimePlatform === "mac"
       ? ([
           {
             role: "appMenu",
@@ -482,7 +484,7 @@ app.on("second-instance", () => {
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   logStartupStep("createMainWindow:start");
-  const isMacOS = process.platform === "darwin";
+  const isMacOS = resolveRuntimePlatform() === "mac";
   const window = new BrowserWindow({
     width: 1400,
     height: 920,
@@ -863,7 +865,11 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
+  switch (resolveRuntimePlatform()) {
+    case "mac":
+      return;
+    case "win":
+      app.quit();
+      return;
   }
 });

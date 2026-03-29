@@ -16,6 +16,7 @@ import type {
   DesktopSidecarMaterializer,
   MaterializePackagedSidecarArgs,
 } from "../types";
+import * as platformFilesystem from "./filesystem-compat";
 
 const require = createRequire(import.meta.url);
 const yauzl = require("yauzl") as {
@@ -139,7 +140,7 @@ async function extractZipArchive(
 
             try {
               await pipeline(readStream, createWriteStream(destinationPath));
-              if (process.platform !== "win32") {
+              if (platformFilesystem.shouldRestoreArchiveEntryMode()) {
                 const entryMode = entry.externalFileAttributes
                   ? (entry.externalFileAttributes >>> 16) & 0o777
                   : 0;
@@ -294,7 +295,7 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
         );
       }
 
-      if (process.platform !== "win32") {
+      if (platformFilesystem.shouldRestoreArchiveEntryMode()) {
         await chmod(
           path.resolve(tempExtractedSidecarRoot, "bin/openclaw"),
           0o755,

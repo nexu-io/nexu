@@ -1,35 +1,26 @@
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
-import { createDefaultPlatformCapabilities } from "./default/capabilities";
 import {
   createFallbackMacRuntimePlatformAdapter,
   createMacRuntimePlatformAdapter,
   shouldUseMacLaunchdRuntime,
 } from "./mac/runtime";
-import {
-  createExternalRuntimePlatformAdapter,
-  createManagedRuntimePlatformAdapter,
-} from "./shared/runtime-common";
+import { resolveRuntimePlatform } from "./platform-resolver";
+import { createExternalRuntimePlatformAdapter } from "./shared/runtime-common";
 import { createWindowsRuntimePlatformAdapter } from "./win/runtime";
 
 function createExternalAdapter() {
-  if (process.platform === "darwin") {
-    return createExternalRuntimePlatformAdapter(
-      "mac",
-      createFallbackMacRuntimePlatformAdapter().capabilities,
-    );
+  switch (resolveRuntimePlatform()) {
+    case "mac":
+      return createExternalRuntimePlatformAdapter(
+        "mac",
+        createFallbackMacRuntimePlatformAdapter().capabilities,
+      );
+    case "win":
+      return createExternalRuntimePlatformAdapter(
+        "win",
+        createWindowsRuntimePlatformAdapter().capabilities,
+      );
   }
-
-  if (process.platform === "win32") {
-    return createExternalRuntimePlatformAdapter(
-      "win",
-      createWindowsRuntimePlatformAdapter().capabilities,
-    );
-  }
-
-  return createExternalRuntimePlatformAdapter(
-    "default",
-    createDefaultPlatformCapabilities(),
-  );
 }
 
 export function getDesktopRuntimePlatformAdapter(
@@ -43,16 +34,10 @@ export function getDesktopRuntimePlatformAdapter(
     return createMacRuntimePlatformAdapter();
   }
 
-  if (process.platform === "darwin") {
-    return createFallbackMacRuntimePlatformAdapter();
+  switch (resolveRuntimePlatform()) {
+    case "mac":
+      return createFallbackMacRuntimePlatformAdapter();
+    case "win":
+      return createWindowsRuntimePlatformAdapter();
   }
-
-  if (process.platform === "win32") {
-    return createWindowsRuntimePlatformAdapter();
-  }
-
-  return createManagedRuntimePlatformAdapter(
-    "default",
-    createDefaultPlatformCapabilities(),
-  );
 }
