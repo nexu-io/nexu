@@ -24,6 +24,7 @@ import {
   setUpdateManager,
 } from "./ipc";
 import { getDesktopRuntimePlatformAdapter } from "./platforms";
+import type { DesktopRuntimeResidencyContext } from "./platforms/types";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import { createRuntimeUnitManifests } from "./runtime/manifests";
 import {
@@ -31,7 +32,6 @@ import {
   rotateDesktopLogSession,
   writeDesktopMainLog,
 } from "./runtime/runtime-logger";
-import type { LaunchdBootstrapResult } from "./services";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -43,7 +43,7 @@ const startupEpochMs = Date.now();
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let sleepGuard: SleepGuard | null = null;
-let launchdResult: LaunchdBootstrapResult | null = null;
+let residencyContext: DesktopRuntimeResidencyContext = null;
 
 let resolveColdStartReady: () => void;
 const coldStartReady = new Promise<void>((resolve) => {
@@ -773,6 +773,19 @@ app.whenReady().then(async () => {
     }
 
     try {
+      const recoveredSession = await runtimeLifecycle.recoverSession?.({
+        app,
+        electronRoot,
+        runtimeConfig,
+        logLifecycleStep: logColdStart,
+      });
+      if (recoveredSession?.snapshot) {
+        const bindings = recoveredSession.snapshot.bindings;
+        logColdStart(
+          `recovery snapshot store=${recoveredSession.snapshot.store} controller=${bindings.controllerPort ?? "n/a"} web=${bindings.webPort ?? "n/a"} openclaw=${bindings.openclawPort ?? "n/a"}`,
+        );
+      }
+
       logColdStart(`bootstrap residency: ${runtimeLifecycle.residency}`);
       logColdStart(`runtime mode: ${runtimeConfig.runtimeMode}`);
       logColdStart(
@@ -789,7 +802,7 @@ app.whenReady().then(async () => {
         rotateDesktopLogSession,
         waitForControllerReadiness,
       });
-      launchdResult = coldStartResult.launchdResult;
+      residencyContext = coldStartResult.residencyContext;
       healthCheck.recordSuccess();
     } catch (error) {
       healthCheck.recordFailure();
@@ -812,7 +825,7 @@ app.whenReady().then(async () => {
     runtimeLifecycle.installShutdownCoordinator({
       app,
       mainWindow: win,
-      launchdResult,
+      residencyContext,
       orchestrator,
       diagnosticsReporter,
       sleepGuardDispose: (reason) => sleepGuard?.dispose(reason),
@@ -823,6 +836,7 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall,
       });
       setUpdateManager(updateMgr);
       updateMgr.startPeriodicCheck();

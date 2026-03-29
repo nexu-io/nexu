@@ -8,8 +8,8 @@ import {
   resolveManagedRuntimeRoots,
 } from "../shared/runtime-roots";
 import {
-  createLaunchdShutdownCoordinator,
   createManagedShutdownCoordinator,
+  createNoopShutdownCoordinator,
 } from "../shared/shutdown-coordinator";
 import { createSyncTarSidecarMaterializer } from "../shared/sidecar-materializer";
 import {
@@ -32,7 +32,7 @@ export function createMacLaunchdCapabilities(): DesktopPlatformCapabilities {
     runtimeExecutables: createDefaultRuntimeExecutableResolver(),
     portStrategy: createLaunchdPortStrategy(),
     stateMigrationPolicy: createMacPackagedStateMigrationPolicy(),
-    shutdownCoordinator: createLaunchdShutdownCoordinator(),
+    shutdownCoordinator: createNoopShutdownCoordinator(),
   };
 }
 

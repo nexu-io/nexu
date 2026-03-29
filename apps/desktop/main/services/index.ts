@@ -22,10 +22,8 @@ export {
   stopAllServices,
   teardownLaunchdServices,
   ensureNexuProcessesDead,
-  isLaunchdBootstrapEnabled,
   getDefaultPlistDir,
   getLogDir,
-  resolveLaunchdPaths,
   type LaunchdBootstrapEnv,
   type LaunchdBootstrapResult,
 } from "./launchd-bootstrap";

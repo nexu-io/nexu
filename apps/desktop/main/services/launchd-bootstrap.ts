@@ -9,7 +9,6 @@
  */
 
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import { createConnection } from "node:net";
 import * as os from "node:os";
@@ -18,14 +17,25 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
-import { getDesktopRuntimePlatformAdapter } from "../platforms";
-import { ensurePackagedOpenclawSidecar } from "../runtime/manifests";
+import {
+  decideLaunchdRecovery,
+  detectStaleLaunchdSession,
+} from "../lifecycle/launchd-recovery-policy";
+import {
+  deleteLaunchdRuntimeSession,
+  readLaunchdRuntimeSession,
+  writeLaunchdRuntimeSession,
+} from "../lifecycle/launchd-session-store";
 import {
   type EmbeddedWebServer,
   startEmbeddedWebServer,
 } from "./embedded-web-server";
 import { LaunchdManager, SERVICE_LABELS } from "./launchd-manager";
 import { type PlistEnv, generatePlist } from "./plist-generator";
+export {
+  ensureExternalNodeRunner,
+  resolveLaunchdPaths,
+} from "../platforms/mac/launchd-paths";
 
 export interface LaunchdBootstrapEnv {
   /** Is this a development build */
@@ -105,25 +115,6 @@ export interface LaunchdBootstrapResult {
 
 type ControllerReadyResult = { ok: true } | { ok: false; error: Error };
 
-/** Metadata persisted between sessions for attach discovery */
-interface RuntimePortsMetadata {
-  writtenAt: string;
-  electronPid: number;
-  controllerPort: number;
-  openclawPort: number;
-  webPort: number;
-  nexuHome: string;
-  isDev: boolean;
-  /** App version at the time ports were written. Used to detect reinstalls. */
-  appVersion?: string;
-  /** OpenClaw state directory — used to prevent cross-attach between builds sharing the same version. */
-  openclawStateDir?: string;
-  /** Electron userData path — used to prevent cross-attach between builds sharing the same version. */
-  userDataPath?: string;
-  /** Build source identifier (e.g. "stable", "beta", "dev") — used to prevent cross-attach. */
-  buildSource?: string;
-}
-
 /**
  * Get unified log directory path.
  * In dev mode, logs go under the NEXU_HOME directory.
@@ -187,43 +178,8 @@ async function waitForControllerReadiness(
   throw new Error(`Controller readiness probe timed out for ${probeUrl}`);
 }
 
-// ---------------------------------------------------------------------------
-// Runtime ports metadata — persisted across sessions for attach discovery
-// ---------------------------------------------------------------------------
-
-function getRuntimePortsPath(plistDir: string): string {
-  return path.join(plistDir, "runtime-ports.json");
-}
-
-async function writeRuntimePorts(
-  plistDir: string,
-  meta: RuntimePortsMetadata,
-): Promise<void> {
-  // Atomic write: write to tmp file then rename, so a crash mid-write
-  // never leaves a half-written JSON that breaks the next startup.
-  const portsPath = getRuntimePortsPath(plistDir);
-  const tmpPath = `${portsPath}.tmp`;
-  await fs.writeFile(tmpPath, JSON.stringify(meta, null, 2), "utf8");
-  await fs.rename(tmpPath, portsPath);
-}
-
-async function readRuntimePorts(
-  plistDir: string,
-): Promise<RuntimePortsMetadata | null> {
-  try {
-    const raw = await fs.readFile(getRuntimePortsPath(plistDir), "utf8");
-    return JSON.parse(raw) as RuntimePortsMetadata;
-  } catch {
-    return null;
-  }
-}
-
 export async function deleteRuntimePorts(plistDir: string): Promise<void> {
-  try {
-    await fs.unlink(getRuntimePortsPath(plistDir));
-  } catch {
-    // best effort
-  }
+  await deleteLaunchdRuntimeSession(plistDir);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +391,7 @@ export async function bootstrapWithLaunchd(
 
   // --- Recover ports from previous session if available ---
   // Single read — used for both stale session detection and port recovery.
-  let recovered = await readRuntimePorts(plistDir);
+  let recovered = await readLaunchdRuntimeSession(plistDir);
 
   // Detect and clean up stale sessions from a Force Quit.
   // When the user Force Quits Electron, the quit handler doesn't run and
@@ -443,14 +399,12 @@ export async function bootstrapWithLaunchd(
   // by checking if the previous Electron PID is dead and the metadata is
   // older than 5 minutes.
   if (recovered) {
-    const STALE_SESSION_THRESHOLD_MS = 5 * 60 * 1000;
-    const previousElectronDead = !isProcessAlive(recovered.electronPid);
-    const metadataAgeMs = Date.now() - new Date(recovered.writtenAt).getTime();
-    if (previousElectronDead && metadataAgeMs > STALE_SESSION_THRESHOLD_MS) {
-      console.log(
-        `Stale session detected: previous Electron pid=${recovered.electronPid} is dead, ` +
-          `metadata age=${Math.round(metadataAgeMs / 1000)}s. Cleaning up launchd services.`,
-      );
+    const staleSession = detectStaleLaunchdSession({
+      metadata: recovered,
+      isElectronAlive: isProcessAlive(recovered.electronPid),
+    });
+    if (staleSession.stale) {
+      console.log(staleSession.reason);
       await Promise.allSettled([
         launchd.bootoutService(labels.controller),
         launchd.bootoutService(labels.openclaw),
@@ -477,104 +431,26 @@ export async function bootstrapWithLaunchd(
     webPort: env.webPort,
   };
 
-  if (recovered && anyRunning && recovered.isDev === env.isDev) {
-    // Detect reinstall / version upgrade: if the app version changed (or
-    // the previous session has no version stamp — e.g. upgrading from an
-    // older release), the running services are from a stale binary and
-    // must be torn down. Treat missing recovered.appVersion as a mismatch
-    // (conservative: forces fresh start on first upgrade to version-aware code).
-    const versionMismatch =
-      env.appVersion != null && recovered.appVersion !== env.appVersion;
-    // Check identity fields beyond version: if any of openclawStateDir,
-    // userDataPath, or buildSource are present in both recovered metadata
-    // and current env, they must match. A mismatch means two different
-    // builds share the same version (e.g. stable vs beta), and we must
-    // not cross-attach.
-    const identityMismatch =
-      !versionMismatch &&
-      (
-        [
-          [
-            "openclawStateDir",
-            recovered.openclawStateDir,
-            env.openclawStateDir,
-          ],
-          ["userDataPath", recovered.userDataPath, env.userDataPath],
-          ["buildSource", recovered.buildSource, env.buildSource],
-        ] as const
-      ).some(
-        ([, recoveredVal, envVal]) =>
-          recoveredVal != null && envVal != null && recoveredVal !== envVal,
-      );
+  const recoveryDecision = decideLaunchdRecovery({
+    recovered,
+    env: {
+      isDev: env.isDev,
+      appVersion: env.appVersion,
+      nexuHome: env.nexuHome,
+      openclawStateDir: env.openclawStateDir,
+      userDataPath: env.userDataPath,
+      buildSource: env.buildSource,
+    },
+    anyRunning,
+    runningNexuHome:
+      controllerStatus.env?.NEXU_HOME ?? openclawStatus.env?.NEXU_HOME,
+    defaultWebPort: env.webPort,
+    previousElectronAlive:
+      recovered != null ? isProcessAlive(recovered.electronPid) : undefined,
+  });
 
-    if (versionMismatch || identityMismatch) {
-      const reason = versionMismatch
-        ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
-        : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)";
-      console.log(`${reason}, tearing down stale services`);
-      await Promise.allSettled([
-        controllerRunning
-          ? launchd.bootoutService(labels.controller)
-          : Promise.resolve(),
-        openclawRunning
-          ? launchd.bootoutService(labels.openclaw)
-          : Promise.resolve(),
-      ]);
-      await deleteRuntimePorts(plistDir).catch(() => {});
-      // Fall through to fresh start below (useRecoveredPorts remains false)
-    } else {
-      // Detect stale session: if the previous Electron process is dead, the web
-      // server port won't be listening. We can still reuse controller/openclaw
-      // ports since launchd keeps those running, but we'll need a fresh web port.
-      const previousElectronAlive = isProcessAlive(recovered.electronPid);
-      if (!previousElectronAlive) {
-        console.log(
-          `Previous Electron (pid=${recovered.electronPid}) is dead, web port ${recovered.webPort} likely stale`,
-        );
-      }
-
-      // Validate NEXU_HOME matches (don't attach to wrong environment)
-      const runningNexuHome =
-        controllerStatus.env?.NEXU_HOME ?? openclawStatus.env?.NEXU_HOME;
-      const expectedNexuHome = env.nexuHome;
-
-      if (
-        !expectedNexuHome ||
-        !runningNexuHome ||
-        runningNexuHome === expectedNexuHome
-      ) {
-        effectivePorts = {
-          controllerPort: recovered.controllerPort,
-          openclawPort: recovered.openclawPort,
-          // Keep controller/openclaw ports but use fresh web port if Electron died
-          webPort: previousElectronAlive ? recovered.webPort : env.webPort,
-        };
-        useRecoveredPorts = true;
-        console.log(
-          `Recovering ports from previous session (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort} web=${effectivePorts.webPort})`,
-        );
-      } else {
-        // NEXU_HOME mismatch — tear down stale services
-        console.log(
-          `NEXU_HOME mismatch (expected=${expectedNexuHome} actual=${runningNexuHome}), tearing down stale services`,
-        );
-        await Promise.allSettled([
-          controllerRunning
-            ? launchd.bootoutService(labels.controller)
-            : Promise.resolve(),
-          openclawRunning
-            ? launchd.bootoutService(labels.openclaw)
-            : Promise.resolve(),
-        ]);
-      }
-    } // end: version match — proceed with attach
-  } else if (anyRunning && !recovered) {
-    // Services running but no runtime-ports.json (e.g. file was deleted or
-    // corrupted). We can't know the ports they're using, so tear them down
-    // and do a clean cold start with fresh ports.
-    console.log(
-      "Services running but no runtime-ports.json found, tearing down for clean start",
-    );
+  if (recoveryDecision.action === "teardown-stale-services") {
+    console.log(recoveryDecision.reason);
     await Promise.allSettled([
       controllerRunning
         ? launchd.bootoutService(labels.controller)
@@ -583,6 +459,18 @@ export async function bootstrapWithLaunchd(
         ? launchd.bootoutService(labels.openclaw)
         : Promise.resolve(),
     ]);
+    if (recoveryDecision.deleteSession) {
+      await deleteRuntimePorts(plistDir).catch(() => {});
+    }
+  } else if (recoveryDecision.action === "reuse-ports") {
+    if (!recoveryDecision.previousElectronAlive && recovered) {
+      console.log(
+        `Previous Electron (pid=${recovered.electronPid}) is dead, web port ${recovered.webPort} likely stale`,
+      );
+    }
+    effectivePorts = recoveryDecision.effectivePorts;
+    useRecoveredPorts = true;
+    console.log(recoveryDecision.reason);
   }
 
   // --- Per-service: validate running ones, start missing ones ---
@@ -751,7 +639,7 @@ export async function bootstrapWithLaunchd(
     : Promise.resolve({ ok: true });
 
   // Persist port metadata (including identity fields for cross-build validation)
-  await writeRuntimePorts(plistDir, {
+  await writeLaunchdRuntimeSession(plistDir, {
     writtenAt: new Date().toISOString(),
     electronPid: process.pid,
     controllerPort: effectivePorts.controllerPort,
@@ -943,7 +831,7 @@ async function findNexuProcessPidsByLabel(): Promise<number[]> {
   // Also check runtime-ports.json in both dev and production plist dirs
   for (const isDev of [true, false]) {
     const plistDir = getDefaultPlistDir(isDev);
-    const recovered = await readRuntimePorts(plistDir);
+    const recovered = await readLaunchdRuntimeSession(plistDir);
     if (recovered?.electronPid && recovered.electronPid > 0) {
       // Only include the stored electron PID if it's still alive but is NOT
       // our current process — it's a stale leftover from a previous session.
@@ -1174,360 +1062,4 @@ export function getDefaultPlistDir(isDev: boolean): string {
   }
   // Production: use standard LaunchAgents directory
   return path.join(os.homedir(), "Library", "LaunchAgents");
-}
-
-// ---------------------------------------------------------------------------
-// External node runner — clone Electron binary + frameworks outside .app
-// ---------------------------------------------------------------------------
-
-/**
- * Safety guard: refuse to rm -rf paths that are too shallow.
- * Prevents catastrophic deletion if nexuHome is accidentally empty/root.
- */
-function assertSafeRmTarget(targetPath: string): void {
-  const segments = targetPath.split(path.sep).filter(Boolean);
-  if (segments.length < 3) {
-    throw new Error(
-      `Refusing rm -rf on shallow path: ${targetPath} (need ≥3 segments)`,
-    );
-  }
-}
-
-/**
- * Read CFBundleExecutable from Info.plist to get the actual binary name.
- * Falls back to "Nexu" if the plist cannot be parsed.
- */
-function readBundleExecutableName(appContentsPath: string): string {
-  const fallback = "Nexu";
-  try {
-    const plistPath = path.join(appContentsPath, "Info.plist");
-    const raw = readFileSync(plistPath, "utf8");
-    const match = raw.match(
-      /<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/,
-    );
-    return match?.[1] ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-/**
- * Ensure a standalone Electron-as-Node runner exists outside the .app bundle.
- *
- * Problem: launchd services that use the Electron binary from inside the .app
- * bundle cause macOS Finder to report "app is in use", blocking reinstall /
- * drag-and-drop updates. The Electron Framework (~250 MB) is mmap'd into the
- * process address space, holding file references to the bundle.
- *
- * Solution: clone the packaged app bundle to
- * `~/.nexu/runtime/nexu-runner.app/`. On APFS (all modern macOS), `cp -Rc`
- * creates copy-on-write clones that occupy near-zero additional disk space.
- * The launchd plist then references this external runner instead of
- * `/Applications/Nexu.app`.
- *
- * The runner is version-stamped so it re-clones when the app is updated.
- *
- * @returns The path to the external binary (the node runner).
- */
-export async function ensureExternalNodeRunner(
-  appContentsPath: string,
-  nexuHome: string,
-  appVersion: string,
-): Promise<string> {
-  const binaryName = readBundleExecutableName(appContentsPath);
-  const runnerRoot = path.join(nexuHome, "runtime", "nexu-runner.app");
-  const stagingRoot = `${runnerRoot}.staging`;
-  const binaryPath = path.join(runnerRoot, "Contents", "MacOS", binaryName);
-  // Version stamp lives OUTSIDE the .app bundle so it does not break the
-  // code signature's sealed-resources check.  Writing any file into the
-  // bundle root causes `codesign --verify` to fail with
-  // "unsealed contents present in the bundle root".
-  const stampPath = path.join(nexuHome, "runtime", ".nexu-runner-version");
-
-  assertSafeRmTarget(runnerRoot);
-  assertSafeRmTarget(stagingRoot);
-
-  // Clean up leftover staging directory from an interrupted extraction
-  if (existsSync(stagingRoot)) {
-    assertSafeRmTarget(stagingRoot);
-    await execFileAsync("rm", ["-rf", stagingRoot]).catch(() => {});
-  }
-
-  // Fast path: already extracted for this version
-  try {
-    if (
-      existsSync(stampPath) &&
-      existsSync(binaryPath) &&
-      readFileSync(stampPath, "utf8").trim() === appVersion
-    ) {
-      return binaryPath;
-    }
-  } catch {
-    // stamp unreadable — re-extract
-  }
-
-  console.log(
-    `Extracting external node runner for v${appVersion} to ${runnerRoot}`,
-  );
-
-  // Atomic extraction: build in staging directory, then rename into place.
-  // If the process is killed mid-extraction, only the staging directory is
-  // left behind and will be cleaned up on next startup (see above).
-  const appBundlePath = path.dirname(appContentsPath);
-  const stagingBinaryPath = path.join(
-    stagingRoot,
-    "Contents",
-    "MacOS",
-    binaryName,
-  );
-
-  // Clone the full app bundle so the runner keeps a valid macOS app layout,
-  // including signed resources like _CodeSignature and Resources.
-  try {
-    await execFileAsync("cp", ["-Rc", appBundlePath, stagingRoot]);
-  } catch {
-    // APFS clone unavailable (e.g. non-APFS volume) — regular copy
-    console.warn(
-      "APFS clone not available for runner bundle, falling back to regular copy",
-    );
-    await execFileAsync("cp", ["-R", appBundlePath, stagingRoot]);
-  }
-
-  if (!existsSync(stagingBinaryPath)) {
-    throw new Error(
-      `Runner extraction failed: ${stagingBinaryPath} not found after clone`,
-    );
-  }
-
-  // Atomic swap: remove old directory, then rename staging into place.
-  // mv (rename) is atomic on the same filesystem (POSIX guarantee).
-  await execFileAsync("rm", ["-rf", runnerRoot]).catch(() => {});
-  await fs.rename(stagingRoot, runnerRoot);
-
-  // Write version stamp AFTER the swap so it is only visible when the
-  // runner bundle is fully in place.  The stamp file is a sibling of the
-  // .app bundle, not inside it, to preserve the code signature.
-  writeFileSync(stampPath, appVersion, "utf8");
-
-  console.log(`External node runner ready at ${binaryPath}`);
-  return binaryPath;
-}
-
-// ---------------------------------------------------------------------------
-// External controller sidecar — clone controller dist outside .app
-// ---------------------------------------------------------------------------
-
-/**
- * Ensure the controller sidecar is available outside the .app bundle.
- *
- * Clones `Contents/Resources/runtime/controller/` to
- * `~/.nexu/runtime/controller-sidecar/` so launchd services don't hold
- * file descriptors (native addons via dlopen, require'd modules) to files
- * inside the .app bundle.
- *
- * @returns The path to the external controller sidecar root.
- */
-async function ensureExternalControllerSidecar(
-  appContentsPath: string,
-  nexuHome: string,
-  appVersion: string,
-): Promise<{ controllerRoot: string; entryPath: string }> {
-  const controllerRoot = path.join(nexuHome, "runtime", "controller-sidecar");
-  const stagingRoot = `${controllerRoot}.staging`;
-  const entryPath = path.join(controllerRoot, "dist", "index.js");
-  const stampPath = path.join(controllerRoot, ".version-stamp");
-
-  // Clean up leftover staging directory from an interrupted extraction
-  if (existsSync(stagingRoot)) {
-    assertSafeRmTarget(stagingRoot);
-    await execFileAsync("rm", ["-rf", stagingRoot]).catch(() => {});
-  }
-
-  // Fast path: already extracted for this version
-  try {
-    if (
-      existsSync(stampPath) &&
-      existsSync(entryPath) &&
-      readFileSync(stampPath, "utf8").trim() === appVersion
-    ) {
-      return { controllerRoot, entryPath };
-    }
-  } catch {
-    // stamp unreadable — re-extract
-  }
-
-  console.log(
-    `Extracting controller sidecar for v${appVersion} to ${controllerRoot}`,
-  );
-
-  const srcControllerDir = path.join(
-    appContentsPath,
-    "Resources",
-    "runtime",
-    "controller",
-  );
-
-  // Atomic extraction: clone to staging directory, then rename into place.
-  // If the process is killed mid-extraction, only the staging directory is
-  // left behind and will be cleaned up on next startup (see above).
-  try {
-    await execFileAsync("cp", ["-Rc", srcControllerDir, stagingRoot]);
-  } catch {
-    console.warn(
-      "APFS clone not available for controller sidecar (~28MB), falling back to regular copy",
-    );
-    await execFileAsync("cp", ["-R", srcControllerDir, stagingRoot]);
-  }
-
-  // Verify critical entry point exists after clone
-  const stagingEntryPath = path.join(stagingRoot, "dist", "index.js");
-  if (!existsSync(stagingEntryPath)) {
-    throw new Error(
-      `Controller sidecar extraction failed: ${stagingEntryPath} not found after clone`,
-    );
-  }
-
-  // Write version stamp inside staging directory
-  const stagingStampPath = path.join(stagingRoot, ".version-stamp");
-  writeFileSync(stagingStampPath, appVersion, "utf8");
-
-  // Atomic swap: remove old directory, then rename staging into place.
-  // mv (rename) is atomic on the same filesystem (POSIX guarantee).
-  assertSafeRmTarget(controllerRoot);
-  await execFileAsync("rm", ["-rf", controllerRoot]).catch(() => {});
-  await fs.rename(stagingRoot, controllerRoot);
-
-  return { controllerRoot, entryPath };
-}
-
-/**
- * Resolve paths for launchd bootstrap based on whether app is packaged.
- *
- * For packaged apps, all paths are resolved OUTSIDE the .app bundle so that
- * launchd services do not hold file references into the bundle. This allows
- * Finder to replace the .app during reinstall / drag-and-drop updates.
- */
-export async function resolveLaunchdPaths(
-  isPackaged: boolean,
-  resourcesPath: string,
-  appVersion?: string,
-): Promise<{
-  nodePath: string;
-  controllerEntryPath: string;
-  openclawPath: string;
-  controllerCwd: string;
-  openclawCwd: string;
-  openclawBinPath: string;
-  openclawExtensionsDir: string;
-}> {
-  if (isPackaged) {
-    const runtimeDir = path.join(resourcesPath, "runtime");
-    const nexuHome = path.join(os.homedir(), ".nexu");
-    const version = appVersion ?? "unknown";
-
-    // Extract runner + controller sidecar outside .app so launchd services
-    // don't lock the bundle. If extraction fails (disk full, permissions,
-    // etc.), fall back to in-bundle paths — the app will work but Finder
-    // will report "app is in use" during reinstall.
-    const appContentsPath = path.dirname(resourcesPath); // .app/Contents
-    let nodePath = process.execPath;
-    let controllerEntryPath = path.join(
-      runtimeDir,
-      "controller",
-      "dist",
-      "index.js",
-    );
-    let controllerRoot = path.join(runtimeDir, "controller");
-
-    try {
-      // 1. Extract Electron runner outside .app (APFS clone, ~0 disk overhead)
-      nodePath = await ensureExternalNodeRunner(
-        appContentsPath,
-        nexuHome,
-        version,
-      );
-
-      // 2. Extract controller sidecar outside .app
-      const result = await ensureExternalControllerSidecar(
-        appContentsPath,
-        nexuHome,
-        version,
-      );
-      controllerEntryPath = result.entryPath;
-      controllerRoot = result.controllerRoot;
-    } catch (err) {
-      console.error(
-        "Failed to extract external runner/sidecar, falling back to in-bundle paths.",
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-
-    // 3. OpenClaw sidecar is already extracted to ~/.nexu/ by existing logic
-    const openclawSidecarRoot = await ensurePackagedOpenclawSidecar(
-      runtimeDir,
-      nexuHome,
-      getDesktopRuntimePlatformAdapter().capabilities,
-    );
-
-    return {
-      nodePath,
-      controllerEntryPath,
-      openclawPath: path.join(
-        openclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
-      // Use nexuHome as cwd instead of .app paths so launchd services
-      // don't hold directory file-descriptors inside the bundle.
-      controllerCwd: controllerRoot,
-      openclawCwd: openclawSidecarRoot,
-      openclawBinPath: path.join(openclawSidecarRoot, "bin", "openclaw"),
-      openclawExtensionsDir: path.join(
-        openclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "extensions",
-      ),
-    };
-  }
-
-  // Development: use local paths
-  const repoRoot = getWorkspaceRoot();
-  return {
-    nodePath: process.execPath,
-    controllerEntryPath: path.join(
-      repoRoot,
-      "apps",
-      "controller",
-      "dist",
-      "index.js",
-    ),
-    openclawPath: path.join(
-      repoRoot,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    ),
-    controllerCwd: path.join(repoRoot, "apps", "controller"),
-    openclawCwd: repoRoot,
-    openclawBinPath: path.join(
-      repoRoot,
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "bin",
-      "openclaw",
-    ),
-    openclawExtensionsDir: path.join(
-      repoRoot,
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "node_modules",
-      "openclaw",
-      "extensions",
-    ),
-  };
 }

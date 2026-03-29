@@ -8,12 +8,12 @@
  */
 
 import { BrowserWindow, app, dialog } from "electron";
+import type { DesktopRuntimeSupervisor } from "../platforms/types";
 import type { EmbeddedWebServer } from "./embedded-web-server";
 import { deleteRuntimePorts } from "./launchd-bootstrap";
-import type { LaunchdManager } from "./launchd-manager";
 
 export interface QuitHandlerOptions {
-  launchd: LaunchdManager;
+  launchd: DesktopRuntimeSupervisor;
   labels: {
     controller: string;
     openclaw: string;
@@ -25,6 +25,18 @@ export interface QuitHandlerOptions {
   onBeforeQuit?: () => void | Promise<void>;
   /** Called to signal that the app should actually close windows on quit */
   onForceQuit?: () => void;
+  /** Optional lifecycle-owned override for quit completely */
+  onQuitCompletely?: () =>
+    | void
+    | Promise<void>
+    | Promise<{ handled: boolean }>
+    | { handled: boolean };
+  /** Optional lifecycle-owned override for backgrounding */
+  onRunInBackground?: () =>
+    | void
+    | Promise<void>
+    | Promise<{ handled: boolean }>
+    | { handled: boolean };
 }
 
 export type QuitDecision = "quit-completely" | "run-in-background" | "cancel";
@@ -79,6 +91,17 @@ async function showQuitDialog(): Promise<QuitDecision> {
   }
 }
 
+async function wasHandled(
+  result:
+    | void
+    | { handled: boolean }
+    | Promise<void>
+    | Promise<{ handled: boolean }>,
+): Promise<boolean> {
+  const resolved = await result;
+  return resolved?.handled ?? false;
+}
+
 /**
  * Install quit handler for launchd-managed services.
  *
@@ -118,11 +141,18 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
         }
 
         if (decision === "run-in-background") {
+          if (await wasHandled(opts.onRunInBackground?.())) {
+            return;
+          }
           window.hide();
           return;
         }
 
         // "quit-completely"
+        if (await wasHandled(opts.onQuitCompletely?.())) {
+          return;
+        }
+
         try {
           await opts.onBeforeQuit?.();
         } catch (err) {
@@ -209,6 +239,10 @@ export async function quitWithDecision(
   }
 
   if (decision === "quit-completely") {
+    if (await wasHandled(opts.onQuitCompletely?.())) {
+      return;
+    }
+
     for (const label of [opts.labels.openclaw, opts.labels.controller]) {
       try {
         await opts.launchd.bootoutService(label);
@@ -232,6 +266,10 @@ export async function quitWithDecision(
   }
 
   // run-in-background: hide window, keep services running
+  if (await wasHandled(opts.onRunInBackground?.())) {
+    return;
+  }
+
   const win = BrowserWindow.getAllWindows()[0];
   if (win) win.hide();
 }

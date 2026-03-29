@@ -4,6 +4,8 @@ import type {
   DesktopRuntimeLifecycleContract,
   DesktopRuntimePlatformId,
   DesktopRuntimeResidency,
+  DesktopRuntimeSessionSnapshot,
+  DesktopRuntimeTeardownReason,
 } from "../../../../packages/shared/src/lifecycle/index.js";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import type { DesktopDiagnosticsReporter } from "../desktop-diagnostics";
@@ -12,7 +14,28 @@ import type {
   DesktopPortAllocationResult,
   PortAllocation,
 } from "../runtime/port-allocation";
-import type { LaunchdBootstrapResult } from "../services";
+import type { EmbeddedWebServer } from "../services/embedded-web-server";
+
+export type DesktopRuntimeSupervisor = {
+  bootoutService: (label: string) => Promise<void>;
+  waitForExit: (label: string, timeoutMs?: number) => Promise<void>;
+};
+
+export type DesktopRuntimeResidencyContext = {
+  serviceSupervisor: DesktopRuntimeSupervisor;
+  serviceLabels: {
+    controller: string;
+    openclaw: string;
+  };
+  embeddedWebServer?: EmbeddedWebServer;
+  controllerReady: Promise<{ ok: true } | { ok: false; error: Error }>;
+  effectivePorts: {
+    controllerPort: number;
+    openclawPort: number;
+    webPort: number;
+  };
+  attached: boolean;
+} | null;
 
 export type RuntimeConfigPreparation = {
   allocations: PortAllocation[];
@@ -82,7 +105,7 @@ export type DesktopRuntimeStateMigrationPolicy = {
 export type InstallShutdownCoordinatorArgs = {
   app: App;
   mainWindow: BrowserWindow;
-  launchdResult: LaunchdBootstrapResult | null;
+  residencyContext: DesktopRuntimeResidencyContext;
   orchestrator: RuntimeOrchestrator;
   diagnosticsReporter: DesktopDiagnosticsReporter | null;
   sleepGuardDispose: (reason: string) => void;
@@ -116,7 +139,19 @@ export type DesktopPlatformCapabilities = {
 };
 
 export type PlatformColdStartResult = {
-  launchdResult: LaunchdBootstrapResult | null;
+  residencyContext: DesktopRuntimeResidencyContext;
+};
+
+export type RecoverPlatformSessionArgs = {
+  app: App;
+  electronRoot: string;
+  runtimeConfig: DesktopRuntimeConfig;
+  logLifecycleStep: (message: string) => void;
+};
+
+export type RecoverPlatformSessionResult = {
+  recovered: boolean;
+  snapshot: DesktopRuntimeSessionSnapshot | null;
 };
 
 export type PrepareRuntimeConfigArgs = {
@@ -137,12 +172,38 @@ export type RunPlatformColdStartArgs = {
   waitForControllerReadiness: () => Promise<void>;
 };
 
+export type PrepareForUpdateInstallArgs = {
+  app: App;
+  orchestrator: RuntimeOrchestrator;
+  logLifecycleStep: (message: string) => void;
+};
+
+export type PrepareForUpdateInstallResult = {
+  handled: boolean;
+};
+
+export type RuntimeTeardownArgs = InstallShutdownCoordinatorArgs & {
+  reason: DesktopRuntimeTeardownReason;
+};
+
+export type RuntimeTeardownResult = {
+  handled: boolean;
+};
+
 export type DesktopRuntimeLifecycle = DesktopRuntimeLifecycleContract<
   PrepareRuntimeConfigArgs,
   RuntimeConfigPreparation,
   RunPlatformColdStartArgs,
   PlatformColdStartResult,
-  InstallShutdownCoordinatorArgs
+  InstallShutdownCoordinatorArgs,
+  void,
+  void,
+  RecoverPlatformSessionArgs,
+  RecoverPlatformSessionResult,
+  PrepareForUpdateInstallArgs,
+  PrepareForUpdateInstallResult,
+  RuntimeTeardownArgs,
+  RuntimeTeardownResult
 >;
 
 export type DesktopRuntimePlatformAdapter = {
