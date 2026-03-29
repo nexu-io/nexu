@@ -35,8 +35,18 @@ async function syncWeixinAccountIndex(
     // File doesn't exist or is invalid
   }
 
-  // Merge: keep existing IDs and add new ones (don't remove - account data may still exist)
-  const mergedIds = [...new Set([...existingIds, ...accountIds])];
+  // Authoritative: config is the source of truth for which accounts should
+  // exist. Filter out internal prewarm IDs that should never be persisted,
+  // and only keep existing IDs that are still present in the current config.
+  // This prevents "ghost accounts" from accumulating across connect/disconnect
+  // cycles and avoids persisting the internal prewarm placeholder.
+  const configIdSet = new Set(accountIds);
+  const mergedIds = [
+    ...new Set([
+      ...existingIds.filter((id) => configIdSet.has(id)),
+      ...accountIds,
+    ]),
+  ].filter((id) => !id.startsWith("__nexu_internal_"));
 
   // Only write if changed
   if (JSON.stringify(mergedIds) === JSON.stringify(existingIds)) {

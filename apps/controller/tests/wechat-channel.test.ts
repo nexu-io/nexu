@@ -10,6 +10,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import { compileChannelsConfig } from "../src/lib/channel-binding-compiler.js";
+import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { ChannelService } from "../src/services/channel-service.js";
 import type { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
@@ -345,5 +346,140 @@ describe("WeChat connect/disconnect lifecycle", () => {
         false,
       );
     }
+  });
+
+  it("connectWechat rolls back on readiness timeout", async () => {
+    gatewayService.getChannelReadiness.mockResolvedValue({
+      ready: false,
+      lastError: "monitor failed to start",
+    });
+
+    await expect(service.connectWechat("fail-account")).rejects.toThrow(
+      "monitor failed to start",
+    );
+
+    // Should have disconnected the channel
+    expect(configStore.disconnectChannel).toHaveBeenCalledWith("ch-1");
+    // syncAll called twice: once for connect, once for rollback
+    expect(syncService.syncAll).toHaveBeenCalledTimes(2);
+  }, 35_000);
+
+  it("disconnect cleanup runs before syncAll", async () => {
+    const callOrder: string[] = [];
+    const accountId = "abc123-im-bot";
+    const accountsDir = path.join(tmpDir, "openclaw-weixin", "accounts");
+    const indexPath = path.join(tmpDir, "openclaw-weixin", "accounts.json");
+    mkdirSync(accountsDir, { recursive: true });
+    writeFileSync(
+      path.join(accountsDir, `${accountId}.json`),
+      JSON.stringify({ token: "tok" }),
+    );
+    writeFileSync(indexPath, JSON.stringify([accountId]));
+
+    syncService.syncAll.mockImplementation(async () => {
+      // At the point syncAll is called, the stale files should already
+      // be removed so the config writer won't see them.
+      callOrder.push("syncAll");
+      const filesExist = existsSync(
+        path.join(accountsDir, `${accountId}.json`),
+      );
+      callOrder.push(filesExist ? "files-still-exist" : "files-cleaned");
+    });
+
+    configStore.getChannel.mockResolvedValue(
+      makeChannel({ id: "ch-1", accountId }),
+    );
+    await service.disconnectChannel("ch-1");
+
+    expect(callOrder).toEqual(["syncAll", "files-cleaned"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// syncWeixinAccountIndex (config writer)
+// ---------------------------------------------------------------------------
+
+describe("syncWeixinAccountIndex via OpenClawConfigWriter", () => {
+  let tmpDir: string;
+  let env: ControllerEnv;
+
+  beforeEach(() => {
+    tmpDir = path.join(tmpdir(), `nexu-writer-test-${Date.now()}`);
+    mkdirSync(tmpDir, { recursive: true });
+    env = createEnv(tmpDir);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("does not persist internal prewarm account ID to index", async () => {
+    const writer = new OpenClawConfigWriter(env);
+    const indexPath = path.join(tmpDir, "openclaw-weixin", "accounts.json");
+
+    // Write config that includes the prewarm account (as compiler would produce)
+    await writer.write({
+      channels: {
+        "openclaw-weixin": {
+          enabled: true,
+          accounts: {
+            __nexu_internal_wechat_prewarm__: { enabled: false },
+          },
+        },
+      },
+    } as never);
+
+    // Index should not contain the prewarm ID
+    if (existsSync(indexPath)) {
+      const ids = JSON.parse(readFileSync(indexPath, "utf-8"));
+      expect(ids).not.toContain("__nexu_internal_wechat_prewarm__");
+    }
+  });
+
+  it("removes stale account IDs not in current config", async () => {
+    const indexDir = path.join(tmpDir, "openclaw-weixin");
+    const indexPath = path.join(indexDir, "accounts.json");
+    mkdirSync(indexDir, { recursive: true });
+
+    // Seed index with stale IDs from previous sessions
+    writeFileSync(
+      indexPath,
+      JSON.stringify(["stale-1", "stale-2", "current-account"]),
+    );
+
+    const writer = new OpenClawConfigWriter(env);
+    await writer.write({
+      channels: {
+        "openclaw-weixin": {
+          enabled: true,
+          accounts: {
+            "current-account": { enabled: true },
+          },
+        },
+      },
+    } as never);
+
+    const ids = JSON.parse(readFileSync(indexPath, "utf-8"));
+    expect(ids).toEqual(["current-account"]);
+  });
+
+  it("handles empty config accounts gracefully", async () => {
+    const indexDir = path.join(tmpDir, "openclaw-weixin");
+    const indexPath = path.join(indexDir, "accounts.json");
+    mkdirSync(indexDir, { recursive: true });
+    writeFileSync(indexPath, JSON.stringify(["old-account"]));
+
+    const writer = new OpenClawConfigWriter(env);
+    await writer.write({
+      channels: {
+        "openclaw-weixin": {
+          enabled: true,
+          accounts: {},
+        },
+      },
+    } as never);
+
+    const ids = JSON.parse(readFileSync(indexPath, "utf-8"));
+    expect(ids).toEqual([]);
   });
 });

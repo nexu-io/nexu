@@ -670,9 +670,18 @@ export class ChannelService {
     const channel = await this.configStore.connectWechat({ accountId });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
-    // Wait for the WeChat channel to become ready so the UI can show accurate
-    // status and the user doesn't send messages into a not-yet-started channel.
-    await this.waitForWechatReady(accountId);
+    const readiness = await this.waitForWechatReady(accountId);
+    if (!readiness.ready) {
+      // Rollback: disconnect the channel so the user doesn't see a
+      // "connected" channel that can't actually receive messages.
+      await this.configStore.disconnectChannel(channel.id);
+      this.cleanupWechatAccountState(accountId);
+      await this.syncService.syncAll();
+      throw new Error(
+        readiness.lastError ??
+          "WeChat linked, but the runtime failed to start the listener.",
+      );
+    }
     return channel;
   }
 
@@ -1045,14 +1054,15 @@ export class ChannelService {
     const channel = await this.configStore.getChannel(channelId);
 
     const removed = await this.configStore.disconnectChannel(channelId);
-    if (removed) {
-      await this.syncService.syncAll();
-    }
 
-    // Clean up WeChat account state (index + credentials + sync buf) so
-    // disconnected accounts don't linger and start on next cold boot.
+    // Clean up WeChat account state BEFORE syncAll so the config writer's
+    // authoritative index sync doesn't see stale credential files.
     if (removed && channel?.channelType === "wechat" && channel.accountId) {
       this.cleanupWechatAccountState(channel.accountId);
+    }
+
+    if (removed) {
+      await this.syncService.syncAll();
     }
 
     return removed;
