@@ -22,7 +22,7 @@ export function createWindowsBuildCapabilities({
         `--config.electronVersion=${electronVersion}`,
         `--config.buildVersion=${buildVersion}`,
         `--config.directories.output=${releaseRoot}`,
-        ...(dirOnly ? ["--config.win.signAndEditExecutable=false"] : []),
+        "--config.win.signAndEditExecutable=false",
       ];
     },
     createElectronBuilderEnv() {
