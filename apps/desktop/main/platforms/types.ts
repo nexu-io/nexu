@@ -1,5 +1,10 @@
 import type { App } from "electron";
 import type { BrowserWindow } from "electron";
+import type {
+  DesktopRuntimeLifecycleContract,
+  DesktopRuntimePlatformId,
+  DesktopRuntimeResidency,
+} from "../../../../packages/shared/src/lifecycle/index.js";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import type { DesktopDiagnosticsReporter } from "../desktop-diagnostics";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
@@ -14,7 +19,7 @@ export type RuntimeConfigPreparation = {
   runtimeConfig: DesktopRuntimeConfig;
 };
 
-export type RuntimeResidencyMode = "managed" | "launchd" | "external";
+export type RuntimeResidencyMode = DesktopRuntimeResidency;
 
 export type PackagedArchiveFormat = "tar.gz" | "zip";
 
@@ -95,7 +100,7 @@ export type PlatformCapabilitiesArgs = {
 };
 
 export type DesktopPlatformCapabilities = {
-  platformId: "mac" | "win" | "default";
+  platformId: DesktopRuntimePlatformId;
   runtimeResidency: RuntimeResidencyMode;
   packagedArchive: {
     format: PackagedArchiveFormat;
@@ -132,14 +137,16 @@ export type RunPlatformColdStartArgs = {
   waitForControllerReadiness: () => Promise<void>;
 };
 
+export type DesktopRuntimeLifecycle = DesktopRuntimeLifecycleContract<
+  PrepareRuntimeConfigArgs,
+  RuntimeConfigPreparation,
+  RunPlatformColdStartArgs,
+  PlatformColdStartResult,
+  InstallShutdownCoordinatorArgs
+>;
+
 export type DesktopRuntimePlatformAdapter = {
-  id: "mac" | "win" | "default";
-  mode: RuntimeResidencyMode;
+  id: DesktopRuntimePlatformId;
   capabilities: DesktopPlatformCapabilities;
-  prepareRuntimeConfig: (
-    args: PrepareRuntimeConfigArgs,
-  ) => Promise<RuntimeConfigPreparation>;
-  runColdStart: (
-    args: RunPlatformColdStartArgs,
-  ) => Promise<PlatformColdStartResult>;
+  lifecycle: DesktopRuntimeLifecycle;
 };

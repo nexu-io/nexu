@@ -16,4 +16,5 @@ export {
 } from "./schemas/skill-filesystem.js";
 export * from "./schemas/composio.js";
 export * from "./schemas/provider.js";
+export * from "./lifecycle/index.js";
 export { ensure } from "./ensure/index.js";

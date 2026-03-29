@@ -1,16 +1,31 @@
 import type {
   DesktopPlatformCapabilities,
+  DesktopRuntimeLifecycle,
   DesktopRuntimePlatformAdapter,
+  PrepareRuntimeConfigArgs,
+  RunPlatformColdStartArgs,
 } from "../types";
+
+function createRuntimeLifecycle(opts: {
+  residency: DesktopRuntimeLifecycle["residency"];
+  capabilities: DesktopPlatformCapabilities;
+  prepareRuntimeConfig: DesktopRuntimeLifecycle["prepareRuntimeConfig"];
+  coldStartOrAttach: DesktopRuntimeLifecycle["coldStartOrAttach"];
+}): DesktopRuntimeLifecycle {
+  return {
+    residency: opts.residency,
+    prepareRuntimeConfig: opts.prepareRuntimeConfig,
+    coldStartOrAttach: opts.coldStartOrAttach,
+    installShutdownCoordinator: (args) => {
+      opts.capabilities.shutdownCoordinator.install(args);
+    },
+  };
+}
 
 export async function prepareManagedRuntimeConfig(
   adapterId: DesktopRuntimePlatformAdapter["id"],
   capabilities: DesktopPlatformCapabilities,
-  {
-    baseRuntimeConfig,
-    env,
-    logStartupStep,
-  }: Parameters<DesktopRuntimePlatformAdapter["prepareRuntimeConfig"]>[0],
+  { baseRuntimeConfig, env, logStartupStep }: PrepareRuntimeConfigArgs,
 ) {
   logStartupStep(`${adapterId}:prepareRuntimeConfig:start`);
   try {
@@ -36,7 +51,7 @@ export async function runManagedColdStart({
   orchestrator,
   rotateDesktopLogSession,
   waitForControllerReadiness,
-}: Parameters<DesktopRuntimePlatformAdapter["runColdStart"]>[0]) {
+}: RunPlatformColdStartArgs) {
   logStartupStep("managedColdStart:start");
   diagnosticsReporter?.markColdStartRunning("starting controller");
   logColdStart("starting controller");
@@ -67,7 +82,7 @@ export async function runExternalColdStart({
   logStartupStep,
   rotateDesktopLogSession,
   waitForControllerReadiness,
-}: Parameters<DesktopRuntimePlatformAdapter["runColdStart"]>[0]) {
+}: RunPlatformColdStartArgs) {
   logStartupStep("externalColdStart:start");
   diagnosticsReporter?.markColdStartRunning("attaching to external runtime");
   logColdStart("attaching to external runtime");
@@ -95,11 +110,14 @@ export function createManagedRuntimePlatformAdapter(
 ): DesktopRuntimePlatformAdapter {
   return {
     id,
-    mode: "managed",
     capabilities,
-    prepareRuntimeConfig: (args) =>
-      prepareManagedRuntimeConfig(id, capabilities, args),
-    runColdStart: (args) => runManagedColdStart(args),
+    lifecycle: createRuntimeLifecycle({
+      residency: "managed",
+      capabilities,
+      prepareRuntimeConfig: (args) =>
+        prepareManagedRuntimeConfig(id, capabilities, args),
+      coldStartOrAttach: (args) => runManagedColdStart(args),
+    }),
   };
 }
 
@@ -109,15 +127,18 @@ export function createExternalRuntimePlatformAdapter(
 ): DesktopRuntimePlatformAdapter {
   return {
     id,
-    mode: "external",
     capabilities,
-    prepareRuntimeConfig: async ({ baseRuntimeConfig, logStartupStep }) => {
-      logStartupStep(`${id}:prepareRuntimeConfig:external`);
-      return {
-        allocations: [],
-        runtimeConfig: baseRuntimeConfig,
-      };
-    },
-    runColdStart: (args) => runExternalColdStart(args),
+    lifecycle: createRuntimeLifecycle({
+      residency: "external",
+      capabilities,
+      prepareRuntimeConfig: async ({ baseRuntimeConfig, logStartupStep }) => {
+        logStartupStep(`${id}:prepareRuntimeConfig:external`);
+        return {
+          allocations: [],
+          runtimeConfig: baseRuntimeConfig,
+        };
+      },
+      coldStartOrAttach: (args) => runExternalColdStart(args),
+    }),
   };
 }

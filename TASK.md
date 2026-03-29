@@ -2,146 +2,159 @@
 
 ## Branch
 
-- Current branch: `feat/local-dev-workflow-optimization`
-- Branch pushed to: `origin/feat/local-dev-workflow-optimization`
-- Latest commit from before this session: `01bd29a` `refactor: clarify scripts dev module boundaries`
-- Workspace status at handoff: code changes for desktop/controller/scripts-dev integration plus this `TASK.md` update
+- Current branch: `feat/launchd-encapsulation-strategy`
+- Branched from: `feat/windows-distribution-smoke`
+- Base branch state already includes:
+  - merge of `origin/main` into `feat/windows-distribution-smoke`
+  - `scripts/dev` as the primary HMR-first local-dev control surface
+  - desktop dev auth-session compat fix (`/api/auth/get-session`)
+  - unified `scripts/dev` logger using `pino`
+- Workspace status at handoff: clean branch transition plus this `TASK.md` refresh
 
-## What Changed In This Session
+## What Was Stabilized Before This Branch
 
-### Desktop runtime ownership was split into `external | internal`
+### `scripts/dev` remains the primary local-dev entrypoint
 
-- `apps/desktop/shared/runtime-config.ts` now exposes `runtimeMode: "external" | "internal"`
-- `apps/desktop/main/platforms/shared/runtime-common.ts` now has an external runtime adapter path
-- `apps/desktop/main/platforms/index.ts` selects an external adapter when desktop is launched in external mode
-- `apps/desktop/main/runtime/manifests.ts` marks `web`, `controller`, and `openclaw` runtime units as `external` when desktop is attaching instead of owning processes
-- `apps/desktop/main/runtime/daemon-supervisor.ts` now probes external runtime units by port and reports external availability state instead of trying to manage them
-- `apps/desktop/main/index.ts` logs the effective desktop runtime mode and the external runtime targets during cold start
+- `pnpm dev start` / `stop` / `restart` drive the lightweight stack
+- `pnpm dev stop` is now idempotent at the default stack level
+- already-stopped services now emit informational output instead of hard-failing the aggregate stop flow
+- service raw logs remain under `.tmp/dev/logs/<run_id>/<service>.log`
 
-### Controller OpenClaw ownership was split into `external | internal`
+### Desktop dev login flow was repaired
 
-- `apps/controller/src/app/env.ts` now accepts:
-  - `NEXU_CONTROLLER_OPENCLAW_MODE=external|internal`
-  - `OPENCLAW_BASE_URL`
-  - `OPENCLAW_LOG_DIR`
-- Legacy `RUNTIME_MANAGE_OPENCLAW_PROCESS` is now treated as a compatibility input; the effective owner is derived from the explicit mode when present
-- `apps/controller/src/runtime/gateway-client.ts`, `apps/controller/src/runtime/runtime-health.ts`, and `apps/controller/src/runtime/openclaw-ws-client.ts` now connect through `OPENCLAW_BASE_URL` instead of hard-coded `127.0.0.1:${port}`
-- `apps/controller/src/app/bootstrap.ts` now logs the runtime contract and only starts OpenClaw when controller is in `internal` mode
-- `apps/controller/src/services/model-provider-service.ts` and `apps/controller/src/services/desktop-local-service.ts` now skip runtime restarts when controller is attached to an external OpenClaw instance
-- `apps/controller/src/runtime/openclaw-process.ts` now exposes `managesProcess()` so ownership checks are explicit at call sites
+- `apps/controller/src/routes/desktop-compat-routes.ts` now exposes `GET /api/auth/get-session`
+- this restores desktop-local auth session resolution for the embedded webview in dev
+- login -> workspace navigation was verified after the fix
 
-### `scripts/dev` now owns OpenClaw local-dev startup
+### Merge of `origin/main` into the Windows distribution branch was completed
 
-- Added `scripts/dev/src/shared/dev-runtime-config.ts`
-  - reads `scripts/dev/.env` when present
-  - defines the cross-service local-dev contract for ports, URLs, state dirs, config path, log dir, and gateway token
-- Added `scripts/dev/.env.example` as the source-of-truth example for dev-only external injection
-- Added `scripts/dev/src/services/openclaw.ts`
-- Added `scripts/dev/src/supervisors/openclaw.ts`
-- Updated `scripts/dev/src/index.ts` so `pnpm dev start|restart|stop|status|logs` now includes `openclaw`
-- Updated existing `scripts/dev` controller/web assembly to consume injected values from `scripts/dev/.env` instead of assuming only hard-coded defaults
+- the merge was completed on `feat/windows-distribution-smoke`
+- the merged result was validated enough to confirm no obvious blocker in the HMR-first local-dev path
+- a few merge follow-up fixes were required and were applied:
+  - `apps/desktop/main/index.ts`
+    - fixed `registerIpcHandlers(...)` argument order so `diagnosticsReporter` is passed correctly
+  - `apps/desktop/main/runtime/manifests.ts`
+    - restored/exported `ensurePackagedOpenclawSidecar(...)` in the new platform-capability shape
+  - `apps/desktop/main/services/launchd-bootstrap.ts`
+    - adapted packaged OpenClaw sidecar lookup to use `getDesktopRuntimePlatformAdapter().capabilities`
 
-### `scripts/dev` now also owns desktop local-dev attach
+### `scripts/dev` logging was unified
 
-- Added `scripts/dev/src/services/desktop.ts`
-- Updated `scripts/dev/src/index.ts` so `pnpm dev start|restart|stop|status|logs` now includes `desktop`
-- Added desktop-specific `scripts/dev` state/log plumbing:
-  - `.tmp/dev/desktop.pid`
-  - desktop log access wired to `.tmp/dev/logs/<run_id>/desktop.log`
-- `scripts/dev` command routing no longer has implicit aggregate defaults for `start | status | stop | restart`
-  - these commands now require an explicit single-service target: `desktop | openclaw | controller | web`
-  - aggregate target `all` is rejected
-  - example: `pnpm dev start openclaw`, `pnpm dev status desktop`, `pnpm dev stop web`
-- `pnpm dev logs <service>` is now session-scoped and tail-oriented:
-  - logs are resolved from the active service session only
-  - output is capped to the last 200 lines by default
-  - the CLI prints a fixed header with the tail policy, session line count, and actual log file path before log content
-- Desktop local dev now starts Electron directly from `scripts/dev`
-  - the old `scripts/desktop-dev.mjs` -> `apps/desktop/scripts/dev-cli.mjs` launcher chain is deleted
-  - desktop session logs now live under `.tmp/dev/logs/<run_id>/desktop.log` like the other services
-  - desktop pid locks now store `launchId` directly inside the service lock
-- The old desktop local-dev system is intentionally not backward compatible anymore
-  - `pnpm start` now fails because that script no longer exists
-  - `apps/desktop/dev.sh` and `apps/desktop/scripts/dev-cli.mjs` are deleted
-  - validation helpers now invoke explicit `pnpm dev start|stop <service>` commands only
-- Two outdated root dev aliases were also removed:
-  - `dev:controller`
-  - `dev:desktop`
-- Root `AGENTS.md` and `scripts/dev/AGENTS.md` were updated to describe the explicit per-service local-dev workflow, the lack of an `all` target, and the new session-scoped logging contract
-- Cleaned obvious old script-managed dev wording in service errors so each service now points to the matching explicit stop command (`pnpm dev stop <service>`)
-- `apps/desktop/main/bootstrap.ts` now respects a pre-injected `NEXU_HOME` in local dev instead of always forcing the desktop-local fallback path
-- Root `package.json` no longer exposes the old `pnpm start|stop|restart|status|logs|reset-state` desktop launcher scripts
-
-### Small controller-chain robustness fix
-
-- `apps/controller/src/runtime/openclaw-config-writer.ts` now derives a fallback state dir from `openclawConfigPath` when the full env shape is not present, which fixed the related config-writer regression in tests
-
-## Validation Already Done
-
-- `pnpm --filter @nexu/desktop typecheck` passed
-- `pnpm --filter @nexu/desktop build` passed earlier in the session after the desktop external-runtime split
-- `pnpm --filter @nexu/controller typecheck` passed
-- `pnpm --filter @nexu/controller build` passed
-- `pnpm --dir ./scripts/dev exec tsc --noEmit` passed
-- Root-entrypoint local-dev acceptance for explicit per-service local-dev flow passed:
-  - `pnpm dev status all` rejects `all` as intended
-  - `pnpm dev start openclaw`
-  - `pnpm dev logs openclaw`
-  - `pnpm dev start controller`
-  - `pnpm dev logs controller`
-  - `pnpm dev start web`
-  - `pnpm dev logs web`
-  - `pnpm dev start desktop`
-  - `pnpm dev logs desktop`
-  - `pnpm dev stop desktop`
-  - `pnpm dev stop web`
-  - `pnpm dev stop controller`
-  - `pnpm dev stop openclaw`
-- Follow-up doc / cleanup validation passed:
-  - `pnpm --dir ./scripts/dev exec tsc --noEmit`
-  - grep audit across `AGENTS.md`, `scripts/dev/AGENTS.md`, and `scripts/dev/src/` for stale implicit-aggregate command wording
-- Direct desktop supervisor validation passed:
-  - `pnpm dev stop desktop`
-  - `pnpm dev start desktop`
-  - `pnpm dev logs desktop`
-  - `pnpm dev status desktop`
-- Legacy launcher removal validation passed:
-  - `pnpm start` now fails with `ERR_PNPM_NO_SCRIPT_OR_SERVER` as intended
-  - `pnpm --filter @nexu/desktop typecheck`
-  - `pnpm dev restart desktop`
-  - `pnpm dev logs desktop`
-- Root alias removal is committed and pushed on `feat/local-dev-workflow-optimization`
-  - latest commit at handoff: `5adcbe3` (`refactor: remove legacy desktop dev launchers`)
-- Verified controller now boots in `external` OpenClaw mode and successfully reaches `openclaw_ws_connected` through the `scripts/dev`-managed OpenClaw process
-- `pnpm lint` still fails, but only on pre-existing repo-wide Biome formatting drift unrelated to this branch
-- `pnpm test` still fails, but the observed failures are pre-existing desktop cross-platform/path test issues unrelated to this branch
+- `packages/dev-utils/src/logger.ts` now provides the shared `createDevLogger()` factory
+- `scripts/dev/src/shared/logger.ts` owns the single root logger for `scripts/dev`
+- `scripts/dev` control-plane logging now uses `logger.debug/info/warn/error`
+- `packages/dev-utils/src/spawn.ts` accepts an explicit `logger?: DevLogger`
+- `scripts/dev/.env.example` now includes:
+  - `NEXU_DEV_LOG_LEVEL=info`
+  - `NEXU_DEV_LOG_PRETTY=false`
+- important constraint preserved:
+  - `<service>.log` files still contain only raw service output
+  - `scripts/dev` control-plane logs are not mixed into service raw logs
 
 ## Important Current Behavior
 
-- OpenClaw local dev is now expected to be orchestrated by `scripts/dev`, not by its own dedicated `.env`
-- `scripts/dev/.env` is intended to become the single dev-only source of truth for cross-service injected runtime values
-- Controller local dev is already consuming OpenClaw through that external contract when launched via `scripts/dev`
-- Desktop local dev is now started/stopped through `scripts/dev` in `external` mode and attaches to the `scripts/dev`-managed controller/web/openclaw stack
-- `pnpm dev start|status|stop|restart` now require an explicit single-service target; `all` is intentionally unsupported
-- `pnpm dev logs <service>` only works for the active session of that service and prints at most the last 200 lines, prefixed with a fixed metadata header
-- Desktop launched via `scripts/dev` now goes straight through Electron + pid lock supervision instead of the extra `dev-cli` wrapper layer
-- Desktop session logs launched via `scripts/dev` now use `.tmp/dev/logs/<run_id>/desktop.log`
-- The old desktop launcher model is abolished; local desktop development is now only supported through explicit `pnpm dev <command> <service>` flows
-- Root `package.json` no longer exposes the old desktop launcher scripts or the old `dev:controller` / `dev:desktop` aliases
-- Remaining old-command references are documentation debt only in historical design/plan docs, not active executable paths
+- `pnpm dev` remains the canonical local-dev control surface
+- `scripts/dev` is still HMR-first and should remain the baseline for future local-dev work
+- `pnpm dev logs <service>` still reads the raw active-session log for that service
+- `NEXU_DEV_LOG_PRETTY` controls pretty terminal logging for the `scripts/dev` control plane only
+- the current branch should treat launchd-related work as follow-up architecture work, not as a reason to regress the validated `scripts/dev` baseline
 
-## Known Existing Issues
+## Known Observations
 
-- `pnpm lint` still fails due to pre-existing repo-wide Biome formatting issues unrelated to this branch
-- `pnpm --filter @nexu/controller test` still has pre-existing failures not introduced by this session:
-  - `tests/nexu-config-store.test.ts`
-  - `tests/openclaw-sync.test.ts`
-  - `tests/openclaw-runtime-plugin-writer.test.ts` (Windows symlink permission issue)
-- `pnpm test` still has additional pre-existing desktop failures on Windows path expectations / filesystem assumptions (launchd, plist, state migration, skill path, runtime manifest, skill DB migration)
+- OpenClaw startup duration on Windows still shows occasional variance
+  - dense timing probes currently remain in place around the hidden-launch path and OpenClaw startup timing
+  - recent measurements showed normal starts in the low-seconds range, but longer outliers were also observed earlier
+  - treat this as a separate observation, not yet a proven structural regression
+- root `pnpm install` on this Windows machine still hits a pre-existing `scripts/postinstall.mjs` `spawn EINVAL` problem
+  - this was observed while installing `pino` / `pino-pretty`
+  - it is not part of the `scripts/dev` logging design itself
 
-## Suggested Next Steps
+## Next Focus For The New Session
 
-1. Decide whether any per-service dependency guardrails are needed when users start `controller` or `desktop` without their expected upstream services already running
-2. Add the missing OpenClaw runtime-root/runtime-port contract that desktop still expects in external mode so the current `Missing external runtime port` warning disappears
-3. Continue tightening the `scripts/dev/.env` contract so every external injection is documented, named consistently, and traced to a single owner
-4. Optionally do a historical-doc cleanup pass for old `pnpm start` / `pnpm restart` references that no longer map to executable paths
+### Primary goal: unify launchd feature encapsulation strategy
+
+- review the merged `launchd` surface and decide what still belongs in:
+  - `apps/desktop/main/services/launchd-bootstrap.ts`
+  - `apps/desktop/main/services/quit-handler.ts`
+  - `apps/desktop/main/runtime/manifests.ts`
+  - `apps/desktop/scripts/*sidecar*.mjs`
+- define a cleaner boundary between:
+  - packaged/launchd runtime responsibilities
+  - `scripts/dev` local-dev responsibilities
+  - desktop main-process orchestration glue
+- avoid broad refactors outside that encapsulation target unless they are required to keep current behavior working
+
+### Recommended starting points
+
+1. Audit launchd-specific capabilities that are still spread across bootstrap/runtime/script layers
+2. Decide which launchd responsibilities should be encapsulated behind one cohesive service boundary
+3. Preserve the current HMR-first `scripts/dev` baseline while tightening launchd internals behind clearer APIs
+
+### Proposed execution phases
+
+#### Phase 1: define the lifecycle-oriented platform boundary
+
+- define a platform lifecycle entry that covers more than cold start
+- explicitly separate:
+  - platform identity (`mac` / `win` / `default`)
+  - runtime residency strategy (`launchd` / managed / future external-service variants)
+- decide the target responsibilities that should move behind the lifecycle adapter:
+  - runtime materialization
+  - cold start / attach / stale-session recovery
+  - shutdown / backgrounding policy
+  - update-install teardown and safety checks
+  - session metadata persistence (today: `runtime-ports.json`)
+- keep behavior unchanged in this phase whenever possible; focus on interface shape and ownership
+
+#### Phase 2: move mac launchd lifecycle logic behind the new entry
+
+- migrate current mac launchd behavior to the new lifecycle boundary without changing validated behavior
+- reduce `apps/desktop/main/services/launchd-bootstrap.ts` from a catch-all module into smaller mac launchd-specific units
+- make `quit-handler`, updater teardown, and recovery paths depend on the new lifecycle entry instead of calling launchd-specific helpers directly
+- preserve the current packaged mac behavior:
+  - attach to existing launchd-managed services
+  - stale session cleanup
+  - background run vs quit completely
+  - update-safe teardown
+
+#### Phase 3: separate runtime unit definition from platform-specific supervision
+
+- identify the shared runtime unit contract that is currently duplicated between:
+  - `apps/desktop/main/runtime/manifests.ts`
+  - `apps/desktop/main/services/plist-generator.ts`
+- introduce a platform-neutral runtime unit spec that can be translated into:
+  - managed/orchestrator manifests
+  - mac launchd service definitions
+  - future Windows or other platform supervisor definitions
+- minimize duplicated env/path contract maintenance across managed and launchd flows
+
+#### Phase 4: isolate packaged-runtime materialization responsibilities
+
+- split packaged sidecar / runner extraction responsibilities out of launchd bootstrap flow
+- clarify ownership for:
+  - packaged OpenClaw sidecar materialization
+  - controller sidecar externalization
+  - external Electron runner extraction
+  - update-safe runtime path layout
+- keep `scripts/dev` responsibilities separate from packaged runtime materialization concerns
+
+#### Phase 5: validate mac behavior and lock the adapter seam
+
+- verify mac launchd behavior still works end to end after the refactor
+- use the existing launchd-focused tests and smoke paths as the primary regression net
+- confirm that the new seam is ready for future Windows adapter work rather than still encoding launchd assumptions in shared APIs
+- only after mac behavior is stable, evaluate follow-up extraction work for other platforms
+
+## Quick Validation Commands
+
+- `pnpm --dir ./scripts/dev exec tsc --noEmit`
+- `pnpm dev start`
+- `pnpm dev status openclaw`
+- `pnpm dev status controller`
+- `pnpm dev status web`
+- `pnpm dev status desktop`
+- `pnpm dev logs <service>`
+- `pnpm dev stop`
+- `pnpm --filter @nexu/controller build`
+- `pnpm --filter @nexu/web build`
+- `pnpm --filter @nexu/desktop build`
