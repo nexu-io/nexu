@@ -1,6 +1,10 @@
 import { createDesktopWebBuildEnv } from "../shared/build-capabilities.mjs";
 
-export function createWindowsBuildCapabilities({ env, releaseRoot, processPlatform }) {
+export function createWindowsBuildCapabilities({
+  env,
+  releaseRoot,
+  processPlatform,
+}) {
   return {
     platformId: "win",
     artifactLayout: {

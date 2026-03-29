@@ -35,12 +35,15 @@ This file captures local guidance for the `scripts/dev` CLI surface.
 - Validate behavior through the real command surface instead of temporary harness scripts.
 - Acceptance must be run from the repo root through `pnpm dev ...`, not by invoking `scripts/dev` internals directly.
 - The focused acceptance chain is: `pnpm dev start` -> `pnpm dev status <service>` / `pnpm dev logs <service>` as needed -> `pnpm dev stop`.
+- For a quick full-stack snapshot, prefer bare `pnpm dev status`, which prints `openclaw`, `controller`, `web`, and `desktop` in order.
+- For human-friendly local logs, prefer pretty output during manual runs via an env override such as `NEXU_DEV_LOG_PRETTY=true pnpm dev start` (POSIX) or `$env:NEXU_DEV_LOG_PRETTY='true'; pnpm dev start` (PowerShell).
 
 ## Runtime model
 
 - Root entrypoint stays `pnpm dev ...`.
 - The CLI executes through `pnpm --dir ./scripts/dev exec tsx ./src/index.ts`.
 - `scripts/dev` may use its own `tsconfig.json` features such as `paths`.
+- `@nexu/dev-utils` is consumed from built `dist/` output at runtime; after editing `packages/dev-utils`, rebuild it with `pnpm --filter @nexu/dev-utils build` before validating `pnpm dev ...`.
 - `scripts/dev/.env.example` is the source-of-truth template for dev-only overrides. Only create `scripts/dev/.env` when you need local overrides for ports, URLs, state paths, config path, log dir, or the shared OpenClaw gateway token.
 - Keep the repo-level pnpm build-script allowlist tight. Do not add Windows-only packaging tools such as `electron-winstaller` unless the team explicitly wants that behavior on every machine.
 - Logs should live under `.tmp/dev/logs/<run_id>/...`.

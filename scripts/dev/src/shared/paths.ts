@@ -67,3 +67,12 @@ export function getOpenclawDevLogPath(runId: string): string {
 export function getDesktopRuntimeRootPath(): string {
   return join(repoRootPath, ".tmp", "desktop");
 }
+
+export function getOpenclawRuntimeStageRootPath(): string {
+  return join(
+    repoRootPath,
+    "openclaw-runtime",
+    "node_modules",
+    ".nexu-dev-runtime",
+  );
+}

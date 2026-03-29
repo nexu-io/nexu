@@ -43,6 +43,23 @@ function getCliLogger() {
   return getScriptsDevLogger({ component: "cli" });
 }
 
+async function runDefaultStartStage(
+  target: DevTarget,
+  sessionId: string,
+): Promise<void> {
+  const logger = getCliLogger();
+  logger.info("starting service", { target, sessionId });
+  await startTarget(target, sessionId);
+  logger.info("startup stage complete", { target, sessionId });
+}
+
+async function runDefaultStopStage(target: DevTarget): Promise<void> {
+  const logger = getCliLogger();
+  logger.info("stopping service", { target });
+  await stopTarget(target);
+  logger.info("stop stage complete", { target });
+}
+
 function readTargetOrThrow(target: string | undefined): DevTarget {
   if (!target) {
     throw new Error(
@@ -58,16 +75,16 @@ function readTargetOrThrow(target: string | undefined): DevTarget {
 }
 
 async function startDefaultStack(): Promise<void> {
-  await startTarget("openclaw", createDevSessionId());
-  await startTarget("controller", createDevSessionId());
-  await startTarget("web", createDevSessionId());
-  await startTarget("desktop", createDevSessionId());
+  await runDefaultStartStage("openclaw", createDevSessionId());
+  await runDefaultStartStage("controller", createDevSessionId());
+  await runDefaultStartStage("web", createDevSessionId());
+  await runDefaultStartStage("desktop", createDevSessionId());
 }
 
 async function stopDefaultStack(): Promise<void> {
   for (const target of ["desktop", "web", "controller", "openclaw"] as const) {
     try {
-      await stopTarget(target);
+      await runDefaultStopStage(target);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("is not running")) {
@@ -83,6 +100,12 @@ async function stopDefaultStack(): Promise<void> {
 async function restartDefaultStack(): Promise<void> {
   await stopDefaultStack();
   await startDefaultStack();
+}
+
+async function printDefaultStackStatus(): Promise<void> {
+  for (const target of ["openclaw", "controller", "web", "desktop"] as const) {
+    await printStatus(target);
+  }
 }
 
 async function startTarget(
@@ -252,6 +275,11 @@ cli
 cli
   .command("status [target]", "Show status for one local dev service")
   .action(async (target?: string) => {
+    if (!target) {
+      await printDefaultStackStatus();
+      return;
+    }
+
     const resolvedTarget = readTargetOrThrow(target);
     await printStatus(resolvedTarget);
   });
@@ -260,7 +288,9 @@ cli
   .command("logs [target]", "Print the local dev logs")
   .action(async (target?: string) => {
     if (!target) {
-      throw new Error("log target is required; use `pnpm dev logs desktop`");
+      throw new Error(
+        "log target is required; run `pnpm dev status` to choose a service, then use `pnpm dev logs <desktop|openclaw|controller|web>`",
+      );
     }
 
     if (!isSupportedDevTarget(target)) {

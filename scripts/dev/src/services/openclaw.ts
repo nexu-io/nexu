@@ -1,15 +1,18 @@
+import { join } from "node:path";
+
 import {
   createNodeOptions,
   ensureDirectory,
   ensureParentDirectory,
   getListeningPortPid,
+  isProcessRunning,
+  prepareOpenclawRuntimeStage,
   readDevLock,
   removeDevLock,
   repoRootPath,
   resolveTsxPaths,
   spawnHiddenProcess,
   terminateProcess,
-  waitForListeningPortPid,
   waitForProcessStart,
   writeDevLock,
 } from "@nexu/dev-utils";
@@ -23,6 +26,7 @@ import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getOpenclawDevLogPath,
+  getOpenclawRuntimeStageRootPath,
   openclawDevLockPath,
   openclawSupervisorPath,
 } from "../shared/paths.js";
@@ -76,16 +80,63 @@ export async function getOpenclawPortPid(): Promise<number> {
 }
 
 async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
-  return waitForListeningPortPid(
-    getScriptsDevRuntimeConfig().openclawPort,
-    "openclaw gateway",
-    {
-      attempts: 120,
-      delayMs: 500,
-      supervisorPid,
-      supervisorName: "openclaw supervisor",
-    },
-  );
+  const logger = getScriptsDevLogger({
+    component: "openclaw-service",
+    service: "openclaw",
+  });
+  const port = getScriptsDevRuntimeConfig().openclawPort;
+  const attempts = 120;
+  const delayMs = 500;
+  const heartbeatEveryAttempts = 4;
+  const waitStartedAt = Date.now();
+
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      return await getListeningPortPid(port, "openclaw gateway");
+    } catch {}
+
+    if (!isProcessRunning(supervisorPid)) {
+      throw new Error(`openclaw supervisor exited before opening port ${port}`);
+    }
+
+    if ((index + 1) % heartbeatEveryAttempts === 0) {
+      logger.info("waiting for openclaw gateway port", {
+        supervisorPid,
+        port,
+        elapsedMs: Date.now() - waitStartedAt,
+      });
+    }
+
+    if (index < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  if (!isProcessRunning(supervisorPid)) {
+    throw new Error(`openclaw supervisor exited before opening port ${port}`);
+  }
+
+  throw new Error(`openclaw gateway did not open port ${port}`);
+}
+
+async function prepareOpenclawEntryPath(): Promise<string> {
+  const logger = getScriptsDevLogger({
+    component: "openclaw-service",
+    service: "openclaw",
+  });
+  const stage = await prepareOpenclawRuntimeStage({
+    sourceOpenclawRoot: join(
+      repoRootPath,
+      "openclaw-runtime",
+      "node_modules",
+      "openclaw",
+    ),
+    patchRoot: join(repoRootPath, "openclaw-runtime-patches"),
+    targetStageRoot: getOpenclawRuntimeStageRootPath(),
+    log: (message) => logger.info(message),
+  });
+
+  return join(stage.stagedOpenclawRoot, "openclaw.mjs");
 }
 
 export async function startOpenclawDevProcess(options: {
@@ -119,6 +170,7 @@ export async function startOpenclawDevProcess(options: {
   await ensureDirectory(runtimeConfig.openclawStateDir);
   await ensureParentDirectory(runtimeConfig.openclawConfigPath);
   await ensureDirectory(runtimeConfig.openclawLogDir);
+  const openclawEntryPath = await prepareOpenclawEntryPath();
 
   logOpenclawTiming("filesystem-ready", startedAt);
 
@@ -132,6 +184,7 @@ export async function startOpenclawDevProcess(options: {
       ...createOpenclawInjectedEnv(),
       NEXU_DEV_OPENCLAW_RUN_ID: runId,
       NEXU_DEV_OPENCLAW_LOG_PATH: logFilePath,
+      NEXU_DEV_OPENCLAW_ENTRY_PATH: openclawEntryPath,
       NEXU_DEV_SESSION_ID: sessionId,
       NEXU_DEV_SERVICE: "openclaw",
       NEXU_DEV_ROLE: "supervisor",
@@ -156,7 +209,16 @@ export async function startOpenclawDevProcess(options: {
   );
   const supervisorPid = processHandle.pid as number;
   logOpenclawTiming(`supervisor-pid=${supervisorPid}`, startedAt);
-  const listenerPid = await waitForOpenclawPortPid(supervisorPid);
+  let listenerPid: number;
+
+  try {
+    listenerPid = await waitForOpenclawPortPid(supervisorPid);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${message}. Inspect ${logFilePath} for OpenClaw startup details.`,
+    );
+  }
 
   logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);
 

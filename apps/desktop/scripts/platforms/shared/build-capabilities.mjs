@@ -34,11 +34,9 @@ export function createDesktopWebBuildEnv(baseEnv, platform) {
 
 export function getSharedBuildSteps({ repoRoot }) {
   return [
+    ["pnpm", ["--dir", repoRoot, "--filter", "@nexu/dev-utils", "build"]],
     ["pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"]],
-    [
-      "pnpm",
-      ["--dir", repoRoot, "--filter", "@nexu/controller", "build"],
-    ],
+    ["pnpm", ["--dir", repoRoot, "--filter", "@nexu/controller", "build"]],
     ["pnpm", ["--dir", repoRoot, "openclaw-runtime:install"]],
   ];
 }
