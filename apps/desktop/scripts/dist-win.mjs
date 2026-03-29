@@ -1,5 +1,13 @@
 import { execFileSync, spawn } from "node:child_process";
-import { cp, lstat, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +33,16 @@ const pnpmCommand = resolvePnpmCommand({
   env: process.env,
   platform: process.platform,
 });
+const shouldReuseExistingBuildArtifacts =
+  process.env.NEXU_DESKTOP_USE_EXISTING_BUILDS === "1" ||
+  process.env.NEXU_DESKTOP_USE_EXISTING_BUILDS?.toLowerCase() === "true";
+const shouldReuseExistingRuntimeInstall =
+  process.env.NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL === "1" ||
+  process.env.NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL?.toLowerCase() ===
+    "true";
+const shouldReuseExistingSidecars =
+  process.env.NEXU_DESKTOP_USE_EXISTING_SIDECARS === "1" ||
+  process.env.NEXU_DESKTOP_USE_EXISTING_SIDECARS?.toLowerCase() === "true";
 
 function createCommandSpec(command, args) {
   if (
@@ -46,6 +64,89 @@ const rmWithRetriesOptions = {
   maxRetries: 5,
   retryDelay: 200,
 };
+
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
+async function timedStep(stepName, fn, timings) {
+  const startedAt = performance.now();
+  console.log(`[dist:win][timing] start ${stepName}`);
+  try {
+    return await fn();
+  } finally {
+    const durationMs = performance.now() - startedAt;
+    timings.push({ stepName, durationMs });
+    console.log(
+      `[dist:win][timing] done ${stepName} duration=${formatDurationMs(durationMs)}`,
+    );
+  }
+}
+
+async function ensureExistingPath(path, label) {
+  try {
+    await lstat(path);
+  } catch {
+    throw new Error(`[dist:win] Missing ${label}: ${path}`);
+  }
+}
+
+async function ensureExistingBuildArtifacts() {
+  await Promise.all([
+    ensureExistingPath(
+      resolve(repoRoot, "packages/dev-utils/dist"),
+      "dev-utils build",
+    ),
+    ensureExistingPath(
+      resolve(repoRoot, "packages/shared/dist"),
+      "shared build",
+    ),
+    ensureExistingPath(
+      resolve(repoRoot, "apps/controller/dist"),
+      "controller build",
+    ),
+    ensureExistingPath(resolve(repoRoot, "apps/web/dist"), "web build"),
+    ensureExistingPath(resolve(electronRoot, "dist"), "desktop renderer build"),
+    ensureExistingPath(
+      resolve(electronRoot, "dist-electron/main"),
+      "desktop main build",
+    ),
+    ensureExistingPath(
+      resolve(electronRoot, "dist-electron/preload"),
+      "desktop preload build",
+    ),
+  ]);
+}
+
+async function ensureExistingRuntimeInstall() {
+  await Promise.all([
+    ensureExistingPath(
+      resolve(repoRoot, "openclaw-runtime/node_modules"),
+      "openclaw-runtime install",
+    ),
+    ensureExistingPath(
+      resolve(repoRoot, "openclaw-runtime/.postinstall-cache.json"),
+      "openclaw-runtime cache",
+    ),
+  ]);
+}
+
+async function ensureExistingSidecars(runtimeDistRoot) {
+  await Promise.all([
+    ensureExistingPath(
+      resolve(runtimeDistRoot, "controller", "package.json"),
+      "controller sidecar",
+    ),
+    ensureExistingPath(
+      resolve(runtimeDistRoot, "openclaw", "payload.tar.gz"),
+      "openclaw sidecar archive",
+    ),
+    ensureExistingPath(
+      resolve(runtimeDistRoot, "web", "package.json"),
+      "web sidecar",
+    ),
+  ]);
+}
 
 async function dereferencePnpmSymlinks() {
   const sharpPath = resolve(electronRoot, "node_modules/sharp");
@@ -156,6 +257,18 @@ async function runElectronBuilder(args, options = {}) {
   await run(process.execPath, [electronBuilderCli, ...args], options);
 }
 
+async function ensureWindowsPwdShim() {
+  if (buildTargetPlatform !== "win") {
+    return null;
+  }
+
+  const shimDir = resolve(repoRoot, ".cache", "nexu-dev", "bin");
+  const shimPath = resolve(shimDir, "pwd.cmd");
+  await mkdir(shimDir, { recursive: true });
+  await writeFile(shimPath, "@echo off\r\necho %CD%\r\n", "utf8");
+  return shimDir;
+}
+
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
   const desktopPackage = JSON.parse(
@@ -260,6 +373,7 @@ async function getWindowsBuildVersion() {
 async function main() {
   const rawArgs = new Set(process.argv.slice(2));
   const dirOnly = rawArgs.has("--dir-only") || rawArgs.has("--target=dir");
+  const timings = [];
   if (buildTargetPlatform !== "win") {
     throw new Error(
       `[dist:win] Windows packaging must run with target platform "win": host=${process.platform}, target=${buildTargetPlatform}.`,
@@ -277,44 +391,185 @@ async function main() {
     releaseRoot,
     processPlatform: process.platform,
   });
+  const runtimeDistRoot = buildContext.resolveRuntimeDistRoot();
+  const electronBuilderEnv = buildCapabilities.createElectronBuilderEnv();
+  const windowsPwdShimDir = await ensureWindowsPwdShim();
 
-  await rm(releaseRoot, rmWithRetriesOptions);
-  await rm(buildContext.resolveRuntimeDistRoot(), rmWithRetriesOptions);
+  await timedStep(
+    "clean release directories",
+    async () => {
+      await rm(releaseRoot, rmWithRetriesOptions);
+      if (!shouldReuseExistingSidecars) {
+        await rm(runtimeDistRoot, rmWithRetriesOptions);
+      }
+    },
+    timings,
+  );
 
-  for (const [command, args] of getSharedBuildSteps({ repoRoot })) {
-    await run(command === "pnpm" ? pnpmCommand : command, args, { env });
+  await timedStep(
+    "build shared workspace steps",
+    async () => {
+      if (
+        shouldReuseExistingBuildArtifacts &&
+        shouldReuseExistingRuntimeInstall
+      ) {
+        await ensureExistingBuildArtifacts();
+        await ensureExistingRuntimeInstall();
+        console.log(
+          "[dist:win] reusing existing workspace builds and runtime install",
+        );
+        return;
+      }
+
+      for (const [command, args] of getSharedBuildSteps({ repoRoot })) {
+        const isBuildStep =
+          args.includes("build") &&
+          (args.includes("@nexu/dev-utils") ||
+            args.includes("@nexu/shared") ||
+            args.includes("@nexu/controller"));
+        const isRuntimeInstallStep = args.includes("openclaw-runtime:install");
+
+        if (isBuildStep && shouldReuseExistingBuildArtifacts) {
+          continue;
+        }
+
+        if (isRuntimeInstallStep && shouldReuseExistingRuntimeInstall) {
+          continue;
+        }
+
+        await run(command === "pnpm" ? pnpmCommand : command, args, { env });
+      }
+    },
+    timings,
+  );
+  await timedStep(
+    "build @nexu/web",
+    async () => {
+      if (shouldReuseExistingBuildArtifacts) {
+        return;
+      }
+      await timedStep(
+        "build @nexu/web:tsc",
+        async () => {
+          await run(
+            pnpmCommand,
+            ["--dir", repoRoot, "--filter", "@nexu/web", "exec", "tsc", "-b"],
+            { env: buildCapabilities.webBuildEnv },
+          );
+        },
+        timings,
+      );
+      await timedStep(
+        "build @nexu/web:vite",
+        async () => {
+          await run(
+            pnpmCommand,
+            [
+              "--dir",
+              repoRoot,
+              "--filter",
+              "@nexu/web",
+              "exec",
+              "vite",
+              "build",
+            ],
+            { env: buildCapabilities.webBuildEnv },
+          );
+        },
+        timings,
+      );
+    },
+    timings,
+  );
+  await timedStep(
+    "build @nexu/desktop",
+    async () => {
+      if (shouldReuseExistingBuildArtifacts) {
+        return;
+      }
+      await run(pnpmCommand, ["run", "build"], { cwd: electronRoot, env });
+    },
+    timings,
+  );
+  await timedStep(
+    "prepare runtime sidecars",
+    async () => {
+      if (shouldReuseExistingSidecars) {
+        await ensureExistingSidecars(runtimeDistRoot);
+        console.log("[dist:win] reusing existing prepared runtime sidecars");
+        return;
+      }
+
+      await run(
+        "node",
+        [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
+        {
+          cwd: electronRoot,
+          env: buildCapabilities.sidecarReleaseEnv,
+        },
+      );
+    },
+    timings,
+  );
+  await timedStep(
+    "generate build config",
+    async () => {
+      await ensureBuildConfig();
+    },
+    timings,
+  );
+  await timedStep(
+    "dereference pnpm symlinks",
+    async () => {
+      await dereferencePnpmSymlinks();
+    },
+    timings,
+  );
+
+  const electronVersion = await timedStep(
+    "resolve electron version",
+    async () => getElectronVersion(),
+    timings,
+  );
+  const buildVersion = await timedStep(
+    "resolve windows build version",
+    async () => getWindowsBuildVersion(),
+    timings,
+  );
+
+  await timedStep(
+    "run electron-builder",
+    async () => {
+      await runElectronBuilder(
+        buildCapabilities.createElectronBuilderArgs({
+          electronVersion,
+          buildVersion,
+          dirOnly,
+        }),
+        {
+          cwd: electronRoot,
+          env: {
+            ...electronBuilderEnv,
+            DEBUG:
+              electronBuilderEnv.DEBUG ?? "electron-builder,electron-builder:*",
+            ...(windowsPwdShimDir
+              ? {
+                  PATH: `${windowsPwdShimDir};${electronBuilderEnv.PATH ?? process.env.PATH ?? ""}`,
+                }
+              : {}),
+          },
+        },
+      );
+    },
+    timings,
+  );
+
+  console.log("[dist:win][timing] summary");
+  for (const timing of timings) {
+    console.log(
+      `[dist:win][timing] ${timing.stepName}=${formatDurationMs(timing.durationMs)}`,
+    );
   }
-  await run(
-    pnpmCommand,
-    ["--dir", repoRoot, "--filter", "@nexu/web", "build"],
-    { env: buildCapabilities.webBuildEnv },
-  );
-  await run(pnpmCommand, ["run", "build"], { cwd: electronRoot, env });
-  await run(
-    "node",
-    [resolve(scriptDir, "prepare-runtime-sidecars.mjs"), "--release"],
-    {
-      cwd: electronRoot,
-      env: buildCapabilities.sidecarReleaseEnv,
-    },
-  );
-  await ensureBuildConfig();
-  await dereferencePnpmSymlinks();
-
-  const electronVersion = await getElectronVersion();
-  const buildVersion = await getWindowsBuildVersion();
-
-  await runElectronBuilder(
-    buildCapabilities.createElectronBuilderArgs({
-      electronVersion,
-      buildVersion,
-      dirOnly,
-    }),
-    {
-      cwd: electronRoot,
-      env: buildCapabilities.createElectronBuilderEnv(),
-    },
-  );
 }
 
 await main();

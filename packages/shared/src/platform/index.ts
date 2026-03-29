@@ -16,9 +16,7 @@ export function isDesktopRuntimePlatform(
   }
 }
 
-export function resolveDesktopRuntimePlatform(
-  platform: NodeJS.Platform,
-): "mac" | "win" {
+export function resolveDesktopRuntimePlatform(platform: string): "mac" | "win" {
   switch (platform) {
     case "darwin":
       return "mac";

@@ -3,7 +3,7 @@ import {
   resolveDesktopEntryLinkKind,
   resolveDesktopPnpmCommand,
   shouldRetryDesktopLinkFailureWithCopy,
-} from "@nexu/shared";
+} from "./desktop-platform.mjs";
 import { resolveBuildTargetPlatform } from "./platform-resolver.mjs";
 
 export function resolveDirectoryLinkKind(options = {}) {

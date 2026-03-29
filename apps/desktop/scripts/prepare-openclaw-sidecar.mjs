@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmod,
   cp,
@@ -7,6 +8,7 @@ import {
   readFile,
   readdir,
   rename,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -35,6 +37,12 @@ const openclawPackagePatchRoot = resolve(
   openclawRuntimePatchesRoot,
   "openclaw",
 );
+const buildCacheRoot = resolve(
+  process.env.NEXU_DEV_CACHE_DIR ?? resolve(repoRoot, ".cache", "nexu-dev"),
+);
+const openclawSidecarCacheRoot = resolve(buildCacheRoot, "openclaw-sidecar");
+const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-03-29-openclaw-sidecar-cache-v1";
+const OPENCLAW_SIDECAR_ARCHIVE_FORMAT = "tar.gz";
 const REPLY_OUTCOME_HELPER_SEARCH = `
 const sessionKey = ctx.SessionKey;
 	const startTime = diagnosticsEnabled ? Date.now() : 0;
@@ -240,6 +248,9 @@ const inheritEntitlementsPath = resolve(
 const shouldArchiveOpenclawSidecar =
   process.env.NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR !== "0" &&
   process.env.NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR?.toLowerCase() !== "false";
+const shouldDisableOpenclawSidecarCache =
+  process.env.NEXU_DEV_DISABLE_CACHE === "1" ||
+  process.env.NEXU_DEV_DISABLE_CACHE?.toLowerCase() === "true";
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(2)}s`;
@@ -333,6 +344,162 @@ async function collectFiles(rootPath) {
   }
 
   return files;
+}
+
+async function collectDirectoryStats(rootPath) {
+  let fileCount = 0;
+  let totalBytes = 0;
+  const entries = await readdir(rootPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = resolve(rootPath, entry.name);
+
+    if (entry.isDirectory()) {
+      const childStats = await collectDirectoryStats(entryPath);
+      fileCount += childStats.fileCount;
+      totalBytes += childStats.totalBytes;
+      continue;
+    }
+
+    if (entry.isFile()) {
+      const entryStats = await stat(entryPath);
+      fileCount += 1;
+      totalBytes += entryStats.size;
+    }
+  }
+
+  return { fileCount, totalBytes };
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(2)} ${units[unitIndex]}`;
+}
+
+async function hashFingerprintInputs(files) {
+  const hash = createHash("sha256");
+  hash.update(`${OPENCLAW_SIDECAR_CACHE_VERSION}\n`);
+
+  for (const filePath of [...files].sort((left, right) =>
+    left.localeCompare(right),
+  )) {
+    if (!(await pathExists(filePath))) {
+      continue;
+    }
+
+    hash.update(`${relative(repoRoot, filePath)}\n`);
+    hash.update(await readFile(filePath));
+    hash.update("\n");
+  }
+
+  return hash.digest("hex");
+}
+
+async function collectOpenclawSidecarFingerprintInputs() {
+  const files = [
+    resolve(openclawRuntimeRoot, ".postinstall-cache.json"),
+    resolve(openclawRuntimeRoot, "package.json"),
+    resolve(openclawRoot, "package.json"),
+    resolve(electronRoot, "package.json"),
+    fileURLToPath(import.meta.url),
+    resolve(electronRoot, "scripts", "lib", "sidecar-paths.mjs"),
+    resolve(electronRoot, "scripts", "platforms", "desktop-platform.mjs"),
+    resolve(electronRoot, "scripts", "platforms", "platform-resolver.mjs"),
+    resolve(electronRoot, "scripts", "platforms", "filesystem-compat.mjs"),
+  ];
+
+  if (await pathExists(openclawPackagePatchRoot)) {
+    files.push(...(await collectFiles(openclawPackagePatchRoot)));
+  }
+
+  return files;
+}
+
+async function computeOpenclawSidecarFingerprint() {
+  return hashFingerprintInputs(await collectOpenclawSidecarFingerprintInputs());
+}
+
+function getOpenclawSidecarCacheEntryRoot(fingerprint) {
+  return resolve(openclawSidecarCacheRoot, fingerprint);
+}
+
+async function tryRestoreCachedArchivedOpenclawSidecar(fingerprint) {
+  if (shouldDisableOpenclawSidecarCache || !shouldArchiveOpenclawSidecar) {
+    return false;
+  }
+
+  const cacheEntryRoot = getOpenclawSidecarCacheEntryRoot(fingerprint);
+  const cachedSidecarRoot = resolve(cacheEntryRoot, "sidecar");
+
+  if (
+    !(await pathExists(resolve(cachedSidecarRoot, "payload.tar.gz"))) ||
+    !(await pathExists(resolve(cachedSidecarRoot, "archive.json"))) ||
+    !(await pathExists(resolve(cachedSidecarRoot, "package.json"))) ||
+    !(await pathExists(resolve(cacheEntryRoot, "manifest.json")))
+  ) {
+    return false;
+  }
+
+  await resetDir(sidecarRoot);
+  await cp(cachedSidecarRoot, sidecarRoot, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log(
+    `[openclaw-sidecar][cache] hit fingerprint=${fingerprint} source=${cacheEntryRoot}`,
+  );
+  return true;
+}
+
+async function writeOpenclawSidecarCacheEntry(fingerprint) {
+  if (shouldDisableOpenclawSidecarCache || !shouldArchiveOpenclawSidecar) {
+    return;
+  }
+
+  const cacheEntryRoot = getOpenclawSidecarCacheEntryRoot(fingerprint);
+  const cacheStageRoot = resolve(
+    openclawSidecarCacheRoot,
+    `.stage-${fingerprint}`,
+  );
+  const payloadPath = resolve(sidecarRoot, "payload.tar.gz");
+  const payloadStats = await stat(payloadPath);
+
+  await removePathIfExists(cacheStageRoot);
+  await mkdir(cacheStageRoot, { recursive: true });
+  await cp(sidecarRoot, resolve(cacheStageRoot, "sidecar"), {
+    recursive: true,
+    dereference: true,
+  });
+  await writeFile(
+    resolve(cacheStageRoot, "manifest.json"),
+    `${JSON.stringify(
+      {
+        fingerprint,
+        format: OPENCLAW_SIDECAR_ARCHIVE_FORMAT,
+        payloadBytes: payloadStats.size,
+        createdAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await removePathIfExists(cacheEntryRoot);
+  await rename(cacheStageRoot, cacheEntryRoot);
+  console.log(
+    `[openclaw-sidecar][cache] stored fingerprint=${fingerprint} payload=${formatBytes(payloadStats.size)}`,
+  );
 }
 
 const nativeBinaryNamePattern = /\.(?:node|dylib|so|dll)$/u;
@@ -781,6 +948,15 @@ async function prepareOpenclawSidecar() {
     );
   }
 
+  const cacheFingerprint = await timedStep(
+    "compute sidecar cache fingerprint",
+    async () => computeOpenclawSidecarFingerprint(),
+  );
+
+  if (await tryRestoreCachedArchivedOpenclawSidecar(cacheFingerprint)) {
+    return;
+  }
+
   await timedStep("reset sidecar root", async () => {
     await resetDir(sidecarRoot);
     await mkdir(sidecarBinDir, { recursive: true });
@@ -799,6 +975,10 @@ async function prepareOpenclawSidecar() {
         },
       );
       await rename(stagedOpenclawRoot, resolve(sidecarNodeModules, "openclaw"));
+      const copyStats = await collectDirectoryStats(sidecarNodeModules);
+      console.log(
+        `[openclaw-sidecar][probe] node_modules files=${copyStats.fileCount} bytes=${copyStats.totalBytes} (${formatBytes(copyStats.totalBytes)})`,
+      );
     });
   } finally {
     await removePathIfExists(stageRoot);
@@ -877,7 +1057,15 @@ exit 127
     );
     await timedStep("archive openclaw sidecar", async () => {
       await removePathIfExists(archivePath);
+      const preArchiveStats = await collectDirectoryStats(sidecarRoot);
+      console.log(
+        `[openclaw-sidecar][probe] pre-archive files=${preArchiveStats.fileCount} bytes=${preArchiveStats.totalBytes} (${formatBytes(preArchiveStats.totalBytes)})`,
+      );
       await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
+      const archiveStats = await stat(archivePath);
+      console.log(
+        `[openclaw-sidecar][probe] archive bytes=${archiveStats.size} (${formatBytes(archiveStats.size)}) ratio=${(archiveStats.size / Math.max(preArchiveStats.totalBytes, 1)).toFixed(3)}`,
+      );
       await resetDir(sidecarRoot);
       await writeFile(
         resolve(sidecarRoot, "archive.json"),
@@ -895,6 +1083,7 @@ exit 127
         '{\n  "name": "openclaw-sidecar",\n  "private": true\n}\n',
       );
       await rename(archivePath, resolve(sidecarRoot, "payload.tar.gz"));
+      await writeOpenclawSidecarCacheEntry(cacheFingerprint);
     });
   } else if (shouldCopyRuntimeDependencies()) {
     console.log(

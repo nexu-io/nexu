@@ -2,7 +2,7 @@ import {
   NEXU_TARGET_PLATFORM_ENV,
   isDesktopRuntimePlatform,
   resolveDesktopRuntimePlatform,
-} from "@nexu/shared";
+} from "./desktop-platform.mjs";
 
 export function readBuildTargetPlatformEnv(env = process.env) {
   const value = env[NEXU_TARGET_PLATFORM_ENV];
