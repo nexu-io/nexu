@@ -136,6 +136,13 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     log: (message) => logger.info(message),
   });
 
+  logger.info("using patched staged openclaw runtime", {
+    stagedOpenclawRoot: stage.stagedOpenclawRoot,
+    fingerprint: stage.fingerprint,
+    reused: stage.reused,
+    patchedFileCount: stage.patchedFileCount,
+  });
+
   return join(stage.stagedOpenclawRoot, "openclaw.mjs");
 }
 
