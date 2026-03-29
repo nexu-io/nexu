@@ -27,7 +27,7 @@ function createEnv(overrides: Record<string, unknown> = {}): ControllerEnv {
     gatewayProbeEnabled: false,
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
-    defaultModelId: "anthropic/claude-sonnet-4",
+    defaultModelId: "link/gemini-3-flash-preview",
     ...overrides,
   } as unknown as ControllerEnv;
 }

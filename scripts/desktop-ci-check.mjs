@@ -4,7 +4,10 @@ import { access, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 const repoRoot = process.cwd();
-const maxHealthAttempts = 60;
+const maxHealthAttemptsByMode = {
+  dev: 60,
+  dist: 90,
+};
 const probeTimeoutMs = 5_000;
 const requiredDiagnosticsUnitIds = ["controller", "openclaw"];
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
@@ -938,6 +941,8 @@ async function captureLogs(context, captureDir) {
 }
 
 async function verifyRuntime(context) {
+  const maxHealthAttempts = maxHealthAttemptsByMode[context.mode];
+
   if (context.statusCommand) {
     await runCommand(context.statusCommand[0], context.statusCommand[1]);
   }

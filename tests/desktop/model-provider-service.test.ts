@@ -54,7 +54,7 @@ function createEnv(homeDir: string): ControllerEnv {
     gatewayProbeEnabled: true,
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
-    defaultModelId: "anthropic/claude-sonnet-4",
+    defaultModelId: "link/gemini-3-flash-preview",
     analyticsStatePath: resolve(homeDir, "analytics-state.json"),
   };
 }
@@ -94,7 +94,7 @@ describe("ModelProviderService", () => {
     const config = await store.getConfig();
 
     expect(result.changed).toBe(false);
-    expect(config.runtime.defaultModelId).toBe("anthropic/claude-sonnet-4");
+    expect(config.runtime.defaultModelId).toBe("link/gemini-3-flash-preview");
   });
 
   it("reads cached cloud models without mutating config on read", async () => {
@@ -256,5 +256,58 @@ describe("ModelProviderService", () => {
     );
 
     expect(capturedIntervalMs).toBe(2000);
+  });
+
+  it("stores a dummy API key for ollama providers", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+
+    await service.upsertProvider("ollama", {
+      baseUrl: "http://127.0.0.1:11434",
+      enabled: true,
+      displayName: "Ollama",
+      modelsJson: JSON.stringify(["qwen2.5-coder:7b"]),
+    });
+
+    const provider = await store.getProvider("ollama");
+
+    expect(provider?.apiKey).toBe("ollama-local");
+    expect(provider?.baseUrl).toBe("http://127.0.0.1:11434");
+  });
+
+  it("verifies ollama providers via /api/tags", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("http://127.0.0.1:11434/api/tags");
+
+      return new Response(
+        JSON.stringify({
+          models: [{ name: "qwen2.5-coder:7b" }, { name: "llama3.2:latest" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("ollama", {
+        apiKey: "ollama-local",
+        baseUrl: "http://127.0.0.1:11434",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["qwen2.5-coder:7b", "llama3.2:latest"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

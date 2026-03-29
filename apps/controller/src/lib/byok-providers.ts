@@ -2,6 +2,7 @@ export const supportedByokProviderIds = [
   "anthropic",
   "openai",
   "google",
+  "ollama",
   "siliconflow",
   "ppio",
   "openrouter",

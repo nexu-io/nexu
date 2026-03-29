@@ -6,7 +6,13 @@ import { logger } from "../lib/logger.js";
 import type { SessionsRuntime } from "../runtime/sessions-runtime.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 
-type AnalyticsChannel = "wechat" | "feishu" | "slack" | "discord";
+type AnalyticsChannel =
+  | "wechat"
+  | "feishu"
+  | "slack"
+  | "discord"
+  | "telegram"
+  | "whatsapp";
 type AnalyticsSkillSource = "builtin" | "explore" | "custom";
 type InternalSkillSource = "curated" | "managed" | "custom";
 
@@ -70,7 +76,9 @@ function toAnalyticsChannel(
   if (
     channelType === "feishu" ||
     channelType === "slack" ||
-    channelType === "discord"
+    channelType === "discord" ||
+    channelType === "telegram" ||
+    channelType === "whatsapp"
   ) {
     return channelType;
   }

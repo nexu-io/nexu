@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir } from "node:fs/promises";
+import { access, cp, mkdir, readdir, rm } from "node:fs/promises";
 import path, { basename } from "node:path";
 import type { ControllerEnv } from "../app/env.js";
 
@@ -25,17 +25,34 @@ export class OpenClawRuntimePluginWriter {
         continue;
       }
 
+      const builtinPluginDir = this.env.openclawBuiltinExtensionsDir
+        ? path.join(this.env.openclawBuiltinExtensionsDir, entry.name)
+        : null;
+      const targetDir = path.join(this.env.openclawExtensionsDir, entry.name);
+      if (builtinPluginDir && (await this.exists(builtinPluginDir))) {
+        await rm(targetDir, { recursive: true, force: true });
+        continue;
+      }
+
       const sourceDir = path.join(
         this.env.runtimePluginTemplatesDir,
         entry.name,
       );
-      const targetDir = path.join(this.env.openclawExtensionsDir, entry.name);
       await cp(sourceDir, targetDir, {
         recursive: true,
         force: true,
         dereference: true,
         filter: (source) => basename(source) !== ".bin",
       });
+    }
+  }
+
+  private async exists(targetPath: string): Promise<boolean> {
+    try {
+      await access(targetPath);
+      return true;
+    } catch {
+      return false;
     }
   }
 }

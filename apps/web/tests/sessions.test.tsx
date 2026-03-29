@@ -401,6 +401,68 @@ describe("SessionsPage", () => {
     );
   });
 
+  it("renders WhatsApp session headers with the platform icon and open-chat action", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["session-meta", "sess-whatsapp"], {
+      id: "sess-whatsapp",
+      botId: "bot-whatsapp",
+      sessionKey: "sess-whatsapp",
+      channelId: "channel-whatsapp-1",
+      title: "Alice",
+      channelType: "whatsapp",
+      messageCount: 5,
+      lastMessageAt: "2026-03-20T08:58:00.000Z",
+      metadata: {},
+    });
+    queryClient.setQueryData(["chat-history", "sess-whatsapp"], {
+      messages: [
+        {
+          id: "msg-whatsapp-1",
+          role: "assistant",
+          content: "Hello from WhatsApp",
+          timestamp: new Date("2026-03-20T08:58:00.000Z").getTime(),
+          createdAt: "2026-03-20T08:58:00.000Z",
+        },
+      ],
+    });
+    queryClient.setQueryData(["channels"], {
+      channels: [
+        {
+          id: "channel-whatsapp-1",
+          channelType: "whatsapp",
+          accountId: "whatsapp-default",
+          teamName: "WhatsApp",
+          appId: null,
+          botUserId: null,
+          status: "connected",
+        },
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/workspace/sessions/sess-whatsapp"]}>
+          <Routes>
+            <Route path="/workspace/sessions/:id" element={<SessionsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('data-session-platform="whatsapp"');
+    expect(markup).toContain("<title>WhatsApp</title>");
+    expect(markup).toContain("WhatsApp · 5 messages");
+    expect(markup).toContain('href="https://web.whatsapp.com/"');
+    expect(markup).toContain("Open in WhatsApp");
+  });
+
   it("strips assistant reply markers and keeps tool-only activity visible", () => {
     const queryClient = new QueryClient({
       defaultOptions: {

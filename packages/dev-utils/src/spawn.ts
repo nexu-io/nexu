@@ -35,6 +35,8 @@ async function spawnWindowsHiddenProcess({
   env,
   logFilePath,
 }: SpawnHiddenProcessArgs): Promise<HiddenProcessHandle> {
+  const startedAt = Date.now();
+  const service = env.NEXU_DEV_SERVICE ?? "unknown";
   const launcherDirectory = await mkdtemp(getDevLauncherTempPrefix());
   const batchPath = getWindowsLauncherBatchPath(launcherDirectory);
   const launcherPath = getWindowsLauncherScriptPath(launcherDirectory);
@@ -53,6 +55,10 @@ async function spawnWindowsHiddenProcess({
 
   await writeFile(batchPath, `${batchSource}\r\n`, "utf8");
   await writeFile(launcherPath, `${launcherSource}\r\n`, "utf8");
+
+  console.log(
+    `[scripts-dev][spawn-hidden] service=${service} stage=launcher-prepared elapsedMs=${Date.now() - startedAt} dir=${launcherDirectory}`,
+  );
 
   const child = spawn(
     "wscript.exe",
@@ -74,6 +80,10 @@ async function spawnWindowsHiddenProcess({
     () => new Error("hidden process did not expose a pid"),
   );
   const pid = child.pid as number;
+
+  console.log(
+    `[scripts-dev][spawn-hidden] service=${service} stage=wscript-spawned elapsedMs=${Date.now() - startedAt} pid=${pid}`,
+  );
 
   child.once("exit", () => {
     void rm(launcherDirectory, { recursive: true, force: true });

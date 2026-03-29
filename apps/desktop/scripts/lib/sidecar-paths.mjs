@@ -44,6 +44,10 @@ export function shouldCopyRuntimeDependencies() {
   return value === "1" || value?.toLowerCase() === "true";
 }
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
 export async function linkOrCopyDirectory(
   sourcePath,
   targetPath,
@@ -216,6 +220,8 @@ export async function copyRuntimeDependencyClosure({
   targetNodeModules,
   dependencyNames,
 }) {
+  const closureStartedAt = performance.now();
+  let copiedPackageCount = 0;
   await mkdir(targetNodeModules, { recursive: true });
 
   const rootPackageJson = await readJson(resolve(packageRoot, "package.json"));
@@ -246,6 +252,7 @@ export async function copyRuntimeDependencyClosure({
       return;
     }
     seen.add(seenKey);
+    copiedPackageCount += 1;
 
     await mkdir(dirname(targetPackageRoot), { recursive: true });
     await rm(targetPackageRoot, { recursive: true, force: true });
@@ -298,4 +305,10 @@ export async function copyRuntimeDependencyClosure({
       destinationNodeModules: targetNodeModules,
     });
   }
+
+  console.log(
+    `[sidecar-paths][timing] copyRuntimeDependencyClosure packageRoot=${packageRoot} packages=${copiedPackageCount} duration=${formatDurationMs(
+      performance.now() - closureStartedAt,
+    )}`,
+  );
 }

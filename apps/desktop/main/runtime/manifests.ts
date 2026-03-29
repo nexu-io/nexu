@@ -25,6 +25,19 @@ function resolveElectronNodeRunner(): string {
   return process.execPath;
 }
 
+export async function ensurePackagedOpenclawSidecar(
+  runtimeSidecarBaseRoot: string,
+  runtimeRoot: string,
+  platformCapabilities: DesktopPlatformCapabilities,
+): Promise<string> {
+  return platformCapabilities.sidecarMaterializer.materializePackagedOpenclawSidecar(
+    {
+      runtimeSidecarBaseRoot,
+      runtimeRoot,
+    },
+  );
+}
+
 function isExternalRuntimeMode(runtimeConfig: DesktopRuntimeConfig): boolean {
   return runtimeConfig.runtimeMode === "external";
 }
@@ -43,11 +56,10 @@ export async function createRuntimeUnitManifests(
     : path.resolve(repoRoot, ".tmp/sidecars");
   const runtimeRoot = ensureDir(path.resolve(userDataPath, "runtime"));
   const openclawSidecarRoot = isPackaged
-    ? await platformCapabilities.sidecarMaterializer.materializePackagedOpenclawSidecar(
-        {
-          runtimeSidecarBaseRoot,
-          runtimeRoot,
-        },
+    ? await ensurePackagedOpenclawSidecar(
+        runtimeSidecarBaseRoot,
+        runtimeRoot,
+        platformCapabilities,
       )
     : path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const logsDir = ensureDir(path.resolve(userDataPath, "logs/runtime-units"));

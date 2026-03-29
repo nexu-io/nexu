@@ -6,6 +6,7 @@ import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
   type RuntimeEvent,
+  type StartupProbePayload,
   type UpdaterBridge,
   type UpdaterEvent,
   type UpdaterEventMap,
@@ -21,6 +22,42 @@ const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   useBuildConfig: !process.defaultApp,
 });
 const webviewPreloadUrl = new URL("./webview-preload.js", import.meta.url).href;
+
+function reportStartupProbe(payload: StartupProbePayload): void {
+  try {
+    ipcRenderer.send("host:startup-probe", payload);
+  } catch (error) {
+    console.error("[desktop] failed to report startup probe", error);
+  }
+}
+
+reportStartupProbe({
+  source: "preload",
+  stage: "preload:module-start",
+  status: "ok",
+});
+
+process.on("uncaughtException", (error) => {
+  reportStartupProbe({
+    source: "preload",
+    stage: "preload:uncaught-exception",
+    status: "error",
+    detail:
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  reportStartupProbe({
+    source: "preload",
+    stage: "preload:unhandled-rejection",
+    status: "error",
+    detail:
+      reason instanceof Error
+        ? (reason.stack ?? reason.message)
+        : String(reason),
+  });
+});
 
 const hostBridge: HostBridge = {
   bootstrap: {
@@ -41,6 +78,10 @@ const hostBridge: HostBridge = {
     return ipcRenderer.invoke("host:invoke", channel, payload) as Promise<
       HostInvokeResultMap[TChannel]
     >;
+  },
+
+  reportStartupProbe(payload) {
+    reportStartupProbe(payload);
   },
 
   onDesktopCommand(listener) {
@@ -76,6 +117,12 @@ const hostBridge: HostBridge = {
 
 contextBridge.exposeInMainWorld("nexuHost", hostBridge);
 
+reportStartupProbe({
+  source: "preload",
+  stage: "preload:bridge-exposed",
+  status: "ok",
+});
+
 const validUpdaterEvents = new Set<string>(updaterEvents);
 
 const updaterBridge: UpdaterBridge = {
@@ -103,3 +150,9 @@ const updaterBridge: UpdaterBridge = {
 };
 
 contextBridge.exposeInMainWorld("nexuUpdater", updaterBridge);
+
+reportStartupProbe({
+  source: "preload",
+  stage: "preload:updater-bridge-exposed",
+  status: "ok",
+});

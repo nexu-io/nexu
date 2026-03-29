@@ -1018,7 +1018,7 @@ export type GetApiV1ChannelsResponses = {
         channels: Array<{
             id: string;
             botId: string;
-            channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+            channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
             accountId: string;
             status: 'pending' | 'connected' | 'disconnected' | 'error';
             teamName: string;
@@ -1102,7 +1102,7 @@ export type PostApiV1ChannelsSlackConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1145,7 +1145,7 @@ export type PostApiV1ChannelsDiscordConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1188,7 +1188,7 @@ export type PostApiV1ChannelsFeishuConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1200,6 +1200,46 @@ export type PostApiV1ChannelsFeishuConnectResponses = {
 };
 
 export type PostApiV1ChannelsFeishuConnectResponse = PostApiV1ChannelsFeishuConnectResponses[keyof PostApiV1ChannelsFeishuConnectResponses];
+
+export type PostApiV1ChannelsTelegramConnectData = {
+    body: {
+        botToken: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/telegram/connect';
+};
+
+export type PostApiV1ChannelsTelegramConnectErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsTelegramConnectError = PostApiV1ChannelsTelegramConnectErrors[keyof PostApiV1ChannelsTelegramConnectErrors];
+
+export type PostApiV1ChannelsTelegramConnectResponses = {
+    /**
+     * Connected telegram channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsTelegramConnectResponse = PostApiV1ChannelsTelegramConnectResponses[keyof PostApiV1ChannelsTelegramConnectResponses];
 
 export type GetApiV1ChannelsByChannelIdStatusData = {
     body?: never;
@@ -1228,7 +1268,7 @@ export type GetApiV1ChannelsByChannelIdStatusResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1280,6 +1320,111 @@ export type DeleteApiV1ChannelsByChannelIdResponses = {
 
 export type DeleteApiV1ChannelsByChannelIdResponse = DeleteApiV1ChannelsByChannelIdResponses[keyof DeleteApiV1ChannelsByChannelIdResponses];
 
+export type PostApiV1ChannelsWhatsappQrStartData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/whatsapp/qr-start';
+};
+
+export type PostApiV1ChannelsWhatsappQrStartErrors = {
+    /**
+     * WhatsApp login unavailable
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWhatsappQrStartError = PostApiV1ChannelsWhatsappQrStartErrors[keyof PostApiV1ChannelsWhatsappQrStartErrors];
+
+export type PostApiV1ChannelsWhatsappQrStartResponses = {
+    /**
+     * QR code data for WhatsApp login
+     */
+    200: {
+        qrDataUrl?: string;
+        message: string;
+        accountId: string;
+        alreadyLinked?: boolean;
+    };
+};
+
+export type PostApiV1ChannelsWhatsappQrStartResponse = PostApiV1ChannelsWhatsappQrStartResponses[keyof PostApiV1ChannelsWhatsappQrStartResponses];
+
+export type PostApiV1ChannelsWhatsappQrWaitData = {
+    body: {
+        accountId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/whatsapp/qr-wait';
+};
+
+export type PostApiV1ChannelsWhatsappQrWaitErrors = {
+    /**
+     * WhatsApp login unavailable or timeout
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWhatsappQrWaitError = PostApiV1ChannelsWhatsappQrWaitErrors[keyof PostApiV1ChannelsWhatsappQrWaitErrors];
+
+export type PostApiV1ChannelsWhatsappQrWaitResponses = {
+    /**
+     * WhatsApp QR login result
+     */
+    200: {
+        connected: boolean;
+        message: string;
+        accountId: string;
+    };
+};
+
+export type PostApiV1ChannelsWhatsappQrWaitResponse = PostApiV1ChannelsWhatsappQrWaitResponses[keyof PostApiV1ChannelsWhatsappQrWaitResponses];
+
+export type PostApiV1ChannelsWhatsappConnectData = {
+    body: {
+        accountId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/whatsapp/connect';
+};
+
+export type PostApiV1ChannelsWhatsappConnectErrors = {
+    /**
+     * Connection failed
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWhatsappConnectError = PostApiV1ChannelsWhatsappConnectErrors[keyof PostApiV1ChannelsWhatsappConnectErrors];
+
+export type PostApiV1ChannelsWhatsappConnectResponses = {
+    /**
+     * Connected whatsapp channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsWhatsappConnectResponse = PostApiV1ChannelsWhatsappConnectResponses[keyof PostApiV1ChannelsWhatsappConnectResponses];
+
 export type PostApiV1ChannelsWechatQrStartData = {
     body?: never;
     path?: never;
@@ -1312,7 +1457,7 @@ export type PostApiV1ChannelsWechatQrStartResponses = {
 export type PostApiV1ChannelsWechatQrStartResponse = PostApiV1ChannelsWechatQrStartResponses[keyof PostApiV1ChannelsWechatQrStartResponses];
 
 export type PostApiV1ChannelsWechatQrWaitData = {
-    body?: {
+    body: {
         sessionKey: string;
     };
     path?: never;
@@ -1345,7 +1490,7 @@ export type PostApiV1ChannelsWechatQrWaitResponses = {
 export type PostApiV1ChannelsWechatQrWaitResponse = PostApiV1ChannelsWechatQrWaitResponses[keyof PostApiV1ChannelsWechatQrWaitResponses];
 
 export type PostApiV1ChannelsWechatConnectData = {
-    body?: {
+    body: {
         accountId: string;
     };
     path?: never;
@@ -1371,7 +1516,7 @@ export type PostApiV1ChannelsWechatConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat';
+        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1798,7 +1943,7 @@ export type GetApiV1ProvidersResponse = GetApiV1ProvidersResponses[keyof GetApiV
 export type DeleteApiV1ProvidersByProviderIdData = {
     body?: never;
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}';
@@ -1825,7 +1970,7 @@ export type PutApiV1ProvidersByProviderIdData = {
         modelsJson?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}';
@@ -1950,7 +2095,7 @@ export type PostApiV1ProvidersByProviderIdVerifyData = {
         baseUrl?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}/verify';

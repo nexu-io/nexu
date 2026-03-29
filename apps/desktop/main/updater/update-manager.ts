@@ -7,6 +7,12 @@ import type {
 } from "../../shared/host";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
 import { writeDesktopMainLog } from "../runtime/runtime-logger";
+import {
+  checkCriticalPathsLocked,
+  ensureNexuProcessesDead,
+  teardownLaunchdServices,
+} from "../services/launchd-bootstrap";
+import type { LaunchdManager } from "../services/launchd-manager";
 import { R2_BASE_URL } from "./component-updater";
 
 export interface UpdateManagerOptions {
@@ -16,6 +22,12 @@ export interface UpdateManagerOptions {
   autoDownload?: boolean;
   checkIntervalMs?: number;
   initialDelayMs?: number;
+  /** Launchd context — required for clean service teardown before update install */
+  launchd?: {
+    manager: LaunchdManager;
+    labels: { controller: string; openclaw: string };
+    plistDir: string;
+  };
 }
 
 function getMacFeedArch(arch: string = process.arch): "arm64" | "x64" {
@@ -87,8 +99,10 @@ export class UpdateManager {
   private readonly feedUrl: string | null;
   private readonly checkIntervalMs: number;
   private readonly initialDelayMs: number;
+  private readonly launchdCtx: UpdateManagerOptions["launchd"];
   private currentFeedUrl: string;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
+  private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -104,6 +118,7 @@ export class UpdateManager {
     this.feedUrl = options?.feedUrl ?? null;
     this.checkIntervalMs = options?.checkIntervalMs ?? 4 * 60 * 60 * 1000;
     this.initialDelayMs = options?.initialDelayMs ?? 60_000;
+    this.launchdCtx = options?.launchd;
     this.currentFeedUrl = getDefaultR2FeedUrl(this.channel);
 
     autoUpdater.autoDownload = options?.autoDownload ?? false;
@@ -261,10 +276,101 @@ export class UpdateManager {
   }
 
   async quitAndInstall(): Promise<void> {
-    await this.orchestrator.dispose();
-    if (process.platform === "win32") {
-      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    this.logCheck("quit-and-install: starting teardown", this.getDiagnostic());
+
+    // --- Phase 1: Best-effort cleanup ---
+    // Each step is wrapped in try/catch so a failure in one step never
+    // prevents the subsequent steps or the final install from proceeding.
+    // The verification gate in phase 2 is the real safety check.
+
+    // 0. Stop periodic update checks so they don't fire during teardown.
+    this.stopPeriodicCheck();
+
+    // 1a. Tear down launchd services (bootout + SIGKILL + delete ports file).
+    if (this.launchdCtx) {
+      try {
+        await teardownLaunchdServices({
+          launchd: this.launchdCtx.manager,
+          labels: this.launchdCtx.labels,
+          plistDir: this.launchdCtx.plistDir,
+        });
+      } catch (err) {
+        this.logCheck(
+          `quit-and-install: teardown failed, proceeding: ${err instanceof Error ? err.message : String(err)}`,
+          this.getDiagnostic(),
+        );
+      }
     }
+
+    // 1b. Dispose the orchestrator (stops non-launchd managed units like
+    // embedded web server, utility processes). These are child processes of
+    // the Electron main process and will be reaped by the OS on exit anyway,
+    // so failure here is non-critical.
+    try {
+      await this.orchestrator.dispose();
+    } catch (err) {
+      this.logCheck(
+        `quit-and-install: orchestrator dispose failed, proceeding: ${err instanceof Error ? err.message : String(err)}`,
+        this.getDiagnostic(),
+      );
+    }
+
+    // --- Phase 2: Process verification ---
+    // Two sweeps of SIGKILL to clear all Nexu sidecar processes. Uses both
+    // authoritative sources (launchd labels, runtime-ports.json) and pgrep.
+    let { clean, remainingPids } = await ensureNexuProcessesDead();
+
+    if (!clean) {
+      this.logCheck(
+        `quit-and-install: ${remainingPids.length} process(es) survived first sweep, retrying`,
+        this.getDiagnostic(),
+      );
+      ({ clean, remainingPids } = await ensureNexuProcessesDead({
+        timeoutMs: 5_000,
+        intervalMs: 200,
+      }));
+    }
+
+    if (clean) {
+      this.logCheck(
+        "quit-and-install: all processes confirmed dead, triggering install",
+        this.getDiagnostic(),
+      );
+    } else {
+      this.logCheck(
+        `quit-and-install: ${remainingPids.length} process(es) survived both sweeps (${remainingPids.join(", ")})`,
+        this.getDiagnostic(),
+      );
+    }
+
+    // --- Phase 3: Evidence-based install decision ---
+    // Even with surviving processes, the update may be safe if those
+    // processes don't hold file handles to critical update paths. Use
+    // lsof to check whether the .app bundle or extracted sidecar dirs
+    // are actually locked.
+    const { locked, lockedPaths } = await checkCriticalPathsLocked();
+
+    if (locked) {
+      // Critical paths are held open — installing now would fail or
+      // corrupt the app. Skip this attempt; electron-updater will
+      // re-detect the pending update on next launch.
+      this.logCheck(
+        `quit-and-install: ABORTING — critical paths still locked: ${lockedPaths.join(", ")}`,
+        this.getDiagnostic(),
+      );
+      return;
+    }
+
+    if (!clean) {
+      // Processes alive but no critical file handles — safe to proceed.
+      this.logCheck(
+        "quit-and-install: residual processes exist but no critical path locks, proceeding",
+        this.getDiagnostic(),
+      );
+    }
+
+    // Set force-quit flag so window close handlers don't intercept the exit
+    (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
     autoUpdater.quitAndInstall(false, true);
   }
 
@@ -279,11 +385,12 @@ export class UpdateManager {
   }
 
   startPeriodicCheck(): void {
-    if (this.timer) {
+    if (this.timer || this.initialTimer) {
       return;
     }
 
-    setTimeout(() => {
+    this.initialTimer = setTimeout(() => {
+      this.initialTimer = null;
       void this.checkNow();
       this.timer = setInterval(() => {
         void this.checkNow();
@@ -292,6 +399,10 @@ export class UpdateManager {
   }
 
   stopPeriodicCheck(): void {
+    if (this.initialTimer) {
+      clearTimeout(this.initialTimer);
+      this.initialTimer = null;
+    }
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;

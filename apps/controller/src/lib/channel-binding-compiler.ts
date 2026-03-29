@@ -4,6 +4,8 @@ import type {
   FeishuAccountConfig,
   OpenClawConfig,
   SlackAccountConfig,
+  TelegramAccountConfig,
+  WhatsappAccountConfig,
 } from "@nexu/shared";
 import type { BotResponse, ChannelResponse } from "@nexu/shared";
 
@@ -46,6 +48,8 @@ export function compileChannelsConfig(params: {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
   const feishuAccounts: Record<string, FeishuAccountConfig> = {};
+  const telegramAccounts: Record<string, TelegramAccountConfig> = {};
+  const whatsappAccounts: Record<string, WhatsappAccountConfig> = {};
   const wechatAccounts: Record<string, { enabled: boolean }> = {};
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
   const useSlackSocketMode =
@@ -91,6 +95,22 @@ export function compileChannelsConfig(params: {
 
     if (channel.channelType === "wechat") {
       wechatAccounts[channel.accountId] = { enabled: true };
+      continue;
+    }
+
+    if (channel.channelType === "telegram") {
+      telegramAccounts[channel.accountId] = {
+        enabled: true,
+        botToken: secret("botToken"),
+      };
+      continue;
+    }
+
+    if (channel.channelType === "whatsapp") {
+      whatsappAccounts[channel.accountId] = {
+        enabled: true,
+        authDir: secret("authDir") || undefined,
+      };
       continue;
     }
 
@@ -174,6 +194,39 @@ export function compileChannelsConfig(params: {
               scopes: true,
             },
             accounts: feishuAccounts,
+          },
+        }
+      : {}),
+    ...(Object.keys(telegramAccounts).length > 0
+      ? {
+          telegram: {
+            enabled: true,
+            dmPolicy: "open",
+            allowFrom: ["*"],
+            groupPolicy: "open",
+            groups: {
+              "*": {
+                requireMention: true,
+              },
+            },
+            accounts: telegramAccounts,
+          },
+        }
+      : {}),
+    ...(Object.keys(whatsappAccounts).length > 0
+      ? {
+          whatsapp: {
+            enabled: true,
+            dmPolicy: "open",
+            allowFrom: ["*"],
+            groupPolicy: "open",
+            groupAllowFrom: ["*"],
+            groups: {
+              "*": {
+                requireMention: true,
+              },
+            },
+            accounts: whatsappAccounts,
           },
         }
       : {}),

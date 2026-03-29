@@ -51,7 +51,7 @@ export function createApp(container: ControllerContainer) {
   app.doc("/openapi.json", {
     openapi: "3.1.0",
     info: {
-      title: "nexu Controller API",
+      title: "Nexu Controller API",
       version: "0.1.0",
     },
   });

@@ -6,10 +6,15 @@ import {
   connectDiscordSchema,
   connectFeishuSchema,
   connectSlackSchema,
+  connectTelegramSchema,
   connectWechatSchema,
+  connectWhatsappSchema,
   slackOAuthUrlResponseSchema,
   wechatQrStartResponseSchema,
   wechatQrWaitResponseSchema,
+  whatsappQrStartResponseSchema,
+  whatsappQrWaitRequestSchema,
+  whatsappQrWaitResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
@@ -208,6 +213,48 @@ export function registerChannelRoutes(
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/api/v1/channels/telegram/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          required: true,
+          content: { "application/json": { schema: connectTelegramSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected telegram channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectTelegram(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Telegram connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "get",
       path: "/api/v1/channels/{channelId}/status",
       tags: ["Channels"],
@@ -274,7 +321,134 @@ export function registerChannelRoutes(
     },
   );
 
-  // WeChat QR login flow
+  // WhatsApp QR login flow
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/whatsapp/qr-start",
+      tags: ["Channels"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: whatsappQrStartResponseSchema },
+          },
+          description: "QR code data for WhatsApp login",
+        },
+        502: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "WhatsApp login unavailable",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(await container.channelService.whatsappQrStart(), 200);
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to start WhatsApp QR login",
+          },
+          502,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/whatsapp/qr-wait",
+      tags: ["Channels"],
+      request: {
+        body: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: whatsappQrWaitRequestSchema,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: whatsappQrWaitResponseSchema },
+          },
+          description: "WhatsApp QR login result",
+        },
+        502: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "WhatsApp login unavailable or timeout",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        const { accountId } = c.req.valid("json");
+        return c.json(
+          await container.channelService.whatsappQrWait(accountId),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "WhatsApp QR login failed",
+          },
+          502,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/whatsapp/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          required: true,
+          content: { "application/json": { schema: connectWhatsappSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected whatsapp channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Connection failed",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        const { accountId } = c.req.valid("json");
+        return c.json(
+          await container.channelService.connectWhatsapp(accountId),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "WhatsApp connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
   app.openapi(
     createRoute({
       method: "post",
@@ -295,7 +469,7 @@ export function registerChannelRoutes(
     }),
     async (c) => {
       try {
-        const result = await container.gatewayService.wechatQrStart();
+        const result = await container.channelService.wechatQrStart();
         return c.json(result, 200);
       } catch (error) {
         return c.json(
@@ -318,6 +492,7 @@ export function registerChannelRoutes(
       tags: ["Channels"],
       request: {
         body: {
+          required: true,
           content: {
             "application/json": {
               schema: z.object({ sessionKey: z.string().min(1) }),
@@ -341,7 +516,7 @@ export function registerChannelRoutes(
     async (c) => {
       try {
         const { sessionKey } = c.req.valid("json");
-        const result = await container.gatewayService.wechatQrWait(sessionKey);
+        const result = await container.channelService.wechatQrWait(sessionKey);
         return c.json(result, 200);
       } catch (error) {
         return c.json(
@@ -362,6 +537,7 @@ export function registerChannelRoutes(
       tags: ["Channels"],
       request: {
         body: {
+          required: true,
           content: { "application/json": { schema: connectWechatSchema } },
         },
       },

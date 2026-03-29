@@ -22,6 +22,7 @@ import {
   cloudStatusResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
+import { resolveModelId } from "../lib/openclaw-config-compiler.js";
 import type { ControllerBindings } from "../types.js";
 
 const defaultModelBodySchema = z.object({ modelId: z.string() });
@@ -436,8 +437,11 @@ export function registerDesktopCompatRoutes(
       },
     }),
     async (c) => {
-      const modelId =
-        await container.runtimeModelStateService.getEffectiveModelId();
+      const config = await container.configStore.getConfig();
+      const rawModelId = config.runtime.defaultModelId;
+      const modelId = rawModelId
+        ? resolveModelId(config, container.env, rawModelId)
+        : null;
       return c.json({ modelId }, 200);
     },
   );

@@ -37,6 +37,12 @@ export type OpenclawDevSnapshot = {
   logFilePath?: string;
 };
 
+function logOpenclawTiming(stage: string, startedAt: number): void {
+  console.log(
+    `[scripts-dev][openclaw-timing] ${stage} elapsedMs=${Date.now() - startedAt}`,
+  );
+}
+
 function createOpenclawCommand(sessionId: string): {
   command: string;
   args: string[];
@@ -80,6 +86,7 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
 export async function startOpenclawDevProcess(options: {
   sessionId: string;
 }): Promise<OpenclawDevSnapshot> {
+  const startedAt = Date.now();
   const existingSnapshot = await getCurrentOpenclawDevSnapshot();
 
   ensure(existingSnapshot.status !== "running").orThrow(
@@ -95,10 +102,14 @@ export async function startOpenclawDevProcess(options: {
   const commandSpec = createOpenclawCommand(sessionId);
   const runtimeConfig = getScriptsDevRuntimeConfig();
 
+  logOpenclawTiming("start:entered", startedAt);
+
   await ensureParentDirectory(logFilePath);
   await ensureDirectory(runtimeConfig.openclawStateDir);
   await ensureParentDirectory(runtimeConfig.openclawConfigPath);
   await ensureDirectory(runtimeConfig.openclawLogDir);
+
+  logOpenclawTiming("filesystem-ready", startedAt);
 
   const processHandle = await spawnHiddenProcess({
     command: commandSpec.command,
@@ -117,9 +128,12 @@ export async function startOpenclawDevProcess(options: {
     logFilePath,
   });
 
+  logOpenclawTiming("spawn-hidden-process-returned", startedAt);
+
   try {
     if (processHandle.child) {
       await waitForProcessStart(processHandle.child, "openclaw dev process");
+      logOpenclawTiming("supervisor-process-start-confirmed", startedAt);
     }
   } finally {
     processHandle.dispose();
@@ -129,13 +143,18 @@ export async function startOpenclawDevProcess(options: {
     () => new Error("openclaw dev process did not expose a pid"),
   );
   const supervisorPid = processHandle.pid as number;
+  logOpenclawTiming(`supervisor-pid=${supervisorPid}`, startedAt);
   const listenerPid = await waitForOpenclawPortPid(supervisorPid);
+
+  logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);
 
   await writeDevLock(openclawDevLockPath, {
     pid: supervisorPid,
     runId,
     sessionId,
   });
+
+  logOpenclawTiming("lock-written", startedAt);
 
   return {
     service: "openclaw",

@@ -60,10 +60,19 @@ async function startDefaultStack(): Promise<void> {
 }
 
 async function stopDefaultStack(): Promise<void> {
-  await stopTarget("desktop");
-  await stopTarget("web");
-  await stopTarget("controller");
-  await stopTarget("openclaw");
+  for (const target of ["desktop", "web", "controller", "openclaw"] as const) {
+    try {
+      await stopTarget(target);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("is not running")) {
+        console.log(`[scripts-dev] ${target} already stopped`);
+        continue;
+      }
+
+      throw error;
+    }
+  }
 }
 
 async function restartDefaultStack(): Promise<void> {

@@ -1,7 +1,6 @@
 import { cp, readFile, writeFile } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
-  copyDirectoryTree,
   copyRuntimeDependencyClosure,
   getSidecarRoot,
   linkOrCopyDirectory,
@@ -24,21 +23,8 @@ const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const controllerNodeModules = resolve(controllerRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
 
-async function runTimedStep(label, action) {
-  const startedAt = Date.now();
-  console.log(`[controller-sidecar] step:start ${label}`);
-  try {
-    const result = await action();
-    console.log(
-      `[controller-sidecar] step:done ${label} durationMs=${Date.now() - startedAt}`,
-    );
-    return result;
-  } catch (error) {
-    console.log(
-      `[controller-sidecar] step:fail ${label} durationMs=${Date.now() - startedAt}`,
-    );
-    throw error;
-  }
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
 }
 
 async function ensureBuildArtifacts() {
@@ -64,42 +50,52 @@ async function ensureBuildArtifacts() {
 }
 
 async function prepareControllerSidecar() {
-  await runTimedStep("prepare_controller_sidecar", async () => {
-    await ensureBuildArtifacts();
-    await resetDir(sidecarRoot);
+  const startedAt = performance.now();
+  await ensureBuildArtifacts();
+  await resetDir(sidecarRoot);
 
-    await cp(controllerDistRoot, sidecarDistRoot, { recursive: true });
+  await cp(controllerDistRoot, sidecarDistRoot, { recursive: true });
 
-    if (await pathExists(controllerStaticRoot)) {
-      await copyDirectoryTree(controllerStaticRoot, sidecarStaticRoot, {
-        filter: ({ sourcePath }) => basename(sourcePath) !== ".bin",
-      });
-    }
+  if (await pathExists(controllerStaticRoot)) {
+    await cp(controllerStaticRoot, sidecarStaticRoot, {
+      recursive: true,
+      dereference: true,
+    });
+  }
 
-    const controllerPackageJson = JSON.parse(
-      await readFile(resolve(controllerRoot, "package.json"), "utf8"),
+  const controllerPackageJson = JSON.parse(
+    await readFile(resolve(controllerRoot, "package.json"), "utf8"),
+  );
+  const sidecarPackageJson = {
+    name: `${controllerPackageJson.name}-sidecar`,
+    private: true,
+    type: controllerPackageJson.type,
+  };
+
+  await writeFile(
+    sidecarPackageJsonPath,
+    `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
+  );
+
+  if (shouldCopyRuntimeDependencies()) {
+    await copyRuntimeDependencyClosure({
+      packageRoot: controllerRoot,
+      targetNodeModules: sidecarNodeModules,
+    });
+    console.log(
+      `[controller-sidecar][timing] prepareControllerSidecar duration=${formatDurationMs(
+        performance.now() - startedAt,
+      )}`,
     );
-    const sidecarPackageJson = {
-      name: `${controllerPackageJson.name}-sidecar`,
-      private: true,
-      type: controllerPackageJson.type,
-    };
+    return;
+  }
 
-    await writeFile(
-      sidecarPackageJsonPath,
-      `${JSON.stringify(sidecarPackageJson, null, 2)}\n`,
-    );
-
-    if (shouldCopyRuntimeDependencies()) {
-      await copyRuntimeDependencyClosure({
-        packageRoot: controllerRoot,
-        targetNodeModules: sidecarNodeModules,
-      });
-      return;
-    }
-
-    await linkOrCopyDirectory(controllerNodeModules, sidecarNodeModules);
-  });
+  await linkOrCopyDirectory(controllerNodeModules, sidecarNodeModules);
+  console.log(
+    `[controller-sidecar][timing] prepareControllerSidecar duration=${formatDurationMs(
+      performance.now() - startedAt,
+    )}`,
+  );
 }
 
 await prepareControllerSidecar();

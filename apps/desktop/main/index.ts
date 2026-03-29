@@ -735,11 +735,16 @@ app.whenReady().then(async () => {
   logStartupStep("installApplicationMenu:start");
   installApplicationMenu();
   logStartupStep("installApplicationMenu:done");
-  logStartupStep("registerIpcHandlers:start");
-  registerIpcHandlers(orchestrator, runtimeConfig, coldStartReady);
-  logStartupStep("registerIpcHandlers:done");
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   logStartupStep("DesktopDiagnosticsReporter:created");
+  logStartupStep("registerIpcHandlers:start");
+  registerIpcHandlers(
+    orchestrator,
+    runtimeConfig,
+    diagnosticsReporter,
+    coldStartReady,
+  );
+  logStartupStep("registerIpcHandlers:done");
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   logStartupStep("DesktopDiagnosticsReporter:started");
   sleepGuard = new SleepGuard({

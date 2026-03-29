@@ -9,6 +9,7 @@ import type {
   RuntimeEventQueryResult,
   RuntimeState,
   RuntimeUnitId,
+  StartupProbePayload,
   UpdateChannelName,
   UpdateSource,
 } from "@shared/host";
@@ -32,6 +33,10 @@ export async function exportDiagnostics(
   source: "diagnostics-page" | "help-menu" = "diagnostics-page",
 ): Promise<DiagnosticsExportResult> {
   return getHostBridge().invoke("diagnostics:export", { source });
+}
+
+export function reportStartupProbe(payload: StartupProbePayload): void {
+  getHostBridge().reportStartupProbe(payload);
 }
 
 export async function triggerMainProcessCrash(): Promise<void> {
