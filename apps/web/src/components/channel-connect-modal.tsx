@@ -220,6 +220,7 @@ export function ChannelConnectModal({
           toast.info(t("modal.channelConnected"));
         } else {
           toast.error(error.message ?? t("modal.connectFailed"));
+          onClose();
           return;
         }
       } else {
