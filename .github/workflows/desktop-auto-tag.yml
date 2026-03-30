@@ -7,6 +7,11 @@ name: Desktop Auto-Tag on Release PR Merge
 #
 # This bridges the gap between "merge Release PR" and "desktop-release.yml"
 # which triggers on tag push to build + sign + publish artifacts.
+#
+# IMPORTANT: Uses RELEASE_PAT (Personal Access Token) instead of GITHUB_TOKEN
+# for git push. Tags pushed by GITHUB_TOKEN don't trigger downstream workflows
+# (GitHub's anti-recursion safeguard), so we need a PAT to ensure
+# desktop-release.yml fires on the tag push event.
 
 on:
   pull_request:
@@ -28,6 +33,8 @@ jobs:
       - name: Checkout merged commit
         uses: actions/checkout@v4
         with:
+          # Use PAT for checkout so git push triggers downstream workflows
+          token: ${{ secrets.RELEASE_PAT }}
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
@@ -64,7 +71,7 @@ jobs:
       - name: Create GitHub Release with PR body as release notes
         if: steps.check.outputs.exists == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
 
