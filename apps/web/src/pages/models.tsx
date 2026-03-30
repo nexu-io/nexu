@@ -1619,20 +1619,20 @@ function ByokProviderDetail({
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Auto-fetch models if none available yet
       let models = displayModels;
-      if (models.length === 0 && effectiveApiKey) {
+      if (isOllama || effectiveApiKey || hasSavedApiKey) {
         const result = await verifyApiKey(
           providerId,
           effectiveApiKey,
           baseUrl || undefined,
         );
-        if (result.valid && result.models && result.models.length > 0) {
+        if (result.valid && result.models) {
           models = result.models;
           setVerifiedModels(result.models);
         }
       }
-      return saveProvider(providerId, {
+
+      await saveProvider(providerId, {
         apiKey: effectiveApiKey || undefined,
         baseUrl: baseUrl || null,
         displayName: meta.name,
@@ -1640,8 +1640,10 @@ function ByokProviderDetail({
         authMode: "apiKey",
         modelsJson: JSON.stringify(models),
       });
+
+      return { models };
     },
-    onSuccess: () => {
+    onSuccess: ({ models }) => {
       track("workspace_provider_save", {
         provider_name: providerId,
       });
@@ -1651,7 +1653,7 @@ function ByokProviderDetail({
       setIsEditingApiKey(false);
       markSetupComplete();
       // Auto-select preferred model if no model is currently selected
-      const preferred = selectPreferredModel(displayModels);
+      const preferred = selectPreferredModel(models);
       if (preferred) {
         onAutoSelectModel(getScopedByokModelId(preferred));
       }
