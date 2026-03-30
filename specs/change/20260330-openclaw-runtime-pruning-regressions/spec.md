@@ -29,7 +29,6 @@ created: '2026-03-30'
 - Keep pruning for low-risk packages, but treat `pdfjs-dist` and Playwright runtime support as required for supported Nexu workflows.
 
 ### Open Questions
-- For #431, is restoring `playwright-core` alone sufficient in Nexu packaging, or must the full Playwright package/browser-support path also be restored for the user-facing workflow?
 - Should the final fix remove these prune rules entirely or gate them behind an explicit lightweight-build mode?
 
 ### Success Criteria
@@ -50,11 +49,16 @@ created: '2026-03-30'
    - Prefer a prompt that requires actual PDF text extraction from the attachment itself, rather than asking about the file at a high level or relying on user-pasted text/images.
    - Expected failing symptom: the model refuses direct PDF reading and reports that the current environment is missing a PDF parsing dependency; at the runtime layer this corresponds to `Optional dependency pdfjs-dist is required for PDF extraction: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pdfjs-dist' imported from .`
    - Validation after a fix: repeat the same attached-PDF flow and confirm the model can extract and analyze the PDF contents directly instead of failing with a missing-PDF-dependency response.
+   - Post-fix validation status:
+     - Direct local-path attempts still failed when the PDF tool was pointed at files outside OpenClaw's allowed media directories (`Local media path is not under an allowed directory`), which is a separate sandbox/path-policy issue rather than a missing runtime dependency.
+     - URL-based validation now succeeds end-to-end: the agent downloaded `https://www.orimi.com/pdf-test.pdf`, called the `pdf` tool successfully, and returned parsed content from the document (`sessions/77da3690-21f7-4102-889d-cf5b30ac4818.jsonl:47-51`).
 2. **Issue #431 — Playwright runtime not available**
    - In the normal IM conversation entrypoint, ask a model to open a webpage and then perform a real browser interaction such as clicking a link/button, expanding a section, or reporting where a click navigates.
    - Prefer interaction-heavy prompts over plain webpage summarization, because simple “review this page” requests may succeed through non-Playwright fallback paths and do not reliably reproduce the bug.
    - Expected failing symptom: the model can sometimes open/read the page but refuses or fails the interaction step with an unsupported / browser-unavailable / missing-Playwright style response, matching OpenClaw's Playwright-unavailable error path.
    - Validation after a fix: repeat the same interaction prompt and confirm the runtime can execute the Playwright-backed action (for example, complete the click and report the resulting destination or changed page state) rather than returning an unsupported/browser-unavailable response.
+   - Post-fix validation status:
+     - Local validation succeeded: the agent opened `https://nettee.io/`, clicked the “全部文章 (26) →” entry, and correctly reported the resulting destination `https://nettee.io/zh/blog`, confirming Playwright-backed interaction now works in the local runtime.
 
 ### Key Findings
 - `openclaw-runtime/prune-runtime-paths.mjs:23-31` explicitly prunes `node_modules/pdfjs-dist`, and the file comment already warns this may break PDF parsing / attachment ingestion paths.
@@ -62,18 +66,21 @@ created: '2026-03-30'
 - Built OpenClaw bundles throw the exact missing-dependency error seen in #425 when `pdfjs-dist` cannot be imported.
 - `openclaw-runtime/prune-runtime-paths.mjs:54-59` explicitly prunes `node_modules/playwright-core`, and the file comment already warns this may break browser control / pw-ai / Playwright-backed automation.
 - OpenClaw docs state some browser features require Playwright and will return `Playwright is not available in this gateway build` when unavailable (`openclaw-runtime/node_modules/openclaw/docs/tools/browser.md:335-342`).
-- Current local runtime/sidecar trees do not contain `pdfjs-dist` or `playwright-core`, matching the prune rules and the observed failures.
+- PDF fallback also requires `@napi-rs/canvas`; pruning that subtree caused the PDF path to remain broken until it was restored alongside `pdfjs-dist`.
+- After updating Nexu-owned prune rules to keep `pdfjs-dist`, `@napi-rs`, and `playwright-core`, local validation now succeeds for URL-downloaded PDF parsing and Playwright-backed click/navigation flows.
+- The remaining direct-attachment/local-file PDF failures observed during validation were caused by OpenClaw's allowed-directory restriction for local media paths, not by missing runtime dependencies.
 
 ### Options Evaluated
 1. **Dependency pruning is the shared root cause** — recommended
    - Evidence directly links both issue symptoms to packages explicitly deleted by Nexu-owned prune rules.
-   - This matches both the runtime error strings and the desktop sidecar packaging flow.
+   - Restoring the pruned runtime dependencies resolved the local URL-based PDF flow and the Playwright interaction flow.
 2. **Only #425 is pruning-related, #431 is a separate browser integration issue**
-   - Less likely based on current evidence, but still possible if #431 additionally requires the full Playwright package or browser binaries beyond `playwright-core`.
+   - Current local validation does not support this anymore; Playwright interaction started working once the runtime pruning fix landed.
 
 ### Recommendation
 - Treat both issues as OpenClaw runtime pruning regressions first.
-- Fix and verify the pruning/packaging chain before investigating secondary browser-support gaps.
+- Keep `pdfjs-dist`, `@napi-rs`, and `playwright-core` in the Nexu runtime.
+- Treat any remaining attached/local PDF failures as a separate follow-up on file handoff / allowed-directory policy rather than on missing runtime dependencies.
 
 ## Design
 
