@@ -189,9 +189,9 @@ export async function createDarwinDesktopDevLaunchSpec(
   };
 }
 
-export async function findDarwinDesktopDevMainPid(): Promise<
-  number | undefined
-> {
+export async function findDarwinDesktopDevMainPid(
+  _launchId?: string,
+): Promise<number | undefined> {
   try {
     const result = await execFileAsync("ps", ["-axo", "pid=,ppid=,command="]);
     const parentPidText = result.stdout

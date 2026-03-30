@@ -1,3 +1,4 @@
+import { execFile, spawn } from "node:child_process";
 import {
   createNodeOptions,
   ensureParentDirectory,
@@ -16,6 +17,7 @@ import { ensure } from "@nexu/shared";
 
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
 import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
@@ -47,6 +49,13 @@ type DesktopLaunchEnv = {
   env: NodeJS.ProcessEnv;
   launchId: string;
 };
+
+type DetachedDesktopHandle = {
+  pid: number;
+  dispose: () => void;
+};
+
+const execFileAsync = promisify(execFile);
 
 async function ensureDesktopDependenciesReady(): Promise<void> {
   const [controllerSnapshot, webSnapshot] = await Promise.all([
@@ -105,14 +114,62 @@ function createDesktopViteCommand(): {
   };
 }
 
-async function waitForDesktopShutdown(previousPid?: number): Promise<void> {
+async function terminateDesktopPid(pid: number, force = false): Promise<void> {
+  if (process.platform === "win32") {
+    const args = ["/PID", String(pid), "/T"];
+
+    if (force) {
+      args.push("/F");
+    }
+
+    try {
+      await execFileAsync("taskkill.exe", args, { windowsHide: true });
+      return;
+    } catch {}
+  }
+
+  try {
+    process.kill(pid, force ? "SIGKILL" : "SIGTERM");
+  } catch {}
+}
+
+function spawnWindowsDetachedDesktopProcess(options: {
+  command: string;
+  args: string[];
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+}): DetachedDesktopHandle {
+  const child = spawn(options.command, options.args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: "ignore",
+    detached: true,
+    windowsHide: true,
+  });
+
+  if (!child.pid) {
+    throw new Error("desktop electron process did not expose a pid");
+  }
+
+  return {
+    pid: child.pid,
+    dispose: () => {
+      child.unref();
+    },
+  };
+}
+
+async function waitForDesktopShutdown(options?: {
+  previousPid?: number;
+  launchId?: string;
+}): Promise<void> {
   await waitFor(
     async () => {
-      if (previousPid && isProcessRunning(previousPid)) {
+      if (options?.previousPid && isProcessRunning(options.previousPid)) {
         throw new Error("desktop process is still shutting down");
       }
 
-      const desktopMainPid = await findDesktopDevMainPid();
+      const desktopMainPid = await findDesktopDevMainPid(options?.launchId);
       if (desktopMainPid) {
         throw new Error("desktop electron process is still shutting down");
       }
@@ -131,6 +188,26 @@ async function waitForDesktopShutdown(previousPid?: number): Promise<void> {
       delayMs: 250,
     },
   );
+}
+
+async function cleanupStaleDesktopDevServer(): Promise<void> {
+  try {
+    const vitePid = await getListeningPortPid(5180, "desktop dev server");
+    await terminateDesktopPid(vitePid);
+    await waitFor(
+      async () => {
+        await getListeningPortPid(5180, "desktop dev server");
+        throw new Error("desktop dev server listener is still active");
+      },
+      () => new Error("desktop dev server listener did not stop in time"),
+      {
+        attempts: 20,
+        delayMs: 250,
+      },
+    ).catch(() => {
+      return terminateDesktopPid(vitePid, true);
+    });
+  } catch {}
 }
 
 async function waitForDesktopBuildOutputs(startedAt: number): Promise<void> {
@@ -192,6 +269,7 @@ export async function startDesktopDevProcess(options: {
   });
 
   await ensureParentDirectory(logFilePath);
+  await cleanupStaleDesktopDevServer();
 
   const viteStartedAt = Date.now();
   const viteHandle = await spawnHiddenProcess({
@@ -242,32 +320,49 @@ export async function startDesktopDevProcess(options: {
     },
   });
 
-  const electronHandle = await spawnHiddenProcess({
-    command: electronLaunchSpec.command,
-    args: electronLaunchSpec.args,
-    cwd: electronLaunchSpec.cwd,
-    env: electronLaunchSpec.env,
-    logFilePath,
-    logger,
-  });
+  const desktopMainPid =
+    process.platform === "win32"
+      ? (() => {
+          const handle = spawnWindowsDetachedDesktopProcess({
+            command: electronLaunchSpec.command,
+            args: electronLaunchSpec.args,
+            cwd: electronLaunchSpec.cwd,
+            env: electronLaunchSpec.env,
+          });
+          handle.dispose();
+          return handle.pid;
+        })()
+      : await (async () => {
+          const electronHandle = await spawnHiddenProcess({
+            command: electronLaunchSpec.command,
+            args: electronLaunchSpec.args,
+            cwd: electronLaunchSpec.cwd,
+            env: electronLaunchSpec.env,
+            logFilePath,
+            logger,
+          });
 
-  electronHandle.dispose();
+          electronHandle.dispose();
 
-  const desktopMainPid = await waitFor(
-    async () => {
-      const pid = await findDesktopDevMainPid();
-      if (!pid) {
-        throw new Error("desktop electron main process was not detected yet");
-      }
+          return waitFor(
+            async () => {
+              const pid = await findDesktopDevMainPid(desktopLaunch.launchId);
+              if (!pid) {
+                throw new Error(
+                  "desktop electron main process was not detected yet",
+                );
+              }
 
-      return pid;
-    },
-    () => new Error("desktop electron main process did not start in time"),
-    {
-      attempts: 40,
-      delayMs: 250,
-    },
-  );
+              return pid;
+            },
+            () =>
+              new Error("desktop electron main process did not start in time"),
+            {
+              attempts: 40,
+              delayMs: 250,
+            },
+          );
+        })();
 
   await writeDevLock(desktopDevLockPath, {
     pid: desktopMainPid,
@@ -296,14 +391,12 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
     () => new Error("desktop dev process is not running"),
   );
 
-  await terminateDesktopDevProcesses(snapshot.pid);
+  await terminateDesktopDevProcesses(snapshot.pid, {
+    launchId: snapshot.launchId,
+  });
 
   if (snapshot.workerPid && isProcessRunning(snapshot.workerPid)) {
-    try {
-      process.kill(-snapshot.workerPid, "SIGTERM");
-    } catch {
-      process.kill(snapshot.workerPid, "SIGTERM");
-    }
+    await terminateDesktopPid(snapshot.workerPid);
   }
 
   try {
@@ -312,23 +405,23 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
       "desktop dev server",
     );
     if (isProcessRunning(desktopVitePid)) {
-      try {
-        process.kill(-desktopVitePid, "SIGTERM");
-      } catch {
-        process.kill(desktopVitePid, "SIGTERM");
-      }
+      await terminateDesktopPid(desktopVitePid);
     }
   } catch {}
 
   try {
-    await waitForDesktopShutdown(snapshot.pid);
+    await waitForDesktopShutdown({
+      previousPid: snapshot.pid,
+      launchId: snapshot.launchId,
+    });
   } catch {
-    await terminateDesktopDevProcesses(snapshot.pid, { force: true });
+    await terminateDesktopDevProcesses(snapshot.pid, {
+      force: true,
+      launchId: snapshot.launchId,
+    });
 
     if (snapshot.workerPid && isProcessRunning(snapshot.workerPid)) {
-      try {
-        process.kill(snapshot.workerPid, "SIGKILL");
-      } catch {}
+      await terminateDesktopPid(snapshot.workerPid, true);
     }
 
     try {
@@ -336,10 +429,13 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
         5180,
         "desktop dev server",
       );
-      process.kill(desktopVitePid, "SIGKILL");
+      await terminateDesktopPid(desktopVitePid, true);
     } catch {}
 
-    await waitForDesktopShutdown(snapshot.pid);
+    await waitForDesktopShutdown({
+      previousPid: snapshot.pid,
+      launchId: snapshot.launchId,
+    });
   }
 
   await removeDevLock(desktopDevLockPath);
@@ -365,7 +461,7 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
     const logFilePath = getDesktopDevLogPath(lock.runId);
 
     if (!isProcessRunning(lock.pid)) {
-      const desktopMainPid = await findDesktopDevMainPid();
+      const desktopMainPid = await findDesktopDevMainPid(lock.launchId);
 
       if (desktopMainPid) {
         return {

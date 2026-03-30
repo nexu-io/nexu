@@ -59,12 +59,14 @@ export async function createDesktopElectronLaunchSpec(
   }
 }
 
-export async function findDesktopDevMainPid(): Promise<number | undefined> {
+export async function findDesktopDevMainPid(
+  launchId?: string,
+): Promise<number | undefined> {
   switch (process.platform) {
     case "darwin":
       return findDarwinDesktopDevMainPid();
     case "win32":
-      return findWindowsDesktopDevMainPid();
+      return findWindowsDesktopDevMainPid(launchId);
     default:
       throw new Error(
         `Unsupported platform for desktop dev process lookup: ${process.platform}`,
@@ -74,7 +76,7 @@ export async function findDesktopDevMainPid(): Promise<number | undefined> {
 
 export async function terminateDesktopDevProcesses(
   pid?: number,
-  options?: { force?: boolean },
+  options?: { force?: boolean; launchId?: string },
 ): Promise<void> {
   switch (process.platform) {
     case "darwin":
