@@ -117,17 +117,6 @@ body {
   display: none !important;
 }
 
-/* ── Hide default appearance toggle (replaced by ThemeToggle icon button) ── */
-
-.VPNavBarAppearance {
-  display: none !important;
-}
-
-/* ── Hide default language switcher (replaced by LanguageSwitcher component) ── */
-
-.VPNavBarTranslations {
-  display: none !important;
-}
 
 /* ── Prev / Next page navigation ── */
 

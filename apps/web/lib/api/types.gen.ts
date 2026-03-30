@@ -2091,7 +2091,7 @@ export type PostApiV1ProvidersMinimaxOauthLoginResponse = PostApiV1ProvidersMini
 
 export type PostApiV1ProvidersByProviderIdVerifyData = {
     body?: {
-        apiKey: string;
+        apiKey?: string;
         baseUrl?: string;
     };
     path: {

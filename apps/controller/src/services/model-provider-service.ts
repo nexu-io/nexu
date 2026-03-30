@@ -565,6 +565,12 @@ export class ModelProviderService {
       return { valid: false, error: "Unsupported provider" };
     }
 
+    const storedProvider = await this.configStore.getProvider(providerId);
+    const apiKey =
+      input.apiKey !== undefined
+        ? input.apiKey.trim()
+        : storedProvider?.apiKey || "";
+
     const verifyUrl =
       buildProviderUrl(
         input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
@@ -577,8 +583,8 @@ export class ModelProviderService {
     try {
       if (providerId === "ollama") {
         const headers: Record<string, string> = {};
-        if (input.apiKey && input.apiKey !== OLLAMA_DUMMY_API_KEY) {
-          headers.Authorization = `Bearer ${input.apiKey}`;
+        if (apiKey && apiKey !== OLLAMA_DUMMY_API_KEY) {
+          headers.Authorization = `Bearer ${apiKey}`;
         }
 
         const response = await proxyFetch(
@@ -608,13 +614,17 @@ export class ModelProviderService {
         };
       }
 
+      if (!apiKey) {
+        return { valid: false, error: "API key required" };
+      }
+
       const headers: Record<string, string> =
         providerId === "anthropic"
           ? {
-              "x-api-key": input.apiKey,
+              "x-api-key": apiKey,
               "anthropic-version": "2023-06-01",
             }
-          : { Authorization: `Bearer ${input.apiKey}` };
+          : { Authorization: `Bearer ${apiKey}` };
 
       const response = await proxyFetch(verifyUrl, {
         headers,

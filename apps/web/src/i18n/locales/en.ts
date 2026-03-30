@@ -326,6 +326,9 @@ const en = {
   "models.byok.none": "None",
   "models.byok.refreshModels": "Refresh",
   "models.byok.fetchingModels": "Fetching models...",
+  "models.byok.refreshSuccess": "Model list refreshed: {{count}} models",
+  "models.byok.refreshFailed":
+    "Failed to refresh model list. Please try again.",
   "models.byok.updateConfig": "Update configuration",
   "models.byok.saveAndEnable": "Save",
   "models.byok.remove": "Remove",
@@ -367,6 +370,8 @@ const en = {
   "channels.comingSoon": "Microsoft Teams, Line and more coming soon",
   "channels.backToConfig": "Back to configuration",
   "channels.statusConnected": "{{platform}} Bot Connected",
+  "channels.statusConnecting": "Connecting...",
+  "channels.statusError": "Connection Error",
   "channels.configuredDate": "configured {{date}}",
   "channels.connectionActive": "connection active",
   "channels.setupGuide": "Setup Guide",

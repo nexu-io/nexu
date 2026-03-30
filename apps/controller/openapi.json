@@ -5697,10 +5697,7 @@
                   "baseUrl": {
                     "type": "string"
                   }
-                },
-                "required": [
-                  "apiKey"
-                ]
+                }
               }
             }
           }

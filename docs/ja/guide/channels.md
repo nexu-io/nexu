@@ -7,3 +7,5 @@ nexu は複数のチャットチャンネルを同時にサポートします。
 - [Feishu](/ja/guide/channels/feishu)
 - [Slack](/ja/guide/channels/slack)
 - [Discord](/ja/guide/channels/discord)
+- [Telegram](/ja/guide/channels/telegram) 🆕
+- [WhatsApp](/ja/guide/channels/whatsapp) 🆕
