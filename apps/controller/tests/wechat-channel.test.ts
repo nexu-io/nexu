@@ -174,7 +174,7 @@ describe("WeChat connect/disconnect lifecycle", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("connectWechat syncs config and waits for readiness", async () => {
+  it("connectWechat returns immediately without blocking on readiness", async () => {
     const channel = await service.connectWechat("test-account");
 
     expect(configStore.connectWechat).toHaveBeenCalledWith({
@@ -183,24 +183,24 @@ describe("WeChat connect/disconnect lifecycle", () => {
     expect(syncService.writePlatformTemplatesForBot).toHaveBeenCalledWith(
       "bot-1",
     );
-    expect(syncService.syncAll).toHaveBeenCalled();
-    expect(gatewayService.getChannelReadiness).toHaveBeenCalledWith(
-      "wechat",
-      "test-account",
-    );
+    expect(syncService.syncAll).toHaveBeenCalledTimes(1);
+    // Must NOT poll readiness — that blocks the connect modal and risks
+    // a rollback that triggers additional config writes + restarts.
+    expect(gatewayService.getChannelReadiness).not.toHaveBeenCalled();
     expect(channel.channelType).toBe("wechat");
   });
 
-  it("connectWechat polls readiness until ready", async () => {
-    let callCount = 0;
-    gatewayService.getChannelReadiness.mockImplementation(async () => {
-      callCount++;
-      return { ready: callCount >= 3 };
+  it("connectWechat does not rollback on slow runtime startup", async () => {
+    gatewayService.getChannelReadiness.mockResolvedValue({
+      ready: false,
+      lastError: "monitor failed to start",
     });
 
-    await service.connectWechat("test-account");
+    const channel = await service.connectWechat("slow-account");
 
-    expect(callCount).toBeGreaterThanOrEqual(3);
+    expect(channel.channelType).toBe("wechat");
+    expect(configStore.disconnectChannel).not.toHaveBeenCalled();
+    expect(syncService.syncAll).toHaveBeenCalledTimes(1);
   });
 
   it("disconnectChannel calls syncAll after unbinding", async () => {
@@ -211,8 +211,6 @@ describe("WeChat connect/disconnect lifecycle", () => {
   });
 
   it("disconnectChannel does not delete credential files directly", async () => {
-    // Disconnect is a pure unbind — credential cleanup is delegated to
-    // the config writer's authoritative index sync + orphan sweep.
     const accountsDir = path.join(tmpDir, "openclaw-weixin", "accounts");
     mkdirSync(accountsDir, { recursive: true });
     writeFileSync(
@@ -222,49 +220,8 @@ describe("WeChat connect/disconnect lifecycle", () => {
 
     await service.disconnectChannel("ch-1");
 
-    // Files still exist — writer will clean them on next sync
     expect(existsSync(path.join(accountsDir, "abc123-im-bot.json"))).toBe(true);
   });
-
-  it("connectWechat rolls back on readiness timeout", async () => {
-    gatewayService.getChannelReadiness.mockResolvedValue({
-      ready: false,
-      lastError: "monitor failed to start",
-    });
-
-    await expect(service.connectWechat("fail-account")).rejects.toThrow(
-      "monitor failed to start",
-    );
-
-    // Should have disconnected the channel
-    expect(configStore.disconnectChannel).toHaveBeenCalledWith("ch-1");
-    // syncAll called twice: once for connect, once for rollback
-    expect(syncService.syncAll).toHaveBeenCalledTimes(2);
-  }, 35_000);
-
-  it("connectWechat rollback cleans up credential files", async () => {
-    const accountId = "fail-account";
-    const accountsDir = path.join(tmpDir, "openclaw-weixin", "accounts");
-    const indexPath = path.join(tmpDir, "openclaw-weixin", "accounts.json");
-    mkdirSync(accountsDir, { recursive: true });
-
-    // Seed credential as if wechatQrWait wrote it just before connectWechat
-    writeFileSync(
-      path.join(accountsDir, `${accountId}.json`),
-      JSON.stringify({ token: "tok" }),
-    );
-    writeFileSync(indexPath, JSON.stringify([accountId]));
-
-    gatewayService.getChannelReadiness.mockResolvedValue({
-      ready: false,
-      lastError: "timeout",
-    });
-
-    await expect(service.connectWechat(accountId)).rejects.toThrow("timeout");
-
-    // Rollback IS destructive — credentials for a failed connect are useless
-    expect(existsSync(path.join(accountsDir, `${accountId}.json`))).toBe(false);
-  }, 35_000);
 });
 
 // ---------------------------------------------------------------------------

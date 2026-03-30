@@ -763,18 +763,12 @@ export class ChannelService {
     const channel = await this.configStore.connectWechat({ accountId });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
-    const readiness = await this.waitForWechatReady(accountId);
-    if (!readiness.ready) {
-      // Rollback: disconnect the channel so the user doesn't see a
-      // "connected" channel that can't actually receive messages.
-      await this.configStore.disconnectChannel(channel.id);
-      this.cleanupWechatAccountState(accountId);
-      await this.syncService.syncAll();
-      throw new Error(
-        readiness.lastError ??
-          "WeChat linked, but the runtime failed to start the listener.",
-      );
-    }
+    // Don't block on readiness — the prewarm hot-reload + monitor startup
+    // can take 15-30s depending on the previous long-poll cycle. Blocking
+    // here keeps the connect modal open and risks a rollback that triggers
+    // yet another config write + channel restart (making things worse).
+    // The home page's live-status polling (every 3s) shows the real-time
+    // "connecting → connected" transition instead.
     return channel;
   }
 
@@ -1215,47 +1209,6 @@ export class ChannelService {
       await sleep(WHATSAPP_READY_POLL_MS);
       lastReadiness = await this.gatewayService.getChannelReadiness(
         "whatsapp",
-        accountId,
-      );
-    }
-    return lastReadiness;
-  }
-
-  /**
-   * Remove credential and sync files for a WeChat account.
-   * Index cleanup is NOT done here — the authoritative config writer
-   * handles index reconciliation during syncAll().
-   */
-  private cleanupWechatAccountState(accountId: string) {
-    const stateDir = this.env.openclawStateDir;
-    if (!stateDir) return;
-
-    const accountsDir = path.join(stateDir, "openclaw-weixin", "accounts");
-    for (const suffix of [".json", ".sync.json"]) {
-      try {
-        rmSync(path.join(accountsDir, `${accountId}${suffix}`));
-      } catch {
-        // ignore if not found
-      }
-    }
-  }
-
-  private async waitForWechatReady(accountId: string) {
-    // With the prewarm account, hot-reload takes ~500ms-2s.
-    // Without prewarm (first ever), full restart takes ~20-45s.
-    // Use a generous deadline but poll frequently for fast path.
-    const deadline = Date.now() + 30_000;
-    let lastReadiness = await this.gatewayService.getChannelReadiness(
-      "wechat",
-      accountId,
-    );
-    while (Date.now() < deadline) {
-      if (lastReadiness.ready) {
-        return lastReadiness;
-      }
-      await sleep(1000);
-      lastReadiness = await this.gatewayService.getChannelReadiness(
-        "wechat",
         accountId,
       );
     }
