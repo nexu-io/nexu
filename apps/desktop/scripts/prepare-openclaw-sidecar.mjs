@@ -41,8 +41,16 @@ const buildCacheRoot = resolve(
   process.env.NEXU_DEV_CACHE_DIR ?? resolve(repoRoot, ".cache", "nexu-dev"),
 );
 const openclawSidecarCacheRoot = resolve(buildCacheRoot, "openclaw-sidecar");
-const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-03-29-openclaw-sidecar-cache-v1";
-const OPENCLAW_SIDECAR_ARCHIVE_FORMAT = "tar.gz";
+const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-03-30-openclaw-sidecar-cache-v2";
+const OPENCLAW_SIDECAR_ARCHIVE_FORMAT =
+  resolveBuildTargetPlatform({
+    env: process.env,
+    platform: process.platform,
+  }) === "win"
+    ? "zip"
+    : "tar.gz";
+const OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME =
+  OPENCLAW_SIDECAR_ARCHIVE_FORMAT === "zip" ? "payload.zip" : "payload.tar.gz";
 const REPLY_OUTCOME_HELPER_SEARCH = `
 const sessionKey = ctx.SessionKey;
 	const startTime = diagnosticsEnabled ? Date.now() : 0;
@@ -443,11 +451,26 @@ async function tryRestoreCachedArchivedOpenclawSidecar(fingerprint) {
   const cacheEntryRoot = getOpenclawSidecarCacheEntryRoot(fingerprint);
   const cachedSidecarRoot = resolve(cacheEntryRoot, "sidecar");
 
+  const archiveMetadataPath = resolve(cachedSidecarRoot, "archive.json");
   if (
-    !(await pathExists(resolve(cachedSidecarRoot, "payload.tar.gz"))) ||
-    !(await pathExists(resolve(cachedSidecarRoot, "archive.json"))) ||
+    !(await pathExists(archiveMetadataPath)) ||
     !(await pathExists(resolve(cachedSidecarRoot, "package.json"))) ||
     !(await pathExists(resolve(cacheEntryRoot, "manifest.json")))
+  ) {
+    return false;
+  }
+
+  let archiveMetadata;
+  try {
+    archiveMetadata = JSON.parse(await readFile(archiveMetadataPath, "utf8"));
+  } catch {
+    return false;
+  }
+
+  if (
+    !archiveMetadata ||
+    typeof archiveMetadata.path !== "string" ||
+    !(await pathExists(resolve(cachedSidecarRoot, archiveMetadata.path)))
   ) {
     return false;
   }
@@ -473,7 +496,7 @@ async function writeOpenclawSidecarCacheEntry(fingerprint) {
     openclawSidecarCacheRoot,
     `.stage-${fingerprint}`,
   );
-  const payloadPath = resolve(sidecarRoot, "payload.tar.gz");
+  const payloadPath = resolve(sidecarRoot, OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME);
   const payloadStats = await stat(payloadPath);
 
   await removePathIfExists(cacheStageRoot);
@@ -511,6 +534,21 @@ function isNativeBinaryCandidate(filePath) {
     nativeBinaryNamePattern.test(baseName) ||
     nativeBinaryBasenames.has(baseName)
   );
+}
+
+async function createOpenclawSidecarArchive(archivePath) {
+  if (OPENCLAW_SIDECAR_ARCHIVE_FORMAT === "zip") {
+    const quotedSidecarRoot = sidecarRoot.replace(/'/gu, "''");
+    const quotedArchivePath = archivePath.replace(/'/gu, "''");
+    await run("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      `Add-Type -AssemblyName 'System.IO.Compression.FileSystem'; if (Test-Path -LiteralPath '${quotedArchivePath}') { Remove-Item -LiteralPath '${quotedArchivePath}' -Force }; [System.IO.Compression.ZipFile]::CreateFromDirectory('${quotedSidecarRoot}', '${quotedArchivePath}', [System.IO.Compression.CompressionLevel]::Optimal, $false)`,
+    ]);
+    return;
+  }
+
+  await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
 }
 
 async function resolveCodesignIdentity() {
@@ -1053,7 +1091,7 @@ exit 127
   if (shouldCopyRuntimeDependencies() && shouldArchiveOpenclawSidecar) {
     const archivePath = resolve(
       dirname(sidecarRoot),
-      "openclaw-sidecar.tar.gz",
+      `openclaw-sidecar.${OPENCLAW_SIDECAR_ARCHIVE_FORMAT}`,
     );
     await timedStep("archive openclaw sidecar", async () => {
       await removePathIfExists(archivePath);
@@ -1061,7 +1099,7 @@ exit 127
       console.log(
         `[openclaw-sidecar][probe] pre-archive files=${preArchiveStats.fileCount} bytes=${preArchiveStats.totalBytes} (${formatBytes(preArchiveStats.totalBytes)})`,
       );
-      await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
+      await createOpenclawSidecarArchive(archivePath);
       const archiveStats = await stat(archivePath);
       console.log(
         `[openclaw-sidecar][probe] archive bytes=${archiveStats.size} (${formatBytes(archiveStats.size)}) ratio=${(archiveStats.size / Math.max(preArchiveStats.totalBytes, 1)).toFixed(3)}`,
@@ -1071,8 +1109,8 @@ exit 127
         resolve(sidecarRoot, "archive.json"),
         `${JSON.stringify(
           {
-            format: "tar.gz",
-            path: "payload.tar.gz",
+            format: OPENCLAW_SIDECAR_ARCHIVE_FORMAT,
+            path: OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME,
           },
           null,
           2,
@@ -1082,7 +1120,10 @@ exit 127
         resolve(sidecarRoot, "package.json"),
         '{\n  "name": "openclaw-sidecar",\n  "private": true\n}\n',
       );
-      await rename(archivePath, resolve(sidecarRoot, "payload.tar.gz"));
+      await rename(
+        archivePath,
+        resolve(sidecarRoot, OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME),
+      );
       await writeOpenclawSidecarCacheEntry(cacheFingerprint);
     });
   } else if (shouldCopyRuntimeDependencies()) {

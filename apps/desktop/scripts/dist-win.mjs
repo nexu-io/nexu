@@ -138,8 +138,8 @@ async function ensureExistingSidecars(runtimeDistRoot) {
       "controller sidecar",
     ),
     ensureExistingPath(
-      resolve(runtimeDistRoot, "openclaw", "payload.tar.gz"),
-      "openclaw sidecar archive",
+      resolve(runtimeDistRoot, "openclaw", "archive.json"),
+      "openclaw sidecar archive metadata",
     ),
     ensureExistingPath(
       resolve(runtimeDistRoot, "web", "package.json"),
