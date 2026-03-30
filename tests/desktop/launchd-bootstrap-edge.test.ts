@@ -313,12 +313,12 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     >;
 
     existsSync.mockImplementation((target: string) => {
-      if (target.endsWith(".version-stamp")) return true;
+      if (target.endsWith(".nexu-runner-version")) return true;
       if (target.includes("nexu-runner.app/Contents/MacOS/Nexu")) return true;
       return target.endsWith("Info.plist");
     });
     readFileSync.mockImplementation((target: string) => {
-      if (target.endsWith(".version-stamp")) return "1.2.3";
+      if (target.endsWith(".nexu-runner-version")) return "1.2.3";
       return "";
     });
 
@@ -363,6 +363,13 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
 
     existsSync.mockImplementation((target: string) => {
       if (target.endsWith("nexu-runner.app.staging")) return true;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
       if (target.endsWith("Info.plist")) return true;
       return false;
     });
@@ -387,6 +394,165 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
       "/Users/testuser/.nexu/runtime/nexu-runner.app.staging",
       "/Users/testuser/.nexu/runtime/nexu-runner.app",
     );
+  });
+
+  it("clones the full app bundle so signed runner resources stay intact", async () => {
+    vi.clearAllMocks();
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith(".nexu-runner-version")) return false;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
+      if (target.endsWith("Info.plist")) return true;
+      return false;
+    });
+    readFileSync.mockReturnValue("");
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await ensureExternalNodeRunner(
+      "/Applications/Nexu.app/Contents",
+      "/Users/testuser/.nexu",
+      "1.0.0",
+    );
+
+    expect(mockExecFile).toHaveBeenCalledWith(
+      "cp",
+      [
+        "-Rc",
+        "/Applications/Nexu.app",
+        "/Users/testuser/.nexu/runtime/nexu-runner.app.staging",
+      ],
+      expect.any(Function),
+    );
+    expect(mockExecFile).not.toHaveBeenCalledWith(
+      "cp",
+      ["-c", "/Applications/Nexu.app/Contents/MacOS/Nexu", expect.any(String)],
+      expect.any(Function),
+    );
+  });
+
+  it("writes version stamp outside .app bundle to preserve code signature", async () => {
+    vi.clearAllMocks();
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    const writeFileSync = fsMock.writeFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith(".nexu-runner-version")) return false;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
+      return false;
+    });
+    readFileSync.mockReturnValue("");
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await ensureExternalNodeRunner(
+      "/Applications/Nexu.app/Contents",
+      "/Users/testuser/.nexu",
+      "2.0.0",
+    );
+
+    // Stamp must be a sibling of the .app bundle, NOT inside it.
+    // Writing inside the bundle breaks codesign sealed resources.
+    const stampCalls = writeFileSync.mock.calls.filter(
+      (call: unknown[]) =>
+        typeof call[0] === "string" &&
+        (call[0] as string).includes("nexu-runner"),
+    );
+    expect(stampCalls).toHaveLength(1);
+    const stampPath = stampCalls[0][0] as string;
+    expect(stampPath).toBe(
+      "/Users/testuser/.nexu/runtime/.nexu-runner-version",
+    );
+    // Must NOT be inside the .app bundle
+    expect(stampPath).not.toContain("nexu-runner.app/");
+    expect(stampCalls[0][1]).toBe("2.0.0");
+  });
+
+  it("writes version stamp after atomic swap, not before", async () => {
+    vi.clearAllMocks();
+    const fsMock = await import("node:fs");
+    const fspMock = await import("node:fs/promises");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    const writeFileSync = fsMock.writeFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    const rename = fspMock.rename as unknown as ReturnType<typeof vi.fn>;
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith(".nexu-runner-version")) return false;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/Nexu",
+        )
+      ) {
+        return true;
+      }
+      return false;
+    });
+    readFileSync.mockReturnValue("");
+
+    // Track call order
+    const callOrder: string[] = [];
+    rename.mockImplementation(() => {
+      callOrder.push("rename");
+      return Promise.resolve();
+    });
+    writeFileSync.mockImplementation((...args: unknown[]) => {
+      if (
+        typeof args[0] === "string" &&
+        (args[0] as string).includes("nexu-runner")
+      ) {
+        callOrder.push("writeStamp");
+      }
+    });
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await ensureExternalNodeRunner(
+      "/Applications/Nexu.app/Contents",
+      "/Users/testuser/.nexu",
+      "3.0.0",
+    );
+
+    // Stamp must be written AFTER the atomic rename, so a crash during
+    // extraction leaves no stale stamp pointing at a half-built bundle.
+    const renameIdx = callOrder.indexOf("rename");
+    const stampIdx = callOrder.indexOf("writeStamp");
+    expect(renameIdx).toBeGreaterThanOrEqual(0);
+    expect(stampIdx).toBeGreaterThanOrEqual(0);
+    expect(stampIdx).toBeGreaterThan(renameIdx);
   });
 });
 
@@ -473,6 +639,154 @@ describe("checkCriticalPathsLocked", () => {
 
     expect(result.locked).toBe(false);
     expect(result.lockedPaths).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// External runner path stability
+// ---------------------------------------------------------------------------
+
+describe("external runner — path stability and edge cases", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("version upgrade triggers re-extraction (old stamp !== new version)", async () => {
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    // Mock: stamp exists with old version, binary exists, Info.plist exists
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith(".nexu-runner-version")) return true;
+      if (target.includes("MacOS/Nexu")) return true;
+      if (target.endsWith("Info.plist")) return true;
+      return false;
+    });
+    readFileSync.mockImplementation((target: string) => {
+      if (target.endsWith(".nexu-runner-version")) return "0.1.6"; // old version
+      return "";
+    });
+
+    // Mock execFile to succeed for all shell commands (rm, cp, mv, mkdir)
+    mockExecFile.mockImplementation(
+      (
+        _cmd: string,
+        _args: string[],
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cb) cb(null, "", "");
+        return { stdout: "", stderr: "" };
+      },
+    );
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await ensureExternalNodeRunner(
+      "/App.app/Contents",
+      "/Users/testuser/.nexu",
+      "0.2.0", // new version — mismatch triggers re-extract
+    );
+
+    // Should have called cp (extraction happened, not fast-path)
+    expect(mockExecFile).toHaveBeenCalled();
+    const cpCalls = mockExecFile.mock.calls.filter((call) => call[0] === "cp");
+    expect(cpCalls.length).toBeGreaterThan(0);
+  });
+
+  it("dev mode paths do NOT use external runner", async () => {
+    const { resolveLaunchdPaths } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const paths = await resolveLaunchdPaths(false, "/ignored");
+
+    // Dev mode should use process.execPath directly
+    expect(paths.nodePath).toBe(process.execPath);
+    expect(paths.nodePath).not.toContain("nexu-runner.app");
+    // Controller path should be in repo, not ~/.nexu
+    expect(paths.controllerEntryPath).toContain(
+      "apps/controller/dist/index.js",
+    );
+    expect(paths.controllerEntryPath).not.toContain("controller-sidecar");
+  });
+
+  it("readBundleExecutableName reads CFBundleExecutable from Info.plist", async () => {
+    const fsMock = await import("node:fs");
+    const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
+    const readFileSync = fsMock.readFileSync as unknown as ReturnType<
+      typeof vi.fn
+    >;
+
+    existsSync.mockImplementation((target: string) => {
+      if (target.endsWith("Info.plist")) return true;
+      if (
+        target.endsWith(
+          "/Users/testuser/.nexu/runtime/nexu-runner.app.staging/Contents/MacOS/MyCustomApp",
+        )
+      ) {
+        return true;
+      }
+      if (target.endsWith(".nexu-runner-version")) return false;
+      return false;
+    });
+    readFileSync.mockImplementation((target: string) => {
+      if (target.endsWith("Info.plist")) {
+        return "<dict><key>CFBundleExecutable</key><string>MyCustomApp</string></dict>";
+      }
+      return "";
+    });
+    mockExecFile.mockImplementation(
+      (
+        _cmd: string,
+        _args: string[],
+        cb?: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cb) cb(null, "", "");
+        return { stdout: "", stderr: "" };
+      },
+    );
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await ensureExternalNodeRunner(
+      "/App.app/Contents",
+      "/Users/testuser/.nexu",
+      "1.0.0",
+    );
+
+    // Should use the name from Info.plist, not hardcoded "Nexu"
+    expect(result).toContain("MacOS/MyCustomApp");
+    expect(result).not.toContain("MacOS/Nexu");
+  });
+
+  it("assertSafeRmTarget rejects shallow paths", async () => {
+    // assertSafeRmTarget is not exported, but we can test it indirectly:
+    // if nexuHome were somehow "/" or "", the rm -rf would be on a shallow path
+    // and ensureExternalNodeRunner should throw before executing rm.
+    const fsMock = await import("node:fs");
+    (fsMock.existsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      false,
+    );
+    (
+      fsMock.readFileSync as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue("");
+
+    const { ensureExternalNodeRunner } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    // nexuHome = "/x" → runnerRoot = "/x/runtime/nexu-runner.app" (3 segments, OK)
+    // But if nexuHome = "" → runnerRoot = "runtime/nexu-runner.app" (2 segments, should fail)
+    await expect(
+      ensureExternalNodeRunner("/App.app/Contents", "", "1.0.0"),
+    ).rejects.toThrow(/shallow path/i);
   });
 });
 

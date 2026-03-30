@@ -3,9 +3,11 @@ import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
+  type StartupProbePayload,
   hostInvokeChannels,
 } from "../shared/host";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
+import type { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import type { ComponentUpdater } from "./updater/component-updater";
@@ -113,6 +115,7 @@ function assertValidChannel(
 export function registerIpcHandlers(
   orchestrator: RuntimeOrchestrator,
   runtimeConfig: DesktopRuntimeConfig,
+  diagnosticsReporter: DesktopDiagnosticsReporter | null,
   coldStartReady?: Promise<void>,
 ): void {
   orchestrator.subscribe((runtimeEvent) => {
@@ -147,6 +150,16 @@ export function registerIpcHandlers(
             sentryMainEnabled,
             sentryDsn,
             nativeCrashPipeline: sentryMainEnabled ? "sentry" : "local-only",
+            proxy: {
+              source: runtimeConfig.proxy.source,
+              httpProxyRedacted:
+                runtimeConfig.proxy.diagnostics.httpProxyRedacted,
+              httpsProxyRedacted:
+                runtimeConfig.proxy.diagnostics.httpsProxyRedacted,
+              allProxyRedacted:
+                runtimeConfig.proxy.diagnostics.allProxyRedacted,
+              noProxy: [...runtimeConfig.proxy.bypass],
+            },
           };
 
           return result;
@@ -498,4 +511,8 @@ export function registerIpcHandlers(
       }
     },
   );
+
+  ipcMain.on("host:startup-probe", (_event, payload: StartupProbePayload) => {
+    diagnosticsReporter?.recordStartupProbe(payload);
+  });
 }

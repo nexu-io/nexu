@@ -263,6 +263,14 @@ A: WeChat 8.0.7 の OpenClaw プラグインに対応しています。接続を
 
 ---
 
+## 📊 GitHub Stats
+
+<picture>
+  <img alt="GitHub Stats" src="docs/github-metrics.svg" />
+</picture>
+
+---
+
 ## ⭐ Star 履歴
 
 <a href="https://star-history.com/#nexu-io/nexu&Date">

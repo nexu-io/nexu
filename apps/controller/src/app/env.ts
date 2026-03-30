@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -58,7 +59,7 @@ const envSchema = z.object({
   RUNTIME_GATEWAY_PROBE_ENABLED: booleanSchema.default("true"),
   RUNTIME_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   RUNTIME_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
-  DEFAULT_MODEL_ID: z.string().default("anthropic/claude-sonnet-4"),
+  DEFAULT_MODEL_ID: z.string().default("link/gemini-3-flash-preview"),
   WEB_URL: z.string().default("http://localhost:5173"),
   AMPLITUDE_API_KEY: z.string().optional(),
   VITE_AMPLITUDE_API_KEY: z.string().optional(),
@@ -91,6 +92,7 @@ export const env = {
   openclawSkillsDir: expandHomeDir(
     parsed.OPENCLAW_SKILLS_DIR ?? path.join(openclawStateDir, "skills"),
   ),
+  userSkillsDir: path.resolve(os.homedir(), ".agents", "skills"),
   openclawBuiltinExtensionsDir: parsed.OPENCLAW_EXTENSIONS_DIR
     ? expandHomeDir(parsed.OPENCLAW_EXTENSIONS_DIR)
     : null,

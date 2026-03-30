@@ -120,6 +120,9 @@ function makeBootstrapEnv(
     openclawExtensionsDir: "/repo/node_modules/openclaw/extensions",
     skillNodePath: "/repo/apps/desktop/node_modules",
     openclawTmpDir: "/tmp/state/tmp",
+    proxyEnv: {
+      NO_PROXY: "localhost,127.0.0.1,::1",
+    },
     ...overrides,
   };
 }

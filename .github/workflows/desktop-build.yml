@@ -41,6 +41,11 @@ on:
         description: "Build source label embedded in desktop metadata"
         required: true
         type: string
+      require_spctl:
+        description: "Run Gatekeeper spctl assessment against packaged and extracted runner apps"
+        required: false
+        type: boolean
+        default: true
     secrets:
       CLOUDFLARE_ZONE_ID:
         required: false
@@ -228,6 +233,56 @@ jobs:
           VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
           AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
         run: pnpm --filter @nexu/desktop dist:mac
+
+      - name: Set packaged app paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          runner_home="$HOME"
+          packaged_home="$RUNNER_TEMP/desktop-home"
+          packaged_user_data_dir="$packaged_home/Library/Application Support/@nexu/desktop"
+          packaged_logs_dir="$packaged_user_data_dir/logs"
+          packaged_runtime_logs_dir="$packaged_logs_dir/runtime-units"
+          default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
+          default_logs_dir="$default_user_data_dir/logs"
+          default_runtime_logs_dir="$default_logs_dir/runtime-units"
+          packaged_apps=(apps/desktop/release/mac*/Nexu.app)
+
+          if [ "${#packaged_apps[@]}" -eq 0 ]; then
+            echo "No packaged app bundle found under apps/desktop/release/mac*" >&2
+            exit 1
+          fi
+
+          packaged_app="${packaged_apps[0]}"
+          packaged_executable="$packaged_app/Contents/MacOS/Nexu"
+
+          mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
+
+          {
+            echo "PACKAGED_HOME=$packaged_home"
+            echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
+            echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
+            echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
+            echo "DEFAULT_LOGS_DIR=$default_logs_dir"
+            echo "DEFAULT_USER_DATA_DIR=$default_user_data_dir"
+            echo "DEFAULT_RUNTIME_LOGS_DIR=$default_runtime_logs_dir"
+            echo "PACKAGED_APP=$packaged_app"
+            echo "PACKAGED_EXECUTABLE=$packaged_executable"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify packaged runtime unit health
+        env:
+          NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
+          NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
+        run: pnpm check:dist
+
+      - name: Verify extracted runner bundle integrity
+        env:
+          NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
+          NEXU_DESKTOP_REQUIRE_SPCTL: ${{ inputs.require_spctl && '1' || '0' }}
+        run: bash scripts/desktop-verify-extracted-runner.sh
 
       - name: Prepare artifacts
         id: artifacts

@@ -24,6 +24,88 @@ This guide covers desktop-specific working rules, structure, and troubleshooting
 - `apps/controller/src/services/skillhub/` — SkillHub catalog/install/uninstall logic. Runs in the controller process, served via HTTP. The web app uses the HTTP SDK — never IPC.
 - Keep process-management logic out of renderer files; keep presentation logic out of `main/`; keep cross-boundary DTOs out of feature-local files when they are shared by IPC.
 
+## External runtime extraction (packaged mode)
+
+In packaged mode, launchd services must NOT reference files inside the `.app` bundle — otherwise macOS Finder reports "app is in use" and blocks drag-and-drop reinstall. The solution: APFS-clone the Electron runtime and sidecars to `~/.nexu/runtime/` on first launch.
+
+### What gets extracted
+
+| Source (inside .app) | Destination (outside .app) | Method |
+|---|---|---|
+| `Contents/MacOS/<binary>` + `Contents/Frameworks/` | `~/.nexu/runtime/nexu-runner.app/Contents/` | APFS clone (`cp -Rc`), near-zero disk |
+| `Contents/Resources/runtime/controller/` | `~/.nexu/runtime/controller-sidecar/` | APFS clone (`cp -Rc`) |
+| `Contents/Resources/runtime/openclaw/payload.tar.gz` | `~/.nexu/runtime/openclaw-sidecar/` | tar extract (existing logic) |
+
+### Version stamping
+
+Each extracted directory has a `.version-stamp` file containing the app version. On startup, `resolveLaunchdPaths()` compares the stamp against `app.getVersion()`:
+- Match → fast path, use existing extraction
+- Mismatch → re-extract via staging dir + atomic rename
+- Missing stamp → treat as mismatch (conservative)
+
+### Extraction flow
+
+1. Clone to `${targetDir}.staging` (temp directory)
+2. Verify critical entry point exists in staging
+3. Write version stamp inside staging
+4. `rm -rf` old target directory
+5. `mv` staging to final location (atomic on same filesystem)
+6. On startup, any leftover `.staging` directories are cleaned up
+
+### Fallback
+
+If extraction fails (disk full, permissions), `resolveLaunchdPaths()` falls back to in-bundle paths (`process.execPath` for node runner, `Contents/Resources/runtime/controller/` for controller). The app will work but Finder will report "app is in use" during reinstall.
+
+### Binary name detection
+
+The Electron binary name is read from `Info.plist` (`CFBundleExecutable`) instead of being hardcoded, so the extraction works even if the product is renamed.
+
+## Launchd service management (packaged mode)
+
+Packaged desktop uses macOS launchd to manage controller and openclaw as independent system services. This means services survive Electron crashes and can be reattached on next launch.
+
+### Service labels
+- Production: `io.nexu.controller`, `io.nexu.openclaw`
+- Dev mode: `io.nexu.controller.dev`, `io.nexu.openclaw.dev`
+
+### Session attach
+
+On startup, `bootstrapWithLaunchd()` checks `runtime-ports.json` for a previous session. Attach is only allowed if ALL identity fields match:
+- `appVersion` — prevents attaching to services from an older build
+- `userDataPath` — prevents cross-environment attach
+- `buildSource` — prevents stable/beta/dev cross-attach
+- `openclawStateDir` — prevents state directory mismatch
+- `NEXU_HOME` — prevents home directory mismatch
+
+If any field mismatches (or is missing from the previous session), stale services are auto-booted-out and a fresh cold start is performed. This is transparent to the user (~2-3s slower).
+
+### Stale session detection
+
+If the previous Electron PID is dead AND `runtime-ports.json` is older than 5 minutes, all services are auto-booted-out before proceeding (handles Force Quit scenarios).
+
+### runtime-ports.json
+
+Written atomically (tmp + rename) after each successful bootstrap. Contains port assignments, identity fields, and the Electron PID for stale detection.
+
+## Update install safety
+
+`update-manager.ts` uses an evidence-based install decision:
+
+1. **teardownLaunchdServices()** — bootout launchd services, kill orphan processes
+2. **orchestrator.dispose()** — stop managed child processes
+3. **ensureNexuProcessesDead()** — two sweeps of SIGKILL (15s + 5s), using both launchd labels and pgrep pattern matching
+4. **checkCriticalPathsLocked()** — `lsof +D` check on `.app` bundle, runner, and sidecar directories
+5. **Decision**:
+   - No processes, no locks → install
+   - Processes alive but no critical file locks → install (harmless residual)
+   - Critical paths locked → skip this attempt; electron-updater retries next launch
+
+### Orphan cleanup hierarchy
+
+1. **Authoritative**: launchd label lookup (`launchctl print`) + stored PIDs from `runtime-ports.json`
+2. **Fallback**: `pgrep -f` with `node.*` prefix patterns, excluding current process tree
+3. Pattern matching is a last resort — prefer label-based cleanup
+
 ## Controller sidecar packaging
 
 The controller is bundled into the desktop distributable as a sidecar. The script `apps/desktop/scripts/prepare-controller-sidecar.mjs` uses `copyRuntimeDependencyClosure` to recursively deep-copy every `dependency` from `apps/controller/package.json` (and all their transitive deps) into `.dist-runtime/controller/node_modules/`.
@@ -39,6 +121,37 @@ The controller is bundled into the desktop distributable as a sidecar. The scrip
 du -sh node_modules/.pnpm/<pkg>@*/node_modules/<pkg>/
 ```
 If total size (including transitive deps) exceeds ~5 MB, consider alternatives: PATH-based invocation, optional dependencies, or lazy runtime download.
+
+## System proxy behavior
+
+Desktop proxy handling is explicit and split by network surface:
+
+- Electron / Chromium traffic reads one normalized proxy policy at startup.
+- If `HTTP_PROXY`, `HTTPS_PROXY`, or `ALL_PROXY` is present, Electron uses explicit fixed proxy rules derived from env.
+- If no proxy env var is present, Electron falls back to system proxy mode.
+- Local loopback traffic is always bypassed with `<local>`, `localhost`, `127.0.0.1`, and `::1` merged into the effective bypass list.
+- The desktop propagates normalized `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY` into the web sidecar and controller/OpenClaw process tree.
+- Controller outbound HTTP uses the shared proxy-aware fetch layer, while desktop-to-controller loopback traffic stays direct.
+
+`ALL_PROXY` is treated as the fallback proxy for both HTTP and HTTPS when scheme-specific env vars are absent.
+
+### Dev vs packaged behavior
+
+- Dev (`pnpm start`): desktop reads proxy env from the launching shell, normalizes mixed-case variants, merges loopback bypass entries, and passes the normalized uppercase env into child processes.
+- Packaged app: Electron still applies the same normalized proxy policy, but child processes rely on the env values written into the desktop runtime manifests / launchd plists rather than the user's shell preserving mixed-case env vars.
+- In both modes, the canonical `NO_PROXY` always includes `localhost,127.0.0.1,::1` even if the operator omitted them.
+
+### Proxy diagnostics
+
+`desktop-diagnostics.json` now includes a `proxy` snapshot with:
+
+- `source`: `env`, `system`, or `direct`
+- redacted proxy env values (`httpProxyRedacted`, `httpsProxyRedacted`, `allProxyRedacted`)
+- normalized bypass entries
+- Electron proxy mode / bypass rules
+- `resolveProxy(...)` results for controller, OpenClaw, and a representative external HTTPS URL
+
+Use this snapshot to confirm that local controller/OpenClaw URLs resolve to direct/bypass behavior while external URLs resolve through the expected proxy mode.
 
 ## Common troubleshooting
 
@@ -82,6 +195,11 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 - OpenClaw native log: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
 - Desktop-scoped Nexu home: `~/Library/Application Support/@nexu/desktop/.nexu`
 - Controller `NEXU_HOME`: points to the desktop-scoped path above when launched from the packaged app
+- External node runner: `~/.nexu/runtime/nexu-runner.app/` (APFS-cloned Electron binary + Frameworks)
+- External controller sidecar: `~/.nexu/runtime/controller-sidecar/` (APFS-cloned controller dist + node_modules)
+- External openclaw sidecar: `~/.nexu/runtime/openclaw-sidecar/` (extracted from .app payload)
+- Launchd plist directory: `~/Library/LaunchAgents/` (`io.nexu.controller.plist`, `io.nexu.openclaw.plist`)
+- Runtime ports metadata: `~/Library/LaunchAgents/runtime-ports.json` (session identity + port assignments)
 
 ### How to use the logs
 
@@ -103,8 +221,8 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 ### Full local wipe checklist
 
 - For a normal dev reset, run `pnpm reset-state`
-- For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` if you also want to discard controller-owned or legacy local state outside the desktop-scoped `userData`
-- Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, and any leftover controller state from earlier local runs
+- For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` (includes extracted runtime sidecars and runner) and `~/Library/Application Support/@nexu/desktop/` if you also want to discard all packaged-app state
+- Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, extracted runtime, and any leftover controller state from earlier local runs
 
 - `a locally packaged app needs build-time overrides`
   - Put local-only packaged-app settings in `apps/desktop/.env` and keep that file untracked.
@@ -116,10 +234,18 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 - `desktop won't cold start`
   - Start with `pnpm logs` and `./apps/desktop/dev.sh devlog`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.
+  - If the issue may be proxy-related, inspect `desktop-diagnostics.json` `proxy.source`, `proxy.env`, `proxy.bypass`, and `proxy.resolutions` before changing runtime code.
   - If the issue looks power-management related, inspect `desktop-diagnostics.json` `sleepGuard` plus `desktop-main.log` entries with `source=sleep-guard` to confirm the blocker type, power-source transitions, and whether a `suspend` was still observed.
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
   - If `tmux session 'nexu-desktop' is not running` immediately after start, verify `pnpm -C apps/desktop exec electron --version` succeeds.
   - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm start` path.
+
+- `external requests fail only behind a corporate proxy`
+  - Confirm the launching environment or packaged launchd manifests include the expected uppercase proxy env vars.
+  - Inspect `desktop-diagnostics.json` and verify `proxy.source === "env"` when env proxying is expected.
+  - Check that `proxy.resolutions` shows local controller/OpenClaw URLs bypassed and the external URL resolved through the proxy.
+  - Confirm `NO_PROXY` still includes `localhost,127.0.0.1,::1`; removing loopback bypass should never be required.
+  - If Electron resolves external traffic through `system` mode but controller traffic still fails, compare the controller child-process env in the runtime manifests / launchd plists with the normalized desktop diagnostics snapshot.
 
 - `a runtime unit looks running but behavior is broken`
   - Check the unit's structured lifecycle/probe logs in `apps/desktop/main/runtime/` outputs before changing UI.

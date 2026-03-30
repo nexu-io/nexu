@@ -9,7 +9,11 @@ import type {
 } from "@nexu/shared";
 import type { BotResponse, ChannelResponse } from "@nexu/shared";
 
-const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = "__nexu_internal_feishu_prewarm__";
+/** Prefix for all internal placeholder account IDs that must never be persisted to runtime state. */
+export const NEXU_INTERNAL_ACCOUNT_PREFIX = "__nexu_internal_";
+
+const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}feishu_prewarm__`;
+const INTERNAL_WECHAT_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}wechat_prewarm__`;
 
 function buildSecretLookup(secrets: Record<string, string>, channelId: string) {
   return (suffix: string): string =>
@@ -148,6 +152,14 @@ export function compileChannelsConfig(params: {
     };
   }
 
+  if (Object.keys(wechatAccounts).length === 0) {
+    // Keep the openclaw-weixin channel subtree stable from the first cold
+    // start so the first real WeChat connect only updates account-level
+    // config and can hot-reload the channel instead of forcing a full
+    // gateway restart (~20-45s → ~500ms).
+    wechatAccounts[INTERNAL_WECHAT_PREWARM_ACCOUNT_ID] = { enabled: false };
+  }
+
   return {
     ...(Object.keys(slackAccounts).length > 0
       ? {
@@ -230,13 +242,9 @@ export function compileChannelsConfig(params: {
           },
         }
       : {}),
-    ...(Object.keys(wechatAccounts).length > 0
-      ? {
-          "openclaw-weixin": {
-            enabled: true,
-            accounts: wechatAccounts,
-          },
-        }
-      : {}),
+    "openclaw-weixin": {
+      enabled: true,
+      accounts: wechatAccounts,
+    },
   };
 }

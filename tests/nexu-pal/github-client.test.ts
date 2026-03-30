@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  checkOrganizationMembership,
   createGitHubIssueClient,
   normalizeTriagePlan,
 } from "../../scripts/nexu-pal/lib/github-client.mjs";
@@ -88,6 +89,30 @@ describe("createGitHubIssueClient.applyPlan", () => {
 
     await expect(client.removeLabel("needs-triage")).rejects.toThrow(
       "GitHub API DELETE /issues/123/labels/needs-triage failed (404): missing",
+    );
+  });
+});
+
+describe("checkOrganizationMembership", () => {
+  it("treats redirect responses as non-member lookups", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 302 });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      checkOrganizationMembership({
+        token: "token",
+        org: "nexu-io",
+        username: "octocat",
+      }),
+    ).resolves.toBe(false);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/orgs/nexu-io/members/octocat",
+      expect.objectContaining({
+        method: "GET",
+        redirect: "manual",
+      }),
     );
   });
 });

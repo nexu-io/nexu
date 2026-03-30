@@ -14,6 +14,8 @@ export const cacheInputs = [
   "utils.mjs",
 ];
 
+export const cacheEnvInputs = ["NEXU_OPENCLAW_PRUNE_DAVEY"];
+
 export async function computeFingerprint(runtimeDir) {
   const hash = createHash("sha256");
   hash.update(process.platform);
@@ -22,6 +24,13 @@ export async function computeFingerprint(runtimeDir) {
   hash.update("\0");
   hash.update(process.version);
   hash.update("\0");
+
+  for (const envName of cacheEnvInputs) {
+    hash.update(envName);
+    hash.update("\0");
+    hash.update(process.env[envName] ?? "<unset>");
+    hash.update("\0");
+  }
 
   for (const relativePath of cacheInputs) {
     const absolutePath = path.join(runtimeDir, relativePath);

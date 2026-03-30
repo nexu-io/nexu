@@ -509,6 +509,66 @@ describe("SkillhubService", () => {
     expect(result).toBe(true);
   });
 
+  describe("onSyncNeeded callback", () => {
+    it("calls onSyncNeeded after install completes", async () => {
+      const env = createEnv(rootDir);
+      const db = createMockSkillDb();
+      mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+      const onSyncNeeded = vi.fn();
+
+      await SkillhubService.create(env, { onSyncNeeded });
+
+      const queue = mocks.installQueueInstances[0];
+      const onComplete = queue.opts.onComplete as (
+        slug: string,
+        source: string,
+      ) => void;
+
+      onComplete("alpha", "managed");
+
+      expect(db.recordInstall).toHaveBeenCalledWith("alpha", "managed");
+      expect(onSyncNeeded).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onSyncNeeded after cancel cleanup completes", async () => {
+      const env = createEnv(rootDir);
+      const db = createMockSkillDb();
+      mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+      const onSyncNeeded = vi.fn();
+
+      await SkillhubService.create(env, { onSyncNeeded });
+
+      const queue = mocks.installQueueInstances[0];
+      const onCancelled = queue.opts.onCancelled as (
+        slug: string,
+      ) => Promise<void>;
+
+      await onCancelled("beta");
+
+      expect(onSyncNeeded).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not throw when onSyncNeeded is not provided", async () => {
+      const env = createEnv(rootDir);
+      const db = createMockSkillDb();
+      mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+
+      await SkillhubService.create(env);
+
+      const queue = mocks.installQueueInstances[0];
+      const onComplete = queue.opts.onComplete as (
+        slug: string,
+        source: string,
+      ) => void;
+      const onCancelled = queue.opts.onCancelled as (
+        slug: string,
+      ) => Promise<void>;
+
+      expect(() => onComplete("alpha", "managed")).not.toThrow();
+      await expect(onCancelled("beta")).resolves.toBeUndefined();
+    });
+  });
+
   it("dispose() stops watcher, disposes queue, disposes catalogManager in order", async () => {
     const env = createEnv(rootDir);
     const db = createMockSkillDb();

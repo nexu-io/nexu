@@ -22,6 +22,7 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 import { LowDbStore } from "./lowdb-store.js";
 import {
   type CloudProfileEntry,
@@ -467,7 +468,7 @@ export class NexuConfigStore {
       }
 
       try {
-        const res = await fetch(`${cloudApiUrl}/api/auth/device-poll`, {
+        const res = await proxyFetch(`${cloudApiUrl}/api/auth/device-poll`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ deviceId, deviceSecret }),
@@ -1352,9 +1353,9 @@ export class NexuConfigStore {
     apiKey: string,
   ): Promise<CloudModel[] | null> {
     try {
-      const res = await fetch(buildLinkModelsUrl(linkUrl), {
+      const res = await proxyFetch(buildLinkModelsUrl(linkUrl), {
         headers: { Authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(10000),
+        timeoutMs: 10000,
       });
       if (!res.ok) {
         return null;
@@ -1445,11 +1446,11 @@ export class NexuConfigStore {
     let res: Response;
     const registerUrl = `${activeProfile.cloudUrl}/api/auth/device-register`;
     try {
-      res = await fetch(registerUrl, {
+      res = await proxyFetch(registerUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId, deviceSecretHash }),
-        signal: AbortSignal.timeout(10_000),
+        timeoutMs: 10_000,
       });
     } catch (error) {
       logger.warn(

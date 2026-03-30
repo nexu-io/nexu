@@ -48,14 +48,15 @@ pnpm install
 ```text
 nexu/
 ├── apps/
-│   ├── api/
-│   ├── web/
-│   ├── desktop/      # Electron desktop client
-│   └── controller/
-├── packages/shared/
-├── docs/             # VitePress documentation site
-├── tests/
-└── specs/
+│   ├── web/              # React + Ant Design dashboard
+│   ├── desktop/          # Electron desktop shell
+│   └── controller/       # Hono backend + OpenClaw orchestration
+├── packages/shared/      # Shared Zod schemas
+├── openclaw-runtime/     # Repo-local packaged OpenClaw runtime
+├── scripts/              # Dev/CI scripts (launchd, probes, e2e)
+├── tests/                # Vitest test suites
+├── docs/                 # VitePress documentation site
+└── specs/                # Design docs, product specs
 ```
 
 ## Common commands
@@ -65,7 +66,9 @@ Run from the repo root unless noted.
 | Command | Purpose |
 | --- | --- |
 | `pnpm dev` | Dev stack (controller + web) with hot reload |
-| `pnpm dev:desktop` | Desktop client dev |
+| `pnpm start` | Full desktop runtime (Electron + launchd services, macOS only) |
+| `pnpm stop` | Stop desktop runtime (graceful SIGTERM → SIGKILL fallback) |
+| `pnpm status` | Show desktop runtime status |
 | `pnpm dev:controller` | Controller only |
 | `pnpm build` | Production build (all packages) |
 | `pnpm typecheck` | TypeScript checks across the workspace |
@@ -74,8 +77,11 @@ Run from the repo root unless noted.
 | `pnpm format` | Format/write with Biome |
 | `pnpm test` | Root Vitest suite (`vitest run`) |
 | `pnpm check:esm-imports` | ESM specifier verification (also run in CI) |
+| `pnpm dist:mac:unsigned` | Build unsigned macOS desktop app for local testing |
 
 Some packages define their own scripts (for example `pnpm --filter @nexu/web test:e2e` for Playwright). Prefer the closest `package.json` to the code you change.
+
+> **Note for desktop contributors:** `pnpm start` requires macOS (uses launchd for process management). The test suite includes real launchd integration tests that only run on macOS — they're automatically skipped on other platforms. If you're contributing to desktop code, test on macOS before submitting a PR.
 
 ## Code style and formatting
 

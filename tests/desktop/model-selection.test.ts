@@ -2,18 +2,18 @@ import { selectPreferredModel } from "@nexu/shared";
 import { describe, expect, it } from "vitest";
 
 describe("selectPreferredModel", () => {
-  it("prefers Gemini 3.1 Pro Preview across naming variants", () => {
+  it("prefers Gemini 3 Flash Preview across naming variants", () => {
     const models = [
       { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro" },
       {
-        id: "link/gemini-3.1-pro-preview",
-        name: "gemini-3.1-pro-preview",
+        id: "link/gemini-3-flash-preview",
+        name: "gemini-3-flash-preview",
       },
       { id: "openai/gpt-5", name: "GPT-5" },
     ];
 
     expect(selectPreferredModel(models)?.id).toBe(
-      "link/gemini-3.1-pro-preview",
+      "link/gemini-3-flash-preview",
     );
   });
 

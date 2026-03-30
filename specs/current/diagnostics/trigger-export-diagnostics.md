@@ -123,9 +123,12 @@ nexu-diagnostics-<timestamp>/
 ├── config/
 │   └── openclaw.json
 └── summary/
-    ├── environment-summary.json
     ├── additional-artifacts.json
-    └── manifest.json
+    ├── app-signing.json
+    ├── environment-summary.json
+    ├── machine-info.json
+    ├── manifest.json
+    └── startup-probe-summary.json
 ```
 
 Recommended: use the following command to inspect the ZIP internal paths directly (more reliable than Finder):
@@ -146,6 +149,12 @@ unzip -l <nexu-repo-root>/.tmp/diagnostics/nexu-diagnostics-<timestamp>.zip
   - Native OpenClaw logs from `/tmp/openclaw`, supplementing troubleshooting info beyond runtime-units.
 - `summary/additional-artifacts.json`
   - Index of newly collected files (source path, archive path, size, modification time) for quickly determining "did we collect everything?"
+- `summary/startup-probe-summary.json`
+  - Extracted preload / renderer / main startup probe timeline for locating early boot failures.
+- `summary/machine-info.json`
+  - Machine architecture, Rosetta check, executable path, and runtime version summary for Intel mac investigations.
+- `summary/app-signing.json`
+  - `codesign` and `spctl` output for packaged app signature / system assessment troubleshooting.
 
 ## Environment Differences (local dev vs packaged build)
 

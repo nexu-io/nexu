@@ -27,3 +27,19 @@ jobs:
       release_name: "Nexu Desktop Nightly"
       channel: "nightly"
     secrets: inherit
+
+  trigger-e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Desktop E2E (async)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'desktop-e2e.yml',
+              ref: context.ref || 'main',
+              inputs: { mode: 'model', channel: 'nightly' },
+            });

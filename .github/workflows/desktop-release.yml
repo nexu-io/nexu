@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
@@ -193,6 +194,56 @@ jobs:
           VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
           AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
         run: pnpm --filter @nexu/desktop dist:mac
+
+      - name: Set packaged app paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          runner_home="$HOME"
+          packaged_home="$RUNNER_TEMP/desktop-home"
+          packaged_user_data_dir="$packaged_home/Library/Application Support/@nexu/desktop"
+          packaged_logs_dir="$packaged_user_data_dir/logs"
+          packaged_runtime_logs_dir="$packaged_logs_dir/runtime-units"
+          default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
+          default_logs_dir="$default_user_data_dir/logs"
+          default_runtime_logs_dir="$default_logs_dir/runtime-units"
+          packaged_apps=(apps/desktop/release/mac*/Nexu.app)
+
+          if [ "${#packaged_apps[@]}" -eq 0 ]; then
+            echo "No packaged app bundle found under apps/desktop/release/mac*" >&2
+            exit 1
+          fi
+
+          packaged_app="${packaged_apps[0]}"
+          packaged_executable="$packaged_app/Contents/MacOS/Nexu"
+
+          mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
+
+          {
+            echo "PACKAGED_HOME=$packaged_home"
+            echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
+            echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
+            echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
+            echo "DEFAULT_LOGS_DIR=$default_logs_dir"
+            echo "DEFAULT_USER_DATA_DIR=$default_user_data_dir"
+            echo "DEFAULT_RUNTIME_LOGS_DIR=$default_runtime_logs_dir"
+            echo "PACKAGED_APP=$packaged_app"
+            echo "PACKAGED_EXECUTABLE=$packaged_executable"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify packaged runtime unit health
+        env:
+          NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
+          NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
+        run: pnpm check:dist
+
+      - name: Verify extracted runner bundle integrity
+        env:
+          NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
+          NEXU_DESKTOP_REQUIRE_SPCTL: "1"
+        run: bash scripts/desktop-verify-extracted-runner.sh
 
       - name: Prepare release artifacts
         id: artifacts
@@ -387,3 +438,30 @@ jobs:
             echo "[r2] uploading legacy arm64 compatibility feed to prefix: ${CHANNEL}/"
             upload_prefix "${CHANNEL}"
           fi
+
+  trigger-e2e:
+    needs: release
+    runs-on: ubuntu-latest
+    if: always() && needs.release.result == 'success'
+    steps:
+      - name: Resolve channel
+        id: channel
+        run: |
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}"
+          if [[ "$tag" == *-* ]]; then
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger Desktop E2E (async)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'desktop-e2e.yml',
+              ref: context.ref || 'main',
+              inputs: { mode: 'model', channel: '${{ steps.channel.outputs.channel }}' },
+            });

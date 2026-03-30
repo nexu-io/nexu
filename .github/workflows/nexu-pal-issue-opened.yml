@@ -42,8 +42,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: "google/gemini-2.5-flash"
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR_LOGIN: ${{ github.event.issue.user.login }}
           ISSUE_AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association }}
         run: node scripts/nexu-pal/process-issue-opened.mjs

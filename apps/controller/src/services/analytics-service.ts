@@ -3,6 +3,7 @@ import path from "node:path";
 import type { SessionResponse } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { SessionsRuntime } from "../runtime/sessions-runtime.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 
@@ -558,23 +559,26 @@ export class AnalyticsService {
     time: number,
   ): Promise<void> {
     try {
-      const response = await fetch("https://api2.amplitude.com/2/httpapi", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await proxyFetch(
+        "https://api2.amplitude.com/2/httpapi",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            api_key: this.env.amplitudeApiKey,
+            events: [
+              {
+                user_id: userId,
+                event_type: eventType,
+                event_properties: eventProperties,
+                time,
+              },
+            ],
+          }),
         },
-        body: JSON.stringify({
-          api_key: this.env.amplitudeApiKey,
-          events: [
-            {
-              user_id: userId,
-              event_type: eventType,
-              event_properties: eventProperties,
-              time,
-            },
-          ],
-        }),
-      });
+      );
 
       if (!response.ok) {
         logger.warn(

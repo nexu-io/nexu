@@ -61,6 +61,15 @@ export type DiagnosticsExportResult = {
   errorMessage?: string;
 };
 
+export type StartupProbeStatus = "ok" | "error";
+
+export type StartupProbePayload = {
+  source: "main" | "preload" | "renderer";
+  stage: string;
+  status: StartupProbeStatus;
+  detail?: string | null;
+};
+
 export type HostInvokePayloadMap = {
   "app:get-info": undefined;
   "diagnostics:get-info": undefined;
@@ -410,6 +419,13 @@ export type DiagnosticsInfo = {
   sentryMainEnabled: boolean;
   sentryDsn: string | null;
   nativeCrashPipeline: "local-only" | "sentry";
+  proxy: {
+    source: "env" | "system" | "direct";
+    httpProxyRedacted: string | null;
+    httpsProxyRedacted: string | null;
+    allProxyRedacted: string | null;
+    noProxy: string[];
+  };
 };
 
 export type DesktopSurface =
@@ -540,6 +556,7 @@ export type HostBridge = {
     channel: TChannel,
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
+  reportStartupProbe(payload: StartupProbePayload): void;
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
   onRuntimeEvent(listener: (event: RuntimeEvent) => void): () => void;
 };

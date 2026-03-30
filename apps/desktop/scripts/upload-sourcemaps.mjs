@@ -274,7 +274,7 @@ async function uploadReleaseFile(
     basename(filePath),
   );
 
-  await sentryRequest(
+  const response = await trySentryRequest(
     `${apiOrigin}/api/0/organizations/${encodeURIComponent(org)}/releases/${encodeURIComponent(release)}/files/`,
     authToken,
     {
@@ -282,6 +282,19 @@ async function uploadReleaseFile(
       body: form,
     },
   );
+
+  if (!response.ok && response.status !== 409) {
+    const body = await response.text();
+    throw new Error(
+      `[sourcemaps] POST upload failed: ${response.status} ${response.statusText}${body ? ` - ${body}` : ""}`,
+    );
+  }
+
+  if (response.status === 409) {
+    console.log(
+      `[sourcemaps] artifact ${getArtifactName(filePath)} already exists for release=${release}, skipping.`,
+    );
+  }
 }
 
 async function main() {

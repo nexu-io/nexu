@@ -1,0 +1,142 @@
+name: Desktop E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'E2E mode'
+        required: false
+        default: 'model'
+        type: choice
+        options: [smoke, login, model, update, resilience, full]
+      source:
+        description: 'Artifact source'
+        required: false
+        default: 'download'
+        type: choice
+        options:
+          - download   # Download published build (nightly/beta/stable)
+          - build      # Build unsigned from current branch
+      channel:
+        description: 'Channel (only for download source)'
+        required: false
+        default: 'nightly'
+        type: choice
+        options: [nightly, beta, stable]
+  schedule:
+    # Run nightly at 03:00 UTC (11:00 CST)
+    - cron: '0 3 * * *'
+
+env:
+  RELEASE_BASE: https://desktop-releases.nexu.io
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Option A: Build unsigned from current branch
+  # --------------------------------------------------------------------------
+  build:
+    if: github.event.inputs.source == 'build'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build unsigned desktop (arm64)
+        run: pnpm dist:mac:unsigned:arm64
+
+      - name: Copy build artifacts to E2E
+        run: |
+          mkdir -p e2e/desktop/artifacts
+          rm -f e2e/desktop/artifacts/*.dmg e2e/desktop/artifacts/*.zip
+          cp apps/desktop/release/*.dmg e2e/desktop/artifacts/
+          cp apps/desktop/release/*.zip e2e/desktop/artifacts/
+          echo "Artifacts:"
+          ls -lh e2e/desktop/artifacts/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-build-${{ github.run_id }}
+          path: e2e/desktop/artifacts/
+          retention-days: 3
+
+  # --------------------------------------------------------------------------
+  # E2E test
+  # --------------------------------------------------------------------------
+  e2e:
+    needs: [build]
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: e2e/desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install E2E dependencies
+        run: npm install
+
+      # --- Download source ---
+      - name: Download published artifacts
+        if: github.event.inputs.source != 'build'
+        env:
+          CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+          NEXU_DESKTOP_E2E_DMG_URL: ${{ env.RELEASE_BASE }}/${{ github.event.inputs.channel || 'nightly' }}/arm64/nexu-latest-${{ github.event.inputs.channel || 'nightly' }}-mac-arm64.dmg
+          NEXU_DESKTOP_E2E_ZIP_URL: ${{ env.RELEASE_BASE }}/${{ github.event.inputs.channel || 'nightly' }}/arm64/nexu-latest-${{ github.event.inputs.channel || 'nightly' }}-mac-arm64.zip
+        run: |
+          echo "Channel: $CHANNEL"
+          npm run download
+
+      # --- Build source ---
+      - name: Download build artifacts
+        if: github.event.inputs.source == 'build'
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-e2e-build-${{ github.run_id }}
+          path: e2e/desktop/artifacts/
+
+      - name: Verify artifacts
+        run: |
+          echo "Artifacts:"
+          ls -lh artifacts/
+          test -f artifacts/*.dmg || { echo "ERROR: No DMG found"; exit 1; }
+          test -f artifacts/*.zip || { echo "ERROR: No ZIP found"; exit 1; }
+
+      - name: Run desktop E2E
+        env:
+          NEXU_DESKTOP_E2E_SKIP_CODESIGN: ${{ github.event.inputs.source == 'build' && 'true' || 'false' }}
+        run: bash scripts/run-e2e.sh "${{ github.event.inputs.mode || 'model' }}"
+
+      - name: Upload E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-${{ github.event.inputs.source || 'download' }}-${{ github.event.inputs.channel || 'nightly' }}-${{ github.event.inputs.mode || 'model' }}-${{ github.run_id }}
+          path: |
+            e2e/desktop/captures/
+          if-no-files-found: warn
+          retention-days: 14

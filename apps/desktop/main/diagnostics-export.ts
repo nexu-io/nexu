@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import type { Dirent } from "node:fs";
 import { access, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
@@ -167,6 +167,14 @@ function redactJsonBuffer(raw: Buffer): Buffer {
   }
 }
 
+function parseJsonBuffer<T>(raw: Buffer): T | null {
+  try {
+    return JSON.parse(raw.toString("utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Artifact collection
 // ---------------------------------------------------------------------------
@@ -229,19 +237,109 @@ async function listFilesRecursive(directoryPath: string): Promise<string[]> {
   return output;
 }
 
+function runCommand(
+  binaryPath: string,
+  args: string[],
+): {
+  binaryPath: string;
+  args: string[];
+  ok: boolean;
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string | null;
+  stderr: string | null;
+  error: string | null;
+} {
+  const result = spawnSync(binaryPath, args, {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+
+  const stdout = result.stdout?.trim() ?? "";
+  const stderr = result.stderr?.trim() ?? "";
+
+  return {
+    binaryPath,
+    args,
+    ok: result.status === 0 && !result.error,
+    status: result.status,
+    signal: result.signal,
+    stdout: stdout.length > 0 ? stdout : null,
+    stderr: stderr.length > 0 ? stderr : null,
+    error: result.error ? String(result.error.message) : null,
+  };
+}
+
 function readMacOsProductVersion(): string | null {
   if (process.platform !== "darwin") {
     return null;
   }
 
-  try {
-    const output = execFileSync("sw_vers", ["-productVersion"], {
-      encoding: "utf8",
-    }).trim();
-    return output.length > 0 ? output : null;
-  } catch {
+  const result = runCommand("/usr/bin/sw_vers", ["-productVersion"]);
+  return result.ok ? result.stdout : null;
+}
+
+function buildMachineSummary(runtimeConfig: DesktopRuntimeConfig): object {
+  const rosettaCheck =
+    process.platform === "darwin"
+      ? runCommand("/usr/sbin/sysctl", ["-n", "sysctl.proc_translated"])
+      : null;
+
+  const unameMachine =
+    process.platform === "darwin" ? runCommand("/usr/bin/uname", ["-m"]) : null;
+
+  return {
+    buildInfo: runtimeConfig.buildInfo,
+    hostName: hostname(),
+    platform: process.platform,
+    arch: process.arch,
+    osVersion: readMacOsProductVersion(),
+    processVersions: process.versions,
+    executablePath: app.getPath("exe"),
+    processExecPath: process.execPath,
+    resourcesPath: process.resourcesPath,
+    isPackaged: app.isPackaged,
+    rosetta: rosettaCheck
+      ? {
+          translated:
+            rosettaCheck.ok && rosettaCheck.stdout !== null
+              ? rosettaCheck.stdout === "1"
+              : null,
+          command: rosettaCheck,
+        }
+      : null,
+    uname: unameMachine,
+    appPaths: {
+      userData: app.getPath("userData"),
+      logs: app.getPath("logs"),
+      crashDumps: app.getPath("crashDumps"),
+      nexuHome: runtimeConfig.paths.nexuHome,
+    },
+  };
+}
+
+function buildAppSigningSummary(): object | null {
+  if (process.platform !== "darwin") {
     return null;
   }
+
+  const appExecutablePath = app.getPath("exe");
+
+  return {
+    executablePath: appExecutablePath,
+    codesign: runCommand("/usr/bin/codesign", [
+      "-dv",
+      "--verbose=4",
+      appExecutablePath,
+    ]),
+    spctl: runCommand("/usr/sbin/spctl", [
+      "--assess",
+      "--type",
+      "execute",
+      "-vv",
+      appExecutablePath,
+    ]),
+  };
 }
 
 function getTimestampSlug(): string {
@@ -265,6 +363,7 @@ async function collectArtifacts(
   const included: string[] = [];
   const missing: string[] = [];
   const warnings: string[] = [];
+  let desktopDiagnosticsSummary: unknown = null;
 
   const additionalArtifacts = {
     startupHealth: null as CollectedFileMetadata | null,
@@ -305,13 +404,58 @@ async function collectArtifacts(
   }
 
   // Desktop diagnostics snapshot
-  await addFile(
+  const desktopDiagnosticsMetadata = await addFile(
     "diagnostics/desktop-diagnostics.json",
     getDesktopDiagnosticsFilePath(),
     {
       redact: true,
     },
   );
+
+  if (desktopDiagnosticsMetadata) {
+    const desktopDiagnosticsFile = await tryReadFile(
+      getDesktopDiagnosticsFilePath(),
+    );
+    const parsedDiagnostics = desktopDiagnosticsFile
+      ? parseJsonBuffer<{
+          startupProbe?: {
+            preloadSeen?: boolean;
+            rendererSeen?: boolean;
+            entries?: Array<{
+              source?: string;
+              stage?: string;
+              status?: string;
+              detail?: string | null;
+              at?: string;
+            }>;
+          };
+          renderer?: {
+            didFinishLoad?: boolean;
+            lastError?: string | null;
+            processGone?: {
+              seen?: boolean;
+              reason?: string | null;
+              exitCode?: number | null;
+              at?: string | null;
+            };
+          };
+          coldStart?: {
+            status?: string;
+            step?: string | null;
+            error?: string | null;
+          };
+        }>(desktopDiagnosticsFile.data)
+      : null;
+
+    if (parsedDiagnostics) {
+      desktopDiagnosticsSummary = {
+        sourceArchivePath: desktopDiagnosticsMetadata.archivePath,
+        coldStart: parsedDiagnostics.coldStart ?? null,
+        renderer: parsedDiagnostics.renderer ?? null,
+        startupProbe: parsedDiagnostics.startupProbe ?? null,
+      };
+    }
+  }
 
   // Main process logs
   const logsDir = resolve(app.getPath("userData"), "logs");
@@ -440,6 +584,8 @@ async function collectArtifacts(
 
   // Environment summary (safe metadata only)
   const envSummary = buildEnvironmentSummary(runtimeConfig);
+  const machineSummary = buildMachineSummary(runtimeConfig);
+  const appSigningSummary = buildAppSigningSummary();
   const now = new Date();
   entries.push({
     name: `${archiveRoot}/summary/environment-summary.json`,
@@ -447,6 +593,41 @@ async function collectArtifacts(
     modTime: now,
   });
   included.push("summary/environment-summary.json");
+
+  entries.push({
+    name: `${archiveRoot}/summary/machine-info.json`,
+    data: Buffer.from(`${JSON.stringify(machineSummary, null, 2)}\n`, "utf8"),
+    modTime: now,
+  });
+  included.push("summary/machine-info.json");
+
+  if (appSigningSummary) {
+    entries.push({
+      name: `${archiveRoot}/summary/app-signing.json`,
+      data: Buffer.from(
+        `${JSON.stringify(appSigningSummary, null, 2)}\n`,
+        "utf8",
+      ),
+      modTime: now,
+    });
+    included.push("summary/app-signing.json");
+  }
+
+  if (desktopDiagnosticsSummary) {
+    const redactedStartupProbeSummary = redactJsonBuffer(
+      Buffer.from(
+        `${JSON.stringify(desktopDiagnosticsSummary, null, 2)}\n`,
+        "utf8",
+      ),
+    );
+
+    entries.push({
+      name: `${archiveRoot}/summary/startup-probe-summary.json`,
+      data: redactedStartupProbeSummary,
+      modTime: now,
+    });
+    included.push("summary/startup-probe-summary.json");
+  }
 
   const extraArtifactsSummary = {
     startupHealth: additionalArtifacts.startupHealth,
@@ -465,6 +646,12 @@ async function collectArtifacts(
   });
   included.push("summary/additional-artifacts.json");
 
+  if (missing.length > 0) {
+    warnings.push(`${missing.length} file(s) were not found and were skipped.`);
+  }
+
+  included.push("summary/manifest.json");
+
   // Manifest
   const manifest = {
     exportedAt: now.toISOString(),
@@ -481,10 +668,6 @@ async function collectArtifacts(
     data: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8"),
     modTime: now,
   });
-
-  if (missing.length > 0) {
-    warnings.push(`${missing.length} file(s) were not found and were skipped.`);
-  }
 
   return { entries, warnings };
 }

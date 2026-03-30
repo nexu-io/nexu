@@ -53,6 +53,32 @@ export interface PlistEnv {
   skillNodePath: string;
   /** TMPDIR for openclaw temp files */
   openclawTmpDir: string;
+  /** Normalized proxy env propagated to child processes */
+  proxyEnv: Record<string, string>;
+}
+
+function renderProxyEnvEntries(proxyEnv: Record<string, string>): string {
+  const orderedKeys = [
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "NODE_USE_ENV_PROXY",
+  ];
+
+  return orderedKeys
+    .flatMap((key) => {
+      const value = proxyEnv[key];
+      if (!value) {
+        return [];
+      }
+
+      return [
+        `\n        <key>${key}</key>`,
+        `\n        <string>${escapeXml(value)}</string>`,
+      ];
+    })
+    .join("");
 }
 
 /**
@@ -127,7 +153,9 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>OPENCLAW_DISABLE_BONJOUR</key>
         <string>1</string>
         <key>TMPDIR</key>
-        <string>${escapeXml(env.openclawTmpDir)}</string>${
+        <string>${escapeXml(env.openclawTmpDir)}</string>${renderProxyEnvEntries(
+          env.proxyEnv,
+        )}${
           env.nexuHome
             ? `
         <key>NEXU_HOME</key>
@@ -219,7 +247,9 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <key>OPENCLAW_SERVICE_MARKER</key>
         <string>launchd</string>
         <key>HOME</key>
-        <string>${escapeXml(os.homedir())}</string>${
+        <string>${escapeXml(os.homedir())}</string>${renderProxyEnvEntries(
+          env.proxyEnv,
+        )}${
           env.systemPath
             ? `
         <key>PATH</key>

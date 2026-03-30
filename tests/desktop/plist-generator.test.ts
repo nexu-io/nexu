@@ -25,6 +25,13 @@ describe("generatePlist", () => {
     openclawExtensionsDir: "/app/node_modules/openclaw/extensions",
     skillNodePath: "/app/bundled-node-modules",
     openclawTmpDir: "/Users/testuser/.nexu/openclaw/tmp",
+    proxyEnv: {
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+      NODE_USE_ENV_PROXY: "1",
+    },
   };
 
   it("generates valid controller plist XML", async () => {
@@ -311,5 +318,23 @@ describe("generatePlist", () => {
     expect(openclawPlist).toContain(
       "<key>ELECTRON_RUN_AS_NODE</key>\n        <string>1</string>",
     );
+  });
+
+  it("includes normalized proxy env vars in controller and openclaw plists", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const controllerPlist = generatePlist("controller", mockEnv);
+    const openclawPlist = generatePlist("openclaw", mockEnv);
+
+    for (const plist of [controllerPlist, openclawPlist]) {
+      expect(plist).toContain("<key>HTTP_PROXY</key>");
+      expect(plist).toContain("<key>HTTPS_PROXY</key>");
+      expect(plist).toContain("<key>ALL_PROXY</key>");
+      expect(plist).toContain("<key>NO_PROXY</key>");
+      expect(plist).toContain("<key>NODE_USE_ENV_PROXY</key>");
+      expect(plist).toContain("example.com,localhost,127.0.0.1,::1");
+    }
   });
 });

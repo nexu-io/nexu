@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  checkOrganizationMembership,
   createGitHubIssueClient,
   fetchWithTimeout,
 } from "./lib/github-client.mjs";
@@ -11,14 +12,24 @@ const apiKey = process.env.OPENAI_API_KEY;
 const model = process.env.OPENAI_MODEL ?? "google/gemini-2.5-flash";
 const ghToken = process.env.GITHUB_TOKEN;
 const repo = process.env.GITHUB_REPOSITORY;
+const repositoryOwner = process.env.GITHUB_REPOSITORY_OWNER;
 const issueNumber = process.env.ISSUE_NUMBER;
 const issueTitle = process.env.ISSUE_TITLE ?? "";
 const issueBody = process.env.ISSUE_BODY ?? "";
+const issueAuthorLogin = process.env.ISSUE_AUTHOR_LOGIN;
 const issueAuthorAssociation = process.env.ISSUE_AUTHOR_ASSOCIATION ?? "NONE";
 
-if (!endpoint || !apiKey || !ghToken || !repo || !issueNumber) {
+if (
+  !endpoint ||
+  !apiKey ||
+  !ghToken ||
+  !repo ||
+  !repositoryOwner ||
+  !issueNumber ||
+  !issueAuthorLogin
+) {
   console.error(
-    "Missing required env: OPENAI_BASE_URL, OPENAI_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY, ISSUE_NUMBER",
+    "Missing required env: OPENAI_BASE_URL, OPENAI_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_REPOSITORY_OWNER, ISSUE_NUMBER, ISSUE_AUTHOR_LOGIN",
   );
   process.exit(1);
 }
@@ -53,9 +64,18 @@ async function chat(systemPrompt, userPrompt) {
 async function main() {
   console.log(`Processing opened issue #${issueNumber}: "${issueTitle}"`);
 
+  const isInternalAuthor = await checkOrganizationMembership({
+    token: ghToken,
+    org: repositoryOwner,
+    username: issueAuthorLogin,
+  });
+
   const plan = await buildOpenedIssueTriagePlan({
     issueTitle,
     issueBody,
+    isInternalAuthor,
+    issueAuthorLogin,
+    repositoryOwner,
     issueAuthorAssociation,
     chat,
   });

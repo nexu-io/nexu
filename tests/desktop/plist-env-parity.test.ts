@@ -35,6 +35,13 @@ describe("controller plist env var parity with manifests", () => {
     openclawExtensionsDir: "/app/node_modules/openclaw/extensions",
     skillNodePath: "/app/bundled-node-modules",
     openclawTmpDir: "/Users/testuser/.nexu/openclaw/tmp",
+    proxyEnv: {
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+      NODE_USE_ENV_PROXY: "1",
+    },
   };
 
   /**
@@ -67,6 +74,11 @@ describe("controller plist env var parity with manifests", () => {
     "TMPDIR",
     "NEXU_HOME",
     "PATH",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "NODE_USE_ENV_PROXY",
     // Runtime control
     "RUNTIME_MANAGE_OPENCLAW_PROCESS",
     "RUNTIME_GATEWAY_PROBE_ENABLED",
@@ -152,6 +164,11 @@ describe("controller plist env var parity with manifests", () => {
       "OPENCLAW_LAUNCHD_LABEL",
       "OPENCLAW_SERVICE_MARKER",
       "HOME",
+      "HTTP_PROXY",
+      "HTTPS_PROXY",
+      "ALL_PROXY",
+      "NO_PROXY",
+      "NODE_USE_ENV_PROXY",
     ];
 
     for (const key of REQUIRED_OPENCLAW_KEYS) {
