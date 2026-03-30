@@ -902,7 +902,7 @@ app.on("web-contents-created", (_event, contents) => {
       if (productionDebugMode) return;
       if (input.type !== "keyDown") return;
       const isReload =
-        (input.key === "r" && (input.meta || input.control)) ||
+        (input.key.toLowerCase() === "r" && (input.meta || input.control)) ||
         input.key === "F5";
       if (isReload) {
         event.preventDefault();
