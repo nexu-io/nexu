@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   actions: write
+  pull-requests: read
 
 concurrency:
   group: desktop-nightly
@@ -43,3 +44,297 @@ jobs:
               ref: context.ref || 'main',
               inputs: { mode: 'model', channel: 'nightly' },
             });
+
+  notify:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve build metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_version=$(node -e 'process.stdout.write(require("./apps/desktop/package.json").version)')
+          build_date=$(date +"%Y%m%d")
+          short_sha="${GITHUB_SHA::7}"
+          version="${base_version}-nightly.${build_date}"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "build_date=$build_date" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog since last release
+        id: changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Find the latest stable release tag (vX.Y.Z, not desktop-nightly)
+          last_release=$(git tag -l 'v*' --sort=-creatordate | head -1)
+          if [ -z "$last_release" ]; then
+            echo "No release tag found, using first commit"
+            last_release=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "Comparing: ${last_release}..HEAD"
+          echo "last_release=$last_release" >> "$GITHUB_OUTPUT"
+
+          # Extract merged PR numbers from merge commits
+          pr_numbers=$(git log "${last_release}..HEAD" --merges --oneline \
+            | grep -oE '#[0-9]+' | tr -d '#' | sort -un || true)
+
+          if [ -z "$pr_numbers" ]; then
+            # Fallback: extract from commit messages
+            pr_numbers=$(git log "${last_release}..HEAD" --oneline \
+              | grep -oE '\(#[0-9]+\)' | tr -d '(#)' | sort -un || true)
+          fi
+
+          changelog_md=""
+          changelog_plain=""
+          pr_count=0
+
+          for pr in $pr_numbers; do
+            # Get PR title, labels, URL, and closing issues
+            pr_data=$(gh pr view "$pr" --json title,labels,url,closingIssuesReferences \
+              --jq '{
+                title: .title,
+                labels: [.labels[].name] | join(","),
+                url: .url,
+                issues: [.closingIssuesReferences[] | {number, title, url}]
+              }' 2>/dev/null || echo "")
+            if [ -z "$pr_data" ]; then
+              continue
+            fi
+
+            title=$(echo "$pr_data" | jq -r '.title')
+            labels=$(echo "$pr_data" | jq -r '.labels')
+            url=$(echo "$pr_data" | jq -r '.url')
+
+            # Extract area from conventional commit prefix: feat(desktop) → desktop
+            area=""
+            if echo "$title" | grep -qE '^\w+\(([^)]+)\)'; then
+              area=$(echo "$title" | sed -E 's/^\w+\(([^)]+)\).*/\1/')
+            fi
+
+            # Build display area from labels or commit prefix
+            display_area="$area"
+            if echo "$labels" | grep -qi "desktop"; then
+              display_area="desktop"
+            elif echo "$labels" | grep -qi "web"; then
+              display_area="web"
+            elif echo "$labels" | grep -qi "controller"; then
+              display_area="controller"
+            elif echo "$labels" | grep -qi "skills"; then
+              display_area="skills"
+            elif echo "$labels" | grep -qi "channels"; then
+              display_area="channels"
+            fi
+
+            area_tag=""
+            if [ -n "$display_area" ]; then
+              area_tag="[${display_area}] "
+            fi
+
+            # Format closing issues: → #598 白屏 | #555 kimi
+            issues_str=""
+            issue_count=$(echo "$pr_data" | jq '.issues | length')
+            if [ "$issue_count" -gt 0 ]; then
+              issues_str=$(echo "$pr_data" | jq -r '.issues[] | "→ #\(.number) \(.title)"' | head -3 | paste -sd " | " -)
+            fi
+
+            if [ -n "$issues_str" ]; then
+              changelog_md="${changelog_md}- ${area_tag}${title} ([#${pr}](${url}))\n  ${issues_str}\n"
+              changelog_plain="${changelog_plain}${area_tag}${title} #${pr}\n  ${issues_str}\n"
+            else
+              changelog_md="${changelog_md}- ${area_tag}${title} ([#${pr}](${url}))\n"
+              changelog_plain="${changelog_plain}${area_tag}${title} #${pr}\n"
+            fi
+            pr_count=$((pr_count + 1))
+          done
+
+          if [ "$pr_count" -eq 0 ]; then
+            changelog_md="- No merged PRs since ${last_release}"
+            changelog_plain="No merged PRs since ${last_release}"
+          fi
+
+          echo "pr_count=$pr_count" >> "$GITHUB_OUTPUT"
+
+          # Write to files (multiline safe)
+          printf '%b' "$changelog_md" > /tmp/changelog_md.txt
+          printf '%b' "$changelog_plain" > /tmp/changelog_plain.txt
+
+          echo "Generated changelog with $pr_count PRs"
+
+      - name: Generate LLM summary
+        id: llm
+        env:
+          LITELLM_ENDPOINT: ${{ secrets.LITELLM_ENDPOINT }}
+          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          changelog=$(cat /tmp/changelog_plain.txt)
+          pr_count="${{ steps.changelog.outputs.pr_count }}"
+
+          if [ "$pr_count" -eq 0 ] || [ -z "$LITELLM_ENDPOINT" ] || [ -z "$LITELLM_API_KEY" ]; then
+            echo "summary=无新增变更" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Ask LLM for a concise Chinese summary
+          prompt="你是一个桌面应用的发布助手。以下是自上次发布以来合并的 PR 列表（带关联 issue）：\n\n${changelog}\n\n请用中文生成一段简洁的变更摘要（3-5 句话），重点说明用户可感知的改进和修复。不要列举 PR 编号，用自然语言概括。如果有 bug 修复请优先提及。"
+
+          response=$(curl -sf --max-time 30 "${LITELLM_ENDPOINT}/chat/completions" \
+            -H "Authorization: Bearer ${LITELLM_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg prompt "$prompt" '{
+              model: "gpt-4o-mini",
+              messages: [{role: "user", content: $prompt}],
+              max_tokens: 300,
+              temperature: 0.3
+            }')" 2>/dev/null || echo "")
+
+          if [ -n "$response" ]; then
+            summary=$(echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null || echo "")
+          fi
+
+          if [ -z "${summary:-}" ]; then
+            summary="本次 nightly 包含 ${pr_count} 个 PR 变更，详见下方列表。"
+          fi
+
+          # Escape for GitHub output
+          {
+            echo "summary<<EOFLLM"
+            echo "$summary"
+            echo "EOFLLM"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send Feishu notification
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.NIGHTLY_FEISHU_WEBHOOK }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          BUILD_DATE: ${{ steps.meta.outputs.build_date }}
+          PR_COUNT: ${{ steps.changelog.outputs.pr_count }}
+          LAST_RELEASE: ${{ steps.changelog.outputs.last_release }}
+          LLM_SUMMARY: ${{ steps.llm.outputs.summary }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "$FEISHU_WEBHOOK" ]; then
+            echo "No Feishu webhook configured, skipping notification"
+            exit 0
+          fi
+
+          changelog=$(cat /tmp/changelog_plain.txt | head -20)
+          run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          release_url="https://github.com/${{ github.repository }}/releases/tag/desktop-nightly"
+          e2e_url="https://github.com/${{ github.repository }}/actions/workflows/desktop-e2e.yml"
+          dmg_arm64="https://desktop-releases.nexu.io/nightly/arm64/nexu-latest-nightly-mac-arm64.dmg"
+          dmg_x64="https://desktop-releases.nexu.io/nightly/x64/nexu-latest-nightly-mac-x64.dmg"
+
+          # Build Feishu interactive card
+          card=$(jq -n \
+            --arg version "$VERSION" \
+            --arg sha "$SHORT_SHA" \
+            --arg date "$BUILD_DATE" \
+            --arg pr_count "$PR_COUNT" \
+            --arg last_release "$LAST_RELEASE" \
+            --arg summary "$LLM_SUMMARY" \
+            --arg changelog "$changelog" \
+            --arg run_url "$run_url" \
+            --arg release_url "$release_url" \
+            --arg e2e_url "$e2e_url" \
+            --arg dmg_arm64 "$dmg_arm64" \
+            --arg dmg_x64 "$dmg_x64" \
+            '{
+              msg_type: "interactive",
+              card: {
+                header: {
+                  template: "turquoise",
+                  title: {
+                    tag: "plain_text",
+                    content: ("🚀 Nexu Desktop Nightly " + $version)
+                  }
+                },
+                elements: [
+                  {
+                    tag: "markdown",
+                    content: ("**变更摘要**\n" + $summary)
+                  },
+                  {
+                    tag: "markdown",
+                    content: ("**版本信息**\n- 版本: `" + $version + "` (`" + $sha + "`)\n- 基线: `" + $last_release + "`\n- 合并 PR: **" + $pr_count + "** 个")
+                  },
+                  {
+                    tag: "markdown",
+                    content: ("**变更列表**\n" + $changelog)
+                  },
+                  {
+                    tag: "hr"
+                  },
+                  {
+                    tag: "action",
+                    actions: [
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "⬇️ DMG (Apple Silicon)" },
+                        type: "primary",
+                        url: $dmg_arm64
+                      },
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "⬇️ DMG (Intel)" },
+                        type: "default",
+                        url: $dmg_x64
+                      }
+                    ]
+                  },
+                  {
+                    tag: "action",
+                    actions: [
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "📦 CI 构建" },
+                        type: "default",
+                        url: $run_url
+                      },
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "🧪 E2E 测试" },
+                        type: "default",
+                        url: $e2e_url
+                      },
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "📋 Release" },
+                        type: "default",
+                        url: $release_url
+                      }
+                    ]
+                  }
+                ]
+              }
+            }')
+
+          curl -sf -X POST "$FEISHU_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "$card"
+
+          echo "Feishu notification sent"
