@@ -44,15 +44,16 @@ created: '2026-03-30'
 - Pruning targets are defined centrally in `openclaw-runtime/prune-runtime-paths.mjs`.
 - Desktop packaging copies `openclaw-runtime/node_modules` into the sidecar, excluding only `openclaw` while staging a patched copy of that package (`apps/desktop/scripts/prepare-openclaw-sidecar.mjs:787-796`).
 
-### Reproduction Paths
+### Minimal Reproduction Paths
 1. **Issue #425 — PDF file recognition failure**
-   - User path: send a PDF file to a model in a Discord channel or DM and ask it to analyze the file.
+   - In any conversation surface that supports file attachments, upload a PDF to a model.
+   - Ask the model to read, summarize, or analyze the PDF contents.
    - Expected failing symptom: runtime returns `Optional dependency pdfjs-dist is required for PDF extraction: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pdfjs-dist' imported from .`
-   - Good validation path after a fix: repeat the same PDF upload flow and confirm extracted PDF content is analyzed instead of throwing the missing dependency error.
+   - Validation after a fix: repeat the same PDF upload flow and confirm the model can analyze extracted PDF content instead of throwing the missing dependency error.
 2. **Issue #431 — Playwright runtime not available**
-   - User path: ask any model to open/review a webpage.
+   - In any conversation surface that exposes browser-assisted actions, ask a model to open, inspect, or review a webpage.
    - Expected failing symptom: browser-assisted workflow is refused as unsupported, matching OpenClaw's Playwright-unavailable error path.
-   - Good validation path after a fix: repeat the webpage review prompt and confirm the runtime can execute a Playwright-backed browser action rather than returning an unsupported/browser-unavailable response.
+   - Validation after a fix: repeat the webpage review prompt and confirm the runtime can execute a Playwright-backed browser action rather than returning an unsupported/browser-unavailable response.
 
 ### Key Findings
 - `openclaw-runtime/prune-runtime-paths.mjs:23-31` explicitly prunes `node_modules/pdfjs-dist`, and the file comment already warns this may break PDF parsing / attachment ingestion paths.
