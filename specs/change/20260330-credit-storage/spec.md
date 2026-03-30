@@ -1,7 +1,7 @@
 ---
 id: 20260330-credit-storage
 name: Credit Storage
-status: researched
+status: designed
 created: '2026-03-30'
 ---
 
@@ -78,23 +78,291 @@ created: '2026-03-30'
 
 ## Design
 
-<!-- Technical approach, architecture decisions -->
+### Architecture
+
+选择 **方案 C：务实平衡**。
+
+核心原则：
+
+- **shared `public` schema 存积分主账本**，由 `nexu-cloud` 负责 migration 与写入。
+- **`nexu-link` 只读 shared DB** 做准入判断，不拥有 `public` schema migration。
+- **`link.*` 只保留运行态遥测/对账信息**，不作为积分权威账本。
+- **v1 只做双账本 + 账户投影**：充值账本、消耗账本、账户余额快照。
+- **v1 不做 debt / allocation / 外部读 API**，先把主链路打通。
+
+```text
+充值/赠送/后台加积分
+  -> nexu-cloud
+  -> public.credit_recharges (append-only)
+  -> public.credit_accounts.available_credits += amount
+
+模型请求
+  -> nexu-link 鉴权(api_key -> user_id)
+  -> 读取 public.credit_accounts.available_credits (fast-path precheck)
+  -> 调用 nexu-cloud 执行权威扣费事务
+  -> 扣费成功才放行模型请求
+  -> 记录 link.usage_events
+  -> 若模型调用失败，nexu-cloud 写补偿 recharge
+```
+
+### Data Model
+
+- **`public.credit_accounts`**
+  - 每个 `user_id` 一行，给 `nexu-link` 提供快速准入读取。
+  - 建议字段：
+    - `id text primary key`
+    - `user_id text not null unique`
+    - `available_credits bigint not null default 0`
+    - `total_recharged_credits bigint not null default 0`
+    - `total_used_credits bigint not null default 0`
+    - `version bigint not null default 0`
+    - `created_at timestamptz not null default now()`
+    - `updated_at timestamptz not null default now()`
+  - 约束：`user_id` 唯一；`available_credits >= 0`；所有积分字段为 `bigint` 最小单位，避免浮点误差。
+  - 不变量：在 v1 无 debt / expiry 前提下，`available_credits = total_recharged_credits - total_used_credits`。
+
+- **`public.credit_recharges`**
+  - 充值/赠送/后台补偿等入账流水，append-only。
+  - 建议字段：
+    - `id text primary key`
+    - `user_id text not null`
+    - `source text not null`
+    - `amount_credits bigint not null`
+    - `idempotency_key text not null unique`
+    - `external_ref text null`
+    - `metadata jsonb not null default '{}'::jsonb`
+    - `created_at timestamptz not null default now()`
+  - 推荐 `source`：`purchase`、`reward_redemption`、`invite_reward`、`admin_grant`、`compensation_refund`。
+  - 索引：`(user_id, created_at desc)`；必要时可增加 `(source, external_ref)` 唯一约束。
+  - v1 不要求 lot 级扣减，只要求保留完整入账历史。
+
+- **`public.credit_usages`**
+  - 模型调用等消耗流水，append-only。
+  - 建议字段：
+    - `id text primary key`
+    - `user_id text not null`
+    - `api_key_id text null`
+    - `request_id text not null unique`
+    - `usage_type text not null`
+    - `amount_credits bigint not null`
+    - `provider text null`
+    - `model text null`
+    - `metadata jsonb not null default '{}'::jsonb`
+    - `created_at timestamptz not null default now()`
+  - v1 `usage_type` 可以先收敛为 `model_call`。
+  - 索引：`(user_id, created_at desc)`、可选 `(api_key_id, created_at desc)`。
+  - `request_id` 必须由网关生成，用作幂等键，避免重试导致重复扣费。
+
+- **继续保留 `link.usage_events`**
+  - 用于网关运行态观察、排障、对账。
+  - 不是积分权威账本，不承载余额语义。
+
+- **v1 不新增单独的 package / reward / adjustment 表**
+  - 积分包、奖励兑换、邀请奖励、后台赠送都先映射为 `credit_recharges` 的不同 `source`。
+  - 套餐编码、支付单号、活动信息放入 `external_ref` / `metadata`。
+
+### Read / Write Boundaries
+
+- **Cloud 写入职责**
+  - 创建充值流水并增加账户余额。
+  - 创建消耗流水并扣减账户余额。
+  - 所有积分写操作在 cloud 事务内完成。
+
+- **Link 读取职责**
+  - 基于 `api_key -> user_id` 读取 `public.credit_accounts.available_credits`。
+  - 作为 fast-path 预检查；最终是否余额足够由 cloud 的扣费事务决定。
+  - v1 不再依赖现有时间窗 / usage limit。
+
+- **内部接口约定（非用户侧 API）**
+  - `PostRecharge(userId, amountCredits, source, externalRef?)`
+  - `PostUsage(userId, apiKeyId?, requestId, amountCredits, usageType, dimensions)`
+  - `GetAvailableCredits(userId)` 仅作为 link 的读模型，不在本轮设计外部接口。
+
+### Implementation Steps
+
+1. **定义 shared schema**
+   - 在 `nexu-cloud` 管理的 shared/public schema 中增加 `credit_accounts`、`credit_recharges`、`credit_usages`。
+   - 为 `user_id`、`request_id`、时间序列查询建立索引。
+
+2. **实现 cloud 写路径**
+   - 充值写入：新增 recharge 流水，并原子增加 `credit_accounts`。
+   - 消耗写入：基于 `request_id` 幂等插入 usage，并在同一事务里原子扣减余额。
+   - 对模型失败等异常场景，允许写入 `compensation_refund` 类型 recharge 做补偿。
+
+3. **切换 link 准入读取**
+   - `nexu-link` 在鉴权后按 `user_id` 读取 `credit_accounts.available_credits`。
+   - 余额不足直接拒绝；预检查通过后仍需 cloud 扣费事务成功才允许进入模型请求。
+
+4. **保留运行态记录与对账能力**
+   - `link.usage_events` 继续记录请求结果与成本维度。
+   - 用于事后排障、补记、对账，不直接驱动余额。
+
+5. **分阶段上线**
+   - 先落 shared schema + cloud writer。
+   - 再切 link 的 admission gate。
+   - 最后补齐对账/回放与运营工具能力。
+
+### Pseudocode
+
+#### Admission Check in Link
+
+```text
+Authenticate apiKey
+Resolve userId from apiKey
+Load creditAccount by userId
+
+If creditAccount missing:
+  Reject as insufficient credits
+
+If available_credits < required_credits:
+  Reject as insufficient credits
+
+Call cloud precharge with request_id and required_credits
+If precharge fails:
+  Reject as insufficient credits
+
+Allow request
+Record link.usage_events for telemetry
+```
+
+#### Recharge Posting in Cloud
+
+```text
+Begin transaction
+Insert credit_recharges row
+Upsert credit_accounts by userId
+Increase available_credits
+Increase total_recharged_credits
+Commit transaction
+```
+
+#### Usage Posting in Cloud
+
+```text
+Begin transaction
+
+If request_id already exists in credit_usages:
+  Return existing result
+
+Update credit_accounts
+  set available_credits = available_credits - amount_credits,
+      total_used_credits = total_used_credits + amount_credits,
+      version = version + 1,
+      updated_at = now()
+  where user_id = ? and available_credits >= amount_credits
+
+If no row updated:
+  Fail with insufficient credits
+
+Insert credit_usages row
+
+Commit transaction
+```
+
+### Lifecycle Flows
+
+#### Flow 1: 用户新注册
+
+```text
+Create user in cloud auth tables
+Insert credit_accounts row with zero balance
+Do not create recharge/usage rows
+```
+
+- 建议在注册时就创建 `credit_accounts`，避免后续“是否开户”分支。
+- 若存在历史用户回填，link 仍应把缺失账户视为 0 余额。
+
+#### Flow 2: 购买积分包
+
+```text
+Payment provider confirms order
+Begin transaction
+Insert credit_recharges with:
+  source = purchase
+  idempotency_key = payment_event_id
+  external_ref = order_id or payment_intent_id
+Upsert credit_accounts by user_id
+Increase available_credits
+Increase total_recharged_credits
+Commit transaction
+```
+
+- 支付成功事件必须提供稳定 `idempotency_key`，防止 webhook 重放重复加积分。
+- 积分包本身先不单独建表，套餐信息写入 `metadata.pack_code`。
+
+#### Flow 3: 兑换奖励 / 邀请奖励 / 后台赠送
+
+```text
+Reward system validates eligibility
+Begin transaction
+Insert credit_recharges with:
+  source = reward_redemption | invite_reward | admin_grant
+  idempotency_key = reward_event_id
+  external_ref = reward_id or campaign_id
+Update credit_accounts
+  available_credits += amount
+  total_recharged_credits += amount
+Commit transaction
+```
+
+- 奖励类入账与购买积分包共用同一张 recharge 账本，只区分 `source`。
+- 若后续需要反作弊或活动审计，再在 reward 子系统补专属表，不放进 v1 积分主账本。
+
+#### Flow 4: 使用模型并消耗积分
+
+```text
+Link authenticates api_key and resolves user_id
+Link reads credit_accounts for fast-path precheck
+Link generates request_id
+Link asks cloud to precharge amount_credits
+
+Cloud transaction:
+  Conditionally decrement credit_accounts where balance is sufficient
+  Insert credit_usages(request_id, user_id, amount_credits, ...)
+
+If precharge succeeds:
+  Link dispatches model request
+  Link records link.usage_events
+
+If provider/model request fails after precharge:
+  Cloud writes compensation_refund recharge with unique idempotency key
+```
+
+- v1 的 **严格拒绝** 依赖一个前提：`amount_credits` 在请求发出前就能确定。
+- 如果未来改成“按最终 token 精确扣费”，则需要 reservation / hold 设计，明确不在本轮范围内。
+
+### Files / Repos Likely Affected
+
+- **This repo**
+  - `specs/change/20260330-credit-storage/spec.md` — 设计与实施计划。
+
+- **nexu-cloud**
+  - `apps/api/src/db/schema/index.ts` — 新增 shared/public 积分表定义。
+  - `apps/api/migrations/` — 新增积分表 migration。
+  - `apps/api/src/services/credit/*` — 充值/消耗写入事务。
+
+- **nexu-link**
+  - `internal/repositories/postgres.go` — 读取 `public.credit_accounts`。
+  - `internal/middleware/auth.go` — 用积分余额替换旧的 usage-limit admission gate。
+  - `internal/server/server.go` / `internal/domain/types.go` — 注入 credit read model。
+
+### Edge Cases
+
+- **重复结算**：`credit_usages.request_id` 唯一，重试只会命中同一笔 usage。
+- **重复支付通知 / 重复奖励发放**：`credit_recharges.idempotency_key` 唯一，防止重复入账。
+- **并发扣减**：cloud 扣费事务必须以“余额足够”作为更新条件，防止写成负数。
+- **用户尚未开户**：正常新注册流程应创建 `credit_accounts`；仅在历史回填/异常场景下把缺失账户视为 0 余额。
+- **api key 轮换**：余额归属 `user_id`，不归属单个 key，避免 key 更换导致余额碎片化。
+- **数值精度**：积分统一使用整数最小单位，不使用浮点。
+- **扣费后模型调用失败**：写一笔 `compensation_refund` recharge 做补偿，保持账本 append-only。
+- **link 预检查通过但 cloud 扣费失败**：以 cloud 事务结果为准，最终拒绝请求。
+- **本轮明确不做**：debt、过期余额 lot 分摊、订阅/礼包策略、按最终 token 精确结算、对外余额读取 API。
 
 ## Plan
 
-<!-- Break down implementation and verification into steps -->
-
-- [ ] Phase 1: Implement the first part of the feature
-  - [ ] Task 1
-  - [ ] Task 2
-  - [ ] Task 3
-- [ ] Phase 2: Implement the second part of the feature
-  - [ ] Task 1
-  - [ ] Task 2
-  - [ ] Task 3
-- [ ] Phase 3: Test and verify
-  - [ ] Test criteria 1
-  - [ ] Test criteria 2
+- [ ] Phase 1: 增加 shared 积分表结构与 cloud 事务写入链路
+- [ ] Phase 2: 将 link 准入从窗口限额切换为积分余额读取
+- [ ] Phase 3: 补齐对账、上线保护与运行验证
 
 ## Notes
 
