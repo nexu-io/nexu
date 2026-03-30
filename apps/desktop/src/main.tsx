@@ -1292,7 +1292,7 @@ function DesktopShell() {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
+              objectFit: "contain",
               display: setupPhase === "playing" ? "block" : "none",
             }}
           />
@@ -1306,7 +1306,7 @@ function DesktopShell() {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
+              objectFit: "contain",
               display: setupPhase === "looping" ? "block" : "none",
             }}
           />
