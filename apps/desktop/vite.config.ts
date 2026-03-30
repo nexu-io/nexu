@@ -14,6 +14,8 @@ const desktopDevPort = Number.parseInt(
 );
 const desktopDevApiOrigin =
   process.env.NEXU_DESKTOP_DEV_API_ORIGIN ?? "http://127.0.0.1:3010";
+const disableImplicitElectronStartup =
+  process.env.NEXU_DESKTOP_DISABLE_VITE_ELECTRON_STARTUP === "1";
 
 export default defineConfig({
   base: "./",
@@ -24,6 +26,10 @@ export default defineConfig({
       {
         entry: "main/bootstrap.ts",
         onstart(options) {
+          if (disableImplicitElectronStartup) {
+            return;
+          }
+
           options.startup();
         },
         vite: {

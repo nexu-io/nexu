@@ -4,6 +4,7 @@ import { ensureParentDirectory } from "./paths.js";
 
 export type DevLock = {
   pid: number;
+  workerPid?: number;
   runId: string;
   sessionId?: string;
   launchId?: string;

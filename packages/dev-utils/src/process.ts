@@ -2,6 +2,97 @@ import { type ChildProcess, spawn } from "node:child_process";
 
 import { waitFor } from "./conditions.js";
 
+async function runCommandForStdout(
+  command: string,
+  args: string[],
+): Promise<{ code: number; stdout: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+
+    let stdout = "";
+
+    child.stdout.on("data", (chunk: Buffer | string) => {
+      stdout += chunk.toString();
+    });
+
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      resolve({ code: code ?? 1, stdout });
+    });
+  });
+}
+
+async function getWindowsListeningPortPid(
+  port: number,
+  serviceName: string,
+): Promise<number> {
+  const { code, stdout } = await runCommandForStdout("netstat", ["-ano"]);
+
+  if (code !== 0) {
+    throw new Error(`netstat exited with code ${code}`);
+  }
+
+  const lines = stdout.split(/\r?\n/);
+
+  for (const line of lines) {
+    if (!line.includes(`:${port}`) || !line.includes("LISTENING")) {
+      continue;
+    }
+
+    const columns = line.trim().split(/\s+/);
+    const pidText = columns.at(-1);
+
+    if (!pidText) {
+      continue;
+    }
+
+    const pid = Number(pidText);
+
+    if (Number.isNaN(pid)) {
+      continue;
+    }
+
+    return pid;
+  }
+
+  throw new Error(`${serviceName} did not open port ${port}`);
+}
+
+async function getDarwinListeningPortPid(
+  port: number,
+  serviceName: string,
+): Promise<number> {
+  const { code, stdout } = await runCommandForStdout("lsof", [
+    "-nP",
+    `-iTCP:${String(port)}`,
+    "-sTCP:LISTEN",
+    "-t",
+  ]);
+
+  if (code !== 0 && code !== 1) {
+    throw new Error(`lsof exited with code ${code}`);
+  }
+
+  const pidText = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  if (!pidText) {
+    throw new Error(`${serviceName} did not open port ${port}`);
+  }
+
+  const pid = Number(pidText);
+
+  if (Number.isNaN(pid)) {
+    throw new Error(`lsof returned a non-numeric pid for port ${port}`);
+  }
+
+  return pid;
+}
+
 export function createNodeOptions(): string {
   const existing = process.env.NODE_OPTIONS?.trim();
 
@@ -102,52 +193,16 @@ export async function getListeningPortPid(
   port: number,
   serviceName: string,
 ): Promise<number> {
-  const output = await new Promise<string>((resolve, reject) => {
-    const child = spawn("netstat", ["-ano"], {
-      stdio: ["ignore", "pipe", "inherit"],
-    });
-
-    let stdout = "";
-
-    child.stdout.on("data", (chunk: Buffer | string) => {
-      stdout += chunk.toString();
-    });
-
-    child.once("error", reject);
-    child.once("exit", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-        return;
-      }
-
-      reject(new Error(`netstat exited with code ${code ?? 1}`));
-    });
-  });
-
-  const lines = output.split(/\r?\n/);
-
-  for (const line of lines) {
-    if (!line.includes(`:${port}`) || !line.includes("LISTENING")) {
-      continue;
-    }
-
-    const columns = line.trim().split(/\s+/);
-    const pidText = columns.at(-1);
-
-    if (!pidText) {
-      continue;
-    }
-
-    const pid = Number(pidText);
-
-    if (Number.isNaN(pid)) {
-      continue;
-    }
-
-    return pid;
+  switch (process.platform) {
+    case "win32":
+      return getWindowsListeningPortPid(port, serviceName);
+    case "darwin":
+      return getDarwinListeningPortPid(port, serviceName);
+    default:
+      throw new Error(
+        `Unsupported platform for listening port detection: ${process.platform}`,
+      );
   }
-
-  throw new Error(`${serviceName} did not open port ${port}`);
 }
 
 export async function waitForListeningPortPid(

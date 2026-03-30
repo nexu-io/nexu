@@ -83,8 +83,8 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - Keep the detailed startup optimization rules, cache invalidation behavior, and troubleshooting notes in `specs/guides/desktop-runtime-guide.md`; keep only the core workflow expectations here.
 - The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
 - The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
-- The desktop dev launcher is `apps/desktop/dev.sh`; it is the source of truth for tmux orchestration, sidecar builds, runtime cleanup, and stable repo-local path setup during local development.
-- `pnpm start` launch chain: `scripts/dev-launchd.sh` → `apps/desktop/scripts/dev-env.sh` → `electron`. `dev-env.sh` patches the dev Electron binary's `LSUIElement` (prevents child processes from creating Dock icons) and exports `NEXU_WORKSPACE_ROOT`. **All Electron launch paths must go through `dev-env.sh`** — bypassing it causes Dock icon proliferation.
+- The desktop dev launcher is `scripts/dev/`; it is the unified source of truth for local dev orchestration, including platform-specific desktop launch preparation and runtime cleanup.
+- `pnpm dev` desktop launch is owned by `scripts/dev`, which starts the desktop Vite worker and Electron main process explicitly while routing platform-specific setup through `scripts/dev/src/shared/platform/desktop-dev-platform.*`. On macOS, the darwin helper patches the dev Electron binary's `LSUIElement` and refreshes Launch Services metadata before launch.
 - `pnpm stop` behavior: sends SIGTERM first (triggers `gracefulShutdown` inside Electron → teardown launchd services → dispose orchestrator → kill orphans), waits up to 10 seconds for graceful exit, then SIGKILL as fallback. Also kills tsc watcher and web watcher background processes.
 - Treat `pnpm start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
@@ -166,7 +166,7 @@ The desktop test suite includes real launchd integration tests that run on macOS
 - `scripts/launchd-lifecycle-e2e.sh` — shell-based e2e: bootstrap → verify → teardown → orphan cleanup → re-bootstrap
 - `scripts/desktop-stop-smoke.sh` — post-stop verification: no residual processes, free ports, no stale state
 - `tests/desktop/data-directory-runtime.test.ts` — verifies every plist env var value by calling real `generatePlist()`
-- `tests/desktop/dev-toolchain-invariants.test.ts` — guards against script bypass regressions (all launch paths go through `dev-env.sh`, all spawn calls set `ELECTRON_RUN_AS_NODE`, etc.)
+- `tests/desktop/dev-toolchain-invariants.test.ts` — guards against desktop dev-launch regressions (scripts/dev platform helpers remain the single desktop launch decision point, launchd manifests keep `ELECTRON_RUN_AS_NODE`, etc.)
 
 ## Hard rules
 
@@ -252,7 +252,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | External runner extraction | `apps/desktop/main/services/launchd-bootstrap.ts` (`ensureExternalNodeRunner`, `resolveLaunchdPaths`) |
 | Desktop auto-updater | `apps/desktop/main/updater/update-manager.ts` (`checkCriticalPathsLocked`, `ensureNexuProcessesDead`) |
 | Entitlements (V8 JIT) | `apps/desktop/build/entitlements.mac.plist`, `apps/desktop/build/entitlements.mac.inherit.plist` |
-| Dev launch scripts | `scripts/dev-launchd.sh`, `apps/desktop/scripts/dev-env.sh`, `apps/desktop/dev.sh` |
+| Dev launch scripts | `scripts/dev-launchd.sh`, `scripts/dev/src/services/desktop.ts`, `scripts/dev/src/shared/platform/desktop-dev-platform.*` |
 | Launchd stability tests | `tests/desktop/launchd-integration.test.ts`, `scripts/launchd-lifecycle-e2e.sh` |
 | Entitlements regression tests | `tests/desktop/entitlements-plist.test.ts` |
 | Stop smoke test | `scripts/desktop-stop-smoke.sh` |

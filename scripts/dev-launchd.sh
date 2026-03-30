@@ -220,15 +220,15 @@ start_services() {
   ) &
   WEB_WATCH_PID=$!
 
-  # Start Electron desktop with launchd mode (blocks until quit)
-  # Use dev-env.sh to patch LSUIElement and source .env files before launch.
-  # Without this, child processes spawned with process.execPath show extra
-  # Dock icons on macOS because Launch Services caches the un-patched plist.
+  # Start Electron desktop with launchd mode (blocks until quit).
+  # scripts/dev owns the desktop dev-launch compatibility path now; launchd mode
+  # keeps the direct Electron launch here because the app boot path is already
+  # launchd-specific and does not reuse the scripts/dev desktop worker model.
   echo "Starting Electron desktop (launchd mode)..."
   echo ""
   cd "$REPO_ROOT"
   NEXU_USE_LAUNCHD=1 NEXU_HOME="$DEV_NEXU_HOME" \
-    apps/desktop/scripts/dev-env.sh pnpm exec electron apps/desktop
+    pnpm exec electron apps/desktop
 }
 
 show_status() {

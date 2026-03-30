@@ -106,3 +106,10 @@ process.on("SIGTERM", async () => {
 
 await writeRunningLock();
 await startWorker();
+
+if (!workerChild) {
+  throw new Error("desktop worker exited before supervisor wait could attach");
+}
+
+await waitForChildExit(workerChild);
+await removeRunningLock();

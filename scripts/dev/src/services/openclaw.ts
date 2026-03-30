@@ -285,21 +285,34 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
   try {
     const lock = await readDevLock(openclawDevLockPath);
     const logFilePath = getOpenclawDevLogPath(lock.runId);
+    let listenerPid: number | undefined;
 
     try {
       process.kill(lock.pid, 0);
     } catch {
+      try {
+        listenerPid = await getOpenclawPortPid();
+      } catch {
+        return {
+          service: "openclaw",
+          status: "stale",
+          pid: lock.pid,
+          runId: lock.runId,
+          sessionId: lock.sessionId,
+          logFilePath,
+        };
+      }
+
       return {
         service: "openclaw",
-        status: "stale",
-        pid: lock.pid,
+        status: "running",
+        pid: listenerPid,
+        listenerPid,
         runId: lock.runId,
         sessionId: lock.sessionId,
         logFilePath,
       };
     }
-
-    let listenerPid: number | undefined;
 
     try {
       listenerPid = await getOpenclawPortPid();
