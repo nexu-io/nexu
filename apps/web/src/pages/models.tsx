@@ -181,11 +181,63 @@ function getModelDisplayLabel(modelId: string): string {
     : modelId;
 }
 
+const MODEL_PROVIDER_SEGMENT_ALIASES: Record<string, string> = {
+  openai: "openai",
+  "openai-codex": "openai",
+  anthropic: "anthropic",
+  google: "google",
+  ollama: "ollama",
+  siliconflow: "siliconflow",
+  ppio: "ppio",
+  openrouter: "openrouter",
+  minimax: "minimax",
+  kimi: "kimi",
+  moonshot: "kimi",
+  glm: "glm",
+  zai: "glm",
+};
+
+function normalizeModelSelectionKey(modelId: string): string {
+  const normalizedModelId = modelId.trim().toLowerCase();
+  if (normalizedModelId.length === 0) {
+    return normalizedModelId;
+  }
+
+  const segments = normalizedModelId.split("/").filter(Boolean);
+  if (segments.length === 0) {
+    return normalizedModelId;
+  }
+
+  if (segments[0] === "link" || segments[0] === "litellm") {
+    return normalizeModelSelectionKey(segments.slice(1).join("/"));
+  }
+
+  const providerIndex = segments.findIndex(
+    (segment) => MODEL_PROVIDER_SEGMENT_ALIASES[segment] !== undefined,
+  );
+
+  if (providerIndex >= 0 && providerIndex < segments.length - 1) {
+    const providerSegment = segments[providerIndex];
+    if (!providerSegment) {
+      return normalizedModelId;
+    }
+
+    const providerId = MODEL_PROVIDER_SEGMENT_ALIASES[providerSegment];
+    const providerModelId = segments.slice(providerIndex + 1).join("/");
+    return `${providerId}/${providerModelId}`;
+  }
+
+  return normalizedModelId;
+}
+
 export function isModelSelected(
   modelId: string,
   currentModelId: string,
 ): boolean {
-  if (modelId === currentModelId) {
+  if (
+    normalizeModelSelectionKey(modelId) ===
+    normalizeModelSelectionKey(currentModelId)
+  ) {
     return true;
   }
 
@@ -1622,7 +1674,7 @@ function ByokProviderDetail({
       // Auto-select preferred model if no model is currently selected
       const preferred = selectPreferredModel(displayModels);
       if (preferred) {
-        onAutoSelectModel(preferred);
+        onAutoSelectModel(getScopedByokModelId(preferred));
       }
     },
   });
@@ -1741,6 +1793,14 @@ function ByokProviderDetail({
     if (stored.length > 0) return stored;
     return DEFAULT_MODELS[providerId] ?? [];
   }, [verifiedModels, dbProvider, providerId]);
+
+  const getScopedByokModelId = useCallback(
+    (modelId: string) =>
+      modelId.startsWith(`${providerId}/`)
+        ? modelId
+        : `${providerId}/${modelId}`,
+    [providerId],
+  );
 
   return (
     <div>
@@ -2307,7 +2367,10 @@ function ByokProviderDetail({
             </div>
           )}
           {displayModels.map((modelId) => {
-            const isSelected = isModelSelected(modelId, currentModelId);
+            const scopedModelId = getScopedByokModelId(modelId);
+            const isSelected =
+              isModelSelected(modelId, currentModelId) ||
+              isModelSelected(scopedModelId, currentModelId);
             return (
               <button
                 key={modelId}
@@ -2315,7 +2378,7 @@ function ByokProviderDetail({
                 disabled={!isProviderConfigured}
                 onClick={() => {
                   if (!isProviderConfigured || isSelected) return;
-                  onSelectModel(modelId);
+                  onSelectModel(scopedModelId);
                 }}
                 className={cn(
                   "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
