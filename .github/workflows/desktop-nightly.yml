@@ -79,9 +79,12 @@ jobs:
         id: changelog
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
+
+          repo_url="https://github.com/${REPO}"
 
           # Find the latest stable release tag (vX.Y.Z, not desktop-nightly)
           last_release=$(git tag -l 'v*' --sort=-creatordate | head -1)
@@ -93,91 +96,98 @@ jobs:
           echo "Comparing: ${last_release}..HEAD"
           echo "last_release=$last_release" >> "$GITHUB_OUTPUT"
 
-          # Extract merged PR numbers from merge commits
-          pr_numbers=$(git log "${last_release}..HEAD" --merges --oneline \
-            | grep -oE '#[0-9]+' | tr -d '#' | sort -un || true)
+          # Extract merged PR numbers from merge commits + squash merges
+          pr_numbers=$(git log "${last_release}..HEAD" --oneline \
+            | grep -oE '\(#[0-9]+\)' | tr -d '(#)' | sort -un || true)
 
-          if [ -z "$pr_numbers" ]; then
-            # Fallback: extract from commit messages
-            pr_numbers=$(git log "${last_release}..HEAD" --oneline \
-              | grep -oE '\(#[0-9]+\)' | tr -d '(#)' | sort -un || true)
-          fi
-
-          changelog_md=""
-          changelog_plain=""
+          # Three output formats: feishu (with links), github (GFM), plain (for LLM)
+          feishu_lines=""
+          github_lines=""
+          plain_lines=""
           pr_count=0
 
           for pr in $pr_numbers; do
-            # Get PR title, labels, URL, and closing issues
-            pr_data=$(gh pr view "$pr" --json title,labels,url,closingIssuesReferences \
+            pr_data=$(gh pr view "$pr" --json title,labels,closingIssuesReferences \
               --jq '{
                 title: .title,
                 labels: [.labels[].name] | join(","),
-                url: .url,
-                issues: [.closingIssuesReferences[] | {number, title, url}]
+                issues: [.closingIssuesReferences[].number]
               }' 2>/dev/null || echo "")
-            if [ -z "$pr_data" ]; then
-              continue
-            fi
+            [ -z "$pr_data" ] && continue
 
             title=$(echo "$pr_data" | jq -r '.title')
             labels=$(echo "$pr_data" | jq -r '.labels')
-            url=$(echo "$pr_data" | jq -r '.url')
 
-            # Extract area from conventional commit prefix: feat(desktop) → desktop
+            # Extract area from conventional commit prefix or labels
             area=""
             if echo "$title" | grep -qE '^\w+\(([^)]+)\)'; then
               area=$(echo "$title" | sed -E 's/^\w+\(([^)]+)\).*/\1/')
             fi
-
-            # Build display area from labels or commit prefix
             display_area="$area"
-            if echo "$labels" | grep -qi "desktop"; then
-              display_area="desktop"
-            elif echo "$labels" | grep -qi "web"; then
-              display_area="web"
-            elif echo "$labels" | grep -qi "controller"; then
-              display_area="controller"
-            elif echo "$labels" | grep -qi "skills"; then
-              display_area="skills"
-            elif echo "$labels" | grep -qi "channels"; then
-              display_area="channels"
-            fi
+            for kw in desktop web controller skills channels models ci; do
+              if echo "$labels" | grep -qi "$kw"; then
+                display_area="$kw"; break
+              fi
+            done
+            tag=""; [ -n "$display_area" ] && tag="\`${display_area}\` "
 
-            area_tag=""
-            if [ -n "$display_area" ]; then
-              area_tag="[${display_area}] "
-            fi
+            # Clean title: strip "scope(area): " prefix for readability
+            clean_title=$(echo "$title" | sed -E 's/^\w+(\([^)]+\))?: ?//')
 
-            # Format closing issues: → #598 白屏 | #555 kimi
-            issues_str=""
-            issue_count=$(echo "$pr_data" | jq '.issues | length')
-            if [ "$issue_count" -gt 0 ]; then
-              issues_str=$(echo "$pr_data" | jq -r '.issues[] | "→ #\(.number) \(.title)"' | head -3 | paste -sd " | " -)
-            fi
+            # Fetch closing issue titles individually (avoids null from closingIssuesReferences)
+            issue_nums=$(echo "$pr_data" | jq -r '.issues[]' 2>/dev/null || true)
+            issue_feishu=""
+            issue_github=""
+            issue_plain=""
+            for inum in $issue_nums; do
+              ititle=$(gh issue view "$inum" --json title --jq '.title' 2>/dev/null || echo "")
+              [ -z "$ititle" ] && continue
+              issue_feishu="${issue_feishu}    📌 [#${inum}](${repo_url}/issues/${inum}) ${ititle}\n"
+              issue_github="${issue_github}  - 📌 #${inum} ${ititle}\n"
+              issue_plain="${issue_plain}  关联: #${inum} ${ititle}\n"
+            done
 
-            if [ -n "$issues_str" ]; then
-              changelog_md="${changelog_md}- ${area_tag}${title} ([#${pr}](${url}))\n  ${issues_str}\n"
-              changelog_plain="${changelog_plain}${area_tag}${title} #${pr}\n  ${issues_str}\n"
-            else
-              changelog_md="${changelog_md}- ${area_tag}${title} ([#${pr}](${url}))\n"
-              changelog_plain="${changelog_plain}${area_tag}${title} #${pr}\n"
-            fi
+            feishu_lines="${feishu_lines}${tag}${clean_title} ([PR #${pr}](${repo_url}/pull/${pr}))\n${issue_feishu}"
+            github_lines="${github_lines}- ${tag}${clean_title} (#${pr})\n${issue_github}"
+            plain_lines="${plain_lines}${display_area:+[${display_area}] }${clean_title} #${pr}\n${issue_plain}"
             pr_count=$((pr_count + 1))
           done
 
           if [ "$pr_count" -eq 0 ]; then
-            changelog_md="- No merged PRs since ${last_release}"
-            changelog_plain="No merged PRs since ${last_release}"
+            feishu_lines="No merged PRs since ${last_release}"
+            github_lines="No merged PRs since ${last_release}"
+            plain_lines="No merged PRs since ${last_release}"
           fi
 
           echo "pr_count=$pr_count" >> "$GITHUB_OUTPUT"
 
-          # Write to files (multiline safe)
-          printf '%b' "$changelog_md" > /tmp/changelog_md.txt
-          printf '%b' "$changelog_plain" > /tmp/changelog_plain.txt
+          printf '%b' "$feishu_lines" > /tmp/changelog_feishu.txt
+          printf '%b' "$github_lines" > /tmp/changelog_github.txt
+          printf '%b' "$plain_lines" > /tmp/changelog_plain.txt
 
           echo "Generated changelog with $pr_count PRs"
+
+      - name: Write GitHub Step Summary
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          PR_COUNT: ${{ steps.changelog.outputs.pr_count }}
+          LAST_RELEASE: ${{ steps.changelog.outputs.last_release }}
+        shell: bash
+        run: |
+          {
+            echo "## Nightly Changelog"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Version** | \`${VERSION}\` (\`${SHORT_SHA}\`) |"
+            echo "| **Baseline** | \`${LAST_RELEASE}\` |"
+            echo "| **PRs merged** | ${PR_COUNT} |"
+            echo ""
+            echo "### Changes since ${LAST_RELEASE}"
+            echo ""
+            cat /tmp/changelog_github.txt
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate LLM summary
         id: llm
@@ -242,7 +252,7 @@ jobs:
             exit 0
           fi
 
-          changelog=$(cat /tmp/changelog_plain.txt | head -20)
+          changelog=$(cat /tmp/changelog_feishu.txt | head -40)
           run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           release_url="https://github.com/${{ github.repository }}/releases/tag/desktop-nightly"
           e2e_url="https://github.com/${{ github.repository }}/actions/workflows/desktop-e2e.yml"
