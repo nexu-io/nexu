@@ -414,15 +414,14 @@ const zhCN = {
   "skills.skillsCount": "{{count}} 个技能",
   "skills.searchPlaceholder": "搜索",
   "skills.official": "官方",
-  "skills.custom": "自定义",
   "skills.all": "全部",
   "skills.explore": "ClawHub",
   "skills.yours": "我的",
   "skills.clawhubDisclaimer":
     "Skill 来自 ClawHub，网络或服务偶有不稳定；若遇到问题，欢迎在",
   "skills.clawhubDisclaimerAfterLink": "反馈。",
-  "skills.recommended": "推荐",
-  "skills.installed": "已安装",
+  "skills.builtin": "内置",
+  "skills.custom": "自定义",
   "skills.installQueued": "技能已加入安装队列",
   "skills.skillNotFound":
     '"{{slug}}" 在 ClawHub 上不可用，可能已被移除或重命名。',
@@ -477,9 +476,6 @@ const zhCN = {
   "skills.installingAction": "安装中…",
   "skills.uninstallingAction": "卸载中…",
   "skills.agentSkills": "代理技能",
-  "skills.installedByAgent": "由 {{agentName}} 安装",
-  "skills.noAgentSkills": "暂无代理安装的技能",
-  "skills.agentSkillsDescription": "代理在对话中安装的技能",
 
   // ── Skill Detail Page ──
   "skillDetail.backToSkills": "返回技能列表",
