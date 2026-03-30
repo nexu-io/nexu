@@ -1,13 +1,11 @@
 /**
  * Quit Handler - Desktop exit behavior with launchd services
  *
- * On macOS, window close is intercepted to show a quit dialog.
- * - Quit Completely: stop all launchd services and exit
- * - Run in Background: hide window, keep services running
- * - Cancel: do nothing
+ * Window close (red traffic light) → hide to background, services keep running.
+ * Cmd+Q / Dock Quit → full teardown and exit.
  */
 
-import { BrowserWindow, app, dialog } from "electron";
+import { BrowserWindow, app } from "electron";
 import type { EmbeddedWebServer } from "./embedded-web-server";
 import { teardownLaunchdServices } from "./launchd-bootstrap";
 import type { LaunchdManager } from "./launchd-manager";
@@ -28,56 +26,6 @@ export interface QuitHandlerOptions {
 }
 
 export type QuitDecision = "quit-completely" | "run-in-background" | "cancel";
-
-const i18n = {
-  en: {
-    buttons: ["Quit Completely", "Run in Background", "Cancel"],
-    title: "Quit Nexu",
-    message: "Choose exit mode",
-    detail:
-      "Running in background keeps services running, bots continue working.\n\n" +
-      "To fully stop services, choose 'Quit Completely'.",
-  },
-  zh: {
-    buttons: ["完全退出", "后台运行", "取消"],
-    title: "退出 Nexu",
-    message: "选择退出方式",
-    detail:
-      "后台运行将保持服务运行，机器人继续工作。\n\n" +
-      "如需完全停止服务，请选择「完全退出」。",
-  },
-} as const;
-
-function getQuitDialogLocale(): {
-  buttons: readonly string[];
-  title: string;
-  message: string;
-  detail: string;
-} {
-  const locale = app.getLocale();
-  return locale.startsWith("zh") ? i18n.zh : i18n.en;
-}
-
-async function showQuitDialog(): Promise<QuitDecision> {
-  const t = getQuitDialogLocale();
-  const { response } = await dialog.showMessageBox({
-    type: "question",
-    buttons: [...t.buttons],
-    defaultId: 0,
-    title: t.title,
-    message: t.message,
-    detail: t.detail,
-  });
-
-  switch (response) {
-    case 0:
-      return "quit-completely";
-    case 1:
-      return "run-in-background";
-    default:
-      return "cancel";
-  }
-}
 
 /**
  * Install quit handler for launchd-managed services.
@@ -123,9 +71,7 @@ async function runTeardownAndExit(
 }
 
 export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
-  let dialogOpen = false;
-
-  // Intercept main window close to show quit dialog
+  // Intercept main window close — hide to background (no dialog)
   const interceptWindowClose = (window: BrowserWindow) => {
     window.on("close", (event) => {
       // If a force-quit is in progress, let the window close
@@ -140,32 +86,11 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
         return;
       }
 
-      // Prevent close while dialog is showing
-      if (dialogOpen) {
-        event.preventDefault();
-        return;
-      }
-
+      // Window close (red traffic light) → hide to background.
+      // Services keep running so bots stay online.
+      // "Quit Completely" is only triggered via Cmd+Q / Dock Quit.
       event.preventDefault();
-      dialogOpen = true;
-
-      void (async () => {
-        const decision = await showQuitDialog();
-        dialogOpen = false;
-
-        if (decision === "cancel") {
-          return;
-        }
-
-        if (decision === "run-in-background") {
-          window.hide();
-          return;
-        }
-
-        // "quit-completely" — onForceQuit only fires on explicit user choice
-        opts.onForceQuit?.();
-        await runTeardownAndExit(opts, "packaged-quit");
-      })();
+      window.hide();
     });
   };
 
@@ -186,16 +111,10 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
       return;
     }
 
-    // Packaged: redirect to window close handler for dialog.
+    // Packaged Cmd+Q / Dock Quit → full teardown and exit.
     event.preventDefault();
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) {
-      if (!win.isVisible()) win.show();
-      win.close();
-    } else {
-      // No window (renderer crashed or already destroyed).
-      void runTeardownAndExit(opts, "packaged-no-window");
-    }
+    opts.onForceQuit?.();
+    void runTeardownAndExit(opts, "packaged-quit");
   });
 }
 
