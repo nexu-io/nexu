@@ -39,9 +39,11 @@ describe("proxy-config", () => {
   });
 
   it("redacts proxy credentials safely", () => {
-    expect(redactProxyUrl("http://user:pass@proxy.example.com:8080")).toBe(
-      "http://***:***@proxy.example.com:8080/",
-    );
+    expect(
+      redactProxyUrl(
+        "http://user:pass@proxy.example.com:8080?token=secret#frag",
+      ),
+    ).toBe("http://***:***@proxy.example.com:8080/");
     expect(redactProxyUrl("not a url")).toBe("***");
   });
 
@@ -60,6 +62,7 @@ describe("proxy-config", () => {
 
     expect(buildChildProcessProxyEnv(policy)).toEqual({
       HTTPS_PROXY: "http://proxy.example.com:8443",
+      NODE_USE_ENV_PROXY: "1",
       NO_PROXY: "localhost,127.0.0.1,::1",
     });
   });

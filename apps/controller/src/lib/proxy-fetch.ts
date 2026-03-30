@@ -18,6 +18,7 @@ type HttpModuleWithProxySupport = typeof http & {
 };
 
 const REQUIRED_LOOPBACK_BYPASS = ["localhost", "127.0.0.1", "::1"];
+const NODE_USE_ENV_PROXY = "NODE_USE_ENV_PROXY";
 
 let configuredProxyKey: string | null = null;
 let restoreProxyConfig: (() => void) | null = null;
@@ -242,6 +243,15 @@ function createAbortSignal(
 }
 
 function ensureGlobalProxySupport(proxyEnv: ProxyFetchEnv): void {
+  if (!proxyEnv.httpProxy && !proxyEnv.httpsProxy) {
+    return;
+  }
+
+  process.env.HTTP_PROXY = proxyEnv.httpProxy ?? "";
+  process.env.HTTPS_PROXY = proxyEnv.httpsProxy ?? "";
+  process.env.NO_PROXY = proxyEnv.noProxy.join(",");
+  process.env[NODE_USE_ENV_PROXY] = "1";
+
   const key = JSON.stringify(proxyEnv);
   if (configuredProxyKey === key) {
     return;
@@ -253,10 +263,6 @@ function ensureGlobalProxySupport(proxyEnv: ProxyFetchEnv): void {
 
   const httpWithProxySupport = http as HttpModuleWithProxySupport;
   if (typeof httpWithProxySupport.setGlobalProxyFromEnv !== "function") {
-    return;
-  }
-
-  if (!proxyEnv.httpProxy && !proxyEnv.httpsProxy) {
     return;
   }
 

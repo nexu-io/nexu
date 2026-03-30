@@ -85,6 +85,8 @@ export function redactProxyUrl(url: string | null): string | null {
       parsed.username = "***";
       parsed.password = "***";
     }
+    parsed.search = "";
+    parsed.hash = "";
     return parsed.toString();
   } catch {
     return "***";
@@ -126,6 +128,16 @@ export function buildChildProcessProxyEnv(
   const nextEnv: Record<string, string> = {
     NO_PROXY: policy.bypass.join(","),
   };
+
+  const hasExplicitProxy = [
+    policy.env.httpProxy,
+    policy.env.httpsProxy,
+    policy.env.allProxy,
+  ].some(Boolean);
+
+  if (hasExplicitProxy) {
+    nextEnv.NODE_USE_ENV_PROXY = "1";
+  }
 
   if (policy.env.httpProxy) {
     nextEnv.HTTP_PROXY = policy.env.httpProxy;

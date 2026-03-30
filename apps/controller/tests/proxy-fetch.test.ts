@@ -7,7 +7,13 @@ import {
   shouldBypassProxy,
 } from "../src/lib/proxy-fetch.js";
 
-const PROXY_ENV_KEYS = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
+const PROXY_ENV_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "NODE_USE_ENV_PROXY",
+];
 
 function resetProxyEnv(): void {
   for (const key of PROXY_ENV_KEYS) {
@@ -108,5 +114,19 @@ describe("proxyFetch", () => {
     expect(redactProxyUrl(process.env.HTTP_PROXY ?? null)).toBe(
       "http://***:***@proxy.example.com:8080/",
     );
+  });
+
+  it("enables env proxy fallback when proxy env is configured", async () => {
+    process.env.HTTP_PROXY = "http://proxy.example.com:8080";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ ok: true }))),
+    );
+
+    await proxyFetch("https://example.com");
+
+    expect(process.env.NODE_USE_ENV_PROXY).toBe("1");
+    expect(process.env.NO_PROXY).toBe("localhost,127.0.0.1,::1");
   });
 });
