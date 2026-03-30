@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { app } from "electron";
 import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
@@ -38,7 +38,34 @@ function loadDesktopDevEnv(): void {
       continue;
     }
 
-    process.loadEnvFile(envPath);
+    const source = readFileSync(envPath, "utf8");
+    for (const rawLine of source.split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex <= 0) {
+        continue;
+      }
+
+      const key = line.slice(0, separatorIndex).trim();
+      if (!key || process.env[key] !== undefined) {
+        continue;
+      }
+
+      const rawValue = line.slice(separatorIndex + 1).trim();
+      if (
+        (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+        (rawValue.startsWith("'") && rawValue.endsWith("'"))
+      ) {
+        process.env[key] = rawValue.slice(1, -1);
+        continue;
+      }
+
+      process.env[key] = rawValue;
+    }
   }
 }
 
