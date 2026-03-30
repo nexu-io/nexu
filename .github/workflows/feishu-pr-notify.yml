@@ -25,7 +25,7 @@ jobs:
 
       - name: Send Feishu notification
         env:
-          WEBHOOK_URL: ${{ secrets.ISSUE_SYNC_FEISHU_BOT_WEBHOOK }}
+          WEBHOOK_URL: ${{ secrets.NOTIFY_PR_FEISHU_WEBHOOK }}
           EVENT_TYPE: pull_request
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
