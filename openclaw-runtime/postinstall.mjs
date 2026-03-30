@@ -10,6 +10,18 @@ const nodeModulesDir = path.join(runtimeDir, "node_modules");
 const cacheFileName = ".postinstall-cache.json";
 const cacheFilePath = path.join(runtimeDir, cacheFileName);
 const lockfilePath = path.join(runtimeDir, "package-lock.json");
+const criticalRuntimeFiles = [
+  path.join("node_modules", "openclaw", "dist"),
+  path.join("node_modules", "@whiskeysockets", "baileys", "lib", "index.js"),
+  path.join(
+    "node_modules",
+    "@whiskeysockets",
+    "baileys",
+    "WAProto",
+    "index.js",
+  ),
+  path.join("node_modules", "@whiskeysockets", "baileys", "package.json"),
+];
 
 async function readCachedFingerprint() {
   if (!(await exists(cacheFilePath))) {
@@ -71,12 +83,28 @@ async function installRuntime() {
   ]);
 }
 
+async function hasCompleteRuntimeInstall() {
+  for (const relativePath of criticalRuntimeFiles) {
+    if (!(await exists(path.join(runtimeDir, relativePath)))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 try {
   const fingerprint = await computeFingerprint(runtimeDir);
   const cachedFingerprint = await readCachedFingerprint();
   const hasNodeModules = await exists(nodeModulesDir);
+  const hasCompleteRuntime = hasNodeModules
+    ? await hasCompleteRuntimeInstall()
+    : false;
 
-  if (hasNodeModules && cachedFingerprint === fingerprint) {
+  if (
+    hasNodeModules &&
+    hasCompleteRuntime &&
+    cachedFingerprint === fingerprint
+  ) {
     console.log("openclaw-runtime unchanged, skipping install:pruned.");
     process.exit(0);
   }
@@ -84,6 +112,10 @@ try {
   if (!hasNodeModules) {
     console.log(
       "openclaw-runtime node_modules missing, running install:pruned.",
+    );
+  } else if (!hasCompleteRuntime) {
+    console.log(
+      "openclaw-runtime critical files missing, running install:pruned.",
     );
   } else if (cachedFingerprint === null) {
     console.log("openclaw-runtime cache missing, running install:pruned.");

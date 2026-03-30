@@ -29,11 +29,24 @@ export interface ChannelAccountSnapshot {
   restartPending?: boolean;
   lastError?: string | null;
   probe?: { ok?: boolean };
+  linked?: boolean;
+}
+
+export interface ChannelSelfPresence {
+  e164?: string | null;
+  jid?: string | null;
+}
+
+export interface ChannelSummarySnapshot {
+  configured?: boolean;
+  linked?: boolean;
+  self?: ChannelSelfPresence | null;
 }
 
 /** Result of channels.status RPC. */
 export interface ChannelsStatusResult {
   channelOrder: string[];
+  channels?: Record<string, ChannelSummarySnapshot>;
   channelAccounts: Record<string, ChannelAccountSnapshot[]>;
 }
 
