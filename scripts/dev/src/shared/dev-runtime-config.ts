@@ -11,9 +11,12 @@ type ScriptsDevRuntimeConfig = {
   controllerPort: number;
   webPort: number;
   openclawPort: number;
+  desktopDevHost: string;
+  desktopDevPort: number;
   controllerUrl: string;
   webUrl: string;
   openclawBaseUrl: string;
+  desktopDevServerUrl: string;
   nexuHomeDir: string;
   openclawStateDir: string;
   openclawConfigPath: string;
@@ -103,6 +106,8 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
   const controllerPort = readNumber(mergedEnv.NEXU_DEV_CONTROLLER_PORT, 50800);
   const webPort = readNumber(mergedEnv.NEXU_DEV_WEB_PORT, 50810);
   const openclawPort = readNumber(mergedEnv.NEXU_DEV_OPENCLAW_PORT, 18789);
+  const desktopDevHost = mergedEnv.NEXU_DEV_DESKTOP_HOST ?? "127.0.0.1";
+  const desktopDevPort = readNumber(mergedEnv.NEXU_DEV_DESKTOP_PORT, 5180);
   const nexuHomeDir = resolvePath(
     mergedEnv.NEXU_DEV_NEXU_HOME_DIR,
     join(devTmpPath, "nexu-home"),
@@ -136,6 +141,8 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     controllerPort,
     webPort,
     openclawPort,
+    desktopDevHost,
+    desktopDevPort,
     controllerUrl:
       mergedEnv.NEXU_DEV_CONTROLLER_URL ??
       `http://127.0.0.1:${String(controllerPort)}`,
@@ -143,6 +150,9 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     openclawBaseUrl:
       mergedEnv.NEXU_DEV_OPENCLAW_BASE_URL ??
       `http://127.0.0.1:${String(openclawPort)}`,
+    desktopDevServerUrl:
+      mergedEnv.NEXU_DEV_DESKTOP_SERVER_URL ??
+      `http://${desktopDevHost}:${String(desktopDevPort)}`,
     nexuHomeDir,
     openclawStateDir,
     openclawConfigPath,
@@ -207,9 +217,9 @@ export function createDesktopInjectedEnv(): NodeJS.ProcessEnv {
     NEXU_WEB_URL: config.webUrl,
     NEXU_OPENCLAW_BASE_URL: config.openclawBaseUrl,
     NEXU_OPENCLAW_GATEWAY_TOKEN: config.openclawGatewayToken,
-    NEXU_DESKTOP_DEV_HOST: "127.0.0.1",
-    NEXU_DESKTOP_DEV_PORT: "5180",
-    NEXU_DESKTOP_DEV_SERVER_URL: "http://127.0.0.1:5180",
+    NEXU_DESKTOP_DEV_HOST: config.desktopDevHost,
+    NEXU_DESKTOP_DEV_PORT: String(config.desktopDevPort),
+    NEXU_DESKTOP_DEV_SERVER_URL: config.desktopDevServerUrl,
     NEXU_DESKTOP_DEV_API_ORIGIN: config.controllerUrl,
     NEXU_HOME: config.nexuHomeDir,
   };

@@ -59,7 +59,62 @@ function compactPaths(paths) {
   return [...new Set(paths.filter(Boolean))];
 }
 
+function readNumberEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function getPortConfig(mode) {
+  return {
+    controllerPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_CONTROLLER_PORT" : "NEXU_CONTROLLER_PORT",
+      50800,
+    ),
+    webPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_WEB_PORT" : "NEXU_WEB_PORT",
+      50810,
+    ),
+    openclawPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_OPENCLAW_PORT" : "NEXU_OPENCLAW_PORT",
+      18789,
+    ),
+  };
+}
+
+function getReadinessUrls(mode, portConfig) {
+  const controllerUrl =
+    process.env[
+      mode === "dev" ? "NEXU_DEV_CONTROLLER_URL" : "NEXU_CONTROLLER_URL"
+    ] ?? `http://127.0.0.1:${portConfig.controllerPort}`;
+  const webUrl =
+    process.env[mode === "dev" ? "NEXU_DEV_WEB_URL" : "NEXU_WEB_URL"] ??
+    `http://127.0.0.1:${portConfig.webPort}`;
+  const openclawBaseUrl =
+    process.env[
+      mode === "dev" ? "NEXU_DEV_OPENCLAW_BASE_URL" : "NEXU_OPENCLAW_BASE_URL"
+    ] ?? `http://127.0.0.1:${portConfig.openclawPort}`;
+
+  return {
+    api: `${controllerUrl}/api/internal/desktop/ready`,
+    web: `${webUrl}/api/internal/desktop/ready`,
+    webSurface: `${webUrl}/workspace`,
+    openclawHealth: `${openclawBaseUrl}/health`,
+  };
+}
+
+function isBrowserControlRequired() {
+  const value = process.env.NEXU_DESKTOP_CHECK_REQUIRE_BROWSER_CONTROL;
+
+  if (value === undefined) {
+    return true;
+  }
+
+  return value === "1" || value.toLowerCase() === "true";
+}
+
 function createCheckContext(mode) {
+  const portConfig = getPortConfig(mode);
+
   if (mode === "dev") {
     const desktopRoot = resolve(repoRoot, ".tmp/desktop/electron");
     const desktopUserDataRoot = resolve(desktopRoot, "user-data");
@@ -70,15 +125,10 @@ function createCheckContext(mode) {
       mode,
       statusCommand: [pnpmCommand, ["dev", "status"]],
       ports: [
-        { unit: "controller", port: 50800 },
-        { unit: "web", port: 50810 },
+        { unit: "controller", port: portConfig.controllerPort },
+        { unit: "web", port: portConfig.webPort },
       ],
-      readinessUrls: {
-        api: "http://127.0.0.1:50800/api/internal/desktop/ready",
-        web: "http://127.0.0.1:50810/api/internal/desktop/ready",
-        webSurface: "http://127.0.0.1:50810/workspace",
-        openclawHealth: "http://127.0.0.1:18789/health",
-      },
+      readinessUrls: getReadinessUrls(mode, portConfig),
       processChecks: {
         lockFile: resolve(repoRoot, ".tmp/dev/desktop.pid"),
         pidKey: "pid",
@@ -101,6 +151,7 @@ function createCheckContext(mode) {
         { source: resolve(repoRoot, ".tmp/dev/logs"), target: "repo-logs" },
         { source: desktopLogsDir, target: "electron-logs" },
       ],
+      portConfig,
     };
   }
 
@@ -117,15 +168,10 @@ function createCheckContext(mode) {
     mode,
     statusCommand: null,
     ports: [
-      { unit: "controller", port: 50800 },
-      { unit: "web", port: 50810 },
+      { unit: "controller", port: portConfig.controllerPort },
+      { unit: "web", port: portConfig.webPort },
     ],
-    readinessUrls: {
-      api: "http://127.0.0.1:50800/api/internal/desktop/ready",
-      web: "http://127.0.0.1:50810/api/internal/desktop/ready",
-      webSurface: "http://127.0.0.1:50810/workspace",
-      openclawHealth: "http://127.0.0.1:18789/health",
-    },
+    readinessUrls: getReadinessUrls(mode, portConfig),
     processChecks: {
       pidFile: process.env.NEXU_DESKTOP_PACKAGED_PID_PATH ?? null,
     },
@@ -195,6 +241,7 @@ function createCheckContext(mode) {
           ]
         : []),
     ],
+    portConfig,
   };
 }
 
@@ -582,7 +629,7 @@ function probesPassed(results, diagnostics) {
     results.webReady.body.includes('"ready":true') &&
     results.webSurface.body.includes('<div id="root"></div>') &&
     results.openclawHealth.ok &&
-    results.browserControlListening &&
+    (!isBrowserControlRequired() || results.browserControlListening) &&
     results.appProcessResults.mainProcess.alive &&
     (results.appProcessResults.tmuxSession?.alive ?? true) &&
     diagnosticsChecksPassed(diagnostics)
@@ -1044,7 +1091,7 @@ async function verifyRuntime(context) {
     addMissing("web", "root document did not contain app mount node");
   }
 
-  if (!probeResults.browserControlListening) {
+  if (isBrowserControlRequired() && !probeResults.browserControlListening) {
     addMissing("openclaw", "browser control port 18791 is not listening");
   }
 

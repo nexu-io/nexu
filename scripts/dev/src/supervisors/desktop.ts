@@ -9,6 +9,7 @@ import {
   writeDevLock,
 } from "@nexu/dev-utils";
 
+import { getScriptsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
 import {
   desktopDevLockPath,
   desktopWorkingDirectoryPath,
@@ -30,14 +31,16 @@ const desktopRunId = runId;
 const desktopSessionId = sessionId;
 
 function createDesktopWorkerCommand(): { command: string; args: string[] } {
+  const runtimeConfig = getScriptsDevRuntimeConfig();
+
   return {
     command: process.execPath,
     args: [
       resolveViteBinPath(desktopWorkingDirectoryPath),
       "--host",
-      process.env.NEXU_DESKTOP_DEV_HOST ?? "127.0.0.1",
+      runtimeConfig.desktopDevHost,
       "--port",
-      process.env.NEXU_DESKTOP_DEV_PORT ?? "5180",
+      String(runtimeConfig.desktopDevPort),
       "--strictPort",
     ],
   };

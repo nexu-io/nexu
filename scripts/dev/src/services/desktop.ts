@@ -18,7 +18,10 @@ import { ensure } from "@nexu/shared";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
+import {
+  createDesktopInjectedEnv,
+  getScriptsDevRuntimeConfig,
+} from "../shared/dev-runtime-config.js";
 import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
@@ -101,14 +104,16 @@ function createDesktopViteCommand(): {
   command: string;
   args: string[];
 } {
+  const runtimeConfig = getScriptsDevRuntimeConfig();
+
   return {
     command: process.execPath,
     args: [
       resolveViteBinPath(desktopWorkingDirectoryPath),
       "--host",
-      process.env.NEXU_DESKTOP_DEV_HOST ?? "127.0.0.1",
+      runtimeConfig.desktopDevHost,
       "--port",
-      process.env.NEXU_DESKTOP_DEV_PORT ?? "5180",
+      String(runtimeConfig.desktopDevPort),
       "--strictPort",
     ],
   };
@@ -163,6 +168,8 @@ async function waitForDesktopShutdown(options?: {
   previousPid?: number;
   launchId?: string;
 }): Promise<void> {
+  const desktopDevPort = getScriptsDevRuntimeConfig().desktopDevPort;
+
   await waitFor(
     async () => {
       if (options?.previousPid && isProcessRunning(options.previousPid)) {
@@ -175,7 +182,7 @@ async function waitForDesktopShutdown(options?: {
       }
 
       try {
-        await getListeningPortPid(5180, "desktop dev server");
+        await getListeningPortPid(desktopDevPort, "desktop dev server");
       } catch {
         return;
       }
@@ -191,12 +198,17 @@ async function waitForDesktopShutdown(options?: {
 }
 
 async function cleanupStaleDesktopDevServer(): Promise<void> {
+  const desktopDevPort = getScriptsDevRuntimeConfig().desktopDevPort;
+
   try {
-    const vitePid = await getListeningPortPid(5180, "desktop dev server");
+    const vitePid = await getListeningPortPid(
+      desktopDevPort,
+      "desktop dev server",
+    );
     await terminateDesktopPid(vitePid);
     await waitFor(
       async () => {
-        await getListeningPortPid(5180, "desktop dev server");
+        await getListeningPortPid(desktopDevPort, "desktop dev server");
         throw new Error("desktop dev server listener is still active");
       },
       () => new Error("desktop dev server listener did not stop in time"),
@@ -245,6 +257,7 @@ async function waitForDesktopBuildOutputs(startedAt: number): Promise<void> {
 export async function startDesktopDevProcess(options: {
   sessionId: string;
 }): Promise<DesktopDevSnapshot> {
+  const runtimeConfig = getScriptsDevRuntimeConfig();
   await ensureDesktopDependenciesReady();
 
   const existingSnapshot = await getCurrentDesktopDevSnapshot();
@@ -298,12 +311,16 @@ export async function startDesktopDevProcess(options: {
     viteHandle.dispose();
   }
 
-  await waitForListeningPortPid(5180, "desktop dev server", {
-    attempts: 40,
-    delayMs: 250,
-    supervisorPid: viteHandle.pid,
-    supervisorName: "desktop vite worker",
-  });
+  await waitForListeningPortPid(
+    runtimeConfig.desktopDevPort,
+    "desktop dev server",
+    {
+      attempts: 40,
+      delayMs: 250,
+      supervisorPid: viteHandle.pid,
+      supervisorName: "desktop vite worker",
+    },
+  );
   await waitForDesktopBuildOutputs(viteStartedAt);
 
   const electronLaunchSpec = await createDesktopElectronLaunchSpec({
@@ -401,7 +418,7 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
 
   try {
     const desktopVitePid = await getListeningPortPid(
-      5180,
+      getScriptsDevRuntimeConfig().desktopDevPort,
       "desktop dev server",
     );
     if (isProcessRunning(desktopVitePid)) {
@@ -426,7 +443,7 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
 
     try {
       const desktopVitePid = await getListeningPortPid(
-        5180,
+        getScriptsDevRuntimeConfig().desktopDevPort,
         "desktop dev server",
       );
       await terminateDesktopPid(desktopVitePid, true);
