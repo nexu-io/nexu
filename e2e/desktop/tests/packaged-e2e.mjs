@@ -22,6 +22,10 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function isCoverageEnabled(env = process.env) {
+  return env.NEXU_DESKTOP_E2E_COVERAGE === "1";
+}
+
 async function waitFor(fn, description, timeoutMs = 60_000, intervalMs = 500) {
   const startedAt = Date.now();
   let lastError = null;
@@ -249,13 +253,210 @@ async function launchPackagedApp({ executablePath, env }) {
   const { _electron: electron } = await import("playwright");
   const app = await electron.launch({ executablePath, env });
   const page = await app.firstWindow();
+  const coverageCollector = await createChromiumCoverageCollector({
+    app,
+    initialPage: page,
+    captureDir: env.NEXU_DESKTOP_E2E_CAPTURE_DIR ?? process.env.NEXU_DESKTOP_E2E_CAPTURE_DIR,
+    scenarioName: env.NEXU_DESKTOP_E2E_SCENARIO_NAME ?? "unknown",
+    enabled: isCoverageEnabled(env),
+  });
   await page.waitForLoadState("domcontentloaded");
   await page.waitForFunction(
     () => Boolean(window.nexuHost?.invoke),
     undefined,
     { timeout: 60_000 },
   );
-  return { app, page };
+  return { app, page, coverageCollector };
+}
+
+function shouldPersistCoverageTarget(url) {
+  if (typeof url !== "string") return false;
+  const normalizedUrl = url.trim();
+  if (!normalizedUrl) return false;
+  if (normalizedUrl === "about:blank") return false;
+  if (normalizedUrl.startsWith("data:")) return false;
+  if (normalizedUrl.startsWith("chrome-error://")) return false;
+  if (normalizedUrl.startsWith("devtools://")) return false;
+  if (normalizedUrl.startsWith("chrome-devtools://")) return false;
+  return true;
+}
+
+function inferCoverageTargetType({ page, initialPage, url }) {
+  if (page === initialPage) return "main-window";
+  if (
+    typeof url === "string" &&
+    (url.includes(":50810") ||
+      url.includes("/workspace") ||
+      url.includes("/welcome") ||
+      url.includes("/home"))
+  ) {
+    return "webview";
+  }
+  return "window";
+}
+
+function sanitizeCoverageLabel(value) {
+  return String(value).replace(/[^a-zA-Z0-9_-]+/g, "-");
+}
+
+async function createChromiumCoverageCollector({
+  app,
+  initialPage,
+  captureDir,
+  scenarioName,
+  enabled,
+}) {
+  if (!enabled) {
+    return {
+      enabled: false,
+      async discoverTargets() {},
+      async flushAll() {},
+    };
+  }
+
+  assert(captureDir, "Chromium coverage requires captureDir");
+
+  const rawDir = path.join(captureDir, "coverage", "raw", "chromium");
+  await mkdir(rawDir, { recursive: true });
+
+  const launchId = `${Date.now()}-${process.pid}`;
+  const scenarioLabel = sanitizeCoverageLabel(scenarioName);
+  let targetCounter = 0;
+  const trackedPages = new Map();
+  const pendingFinalizers = new Set();
+
+  const trackPage = async (page, discoveryReason) => {
+    if (!page || trackedPages.has(page)) return;
+
+    const targetId = `target-${String(++targetCounter).padStart(3, "0")}`;
+    const entry = {
+      targetId,
+      page,
+      discoveredBy: discoveryReason,
+      firstSeenAt: new Date().toISOString(),
+      firstUrl: page.url(),
+      session: null,
+      finalized: false,
+    };
+    trackedPages.set(page, entry);
+
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) {
+        entry.lastUrl = frame.url();
+      }
+    });
+
+    page.on("close", () => {
+      const finalizePromise = finalizePage(page, "page-close").catch((error) => {
+        log(
+          `Coverage finalize failed for ${entry.targetId} on close: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+      pendingFinalizers.add(finalizePromise);
+      finalizePromise.finally(() => pendingFinalizers.delete(finalizePromise));
+    });
+
+    try {
+      entry.session = await page.context().newCDPSession(page);
+      await entry.session.send("Profiler.enable");
+      await entry.session.send("Profiler.startPreciseCoverage", {
+        callCount: true,
+        detailed: true,
+      });
+      log(`Started Chromium precise coverage for ${targetId}: ${page.url() || "(blank)"}`);
+    } catch (error) {
+      entry.startError = error instanceof Error ? error.message : String(error);
+      log(
+        `Failed to start Chromium precise coverage for ${targetId}: ${entry.startError}`,
+      );
+    }
+  };
+
+  const discoverTargets = async () => {
+    await Promise.all(app.windows().map((page) => trackPage(page, "window-scan")));
+  };
+
+  const finalizePage = async (page, finalizeReason) => {
+    const entry = trackedPages.get(page);
+    if (!entry || entry.finalized) return;
+    entry.finalized = true;
+
+    const url = entry.lastUrl ?? page.url() ?? entry.firstUrl ?? "";
+    const targetType = inferCoverageTargetType({ page, initialPage, url });
+
+    let result = [];
+    let stopError = null;
+
+    if (entry.session) {
+      try {
+        const response = await entry.session.send("Profiler.takePreciseCoverage");
+        result = Array.isArray(response?.result) ? response.result : [];
+      } catch (error) {
+        stopError = error instanceof Error ? error.message : String(error);
+      }
+
+      try {
+        await entry.session.send("Profiler.stopPreciseCoverage");
+      } catch (error) {
+        stopError ??= error instanceof Error ? error.message : String(error);
+      }
+
+      try {
+        await entry.session.send("Profiler.disable");
+      } catch (error) {
+        stopError ??= error instanceof Error ? error.message : String(error);
+      }
+    }
+
+  if (!shouldPersistCoverageTarget(url)) {
+      log(`Skipping Chromium coverage artifact for ${entry.targetId}: ${url || "(blank)"}`);
+      return;
+    }
+
+    const payload = {
+      targetId: entry.targetId,
+      targetType,
+      scenarioName,
+      discoveredBy: entry.discoveredBy,
+      firstSeenAt: entry.firstSeenAt,
+      finalizedAt: new Date().toISOString(),
+      finalizeReason,
+      url,
+      firstUrl: entry.firstUrl,
+      startError: entry.startError ?? null,
+      stopError,
+      result,
+    };
+
+    await writeFile(
+      path.join(rawDir, `${scenarioLabel}-${launchId}-${entry.targetId}.json`),
+      `${JSON.stringify(payload, null, 2)}\n`,
+      "utf8",
+    );
+  };
+
+  const onWindow = (page) => {
+    void trackPage(page, "window-event");
+  };
+
+  app.on("window", onWindow);
+  await trackPage(initialPage, "initial-window");
+  await discoverTargets();
+
+  return {
+    enabled: true,
+    async discoverTargets() {
+      await discoverTargets();
+    },
+    async flushAll(finalizeReason) {
+      await discoverTargets();
+      await Promise.all(
+        [...trackedPages.keys()].map((page) => finalizePage(page, finalizeReason)),
+      );
+      await Promise.all([...pendingFinalizers]);
+      app.off("window", onWindow);
+    },
+  };
 }
 
 function execFileAsync(command, args) {
@@ -313,7 +514,13 @@ async function clickQuitDialog() {
   return false;
 }
 
-async function quitPackagedApp(page, app) {
+async function quitPackagedApp(page, app, coverageCollector) {
+  await coverageCollector?.flushAll("pre-quit").catch((error) => {
+    log(
+      `Chromium coverage flush failed before quit: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
+
   const closePromise = app.waitForEvent("close").catch(() => null);
 
   // Try IPC quit first (preferred — no dialog)
@@ -492,13 +699,16 @@ async function runUpdateScenario({ appPath, zipPath, captureDir }) {
 
   let app;
   let page;
+  let coverageCollector;
   try {
-    ({ app, page } = await launchPackagedApp({
+    ({ app, page, coverageCollector } = await launchPackagedApp({
       executablePath: path.join(appPath, "Contents", "MacOS", "Nexu"),
       env: {
         ...process.env,
         NEXU_UPDATE_FEED_URL: updateFeed.feedUrl,
         NEXU_DESKTOP_USER_DATA_ROOT: userDataDir,
+        NEXU_DESKTOP_E2E_CAPTURE_DIR: captureDir,
+        NEXU_DESKTOP_E2E_SCENARIO_NAME: "update",
         HOME: homeDir,
       },
     }));
@@ -532,6 +742,8 @@ async function runUpdateScenario({ appPath, zipPath, captureDir }) {
     assert(downloadOk === true, "download failed");
     log("Update downloaded");
 
+    await coverageCollector?.flushAll("pre-update-install");
+
     const waitForClose = app.waitForEvent("close").catch(() => null);
     await page.evaluate(async () => {
       await window.nexuHost.invoke("update:install", undefined);
@@ -556,6 +768,7 @@ async function runUpdateScenario({ appPath, zipPath, captureDir }) {
     );
     log("Update scenario PASSED");
   } finally {
+    await coverageCollector?.flushAll("finally").catch(() => {});
     if (app) await app.close().catch(() => {});
     await updateFeed.close();
   }
@@ -565,11 +778,12 @@ async function runUpdateScenario({ appPath, zipPath, captureDir }) {
 // Scenario: Login + Agent Ready
 // ---------------------------------------------------------------------------
 
-async function getWebviewPage(app, timeout = 30_000) {
+async function getWebviewPage(app, coverageCollector, timeout = 30_000) {
   // The web app runs inside a <webview> tag, which appears as a separate window in Playwright.
   // We need to find the window whose URL points to the embedded web server (port 50810).
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
+    await coverageCollector?.discoverTargets();
     const windows = app.windows();
     for (const w of windows) {
       const url = w.url();
@@ -590,7 +804,7 @@ async function getWebviewPage(app, timeout = 30_000) {
   throw new Error("Webview page not found");
 }
 
-async function runLoginScenario({ app, page, captureDir }) {
+async function runLoginScenario({ app, page, captureDir, coverageCollector }) {
   const controllerBase = await page.evaluate(async () => {
     const r = await window.nexuHost.invoke(
       "env:get-controller-base-url",
@@ -613,7 +827,7 @@ async function runLoginScenario({ app, page, captureDir }) {
 
   // Step 1: Find the webview page (web app runs inside <webview>)
   log(`Main window URL: ${page.url()}`);
-  const webPage = await getWebviewPage(app);
+  const webPage = await getWebviewPage(app, coverageCollector);
   await webPage.waitForLoadState("domcontentloaded");
 
   // Save webview HTML for debugging
@@ -766,36 +980,48 @@ async function main() {
   const launchEnv = {
     ...process.env,
     NEXU_DESKTOP_USER_DATA_ROOT: args.userDataDir,
+    NEXU_DESKTOP_E2E_CAPTURE_DIR: args.captureDir,
     HOME: homeDir,
   };
 
   let app;
   let page;
+  let coverageCollector;
   try {
     if (args.mode === "login") {
-      ({ app, page } = await launchPackagedApp({
+      ({ app, page, coverageCollector } = await launchPackagedApp({
         executablePath: args.executablePath,
-        env: launchEnv,
+        env: { ...launchEnv, NEXU_DESKTOP_E2E_SCENARIO_NAME: "login" },
       }));
       await waitForDesktopReady();
-      await runLoginScenario({ app, page, captureDir: args.captureDir });
-      await quitPackagedApp(page, app);
+      await runLoginScenario({
+        app,
+        page,
+        captureDir: args.captureDir,
+        coverageCollector,
+      });
+      await quitPackagedApp(page, app, coverageCollector);
       app = null;
+      page = null;
+      coverageCollector = null;
     }
 
     if (args.mode === "model" || args.mode === "full") {
-      ({ app, page } = await launchPackagedApp({
+      ({ app, page, coverageCollector } = await launchPackagedApp({
         executablePath: args.executablePath,
-        env: launchEnv,
+        env: { ...launchEnv, NEXU_DESKTOP_E2E_SCENARIO_NAME: "model" },
       }));
       await waitForDesktopReady();
+      await coverageCollector?.discoverTargets();
       await runModelSwitchScenario({
         page,
         userDataDir: args.userDataDir,
         captureDir: args.captureDir,
       });
-      await quitPackagedApp(page, app);
+      await quitPackagedApp(page, app, coverageCollector);
       app = null;
+      page = null;
+      coverageCollector = null;
     }
 
     if (args.mode === "update" || args.mode === "full") {
@@ -806,6 +1032,7 @@ async function main() {
       });
     }
   } finally {
+    await coverageCollector?.flushAll("finally").catch(() => {});
     if (app) await app.close().catch(() => {});
   }
 }
