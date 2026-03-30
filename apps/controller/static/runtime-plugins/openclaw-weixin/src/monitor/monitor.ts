@@ -159,8 +159,18 @@ export async function monitorWeixinProvider(
           aLog.error(
             `getUpdates: session expired (errcode=${resp.errcode} ret=${resp.ret}), pausing all requests for ${Math.ceil(pauseMs / 60_000)} min`,
           );
+          // Surface the error to the runtime snapshot so live-status
+          // reports "error / session expired" instead of "connected"
+          // while the monitor is paused.
+          setStatus?.({
+            accountId,
+            running: false,
+            lastError: "not configured",
+          });
           consecutiveFailures = 0;
           await sleep(pauseMs, abortSignal);
+          // Clear error when resuming so the monitor can retry.
+          setStatus?.({ accountId, running: true, lastError: null });
           continue;
         }
 

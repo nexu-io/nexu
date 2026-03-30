@@ -370,6 +370,8 @@ const en = {
   "channels.comingSoon": "Microsoft Teams, Line and more coming soon",
   "channels.backToConfig": "Back to configuration",
   "channels.statusConnected": "{{platform}} Bot Connected",
+  "channels.statusConnecting": "Connecting...",
+  "channels.statusError": "Connection Error",
   "channels.configuredDate": "configured {{date}}",
   "channels.connectionActive": "connection active",
   "channels.setupGuide": "Setup Guide",

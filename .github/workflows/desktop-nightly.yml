@@ -100,7 +100,7 @@ jobs:
           pr_numbers=$(git log "${last_release}..HEAD" --oneline \
             | grep -oE '\(#[0-9]+\)' | tr -d '(#)' | sort -un || true)
 
-          # Three output formats: feishu (with links), github (GFM), plain (for LLM)
+          # Output files: feishu (with feishu markdown links), github (GFM), plain (for LLM)
           feishu_lines=""
           github_lines=""
           plain_lines=""
@@ -124,32 +124,34 @@ jobs:
               area=$(echo "$title" | sed -E 's/^\w+\(([^)]+)\).*/\1/')
             fi
             display_area="$area"
-            for kw in desktop web controller skills channels models ci; do
-              if echo "$labels" | grep -qi "$kw"; then
-                display_area="$kw"; break
+            for kw_label in desktop web controller skills channels models ci; do
+              if echo "$labels" | grep -qi "$kw_label"; then
+                display_area="$kw_label"
+                break
               fi
             done
             tag=""; [ -n "$display_area" ] && tag="\`${display_area}\` "
 
-            # Clean title: strip "scope(area): " prefix for readability
+            # Clean title: remove redundant "scope(area): " prefix for display
             clean_title=$(echo "$title" | sed -E 's/^\w+(\([^)]+\))?: ?//')
 
-            # Fetch closing issue titles individually (avoids null from closingIssuesReferences)
+            # Resolve closing issue titles (fetch individually to avoid null)
             issue_nums=$(echo "$pr_data" | jq -r '.issues[]' 2>/dev/null || true)
-            issue_feishu=""
-            issue_github=""
-            issue_plain=""
+            issue_parts_feishu=""
+            issue_parts_github=""
+            issue_parts_plain=""
             for inum in $issue_nums; do
               ititle=$(gh issue view "$inum" --json title --jq '.title' 2>/dev/null || echo "")
               [ -z "$ititle" ] && continue
-              issue_feishu="${issue_feishu}    📌 [#${inum}](${repo_url}/issues/${inum}) ${ititle}\n"
-              issue_github="${issue_github}  - 📌 #${inum} ${ititle}\n"
-              issue_plain="${issue_plain}  关联: #${inum} ${ititle}\n"
+              issue_parts_feishu="${issue_parts_feishu}    📌 [#${inum}](${repo_url}/issues/${inum}) ${ititle}\n"
+              issue_parts_github="${issue_parts_github}    - 📌 #${inum} ${ititle}\n"
+              issue_parts_plain="${issue_parts_plain}  关联: #${inum} ${ititle}\n"
             done
 
-            feishu_lines="${feishu_lines}${tag}${clean_title} ([PR #${pr}](${repo_url}/pull/${pr}))\n${issue_feishu}"
-            github_lines="${github_lines}- ${tag}${clean_title} (#${pr})\n${issue_github}"
-            plain_lines="${plain_lines}${display_area:+[${display_area}] }${clean_title} #${pr}\n${issue_plain}"
+            # Build lines
+            feishu_lines="${feishu_lines}${tag}${clean_title} ([PR #${pr}](${repo_url}/pull/${pr}))\n${issue_parts_feishu}"
+            github_lines="${github_lines}- ${tag}${clean_title} (#${pr})\n${issue_parts_github}"
+            plain_lines="${plain_lines}${display_area:+[${display_area}] }${clean_title} #${pr}\n${issue_parts_plain}"
             pr_count=$((pr_count + 1))
           done
 

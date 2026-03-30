@@ -7,3 +7,6 @@ Click the links below for detailed setup guides:
 - [Feishu](/guide/channels/feishu)
 - [Slack](/guide/channels/slack)
 - [Discord](/guide/channels/discord)
+- [WeChat](/guide/channels/wechat)
+- [Telegram](/guide/channels/telegram) 🆕
+- [WhatsApp](/guide/channels/whatsapp) 🆕

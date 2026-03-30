@@ -354,6 +354,8 @@ const zhCN = {
   "channels.comingSoon": "Microsoft Teams、Line 等更多平台即将支持",
   "channels.backToConfig": "返回配置",
   "channels.statusConnected": "{{platform}} Bot 已连接",
+  "channels.statusConnecting": "连接中...",
+  "channels.statusError": "连接异常",
   "channels.configuredDate": "配置于 {{date}}",
   "channels.connectionActive": "连接正常",
   "channels.setupGuide": "配置指南",

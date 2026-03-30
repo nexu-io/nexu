@@ -33,3 +33,5 @@ apps/desktop/.dist-runtime/
 apps/desktop/.cache/
 apps/desktop/build-config.json
 .claude/settings.local.json
+.claude/worktrees
+.claude/worktrees/
