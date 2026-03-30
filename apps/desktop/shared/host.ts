@@ -36,6 +36,7 @@ export const hostInvokeChannels = [
   "update:set-source",
   "component:check",
   "component:install",
+  "setup:animation-complete",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -132,6 +133,7 @@ export type HostInvokePayloadMap = {
   "update:set-source": { source: UpdateSource };
   "component:check": undefined;
   "component:install": { id: string };
+  "setup:animation-complete": undefined;
 };
 
 export type HostInvokeResultMap = {
@@ -392,6 +394,7 @@ export type HostInvokeResultMap = {
     }>;
   };
   "component:install": { ok: boolean };
+  "setup:animation-complete": undefined;
 };
 
 export type AppInfo = {

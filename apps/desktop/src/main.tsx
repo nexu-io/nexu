@@ -32,6 +32,7 @@ import {
   getRuntimeConfig,
   getRuntimeState,
   installComponent,
+  notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
   openExternal,
@@ -969,6 +970,16 @@ function DesktopShell() {
   const [setupPhase, setSetupPhase] = useState<
     "playing" | "looping" | "fading" | "done"
   >(window.nexuHost.bootstrap.needsSetupAnimation ? "playing" : "done");
+
+  // When animation finishes, notify main process to restore vibrancy
+  useEffect(() => {
+    if (
+      setupPhase === "done" &&
+      window.nexuHost.bootstrap.needsSetupAnimation
+    ) {
+      void notifySetupAnimationComplete();
+    }
+  }, [setupPhase]);
 
   useEffect(() => {
     void getRuntimeConfig()

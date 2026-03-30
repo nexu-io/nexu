@@ -818,13 +818,31 @@ function createMainWindow(): BrowserWindow {
 
   window.once("ready-to-show", () => {
     logLaunchTimeline("main window ready-to-show");
-    if (isMacOS) {
+    if (isMacOS && !needsSetupExtraction) {
+      // Only apply vibrancy after ready-to-show when NOT in setup mode.
+      // During setup, vibrancy is applied after the animation finishes
+      // to avoid the transparent background showing through the video.
       window.setBackgroundColor("#00000000");
       window.setVibrancy("sidebar");
     }
-    window.show();
-    focusMainWindow();
+    if (!window.isVisible()) {
+      window.show();
+      focusMainWindow();
+    }
   });
+
+  // During first install / post-update, show the window immediately with a
+  // white background so the user sees the animation ASAP instead of waiting
+  // for React to fully initialize. The white background matches the animation
+  // overlay, creating a seamless experience.
+  if (needsSetupExtraction) {
+    window.webContents.once("did-start-loading", () => {
+      logLaunchTimeline("setup animation: showing window early");
+      window.setBackgroundColor("#ffffff");
+      window.show();
+      focusMainWindow();
+    });
+  }
 
   window.on("closed", () => {
     if (mainWindow === window) {

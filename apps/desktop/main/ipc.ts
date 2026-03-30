@@ -482,6 +482,17 @@ export function registerIpcHandlers(
           return { ok: true };
         }
 
+        case "setup:animation-complete": {
+          // Restore vibrancy now that the white-background animation overlay
+          // has been removed and the main UI is visible.
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win && process.platform === "darwin") {
+            win.setBackgroundColor("#00000000");
+            win.setVibrancy("sidebar");
+          }
+          return undefined;
+        }
+
         default:
           throw new Error(`Unhandled host channel: ${channel satisfies never}`);
       }
