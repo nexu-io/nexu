@@ -1254,6 +1254,7 @@ function DesktopShell() {
                   : prev,
               );
             }}
+            onError={() => setSetupPhase("done")}
             style={{
               width: "100%",
               height: "100%",
@@ -1267,6 +1268,7 @@ function DesktopShell() {
             playsInline
             loop
             src={setupLoopVideoUrl}
+            onError={() => setSetupPhase("fading")}
             style={{
               width: "100%",
               height: "100%",
