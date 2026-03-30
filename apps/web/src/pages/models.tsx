@@ -181,63 +181,11 @@ function getModelDisplayLabel(modelId: string): string {
     : modelId;
 }
 
-const MODEL_PROVIDER_SEGMENT_ALIASES: Record<string, string> = {
-  openai: "openai",
-  "openai-codex": "openai",
-  anthropic: "anthropic",
-  google: "google",
-  ollama: "ollama",
-  siliconflow: "siliconflow",
-  ppio: "ppio",
-  openrouter: "openrouter",
-  minimax: "minimax",
-  kimi: "kimi",
-  moonshot: "kimi",
-  glm: "glm",
-  zai: "glm",
-};
-
-function normalizeModelSelectionKey(modelId: string): string {
-  const normalizedModelId = modelId.trim().toLowerCase();
-  if (normalizedModelId.length === 0) {
-    return normalizedModelId;
-  }
-
-  const segments = normalizedModelId.split("/").filter(Boolean);
-  if (segments.length === 0) {
-    return normalizedModelId;
-  }
-
-  if (segments[0] === "link" || segments[0] === "litellm") {
-    return normalizeModelSelectionKey(segments.slice(1).join("/"));
-  }
-
-  const providerIndex = segments.findIndex(
-    (segment) => MODEL_PROVIDER_SEGMENT_ALIASES[segment] !== undefined,
-  );
-
-  if (providerIndex >= 0 && providerIndex < segments.length - 1) {
-    const providerSegment = segments[providerIndex];
-    if (!providerSegment) {
-      return normalizedModelId;
-    }
-
-    const providerId = MODEL_PROVIDER_SEGMENT_ALIASES[providerSegment];
-    const providerModelId = segments.slice(providerIndex + 1).join("/");
-    return `${providerId}/${providerModelId}`;
-  }
-
-  return normalizedModelId;
-}
-
 export function isModelSelected(
   modelId: string,
   currentModelId: string,
 ): boolean {
-  if (
-    normalizeModelSelectionKey(modelId) ===
-    normalizeModelSelectionKey(currentModelId)
-  ) {
+  if (modelId === currentModelId) {
     return true;
   }
 
@@ -246,6 +194,40 @@ export function isModelSelected(
   }
 
   return modelId.includes("/") !== currentModelId.includes("/");
+}
+
+function normalizeByokModelSelectionKey(
+  providerId: string,
+  modelId: string,
+): string {
+  const normalizedModelId = modelId.trim().toLowerCase();
+  if (normalizedModelId.length === 0) {
+    return normalizedModelId;
+  }
+
+  if (
+    normalizedModelId.startsWith("link/") ||
+    normalizedModelId.startsWith("litellm/")
+  ) {
+    const [, ...rest] = normalizedModelId.split("/");
+    return normalizeByokModelSelectionKey(providerId, rest.join("/"));
+  }
+
+  const normalizedProviderId = providerId.trim().toLowerCase();
+  return normalizedModelId.startsWith(`${normalizedProviderId}/`)
+    ? normalizedModelId
+    : `${normalizedProviderId}/${normalizedModelId}`;
+}
+
+function isByokModelSelected(
+  providerId: string,
+  modelId: string,
+  currentModelId: string,
+): boolean {
+  return (
+    normalizeByokModelSelectionKey(providerId, modelId) ===
+    normalizeByokModelSelectionKey(providerId, currentModelId)
+  );
 }
 
 function getProviderIdFromModelId(
@@ -499,7 +481,7 @@ async function deleteProvider(providerId: ByokProviderId): Promise<void> {
 
 async function verifyApiKey(
   providerId: ByokProviderId,
-  apiKey: string,
+  apiKey?: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
   const { data, error } = await postApiV1ProvidersByProviderIdVerify({
@@ -2368,9 +2350,11 @@ function ByokProviderDetail({
           )}
           {displayModels.map((modelId) => {
             const scopedModelId = getScopedByokModelId(modelId);
-            const isSelected =
-              isModelSelected(modelId, currentModelId) ||
-              isModelSelected(scopedModelId, currentModelId);
+            const isSelected = isByokModelSelected(
+              providerId,
+              modelId,
+              currentModelId,
+            );
             return (
               <button
                 key={modelId}

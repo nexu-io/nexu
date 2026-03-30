@@ -35,7 +35,7 @@ export const upsertProviderBodySchema = z.object({
 });
 
 export const verifyProviderBodySchema = z.object({
-  apiKey: z.string(),
+  apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
 });
 
