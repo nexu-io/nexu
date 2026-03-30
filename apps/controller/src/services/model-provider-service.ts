@@ -566,7 +566,10 @@ export class ModelProviderService {
     }
 
     const storedProvider = await this.configStore.getProvider(providerId);
-    const apiKey: string = input.apiKey?.trim() || storedProvider?.apiKey || "";
+    const apiKey =
+      input.apiKey !== undefined
+        ? input.apiKey.trim()
+        : storedProvider?.apiKey || "";
 
     const verifyUrl =
       buildProviderUrl(

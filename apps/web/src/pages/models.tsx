@@ -205,14 +205,6 @@ function normalizeByokModelSelectionKey(
     return normalizedModelId;
   }
 
-  if (
-    normalizedModelId.startsWith("link/") ||
-    normalizedModelId.startsWith("litellm/")
-  ) {
-    const [, ...rest] = normalizedModelId.split("/");
-    return normalizeByokModelSelectionKey(providerId, rest.join("/"));
-  }
-
   const normalizedProviderId = providerId.trim().toLowerCase();
   return normalizedModelId.startsWith(`${normalizedProviderId}/`)
     ? normalizedModelId
@@ -1387,7 +1379,7 @@ function ByokProviderDetail({
   const isMiniMax = providerId === "minimax";
   const isOllama = providerId === "ollama";
   const hostBridge = getModelsHostInvokeBridge();
-  const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey;
+  const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey.trim();
 
   const { data: minimaxOauthStatus } = useQuery({
     queryKey: ["minimax-oauth-status"],
