@@ -299,6 +299,36 @@ function sanitizeCoverageLabel(value) {
   return String(value).replace(/[^a-zA-Z0-9_-]+/g, "-");
 }
 
+function getCoverageRunContext(env = process.env) {
+  return {
+    coverageRunId: env.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID ?? null,
+    workflowRunId: env.NEXU_DESKTOP_E2E_WORKFLOW_RUN_ID ?? null,
+    gitSha: env.NEXU_DESKTOP_E2E_GIT_SHA ?? null,
+    source: env.NEXU_DESKTOP_E2E_SOURCE ?? null,
+    mode: env.MODE ?? null,
+    startedAt: env.NEXU_DESKTOP_E2E_COVERAGE_STARTED_AT ?? null,
+  };
+}
+
+async function writeCoverageScenarioMetadata({ captureDir, scenarioName, env }) {
+  if (!isCoverageEnabled(env) || !captureDir) {
+    return;
+  }
+
+  const rawDir = path.join(captureDir, "coverage", "raw");
+  await mkdir(rawDir, { recursive: true });
+  const payload = {
+    scenarioName,
+    recordedAt: new Date().toISOString(),
+    ...getCoverageRunContext(env),
+  };
+  await writeFile(
+    path.join(rawDir, `scenario-${sanitizeCoverageLabel(scenarioName)}.json`),
+    `${JSON.stringify(payload, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 async function createChromiumCoverageCollector({
   app,
   initialPage,
@@ -321,6 +351,7 @@ async function createChromiumCoverageCollector({
 
   const launchId = `${Date.now()}-${process.pid}`;
   const scenarioLabel = sanitizeCoverageLabel(scenarioName);
+  const coverageRunContext = getCoverageRunContext();
   let targetCounter = 0;
   const trackedPages = new Map();
   const pendingFinalizers = new Set();
@@ -408,7 +439,7 @@ async function createChromiumCoverageCollector({
       }
     }
 
-  if (!shouldPersistCoverageTarget(url)) {
+    if (!shouldPersistCoverageTarget(url)) {
       log(`Skipping Chromium coverage artifact for ${entry.targetId}: ${url || "(blank)"}`);
       return;
     }
@@ -417,6 +448,7 @@ async function createChromiumCoverageCollector({
       targetId: entry.targetId,
       targetType,
       scenarioName,
+      ...coverageRunContext,
       discoveredBy: entry.discoveredBy,
       firstSeenAt: entry.firstSeenAt,
       finalizedAt: new Date().toISOString(),
@@ -983,6 +1015,12 @@ async function main() {
     NEXU_DESKTOP_E2E_CAPTURE_DIR: args.captureDir,
     HOME: homeDir,
   };
+
+  await writeCoverageScenarioMetadata({
+    captureDir: args.captureDir,
+    scenarioName: args.mode,
+    env: launchEnv,
+  });
 
   let app;
   let page;
