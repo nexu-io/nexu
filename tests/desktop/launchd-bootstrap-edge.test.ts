@@ -219,9 +219,16 @@ describe("isLaunchdBootstrapEnabled — packaged app detection", () => {
 });
 
 describe("resolveLaunchdPaths — packaged mode details", () => {
+  const originalPlatform = process.platform;
+
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.resetModules();
     resetExecFileMock();
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
 
     const fsMock = await import("node:fs");
     const existsSync = fsMock.existsSync as unknown as ReturnType<typeof vi.fn>;
@@ -230,6 +237,13 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     >;
     existsSync.mockImplementation(() => true);
     readFileSync.mockImplementation(() => "");
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
   });
 
   it("resolves all paths outside .app bundle in packaged mode", async () => {
