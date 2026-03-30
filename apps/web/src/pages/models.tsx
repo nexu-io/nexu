@@ -1488,8 +1488,12 @@ function ByokProviderDetail({
 
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
-  const canSubmitApiKeyConfig = Boolean(isOllama || apiKey || hasSavedApiKey);
-  const canRefreshModels = Boolean(isOllama || apiKey || hasSavedApiKey);
+  const canSubmitApiKeyConfig = Boolean(
+    isOllama || effectiveApiKey || hasSavedApiKey,
+  );
+  const canRefreshModels = Boolean(
+    isOllama || effectiveApiKey || hasSavedApiKey,
+  );
   const isProviderConfigured = Boolean(
     isOllama || hasSavedAccess || isOAuthConnected,
   );
