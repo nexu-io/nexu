@@ -116,8 +116,8 @@ export class UpdateManager {
     this.source = options?.source ?? "r2";
     this.channel = options?.channel ?? "stable";
     this.feedUrl = options?.feedUrl ?? null;
-    this.checkIntervalMs = options?.checkIntervalMs ?? 4 * 60 * 60 * 1000;
-    this.initialDelayMs = options?.initialDelayMs ?? 60_000;
+    this.checkIntervalMs = options?.checkIntervalMs ?? 15 * 60 * 1000;
+    this.initialDelayMs = options?.initialDelayMs ?? 0;
     this.launchdCtx = options?.launchd;
     this.currentFeedUrl = getDefaultR2FeedUrl(this.channel);
 
