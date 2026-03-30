@@ -21,6 +21,7 @@ import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
+import { registerHandledFailureReporter } from "./handled-failure-reporter";
 import {
   registerIpcHandlers,
   setComponentUpdater,
@@ -997,6 +998,10 @@ app.whenReady().then(async () => {
     coldStartReady,
   );
   const unsubscribeDiagnostics = diagnosticsReporter.start();
+  const unsubscribeHandledFailures = registerHandledFailureReporter({
+    orchestrator,
+    runtimeConfig,
+  });
   sleepGuard = new SleepGuard({
     powerMonitor,
     powerSaveBlocker,
@@ -1098,6 +1103,7 @@ app.whenReady().then(async () => {
 
   app.once("before-quit", () => {
     unsubscribeDiagnostics();
+    unsubscribeHandledFailures();
   });
 });
 

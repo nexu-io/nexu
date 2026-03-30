@@ -108,6 +108,110 @@ Implications:
 - **复用优先：** 能复用 diagnostics export / Sentry 现有链路，就不额外新造系统。
 - **保留手动兜底：** 自动上传不能替代手动导出，只是减少其发生频率。
 
+## POC
+
+本次做了一个以“验证整条链路可行”为目标的最小 POC，不追求最终触发策略，只验证以下问题：
+
+- desktop 是否可以在非 crash、非 uncaught exception 的情况下主动向 Sentry 发送 handled failure 事件。
+- 是否可以复用现有 diagnostics export 能力，自动生成并上传 diagnostics ZIP attachment。
+- 本地是否存在一个足够容易、稳定、可重复的触发方式，用于验证整条链路。
+
+### POC 思路
+
+POC 采用“复用现有能力 + 最小新增 glue code”的方式：
+
+- 继续使用 desktop 现有 Sentry SDK 初始化与上报链路。
+- 复用 `apps/desktop/main/diagnostics-export.ts` 的 diagnostics 收集、脱敏、打 ZIP 逻辑。
+- 新增一个 main-process reporter，监听 desktop runtime event，在命中目标信号时：
+  1. 导出 diagnostics ZIP 到临时目录
+  2. 调用 Sentry `captureMessage(...)` 创建 handled failure 事件
+  3. 通过 attachment 把 ZIP 一起上传
+  4. 上传完成后删除本地临时 ZIP
+
+### 触发信号选择与调整
+
+最初尝试的信号是 `openclaw` runtime unit 的 `process_exited`。从语义上它最贴近“OpenClaw 异常退出”，但在本地 desktop 的 launchd 模式下，手动 `kill` OpenClaw 后，实际稳定出现的是：
+
+- `launchd_log_line`
+- 日志内容包含 `signal SIGTERM received` / `received SIGTERM; shutting down`
+- 随后 launchd 自动拉起新的 OpenClaw PID
+
+也就是说，在当前本地验证环境里，`process_exited` 并不是最稳定可见的信号，导致第一轮没有触发 Sentry 上报。
+
+因此 POC 将触发条件调整为：
+
+- `unitId === "openclaw"`
+- 且满足以下任一条件：
+  - `reasonCode === "process_exited"`
+  - `reasonCode === "launchd_log_line"` 且 message 包含 `signal SIGTERM received`
+  - `reasonCode === "launchd_log_line"` 且 message 包含 `received SIGTERM; shutting down`
+
+这个调整不是最终产品策略，只是为了让 launchd 模式下的本地 kill 场景能够稳定命中，验证“trigger -> diagnostics export -> Sentry event -> attachment”整条链路。
+
+### 实施过程
+
+POC 过程中新增了两个最小改动点：
+
+- 在 `apps/desktop/main/diagnostics-export.ts` 中补充可复用的无 UI 导出入口，允许直接导出 diagnostics ZIP 到指定路径。
+- 新增 `apps/desktop/main/handled-failure-reporter.ts`，在 desktop main process 中订阅 runtime event，并在命中 handled failure trigger 时发往 Sentry。
+
+事件上报时使用统一 message：
+
+- `desktop.handled_failure.openclaw_process_exited`
+
+并附带以下 tags / context 作为检索与排障入口：
+
+- `nexu.handled_failure=true`
+- `nexu.handled_failure_kind=openclaw_process_exited`
+- `nexu.runtime_unit=openclaw`
+- `nexu.runtime_reason_code=<实际命中的 reasonCode>`
+- `nexu.runtime_trigger_source=<实际命中的 reasonCode>`
+- `handled_failure` context（包含 logId、message、ts、phase、warnings 等）
+
+### 本地验证步骤
+
+本地使用 launchd dev runtime 进行验证，步骤如下：
+
+1. 启动 desktop 本地运行时
+2. 确认 `openclaw` 处于 running 状态
+3. 手动执行 `kill -TERM <openclaw pid>`
+4. 观察 launchd 自动拉起新的 OpenClaw PID
+5. 查询 Sentry `nexu-desktop-dev` project 中是否出现新的 handled failure issue / event
+6. 确认 event 是否包含 diagnostics ZIP attachment
+
+### 验证结果
+
+POC 验证通过，链路已经打通。
+
+实际观察结果：
+
+- 手动 kill OpenClaw 后，launchd 会自动重启 OpenClaw，新 PID 能稳定出现。
+- 本地 `openclaw.log` 中稳定出现：
+  - `signal SIGTERM received`
+  - `received SIGTERM; shutting down`
+- Sentry `nexu-desktop-dev` 中成功创建并聚合 handled failure issue：
+  - issue: `NEXU-DESKTOP-DEV-J`
+  - title: `desktop.handled_failure.openclaw_process_exited`
+- 最新 event 成功带上 diagnostics ZIP attachment：
+  - filename: `nexu-diagnostics.zip`
+  - size: `44361` bytes
+
+这说明当前方案至少已经证明以下事实：
+
+- desktop 可以不依赖 crash / exception，也能主动产生 handled failure Sentry event。
+- diagnostics ZIP 可以通过现有 export 逻辑生成，并作为 attachment 成功进入 Sentry。
+- 现有 Sentry project 足以承载这一类“signal-driven handled failure”事件，不需要先建设新的上传基础设施。
+
+### POC 结论
+
+本 spec 关注的核心方向是可行的。
+
+具体来说，Nexu Desktop 已经具备实现“trusted abnormal signal 触发 -> 自动导出 diagnostics ZIP -> 自动上报到 Sentry”这条 handled failure reporting 链路的工程基础。后续要做的主要不是证明能不能做，而是决定：
+
+- 第一批正式触发信号选哪些
+- 如何控制噪音和分组
+- 何时需要从 Sentry attachment 升级为独立上传路径
+
 ## Plan
 
 - [ ] Phase 1: Clarify handled failure reporting boundaries

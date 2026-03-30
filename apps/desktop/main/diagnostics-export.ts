@@ -1,8 +1,15 @@
 import { spawnSync } from "node:child_process";
 import type { Dirent } from "node:fs";
-import { access, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  readFile,
+  readdir,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { homedir, hostname } from "node:os";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { app, dialog } from "electron";
 import type { DesktopRuntimeConfig } from "../shared/runtime-config";
@@ -754,4 +761,33 @@ export async function exportDiagnostics({
       errorMessage: error instanceof Error ? error.message : "Export failed.",
     };
   }
+}
+
+export async function exportDiagnosticsToFile({
+  orchestrator,
+  runtimeConfig,
+  outputPath,
+}: {
+  orchestrator: RuntimeOrchestrator;
+  runtimeConfig: DesktopRuntimeConfig;
+  outputPath: string;
+}): Promise<{ outputPath: string; warnings: string[] }> {
+  const archiveRoot =
+    outputPath
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/\.zip$/i, "") || `nexu-diagnostics-${getTimestampSlug()}`;
+
+  await mkdir(dirname(outputPath), { recursive: true });
+  const { entries, warnings } = await collectArtifacts(
+    orchestrator,
+    runtimeConfig,
+    archiveRoot,
+  );
+  await writeZip(entries, outputPath);
+
+  return {
+    outputPath,
+    warnings,
+  };
 }
