@@ -121,6 +121,7 @@ const enSidebar = [
       },
       { text: "Model Configuration", link: "/guide/models" },
       { text: "Skill Installation", link: "/guide/skills" },
+      { text: "Usage & Rewards", link: "/guide/usage" },
     ],
   },
   {
@@ -157,6 +158,7 @@ const jaSidebar = [
       },
       { text: "モデル設定", link: "/ja/guide/models" },
       { text: "スキルインストール", link: "/ja/guide/skills" },
+      { text: "使用量とリワード", link: "/ja/guide/usage" },
     ],
   },
   {
@@ -194,6 +196,7 @@ const zhSidebar = [
       },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
+      { text: "用量与奖励", link: "/zh/guide/usage" },
     ],
   },
   {

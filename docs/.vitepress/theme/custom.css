@@ -129,6 +129,12 @@ body {
   display: none !important;
 }
 
+/* ── Hide default extra menu (language + appearance already exposed as custom buttons) ── */
+
+.VPNavBarExtra {
+  display: none !important;
+}
+
 /* ── Prev / Next page navigation ── */
 
 .VPDocFooter .pager-link {
