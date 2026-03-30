@@ -1405,9 +1405,8 @@ function ByokProviderDetail({
   const hasMiniMaxOauthAccess =
     isMiniMax &&
     (minimaxOauthStatus?.connected === true || dbProvider?.hasOauthCredential);
-  const hasSavedAccess = Boolean(
-    dbProvider?.hasApiKey || hasMiniMaxOauthAccess,
-  );
+  const hasSavedApiKey = Boolean(dbProvider?.hasApiKey);
+  const hasSavedAccess = Boolean(hasSavedApiKey || hasMiniMaxOauthAccess);
 
   const visibleMiniMaxOauthError =
     minimaxOauthStatus?.error &&
@@ -1497,10 +1496,8 @@ function ByokProviderDetail({
 
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
-  const canSubmitApiKeyConfig = Boolean(
-    isOllama || apiKey || dbProvider?.hasApiKey,
-  );
-  const canRefreshModels = Boolean(isOllama || apiKey || hasSavedAccess);
+  const canSubmitApiKeyConfig = Boolean(isOllama || apiKey || hasSavedApiKey);
+  const canRefreshModels = Boolean(isOllama || apiKey || hasSavedApiKey);
   const isProviderConfigured = Boolean(
     isOllama || hasSavedAccess || isOAuthConnected,
   );
