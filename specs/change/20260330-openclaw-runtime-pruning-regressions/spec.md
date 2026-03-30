@@ -46,14 +46,15 @@ created: '2026-03-30'
 
 ### Minimal Reproduction Paths
 1. **Issue #425 — PDF file recognition failure**
-   - In any conversation surface that supports file attachments, upload a PDF to a model.
-   - Ask the model to read, summarize, or analyze the PDF contents.
-   - Expected failing symptom: runtime returns `Optional dependency pdfjs-dist is required for PDF extraction: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pdfjs-dist' imported from .`
-   - Validation after a fix: repeat the same PDF upload flow and confirm the model can analyze extracted PDF content instead of throwing the missing dependency error.
+   - In the normal IM conversation entrypoint, upload a PDF attachment and ask the model to directly read, summarize, or analyze the file contents.
+   - Prefer a prompt that requires actual PDF text extraction from the attachment itself, rather than asking about the file at a high level or relying on user-pasted text/images.
+   - Expected failing symptom: the model refuses direct PDF reading and reports that the current environment is missing a PDF parsing dependency; at the runtime layer this corresponds to `Optional dependency pdfjs-dist is required for PDF extraction: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'pdfjs-dist' imported from .`
+   - Validation after a fix: repeat the same attached-PDF flow and confirm the model can extract and analyze the PDF contents directly instead of failing with a missing-PDF-dependency response.
 2. **Issue #431 — Playwright runtime not available**
-   - In any conversation surface that exposes browser-assisted actions, ask a model to open, inspect, or review a webpage.
-   - Expected failing symptom: browser-assisted workflow is refused as unsupported, matching OpenClaw's Playwright-unavailable error path.
-   - Validation after a fix: repeat the webpage review prompt and confirm the runtime can execute a Playwright-backed browser action rather than returning an unsupported/browser-unavailable response.
+   - In the normal IM conversation entrypoint, ask a model to open a webpage and then perform a real browser interaction such as clicking a link/button, expanding a section, or reporting where a click navigates.
+   - Prefer interaction-heavy prompts over plain webpage summarization, because simple “review this page” requests may succeed through non-Playwright fallback paths and do not reliably reproduce the bug.
+   - Expected failing symptom: the model can sometimes open/read the page but refuses or fails the interaction step with an unsupported / browser-unavailable / missing-Playwright style response, matching OpenClaw's Playwright-unavailable error path.
+   - Validation after a fix: repeat the same interaction prompt and confirm the runtime can execute the Playwright-backed action (for example, complete the click and report the resulting destination or changed page state) rather than returning an unsupported/browser-unavailable response.
 
 ### Key Findings
 - `openclaw-runtime/prune-runtime-paths.mjs:23-31` explicitly prunes `node_modules/pdfjs-dist`, and the file comment already warns this may break PDF parsing / attachment ingestion paths.
