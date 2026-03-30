@@ -1,15 +1,20 @@
-import { readFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_PATH_NORMALIZATION_VERSION = 1;
-const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-const base64Map = new Map([...base64Chars].map((value, index) => [value, index]));
+const base64Chars =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const base64Map = new Map(
+  [...base64Chars].map((value, index) => [value, index]),
+);
 
 function parseArgs(argv) {
   const args = {
-    captureDir: process.env.NEXU_DESKTOP_E2E_CAPTURE_DIR ?? path.resolve(process.cwd(), "captures"),
+    captureDir:
+      process.env.NEXU_DESKTOP_E2E_CAPTURE_DIR ??
+      path.resolve(process.cwd(), "captures"),
     artifactsDir: path.resolve(process.cwd(), "artifacts"),
     repoRoot: path.resolve(process.cwd(), "..", ".."),
   };
@@ -153,14 +158,22 @@ function parseMappings(mappings) {
     generatedColumn += decoded[index++];
     const segment = { generatedColumn };
 
-    if (index < decoded.length && decoded[index] !== "," && decoded[index] !== ";") {
+    if (
+      index < decoded.length &&
+      decoded[index] !== "," &&
+      decoded[index] !== ";"
+    ) {
       sourceIndex += decoded[index++];
       originalLine += decoded[index++];
       originalColumn += decoded[index++];
       segment.sourceIndex = sourceIndex;
       segment.originalLine = originalLine;
       segment.originalColumn = originalColumn;
-      if (index < decoded.length && decoded[index] !== "," && decoded[index] !== ";") {
+      if (
+        index < decoded.length &&
+        decoded[index] !== "," &&
+        decoded[index] !== ";"
+      ) {
         nameIndex += decoded[index++];
         segment.nameIndex = nameIndex;
       }
@@ -199,7 +212,11 @@ function offsetsToLineCoverage(lineLengths, ranges) {
 
   const lineHits = new Map();
   for (const range of ranges) {
-    if (!range || typeof range.startOffset !== "number" || typeof range.endOffset !== "number") {
+    if (
+      !range ||
+      typeof range.startOffset !== "number" ||
+      typeof range.endOffset !== "number"
+    ) {
       continue;
     }
     if ((range.count ?? 0) <= 0) {
@@ -215,7 +232,10 @@ function offsetsToLineCoverage(lineLengths, ranges) {
       if (range.startOffset >= lineEnd) {
         continue;
       }
-      const nextValue = Math.max(lineHits.get(index + 1) ?? 0, range.count ?? 0);
+      const nextValue = Math.max(
+        lineHits.get(index + 1) ?? 0,
+        range.count ?? 0,
+      );
       lineHits.set(index + 1, nextValue);
     }
   }
@@ -244,19 +264,34 @@ function normalizeRelativePath(filePath, repoRoot) {
   return relativePath;
 }
 
-function resolveSourcePath({ repoRoot, compiledRepoPath, sourceRoot, sourcePath }) {
+function resolveSourcePath({
+  repoRoot,
+  compiledRepoPath,
+  sourceRoot,
+  sourcePath,
+}) {
   if (typeof sourcePath !== "string" || sourcePath.length === 0) {
     return null;
   }
 
   const normalizedSourcePath = fromFileUrl(sourcePath) ?? sourcePath;
   if (path.isAbsolute(normalizedSourcePath)) {
-    return normalizeRelativePath(path.normalize(normalizedSourcePath), repoRoot);
+    return normalizeRelativePath(
+      path.normalize(normalizedSourcePath),
+      repoRoot,
+    );
   }
 
-  const compiledDir = compiledRepoPath ? path.dirname(path.join(repoRoot, compiledRepoPath)) : repoRoot;
-  const sourceRootPath = sourceRoot ? path.resolve(compiledDir, sourceRoot) : compiledDir;
-  return normalizeRelativePath(path.resolve(sourceRootPath, normalizedSourcePath), repoRoot);
+  const compiledDir = compiledRepoPath
+    ? path.dirname(path.join(repoRoot, compiledRepoPath))
+    : repoRoot;
+  const sourceRootPath = sourceRoot
+    ? path.resolve(compiledDir, sourceRoot)
+    : compiledDir;
+  return normalizeRelativePath(
+    path.resolve(sourceRootPath, normalizedSourcePath),
+    repoRoot,
+  );
 }
 
 async function buildArtifactSourceMapsIndex({ artifactsDir, repoRoot }) {
@@ -271,7 +306,9 @@ async function buildArtifactSourceMapsIndex({ artifactsDir, repoRoot }) {
     const fileContent = await readFile(filePath, "utf8");
     const sourceMap = JSON.parse(fileContent);
     const compiledArtifactPath = filePath.slice(0, -4);
-    const sourceMapsRelative = toPosixPath(path.relative(sourceMapsRoot, compiledArtifactPath));
+    const sourceMapsRelative = toPosixPath(
+      path.relative(sourceMapsRoot, compiledArtifactPath),
+    );
     const compiledRepoPath = sourceMapsRelative.startsWith("dist-electron/")
       ? `apps/desktop/${sourceMapsRelative}`
       : `apps/desktop/${sourceMapsRelative}`;
@@ -282,7 +319,9 @@ async function buildArtifactSourceMapsIndex({ artifactsDir, repoRoot }) {
       kind: "artifact",
       compiledRepoPath,
       compiledContent,
-      lineLengths: compiledContent ? lineLengthsFromContent(compiledContent) : null,
+      lineLengths: compiledContent
+        ? lineLengthsFromContent(compiledContent)
+        : null,
       sourceMap,
       sourceMapLines: parseMappings(sourceMap.mappings ?? ""),
       sourceMapPath: filePath,
@@ -316,7 +355,8 @@ function getNodeSourceMapEntry(rawNodeCoverage, url) {
   if (!entry || typeof entry !== "object") {
     return null;
   }
-  const sourceMap = typeof entry.data === "string" ? JSON.parse(entry.data) : entry.data;
+  const sourceMap =
+    typeof entry.data === "string" ? JSON.parse(entry.data) : entry.data;
   if (!sourceMap || typeof sourceMap !== "object") {
     return null;
   }
@@ -371,13 +411,20 @@ function recordCoverageFromScript({
   const sourceMap = sourceMapMeta.sourceMap;
   let wroteCoverage = false;
 
-  for (let lineIndex = 0; lineIndex < sourceMapMeta.sourceMapLines.length; lineIndex += 1) {
+  for (
+    let lineIndex = 0;
+    lineIndex < sourceMapMeta.sourceMapLines.length;
+    lineIndex += 1
+  ) {
     const segments = sourceMapMeta.sourceMapLines[lineIndex];
     const generatedLine = lineIndex + 1;
     const hitCount = generatedLineHits.get(generatedLine) ?? 0;
 
     for (const segment of segments) {
-      if (typeof segment.sourceIndex !== "number" || typeof segment.originalLine !== "number") {
+      if (
+        typeof segment.sourceIndex !== "number" ||
+        typeof segment.originalLine !== "number"
+      ) {
         continue;
       }
       const sourcePath = sourceMap.sources?.[segment.sourceIndex];
@@ -396,7 +443,10 @@ function recordCoverageFromScript({
       fileCoverage.executableLines.add(originalLine);
       fileCoverage.generatedSources.add(compiledLabel);
       if (hitCount > 0) {
-        const nextValue = Math.max(fileCoverage.coveredLines.get(originalLine) ?? 0, hitCount);
+        const nextValue = Math.max(
+          fileCoverage.coveredLines.get(originalLine) ?? 0,
+          hitCount,
+        );
         fileCoverage.coveredLines.set(originalLine, nextValue);
         wroteCoverage = true;
       }
@@ -407,19 +457,29 @@ function recordCoverageFromScript({
 }
 
 async function loadNodeCoverage(rawDir) {
-  const files = (await walkFiles(rawDir)).filter((filePath) => filePath.endsWith(".json"));
+  const files = (await walkFiles(rawDir)).filter((filePath) =>
+    filePath.endsWith(".json"),
+  );
   const payloads = [];
   for (const filePath of files) {
-    payloads.push({ filePath, payload: JSON.parse(await readFile(filePath, "utf8")) });
+    payloads.push({
+      filePath,
+      payload: JSON.parse(await readFile(filePath, "utf8")),
+    });
   }
   return payloads;
 }
 
 async function loadChromiumCoverage(rawDir) {
-  const files = (await walkFiles(rawDir)).filter((filePath) => filePath.endsWith(".json"));
+  const files = (await walkFiles(rawDir)).filter((filePath) =>
+    filePath.endsWith(".json"),
+  );
   const payloads = [];
   for (const filePath of files) {
-    payloads.push({ filePath, payload: JSON.parse(await readFile(filePath, "utf8")) });
+    payloads.push({
+      filePath,
+      payload: JSON.parse(await readFile(filePath, "utf8")),
+    });
   }
   return payloads;
 }
@@ -491,9 +551,12 @@ async function main() {
   await mkdir(coverageDir, { recursive: true });
   await mkdir(htmlDir, { recursive: true });
 
-  const runContext = (await readJsonIfExists(path.join(rawDir, "run-context.json"))) ?? {};
+  const runContext =
+    (await readJsonIfExists(path.join(rawDir, "run-context.json"))) ?? {};
   const buildManifest =
-    (await readJsonIfExists(path.join(args.artifactsDir, "coverage-build-manifest.json"))) ?? {};
+    (await readJsonIfExists(
+      path.join(args.artifactsDir, "coverage-build-manifest.json"),
+    )) ?? {};
   const artifactSourceMaps = await buildArtifactSourceMapsIndex({
     artifactsDir: args.artifactsDir,
     repoRoot: args.repoRoot,
@@ -513,7 +576,10 @@ async function main() {
       if (!sourceMapMeta?.lineLengths) {
         continue;
       }
-      const generatedLineHits = offsetsToLineCoverage(sourceMapMeta.lineLengths, flattenRanges(script.functions));
+      const generatedLineHits = offsetsToLineCoverage(
+        sourceMapMeta.lineLengths,
+        flattenRanges(script.functions),
+      );
       recordCoverageFromScript({
         coverageByFile,
         compiledLabel: script.url,
@@ -535,11 +601,17 @@ async function main() {
       url: payload.url ?? null,
     });
     for (const script of Array.isArray(payload?.result) ? payload.result : []) {
-      const sourceMapMeta = pickArtifactSourceMap(script.url, artifactSourceMaps);
+      const sourceMapMeta = pickArtifactSourceMap(
+        script.url,
+        artifactSourceMaps,
+      );
       if (!sourceMapMeta?.lineLengths) {
         continue;
       }
-      const generatedLineHits = offsetsToLineCoverage(sourceMapMeta.lineLengths, flattenRanges(script.functions));
+      const generatedLineHits = offsetsToLineCoverage(
+        sourceMapMeta.lineLengths,
+        flattenRanges(script.functions),
+      );
       recordCoverageFromScript({
         coverageByFile,
         compiledLabel: script.url,
@@ -552,20 +624,27 @@ async function main() {
 
   const files = [...coverageByFile.values()]
     .map((entry) => {
-      const executableLines = [...entry.executableLines].sort((left, right) => left - right);
+      const executableLines = [...entry.executableLines].sort(
+        (left, right) => left - right,
+      );
       const coveredLines = Object.fromEntries(
         [...entry.coveredLines.entries()]
           .sort((left, right) => left[0] - right[0])
           .map(([line, count]) => [String(line), count]),
       );
-      const uncoveredLines = executableLines.filter((line) => !(line in coveredLines));
+      const uncoveredLines = executableLines.filter(
+        (line) => !(line in coveredLines),
+      );
       return {
         path: entry.path,
         generatedSources: [...entry.generatedSources].sort(),
         executableLines,
         coveredLines,
         uncoveredLines,
-        lines: toSummaryMetric(Object.keys(coveredLines).length, executableLines.length),
+        lines: toSummaryMetric(
+          Object.keys(coveredLines).length,
+          executableLines.length,
+        ),
       };
     })
     .sort((left, right) => left.path.localeCompare(right.path));
@@ -576,7 +655,10 @@ async function main() {
     );
   }
 
-  const totalLinesCovered = files.reduce((sum, file) => sum + file.lines.covered, 0);
+  const totalLinesCovered = files.reduce(
+    (sum, file) => sum + file.lines.covered,
+    0,
+  );
   const totalLines = files.reduce((sum, file) => sum + file.lines.total, 0);
 
   const summary = {
@@ -587,19 +669,39 @@ async function main() {
     },
     files,
     topUncoveredFiles: [...files]
-      .sort((left, right) => right.uncoveredLines.length - left.uncoveredLines.length)
+      .sort(
+        (left, right) =>
+          right.uncoveredLines.length - left.uncoveredLines.length,
+      )
       .slice(0, 10)
-      .map((file) => ({ path: file.path, uncoveredLineCount: file.uncoveredLines.length })),
+      .map((file) => ({
+        path: file.path,
+        uncoveredLineCount: file.uncoveredLines.length,
+      })),
   };
 
   const meta = {
-    gitSha: runContext.gitSha ?? buildManifest.gitSha ?? process.env.GITHUB_SHA ?? null,
+    gitSha:
+      runContext.gitSha ??
+      buildManifest.gitSha ??
+      process.env.GITHUB_SHA ??
+      null,
     workflowRunId:
-      runContext.workflowRunId ?? buildManifest.workflowRunId ?? process.env.GITHUB_RUN_ID ?? null,
+      runContext.workflowRunId ??
+      buildManifest.workflowRunId ??
+      process.env.GITHUB_RUN_ID ??
+      null,
     mode: runContext.mode ?? buildManifest.mode ?? process.env.MODE ?? null,
-    source: runContext.source ?? buildManifest.source ?? process.env.NEXU_DESKTOP_E2E_SOURCE ?? null,
+    source:
+      runContext.source ??
+      buildManifest.source ??
+      process.env.NEXU_DESKTOP_E2E_SOURCE ??
+      null,
     coverageEnabled: runContext.coverageEnabled ?? true,
-    coverageRunId: runContext.coverageRunId ?? process.env.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID ?? null,
+    coverageRunId:
+      runContext.coverageRunId ??
+      process.env.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID ??
+      null,
     startedAt: runContext.startedAt ?? null,
     finishedAt: new Date().toISOString(),
     includedTargets,
@@ -630,7 +732,10 @@ async function main() {
   const lcovInfo = files
     .map((file) => {
       const daLines = file.executableLines
-        .map((lineNumber) => `DA:${lineNumber},${file.coveredLines[String(lineNumber)] ?? 0}`)
+        .map(
+          (lineNumber) =>
+            `DA:${lineNumber},${file.coveredLines[String(lineNumber)] ?? 0}`,
+        )
         .join("\n");
       return [
         "TN:",
@@ -643,11 +748,27 @@ async function main() {
     })
     .join("\n");
 
-  await writeFile(path.join(coverageDir, "coverage-final.json"), `${JSON.stringify(coverageFinal, null, 2)}\n`, "utf8");
-  await writeFile(path.join(coverageDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
-  await writeFile(path.join(coverageDir, "meta.json"), `${JSON.stringify(meta, null, 2)}\n`, "utf8");
+  await writeFile(
+    path.join(coverageDir, "coverage-final.json"),
+    `${JSON.stringify(coverageFinal, null, 2)}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(coverageDir, "summary.json"),
+    `${JSON.stringify(summary, null, 2)}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(coverageDir, "meta.json"),
+    `${JSON.stringify(meta, null, 2)}\n`,
+    "utf8",
+  );
   await writeFile(path.join(coverageDir, "lcov.info"), `${lcovInfo}\n`, "utf8");
-  await writeFile(path.join(htmlDir, "index.html"), renderHtml(summary, meta), "utf8");
+  await writeFile(
+    path.join(htmlDir, "index.html"),
+    renderHtml(summary, meta),
+    "utf8",
+  );
 
   log(`Merged coverage for ${files.length} file(s)`);
 }

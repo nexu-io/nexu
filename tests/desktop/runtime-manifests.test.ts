@@ -353,9 +353,13 @@ describe("desktop runtime manifests", () => {
 
       expect(webManifest?.env?.NODE_V8_COVERAGE).toBeUndefined();
       expect(webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE).toBeUndefined();
-      expect(webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID).toBeUndefined();
+      expect(
+        webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
+      ).toBeUndefined();
       expect(controllerManifest?.env?.NODE_V8_COVERAGE).toBeUndefined();
-      expect(controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE).toBeUndefined();
+      expect(
+        controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE,
+      ).toBeUndefined();
       expect(
         controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
       ).toBeUndefined();

@@ -256,7 +256,9 @@ async function launchPackagedApp({ executablePath, env }) {
   const coverageCollector = await createChromiumCoverageCollector({
     app,
     initialPage: page,
-    captureDir: env.NEXU_DESKTOP_E2E_CAPTURE_DIR ?? process.env.NEXU_DESKTOP_E2E_CAPTURE_DIR,
+    captureDir:
+      env.NEXU_DESKTOP_E2E_CAPTURE_DIR ??
+      process.env.NEXU_DESKTOP_E2E_CAPTURE_DIR,
     scenarioName: env.NEXU_DESKTOP_E2E_SCENARIO_NAME ?? "unknown",
     enabled: isCoverageEnabled(env),
   });
@@ -310,7 +312,11 @@ function getCoverageRunContext(env = process.env) {
   };
 }
 
-async function writeCoverageScenarioMetadata({ captureDir, scenarioName, env }) {
+async function writeCoverageScenarioMetadata({
+  captureDir,
+  scenarioName,
+  env,
+}) {
   if (!isCoverageEnabled(env) || !captureDir) {
     return;
   }
@@ -378,11 +384,13 @@ async function createChromiumCoverageCollector({
     });
 
     page.on("close", () => {
-      const finalizePromise = finalizePage(page, "page-close").catch((error) => {
-        log(
-          `Coverage finalize failed for ${entry.targetId} on close: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
+      const finalizePromise = finalizePage(page, "page-close").catch(
+        (error) => {
+          log(
+            `Coverage finalize failed for ${entry.targetId} on close: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        },
+      );
       pendingFinalizers.add(finalizePromise);
       finalizePromise.finally(() => pendingFinalizers.delete(finalizePromise));
     });
@@ -394,7 +402,9 @@ async function createChromiumCoverageCollector({
         callCount: true,
         detailed: true,
       });
-      log(`Started Chromium precise coverage for ${targetId}: ${page.url() || "(blank)"}`);
+      log(
+        `Started Chromium precise coverage for ${targetId}: ${page.url() || "(blank)"}`,
+      );
     } catch (error) {
       entry.startError = error instanceof Error ? error.message : String(error);
       log(
@@ -404,7 +414,9 @@ async function createChromiumCoverageCollector({
   };
 
   const discoverTargets = async () => {
-    await Promise.all(app.windows().map((page) => trackPage(page, "window-scan")));
+    await Promise.all(
+      app.windows().map((page) => trackPage(page, "window-scan")),
+    );
   };
 
   const finalizePage = async (page, finalizeReason) => {
@@ -420,7 +432,9 @@ async function createChromiumCoverageCollector({
 
     if (entry.session) {
       try {
-        const response = await entry.session.send("Profiler.takePreciseCoverage");
+        const response = await entry.session.send(
+          "Profiler.takePreciseCoverage",
+        );
         result = Array.isArray(response?.result) ? response.result : [];
       } catch (error) {
         stopError = error instanceof Error ? error.message : String(error);
@@ -440,7 +454,9 @@ async function createChromiumCoverageCollector({
     }
 
     if (!shouldPersistCoverageTarget(url)) {
-      log(`Skipping Chromium coverage artifact for ${entry.targetId}: ${url || "(blank)"}`);
+      log(
+        `Skipping Chromium coverage artifact for ${entry.targetId}: ${url || "(blank)"}`,
+      );
       return;
     }
 
@@ -483,7 +499,9 @@ async function createChromiumCoverageCollector({
     async flushAll(finalizeReason) {
       await discoverTargets();
       await Promise.all(
-        [...trackedPages.keys()].map((page) => finalizePage(page, finalizeReason)),
+        [...trackedPages.keys()].map((page) =>
+          finalizePage(page, finalizeReason),
+        ),
       );
       await Promise.all([...pendingFinalizers]);
       app.off("window", onWindow);

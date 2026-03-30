@@ -122,15 +122,7 @@ export class LaunchdManager {
    * Uninstall a launchd service (bootout + remove plist).
    */
   async uninstallService(label: string): Promise<void> {
-    try {
-      await execFileAsync("launchctl", ["bootout", `${this.domain}/${label}`]);
-    } catch (err) {
-      // Service may not be running, log but don't throw
-      console.warn(
-        `Failed to bootout ${label}:`,
-        err instanceof Error ? err.message : err,
-      );
-    }
+    await this.bootoutAndWaitForExit(label);
     try {
       const plistPath = path.join(this.plistDir, `${label}.plist`);
       await fs.unlink(plistPath);

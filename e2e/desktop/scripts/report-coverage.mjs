@@ -67,7 +67,10 @@ async function main() {
       "",
       "### Top uncovered files",
       "",
-      ...topFiles.map((file) => `- \`${file.path}\` — ${file.uncoveredLineCount} uncovered lines`),
+      ...topFiles.map(
+        (file) =>
+          `- \`${file.path}\` — ${file.uncoveredLineCount} uncovered lines`,
+      ),
       "",
     ].join("\n");
     await appendFile(process.env.GITHUB_STEP_SUMMARY, markdown, "utf8");

@@ -185,9 +185,7 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>TMPDIR</key>
         <string>${escapeXml(env.openclawTmpDir)}</string>${renderProxyEnvEntries(
           env.proxyEnv,
-        )}${renderCoverageEnvEntries(
-          env,
-        )}${
+        )}${renderCoverageEnvEntries(env)}${
           env.nexuHome
             ? `
         <key>NEXU_HOME</key>
@@ -281,9 +279,7 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <key>HOME</key>
         <string>${escapeXml(os.homedir())}</string>${renderProxyEnvEntries(
           env.proxyEnv,
-        )}${renderCoverageEnvEntries(
-          env,
-        )}${
+        )}${renderCoverageEnvEntries(env)}${
           env.systemPath
             ? `
         <key>PATH</key>

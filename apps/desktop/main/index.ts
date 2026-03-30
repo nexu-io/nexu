@@ -53,12 +53,12 @@ import {
   resolveLaunchdPaths,
   teardownLaunchdServices,
 } from "./services";
-import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
 import { ProxyManager } from "./services/proxy-manager";
 import {
   getLegacyNexuHomeStateDir,
   migrateOpenclawState,
 } from "./services/state-migration";
+import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";

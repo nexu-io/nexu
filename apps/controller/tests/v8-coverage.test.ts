@@ -12,9 +12,7 @@ describe("controller v8 coverage flush", () => {
   });
 
   it("calls takeCoverage when desktop E2E coverage is enabled", async () => {
-    const { flushV8CoverageIfEnabled } = await import(
-      "../src/lib/v8-coverage"
-    );
+    const { flushV8CoverageIfEnabled } = await import("../src/lib/v8-coverage");
 
     flushV8CoverageIfEnabled({ NEXU_DESKTOP_E2E_COVERAGE: "1" });
 
@@ -22,9 +20,7 @@ describe("controller v8 coverage flush", () => {
   });
 
   it("does not call takeCoverage outside desktop E2E coverage mode", async () => {
-    const { flushV8CoverageIfEnabled } = await import(
-      "../src/lib/v8-coverage"
-    );
+    const { flushV8CoverageIfEnabled } = await import("../src/lib/v8-coverage");
 
     flushV8CoverageIfEnabled({});
 
