@@ -229,7 +229,15 @@ export class OpenClawSyncService {
    * Called when creating a new bot to seed workspace with platform files.
    */
   async writePlatformTemplatesForBot(botId: string): Promise<void> {
-    await this.templateWriter.write([{ id: botId, status: "active" }]);
+    const profile = await this.configStore.getLocalProfile();
+    const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    await this.templateWriter.write(
+      [{ id: botId, status: "active" }],
+      {
+        name: profile.name,
+        timezone: systemTimezone,
+      },
+    );
   }
 
   private async doSync(): Promise<{ configPushed: boolean }> {
