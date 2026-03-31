@@ -11,7 +11,20 @@ const execFileSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", () => ({
   execFileSync: execFileSyncMock,
+  execFile: vi.fn(
+    (_cmd: unknown, _args: unknown, cb?: (...a: unknown[]) => void) => {
+      cb?.(null, "", "");
+    },
+  ),
 }));
+
+vi.mock("node:util", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:util")>();
+  return {
+    ...actual,
+    promisify: () => vi.fn().mockResolvedValue({ stdout: "", stderr: "" }),
+  };
+});
 
 vi.mock("node:fs", () => ({
   existsSync: vi.fn((target: string) => fsState.paths.has(target)),

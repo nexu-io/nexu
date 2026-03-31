@@ -74,6 +74,28 @@ PY
   log "Coverage enabled (run-id=$coverage_run_id)"
 }
 
+resolve_mac_arch() {
+  local arm64_capable
+  arm64_capable="$(sysctl -in hw.optional.arm64 2>/dev/null || true)"
+  if [ "$arm64_capable" = "1" ]; then
+    printf 'arm64\n'
+    return 0
+  fi
+
+  case "$(uname -m)" in
+    arm64)
+      printf 'arm64\n'
+      ;;
+    x86_64)
+      printf 'x64\n'
+      ;;
+    *)
+      log "ERROR: unsupported mac architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+}
+
 # -----------------------------------------------------------------------
 # Cleanup helpers
 # -----------------------------------------------------------------------
@@ -113,15 +135,40 @@ wait_ports_free() {
 # -----------------------------------------------------------------------
 resolve_artifact() {
   local ext="$1"
+  local arch
+  arch="$(resolve_mac_arch)" || return 1
+  local artifact
+  local candidates=()
   shopt -s nullglob
-  local candidates=("$ARTIFACT_DIR"/*."$ext")
+  for artifact in "$ARTIFACT_DIR"/*."$ext"; do
+    case "$(basename "$artifact")" in
+      *-mac-"$arch"."$ext"|*-"$arch"."$ext")
+        candidates+=("$artifact")
+        ;;
+    esac
+  done
   shopt -u nullglob
 
   if [ "${#candidates[@]}" -eq 0 ]; then
-    log "No .$ext artifacts in $ARTIFACT_DIR — run: npm run download"
+    log "No .$ext artifacts for mac arch $arch in $ARTIFACT_DIR — run: npm run download"
     return 1
   fi
-  printf '%s\n' "${candidates[0]}"
+
+  local selected_artifact="${candidates[0]}"
+  local selected_mtime
+  selected_mtime="$(stat -f %m "$selected_artifact")"
+
+  for artifact in "${candidates[@]:1}"; do
+    local artifact_mtime
+    artifact_mtime="$(stat -f %m "$artifact")"
+    if [ "$artifact_mtime" -gt "$selected_mtime" ]; then
+      selected_artifact="$artifact"
+      selected_mtime="$artifact_mtime"
+    fi
+  done
+
+  log "Selected .$ext artifact: $(basename "$selected_artifact")"
+  printf '%s\n' "$selected_artifact"
 }
 
 # -----------------------------------------------------------------------

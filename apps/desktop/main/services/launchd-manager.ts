@@ -75,20 +75,35 @@ export class LaunchdManager {
 
     await fs.writeFile(plistPath, plistContent, "utf8");
 
-    try {
-      const { stdout, stderr } = await execFileAsync("launchctl", [
-        "bootstrap",
-        this.domain,
-        plistPath,
-      ]);
-      if (stdout) console.log(`Bootstrap ${label}:`, stdout);
-      if (stderr) console.warn(`Bootstrap ${label} warnings:`, stderr);
-    } catch (err) {
-      console.error(
-        `Failed to bootstrap ${label}:`,
-        err instanceof Error ? err.message : err,
-      );
-      throw err;
+    // Bootstrap with retry: "Input/output error" (code 5) means launchd
+    // has stale state for this label. Bootout to clear it, then retry.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { stdout, stderr } = await execFileAsync("launchctl", [
+          "bootstrap",
+          this.domain,
+          plistPath,
+        ]);
+        if (stdout) console.log(`Bootstrap ${label}:`, stdout);
+        if (stderr) console.warn(`Bootstrap ${label} warnings:`, stderr);
+        return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (attempt === 0 && /Input\/output error|error: 5/.test(message)) {
+          console.warn(
+            `Bootstrap ${label} hit stale state, clearing and retrying`,
+          );
+          try {
+            await this.bootoutService(label);
+          } catch {
+            // may already be unregistered
+          }
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+        console.error(`Failed to bootstrap ${label}:`, message);
+        throw err;
+      }
     }
   }
 

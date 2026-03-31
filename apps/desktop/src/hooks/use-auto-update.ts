@@ -145,6 +145,10 @@ export function useAutoUpdate() {
   }, []);
 
   const download = useCallback(async () => {
+    // Immediately switch to downloading state so the UI shows progress
+    // instead of leaving the Download button unresponsive while waiting
+    // for the first update:progress event from electron-updater.
+    setState((prev) => ({ ...prev, phase: "downloading", percent: 0 }));
     try {
       await downloadUpdate();
     } catch {

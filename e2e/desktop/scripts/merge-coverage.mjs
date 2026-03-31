@@ -362,6 +362,60 @@ function buildArtifactMatchSuffixes(sourceMapsRelative) {
   return [...suffixes].filter(Boolean);
 }
 
+function normalizeCompiledRepoPath(relativePath) {
+  if (typeof relativePath !== "string" || relativePath.length === 0) {
+    return null;
+  }
+
+  const normalized = toPosixPath(relativePath.replace(/\\/g, "/"));
+  if (
+    normalized.startsWith("apps/controller/dist/") ||
+    normalized.startsWith("apps/desktop/dist-electron/main/") ||
+    normalized.startsWith("apps/desktop/dist-electron/preload/")
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
+function resolveNodeCompiledRepoPath(url, repoRoot) {
+  const normalizedUrl = toPosixPath(
+    (fromFileUrl(url) ?? url ?? "").replace(/\\/g, "/"),
+  );
+
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  const normalizedFromRepo = normalizeCompiledRepoPath(
+    normalizeRelativePath(path.normalize(normalizedUrl), repoRoot),
+  );
+  if (normalizedFromRepo) {
+    return normalizedFromRepo;
+  }
+
+  const suffixMappings = [
+    ["/dist-electron/main/", "apps/desktop/dist-electron/main/"],
+    ["/dist-electron/preload/", "apps/desktop/dist-electron/preload/"],
+    ["/runtime/controller/dist/", "apps/controller/dist/"],
+    ["/apps/controller/dist/", "apps/controller/dist/"],
+    ["/controller/dist/", "apps/controller/dist/"],
+  ];
+
+  for (const [needle, prefix] of suffixMappings) {
+    const markerIndex = normalizedUrl.lastIndexOf(needle);
+    if (markerIndex === -1) {
+      continue;
+    }
+
+    const suffix = normalizedUrl.slice(markerIndex + needle.length);
+    return normalizeCompiledRepoPath(`${prefix}${suffix}`);
+  }
+
+  return null;
+}
+
 function pickArtifactSourceMap(url, mapIndex) {
   if (typeof url !== "string") {
     return null;
@@ -379,7 +433,7 @@ function pickArtifactSourceMap(url, mapIndex) {
   return ranked[0]?.entry ?? null;
 }
 
-function getNodeSourceMapEntry(rawNodeCoverage, url) {
+function getNodeSourceMapEntry(rawNodeCoverage, url, repoRoot) {
   const cache = rawNodeCoverage?.["source-map-cache"];
   if (!cache || typeof cache !== "object") {
     return null;
@@ -395,7 +449,7 @@ function getNodeSourceMapEntry(rawNodeCoverage, url) {
   }
   return {
     kind: "node-v8",
-    compiledRepoPath: null,
+    compiledRepoPath: resolveNodeCompiledRepoPath(url, repoRoot),
     compiledContent: null,
     lineLengths: Array.isArray(entry.lineLengths) ? entry.lineLengths : null,
     sourceMap,
@@ -605,7 +659,11 @@ async function main() {
     const relativeArtifactPath = toPosixPath(path.relative(rawDir, filePath));
     includedProcesses.push(relativeArtifactPath);
     for (const script of scripts) {
-      const sourceMapMeta = getNodeSourceMapEntry(payload, script.url);
+      const sourceMapMeta = getNodeSourceMapEntry(
+        payload,
+        script.url,
+        args.repoRoot,
+      );
       if (!sourceMapMeta?.lineLengths) {
         continue;
       }

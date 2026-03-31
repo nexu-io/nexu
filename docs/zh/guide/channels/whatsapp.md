@@ -38,6 +38,16 @@
 
 ## 常见问题
 
+**Q: 二维码一直转圈、加载不出来怎么办？**
+
+WhatsApp 对网络环境要求较严格，需要能稳定访问 WhatsApp 服务器才能生成二维码。如果你使用了代理工具（如 Clash、Surge 等），请将出站模式切换为**全局连接**，再重新点击「Scan WhatsApp QR」。
+
+以 Clash 为例：点击菜单栏图标 → 出站模式 → **全局连接**。
+
+![Clash 切换全局连接模式](/assets/whatsapp/clash-global-mode.webp)
+
+---
+
 **Q: 需要公网服务器吗？**
 
 不需要。nexu 通过 WhatsApp Web 协议直连，无需公网 IP 或回调地址。

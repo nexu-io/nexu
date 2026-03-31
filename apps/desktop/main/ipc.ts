@@ -495,6 +495,22 @@ export function registerIpcHandlers(
           return { ok: true };
         }
 
+        case "setup:animation-complete": {
+          // Restore normal window size and vibrancy now that the
+          // white-background animation overlay has been removed.
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            win.setMinimumSize(1120, 760);
+            win.setSize(1400, 920, true);
+            win.center();
+            if (process.platform === "darwin") {
+              win.setBackgroundColor("#00000000");
+              win.setVibrancy("sidebar");
+            }
+          }
+          return undefined;
+        }
+
         default:
           throw new Error(`Unhandled host channel: ${channel satisfies never}`);
       }

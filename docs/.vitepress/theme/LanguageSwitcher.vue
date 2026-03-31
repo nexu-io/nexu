@@ -10,6 +10,7 @@ const el = ref<HTMLElement>()
 const locales = [
   { key: 'root', label: 'English', link: '/' },
   { key: 'zh', label: '简体中文', link: '/zh/' },
+  { key: 'ja', label: '日本語', link: '/ja/' },
 ]
 
 const currentKey = computed(() => localeIndex.value)

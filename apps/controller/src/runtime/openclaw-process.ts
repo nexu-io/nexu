@@ -160,6 +160,11 @@ export class OpenClawProcessManager {
         OPENCLAW_LOG_LEVEL: "info",
         // Explicitly pass config path so OpenClaw's file watcher monitors the correct file
         OPENCLAW_CONFIG_PATH: this.env.openclawConfigPath,
+        // Prefer sips (macOS system tool) over sharp for image processing on macOS.
+        // sharp requires native binaries that may not be available in the packaged app.
+        ...(process.platform === "darwin"
+          ? { OPENCLAW_IMAGE_BACKEND: "sips" }
+          : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

@@ -96,9 +96,12 @@ jobs:
           echo "Comparing: ${last_release}..HEAD"
           echo "last_release=$last_release" >> "$GITHUB_OUTPUT"
 
-          # Extract merged PR numbers from merge commits + squash merges
+          # Extract merged PR numbers from both formats:
+          #   Squash merge:  "feat: add foo (#123)"  → matches (#123)
+          #   Merge commit:  "Merge pull request #123 from ..."  → matches #123
           pr_numbers=$(git log "${last_release}..HEAD" --oneline \
-            | grep -oE '\(#[0-9]+\)' | tr -d '(#)' | sort -un || true)
+            | grep -oE '(\(#[0-9]+\)|Merge pull request #[0-9]+)' \
+            | grep -oE '[0-9]+' | sort -un || true)
 
           # Output files: feishu (with feishu markdown links), github (GFM), plain (for LLM)
           feishu_lines=""
