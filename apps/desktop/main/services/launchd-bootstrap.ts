@@ -83,6 +83,8 @@ export interface LaunchdBootstrapEnv {
   openclawTmpDir: string;
   /** Normalized proxy env propagated to controller/openclaw launchd services */
   proxyEnv: Record<string, string>;
+  /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
+  log?: (message: string) => void;
 }
 
 export interface LaunchdBootstrapResult {
@@ -278,20 +280,31 @@ function isProcessAlive(pid: number): boolean {
 // Port occupier detection
 // ---------------------------------------------------------------------------
 
+/**
+ * Check if a port is occupied by attempting a TCP connection.
+ * Returns `{ occupied: true }` if something is listening, `null` if free.
+ *
+ * Uses net.connect instead of lsof because packaged Electron apps with
+ * hardened runtime cannot see other processes' file descriptors via lsof.
+ */
 async function detectPortOccupier(
   port: number,
 ): Promise<{ pid: number } | null> {
-  try {
-    const { stdout } = await execFileAsync("lsof", [
-      `-iTCP:${port}`,
-      "-sTCP:LISTEN",
-      "-t",
-    ]);
-    const pid = Number.parseInt(stdout.trim(), 10);
-    return Number.isNaN(pid) ? null : { pid };
-  } catch {
-    return null;
-  }
+  const occupied = await new Promise<boolean>((resolve) => {
+    const sock = createConnection(port, "127.0.0.1");
+    sock.once("connect", () => {
+      sock.destroy();
+      resolve(true);
+    });
+    sock.once("error", () => resolve(false));
+    sock.setTimeout(1000, () => {
+      sock.destroy();
+      resolve(false);
+    });
+  });
+  // We can't get the PID without lsof, but we know the port is occupied.
+  // Return pid=0 as a sentinel — callers check occupier != null.
+  return occupied ? { pid: 0 } : null;
 }
 
 /**
@@ -374,6 +387,7 @@ async function cleanupStalePlists(
 export async function bootstrapWithLaunchd(
   env: LaunchdBootstrapEnv,
 ): Promise<LaunchdBootstrapResult> {
+  const log = env.log ?? console.log;
   const logDir = await ensureLogDir(env.nexuHome);
   const plistDir = env.plistDir ?? getDefaultPlistDir(env.isDev);
 
@@ -644,12 +658,20 @@ export async function bootstrapWithLaunchd(
     }
   }
   if (!openclawHealthy) {
+    const preOccupier = await detectPortOccupier(effectivePorts.openclawPort);
+    log(
+      `[bootstrap] pre-findFreePort: openclawPort=${effectivePorts.openclawPort} occupier=${preOccupier ? `PID ${preOccupier.pid}` : "none"}`,
+    );
     const freePort = await findFreePort(effectivePorts.openclawPort);
     if (freePort !== effectivePorts.openclawPort) {
       console.log(
         `OpenClaw port ${effectivePorts.openclawPort} occupied, using ${freePort}`,
       );
       effectivePorts.openclawPort = freePort;
+    } else {
+      log(
+        `[bootstrap] openclawPort ${effectivePorts.openclawPort} appears free, keeping`,
+      );
     }
   }
 
@@ -702,38 +724,50 @@ export async function bootstrapWithLaunchd(
     // (e.g. global `ai.openclaw.gateway` with KeepAlive=true) may have
     // raced us and grabbed the port first. If so, pick a new port and
     // re-bootstrap our service.
+    // Wait briefly for the port to be bound (our openclaw needs time to start).
+    await new Promise((r) => setTimeout(r, 2000));
     const occupier = await detectPortOccupier(effectivePorts.openclawPort);
     const ocStatus = await launchd.getServiceStatus(labels.openclaw);
-    if (occupier && ocStatus.pid != null && occupier.pid !== ocStatus.pid) {
-      console.log(
+    log(
+      `[bootstrap] post-launch check: port=${effectivePorts.openclawPort} occupied=${!!occupier} ocStatus=${JSON.stringify({ pid: ocStatus.pid, status: ocStatus.status })}`,
+    );
+    // Port is stolen if someone is listening but our service crashed or
+    // isn't running. We can't compare PIDs (lsof blocked by hardened
+    // runtime), so check if our service is healthy instead.
+    const portStolen =
+      occupier && (ocStatus.pid == null || ocStatus.status !== "running");
+    log(`[bootstrap] portStolen=${portStolen}`);
+    if (portStolen) {
+      log(
         `[bootstrap] OpenClaw port ${effectivePorts.openclawPort} stolen by PID ${occupier.pid} (ours is ${ocStatus.pid}), reassigning`,
       );
+      // Bootout crashed openclaw and wait for launchd to fully release it
       await launchd.bootoutService(labels.openclaw).catch(() => {});
+      await launchd.waitForExit(labels.openclaw, 5000).catch(() => {});
+
       const newPort = await findFreePort(effectivePorts.openclawPort + 1);
       effectivePorts.openclawPort = newPort;
-      // Regenerate plist with new port and restart
+
+      // Regenerate plists with new port for both openclaw and controller
       const retryPlistEnv: PlistEnv = {
         ...plistEnv,
         openclawPort: newPort,
       };
+
+      // Re-bootstrap openclaw on new port
       const retryPlist = generatePlist("openclaw", retryPlistEnv);
       await launchd.installService(labels.openclaw, retryPlist);
       await launchd.startService(labels.openclaw);
       await ensureRunning(labels.openclaw, "openclaw");
+
       // Controller needs the new port — re-bootstrap it too
-      const retryControllerPlistEnv: PlistEnv = {
-        ...plistEnv,
-        openclawPort: newPort,
-      };
       await launchd.bootoutService(labels.controller).catch(() => {});
-      const retryControllerPlist = generatePlist(
-        "controller",
-        retryControllerPlistEnv,
-      );
+      await launchd.waitForExit(labels.controller, 5000).catch(() => {});
+      const retryControllerPlist = generatePlist("controller", retryPlistEnv);
       await launchd.installService(labels.controller, retryControllerPlist);
       await launchd.startService(labels.controller);
       await ensureRunning(labels.controller, "controller");
-      console.log(
+      log(
         `[bootstrap] OpenClaw reassigned to port ${newPort}, controller restarted`,
       );
     }
