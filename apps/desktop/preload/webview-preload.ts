@@ -6,6 +6,7 @@ import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
   type RuntimeEvent,
+  type StartupProbePayload,
   hostInvokeChannels,
 } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
@@ -17,11 +18,20 @@ const runtimeConfig = getDesktopRuntimeConfig(process.env, {
   useBuildConfig: !process.defaultApp,
 });
 
+function reportStartupProbe(payload: StartupProbePayload): void {
+  try {
+    ipcRenderer.send("host:startup-probe", payload);
+  } catch (error) {
+    console.error("[desktop] failed to report startup probe", error);
+  }
+}
+
 const hostBridge: HostBridge = {
   bootstrap: {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
+    needsSetupAnimation: false,
   },
 
   invoke<TChannel extends HostInvokeChannel>(
@@ -35,6 +45,10 @@ const hostBridge: HostBridge = {
     return ipcRenderer.invoke("host:invoke", channel, payload) as Promise<
       HostInvokeResultMap[TChannel]
     >;
+  },
+
+  reportStartupProbe(payload) {
+    reportStartupProbe(payload);
   },
 
   onDesktopCommand(listener) {

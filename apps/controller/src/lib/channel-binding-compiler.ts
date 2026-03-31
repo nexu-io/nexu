@@ -4,10 +4,16 @@ import type {
   FeishuAccountConfig,
   OpenClawConfig,
   SlackAccountConfig,
+  TelegramAccountConfig,
+  WhatsappAccountConfig,
 } from "@nexu/shared";
 import type { BotResponse, ChannelResponse } from "@nexu/shared";
 
-const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = "__nexu_internal_feishu_prewarm__";
+/** Prefix for all internal placeholder account IDs that must never be persisted to runtime state. */
+export const NEXU_INTERNAL_ACCOUNT_PREFIX = "__nexu_internal_";
+
+const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}feishu_prewarm__`;
+const INTERNAL_WECHAT_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}wechat_prewarm__`;
 
 function buildSecretLookup(secrets: Record<string, string>, channelId: string) {
   return (suffix: string): string =>
@@ -46,6 +52,8 @@ export function compileChannelsConfig(params: {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
   const feishuAccounts: Record<string, FeishuAccountConfig> = {};
+  const telegramAccounts: Record<string, TelegramAccountConfig> = {};
+  const whatsappAccounts: Record<string, WhatsappAccountConfig> = {};
   const wechatAccounts: Record<string, { enabled: boolean }> = {};
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
   const useSlackSocketMode =
@@ -94,6 +102,22 @@ export function compileChannelsConfig(params: {
       continue;
     }
 
+    if (channel.channelType === "telegram") {
+      telegramAccounts[channel.accountId] = {
+        enabled: true,
+        botToken: secret("botToken"),
+      };
+      continue;
+    }
+
+    if (channel.channelType === "whatsapp") {
+      whatsappAccounts[channel.accountId] = {
+        enabled: true,
+        authDir: secret("authDir") || undefined,
+      };
+      continue;
+    }
+
     if (channel.channelType === "feishu") {
       const connectionMode =
         secret("connectionMode") === "webhook" ? "webhook" : "websocket";
@@ -126,6 +150,14 @@ export function compileChannelsConfig(params: {
       appSecret: "nexu-feishu-prewarm",
       connectionMode: "websocket",
     };
+  }
+
+  if (Object.keys(wechatAccounts).length === 0) {
+    // Keep the openclaw-weixin channel subtree stable from the first cold
+    // start so the first real WeChat connect only updates account-level
+    // config and can hot-reload the channel instead of forcing a full
+    // gateway restart (~20-45s → ~500ms).
+    wechatAccounts[INTERNAL_WECHAT_PREWARM_ACCOUNT_ID] = { enabled: false };
   }
 
   return {
@@ -177,13 +209,42 @@ export function compileChannelsConfig(params: {
           },
         }
       : {}),
-    ...(Object.keys(wechatAccounts).length > 0
+    ...(Object.keys(telegramAccounts).length > 0
       ? {
-          "openclaw-weixin": {
+          telegram: {
             enabled: true,
-            accounts: wechatAccounts,
+            dmPolicy: "open",
+            allowFrom: ["*"],
+            groupPolicy: "open",
+            groups: {
+              "*": {
+                requireMention: true,
+              },
+            },
+            accounts: telegramAccounts,
           },
         }
       : {}),
+    ...(Object.keys(whatsappAccounts).length > 0
+      ? {
+          whatsapp: {
+            enabled: true,
+            dmPolicy: "open",
+            allowFrom: ["*"],
+            groupPolicy: "open",
+            groupAllowFrom: ["*"],
+            groups: {
+              "*": {
+                requireMention: true,
+              },
+            },
+            accounts: whatsappAccounts,
+          },
+        }
+      : {}),
+    "openclaw-weixin": {
+      enabled: true,
+      accounts: wechatAccounts,
+    },
   };
 }

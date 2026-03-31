@@ -5,8 +5,10 @@ import type {
   RuntimeEventQueryResult,
   RuntimeLogEntry,
   RuntimeState,
+  StartupProbePayload,
 } from "../shared/host";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import type { ProxyDiagnosticsSnapshot } from "./services/proxy-manager";
 import {
   type SleepGuardSnapshot,
   createInitialSleepGuardSnapshot,
@@ -53,7 +55,19 @@ type DesktopEmbeddedContentSnapshot = {
 type DesktopDiagnosticsSnapshot = {
   updatedAt: string;
   isPackaged: boolean;
+  proxy: ProxyDiagnosticsSnapshot | null;
   coldStart: DesktopColdStartSnapshot;
+  startupProbe: {
+    preloadSeen: boolean;
+    rendererSeen: boolean;
+    entries: Array<{
+      source: StartupProbePayload["source"];
+      stage: string;
+      status: StartupProbePayload["status"];
+      detail: string | null;
+      at: string;
+    }>;
+  };
   sleepGuard: SleepGuardSnapshot;
   renderer: DesktopRendererSnapshot;
   embeddedContents: DesktopEmbeddedContentSnapshot[];
@@ -68,6 +82,8 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const MAX_STARTUP_PROBE_ENTRIES = 200;
+
 export function getDesktopDiagnosticsFilePath(): string {
   return resolve(app.getPath("userData"), "logs", "desktop-diagnostics.json");
 }
@@ -81,6 +97,12 @@ export class DesktopDiagnosticsReporter {
     startedAt: null,
     completedAt: null,
     error: null,
+  };
+
+  private readonly startupProbe: DesktopDiagnosticsSnapshot["startupProbe"] = {
+    preloadSeen: false,
+    rendererSeen: false,
+    entries: [],
   };
 
   private sleepGuard: SleepGuardSnapshot = createInitialSleepGuardSnapshot();
@@ -102,6 +124,8 @@ export class DesktopDiagnosticsReporter {
     number,
     DesktopEmbeddedContentSnapshot
   >();
+
+  private proxy: ProxyDiagnosticsSnapshot | null = null;
 
   private flushScheduled = false;
 
@@ -149,6 +173,49 @@ export class DesktopDiagnosticsReporter {
       counters: { ...snapshot.counters },
       lastEvent: snapshot.lastEvent ? { ...snapshot.lastEvent } : null,
     };
+    this.scheduleFlush();
+  }
+
+  setProxySnapshot(snapshot: ProxyDiagnosticsSnapshot): void {
+    this.proxy = {
+      ...snapshot,
+      env: { ...snapshot.env },
+      bypass: [...snapshot.bypass],
+      electron: {
+        ...snapshot.electron,
+        proxyBypassRules: [...snapshot.electron.proxyBypassRules],
+      },
+      resolutions: snapshot.resolutions.map((resolution) => ({
+        ...resolution,
+      })),
+    };
+    this.scheduleFlush();
+  }
+
+  recordStartupProbe(payload: StartupProbePayload): void {
+    if (payload.source === "preload") {
+      this.startupProbe.preloadSeen = true;
+    }
+
+    if (payload.source === "renderer") {
+      this.startupProbe.rendererSeen = true;
+    }
+
+    this.startupProbe.entries.push({
+      source: payload.source,
+      stage: payload.stage,
+      status: payload.status,
+      detail: payload.detail ?? null,
+      at: nowIso(),
+    });
+
+    if (this.startupProbe.entries.length > MAX_STARTUP_PROBE_ENTRIES) {
+      this.startupProbe.entries.splice(
+        0,
+        this.startupProbe.entries.length - MAX_STARTUP_PROBE_ENTRIES,
+      );
+    }
+
     this.scheduleFlush();
   }
 
@@ -276,7 +343,26 @@ export class DesktopDiagnosticsReporter {
     return {
       updatedAt: nowIso(),
       isPackaged: app.isPackaged,
+      proxy: this.proxy
+        ? {
+            ...this.proxy,
+            env: { ...this.proxy.env },
+            bypass: [...this.proxy.bypass],
+            electron: {
+              ...this.proxy.electron,
+              proxyBypassRules: [...this.proxy.electron.proxyBypassRules],
+            },
+            resolutions: this.proxy.resolutions.map((resolution) => ({
+              ...resolution,
+            })),
+          }
+        : null,
       coldStart: { ...this.coldStart },
+      startupProbe: {
+        preloadSeen: this.startupProbe.preloadSeen,
+        rendererSeen: this.startupProbe.rendererSeen,
+        entries: this.startupProbe.entries.map((entry) => ({ ...entry })),
+      },
       sleepGuard: {
         ...this.sleepGuard,
         counters: { ...this.sleepGuard.counters },

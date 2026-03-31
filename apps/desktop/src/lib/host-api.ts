@@ -9,6 +9,7 @@ import type {
   RuntimeEventQueryResult,
   RuntimeState,
   RuntimeUnitId,
+  StartupProbePayload,
   UpdateChannelName,
   UpdateSource,
 } from "@shared/host";
@@ -34,6 +35,10 @@ export async function exportDiagnostics(
   return getHostBridge().invoke("diagnostics:export", { source });
 }
 
+export function reportStartupProbe(payload: StartupProbePayload): void {
+  getHostBridge().reportStartupProbe(payload);
+}
+
 export async function triggerMainProcessCrash(): Promise<void> {
   await getHostBridge().invoke("diagnostics:crash-main", undefined);
 }
@@ -56,6 +61,10 @@ export async function getRuntimeConfig(): Promise<DesktopRuntimeConfig> {
 
 export async function openExternal(url: string): Promise<void> {
   await getHostBridge().invoke("shell:open-external", { url });
+}
+
+export async function notifySetupAnimationComplete(): Promise<void> {
+  await getHostBridge().invoke("setup:animation-complete", undefined);
 }
 
 export async function getRuntimeState(): Promise<RuntimeState> {

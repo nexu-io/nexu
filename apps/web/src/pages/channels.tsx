@@ -1,9 +1,12 @@
 import { DiscordSetupView } from "@/components/channel-setup/discord-setup-view";
 import { FeishuSetupView } from "@/components/channel-setup/feishu-setup-view";
 import { SlackOAuthView } from "@/components/channel-setup/slack-oauth-view";
+import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
+import { WhatsappSetupView } from "@/components/channel-setup/whatsapp-setup-view";
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
+import { getChannelChatUrl } from "@/lib/channel-links";
 import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -30,12 +33,31 @@ import "@/lib/api";
 import {
   deleteApiV1ChannelsByChannelId,
   getApiV1Channels,
+  getApiV1ChannelsLiveStatus,
 } from "../../lib/api/sdk.gen";
 
-type Platform = "slack" | "discord" | "feishu" | "wechat";
+type Platform =
+  | "slack"
+  | "discord"
+  | "feishu"
+  | "wechat"
+  | "telegram"
+  | "whatsapp";
+
+type LiveStatusData = {
+  gatewayConnected: boolean;
+  channels: {
+    channelType: string;
+    channelId: string;
+    status: string;
+    lastError: string | null;
+  }[];
+};
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
+  { id: "whatsapp", emoji: "\u{1F4DE}", desc: "Personal WhatsApp" },
   { id: "wechat", emoji: "\u{1F4AC}", desc: "Personal WeChat" },
+  { id: "telegram", emoji: "\u{2708}\u{FE0F}", desc: "Telegram Bot" },
   { id: "feishu", emoji: "\u{1F426}", desc: "Feishu Bot" },
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
@@ -46,6 +68,8 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   discord: "Discord",
   feishu: "Feishu",
   wechat: "WeChat",
+  telegram: "Telegram",
+  whatsapp: "WhatsApp",
 };
 
 // ─── Main page ───────────────────────────────────────────────
@@ -78,6 +102,16 @@ export function ChannelsPage() {
       const { data } = await getApiV1Channels();
       return data;
     },
+  });
+
+  const { data: liveStatusData } = useQuery({
+    queryKey: ["channels-live-status"],
+    queryFn: async () => {
+      const { data } = await getApiV1ChannelsLiveStatus();
+      return data as LiveStatusData | undefined;
+    },
+    refetchInterval: 3000,
+    enabled: (channelsData?.channels?.length ?? 0) > 0,
   });
 
   const { available: quotaAvailable, resetsAt } = useBotQuota();
@@ -113,10 +147,19 @@ export function ChannelsPage() {
       </div>
 
       {/* Platform selector */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
         {PLATFORMS.map((p) => {
           const isActive = platform === p.id;
-          const connected = channels.some((ch) => ch.channelType === p.id);
+          const configuredChannel = channels.find(
+            (ch) => ch.channelType === p.id,
+          );
+          const connected = !!configuredChannel;
+          const channelLive = liveStatusData?.channels?.find(
+            (e) => e.channelId === configuredChannel?.id,
+          );
+          const channelLiveStatus = liveStatusData
+            ? (channelLive?.status ?? "connecting")
+            : undefined;
           return (
             <button
               type="button"
@@ -146,10 +189,21 @@ export function ChannelsPage() {
                 </div>
               </div>
               {connected ? (
-                <CheckCircle2
-                  size={14}
-                  className="text-[var(--color-success)] shrink-0"
-                />
+                channelLiveStatus === "error" ||
+                channelLiveStatus === "disconnected" ? (
+                  <Shield size={14} className="text-red-500 shrink-0" />
+                ) : channelLiveStatus === "connecting" ||
+                  channelLiveStatus === "restarting" ? (
+                  <Loader2
+                    size={14}
+                    className="text-amber-500 shrink-0 animate-spin"
+                  />
+                ) : (
+                  <CheckCircle2
+                    size={14}
+                    className="text-[var(--color-success)] shrink-0"
+                  />
+                )
               ) : (
                 <Circle size={14} className="text-text-muted/30 shrink-0" />
               )}
@@ -191,6 +245,16 @@ export function ChannelsPage() {
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
+        ) : platform === "telegram" ? (
+          <TelegramSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
+        ) : platform === "whatsapp" ? (
+          <WhatsappSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
         ) : platform === "wechat" ? (
           <WechatSetupView
             onConnected={handleConnected}
@@ -208,6 +272,7 @@ export function ChannelsPage() {
           channel={currentChannel}
           queryClient={queryClient}
           onShowGuide={() => setForceGuide(true)}
+          liveStatusData={liveStatusData}
         />
       ) : null}
     </div>
@@ -221,6 +286,7 @@ function ConfiguredView({
   channel,
   queryClient,
   onShowGuide,
+  liveStatusData,
 }: {
   platform: Platform;
   channel: {
@@ -234,10 +300,21 @@ function ConfiguredView({
   };
   queryClient: ReturnType<typeof useQueryClient>;
   onShowGuide: () => void;
+  liveStatusData: LiveStatusData | undefined;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const liveEntry = liveStatusData?.channels?.find(
+    (e) => e.channelId === channel.id,
+  );
+  // Before live-status data arrives, show a neutral loading state
+  // instead of defaulting to green "connected".
+  const liveStatus = liveStatusData
+    ? (liveEntry?.status ?? "connecting")
+    : "connecting";
+  const liveError = liveEntry?.lastError ?? null;
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -309,27 +386,72 @@ function ConfiguredView({
   const discordInviteUrl = channel.appId
     ? `https://discord.com/oauth2/authorize?client_id=${channel.appId}&scope=bot&permissions=8`
     : null;
+  const telegramBotUrl =
+    platform === "telegram"
+      ? getChannelChatUrl(
+          "telegram",
+          channel.appId,
+          channel.botUserId,
+          channel.accountId,
+        )
+      : null;
 
   return (
     <>
       <div className="space-y-4 sm:space-y-5">
         {/* Status banner */}
-        <div className="flex flex-col items-start gap-3 p-4 rounded-xl border bg-[var(--color-success-subtle)] border-[var(--color-success-border)] sm:flex-row sm:items-center">
-          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-[var(--color-success-muted)] shrink-0">
-            <CheckCircle2 size={18} className="text-[var(--color-success)]" />
+        <div
+          className={`flex flex-col items-start gap-3 p-4 rounded-xl border sm:flex-row sm:items-center ${
+            liveStatus === "error" || liveStatus === "disconnected"
+              ? "bg-red-500/5 border-red-500/20"
+              : liveStatus === "connecting" || liveStatus === "restarting"
+                ? "bg-amber-500/5 border-amber-500/20"
+                : "bg-[var(--color-success-subtle)] border-[var(--color-success-border)]"
+          }`}
+        >
+          <div
+            className={`flex justify-center items-center w-9 h-9 rounded-lg shrink-0 ${
+              liveStatus === "error" || liveStatus === "disconnected"
+                ? "bg-red-500/10"
+                : liveStatus === "connecting" || liveStatus === "restarting"
+                  ? "bg-amber-500/10"
+                  : "bg-[var(--color-success-muted)]"
+            }`}
+          >
+            {liveStatus === "error" || liveStatus === "disconnected" ? (
+              <Shield size={18} className="text-red-500" />
+            ) : liveStatus === "connecting" || liveStatus === "restarting" ? (
+              <Loader2 size={18} className="text-amber-500 animate-spin" />
+            ) : (
+              <CheckCircle2 size={18} className="text-[var(--color-success)]" />
+            )}
           </div>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-text-primary">
-              {t("channels.statusConnected", {
-                platform: PLATFORM_LABELS[platform],
-              })}
+              {liveStatus === "error" || liveStatus === "disconnected"
+                ? `${PLATFORM_LABELS[platform]} ${t("channels.statusError")}`
+                : liveStatus === "connecting" || liveStatus === "restarting"
+                  ? `${PLATFORM_LABELS[platform]} ${t("channels.statusConnecting")}`
+                  : t("channels.statusConnected", {
+                      platform: PLATFORM_LABELS[platform],
+                    })}
             </div>
             <div className="text-[11px] text-text-muted mt-0.5">
-              {channel.teamName ?? channel.accountId}
-              {channel.createdAt &&
-                ` \u00B7 ${t("channels.configuredDate", { date: new Date(channel.createdAt).toLocaleDateString() })}`}
-              {" \u00B7 "}
-              {t("channels.connectionActive")}
+              {liveError ? (
+                <span className="text-red-400">{liveError}</span>
+              ) : (
+                <>
+                  {channel.teamName ?? channel.accountId}
+                  {channel.createdAt &&
+                    ` \u00B7 ${t("channels.configuredDate", { date: new Date(channel.createdAt).toLocaleDateString() })}`}
+                  {liveStatus === "connected" && (
+                    <>
+                      {" \u00B7 "}
+                      {t("channels.connectionActive")}
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
           <button
@@ -419,6 +541,30 @@ function ConfiguredView({
               className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-[#3370FF] hover:bg-[#2860E6] transition-all"
             >
               <ExternalLink size={13} /> {t("channels.messageBotFeishu")}
+            </a>
+          </div>
+        )}
+
+        {platform === "telegram" && telegramBotUrl && (
+          <div className="p-5 rounded-xl border bg-surface-1 border-border">
+            <div className="flex gap-2 items-center mb-4">
+              <div className="flex justify-center items-center w-7 h-7 rounded-lg bg-sky-500/10 shrink-0">
+                <ExternalLink size={13} className="text-sky-500" />
+              </div>
+              <h3 className="text-[13px] font-semibold text-text-primary">
+                {t("channels.openInTelegram")}
+              </h3>
+            </div>
+            <p className="text-[12px] text-text-muted mb-3 leading-relaxed">
+              {t("channels.openTelegramDesc")}
+            </p>
+            <a
+              href={telegramBotUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-white rounded-lg bg-sky-500 hover:bg-sky-600 transition-all"
+            >
+              <ExternalLink size={13} /> {t("channels.openTelegramBot")}
             </a>
           </div>
         )}

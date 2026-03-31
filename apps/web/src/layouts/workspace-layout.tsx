@@ -67,6 +67,7 @@ type Platform =
   | "whatsapp"
   | "telegram"
   | "feishu"
+  | "wechat"
   | "openclaw-weixin"
   | "web";
 
@@ -74,6 +75,7 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   discord: "Discord",
   slack: "Slack",
   feishu: "Feishu",
+  wechat: "WeChat",
   "openclaw-weixin": "WeChat",
   whatsapp: "WhatsApp",
   telegram: "Telegram",
@@ -1082,7 +1084,9 @@ function WorkspaceLayoutInner() {
                               : "text-text-secondary hover:text-text-primary hover:bg-surface-3",
                           )}
                         >
-                          <SidebarPlatformIcon platform={s.channelType} />
+                          <SidebarPlatformIcon
+                            platform={s.channelType ?? "web"}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="text-[13px] truncate font-medium">

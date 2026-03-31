@@ -18,8 +18,33 @@ describe("desktop update feed resolution", () => {
         source: "r2",
         channel: "nightly",
         feedUrl: null,
+        arch: "arm64",
       }),
-    ).toBe("https://desktop-releases.nexu.io/nightly");
+    ).toBe("https://desktop-releases.nexu.io/nightly/arm64");
+  });
+
+  it("uses the x64 R2 feed for Intel mac builds", () => {
+    expect(
+      resolveUpdateFeedUrlForTests({
+        source: "r2",
+        channel: "stable",
+        feedUrl: null,
+        arch: "x64",
+      }),
+    ).toBe("https://desktop-releases.nexu.io/stable/x64");
+  });
+
+  it("throws for unsupported mac architectures", () => {
+    expect(() =>
+      resolveUpdateFeedUrlForTests({
+        source: "r2",
+        channel: "stable",
+        feedUrl: null,
+        arch: "x86_64",
+      }),
+    ).toThrow(
+      '[update-manager] Unsupported mac architecture "x86_64". Expected "x64" or "arm64".',
+    );
   });
 
   it("lets explicit feed URLs override the channel mapping", () => {

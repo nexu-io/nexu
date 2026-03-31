@@ -22,6 +22,7 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 import { LowDbStore } from "./lowdb-store.js";
 import {
   type CloudProfileEntry,
@@ -467,7 +468,7 @@ export class NexuConfigStore {
       }
 
       try {
-        const res = await fetch(`${cloudApiUrl}/api/auth/device-poll`, {
+        const res = await proxyFetch(`${cloudApiUrl}/api/auth/device-poll`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ deviceId, deviceSecret }),
@@ -816,6 +817,111 @@ export class NexuConfigStore {
 
     await this.store.update((config) => ({
       ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
+  async connectTelegram(input: {
+    botToken: string;
+    telegramBotId: string;
+    botUsername: string | null;
+    displayName: string | null;
+  }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const accountId = `telegram-${input.telegramBotId}`;
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "telegram",
+      accountId,
+      status: "connected",
+      teamName: input.displayName,
+      appId: input.telegramBotId,
+      botUserId: input.botUsername,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      ...(() => {
+        const previous = config.channels.find(
+          (existing) =>
+            existing.channelType === channel.channelType &&
+            existing.accountId === channel.accountId,
+        );
+        const secrets = { ...config.secrets };
+        if (previous) {
+          delete secrets[`channel:${previous.id}:botToken`];
+          delete secrets[`channel:${previous.id}:authDir`];
+        }
+        secrets[`channel:${channel.id}:botToken`] = input.botToken;
+        return { secrets };
+      })(),
+      channels: [
+        ...config.channels.filter(
+          (existing) =>
+            !(
+              existing.channelType === channel.channelType &&
+              existing.accountId === channel.accountId
+            ),
+        ),
+        channel,
+      ],
+    }));
+
+    return channel;
+  }
+
+  async connectWhatsapp(input: {
+    accountId: string;
+    authDir?: string | null;
+  }): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "whatsapp",
+      accountId: input.accountId,
+      status: "connected",
+      teamName: null,
+      appId: null,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      ...(() => {
+        const previous = config.channels.find(
+          (existing) =>
+            existing.channelType === channel.channelType &&
+            existing.accountId === channel.accountId,
+        );
+        const secrets = { ...config.secrets };
+        if (previous) {
+          delete secrets[`channel:${previous.id}:botToken`];
+          delete secrets[`channel:${previous.id}:authDir`];
+        }
+        if (input.authDir) {
+          secrets[`channel:${channel.id}:authDir`] = input.authDir;
+        }
+        return { secrets };
+      })(),
       channels: [
         ...config.channels.filter(
           (existing) =>
@@ -1247,9 +1353,9 @@ export class NexuConfigStore {
     apiKey: string,
   ): Promise<CloudModel[] | null> {
     try {
-      const res = await fetch(buildLinkModelsUrl(linkUrl), {
+      const res = await proxyFetch(buildLinkModelsUrl(linkUrl), {
         headers: { Authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(10000),
+        timeoutMs: 10000,
       });
       if (!res.ok) {
         return null;
@@ -1340,11 +1446,11 @@ export class NexuConfigStore {
     let res: Response;
     const registerUrl = `${activeProfile.cloudUrl}/api/auth/device-register`;
     try {
-      res = await fetch(registerUrl, {
+      res = await proxyFetch(registerUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId, deviceSecretHash }),
-        signal: AbortSignal.timeout(10_000),
+        timeoutMs: 10_000,
       });
     } catch (error) {
       logger.warn(

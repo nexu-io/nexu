@@ -61,6 +61,35 @@ function renderActivityFeed(): string {
   );
 }
 
+function renderActivityFeedWithSession(session: {
+  id: string;
+  title: string;
+  channelType: string;
+  lastMessageAt: string;
+  messageCount: number;
+  status: string;
+}): string {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  queryClient.setQueryData(["sessions-recent"], {
+    sessions: [session],
+  });
+
+  return renderToStaticMarkup(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <ActivityFeed />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("ActivityFeed", () => {
   it("links recent activity rows to the matching workspace session", () => {
     const markup = renderActivityFeed();
@@ -68,5 +97,29 @@ describe("ActivityFeed", () => {
     expect(markup).toContain('data-activity-session-link="sess-1"');
     expect(markup).toContain('href="/workspace/sessions/sess-1"');
     expect(markup).toContain("唐其远");
+  });
+
+  it("renders Telegram and WhatsApp activity with distinct badges", () => {
+    const telegramMarkup = renderActivityFeedWithSession({
+      id: "sess-tg",
+      title: "Telegram thread",
+      channelType: "telegram",
+      lastMessageAt: "2026-03-20T08:58:00.000Z",
+      messageCount: 2,
+      status: "active",
+    });
+    const whatsappMarkup = renderActivityFeedWithSession({
+      id: "sess-wa",
+      title: "WhatsApp thread",
+      channelType: "whatsapp",
+      lastMessageAt: "2026-03-20T08:58:00.000Z",
+      messageCount: 2,
+      status: "active",
+    });
+
+    expect(telegramMarkup).toContain("Telegram");
+    expect(telegramMarkup).toContain("<title>Telegram</title>");
+    expect(whatsappMarkup).toContain("WhatsApp");
+    expect(whatsappMarkup).toContain("<title>WhatsApp</title>");
   });
 });

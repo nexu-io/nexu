@@ -29,11 +29,24 @@ export interface ChannelAccountSnapshot {
   restartPending?: boolean;
   lastError?: string | null;
   probe?: { ok?: boolean };
+  linked?: boolean;
+}
+
+export interface ChannelSelfPresence {
+  e164?: string | null;
+  jid?: string | null;
+}
+
+export interface ChannelSummarySnapshot {
+  configured?: boolean;
+  linked?: boolean;
+  self?: ChannelSelfPresence | null;
 }
 
 /** Result of channels.status RPC. */
 export interface ChannelsStatusResult {
   channelOrder: string[];
+  channels?: Record<string, ChannelSummarySnapshot>;
   channelAccounts: Record<string, ChannelAccountSnapshot[]>;
 }
 
@@ -82,6 +95,11 @@ export interface SendChannelMessageResult {
   channel?: string;
   chatId?: string;
   conversationId?: string;
+}
+
+export interface LogoutChannelAccountResult {
+  cleared?: boolean;
+  loggedOut?: boolean;
 }
 
 interface LiveStatusChannelInput {
@@ -168,6 +186,22 @@ export class OpenClawGatewayService {
           )
           .digest("hex"),
     });
+  }
+
+  async logoutChannelAccount(
+    channelType: string,
+    accountId?: string,
+  ): Promise<LogoutChannelAccountResult> {
+    const channel =
+      channelType === "wechat" ? "openclaw-weixin" : channelType.trim();
+    return this.wsClient.request<LogoutChannelAccountResult>(
+      "channels.logout",
+      {
+        channel,
+        ...(accountId ? { accountId } : {}),
+      },
+      { timeoutMs: 5000 },
+    );
   }
 
   async getChannelsStatusSnapshot(opts?: {
@@ -458,6 +492,35 @@ export class OpenClawGatewayService {
     return this.wsClient.request(
       "web.login.wait",
       { accountId: sessionKey },
+      { timeoutMs: 500_000 },
+    );
+  }
+
+  async whatsappQrStart(accountId: string): Promise<{
+    qrDataUrl?: string;
+    message: string;
+    accountId?: string;
+  }> {
+    if (!this.wsClient.isConnected()) {
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return this.wsClient.request(
+      "web.login.start",
+      {
+        accountId,
+        force: true,
+      },
+      { timeoutMs: 60_000 },
+    );
+  }
+
+  async whatsappQrWait(accountId: string): Promise<{
+    connected: boolean;
+    message: string;
+  }> {
+    return this.wsClient.request(
+      "web.login.wait",
+      { accountId },
       { timeoutMs: 500_000 },
     );
   }

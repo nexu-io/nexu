@@ -1,22 +1,32 @@
-// Baseline installed size: 665M.
+// Baseline installed size: 652M.
+
+const clipboardNativeTargets = [
+  "node_modules/@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
+  "node_modules/@mariozechner/clipboard-darwin-x64/clipboard.darwin-x64.node",
+  "node_modules/@mariozechner/clipboard-darwin-universal/clipboard.darwin-universal.node",
+];
+
+const daveyNativeTargets = [
+  "node_modules/@snazzah/davey-darwin-arm64/davey.darwin-arm64.node",
+  "node_modules/@snazzah/davey-darwin-x64/davey.darwin-x64.node",
+  "node_modules/@snazzah/davey-darwin-universal/davey.darwin-universal.node",
+];
+
+const shouldPruneDavey = process.env.NEXU_OPENCLAW_PRUNE_DAVEY === "1";
 
 export const pruneDependencyTargets = [
-  // Round 1: actual savings 191M; actual pruned size 474M.
+  // Round 1: actual savings 124M; actual pruned size 528M.
   // - Why these targets:
   //   biggest early size win
   // - Impact:
   //   `koffi`: may break native/system-level integrations or FFI-backed helpers.
-  //   `pdfjs-dist` + `@napi-rs`: may break PDF parsing, image extraction,
-  //   or attachment ingestion paths involving PDFs.
   //   `node-llama-cpp` + `@node-llama-cpp`: may break local/on-device llama
   //   execution; hosted provider paths should still work.
   "node_modules/koffi",
-  "node_modules/pdfjs-dist",
   "node_modules/node-llama-cpp",
   "node_modules/@node-llama-cpp",
-  "node_modules/@napi-rs",
 
-  // Round 2: actual savings 37M; actual pruned size 437M.
+  // Round 2: actual savings 37M; actual pruned size 491M.
   // - Why these targets:
   //   focus on packages that are extraneous or not observed as startup-time imports.
   //   `@google` is intentionally excluded because pruning it broke startup via
@@ -32,16 +42,14 @@ export const pruneDependencyTargets = [
   "node_modules/octokit",
   "node_modules/@cloudflare",
 
-  // Round 3: actual savings 16M; actual pruned size 421M.
+  // Round 3: actual savings 6M; actual pruned size 485M.
   // - Why these targets:
   //   browser/runtime-adjacent packages, and a few small low-risk cleanup
   //   targets that are extraneous or type-only in the current install tree.
   // - Impact:
-  //   `playwright-core`: may break browser control, pw-ai, or other Playwright-backed automation features.
   //   `bun-types`: should mainly affect Bun-oriented typing/tooling paths, not normal Node runtime behavior.
   //   `simple-git` + `ipull`: may break Git/download helper flows if any plugin still expects these extraneous packages to be present.
   //   `fast-xml-builder`: may break provider paths that depend on AWS XML serialization, such as Bedrock-related integrations.
-  "node_modules/playwright-core",
   "node_modules/bun-types",
   "node_modules/simple-git",
   "node_modules/ipull",
@@ -61,11 +69,11 @@ export const pruneDependencyTargets = [
   "node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.8.17.3.dylib",
   "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/pty.node",
   "node_modules/@lydell/node-pty-darwin-arm64/prebuilds/darwin-arm64/spawn-helper",
-  "node_modules/@mariozechner/clipboard-darwin-arm64/clipboard.darwin-arm64.node",
-  "node_modules/@mariozechner/clipboard-darwin-universal/clipboard.darwin-universal.node",
+  ...clipboardNativeTargets,
   "node_modules/@reflink/reflink-darwin-arm64/reflink.darwin-arm64.node",
-  // Keep davey - required for OpenClaw Discord DAVE protocol
-  // "node_modules/@snazzah/davey-darwin-arm64/davey.darwin-arm64.node",
+  // Keep davey by default - required for OpenClaw Discord DAVE protocol.
+  // Set NEXU_OPENCLAW_PRUNE_DAVEY=1 only for builds that never enable Discord voice.
+  ...(shouldPruneDavey ? daveyNativeTargets : []),
   "node_modules/sqlite-vec-darwin-arm64/vec0.dylib",
 ];
 

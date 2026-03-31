@@ -22,6 +22,7 @@ function createEnv(): ControllerEnv {
     openclawStateDir: "/tmp/nexu-home/runtime/openclaw/state",
     openclawConfigPath: "/tmp/nexu-home/runtime/openclaw/openclaw.json",
     openclawSkillsDir: "/tmp/nexu-home/runtime/openclaw/state/skills",
+    userSkillsDir: "/tmp/.agents/skills",
     openclawExtensionsDir: "/tmp/nexu-home/runtime/openclaw/state/extensions",
     runtimePluginTemplatesDir: "/tmp/nexu-home/runtime-plugins",
     openclawRuntimeModelStatePath:
@@ -287,5 +288,39 @@ describe("compileOpenClawConfig", () => {
     expect(selectPreferredModel(availableModels)?.id).toBe(
       "link/gemini-3.1-pro-preview",
     );
+  });
+
+  it("compiles ollama providers with the native ollama API", () => {
+    const config = createBaseConfig();
+    config.providers = [
+      {
+        id: "provider_ollama",
+        providerId: "ollama",
+        displayName: "Ollama",
+        enabled: true,
+        baseUrl: "http://127.0.0.1:11434",
+        authMode: "apiKey",
+        apiKey: "ollama-local",
+        oauthRegion: null,
+        oauthCredential: null,
+        models: ["qwen2.5-coder:7b"],
+        createdAt: "2026-03-21T00:00:00.000Z",
+        updatedAt: "2026-03-21T00:00:00.000Z",
+      },
+    ];
+
+    const compiled = compileOpenClawConfig(config, createEnv());
+
+    expect(compiled.models?.providers?.ollama).toEqual({
+      baseUrl: "http://127.0.0.1:11434",
+      apiKey: "ollama-local",
+      api: "ollama",
+      models: [
+        expect.objectContaining({
+          id: "qwen2.5-coder:7b",
+          name: "qwen2.5-coder:7b",
+        }),
+      ],
+    });
   });
 });

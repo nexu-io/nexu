@@ -88,11 +88,30 @@ full_cleanup() {
 stop_services() {
   echo "Stopping services..."
 
-  # Kill Electron with SIGKILL to bypass quit handler
-  pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
-  pkill -f "vite.*apps/desktop" 2>/dev/null || true
+  # Try graceful SIGTERM first — this triggers the unified gracefulShutdown()
+  # handler in the Electron main process, which does proper teardown.
+  echo "  Sending SIGTERM to Electron..."
+  pkill -TERM -f "Electron.*apps/desktop" 2>/dev/null || true
 
-  # Bootout launchd services (sends SIGTERM + unregisters)
+  # Wait up to 10 seconds for Electron + children to exit gracefully
+  local max_graceful=10
+  local waited=0
+  while [ $waited -lt $max_graceful ]; do
+    if ! pgrep -f "Electron.*apps/desktop" &>/dev/null; then
+      echo "  Electron exited gracefully after ${waited}s"
+      break
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  # If Electron is still alive, escalate to SIGKILL
+  if pgrep -f "Electron.*apps/desktop" &>/dev/null; then
+    echo "  Electron did not exit, sending SIGKILL..."
+    pkill -9 -f "Electron.*apps/desktop" 2>/dev/null || true
+  fi
+
+  # Bootout launchd services (in case graceful shutdown didn't do it)
   if launchctl print "$DOMAIN/$OPENCLAW_LABEL" &>/dev/null; then
     echo "  Stopping $OPENCLAW_LABEL..."
     launchctl bootout "$DOMAIN/$OPENCLAW_LABEL" 2>/dev/null || true
@@ -102,9 +121,9 @@ stop_services() {
     launchctl bootout "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null || true
   fi
 
-  # Wait for ports to be freed (OpenClaw graceful shutdown can take a few seconds)
+  # Wait for ports to be freed
   local max_wait=8
-  local waited=0
+  waited=0
   while [ $waited -lt $max_wait ]; do
     local port_busy=0
     lsof -i ":$CONTROLLER_PORT" -P -n &>/dev/null && port_busy=1
@@ -118,6 +137,13 @@ stop_services() {
   pkill -9 -f "openclaw.mjs gateway" 2>/dev/null || true
   pkill -9 -f "controller/dist/index.js" 2>/dev/null || true
   pkill -9 -f "chrome_crashpad_handler" 2>/dev/null || true
+
+  # Kill tsc --watch and web watcher background processes.
+  # These are started by start_services and normally cleaned by the EXIT
+  # trap, but `pnpm stop` calls stop_services directly without triggering
+  # the trap, leaving watchers alive and printing to the terminal.
+  pkill -f "tsc --watch.*apps/controller" 2>/dev/null || true
+  pkill -f "find.*apps/web/src" 2>/dev/null || true
 
   echo "Services stopped."
 }
@@ -138,8 +164,10 @@ start_services() {
   echo "Log directory: $LOG_DIR"
   echo ""
 
-  # Build all dependencies (shared must build before controller/web)
+  # Clean stale dist to avoid stale incremental output (tsc doesn't remove
+  # dist files for deleted source files) and ensure desktop bundles fresh code
   echo "Building..."
+  rm -rf "$REPO_ROOT/packages/shared/dist" "$REPO_ROOT/apps/controller/dist" "$REPO_ROOT/apps/desktop/dist-electron"
   pnpm build
 
   # Ensure desktop shell dist exists (Electron loadFile needs it on disk)
@@ -193,10 +221,14 @@ start_services() {
   WEB_WATCH_PID=$!
 
   # Start Electron desktop with launchd mode (blocks until quit)
+  # Use dev-env.sh to patch LSUIElement and source .env files before launch.
+  # Without this, child processes spawned with process.execPath show extra
+  # Dock icons on macOS because Launch Services caches the un-patched plist.
   echo "Starting Electron desktop (launchd mode)..."
   echo ""
   cd "$REPO_ROOT"
-  NEXU_USE_LAUNCHD=1 NEXU_WORKSPACE_ROOT="$REPO_ROOT" NEXU_HOME="$DEV_NEXU_HOME" pnpm exec electron apps/desktop
+  NEXU_USE_LAUNCHD=1 NEXU_HOME="$DEV_NEXU_HOME" \
+    apps/desktop/scripts/dev-env.sh pnpm exec electron apps/desktop
 }
 
 show_status() {

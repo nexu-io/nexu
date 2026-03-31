@@ -16,6 +16,7 @@ import type {
   UpdateSessionInput,
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 
 export type ChatMessage = {
   id: string;
@@ -48,9 +49,19 @@ type SanitizedUserMessageText = {
 };
 type SessionHints = {
   senderName?: string;
+  groupName?: string;
   channelType?: string;
   metadata?: SessionMetadataRecord;
   feishuMessageId?: string;
+};
+type SessionsIndexEntry = {
+  sessionId?: string;
+  sessionFile?: string;
+  lastChannel?: string;
+  origin?: {
+    provider?: string;
+    label?: string;
+  };
 };
 type ControllerConfigRecord = {
   channels?: Array<{
@@ -102,6 +113,7 @@ export class SessionsRuntime {
         }
 
         const sessionsDir = path.join(agentsDir, agentEntry.name, "sessions");
+        const sessionsIndex = await this.readSessionsIndex(sessionsDir);
         let files: Dirent[];
         try {
           files = await readdir(sessionsDir, { withFileTypes: true });
@@ -122,7 +134,20 @@ export class SessionsRuntime {
           // Read the first user message metadata block and backfill exact
           // Feishu chat targets for existing sessions without touching
           // OpenClaw's transcript writer.
-          const hints = await this.inferSessionHints(filePath);
+          const transcriptHints = await this.inferSessionHints(filePath);
+          const indexHints = this.inferSessionHintsFromIndex(
+            sessionsIndex,
+            filePath,
+            sessionKey,
+          );
+          const hints: SessionHints = {
+            senderName: transcriptHints.senderName ?? indexHints.senderName,
+            groupName: transcriptHints.groupName ?? indexHints.groupName,
+            channelType: transcriptHints.channelType ?? indexHints.channelType,
+            metadata: transcriptHints.metadata ?? indexHints.metadata,
+            feishuMessageId:
+              transcriptHints.feishuMessageId ?? indexHints.feishuMessageId,
+          };
           const resolvedHintMetadata = await this.resolveExactChatMetadata(
             agentEntry.name,
             extra.metadata,
@@ -133,16 +158,20 @@ export class SessionsRuntime {
           if (!channelType && hints.channelType) {
             channelType = hints.channelType;
           }
-          if (
-            this.shouldReplaceInferredTitle(title, sessionKey) &&
-            hints.senderName
-          ) {
-            title =
-              channelType === "openclaw-weixin"
-                ? hints.senderName
-                : channelType
-                  ? `${hints.senderName} · ${channelType}`
-                  : hints.senderName;
+          if (this.shouldReplaceInferredTitle(title, sessionKey)) {
+            if (hints.groupName) {
+              title =
+                channelType && channelType !== "openclaw-weixin"
+                  ? `${hints.groupName} · ${channelType}`
+                  : hints.groupName;
+            } else if (hints.senderName) {
+              title =
+                channelType === "openclaw-weixin"
+                  ? hints.senderName
+                  : channelType
+                    ? `${hints.senderName} · ${channelType}`
+                    : hints.senderName;
+            }
           }
           if (
             this.shouldReplaceInferredTitle(title, sessionKey) &&
@@ -697,6 +726,48 @@ export class SessionsRuntime {
     );
   }
 
+  private async readSessionsIndex(
+    sessionsDir: string,
+  ): Promise<Record<string, SessionsIndexEntry>> {
+    const indexPath = path.join(sessionsDir, "sessions.json");
+    try {
+      const raw = await readFile(indexPath, "utf8");
+      const parsed = JSON.parse(raw) as Record<string, SessionsIndexEntry>;
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  private inferSessionHintsFromIndex(
+    index: Record<string, SessionsIndexEntry>,
+    filePath: string,
+    sessionKey: string,
+  ): SessionHints {
+    const entry = Object.values(index).find((item) => {
+      if (item.sessionId === sessionKey) {
+        return true;
+      }
+      if (typeof item.sessionFile === "string") {
+        return path.resolve(item.sessionFile) === path.resolve(filePath);
+      }
+      return false;
+    });
+
+    if (!entry) {
+      return {};
+    }
+
+    const rawChannel = entry.lastChannel ?? entry.origin?.provider ?? undefined;
+    const channelType = this.normalizeInferredChannelType(rawChannel);
+    const senderName = entry.origin?.label;
+
+    return {
+      senderName,
+      channelType,
+    };
+  }
+
   private async readSessionMetadata(
     filePath: string,
   ): Promise<SessionMetadata> {
@@ -796,6 +867,23 @@ export class SessionsRuntime {
       this.readStringValue(conversationMeta, "sender") ??
       undefined;
 
+    // Extract group name from conversation metadata, with multi-source fallback
+    const rawGroupName =
+      this.readStringValue(conversationMeta, "group_name") ??
+      this.readStringValue(conversationMeta, "chat_name") ??
+      this.readStringValue(conversationMeta, "group_subject") ??
+      this.readStringValue(conversationMeta, "conversation_label") ??
+      undefined;
+
+    // Filter out platform-internal IDs that look like identifiers rather than
+    // human-readable group names:
+    //   oc_ / ou_  — OpenClaw / Feishu internal IDs (hex suffix)
+    //   C/G/D + [A-Z0-9]{8,} — Slack IDs: channels (C), groups (G), DMs (D)
+    const isIdLike =
+      rawGroupName !== undefined &&
+      /^(?:oc_|ou_)[a-f0-9]+$|^[CGD][A-Z0-9]{8,}$/.test(rawGroupName);
+    const groupName = isIdLike ? undefined : rawGroupName;
+
     let channelType: string | undefined;
     const combined = [
       this.readStringValue(senderMeta, "label") ?? "",
@@ -821,11 +909,20 @@ export class SessionsRuntime {
       channelType = "slack";
     } else if (combined.includes("discord")) {
       channelType = "discord";
+    } else if (
+      combined.includes("whatsapp") ||
+      combined.includes("@s.whatsapp.net") ||
+      combined.includes("@g.us")
+    ) {
+      channelType = "whatsapp";
+    } else if (combined.includes("telegram")) {
+      channelType = "telegram";
     }
 
     return {
       senderName,
-      channelType,
+      groupName,
+      channelType: this.normalizeInferredChannelType(channelType),
       metadata: this.extractExactChatTargetMetadata(
         senderMeta,
         conversationMeta,
@@ -833,6 +930,21 @@ export class SessionsRuntime {
       feishuMessageId:
         this.readStringValue(conversationMeta, "message_id") ?? undefined,
     };
+  }
+
+  private normalizeInferredChannelType(
+    channelType: string | undefined,
+  ): string | undefined {
+    if (!channelType) {
+      return undefined;
+    }
+
+    const normalized = channelType.trim().toLowerCase();
+    if (normalized === "wechat") {
+      return "openclaw-weixin";
+    }
+
+    return normalized || undefined;
   }
 
   private parseJsonMetadataBlock(
@@ -986,7 +1098,7 @@ export class SessionsRuntime {
     }
 
     try {
-      const response = await fetch(
+      const response = await proxyFetch(
         `https://open.feishu.cn/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
         {
           headers: {
@@ -1070,7 +1182,7 @@ export class SessionsRuntime {
     }
 
     try {
-      const response = await fetch(
+      const response = await proxyFetch(
         "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
         {
           method: "POST",

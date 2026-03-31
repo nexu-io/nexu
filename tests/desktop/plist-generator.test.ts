@@ -25,6 +25,13 @@ describe("generatePlist", () => {
     openclawExtensionsDir: "/app/node_modules/openclaw/extensions",
     skillNodePath: "/app/bundled-node-modules",
     openclawTmpDir: "/Users/testuser/.nexu/openclaw/tmp",
+    proxyEnv: {
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+      NODE_USE_ENV_PROXY: "1",
+    },
   };
 
   it("generates valid controller plist XML", async () => {
@@ -124,6 +131,180 @@ describe("generatePlist", () => {
     );
   });
 
+  // -----------------------------------------------------------------------
+  // ProgramArguments ordering — controller
+  // -----------------------------------------------------------------------
+  it("controller ProgramArguments: [nodePath, controllerEntryPath] in exact order", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("controller", mockEnv);
+
+    // Extract ProgramArguments array content
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/controller/dist/index.js",
+    ]);
+  });
+
+  // -----------------------------------------------------------------------
+  // ProgramArguments ordering — openclaw
+  // -----------------------------------------------------------------------
+  it("openclaw ProgramArguments: [nodePath, openclawPath, gateway, run] in exact order", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/openclaw/openclaw.mjs",
+      "gateway",
+      "run",
+      "--port",
+      String(mockEnv.openclawPort),
+    ]);
+  });
+
+  it("openclaw dev mode inserts --auth none after gateway run", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", { ...mockEnv, isDev: true });
+
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/openclaw/openclaw.mjs",
+      "gateway",
+      "run",
+      "--port",
+      String(mockEnv.openclawPort),
+      "--auth",
+      "none",
+    ]);
+  });
+
+  // -----------------------------------------------------------------------
+  // Openclaw plist completeness — WorkingDirectory, error log, KeepAlive
+  // -----------------------------------------------------------------------
+  it("openclaw plist has correct WorkingDirectory", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    expect(plist).toContain(
+      "<key>WorkingDirectory</key>\n    <string>/app</string>",
+    );
+  });
+
+  it("openclaw plist has StandardErrorPath", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    expect(plist).toContain(
+      "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
+    );
+  });
+
+  it("openclaw plist KeepAlive restarts on non-zero exit", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    // SuccessfulExit=false means launchd restarts when exit code != 0
+    expect(plist).toContain("<key>SuccessfulExit</key>");
+    expect(plist).toMatch(/<key>SuccessfulExit<\/key>\s*<false\/>/);
+  });
+
+  it("openclaw plist has ThrottleInterval to prevent rapid respawn", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", mockEnv);
+
+    expect(plist).toContain("<key>ThrottleInterval</key>");
+    expect(plist).toMatch(
+      /<key>ThrottleInterval<\/key>\s*<integer>\d+<\/integer>/,
+    );
+  });
+
+  it("controller plist has correct WorkingDirectory", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("controller", mockEnv);
+
+    expect(plist).toContain(
+      "<key>WorkingDirectory</key>\n    <string>/app/controller</string>",
+    );
+  });
+
+  it("both plists have RunAtLoad=false (explicit start only)", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const controller = generatePlist("controller", mockEnv);
+    const openclaw = generatePlist("openclaw", mockEnv);
+
+    expect(controller).toMatch(/<key>RunAtLoad<\/key>\s*<false\/>/);
+    expect(openclaw).toMatch(/<key>RunAtLoad<\/key>\s*<false\/>/);
+  });
+
+  // -----------------------------------------------------------------------
+  // XML escaping robustness
+  // -----------------------------------------------------------------------
+  it("escapes ampersand, angle brackets, quotes, and apostrophes in all path fields", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const nastEnv = {
+      ...mockEnv,
+      nodePath: "/usr/bin/node's",
+      controllerCwd: '/app/"controller"',
+      openclawPath: "/path/with&special<chars>.mjs",
+      openclawConfigPath: "/Users/test'user/.nexu/config",
+    };
+
+    const controller = generatePlist("controller", nastEnv);
+    const openclaw = generatePlist("openclaw", nastEnv);
+
+    // Verify escaped forms present, raw forms absent
+    expect(controller).toContain("node&apos;s");
+    expect(controller).not.toContain("node's</string>");
+    expect(controller).toContain("&quot;controller&quot;");
+    expect(openclaw).toContain("&amp;special&lt;chars&gt;");
+    expect(openclaw).toContain("test&apos;user");
+  });
+
   it("sets ELECTRON_RUN_AS_NODE=1 for both services", async () => {
     const { generatePlist } = await import(
       "../../apps/desktop/main/services/plist-generator"
@@ -141,5 +322,23 @@ describe("generatePlist", () => {
     expect(openclawPlist).toContain(
       "<key>ELECTRON_RUN_AS_NODE</key>\n        <string>1</string>",
     );
+  });
+
+  it("includes normalized proxy env vars in controller and openclaw plists", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const controllerPlist = generatePlist("controller", mockEnv);
+    const openclawPlist = generatePlist("openclaw", mockEnv);
+
+    for (const plist of [controllerPlist, openclawPlist]) {
+      expect(plist).toContain("<key>HTTP_PROXY</key>");
+      expect(plist).toContain("<key>HTTPS_PROXY</key>");
+      expect(plist).toContain("<key>ALL_PROXY</key>");
+      expect(plist).toContain("<key>NO_PROXY</key>");
+      expect(plist).toContain("<key>NODE_USE_ENV_PROXY</key>");
+      expect(plist).toContain("example.com,localhost,127.0.0.1,::1");
+    }
   });
 });

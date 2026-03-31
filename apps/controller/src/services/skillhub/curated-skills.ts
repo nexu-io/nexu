@@ -70,9 +70,17 @@ export function copyStaticSkills(params: {
     return { copied, skipped };
   }
 
+  const knownSlugs = params.skillDb.getAllKnownSlugs();
+
   for (const slug of STATIC_SKILL_SLUGS) {
     const destDir = resolve(params.targetDir, slug);
     if (existsSync(resolve(destDir, "SKILL.md"))) {
+      skipped.push(slug);
+      continue;
+    }
+
+    // Skip if ledger already knows this slug (user uninstalled it, or it's tracked)
+    if (knownSlugs.has(slug)) {
       skipped.push(slug);
       continue;
     }

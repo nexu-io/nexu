@@ -1,4 +1,4 @@
-import type { SkillhubCatalogData } from "@/types/desktop";
+import type { SkillSource, SkillhubCatalogData } from "@/types/desktop";
 import "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,12 @@ import {
   postApiV1SkillhubRefresh,
   postApiV1SkillhubUninstall,
 } from "../../lib/api/sdk.gen";
+
+export type SkillUninstallInput = {
+  slug: string;
+  source?: Exclude<SkillSource, "curated">;
+  agentId?: string | null;
+};
 
 const CATALOG_QUERY_KEY = ["skillhub", "catalog"] as const;
 const DETAIL_QUERY_KEY = ["skillhub", "detail"] as const;
@@ -83,9 +89,13 @@ export function useUninstallSkill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (slug: string) => {
+    mutationFn: async ({ slug, source, agentId }: SkillUninstallInput) => {
       const { data, error } = await postApiV1SkillhubUninstall({
-        body: { slug },
+        body: {
+          slug,
+          ...(source ? { source } : {}),
+          ...(agentId ? { agentId } : {}),
+        },
       });
       if (error) throw new Error("Uninstall request failed");
       const result = data as { ok: boolean; error?: string };

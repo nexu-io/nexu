@@ -25,6 +25,11 @@ const RETRY_DELAY_MS = 2000;
 const PROGRESS_INTERVAL_MS = 400;
 const PROGRESS_DURATION_MS = 40_000;
 
+function isQrImageSource(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.startsWith("data:image/");
+}
+
 function calcFakeProgress(elapsedMs: number): number {
   const ratio = Math.min(elapsedMs / PROGRESS_DURATION_MS, 1);
   // Ease-out: fast start, slow finish, caps at 95%
@@ -131,12 +136,17 @@ export function WechatSetupView({
       }
 
       stopProgress();
+      if (!startData.sessionKey) {
+        setErrorMessage(t("wechatSetup.connectFailed"));
+        setPhase("error");
+        return;
+      }
       setQrUrl(startData.qrDataUrl ?? null);
       setPhase("scanning");
 
       const { data: waitData, error: waitError } =
         await postApiV1ChannelsWechatQrWait({
-          body: { sessionKey: startData.sessionKey ?? "" },
+          body: { sessionKey: startData.sessionKey },
         });
 
       if (controller.signal.aborted) return;
@@ -231,7 +241,15 @@ export function WechatSetupView({
         {qrUrl && phase === "scanning" ? (
           <div className="flex flex-col items-center gap-3">
             <div className="p-3 bg-white rounded-xl shadow-sm border border-border">
-              <QRCodeSVG value={qrUrl} size={208} />
+              {isQrImageSource(qrUrl) ? (
+                <img
+                  src={qrUrl}
+                  alt={t("wechatSetup.title")}
+                  className="block w-[208px] h-[208px] object-contain"
+                />
+              ) : (
+                <QRCodeSVG value={qrUrl} size={208} />
+              )}
             </div>
             <div className="flex items-center gap-2 text-[12px] text-text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-success)]" />

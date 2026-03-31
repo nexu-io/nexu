@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -460,6 +460,25 @@ describe("SkillhubService", () => {
     expect(watcher.start).not.toHaveBeenCalled();
   });
 
+  it("start() enqueues curated skills even when ledger already exists", async () => {
+    const env = createEnv(rootDir);
+    // Pre-create the ledger so this simulates a second launch
+    mkdirSync(path.dirname(env.skillDbPath), { recursive: true });
+    writeFileSync(env.skillDbPath, JSON.stringify({ skills: [] }));
+
+    const db = createMockSkillDb();
+    mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+
+    const service = await SkillhubService.create(env);
+    const catalog = mocks.catalogManagerInstances[0];
+    catalog.getCuratedSlugsToEnqueue.mockReturnValue(["failed-skill"]);
+
+    service.start();
+
+    const queue = mocks.installQueueInstances[0];
+    expect(queue.enqueue).toHaveBeenCalledWith("failed-skill", "managed");
+  });
+
   it("enqueueInstall() delegates to queue with source 'managed'", async () => {
     const env = createEnv(rootDir);
     const db = createMockSkillDb();
@@ -488,6 +507,66 @@ describe("SkillhubService", () => {
     expect(catalog.canonicalizeSlug).toHaveBeenCalledWith("find-skills");
     expect(queue.cancel).toHaveBeenCalledWith("find-skill");
     expect(result).toBe(true);
+  });
+
+  describe("onSyncNeeded callback", () => {
+    it("calls onSyncNeeded after install completes", async () => {
+      const env = createEnv(rootDir);
+      const db = createMockSkillDb();
+      mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+      const onSyncNeeded = vi.fn();
+
+      await SkillhubService.create(env, { onSyncNeeded });
+
+      const queue = mocks.installQueueInstances[0];
+      const onComplete = queue.opts.onComplete as (
+        slug: string,
+        source: string,
+      ) => void;
+
+      onComplete("alpha", "managed");
+
+      expect(db.recordInstall).toHaveBeenCalledWith("alpha", "managed");
+      expect(onSyncNeeded).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onSyncNeeded after cancel cleanup completes", async () => {
+      const env = createEnv(rootDir);
+      const db = createMockSkillDb();
+      mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+      const onSyncNeeded = vi.fn();
+
+      await SkillhubService.create(env, { onSyncNeeded });
+
+      const queue = mocks.installQueueInstances[0];
+      const onCancelled = queue.opts.onCancelled as (
+        slug: string,
+      ) => Promise<void>;
+
+      await onCancelled("beta");
+
+      expect(onSyncNeeded).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not throw when onSyncNeeded is not provided", async () => {
+      const env = createEnv(rootDir);
+      const db = createMockSkillDb();
+      mocks.mockSkillDbCreate.mockResolvedValueOnce(db);
+
+      await SkillhubService.create(env);
+
+      const queue = mocks.installQueueInstances[0];
+      const onComplete = queue.opts.onComplete as (
+        slug: string,
+        source: string,
+      ) => void;
+      const onCancelled = queue.opts.onCancelled as (
+        slug: string,
+      ) => Promise<void>;
+
+      expect(() => onComplete("alpha", "managed")).not.toThrow();
+      await expect(onCancelled("beta")).resolves.toBeUndefined();
+    });
   });
 
   it("dispose() stops watcher, disposes queue, disposes catalogManager in order", async () => {

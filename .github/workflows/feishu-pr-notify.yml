@@ -1,0 +1,39 @@
+name: Feishu Pull Request Notification
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Notify Feishu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NEXU_PAL_APP_ID }}
+          private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
+
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      - name: Send Feishu notification
+        env:
+          WEBHOOK_URL: ${{ secrets.NOTIFY_PR_FEISHU_WEBHOOK }}
+          EVENT_TYPE: pull_request
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BODY: ${{ github.event.pull_request.body }}
+          LABELS_OR_CATEGORY: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
+          REPO: ${{ github.repository }}
+        run: node scripts/notify/feishu-notify.mjs

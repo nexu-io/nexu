@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
+import setupLoopVideoUrl from "../assets/setup-animation-loop.mp4";
+import setupVideoUrl from "../assets/setup-animation.mp4";
 import type {
   AppInfo,
   DesktopChromeMode,
@@ -30,8 +32,10 @@ import {
   getRuntimeConfig,
   getRuntimeState,
   installComponent,
+  notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
+  reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
@@ -46,6 +50,42 @@ const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
 
 let rendererSentryInitialized = false;
+let amplitudeTelemetryInitialized = false;
+let rendererCommitReported = false;
+
+function sendRendererStartupProbe(
+  stage: string,
+  status: "ok" | "error",
+  detail?: string | null,
+): void {
+  try {
+    reportStartupProbe({
+      source: "renderer",
+      stage,
+      status,
+      detail: detail ?? null,
+    });
+  } catch (error) {
+    console.error("[desktop] failed to report startup probe", error);
+  }
+}
+
+sendRendererStartupProbe("renderer:module-start", "ok");
+
+window.addEventListener("error", (event) => {
+  const detail =
+    event.error instanceof Error
+      ? (event.error.stack ?? event.error.message)
+      : event.message;
+  sendRendererStartupProbe("renderer:window-error", "error", detail);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  const detail =
+    reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+  sendRendererStartupProbe("renderer:unhandled-rejection", "error", detail);
+});
 
 function initializeRendererSentry(dsn: string): void {
   if (rendererSentryInitialized) {
@@ -68,8 +108,19 @@ function initializeRendererSentry(dsn: string): void {
   rendererSentryInitialized = true;
 }
 
-if (rendererSentryDsn) {
-  initializeRendererSentry(rendererSentryDsn);
+function initializeAmplitudeTelemetry(): void {
+  if (amplitudeTelemetryInitialized || !amplitudeApiKey) {
+    return;
+  }
+
+  amplitude.initAll(amplitudeApiKey, {
+    analytics: { autocapture: true },
+    sessionReplay: { sampleRate: 1 },
+  });
+  const env = new Identify();
+  env.set("environment", import.meta.env.MODE);
+  amplitude.identify(env);
+  amplitudeTelemetryInitialized = true;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -126,16 +177,6 @@ function formatBuildCommit(value: string | null | undefined): string {
   }
 
   return value.slice(0, 7);
-}
-
-if (amplitudeApiKey) {
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
-  });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
 }
 
 const queryClient = new QueryClient({
@@ -957,9 +998,35 @@ function DesktopShell() {
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
   const update = useAutoUpdate();
+
+  // Setup animation phases:
+  // "playing" → main video (23s) plays once
+  // "looping" → short loop video repeats until cold-start is ready
+  // "fading" → overlay fades out (0.6s CSS transition)
+  // "done" → overlay removed from DOM
+  const [setupPhase, setSetupPhase] = useState<
+    "playing" | "looping" | "fading" | "done"
+  >(window.nexuHost.bootstrap.needsSetupAnimation ? "playing" : "done");
+
+  // When animation finishes, notify main process to restore vibrancy
+  useEffect(() => {
+    if (
+      setupPhase === "done" &&
+      window.nexuHost.bootstrap.needsSetupAnimation
+    ) {
+      void notifySetupAnimationComplete();
+    }
+  }, [setupPhase]);
+
   useEffect(() => {
     void getRuntimeConfig()
-      .then(setRuntimeConfig)
+      .then((config) => {
+        setRuntimeConfig(config);
+        // Cold-start is done — if we're still in the looping phase, fade out.
+        // If main video hasn't finished yet, it will transition to fade on its
+        // own via onEnded (the main video is the minimum guaranteed animation).
+        setSetupPhase((prev) => (prev === "looping" ? "fading" : prev));
+      })
       .catch(() => null);
   }, []);
 
@@ -967,6 +1034,9 @@ function DesktopShell() {
     return onDesktopCommand((command) => {
       if (command.type === "desktop:check-for-updates") {
         void update.check();
+        return;
+      }
+      if (command.type === "setup:complete") {
         return;
       }
 
@@ -1163,6 +1233,85 @@ function DesktopShell() {
         phase={update.phase}
         version={update.version}
       />
+
+      {/* Setup animation overlay — shown during first install / post-update extraction.
+          Phase flow: "playing" (main 23s video) → "looping" (4s loop until ready)
+                      → "fading" (0.6s opacity transition) → "done" (removed from DOM).
+          If cold-start finishes during the main video, it skips straight to "fading"
+          when the main video ends (no loop needed). */}
+      {setupPhase !== "done" && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            background: "#ffffff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: setupPhase === "fading" ? 0 : 1,
+            transition: "opacity 0.6s ease-out",
+          }}
+          onTransitionEnd={() => {
+            if (setupPhase === "fading") setSetupPhase("done");
+          }}
+        >
+          {/* Draggable title bar area so window remains movable during setup */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 52,
+              // @ts-expect-error Electron CSS property for window dragging
+              WebkitAppRegion: "drag",
+              zIndex: 1,
+            }}
+          />
+
+          {/* Both videos are mounted simultaneously. The loop video preloads
+              in the background while the main video plays, so the transition
+              is instant — no blank gap waiting for the loop video to buffer.
+              Visibility is controlled via CSS (display none/block). */}
+          <video
+            autoPlay
+            muted
+            playsInline
+            src={setupVideoUrl}
+            onEnded={() => {
+              setSetupPhase((prev) =>
+                prev === "playing"
+                  ? runtimeConfig
+                    ? "fading"
+                    : "looping"
+                  : prev,
+              );
+            }}
+            onError={() => setSetupPhase("done")}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: setupPhase === "playing" ? "block" : "none",
+            }}
+          />
+          <video
+            autoPlay
+            muted
+            playsInline
+            loop
+            src={setupLoopVideoUrl}
+            onError={() => setSetupPhase("fading")}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: setupPhase === "looping" ? "block" : "none",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1171,16 +1320,76 @@ function RootApp() {
   return <DesktopShell />;
 }
 
+function RendererTelemetryBootstrap() {
+  useEffect(() => {
+    if (rendererSentryDsn && !rendererSentryInitialized) {
+      sendRendererStartupProbe("renderer:sentry-init:start", "ok");
+      try {
+        initializeRendererSentry(rendererSentryDsn);
+        sendRendererStartupProbe("renderer:sentry-init:success", "ok");
+      } catch (error) {
+        sendRendererStartupProbe(
+          "renderer:sentry-init:error",
+          "error",
+          error instanceof Error
+            ? (error.stack ?? error.message)
+            : String(error),
+        );
+        console.error("[desktop] renderer Sentry init failed", error);
+      }
+    }
+
+    if (!amplitudeApiKey || amplitudeTelemetryInitialized) {
+      return;
+    }
+
+    sendRendererStartupProbe("renderer:amplitude-init:start", "ok");
+    try {
+      initializeAmplitudeTelemetry();
+      sendRendererStartupProbe("renderer:amplitude-init:success", "ok");
+    } catch (error) {
+      sendRendererStartupProbe(
+        "renderer:amplitude-init:error",
+        "error",
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      );
+      console.error("[desktop] renderer Amplitude init failed", error);
+    }
+  }, []);
+
+  return null;
+}
+
+function RendererStartupSentinel() {
+  useEffect(() => {
+    if (rendererCommitReported) {
+      return;
+    }
+
+    rendererCommitReported = true;
+    sendRendererStartupProbe("renderer:react-render:committed", "ok");
+  }, []);
+
+  return null;
+}
+
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
+  sendRendererStartupProbe("renderer:root-element-missing", "error");
   throw new Error("Root element not found");
 }
+
+sendRendererStartupProbe("renderer:react-render:start", "ok");
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <RendererStartupSentinel />
+      <RendererTelemetryBootstrap />
       <RootApp />
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+sendRendererStartupProbe("renderer:react-render:scheduled", "ok");

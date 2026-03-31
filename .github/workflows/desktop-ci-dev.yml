@@ -4,32 +4,48 @@ on:
   pull_request:
     paths:
       - 'apps/desktop/**'
+      - 'apps/controller/**'
       - 'apps/web/**'
       - 'packages/shared/**'
       - 'openclaw-runtime/**'
+      - 'tests/desktop/**'
+      - 'scripts/dev-launchd.sh'
+      - 'scripts/desktop-check-dev.sh'
+      - 'scripts/desktop-stop-smoke.sh'
+      - 'scripts/desktop-ci-check.mjs'
+      - 'scripts/launchd-lifecycle-e2e.sh'
+      - 'scripts/kill-all.sh'
+      - 'vitest.config.ts'
+      - 'tsconfig.base.json'
+      - 'scripts/postinstall.mjs'
       - '.npmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'scripts/desktop-check-dev.sh'
-      - 'scripts/desktop-ci-check.mjs'
-      - 'tsconfig.base.json'
       - '.github/workflows/desktop-ci-dev.yml'
   push:
     branches:
       - main
     paths:
       - 'apps/desktop/**'
+      - 'apps/controller/**'
       - 'apps/web/**'
       - 'packages/shared/**'
       - 'openclaw-runtime/**'
+      - 'tests/desktop/**'
+      - 'scripts/dev-launchd.sh'
+      - 'scripts/desktop-check-dev.sh'
+      - 'scripts/desktop-stop-smoke.sh'
+      - 'scripts/desktop-ci-check.mjs'
+      - 'scripts/launchd-lifecycle-e2e.sh'
+      - 'scripts/kill-all.sh'
+      - 'vitest.config.ts'
+      - 'tsconfig.base.json'
+      - 'scripts/postinstall.mjs'
       - '.npmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'scripts/desktop-check-dev.sh'
-      - 'scripts/desktop-ci-check.mjs'
-      - 'tsconfig.base.json'
       - '.github/workflows/desktop-ci-dev.yml'
 
 permissions:
@@ -56,9 +72,30 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
+
+      - name: Restore npm cache for runtime installs
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          restore-keys: |
+            desktop-npm-cache-${{ runner.os }}-arm64-
+            desktop-npm-cache-${{ runner.os }}-
+
+      - name: Restore Electron build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            apps/desktop/.cache
+          key: desktop-electron-cache-${{ runner.os }}-arm64-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/package.json') }}
+          restore-keys: |
+            desktop-electron-cache-${{ runner.os }}-arm64-
+            desktop-electron-cache-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -75,6 +112,16 @@ jobs:
           set -euo pipefail
           pnpm exec electron --version
           tmux -V
+
+      - name: Build all
+        run: pnpm build
+
+      - name: Run unit tests (includes real launchd integration tests on macOS)
+        run: pnpm test
+
+      - name: Launchd lifecycle e2e test
+        shell: bash
+        run: bash scripts/launchd-lifecycle-e2e.sh
 
       - name: Verify desktop runtime unit health
         env:
@@ -94,7 +141,7 @@ jobs:
           if [ -d .tmp/desktop/electron/logs ]; then
             cp -R .tmp/desktop/electron/logs "$RUNNER_TEMP/desktop-ci/electron-logs"
           fi
-          if tmux has-session -t nexu-desktop 2>/dev/null; then
+          if command -v tmux >/dev/null 2>&1 && tmux has-session -t nexu-desktop 2>/dev/null; then
             tmux capture-pane -pt nexu-desktop -S -400 > "$RUNNER_TEMP/desktop-ci/tmux.log"
           fi
 

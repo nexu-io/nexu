@@ -63,6 +63,154 @@ function signDevicePayload(privateKeyPem: string, payload: string): string {
   );
 }
 
+type DeviceAuthStore = {
+  version: 1;
+  deviceId: string;
+  tokens: Record<
+    string,
+    {
+      token: string;
+      role: string;
+      scopes: string[];
+      updatedAtMs: number;
+    }
+  >;
+};
+
+function resolveDeviceAuthPath(stateDir: string): string {
+  return path.join(stateDir, "identity", "device-auth.json");
+}
+
+function readDeviceAuthStore(filePath: string): DeviceAuthStore | null {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (parsed.version !== 1 || typeof parsed.deviceId !== "string") {
+      return null;
+    }
+    if (!parsed.tokens || typeof parsed.tokens !== "object") {
+      return null;
+    }
+    const tokens = Object.fromEntries(
+      Object.entries(parsed.tokens as Record<string, unknown>).flatMap(
+        ([role, value]) => {
+          if (!value || typeof value !== "object") {
+            return [];
+          }
+          const tokenEntry = value as Record<string, unknown>;
+          if (typeof tokenEntry.token !== "string") {
+            return [];
+          }
+          return [
+            [
+              role,
+              {
+                token: tokenEntry.token,
+                role:
+                  typeof tokenEntry.role === "string" ? tokenEntry.role : role,
+                scopes: Array.isArray(tokenEntry.scopes)
+                  ? tokenEntry.scopes.filter(
+                      (scope): scope is string => typeof scope === "string",
+                    )
+                  : [],
+                updatedAtMs:
+                  typeof tokenEntry.updatedAtMs === "number"
+                    ? tokenEntry.updatedAtMs
+                    : Date.now(),
+              },
+            ],
+          ];
+        },
+      ),
+    );
+    return {
+      version: 1,
+      deviceId: parsed.deviceId,
+      tokens,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDeviceAuthStore(filePath: string, store: DeviceAuthStore): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(store, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  try {
+    fs.chmodSync(filePath, 0o600);
+  } catch {
+    // ignore chmod failure on platforms that do not support it
+  }
+}
+
+function loadStoredDeviceToken(params: {
+  stateDir: string;
+  deviceId: string;
+  role: string;
+}): string | null {
+  const store = readDeviceAuthStore(resolveDeviceAuthPath(params.stateDir));
+  if (!store || store.deviceId !== params.deviceId) {
+    return null;
+  }
+  const entry = store.tokens[params.role];
+  return entry?.token?.trim() || null;
+}
+
+function storeDeviceToken(params: {
+  stateDir: string;
+  deviceId: string;
+  role: string;
+  token: string;
+  scopes: string[];
+}): void {
+  const filePath = resolveDeviceAuthPath(params.stateDir);
+  const existing = readDeviceAuthStore(filePath);
+  const next: DeviceAuthStore = {
+    version: 1,
+    deviceId: params.deviceId,
+    tokens:
+      existing && existing.deviceId === params.deviceId
+        ? { ...existing.tokens }
+        : {},
+  };
+  next.tokens[params.role] = {
+    token: params.token,
+    role: params.role,
+    scopes: [
+      ...new Set(params.scopes.map((scope) => scope.trim()).filter(Boolean)),
+    ].sort(),
+    updatedAtMs: Date.now(),
+  };
+  writeDeviceAuthStore(filePath, next);
+}
+
+function clearStoredDeviceToken(params: {
+  stateDir: string;
+  deviceId: string;
+  role: string;
+}): void {
+  const filePath = resolveDeviceAuthPath(params.stateDir);
+  const existing = readDeviceAuthStore(filePath);
+  if (!existing || existing.deviceId !== params.deviceId) {
+    return;
+  }
+  if (!existing.tokens[params.role]) {
+    return;
+  }
+  const next: DeviceAuthStore = {
+    version: 1,
+    deviceId: existing.deviceId,
+    tokens: { ...existing.tokens },
+  };
+  delete next.tokens[params.role];
+  writeDeviceAuthStore(filePath, next);
+}
+
 function loadOrCreateDeviceIdentity(filePath: string): DeviceIdentity {
   try {
     if (fs.existsSync(filePath)) {
@@ -201,11 +349,13 @@ export class OpenClawWsClient {
     | null = null;
   private readonly url: string;
   private readonly token: string;
+  private readonly stateDir: string;
   private readonly deviceIdentity: DeviceIdentity;
 
   constructor(env: ControllerEnv) {
     this.url = `ws://127.0.0.1:${env.openclawGatewayPort}`;
     this.token = env.openclawGatewayToken ?? "";
+    this.stateDir = env.openclawStateDir;
     this.deviceIdentity = loadOrCreateDeviceIdentity(
       path.join(env.openclawStateDir, "identity", "device.json"),
     );
@@ -255,6 +405,18 @@ export class OpenClawWsClient {
     };
 
     ws.onclose = (event) => {
+      const reasonText = event.reason.trim().toLowerCase();
+      if (
+        event.code === 1008 &&
+        (reasonText.includes("device token mismatch") ||
+          reasonText.includes("device signature invalid"))
+      ) {
+        clearStoredDeviceToken({
+          stateDir: this.stateDir,
+          deviceId: this.deviceIdentity.deviceId,
+          role: "operator",
+        });
+      }
       logger.info(
         { code: event.code, reason: event.reason },
         "openclaw_ws_closed",
@@ -410,6 +572,16 @@ export class OpenClawWsClient {
     const clientId = "gateway-client";
     const clientMode = "backend";
     const platform = process.platform;
+    const explicitGatewayToken = this.token.trim() || undefined;
+    const storedDeviceToken = loadStoredDeviceToken({
+      stateDir: this.stateDir,
+      deviceId: this.deviceIdentity.deviceId,
+      role,
+    });
+    const resolvedDeviceToken = explicitGatewayToken
+      ? undefined
+      : (storedDeviceToken ?? undefined);
+    const authToken = explicitGatewayToken ?? resolvedDeviceToken;
 
     // Build v3 auth payload and sign with device identity
     const payloadStr = buildDeviceAuthPayloadV3({
@@ -419,7 +591,7 @@ export class OpenClawWsClient {
       role,
       scopes,
       signedAtMs,
-      token: this.token,
+      token: authToken ?? "",
       nonce,
       platform,
     });
@@ -450,7 +622,13 @@ export class OpenClawWsClient {
           signedAt: signedAtMs,
           nonce,
         },
-        auth: { token: this.token },
+        auth:
+          authToken || resolvedDeviceToken
+            ? {
+                token: authToken,
+                deviceToken: resolvedDeviceToken,
+              }
+            : undefined,
         role,
         scopes,
       },
@@ -466,6 +644,26 @@ export class OpenClawWsClient {
       resolve: (helloOk) => {
         this._connected = true;
         this.backoffMs = 500;
+
+        const authInfo =
+          helloOk && typeof helloOk === "object"
+            ? ((helloOk as Record<string, unknown>).auth as
+                | Record<string, unknown>
+                | undefined)
+            : undefined;
+        if (typeof authInfo?.deviceToken === "string") {
+          storeDeviceToken({
+            stateDir: this.stateDir,
+            deviceId: this.deviceIdentity.deviceId,
+            role: typeof authInfo.role === "string" ? authInfo.role : role,
+            token: authInfo.deviceToken,
+            scopes: Array.isArray(authInfo.scopes)
+              ? authInfo.scopes.filter(
+                  (scope): scope is string => typeof scope === "string",
+                )
+              : scopes,
+          });
+        }
 
         const policy = (helloOk as Record<string, unknown>)?.policy as
           | { tickIntervalMs?: number }

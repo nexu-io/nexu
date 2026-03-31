@@ -117,15 +117,10 @@ body {
   display: none !important;
 }
 
-/* ── Hide default appearance toggle (replaced by ThemeToggle icon button) ── */
 
-.VPNavBarAppearance {
-  display: none !important;
-}
+/* ── Hide default extra menu (language + appearance already exposed as custom buttons) ── */
 
-/* ── Hide default language switcher (replaced by LanguageSwitcher component) ── */
-
-.VPNavBarTranslations {
+.VPNavBarExtra {
   display: none !important;
 }
 
