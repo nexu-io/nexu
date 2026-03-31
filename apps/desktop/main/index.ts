@@ -740,6 +740,11 @@ function focusMainWindow(): void {
 }
 
 app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
   focusMainWindow();
 });
 
