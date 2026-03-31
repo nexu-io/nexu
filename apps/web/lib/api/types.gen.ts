@@ -1898,6 +1898,23 @@ export type PostApiInternalChannelsFeishuSendCardData = {
     url: '/api/internal/channels/feishu/send-card';
 };
 
+export type PostApiInternalChannelsFeishuSendCardErrors = {
+    /**
+     * Internal server error
+     */
+    500: {
+        message: string;
+    };
+    /**
+     * Feishu card delivery failed
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuSendCardError = PostApiInternalChannelsFeishuSendCardErrors[keyof PostApiInternalChannelsFeishuSendCardErrors];
+
 export type PostApiInternalChannelsFeishuSendCardResponses = {
     /**
      * Feishu card send result
@@ -1921,6 +1938,23 @@ export type PostApiInternalChannelsFeishuUpdateCardData = {
     query?: never;
     url: '/api/internal/channels/feishu/update-card';
 };
+
+export type PostApiInternalChannelsFeishuUpdateCardErrors = {
+    /**
+     * Internal server error
+     */
+    500: {
+        message: string;
+    };
+    /**
+     * Feishu card delivery failed
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuUpdateCardError = PostApiInternalChannelsFeishuUpdateCardErrors[keyof PostApiInternalChannelsFeishuUpdateCardErrors];
 
 export type PostApiInternalChannelsFeishuUpdateCardResponses = {
     /**
