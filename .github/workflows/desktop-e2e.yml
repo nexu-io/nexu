@@ -141,13 +141,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Notify Feishu on E2E failure
-        if: failure()
+      - name: Notify Feishu E2E result
+        if: always()
         env:
           FEISHU_WEBHOOK: ${{ secrets.NIGHTLY_FEISHU_WEBHOOK }}
           E2E_MODE: ${{ github.event.inputs.mode || 'model' }}
           E2E_SOURCE: ${{ github.event.inputs.source || 'download' }}
           E2E_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+          E2E_STATUS: ${{ job.status }}
         shell: bash
         run: |
           set -euo pipefail
@@ -161,6 +162,14 @@ jobs:
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           trigger="${GITHUB_TRIGGERING_ACTOR:-unknown}"
 
+          if [ "$E2E_STATUS" = "success" ]; then
+            template="green"
+            title="✅ Desktop E2E 测试通过"
+          else
+            template="red"
+            title="❌ Desktop E2E 测试失败"
+          fi
+
           # Determine what triggered this: PR, commit, or scheduled
           trigger_info=""
           if [ -n "$GITHUB_HEAD_REF" ]; then
@@ -173,6 +182,8 @@ jobs:
           fi
 
           card=$(jq -n \
+            --arg title "$title" \
+            --arg template "$template" \
             --arg mode "$E2E_MODE" \
             --arg source "$E2E_SOURCE" \
             --arg channel "$E2E_CHANNEL" \
@@ -183,10 +194,10 @@ jobs:
               msg_type: "interactive",
               card: {
                 header: {
-                  template: "red",
+                  template: $template,
                   title: {
                     tag: "plain_text",
-                    content: "❌ Desktop E2E 测试失败"
+                    content: $title
                   }
                 },
                 elements: [
@@ -199,8 +210,8 @@ jobs:
                     actions: [
                       {
                         tag: "button",
-                        text: { tag: "plain_text", content: "🔍 查看日志" },
-                        type: "primary",
+                        text: { tag: "plain_text", content: "📋 查看详情" },
+                        type: "default",
                         url: $run_url
                       }
                     ]
