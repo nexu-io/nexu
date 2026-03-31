@@ -175,9 +175,9 @@ created: '2026-03-30'
 ### Read / Write Boundaries
 
 - **Cloud 写入职责**
-  - 创建充值流水并增加账户余额。
-  - 创建消耗流水并扣减账户余额。
-  - 所有积分写操作在 cloud 事务内完成。
+  - 固定负责充值、奖励、后台赠送等入账写入。
+  - 若最终选择 **Option A / cloud internal API**，则 cloud 也负责 reservation / usage / refund 等模型消耗相关主账本写入。
+  - 若最终选择 **Option B / link 直写部分 shared 数据**，则 cloud 保留 shared schema ownership 与入账类写入职责。
 
 - **Link 读取职责**
   - 基于 `api_key -> user_id` 读取 `public.credit_accounts.available_credits`。
@@ -185,12 +185,19 @@ created: '2026-03-30'
   - v1 不再依赖现有时间窗 / usage limit。
 
 - **内部接口约定（非用户侧 API）**
-  - `PostRecharge(userId, amountCredits, source, externalRef?)`
-  - `CreateReservation(userId, apiKeyId?, requestId, reserveAmount, pricingContext)`（仅方案 A）
-  - `FinalizeUsage(userId, apiKeyId?, requestId, actualAmountCredits, usageType, dimensions)`
+  - 若采用 **cloud internal API** 路线：
+    - `PostRecharge(userId, amountCredits, source, externalRef?)`
+    - `CreateReservation(userId, apiKeyId?, requestId, reserveAmount, pricingContext)`（仅结算方案 A）
+    - `FinalizeUsage(userId, apiKeyId?, requestId, actualAmountCredits, usageType, dimensions)`
+  - 若采用 **link 直写部分 shared 数据** 路线：
+    - 不需要额外 internal credit write API
+    - 但 link 需要直接执行 `credit_accounts` / `credit_usages` / `credit_reservations`（如有）相关写事务
   - `GetAvailableCredits(userId)` 仅作为 link 的读模型，不在本轮设计外部接口。
 
-### Why Service Call + DB Write Are Split
+### Why Service Call + DB Write Are Split (Option A)
+
+> 本节是在解释 **候选路线 A：cloud 暴露 internal API，link 通过服务调用触发记账**。
+> 另一条候选路线见下方 `Open Design Decision: Usage Write Boundary`。
 
 这部分容易混淆，v1 设计里要明确区分 **“谁感知到一次消耗”** 和 **“谁真正把消耗记到账本里”**：
 
@@ -213,7 +220,7 @@ link 负责“发起结算控制”
 cloud 负责“正式记账”
 ```
 
-### Sequence: LLM Settlement Flow (Pending Decision)
+### Sequence: LLM Settlement Flow (Pending Decision, shown with Option A write boundary)
 
 ```text
 User/API client
@@ -261,7 +268,7 @@ Both A/B:
   - 没有要求 link 和 cloud 同时 commit。
   - 真正的强一致只发生在 cloud 自己那次 DB transaction 里。
 
-### Responsibility Matrix
+### Responsibility Matrix (Option A baseline)
 
 | 动作 | 发起者 | 真正执行者 | 落库位置 |
 |---|---|---|---|
@@ -272,13 +279,13 @@ Both A/B:
 | 平台 absorb 差额记账（仅方案 B） | link | cloud | `public.credit_usages` |
 | 运行态 usage 记录 | link | link | `link.usage_events` |
 
-### Why Link Still Writes `usage_events`
+### Why Link Still Writes `usage_events` (Both Options)
 
-虽然 link 不写积分主账本，但仍然要写 `link.usage_events`，原因是：
+无论最终是否让 link 直写部分 shared 数据，link 仍然要写 `link.usage_events`，原因是：
 
 - 它是模型网关，天然拥有请求耗时、provider、model、状态码等运行态信息。
 - 这些信息适合做排障、监控、对账。
-- 但它们**不等于**权威余额账本；真正的余额语义仍以 cloud 写入的 `credit_usages` / `credit_recharges` 为准。
+- 但它们**不等于**权威余额账本；真正的余额语义仍以 shared 主账本里的 `credit_usages` / `credit_recharges` 为准。
 
 可以把它理解成：
 
@@ -294,9 +301,11 @@ usage_events   = 运营日志
    - 为 `user_id`、`request_id`、时间序列查询建立索引。
 
 2. **实现 cloud 写路径**
-   - 充值写入：新增 recharge 流水，并原子增加 `credit_accounts`。
-   - 消耗写入：基于 `request_id` 幂等写 usage；具体是“reservation finalize”还是“平台吸收差额”，待结算策略拍板后实现。
-   - 如走 platform absorb 路线，需要同时记录用户扣减金额与平台补贴金额。
+  - 充值写入：新增 recharge 流水，并原子增加 `credit_accounts`。
+  - 模型消耗写路径待拍板：
+    - 路线 A：cloud 暴露 internal API，cloud 执行 usage / reservation 写事务。
+    - 路线 B：link 直接写 usage 相关 shared 表，cloud 仅负责 recharge 类写入。
+  - 在任一路线下，`request_id` 幂等与余额条件更新都必须保留。
 
 3. **切换 link 准入读取**
    - `nexu-link` 在鉴权后按 `user_id` 读取 `credit_accounts.available_credits`。
@@ -307,9 +316,10 @@ usage_events   = 运营日志
    - 用于事后排障、补记、对账，不直接驱动余额。
 
 5. **分阶段上线**
-   - 先落 shared schema + cloud writer。
-   - 再切 link 的 admission gate。
-   - 最后补齐对账/回放与运营工具能力。
+  - 先落 shared schema。
+  - 再按拍板结果实现 cloud internal API 或 link direct writer。
+  - 再切 link 的 admission gate。
+  - 最后补齐对账/回放与运营工具能力。
 
 ### Pseudocode
 
@@ -472,6 +482,64 @@ Option B: platform absorb overrun
 - 在拍板前，shared 主账本仍以 `credit_accounts + credit_recharges + credit_usages` 为基础模型。
 - `credit_debts` 明确不纳入 v1。
 
+### Open Design Decision: Usage Write Boundary
+
+#### Option A: Cloud Internal API（保持 cloud 单点写入）
+
+- **核心思路**
+  - link 继续负责模型入口、余额预检查、usage telemetry。
+  - 一旦需要 reservation / finalize / refund / usage 结算，由 link 调用 cloud internal API。
+  - 真正的积分账本写入统一在 cloud 的本地 DB transaction 中完成。
+- **数据库写入边界**
+  - `cloud`：写 `credit_accounts`、`credit_recharges`、`credit_usages`、`credit_reservations`（如有）。
+  - `link`：只写 `link.usage_events` 等运行态表。
+- **优点**
+  - 最符合当前“写入在 cloud 做，读取在 link 做”的原则。
+  - `public` shared schema 只有一个积分主账本 writer，审计边界更清晰。
+  - 计费规则、补偿、风控策略更容易集中在 cloud 演进。
+- **缺点**
+  - 模型请求链路中多一次 link -> cloud 服务调用。
+  - 需要额外设计 service-to-service auth、internal endpoint、重试和超时策略。
+  - 由于模型生命周期发生在 link，理解成本会更高。
+
+#### Option B: Link Writes Usage-Related Shared Data（link 写部分 shared 数据）
+
+- **核心思路**
+  - 保持 recharge / grant / admin adjustment 仍由 cloud 写。
+  - 但模型请求相关的 reservation / finalize / usage 结算，直接由 link 写 shared `public` 表。
+  - link 在一次本地 DB transaction 中完成 `credit_accounts` 条件更新和 `credit_usages` / `credit_reservations` 写入。
+- **数据库写入边界**
+  - `cloud`：继续写 `credit_recharges` 与账户入账类变更。
+  - `link`：新增对 `credit_accounts`、`credit_usages`、`credit_reservations`（如有）的写权限。
+- **是否存在共同写一张表**
+  - **有。`credit_accounts` 会成为 cloud + link 共同写入的 shared 表。**
+  - `cloud` 负责入账方向更新：`available_credits += x`、`total_recharged_credits += x`。
+  - `link` 负责消耗方向更新：`available_credits -= x`、`total_used_credits += x`，以及 reservation 相关 `reserved_credits` 变化（如采用 hold）。
+  - 当前意图是把共同写表范围**收敛到 `credit_accounts` 一张表**：
+    - `credit_recharges`：仍由 cloud 单写
+    - `credit_usages`：由 link 单写
+    - `credit_reservations`：若存在，则由 link 单写
+  - 这意味着 Option B 的主要复杂度，不是“谁写 usage”，而是“`credit_accounts` 变成双 writer 表后的 ownership 与事务约束”。
+- **优点**
+  - 更贴近模型执行现场，link 更容易把 provider 返回的最终 usage 直接落账。
+  - 少一跳 internal API，请求链路更短。
+  - “谁发请求谁记 usage” 的心智模型更直接。
+- **缺点**
+  - 明确削弱“写入在 cloud 做”的原始边界。
+  - shared `public` schema 变成 cloud + link 双 writer，长期 ownership 更容易变复杂。
+  - 计费规则、补偿策略、风控逻辑可能分散到两个服务。
+  - `credit_accounts` 上必须额外约束字段级责任、条件更新方式、幂等与并发测试，否则容易出现账不平。
+
+#### Pending Decision
+
+- 当前 spec 同时保留 **Option A / Option B**，等待后续讨论拍板。
+- 无论选择哪条路线，shared schema 仍以 `credit_accounts + credit_recharges + credit_usages` 为基础。
+- 若后续采用 reservation / hold，再额外引入 `credit_reservations`。
+- 当前更贴近既定原则的是 **Option A**；更贴近模型调用现场的是 **Option B**。
+- 若采用 **Option B**，需额外确认：模型失败补偿是否仍建模为 `credit_recharges`。
+  - 若 **是**：则仍需保留 cloud refund 写入口，否则 `credit_recharges` 也会变成双写表。
+  - 若 **否**：则需要单独定义 link 侧 usage rollback / adjustment 的表示方式。
+
 ### Files / Repos Likely Affected
 
 - **This repo**
@@ -480,10 +548,10 @@ Option B: platform absorb overrun
 - **nexu-cloud**
   - `apps/api/src/db/schema/index.ts` — 新增 shared/public 积分表定义。
   - `apps/api/migrations/` — 新增积分表 migration。
-  - `apps/api/src/services/credit/*` — 充值/消耗写入事务。
+  - `apps/api/src/services/credit/*` — 充值写入事务；若选 Option A，也承载 usage / reservation 写入事务。
 
 - **nexu-link**
-  - `internal/repositories/postgres.go` — 读取 `public.credit_accounts`。
+  - `internal/repositories/postgres.go` — 读取 `public.credit_accounts`；若选 Option B，也会新增 usage 相关 shared 写事务。
   - `internal/middleware/auth.go` — 用积分余额替换旧的 usage-limit admission gate。
   - `internal/server/server.go` / `internal/domain/types.go` — 注入 credit read model。
 
@@ -491,7 +559,7 @@ Option B: platform absorb overrun
 
 - **重复结算**：`credit_usages.request_id` 唯一，重试只会命中同一笔 usage。
 - **重复支付通知 / 重复奖励发放**：`credit_recharges.idempotency_key` 唯一，防止重复入账。
-- **并发扣减 / 并发 reservation**：任何冻结、释放、结算都必须在 cloud 条件更新事务中完成，防止余额或 reserved 状态错乱。
+- **并发扣减 / 并发 reservation**：无论最终由 cloud 还是 link 执行写入，任何冻结、释放、结算都必须在单次条件更新事务中完成，防止余额或 reserved 状态错乱。
 - **用户尚未开户**：正常新注册流程应创建 `credit_accounts`；仅在历史回填/异常场景下把缺失账户视为 0 余额。
 - **api key 轮换**：余额归属 `user_id`，不归属单个 key，避免 key 更换导致余额碎片化。
 - **数值精度**：积分统一使用整数最小单位，不使用浮点。
@@ -501,7 +569,7 @@ Option B: platform absorb overrun
 
 ## Plan
 
-- [ ] Phase 1: 增加 shared 积分表结构与 cloud 事务写入链路
+- [ ] Phase 1: 增加 shared 积分表结构并拍板 usage 写入边界
 - [ ] Phase 2: 将 link 准入从窗口限额切换为积分余额读取
 - [ ] Phase 3: 补齐对账、上线保护与运行验证
 
