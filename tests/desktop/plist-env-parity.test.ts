@@ -111,7 +111,7 @@ describe("controller plist env var parity with manifests", () => {
       "<key>RUNTIME_MANAGE_OPENCLAW_PROCESS</key>\n        <string>false</string>",
     );
     expect(plist).toContain(
-      "<key>RUNTIME_GATEWAY_PROBE_ENABLED</key>\n        <string>false</string>",
+      "<key>RUNTIME_GATEWAY_PROBE_ENABLED</key>\n        <string>true</string>",
     );
     expect(plist).toContain(
       "<key>OPENCLAW_DISABLE_BONJOUR</key>\n        <string>1</string>",
