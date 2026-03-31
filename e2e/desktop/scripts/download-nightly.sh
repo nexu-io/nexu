@@ -46,6 +46,7 @@ log "Using macOS artifact architecture: $MAC_ARCH"
 download() {
   local url="$1"
   local target="$ARTIFACT_DIR/$(basename "$url")"
+  local temp_target="$target.partial"
 
   if [ -f "$target" ]; then
     local age_hours
@@ -58,7 +59,9 @@ download() {
   fi
 
   log "Downloading $(basename "$url")..."
-  curl -fL --retry 3 --retry-delay 5 --progress-bar -o "$target" "$url"
+  rm -f "$temp_target"
+  curl -fL --retry 3 --retry-delay 5 --progress-bar -o "$temp_target" "$url"
+  mv "$temp_target" "$target"
   log "Saved to $target ($(du -h "$target" | cut -f1))"
 }
 

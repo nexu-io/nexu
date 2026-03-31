@@ -22,6 +22,28 @@ SKIP_CODESIGN="${NEXU_DESKTOP_E2E_SKIP_CODESIGN:-false}"
 
 log() { printf '[e2e:%s] %s\n' "$MODE" "$1" >&2; }
 
+resolve_mac_arch() {
+  local arm64_capable
+  arm64_capable="$(sysctl -in hw.optional.arm64 2>/dev/null || true)"
+  if [ "$arm64_capable" = "1" ]; then
+    printf 'arm64\n'
+    return 0
+  fi
+
+  case "$(uname -m)" in
+    arm64)
+      printf 'arm64\n'
+      ;;
+    x86_64)
+      printf 'x64\n'
+      ;;
+    *)
+      log "ERROR: unsupported mac architecture: $(uname -m)"
+      return 1
+      ;;
+  esac
+}
+
 # -----------------------------------------------------------------------
 # Cleanup helpers
 # -----------------------------------------------------------------------
@@ -58,12 +80,14 @@ wait_ports_free() {
 # -----------------------------------------------------------------------
 resolve_artifact() {
   local ext="$1"
+  local arch
+  arch="$(resolve_mac_arch)" || return 1
   shopt -s nullglob
-  local candidates=("$ARTIFACT_DIR"/*."$ext")
+  local candidates=("$ARTIFACT_DIR"/*-mac-"$arch"."$ext")
   shopt -u nullglob
 
   if [ "${#candidates[@]}" -eq 0 ]; then
-    log "No .$ext artifacts in $ARTIFACT_DIR — run: npm run download"
+    log "No .$ext artifacts for mac arch $arch in $ARTIFACT_DIR — run: npm run download"
     return 1
   fi
   printf '%s\n' "${candidates[0]}"
