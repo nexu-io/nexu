@@ -56,4 +56,21 @@ export class SessionService {
   async getChatHistory(id: string, limit?: number) {
     return this.sessionsRuntime.getChatHistory(id, limit);
   }
+
+  async sendFeishuCard(params: {
+    botId: string;
+    card: Record<string, unknown>;
+    to: string;
+    receiveIdType?: "chat_id" | "open_id" | "user_id" | "union_id" | "email";
+  }) {
+    return this.sessionsRuntime.sendFeishuCard(params);
+  }
+
+  async updateFeishuCard(params: {
+    botId: string;
+    messageId: string;
+    card: Record<string, unknown>;
+  }) {
+    return this.sessionsRuntime.updateFeishuCard(params);
+  }
 }

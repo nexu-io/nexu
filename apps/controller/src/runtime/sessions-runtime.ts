@@ -72,6 +72,15 @@ function sessionMetadataPath(filePath: string): string {
   return filePath.replace(/\.jsonl$/, ".meta.json");
 }
 
+export class FeishuCardDeliveryError extends Error {
+  readonly statusCode: number;
+  constructor(message: string, statusCode = 502) {
+    super(message);
+    this.name = "FeishuCardDeliveryError";
+    this.statusCode = statusCode;
+  }
+}
+
 export class SessionsRuntime {
   private readonly feishuTokenCache = new Map<
     string,
@@ -1100,6 +1109,137 @@ export class SessionsRuntime {
       return payload.tenant_access_token;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Send an interactive Feishu card to a target.
+   * The card JSON should use schema 2.0 format with button actions.
+   * Button click values will be received as text messages by the bot.
+   */
+  async sendFeishuCard(params: {
+    botId: string;
+    card: Record<string, unknown>;
+    to: string;
+    receiveIdType?: "chat_id" | "open_id" | "user_id" | "union_id" | "email";
+  }): Promise<{ messageId: string }> {
+    const { botId, card, to, receiveIdType = "chat_id" } = params;
+    const credentials = await this.getFeishuCredentials(botId);
+    if (!credentials) {
+      throw new FeishuCardDeliveryError(
+        `Feishu credentials not found for botId=${botId}`,
+      );
+    }
+
+    const tenantToken = await this.getFeishuTenantToken(
+      credentials.appId,
+      credentials.appSecret,
+    );
+    if (!tenantToken) {
+      throw new FeishuCardDeliveryError(
+        `Failed to obtain Feishu tenant token for botId=${botId}`,
+      );
+    }
+
+    try {
+      const body: Record<string, unknown> = {
+        receive_id: to,
+        msg_type: "interactive",
+        content: JSON.stringify(card),
+      };
+
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${tenantToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        code?: number;
+        msg?: string;
+        data?: { message_id?: string };
+      };
+
+      if (!response.ok || payload.code !== 0 || !payload.data?.message_id) {
+        throw new FeishuCardDeliveryError(
+          `Feishu API error: status=${response.status} code=${payload.code} msg=${payload.msg}`,
+        );
+      }
+      return { messageId: payload.data.message_id };
+    } catch (err) {
+      if (err instanceof FeishuCardDeliveryError) throw err;
+      throw new FeishuCardDeliveryError(
+        `Feishu API request failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Update an existing Feishu interactive card in place.
+   * Useful for one-time choice flows where the original card should be
+   * replaced after the user clicks a button.
+   */
+  async updateFeishuCard(params: {
+    botId: string;
+    messageId: string;
+    card: Record<string, unknown>;
+  }): Promise<{ ok: true }> {
+    const { botId, messageId, card } = params;
+    const credentials = await this.getFeishuCredentials(botId);
+    if (!credentials) {
+      throw new FeishuCardDeliveryError(
+        `Feishu credentials not found for botId=${botId}`,
+      );
+    }
+
+    const tenantToken = await this.getFeishuTenantToken(
+      credentials.appId,
+      credentials.appSecret,
+    );
+    if (!tenantToken) {
+      throw new FeishuCardDeliveryError(
+        `Failed to obtain Feishu tenant token for botId=${botId}`,
+      );
+    }
+
+    try {
+      const response = await fetch(
+        `https://open.feishu.cn/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${tenantToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: JSON.stringify(card),
+          }),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        code?: number;
+        msg?: string;
+      };
+
+      if (!response.ok || payload.code !== 0) {
+        throw new FeishuCardDeliveryError(
+          `Feishu API error: status=${response.status} code=${payload.code} msg=${payload.msg}`,
+        );
+      }
+
+      return { ok: true };
+    } catch (err) {
+      if (err instanceof FeishuCardDeliveryError) throw err;
+      throw new FeishuCardDeliveryError(
+        `Feishu API request failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 

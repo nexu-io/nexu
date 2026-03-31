@@ -6,6 +6,7 @@ import {
   updateSessionSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
+import { FeishuCardDeliveryError } from "../runtime/sessions-runtime.js";
 import type { ControllerBindings } from "../types.js";
 
 const querySchema = z.object({
@@ -223,6 +224,131 @@ export function registerSessionRoutes(
         { ok: await container.sessionService.deleteSession(id) },
         200,
       );
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Internal: Feishu interactive card
+  // ---------------------------------------------------------------------------
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/channels/feishu/send-card",
+      tags: ["Internal", "Channels"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: z.object({
+                botId: z.string(),
+                card: z.record(z.unknown()),
+                to: z.string(),
+                receiveIdType: z
+                  .enum(["chat_id", "open_id", "user_id", "union_id", "email"])
+                  .optional(),
+              }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: z.object({ messageId: z.string() }),
+            },
+          },
+          description: "Feishu card send result",
+        },
+        502: {
+          content: {
+            "application/json": { schema: errorSchema },
+          },
+          description: "Feishu card delivery failed",
+        },
+        500: {
+          content: {
+            "application/json": { schema: errorSchema },
+          },
+          description: "Internal server error",
+        },
+      },
+    }),
+    async (c) => {
+      const { botId, card, to, receiveIdType } = c.req.valid("json");
+      try {
+        const result = await container.sessionService.sendFeishuCard({
+          botId,
+          card,
+          to,
+          receiveIdType,
+        });
+        return c.json(result, 200);
+      } catch (e) {
+        if (e instanceof FeishuCardDeliveryError) {
+          return c.json({ message: e.message }, e.statusCode as 502);
+        }
+        return c.json({ message: "Internal error sending Feishu card" }, 500);
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/internal/channels/feishu/update-card",
+      tags: ["Internal", "Channels"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: z.object({
+                botId: z.string(),
+                messageId: z.string(),
+                card: z.record(z.unknown()),
+              }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: z.object({ ok: z.boolean() }),
+            },
+          },
+          description: "Feishu card update result",
+        },
+        502: {
+          content: {
+            "application/json": { schema: errorSchema },
+          },
+          description: "Feishu card delivery failed",
+        },
+        500: {
+          content: {
+            "application/json": { schema: errorSchema },
+          },
+          description: "Internal server error",
+        },
+      },
+    }),
+    async (c) => {
+      const { botId, messageId, card } = c.req.valid("json");
+      try {
+        const result = await container.sessionService.updateFeishuCard({
+          botId,
+          messageId,
+          card,
+        });
+        return c.json(result, 200);
+      } catch (e) {
+        if (e instanceof FeishuCardDeliveryError) {
+          return c.json({ message: e.message }, e.statusCode as 502);
+        }
+        return c.json({ message: "Internal error updating Feishu card" }, 500);
+      }
     },
   );
 }

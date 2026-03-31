@@ -1739,6 +1739,55 @@ export type GetApiV1SessionsByIdMessagesResponses = {
 
 export type GetApiV1SessionsByIdMessagesResponse = GetApiV1SessionsByIdMessagesResponses[keyof GetApiV1SessionsByIdMessagesResponses];
 
+export type PostApiInternalChannelsFeishuSendCardData = {
+    body?: {
+        botId: string;
+        card: {
+            [key: string]: unknown;
+        };
+        to: string;
+        receiveIdType?: 'chat_id' | 'open_id' | 'user_id' | 'union_id' | 'email';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/channels/feishu/send-card';
+};
+
+export type PostApiInternalChannelsFeishuSendCardResponses = {
+    /**
+     * Feishu card send result
+     */
+    200: {
+        messageId: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuSendCardResponse = PostApiInternalChannelsFeishuSendCardResponses[keyof PostApiInternalChannelsFeishuSendCardResponses];
+
+export type PostApiInternalChannelsFeishuUpdateCardData = {
+    body?: {
+        botId: string;
+        messageId: string;
+        card: {
+            [key: string]: unknown;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/channels/feishu/update-card';
+};
+
+export type PostApiInternalChannelsFeishuUpdateCardResponses = {
+    /**
+     * Feishu card update result
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PostApiInternalChannelsFeishuUpdateCardResponse = PostApiInternalChannelsFeishuUpdateCardResponses[keyof PostApiInternalChannelsFeishuUpdateCardResponses];
+
 export type GetApiV1ModelsData = {
     body?: never;
     path?: never;

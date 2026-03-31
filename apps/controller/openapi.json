@@ -4701,6 +4701,130 @@
         }
       }
     },
+    "/api/internal/channels/feishu/send-card": {
+      "post": {
+        "tags": [
+          "Internal",
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string"
+                  },
+                  "card": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "receiveIdType": {
+                    "type": "string",
+                    "enum": [
+                      "chat_id",
+                      "open_id",
+                      "user_id",
+                      "union_id",
+                      "email"
+                    ]
+                  }
+                },
+                "required": [
+                  "botId",
+                  "card",
+                  "to"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Feishu card send result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "messageId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "messageId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/channels/feishu/update-card": {
+      "post": {
+        "tags": [
+          "Internal",
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "card": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    }
+                  }
+                },
+                "required": [
+                  "botId",
+                  "messageId",
+                  "card"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Feishu card update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/models": {
       "get": {
         "tags": [

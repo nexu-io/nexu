@@ -225,6 +225,133 @@ const LEGACY_FEISHU_SINGLE_AGENT_TRIGGER_BLOCK = [
   "        return;",
   "      }",
 ].join("\n");
+const FEISHU_CARD_ACTION_SIGNATURE_SEARCH = `
+export async function handleFeishuCardAction(params: {
+  cfg: ClawdbotConfig;
+  event: FeishuCardActionEvent;
+  botOpenId?: string;
+  runtime?: RuntimeEnv;
+  accountId?: string;
+}): Promise<void> {
+`.trim();
+const FEISHU_CARD_ACTION_SIGNATURE_REPLACEMENT = `
+export async function handleFeishuCardAction(params: {
+  cfg: ClawdbotConfig;
+  event: FeishuCardActionEvent;
+  botOpenId?: string;
+  runtime?: RuntimeEnv;
+  accountId?: string;
+  fireAndForget?: boolean;
+}): Promise<{
+  toast: {
+    type: string;
+    content: string;
+    i18n: Record<string, string>;
+  };
+}> {
+`.trim();
+const FEISHU_CARD_ACTION_DISPATCH_SEARCH = `
+  log(
+    \`feishu[\${account.accountId}]: handling card action from \${event.operator.open_id}: \${content}\`,
+  );
+
+  // Dispatch as normal message
+  await handleFeishuMessage({
+    cfg,
+    event: messageEvent,
+    botOpenId: params.botOpenId,
+    runtime,
+    accountId,
+  });
+}
+`.trim();
+const FEISHU_CARD_ACTION_DISPATCH_REPLACEMENT = `
+  log(
+    \`feishu[\${account.accountId}]: handling card action from \${event.operator.open_id}: \${content}\`,
+  );
+
+  const dispatchMessage = () =>
+    handleFeishuMessage({
+      cfg,
+      event: messageEvent,
+      botOpenId: params.botOpenId,
+      runtime,
+      accountId,
+    });
+
+  if (params.fireAndForget !== false) {
+    const error = runtime?.error ?? console.error;
+    void dispatchMessage().catch((err) => {
+      error(
+        \`feishu[\${account.accountId}]: error handling card action message: \${String(err)}\`,
+      );
+    });
+  } else {
+    await dispatchMessage();
+  }
+
+  return {
+    toast: {
+      type: "info",
+      content: "已收到，正在处理...",
+      i18n: {
+        zh_cn: "已收到，正在处理...",
+        en_us: "Received. Processing...",
+      },
+    },
+  };
+}
+`.trim();
+const FEISHU_CARD_ACTION_CALLBACK_SEARCH = `
+    "card.action.trigger": async (data: unknown) => {
+      try {
+        const event = data as unknown as FeishuCardActionEvent;
+        const promise = handleFeishuCardAction({
+          cfg,
+          event,
+          botOpenId: botOpenIds.get(accountId),
+          runtime,
+          accountId,
+        });
+        if (fireAndForget) {
+          promise.catch((err) => {
+            error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
+          });
+        } else {
+          await promise;
+        }
+      } catch (err) {
+        error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
+      }
+    },
+`.trim();
+const FEISHU_CARD_ACTION_CALLBACK_REPLACEMENT = `
+    "card.action.trigger": async (data: unknown) => {
+      try {
+        const event = data as unknown as FeishuCardActionEvent;
+        return await handleFeishuCardAction({
+          cfg,
+          event,
+          botOpenId: botOpenIds.get(accountId),
+          runtime,
+          accountId,
+          fireAndForget,
+        });
+      } catch (err) {
+        error(\`feishu[\${accountId}]: error handling card action: \${String(err)}\`);
+        return {
+          toast: {
+            type: "error",
+            content: "交互处理失败，请重试",
+            i18n: {
+              zh_cn: "交互处理失败，请重试",
+              en_us: "Card action failed. Please try again.",
+            },
+          },
+        };
+      }
+    },
+`.trim();
 const sidecarRoot = getSidecarRoot("openclaw");
 const sidecarBinDir = resolve(sidecarRoot, "bin");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
@@ -555,6 +682,71 @@ function countOccurrences(source, search) {
 
 async function patchReplyOutcomeBridge(openclawPackageRoot) {
   const patchedFiles = new Map();
+  const feishuCardActionPath = resolve(
+    openclawPackageRoot,
+    "extensions",
+    "feishu",
+    "src",
+    "card-action.ts",
+  );
+  let feishuCardActionSource = await readFile(feishuCardActionPath, "utf8");
+
+  if (!feishuCardActionSource.includes("Received. Processing...")) {
+    feishuCardActionSource = applyExactReplacement(
+      feishuCardActionSource,
+      FEISHU_CARD_ACTION_SIGNATURE_SEARCH,
+      FEISHU_CARD_ACTION_SIGNATURE_REPLACEMENT,
+      "feishu card-action signature",
+    );
+    feishuCardActionSource = applyExactReplacement(
+      feishuCardActionSource,
+      FEISHU_CARD_ACTION_DISPATCH_SEARCH,
+      FEISHU_CARD_ACTION_DISPATCH_REPLACEMENT,
+      "feishu card-action immediate toast",
+    );
+    console.log(
+      "[openclaw-sidecar] patched feishu card action immediate toast ack",
+    );
+  }
+
+  patchedFiles.set(
+    relative(openclawPackageRoot, feishuCardActionPath),
+    feishuCardActionSource,
+  );
+
+  const feishuMonitorAccountPath = resolve(
+    openclawPackageRoot,
+    "extensions",
+    "feishu",
+    "src",
+    "monitor.account.ts",
+  );
+  let feishuMonitorAccountSource = await readFile(
+    feishuMonitorAccountPath,
+    "utf8",
+  );
+
+  if (
+    !feishuMonitorAccountSource.includes(
+      "Card action failed. Please try again.",
+    )
+  ) {
+    feishuMonitorAccountSource = applyExactReplacement(
+      feishuMonitorAccountSource,
+      FEISHU_CARD_ACTION_CALLBACK_SEARCH,
+      FEISHU_CARD_ACTION_CALLBACK_REPLACEMENT,
+      "feishu monitor card action callback response",
+    );
+    console.log(
+      "[openclaw-sidecar] patched feishu card action callback response",
+    );
+  }
+
+  patchedFiles.set(
+    relative(openclawPackageRoot, feishuMonitorAccountPath),
+    feishuMonitorAccountSource,
+  );
+
   const feishuBotPath = resolve(
     openclawPackageRoot,
     "extensions",

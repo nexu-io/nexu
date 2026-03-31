@@ -1,0 +1,10 @@
+{
+  "id": "nexu-feishu-card",
+  "name": "Nexu Feishu Card",
+  "description": "发送飞书交互卡片给用户，支持按钮选择等交互元素。",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
