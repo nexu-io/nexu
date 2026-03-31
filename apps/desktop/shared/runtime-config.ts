@@ -7,10 +7,7 @@ import { getDesktopAppRoot } from "./workspace-paths";
 
 export const DEFAULT_CONTROLLER_PORT = 50_800;
 export const DEFAULT_WEB_PORT = 50_810;
-// Use port 50789 instead of the OpenClaw CLI default (18789) to avoid
-// conflicts with a user's global `openclaw install` launchd service
-// (ai.openclaw.gateway) which binds to 18789 with KeepAlive=true.
-export const DEFAULT_OPENCLAW_BASE_URL = "http://127.0.0.1:50789";
+export const DEFAULT_OPENCLAW_BASE_URL = "http://127.0.0.1:18789";
 export const DEFAULT_GATEWAY_TOKEN = "gw-secret-token";
 export const DEFAULT_NEXU_HOME = "~/.nexu";
 

@@ -650,7 +650,7 @@ async function runLaunchdColdStart(): Promise<void> {
     isDev,
     controllerPort: runtimeConfig.ports.controller,
     openclawPort: Number(
-      new URL(runtimeConfig.urls.openclawBase).port || 50789,
+      new URL(runtimeConfig.urls.openclawBase).port || 18789,
     ),
     nexuHome,
     gatewayToken: isDev ? undefined : runtimeConfig.tokens.gateway,

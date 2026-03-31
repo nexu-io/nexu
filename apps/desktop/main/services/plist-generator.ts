@@ -229,7 +229,9 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <string>${escapeXml(env.nodePath)}</string>
         <string>${escapeXml(env.openclawPath)}</string>
         <string>gateway</string>
-        <string>run</string>${authArgs}
+        <string>run</string>
+        <string>--port</string>
+        <string>${env.openclawPort}</string>${authArgs}
     </array>
 
     <key>WorkingDirectory</key>
