@@ -123,6 +123,7 @@ NEXU_DESKTOP_E2E_SKIP_CODESIGN=true npm run test:model
 | **Orphan Cleanup** | Kill Electron, leave controller/openclaw as orphan processes | App detects and cleans up orphans on restart, starts fresh |
 | **Port Conflict (Controller)** | Occupy port 50800 with a dummy listener before launching | App detects EADDRINUSE, picks an alternative port or exits gracefully |
 | **Port Conflict (OpenClaw)** | Occupy port 18789 (simulating global `openclaw install` or ClawX) | App detects conflict, auto-assigns alternative port (18790+), coexists without killing the other service |
+| **Port Theft (OpenClaw)** | Start normally, kill openclaw, occupy its port, re-launch | App detects port was stolen on cold start, reassigns to new port, recovers |
 | **Stale State** | Write a fake `runtime-ports.json` pointing to non-existent services | App detects stale session, ignores fake state, performs fresh start |
 | **Double Launch** | Start a second instance while the app is already running | Second instance exits (single-instance lock), first instance unaffected |
 
