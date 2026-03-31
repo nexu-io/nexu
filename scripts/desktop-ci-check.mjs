@@ -62,7 +62,7 @@ function createCheckContext(mode) {
         api: "http://127.0.0.1:50800/api/internal/desktop/ready",
         web: "http://127.0.0.1:50810/api/internal/desktop/ready",
         webSurface: "http://127.0.0.1:50810/workspace",
-        openclawHealth: "http://127.0.0.1:18789/health",
+        openclawHealth: "http://127.0.0.1:50789/health",
       },
       processChecks: {
         tmuxSessionName: "nexu-desktop",
@@ -108,7 +108,7 @@ function createCheckContext(mode) {
       api: "http://127.0.0.1:50800/api/internal/desktop/ready",
       web: "http://127.0.0.1:50810/api/internal/desktop/ready",
       webSurface: "http://127.0.0.1:50810/workspace",
-      openclawHealth: "http://127.0.0.1:18789/health",
+      openclawHealth: "http://127.0.0.1:50789/health",
     },
     processChecks: {
       pidFile: process.env.NEXU_DESKTOP_PACKAGED_PID_PATH ?? null,
