@@ -77,6 +77,8 @@ npm run test:smoke
 
 ### Nightly (default)
 
+`npm run download` automatically selects the nightly `arm64` or `x64` artifacts for the current Mac.
+
 ```bash
 npm run download && npm test
 ```
@@ -86,12 +88,12 @@ npm run download && npm test
 Override download URLs via environment variables:
 
 ```bash
-# Beta
-NEXU_DESKTOP_E2E_DMG_URL=https://desktop-releases.nexu.io/beta/arm64/nexu-latest-beta-mac-arm64.dmg \
-NEXU_DESKTOP_E2E_ZIP_URL=https://desktop-releases.nexu.io/beta/arm64/nexu-latest-beta-mac-arm64.zip \
+# Beta (Intel Mac example)
+NEXU_DESKTOP_E2E_DMG_URL=https://desktop-releases.nexu.io/beta/x64/nexu-latest-beta-mac-x64.dmg \
+NEXU_DESKTOP_E2E_ZIP_URL=https://desktop-releases.nexu.io/beta/x64/nexu-latest-beta-mac-x64.zip \
 npm run download && npm test
 
-# Stable
+# Stable (Apple Silicon example)
 NEXU_DESKTOP_E2E_DMG_URL=https://desktop-releases.nexu.io/stable/arm64/nexu-latest-stable-mac-arm64.dmg \
 NEXU_DESKTOP_E2E_ZIP_URL=https://desktop-releases.nexu.io/stable/arm64/nexu-latest-stable-mac-arm64.zip \
 npm run download && npm test
@@ -102,8 +104,10 @@ npm run download && npm test
 Copy DMG and ZIP into `artifacts/` and skip signature checks:
 
 ```bash
-# Build in the main repo
+# Build in the main repo (choose the variant matching your Mac)
 pnpm dist:mac:unsigned:arm64
+# or
+pnpm dist:mac:unsigned:x64
 
 # Copy to E2E artifacts
 cp apps/desktop/release/*.dmg apps/desktop/release/*.zip e2e/desktop/artifacts/
@@ -270,8 +274,8 @@ The test runner automatically captures diagnostics into `captures/`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NEXU_DESKTOP_E2E_DMG_URL` | nightly arm64 DMG | DMG download URL |
-| `NEXU_DESKTOP_E2E_ZIP_URL` | nightly arm64 ZIP | ZIP download URL |
+| `NEXU_DESKTOP_E2E_DMG_URL` | nightly DMG for current Mac arch | DMG download URL |
+| `NEXU_DESKTOP_E2E_ZIP_URL` | nightly ZIP for current Mac arch | ZIP download URL |
 | `NEXU_DESKTOP_E2E_SKIP_CODESIGN` | `false` | Set to `true` to skip signature verification (for unsigned local builds) |
 
 ## Project Structure
