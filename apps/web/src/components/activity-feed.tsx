@@ -42,6 +42,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   discord: "Discord",
   telegram: "Telegram",
   whatsapp: "WhatsApp",
+  qqbot: "QQ",
   wechat: "WeChat",
   "openclaw-weixin": "openclaw-weixin",
   web: "Web",

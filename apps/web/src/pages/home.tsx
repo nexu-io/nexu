@@ -71,6 +71,31 @@ type LiveStatusResponse = {
   };
 };
 
+function normalizeHomeChannelStatus(
+  status: ChannelLiveStatus | undefined,
+  agentAlive: boolean | undefined,
+  isPendingChannel = false,
+): ChannelLiveStatus | undefined {
+  if (
+    isPendingChannel &&
+    (!status ||
+      status === "disconnected" ||
+      status === "restarting" ||
+      (status === "connected" && !agentAlive))
+  ) {
+    return "connecting";
+  }
+
+  if (
+    agentAlive === false &&
+    (!status || status === "disconnected" || status === "restarting")
+  ) {
+    return "connecting";
+  }
+
+  return status;
+}
+
 function formatRelativeTime(
   date: string | null | undefined,
   t: (key: string, opts?: Record<string, unknown>) => string,
@@ -554,7 +579,7 @@ export function HomePage() {
       toast.loading(t("home.channel.phase.configuring"), { id: toastId });
       return;
     }
-    if (pending.status === "connected") {
+    if (pending.status === "connected" && liveStatus?.agent?.alive) {
       toast.success(t("home.channel.phase.done"), { id: toastId });
       connectingToastIdRef.current = null;
       setPendingChannelId(null);
@@ -573,7 +598,7 @@ export function HomePage() {
       return;
     }
     toast.loading(t("home.channel.phase.almostReady"), { id: toastId });
-  }, [liveStatusByChannelId, pendingChannelId, t]);
+  }, [liveStatus?.agent?.alive, liveStatusByChannelId, pendingChannelId, t]);
 
   useEffect(() => {
     const previous = previousLiveStatusesRef.current;
@@ -917,13 +942,11 @@ export function HomePage() {
                       : liveStatusByChannelType.get(ch.id);
                     const isPendingChannel =
                       connectedChannel?.id === pendingChannelId;
-                    const effectiveStatus: ChannelLiveStatus | undefined =
-                      isPendingChannel &&
-                      (!statusEntry ||
-                        statusEntry.status === "disconnected" ||
-                        statusEntry.status === "restarting")
-                        ? "connecting"
-                        : statusEntry?.status;
+                    const effectiveStatus = normalizeHomeChannelStatus(
+                      statusEntry?.status,
+                      liveStatus?.agent?.alive,
+                      isPendingChannel,
+                    );
                     const statusMeta = getChannelStatusMeta(
                       effectiveStatus,
                       t,

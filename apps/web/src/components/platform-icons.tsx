@@ -153,19 +153,13 @@ export function TelegramIcon({ size = 16 }: { size?: number }) {
 
 export function QqbotIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img">
-      <title>QQ</title>
-      <circle cx="12" cy="12" r="10" fill="#111827" />
-      <path
-        d="M8.2 16.8c.7-1.2 1.5-2.1 2.4-2.8-.9-.8-1.4-1.8-1.4-2.9 0-1.7 1.3-3.1 2.8-3.1s2.8 1.4 2.8 3.1c0 1.1-.5 2.1-1.4 2.9.9.7 1.7 1.6 2.4 2.8"
-        stroke="#fff"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="10.8" cy="10.8" r="0.7" fill="#fff" />
-      <circle cx="13.2" cy="10.8" r="0.7" fill="#fff" />
-    </svg>
+    <img
+      width={size}
+      height={size}
+      alt="QQ"
+      src="/qq-logo.svg"
+      style={{ objectFit: "contain" }}
+    />
   );
 }
 

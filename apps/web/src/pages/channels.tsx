@@ -48,6 +48,9 @@ type Platform =
 
 type LiveStatusData = {
   gatewayConnected: boolean;
+  agent?: {
+    alive: boolean;
+  };
   channels: {
     channelType: string;
     channelId: string;
@@ -55,6 +58,20 @@ type LiveStatusData = {
     lastError: string | null;
   }[];
 };
+
+function normalizeChannelsPageStatus(
+  status: string | undefined,
+  agentAlive: boolean | undefined,
+): string {
+  if (
+    agentAlive === false &&
+    (!status || status === "disconnected" || status === "restarting")
+  ) {
+    return "connecting";
+  }
+
+  return status ?? "connecting";
+}
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
   { id: "whatsapp", emoji: "\u{1F4DE}", desc: "Personal WhatsApp" },
@@ -162,7 +179,10 @@ export function ChannelsPage() {
             (e) => e.channelId === configuredChannel?.id,
           );
           const channelLiveStatus = liveStatusData
-            ? (channelLive?.status ?? "connecting")
+            ? normalizeChannelsPageStatus(
+                channelLive?.status,
+                liveStatusData.agent?.alive,
+              )
             : undefined;
           return (
             <button
@@ -318,10 +338,11 @@ function ConfiguredView({
   const liveEntry = liveStatusData?.channels?.find(
     (e) => e.channelId === channel.id,
   );
-  // Before live-status data arrives, show a neutral loading state
-  // instead of defaulting to green "connected".
   const liveStatus = liveStatusData
-    ? (liveEntry?.status ?? "connecting")
+    ? normalizeChannelsPageStatus(
+        liveEntry?.status,
+        liveStatusData.agent?.alive,
+      )
     : "connecting";
   const liveError = liveEntry?.lastError ?? null;
 
