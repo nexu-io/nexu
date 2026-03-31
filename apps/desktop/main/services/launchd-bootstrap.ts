@@ -628,7 +628,23 @@ export async function bootstrapWithLaunchd(
   }
 
   if (openclawRunning && useRecoveredPorts) {
-    openclawHealthy = await probePort(effectivePorts.openclawPort);
+    const portListening = await probePort(effectivePorts.openclawPort);
+    // Port listening isn't enough — verify it's OUR openclaw by checking
+    // that the launchd service env matches our expected token/state dir.
+    // This prevents attaching to a global openclaw or ClawX on the same port.
+    if (portListening) {
+      const ocEnv = (await launchd.getServiceStatus(labels.openclaw)).env;
+      const expectedToken = env.gatewayToken;
+      const runningToken = ocEnv?.OPENCLAW_GATEWAY_TOKEN;
+      if (expectedToken && runningToken && runningToken !== expectedToken) {
+        console.log(
+          "OpenClaw port is listening but gateway token mismatch — not our instance",
+        );
+        openclawHealthy = false;
+      } else {
+        openclawHealthy = true;
+      }
+    }
     if (openclawHealthy) {
       console.log("OpenClaw already running and healthy");
     } else {
@@ -738,9 +754,13 @@ export async function bootstrapWithLaunchd(
       log(
         `[bootstrap] OpenClaw port ${effectivePorts.openclawPort} stolen by PID ${occupier.pid} (ours is ${ocStatus.pid}), reassigning`,
       );
-      // Bootout crashed openclaw and wait for launchd to fully release it
-      await launchd.bootoutService(labels.openclaw).catch(() => {});
-      await launchd.waitForExit(labels.openclaw, 5000).catch(() => {});
+      // Bootout crashed openclaw and wait for launchd to fully release it.
+      // Use bootoutAndWaitForExit which captures the PID before bootout
+      // so waitForExit can SIGKILL if needed (plain waitForExit without
+      // knownPid exits early on "unknown" status).
+      await launchd
+        .bootoutAndWaitForExit(labels.openclaw, 5000)
+        .catch(() => {});
 
       const newPort = await findFreePort(effectivePorts.openclawPort + 1);
       effectivePorts.openclawPort = newPort;
@@ -758,8 +778,9 @@ export async function bootstrapWithLaunchd(
       await ensureRunning(labels.openclaw, "openclaw");
 
       // Controller needs the new port — re-bootstrap it too
-      await launchd.bootoutService(labels.controller).catch(() => {});
-      await launchd.waitForExit(labels.controller, 5000).catch(() => {});
+      await launchd
+        .bootoutAndWaitForExit(labels.controller, 5000)
+        .catch(() => {});
       const retryControllerPlist = generatePlist("controller", retryPlistEnv);
       await launchd.installService(labels.controller, retryControllerPlist);
       await launchd.startService(labels.controller);

@@ -613,21 +613,37 @@ while True:
 
   local passed=false
 
-  # Controller should be up on default port
+  # Controller MUST be up — hard fail if not
   if curl -sf "http://127.0.0.1:50800/api/internal/desktop/ready" 2>/dev/null | grep -q '"ready":true'; then
     log "Controller ready on 50800"
   else
-    log "WARNING: controller not ready on 50800"
+    log "FAILED: controller not ready on 50800"
+    kill "$blocker_pid" 2>/dev/null || true
+    quit_app
+    bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-oc-port-conflict.log" 2>&1 || true
+    wait_ports_free
+    return 1
   fi
 
-  # OpenClaw should be on an alternative port (18790, 18791, etc.) — NOT 18789
-  for port in 18790 18791 18792 18793 18794; do
-    if curl -sf "http://127.0.0.1:$port/health" 2>/dev/null; then
-      log "PASSED: openclaw running on alternative port $port (18789 was occupied)"
+  # Read actual openclaw port from runtime-ports.json instead of guessing
+  local plist_dir
+  plist_dir="$PERSISTENT_HOME/Library/LaunchAgents"
+  local runtime_ports="$plist_dir/runtime-ports.json"
+  local oc_port=""
+  if [ -f "$runtime_ports" ]; then
+    oc_port=$(python3 -c "import json; print(json.load(open('$runtime_ports')).get('openclawPort',''))" 2>/dev/null)
+  fi
+
+  if [ -n "$oc_port" ] && [ "$oc_port" != "18789" ]; then
+    if curl -sf "http://127.0.0.1:$oc_port/health" 2>/dev/null; then
+      log "PASSED: openclaw running on port $oc_port (auto-assigned, 18789 was occupied)"
       passed=true
-      break
+    else
+      log "FAILED: runtime-ports says port $oc_port but openclaw not healthy there"
     fi
-  done
+  elif [ -n "$oc_port" ] && [ "$oc_port" = "18789" ]; then
+    log "FAILED: openclaw still assigned to 18789 despite conflict"
+  fi
 
   if ! $passed; then
     log "FAILED: openclaw not found on any alternative port"
