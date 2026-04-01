@@ -1066,9 +1066,38 @@ function getNexuProcessPatterns(): string[] {
   return Array.from(patterns);
 }
 
-const NEXU_MANAGED_OPENCLAW_PATH_PATTERNS = [
-  "\\.nexu/(runtime/)?openclaw-sidecar",
-] as const;
+function getNexuOpenclawProcessPatterns(): string[] {
+  const repoRoot = getWorkspaceRoot();
+  const patterns = new Set<string>([
+    "\\.nexu/(runtime/)?openclaw-sidecar",
+    escapeRegexLiteral(
+      path.join(
+        repoRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
+    ),
+  ]);
+
+  if (process.resourcesPath) {
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      ),
+    );
+  }
+
+  return Array.from(patterns);
+}
 
 /**
  * Collect the current process tree PIDs (current PID + all descendants) so
@@ -1201,7 +1230,7 @@ async function killOrphanOpenclawProcesses(opts: {
   extraPids?: number[];
 }): Promise<number[]> {
   const pids = await findProcessPidsByPatterns(
-    NEXU_MANAGED_OPENCLAW_PATH_PATTERNS,
+    getNexuOpenclawProcessPatterns(),
     true,
   );
   const candidatePids = new Set(pids);

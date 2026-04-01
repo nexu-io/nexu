@@ -1155,9 +1155,18 @@ describe("Launchd Startup Scenarios", () => {
           return;
         }
 
-        // orphan openclaw process still present from old sidecar path
+        // orphan openclaw process still present from dev runtime path
         if (cmd === "pgrep" && args[0] === "-f") {
-          callback(null, { stdout: "77777\n", stderr: "" });
+          if (
+            args[1]?.includes(
+              "openclaw-runtime/node_modules/openclaw/openclaw\\.mjs",
+            )
+          ) {
+            callback(null, { stdout: "77777\n", stderr: "" });
+            return;
+          }
+
+          callback(new Error("no process"), { stdout: "", stderr: "" });
           return;
         }
 
