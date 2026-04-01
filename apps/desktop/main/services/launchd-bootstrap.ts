@@ -464,10 +464,12 @@ export async function bootstrapWithLaunchd(
         `Stale session detected: previous Electron pid=${recovered.electronPid} is dead, ` +
           `metadata age=${Math.round(metadataAgeMs / 1000)}s. Cleaning up launchd services.`,
       );
-      await Promise.allSettled([
-        launchd.bootoutService(labels.controller),
-        launchd.bootoutService(labels.openclaw),
-      ]);
+      await bootoutServicesAndWait({
+        launchd,
+        labels,
+        controllerRunning: true,
+        openclawRunning: true,
+      });
       await deleteRuntimePorts(plistDir);
       recovered = null; // Force fresh start
     }
@@ -498,14 +500,12 @@ export async function bootstrapWithLaunchd(
       );
     }
 
-    await Promise.allSettled([
-      controllerRunning
-        ? launchd.bootoutService(labels.controller)
-        : Promise.resolve(),
-      openclawRunning
-        ? launchd.bootoutService(labels.openclaw)
-        : Promise.resolve(),
-    ]);
+    await bootoutServicesAndWait({
+      launchd,
+      labels,
+      controllerRunning,
+      openclawRunning,
+    });
 
     await killOrphanOpenclawProcesses({
       registeredPid: openclawStatus.pid,
@@ -569,14 +569,12 @@ export async function bootstrapWithLaunchd(
       console.log(
         `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
       );
-      await Promise.allSettled([
-        controllerRunning
-          ? launchd.bootoutService(labels.controller)
-          : Promise.resolve(),
-        openclawRunning
-          ? launchd.bootoutService(labels.openclaw)
-          : Promise.resolve(),
-      ]);
+      await bootoutServicesAndWait({
+        launchd,
+        labels,
+        controllerRunning,
+        openclawRunning,
+      });
       await deleteRuntimePorts(plistDir).catch(() => {});
       // Fall through to fresh start below (useRecoveredPorts remains false)
     } else {
@@ -615,14 +613,12 @@ export async function bootstrapWithLaunchd(
         console.log(
           `NEXU_HOME mismatch (expected=${expectedNexuHome} actual=${runningNexuHome}), tearing down stale services`,
         );
-        await Promise.allSettled([
-          controllerRunning
-            ? launchd.bootoutService(labels.controller)
-            : Promise.resolve(),
-          openclawRunning
-            ? launchd.bootoutService(labels.openclaw)
-            : Promise.resolve(),
-        ]);
+        await bootoutServicesAndWait({
+          launchd,
+          labels,
+          controllerRunning,
+          openclawRunning,
+        });
       }
     } // end: version match — proceed with attach
   } else if (anyRunning && !recovered) {
@@ -632,14 +628,12 @@ export async function bootstrapWithLaunchd(
     console.log(
       `[bootstrap] teardown: no runtime-ports.json but services running (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
     );
-    await Promise.allSettled([
-      controllerRunning
-        ? launchd.bootoutService(labels.controller)
-        : Promise.resolve(),
-      openclawRunning
-        ? launchd.bootoutService(labels.openclaw)
-        : Promise.resolve(),
-    ]);
+    await bootoutServicesAndWait({
+      launchd,
+      labels,
+      controllerRunning,
+      openclawRunning,
+    });
   }
 
   // --- Per-service: validate running ones, start missing ones ---
@@ -1230,6 +1224,24 @@ async function killOrphanOpenclawProcesses(opts: {
   }
 
   return orphanPids;
+}
+
+async function bootoutServicesAndWait(opts: {
+  launchd: LaunchdManager;
+  labels: { controller: string; openclaw: string };
+  controllerRunning: boolean;
+  openclawRunning: boolean;
+  timeoutMs?: number;
+}): Promise<void> {
+  const timeoutMs = opts.timeoutMs ?? 5000;
+  await Promise.allSettled([
+    opts.controllerRunning
+      ? opts.launchd.bootoutAndWaitForExit(opts.labels.controller, timeoutMs)
+      : Promise.resolve(),
+    opts.openclawRunning
+      ? opts.launchd.bootoutAndWaitForExit(opts.labels.openclaw, timeoutMs)
+      : Promise.resolve(),
+  ]);
 }
 
 /**

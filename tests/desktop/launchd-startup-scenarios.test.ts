@@ -339,7 +339,7 @@ describe("Launchd Startup Scenarios", () => {
     await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     // Should have bootout the unhealthy controller
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     // Should have reinstalled
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   });
@@ -441,7 +441,7 @@ describe("Launchd Startup Scenarios", () => {
       makeBootstrapEnv({ nexuHome: "/correct/nexu-home" }) as never,
     );
 
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     // Should still install and start services after teardown
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   });
@@ -461,7 +461,7 @@ describe("Launchd Startup Scenarios", () => {
     await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     // Should teardown orphaned services
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     // Then do clean install
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   });
@@ -781,7 +781,7 @@ describe("Launchd Startup Scenarios", () => {
     );
 
     expect(result.isAttach).toBe(false);
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
   });
 
@@ -820,7 +820,7 @@ describe("Launchd Startup Scenarios", () => {
     );
 
     expect(result.isAttach).toBe(false);
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
   });
 
@@ -1067,7 +1067,7 @@ describe("Launchd Startup Scenarios", () => {
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     expect(result.isAttach).toBe(false);
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(fsMock.unlink).toHaveBeenCalledWith(
       expect.stringContaining("runtime-ports.json"),
     );
@@ -1182,15 +1182,17 @@ describe("Launchd Startup Scenarios", () => {
     expect(result.effectivePorts.controllerPort).toBe(50800);
     expect(result.effectivePorts.openclawPort).toBeGreaterThanOrEqual(18789);
 
-    // stale partial launchd state is torn down
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalledWith(
+    // stale partial launchd state is torn down and waits for exit
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledWith(
       "io.nexu.controller",
+      5000,
     );
     // stale runtime metadata is removed before clean bootstrap
     expect(fsMock.unlink).toHaveBeenCalledWith(
       expect.stringContaining("runtime-ports.json"),
     );
     expect(netMock.createServer).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledTimes(1);
   });
 
   // -----------------------------------------------------------------------

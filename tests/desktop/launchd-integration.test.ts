@@ -277,22 +277,18 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
 
-    // Spawn a process that matches one of NEXU_PROCESS_PATTERNS:
-    // "\\.nexu/runtime/controller-sidecar/dist/index\\.js"
-    const orphanDir = join(
+    // Spawn an orphan with an argv token that matches the sidecar pattern.
+    // Important: do NOT write files under real ~/.nexu/runtime paths.
+    const fakeSidecarArg = join(
       homedir(),
       ".nexu",
       "runtime",
       "controller-sidecar",
       "dist",
+      "index.js",
     );
-    mkdirSync(orphanDir, { recursive: true });
-    writeFileSync(
-      join(orphanDir, "index.js"),
-      "setTimeout(() => process.exit(0), 60000);",
-    );
-
-    const orphan = spawn(NODE_BIN, [join(orphanDir, "index.js")], {
+    const orphanScript = `const marker = "${fakeSidecarArg}"; setTimeout(() => process.exit(0), 60000);`;
+    const orphan = spawn(NODE_BIN, ["-e", orphanScript], {
       detached: true,
       stdio: "ignore",
     });
