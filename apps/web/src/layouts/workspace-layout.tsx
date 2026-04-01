@@ -2,8 +2,10 @@ import { BrandMark } from "@/components/brand-mark";
 import { PlatformIcon } from "@/components/platform-icons";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
+import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
+import { openExternalUrl } from "@/lib/desktop-links";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -11,9 +13,11 @@ import {
   BookOpen,
   ChevronUp,
   CircleHelp,
+  Coins,
   Gift,
   Globe,
   Home,
+  LogIn,
   LogOut,
   Mail,
   Menu,
@@ -35,7 +39,11 @@ import {
   useNavigate,
 } from "react-router-dom";
 import "@/lib/api";
-import { getApiV1Me, getApiV1Sessions } from "../../lib/api/sdk.gen";
+import {
+  getApiV1Me,
+  getApiV1Sessions,
+  postApiInternalDesktopCloudConnect,
+} from "../../lib/api/sdk.gen";
 
 interface SidebarSession {
   id: string;
@@ -331,6 +339,9 @@ function WorkspaceLayoutInner() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [cloudConnecting, setCloudConnecting] = useState(false);
+  const { status: rewardsStatus, refresh: refreshRewards } =
+    useDesktopRewardsStatus();
   const update = useAutoUpdate();
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const hasUpdate =
@@ -492,6 +503,34 @@ function WorkspaceLayoutInner() {
   const isModelsPage =
     location.pathname.includes("/models") ||
     location.pathname.includes("/settings");
+
+  const handleCloudConnect = async () => {
+    setCloudConnecting(true);
+    try {
+      const { data } = await postApiInternalDesktopCloudConnect();
+      if (data?.browserUrl) {
+        openExternalUrl(data.browserUrl);
+      }
+    } catch {
+      setCloudConnecting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!cloudConnecting || rewardsStatus.viewer.cloudConnected) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      void refreshRewards();
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [cloudConnecting, refreshRewards, rewardsStatus.viewer.cloudConnected]);
+
+  useEffect(() => {
+    if (rewardsStatus.viewer.cloudConnected) {
+      setCloudConnecting(false);
+    }
+  }, [rewardsStatus.viewer.cloudConnected]);
 
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
@@ -774,6 +813,65 @@ function WorkspaceLayoutInner() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* Cloud login / credits area */}
+        <div
+          className="px-3 pb-1 shrink-0"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          {!rewardsStatus.viewer.cloudConnected ? (
+            <button
+              type="button"
+              onClick={() => void handleCloudConnect()}
+              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer"
+              title={t("layout.loginCta")}
+            >
+              {cloudConnecting ? (
+                <Sparkles size={14} className="animate-pulse shrink-0" />
+              ) : (
+                <LogIn size={14} className="shrink-0" />
+              )}
+              {!collapsed && t("layout.loginCta")}
+            </button>
+          ) : (
+            <Link
+              to="/workspace/rewards"
+              className="block rounded-lg px-3 py-2 hover:bg-surface-3 transition-colors"
+              title={t("layout.credits.label")}
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <Coins
+                  size={13}
+                  className="text-[var(--color-brand-primary)] shrink-0"
+                />
+                {!collapsed && (
+                  <span className="text-[11px] font-medium text-text-primary truncate">
+                    {rewardsStatus.progress.earnedCredits}{" "}
+                    <span className="text-text-muted font-normal">
+                      /{" "}
+                      {rewardsStatus.progress.earnedCredits +
+                        rewardsStatus.progress.availableCredits}{" "}
+                      {t("layout.credits.label")}
+                    </span>
+                  </span>
+                )}
+              </div>
+              {!collapsed && (
+                <div className="h-[4px] w-full rounded-full bg-border overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
+                    style={{
+                      width:
+                        rewardsStatus.progress.totalCount > 0
+                          ? `${Math.round((rewardsStatus.progress.claimedCount / rewardsStatus.progress.totalCount) * 100)}%`
+                          : "0%",
+                    }}
+                  />
+                </div>
+              )}
+            </Link>
+          )}
         </div>
 
         {/* Bottom action row */}

@@ -29,6 +29,7 @@ import { ModelProviderService } from "../services/model-provider-service.js";
 import { OpenClawAuthService } from "../services/openclaw-auth-service.js";
 import { OpenClawGatewayService } from "../services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../services/openclaw-sync-service.js";
+import { QuotaFallbackService } from "../services/quota-fallback-service.js";
 import { RuntimeConfigService } from "../services/runtime-config-service.js";
 import { RuntimeModelStateService } from "../services/runtime-model-state-service.js";
 import { SessionService } from "../services/session-service.js";
@@ -61,6 +62,7 @@ export interface ControllerContainer {
   skillhubService: SkillhubService;
   openclawSyncService: OpenClawSyncService;
   openclawAuthService: OpenClawAuthService;
+  quotaFallbackService: QuotaFallbackService;
   wsClient: OpenClawWsClient;
   gatewayService: OpenClawGatewayService;
   runtimeState: ControllerRuntimeState;
@@ -141,6 +143,10 @@ export async function createContainer(): Promise<ControllerContainer> {
   );
   modelProviderService.setAuthService(openclawAuthService);
   const runtimeModelStateService = new RuntimeModelStateService(env);
+  const quotaFallbackService = new QuotaFallbackService(
+    configStore,
+    openclawSyncService,
+  );
 
   // Wire cloud state change callback to sync refreshed cloud inventory without
   // auto-switching the default model during startup or first-channel connect.
@@ -167,6 +173,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       openclawProcess,
       runtimeHealth,
       wsClient,
+      quotaFallbackService,
     ),
     channelFallbackService,
     sessionService: new SessionService(sessionsRuntime),
@@ -189,6 +196,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     skillhubService,
     openclawSyncService,
     openclawAuthService,
+    quotaFallbackService,
     wsClient,
     gatewayService,
     configStore,

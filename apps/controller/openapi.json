@@ -3968,6 +3968,15 @@
                     },
                     "resetsAt": {
                       "type": "string"
+                    },
+                    "usingByok": {
+                      "type": "boolean"
+                    },
+                    "byokAvailable": {
+                      "type": "boolean"
+                    },
+                    "autoFallbackTriggered": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -6103,6 +6112,84 @@
                   },
                   "required": [
                     "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quota/fallback-to-byok": {
+      "post": {
+        "tags": [
+          "Quota"
+        ],
+        "responses": {
+          "200": {
+            "description": "Trigger automatic fallback to BYOK provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "newModelId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quota/restore-managed": {
+      "post": {
+        "tags": [
+          "Quota"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "managedModelId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "managedModelId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restore default model to managed (cloud) model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "newModelId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
                   ]
                 }
               }

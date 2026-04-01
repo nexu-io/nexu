@@ -158,6 +158,9 @@ const en = {
   "layout.empty.step1": "Connect a platform",
   "layout.empty.step2": "Mention @nexu",
   "layout.empty.step3": "Conversations appear",
+  "layout.loginCta": "Sign in",
+  "layout.credits.label": "Credits",
+  "layout.credits.earned": "earned",
 
   // ── Home Page ──
   "home.running": "Running",
@@ -298,6 +301,12 @@ const en = {
   "budget.confirm.cancel": "Not yet",
   "budget.confirm.checkinDesc":
     "Confirm today's check-in to add +${n} to your reward balance. This can be claimed once per day.",
+  "budget.banner.warningTitle": "Credits running low",
+  "budget.banner.depletedTitle": "Credits depleted",
+  "budget.banner.description":
+    "Complete tasks to earn more credits, or use your own API key (BYOK) to continue.",
+  "budget.banner.earnCredits": "Earn credits",
+  "budget.banner.byok": "Use your API key",
   "rewards.action.claimed": "Claimed",
   "rewards.action.checkIn": "Check in",
   "rewards.action.download": "Download",

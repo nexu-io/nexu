@@ -1385,6 +1385,9 @@ export type GetApiV1BotQuotaResponses = {
     200: {
         available: boolean;
         resetsAt: string;
+        usingByok?: boolean;
+        byokAvailable?: boolean;
+        autoFallbackTriggered?: boolean;
     };
 };
 
@@ -2203,6 +2206,46 @@ export type PostApiV1ProvidersByProviderIdVerifyResponses = {
 };
 
 export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
+
+export type PostApiV1QuotaFallbackToByokData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/fallback-to-byok';
+};
+
+export type PostApiV1QuotaFallbackToByokResponses = {
+    /**
+     * Trigger automatic fallback to BYOK provider
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaFallbackToByokResponse = PostApiV1QuotaFallbackToByokResponses[keyof PostApiV1QuotaFallbackToByokResponses];
+
+export type PostApiV1QuotaRestoreManagedData = {
+    body?: {
+        managedModelId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/restore-managed';
+};
+
+export type PostApiV1QuotaRestoreManagedResponses = {
+    /**
+     * Restore default model to managed (cloud) model
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaRestoreManagedResponse = PostApiV1QuotaRestoreManagedResponses[keyof PostApiV1QuotaRestoreManagedResponses];
 
 export type PostApiV1ProvidersByProviderIdOauthStartData = {
     body?: never;

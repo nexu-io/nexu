@@ -1,4 +1,5 @@
 import { ActivityFeed } from "@/components/activity-feed";
+import { BudgetWarningBanner } from "@/components/budget-warning-banner";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
@@ -11,6 +12,7 @@ import {
   WhatsAppIcon,
 } from "@/components/platform-icons";
 import { HomeRewardsTeaser } from "@/components/rewards/home-rewards-teaser";
+import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { normalizeChannel, track } from "@/lib/tracking";
@@ -268,6 +270,41 @@ export function HomePage() {
   const [modalChannel, setModalChannel] = useState<
     "feishu" | "slack" | "discord" | null
   >(null);
+
+  // Budget warning banner: dismissed for today using localStorage
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem("nexu_budget_banner_dismissed");
+      if (!stored) return false;
+      const { date } = JSON.parse(stored) as { date: string };
+      return date === new Date().toDateString();
+    } catch {
+      return false;
+    }
+  });
+
+  const { status: rewardsStatus } = useDesktopRewardsStatus();
+
+  const budgetBannerStatus = useMemo((): "warning" | "depleted" | "healthy" => {
+    if (!rewardsStatus.viewer.cloudConnected) return "healthy";
+    const { availableCredits, earnedCredits } = rewardsStatus.progress;
+    if (availableCredits === 0) return "depleted";
+    const total = earnedCredits + availableCredits;
+    if (total > 0 && earnedCredits / total >= 0.8) return "warning";
+    return "healthy";
+  }, [rewardsStatus]);
+
+  const handleBannerDismiss = useCallback(() => {
+    setBannerDismissed(true);
+    try {
+      localStorage.setItem(
+        "nexu_budget_banner_dismissed",
+        JSON.stringify({ date: new Date().toDateString() }),
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
   const [wechatQrOpen, setWechatQrOpen] = useState(false);
   const [telegramOpen, setTelegramOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
@@ -589,6 +626,12 @@ export function HomePage() {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+          {!bannerDismissed && budgetBannerStatus !== "healthy" && (
+            <BudgetWarningBanner
+              status={budgetBannerStatus}
+              onDismiss={handleBannerDismiss}
+            />
+          )}
           {/* ═══ TOP: Hero — Bot idle, waiting to be activated ═══ */}
           <div className="flex flex-col items-center text-center">
             <div
@@ -748,6 +791,12 @@ export function HomePage() {
         className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 sm:pb-8 space-y-6"
         style={{ paddingTop: isDesktopClient ? "2rem" : "1.5rem" }}
       >
+        {!bannerDismissed && budgetBannerStatus !== "healthy" && (
+          <BudgetWarningBanner
+            status={budgetBannerStatus}
+            onDismiss={handleBannerDismiss}
+          />
+        )}
         {/* ═══ TOP: Hero — Bot running (horizontal layout) ═══ */}
         <div className="flex items-center gap-4">
           <div

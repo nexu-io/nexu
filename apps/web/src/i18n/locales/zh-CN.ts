@@ -155,6 +155,9 @@ const zhCN = {
   "layout.empty.step1": "连接平台",
   "layout.empty.step2": "提及 @nexu",
   "layout.empty.step3": "对话出现",
+  "layout.loginCta": "登录",
+  "layout.credits.label": "积分",
+  "layout.credits.earned": "已获取",
 
   // ── Home Page ──
   "home.running": "运行中",
@@ -291,6 +294,12 @@ const zhCN = {
   "budget.confirm.cancel": "稍后再说",
   "budget.confirm.checkinDesc":
     "确认今日打卡后，+${n} 会加入你的奖励额度。每天可领取一次。",
+  "budget.banner.warningTitle": "积分即将耗尽",
+  "budget.banner.depletedTitle": "积分已耗尽",
+  "budget.banner.description":
+    "完成任务赚取更多积分，或使用自带 API Key (BYOK) 继续使用。",
+  "budget.banner.earnCredits": "做任务赚积分",
+  "budget.banner.byok": "自带 API Key",
   "rewards.action.claimed": "已领取",
   "rewards.action.checkIn": "打卡",
   "rewards.action.download": "下载",
