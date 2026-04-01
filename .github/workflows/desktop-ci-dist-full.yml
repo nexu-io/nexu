@@ -96,6 +96,7 @@ jobs:
           path: |
             packages/shared/dist/**
             apps/controller/dist/**
+            apps/controller/.dist-runtime/plugins/**
             apps/web/dist/**
             apps/desktop/dist/**
             apps/desktop/dist-electron/**
