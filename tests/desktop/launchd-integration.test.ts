@@ -10,8 +10,14 @@
  * in afterEach to avoid polluting the host system.
  */
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -271,16 +277,18 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
 
-    // Spawn a process that matches one of NEXU_PROCESS_PATTERNS:
-    // "controller/dist/index.js" — we'll spawn a node process with that in args
-    const orphanDir = join(tempDir, "controller", "dist");
-    mkdirSync(orphanDir, { recursive: true });
-    writeFileSync(
-      join(orphanDir, "index.js"),
-      "setTimeout(() => process.exit(0), 60000);",
+    // Spawn an orphan with an argv token that matches the sidecar pattern.
+    // Important: do NOT write files under real ~/.nexu/runtime paths.
+    const fakeSidecarArg = join(
+      homedir(),
+      ".nexu",
+      "runtime",
+      "controller-sidecar",
+      "dist",
+      "index.js",
     );
-
-    const orphan = spawn(NODE_BIN, [join(orphanDir, "index.js")], {
+    const orphanScript = `const marker = "${fakeSidecarArg}"; setTimeout(() => process.exit(0), 60000);`;
+    const orphan = spawn(NODE_BIN, ["-e", orphanScript], {
       detached: true,
       stdio: "ignore",
     });

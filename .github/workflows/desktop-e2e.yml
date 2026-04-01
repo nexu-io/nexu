@@ -140,3 +140,86 @@ jobs:
             e2e/desktop/captures/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Notify Feishu E2E result
+        if: always()
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.NIGHTLY_FEISHU_WEBHOOK }}
+          E2E_MODE: ${{ github.event.inputs.mode || 'model' }}
+          E2E_SOURCE: ${{ github.event.inputs.source || 'download' }}
+          E2E_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+          E2E_STATUS: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$FEISHU_WEBHOOK" ]; then
+            echo "No Feishu webhook, skipping"
+            exit 0
+          fi
+
+          run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          short_sha="${GITHUB_SHA::7}"
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          trigger="${GITHUB_TRIGGERING_ACTOR:-unknown}"
+
+          if [ "$E2E_STATUS" = "success" ]; then
+            template="green"
+            title="✅ Desktop E2E 测试通过"
+          else
+            template="red"
+            title="❌ Desktop E2E 测试失败"
+          fi
+
+          # Determine what triggered this: PR, commit, or scheduled
+          trigger_info=""
+          if [ -n "$GITHUB_HEAD_REF" ]; then
+            pr_number=$(echo "$GITHUB_REF" | grep -oE '[0-9]+' || echo "")
+            trigger_info="PR [#${pr_number}](https://github.com/${{ github.repository }}/pull/${pr_number}) on \`${branch}\`"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            trigger_info="定时触发 (\`${branch}\` @ \`${short_sha}\`)"
+          else
+            trigger_info="手动触发 (\`${branch}\` @ \`${short_sha}\`)"
+          fi
+
+          card=$(jq -n \
+            --arg title "$title" \
+            --arg template "$template" \
+            --arg mode "$E2E_MODE" \
+            --arg source "$E2E_SOURCE" \
+            --arg channel "$E2E_CHANNEL" \
+            --arg trigger_info "$trigger_info" \
+            --arg trigger "$trigger" \
+            --arg run_url "$run_url" \
+            '{
+              msg_type: "interactive",
+              card: {
+                header: {
+                  template: $template,
+                  title: {
+                    tag: "plain_text",
+                    content: $title
+                  }
+                },
+                elements: [
+                  {
+                    tag: "markdown",
+                    content: ("**触发来源**\n" + $trigger_info + "\n触发人: " + $trigger + "\n\n**测试配置**\n- 模式: `" + $mode + "`\n- 构建来源: `" + $source + "`\n- 频道: `" + $channel + "`")
+                  },
+                  {
+                    tag: "action",
+                    actions: [
+                      {
+                        tag: "button",
+                        text: { tag: "plain_text", content: "📋 查看详情" },
+                        type: "default",
+                        url: $run_url
+                      }
+                    ]
+                  }
+                ]
+              }
+            }')
+
+          curl -sf -X POST "$FEISHU_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "$card" || echo "Feishu notification failed (non-fatal)"

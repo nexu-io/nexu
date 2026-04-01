@@ -131,6 +131,9 @@ describe("compileOpenClawConfig", () => {
         appId: "cli_app_id",
         appSecret: "cli_app_secret",
         connectionMode: "websocket",
+        dmPolicy: "open",
+        groupPolicy: "open",
+        allowFrom: ["*"],
       },
     });
     expect(compiled.bindings).toEqual([
@@ -174,6 +177,9 @@ describe("compileOpenClawConfig", () => {
         appId: "cli_app_id",
         appSecret: "cli_app_secret",
         connectionMode: "websocket",
+        dmPolicy: "open",
+        groupPolicy: "open",
+        allowFrom: ["*"],
       },
     });
     expect(compiled.bindings).toEqual([]);

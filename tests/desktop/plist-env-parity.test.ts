@@ -176,6 +176,28 @@ describe("controller plist env var parity with manifests", () => {
         `<key>${key}</key>`,
       );
     }
+
+    if (mockEnv.gatewayToken) {
+      expect(
+        plist,
+        "openclaw plist must include OPENCLAW_GATEWAY_TOKEN when gatewayToken is set",
+      ).toContain("<key>OPENCLAW_GATEWAY_TOKEN</key>");
+    }
+  });
+
+  it("gateway token is present in BOTH controller and openclaw plists", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const envWithToken = { ...mockEnv, gatewayToken: "parity-test-token" };
+    const controllerPlist = generatePlist("controller", envWithToken);
+    const openclawPlist = generatePlist("openclaw", envWithToken);
+
+    expect(controllerPlist).toContain("<key>OPENCLAW_GATEWAY_TOKEN</key>");
+    expect(controllerPlist).toContain("<string>parity-test-token</string>");
+    expect(openclawPlist).toContain("<key>OPENCLAW_GATEWAY_TOKEN</key>");
+    expect(openclawPlist).toContain("<string>parity-test-token</string>");
   });
 
   it("dev mode sets NODE_ENV=development and adds --auth none to openclaw", async () => {

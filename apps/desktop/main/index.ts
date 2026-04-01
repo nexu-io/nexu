@@ -25,12 +25,16 @@ import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
   setComponentUpdater,
+  setQuitFallback,
+  setQuitHandlerOpts,
   setUpdateManager,
 } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
   buildSkillNodePath,
+  checkOpenclawExtractionNeeded,
   createRuntimeUnitManifests,
+  extractOpenclawSidecarAsync,
 } from "./runtime/manifests";
 import {
   type PortAllocation,
@@ -112,6 +116,17 @@ const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
         throw error;
       },
     );
+const needsSetupExtraction = checkOpenclawExtractionNeeded(
+  electronRoot,
+  app.getPath("userData"),
+  app.isPackaged,
+);
+
+// Set env var BEFORE window creation so the preload can read it for bootstrap data.
+if (needsSetupExtraction) {
+  process.env.NEXU_NEEDS_SETUP_ANIMATION = "1";
+}
+
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
@@ -670,6 +685,7 @@ async function runLaunchdColdStart(): Promise<void> {
     skillNodePath,
     openclawTmpDir,
     proxyEnv,
+    log: (message: string) => logColdStart(message),
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
     buildSource:
@@ -740,6 +756,11 @@ function focusMainWindow(): void {
 }
 
 app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
   focusMainWindow();
 });
 
@@ -747,10 +768,10 @@ function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
   const window = new BrowserWindow({
-    width: 1400,
-    height: 920,
-    minWidth: 1120,
-    minHeight: 760,
+    width: 1280,
+    height: 720,
+    minWidth: needsSetupExtraction ? 1280 : 1120,
+    minHeight: 720,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "nexu",
     titleBarStyle: "hiddenInset",
@@ -875,12 +896,17 @@ function createMainWindow(): BrowserWindow {
       detail: window.webContents.getURL(),
     });
     logLaunchTimeline("main window ready-to-show");
-    if (isMacOS) {
+    if (isMacOS && !needsSetupExtraction) {
+      // Only apply vibrancy after ready-to-show when NOT in setup mode.
+      // During setup, vibrancy is applied after the animation finishes
+      // to avoid the transparent background showing through the video.
       window.setBackgroundColor("#00000000");
       window.setVibrancy("sidebar");
     }
-    window.show();
-    focusMainWindow();
+    if (!window.isVisible()) {
+      window.show();
+      focusMainWindow();
+    }
   });
 
   window.on("closed", () => {
@@ -888,6 +914,18 @@ function createMainWindow(): BrowserWindow {
       mainWindow = null;
     }
   });
+
+  // During first install / post-update, show the window IMMEDIATELY with a
+  // white background — before loadFile, before React, before anything.
+  // This eliminates the 10-20s blank screen while the Electron main process
+  // is doing sidecar extraction / launchd bootstrap in the background.
+  // The white background matches the animation overlay seamlessly.
+  if (needsSetupExtraction) {
+    logLaunchTimeline("setup animation: showing window immediately");
+    window.setBackgroundColor("#ffffff");
+    window.show();
+    focusMainWindow();
+  }
 
   void window.loadFile(resolve(__dirname, "../../dist/index.html"));
   diagnosticsReporter?.recordStartupProbe({
@@ -1045,6 +1083,14 @@ app.whenReady().then(async () => {
     diagnosticsReporter,
     coldStartReady,
   );
+  // Provide orchestrator-mode quit fallback for app:quit IPC when launchd
+  // quit handler is not available (e.g. CI, orchestrator mode).
+  setQuitFallback(() =>
+    gracefulShutdown("ipc-quit").finally(() => {
+      (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+      app.exit(0);
+    }),
+  );
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   sleepGuard = new SleepGuard({
     powerMonitor,
@@ -1068,6 +1114,18 @@ app.whenReady().then(async () => {
     }
 
     try {
+      if (needsSetupExtraction) {
+        logColdStart("starting async openclaw sidecar extraction");
+        diagnosticsReporter?.markColdStartRunning(
+          "extracting openclaw sidecar",
+        );
+        await extractOpenclawSidecarAsync(
+          electronRoot,
+          app.getPath("userData"),
+        );
+        logColdStart("openclaw sidecar extraction complete");
+      }
+
       logColdStart(
         `bootstrap mode: ${useLaunchdMode ? "launchd" : "orchestrator"}`,
       );
@@ -1101,7 +1159,7 @@ app.whenReady().then(async () => {
     // Install launchd quit handler regardless of cold-start success/failure
     // so services can always be stopped cleanly on quit.
     if (launchdResult) {
-      installLaunchdQuitHandler({
+      const quitOpts = {
         launchd: launchdResult.launchd,
         labels: launchdResult.labels,
         webServer: launchdResult.webServer,
@@ -1111,7 +1169,9 @@ app.whenReady().then(async () => {
           await diagnosticsReporter?.flushNow().catch(() => undefined);
           flushRuntimeLoggers();
         },
-      });
+      };
+      installLaunchdQuitHandler(quitOpts);
+      setQuitHandlerOpts(quitOpts);
     }
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
