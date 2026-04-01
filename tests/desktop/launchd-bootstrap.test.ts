@@ -266,6 +266,7 @@ describe("bootstrapWithLaunchd", () => {
     mockLaunchdManager.isServiceInstalled.mockResolvedValue(false);
     mockLaunchdManager.installService.mockResolvedValue(undefined);
     mockLaunchdManager.startService.mockResolvedValue(undefined);
+    mockLaunchdManager.bootoutAndWaitForExit.mockResolvedValue(undefined);
 
     // Mock fetch for controller readiness probe
     vi.stubGlobal(
@@ -300,11 +301,29 @@ describe("bootstrapWithLaunchd", () => {
 
   it("always calls installService to detect plist changes", async () => {
     mockLaunchdManager.isServiceInstalled.mockResolvedValue(true);
-    // Service registered but not running
-    mockLaunchdManager.getServiceStatus.mockResolvedValue({
-      label: "test",
-      plistPath: "",
-      status: "stopped",
+    let controllerRecovered = false;
+    mockLaunchdManager.bootoutAndWaitForExit.mockImplementation(
+      (label: string) => {
+        if (label.includes("controller")) {
+          controllerRecovered = true;
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        return Promise.resolve(
+          controllerRecovered
+            ? { label: "test", plistPath: "", status: "running", pid: 1234 }
+            : { label: "test", plistPath: "", status: "stopped" },
+        );
+      }
+
+      return Promise.resolve(
+        controllerRecovered
+          ? { label: "test", plistPath: "", status: "running", pid: 1234 }
+          : { label: "test", plistPath: "", status: "stopped" },
+      );
     });
 
     const { bootstrapWithLaunchd } = await import(
