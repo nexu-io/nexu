@@ -44,7 +44,27 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 vi.mock("node:net", () => ({
-  createConnection: vi.fn(),
+  default: {
+    createServer: vi.fn(() => ({
+      once() {},
+      listen(_p: number, _h: string, cb: () => void) {
+        setTimeout(() => cb(), 0);
+      },
+      close(cb: () => void) {
+        setTimeout(() => cb(), 0);
+      },
+    })),
+  },
+  createConnection: vi.fn(() => {
+    const socket = {
+      once(event: string, cb: () => void) {
+        if (event === "connect") setTimeout(() => cb(), 0);
+      },
+      destroy: vi.fn(),
+      setTimeout: vi.fn(),
+    };
+    return socket;
+  }),
 }));
 
 const mockLaunchdManager = {

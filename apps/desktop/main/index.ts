@@ -30,7 +30,9 @@ import {
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
   buildSkillNodePath,
+  checkOpenclawExtractionNeeded,
   createRuntimeUnitManifests,
+  extractOpenclawSidecarAsync,
 } from "./runtime/manifests";
 import {
   type PortAllocation,
@@ -112,6 +114,17 @@ const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
         throw error;
       },
     );
+const needsSetupExtraction = checkOpenclawExtractionNeeded(
+  electronRoot,
+  app.getPath("userData"),
+  app.isPackaged,
+);
+
+// Set env var BEFORE window creation so the preload can read it for bootstrap data.
+if (needsSetupExtraction) {
+  process.env.NEXU_NEEDS_SETUP_ANIMATION = "1";
+}
+
 const orchestrator = new RuntimeOrchestrator(
   createRuntimeUnitManifests(
     electronRoot,
@@ -670,6 +683,7 @@ async function runLaunchdColdStart(): Promise<void> {
     skillNodePath,
     openclawTmpDir,
     proxyEnv,
+    log: (message: string) => logColdStart(message),
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
     buildSource:
@@ -740,17 +754,29 @@ function focusMainWindow(): void {
 }
 
 app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
   focusMainWindow();
 });
 
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
+  // During setup animation, use 16:9 dimensions matching the video (1920×1080)
+  // to avoid non-uniform scaling / edge cropping. Restored to normal size
+  // when setup:animation-complete IPC fires.
+  const setupWidth = 1280;
+  const setupHeight = 720;
+  const normalWidth = 1400;
+  const normalHeight = 920;
   const window = new BrowserWindow({
-    width: 1400,
-    height: 920,
-    minWidth: 1120,
-    minHeight: 760,
+    width: needsSetupExtraction ? setupWidth : normalWidth,
+    height: needsSetupExtraction ? setupHeight : normalHeight,
+    minWidth: needsSetupExtraction ? setupWidth : 1120,
+    minHeight: needsSetupExtraction ? setupHeight : 760,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "nexu",
     titleBarStyle: "hiddenInset",
@@ -875,12 +901,17 @@ function createMainWindow(): BrowserWindow {
       detail: window.webContents.getURL(),
     });
     logLaunchTimeline("main window ready-to-show");
-    if (isMacOS) {
+    if (isMacOS && !needsSetupExtraction) {
+      // Only apply vibrancy after ready-to-show when NOT in setup mode.
+      // During setup, vibrancy is applied after the animation finishes
+      // to avoid the transparent background showing through the video.
       window.setBackgroundColor("#00000000");
       window.setVibrancy("sidebar");
     }
-    window.show();
-    focusMainWindow();
+    if (!window.isVisible()) {
+      window.show();
+      focusMainWindow();
+    }
   });
 
   window.on("closed", () => {
@@ -888,6 +919,18 @@ function createMainWindow(): BrowserWindow {
       mainWindow = null;
     }
   });
+
+  // During first install / post-update, show the window IMMEDIATELY with a
+  // white background — before loadFile, before React, before anything.
+  // This eliminates the 10-20s blank screen while the Electron main process
+  // is doing sidecar extraction / launchd bootstrap in the background.
+  // The white background matches the animation overlay seamlessly.
+  if (needsSetupExtraction) {
+    logLaunchTimeline("setup animation: showing window immediately");
+    window.setBackgroundColor("#ffffff");
+    window.show();
+    focusMainWindow();
+  }
 
   void window.loadFile(resolve(__dirname, "../../dist/index.html"));
   diagnosticsReporter?.recordStartupProbe({
@@ -1068,6 +1111,18 @@ app.whenReady().then(async () => {
     }
 
     try {
+      if (needsSetupExtraction) {
+        logColdStart("starting async openclaw sidecar extraction");
+        diagnosticsReporter?.markColdStartRunning(
+          "extracting openclaw sidecar",
+        );
+        await extractOpenclawSidecarAsync(
+          electronRoot,
+          app.getPath("userData"),
+        );
+        logColdStart("openclaw sidecar extraction complete");
+      }
+
       logColdStart(
         `bootstrap mode: ${useLaunchdMode ? "launchd" : "orchestrator"}`,
       );

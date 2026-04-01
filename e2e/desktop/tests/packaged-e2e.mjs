@@ -347,7 +347,8 @@ async function quitPackagedApp(page, app) {
 }
 
 async function waitForDesktopReady() {
-  await waitFor(async () => {
+  // Controller readiness — also returns runtime ports
+  const readyPayload = await waitFor(async () => {
     const r = await fetch("http://127.0.0.1:50800/api/internal/desktop/ready");
     if (!r.ok) return false;
     const p = await r.json();
@@ -359,10 +360,14 @@ async function waitForDesktopReady() {
     return r.ok;
   }, "web ready");
 
+  // Discover actual openclaw port from controller readiness payload or
+  // fall back to scanning common ports. The port may differ from 18789
+  // if another service occupied it.
+  const ocPort = readyPayload?.openclawPort ?? 18789;
   await waitFor(async () => {
-    const r = await fetch("http://127.0.0.1:18789/health");
+    const r = await fetch(`http://127.0.0.1:${ocPort}/health`);
     return r.ok;
-  }, "openclaw health");
+  }, `openclaw health (port ${ocPort})`);
 }
 
 // ---------------------------------------------------------------------------
