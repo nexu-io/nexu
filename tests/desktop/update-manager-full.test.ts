@@ -161,6 +161,16 @@ describe("bindEvents", () => {
     expect(eventNames).toContain("error");
   });
 
+  it("logs that the update feed was configured", async () => {
+    await createManager();
+
+    expect(mockWriteDesktopMainLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("update feed configured"),
+      }),
+    );
+  });
+
   // -------------------------------------------------------------------------
   // checking-for-update
   // -------------------------------------------------------------------------
@@ -292,21 +302,53 @@ describe("bindEvents", () => {
   // download-progress
   // -------------------------------------------------------------------------
 
-  it("download-progress: sends progress data without logCheck", async () => {
+  it("download-progress: throttles logs but keeps first and 100% progress", async () => {
+    vi.spyOn(Date, "now")
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_000)
+      .mockReturnValueOnce(1_000);
+
     const { win } = await createManager();
     const handlers = extractHandlers();
 
     handlers["download-progress"]({
-      percent: 42.5,
+      percent: 1,
       bytesPerSecond: 1024000,
       transferred: 5000000,
       total: 12000000,
     });
-
-    expect(win.webContents.send).toHaveBeenCalledWith("update:progress", {
-      percent: 42.5,
+    handlers["download-progress"]({
+      percent: 2,
       bytesPerSecond: 1024000,
-      transferred: 5000000,
+      transferred: 5100000,
+      total: 12000000,
+    });
+    handlers["download-progress"]({
+      percent: 4,
+      bytesPerSecond: 1024000,
+      transferred: 5200000,
+      total: 12000000,
+    });
+    handlers["download-progress"]({
+      percent: 100,
+      bytesPerSecond: 1024000,
+      transferred: 12000000,
+      total: 12000000,
+    });
+
+    const progressLogs = mockWriteDesktopMainLog.mock.calls
+      .map(([entry]) => entry as { message?: string })
+      .filter((entry) => entry.message?.includes("download progress"));
+
+    expect(progressLogs).toHaveLength(2);
+    expect(progressLogs[0]?.message).toContain("download progress 1%");
+    expect(progressLogs[1]?.message).toContain("download progress 100%");
+    expect(win.webContents.send).toHaveBeenLastCalledWith("update:progress", {
+      percent: 100,
+      bytesPerSecond: 1024000,
+      transferred: 12000000,
       total: 12000000,
     });
   });

@@ -19,6 +19,23 @@ describe("desktop useAutoUpdate", () => {
       ).phase,
     ).toBe("ready");
   });
+
+  it("keeps later non-installing phases intact", () => {
+    expect(
+      restoreDesktopPhase(
+        {
+          phase: "error",
+          version: "1.2.3",
+          releaseNotes: null,
+          percent: 100,
+          errorMessage: "failed",
+          dismissed: false,
+          userInitiated: false,
+        },
+        "available",
+      ).phase,
+    ).toBe("error");
+  });
 });
 
 describe("web useAutoUpdate", () => {
