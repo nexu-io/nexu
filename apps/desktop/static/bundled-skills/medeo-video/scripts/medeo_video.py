@@ -463,6 +463,18 @@ def cmd_spawn_task(args):
     # Persist task
     _save_task(task_id, status="composing", text=args.text)
 
+    # Collect env vars to pass through to the sub-agent
+    passthrough_env = {}
+    for var in [
+        "OPENCLAW_CHANNEL_TYPE", "OPENCLAW_CHAT_ID",
+        "OPENCLAW_CONFIG", "OPENCLAW_STATE_DIR",
+        "FEISHU_APP_ID", "FEISHU_APP_SECRET",
+        "NEXU_HOME",
+    ]:
+        val = os.environ.get(var, "")
+        if val:
+            passthrough_env[var] = val
+
     # Output sessions_spawn payload (stdout -> OpenClaw parses)
     spawn_payload = {
         "sessions_spawn": {
@@ -471,6 +483,7 @@ def cmd_spawn_task(args):
                 f"Use command: python3 scripts/medeo_video.py wait-and-deliver --task-id {task_id}"
             ),
             "runTimeoutSeconds": 5400,
+            **({"env": passthrough_env} if passthrough_env else {}),
         }
     }
     print(json.dumps(spawn_payload))

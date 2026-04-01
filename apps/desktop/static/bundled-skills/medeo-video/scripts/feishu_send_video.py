@@ -20,24 +20,48 @@ import urllib.request
 import urllib.error
 
 
+def _find_openclaw_config():
+    """Locate openclaw.json with priority: OPENCLAW_CONFIG > OPENCLAW_STATE_DIR > NEXU_HOME fallback"""
+    # 1. OPENCLAW_CONFIG points directly to the file
+    config_path = os.environ.get("OPENCLAW_CONFIG", "").strip()
+    if config_path and os.path.exists(config_path):
+        return config_path
+
+    # 2. OPENCLAW_STATE_DIR/openclaw.json
+    state_dir = os.environ.get("OPENCLAW_STATE_DIR", "").strip()
+    if state_dir:
+        p = os.path.join(state_dir, "openclaw.json")
+        if os.path.exists(p):
+            return p
+
+    # 3. Fallback: ~/.nexu/runtime/openclaw/state/openclaw.json
+    nexu_home = os.environ.get("NEXU_HOME", os.path.expanduser("~/.nexu"))
+    p = os.path.join(nexu_home, "runtime", "openclaw", "state", "openclaw.json")
+    if os.path.exists(p):
+        return p
+
+    return None
+
+
 def get_tenant_token():
-    """Get Feishu app credentials from OpenClaw config and exchange for tenant_access_token"""
-    # Get from environment variables (injected by OpenClaw)
+    """Get Feishu app credentials and exchange for tenant_access_token.
+
+    Credential lookup priority:
+    1. FEISHU_APP_ID / FEISHU_APP_SECRET env vars (passed through by sessions_spawn)
+    2. OPENCLAW_CONFIG file (direct path)
+    3. OPENCLAW_STATE_DIR/openclaw.json
+    4. ~/.nexu/runtime/openclaw/state/openclaw.json (fallback)
+    """
+    # 1. Environment variables (highest priority)
     app_id = os.environ.get("FEISHU_APP_ID", "")
     app_secret = os.environ.get("FEISHU_APP_SECRET", "")
 
-    # Or read from openclaw.json
+    # 2-4. Read from openclaw.json
     if not app_id or not app_secret:
-        state_dir = os.environ.get("OPENCLAW_STATE_DIR", "")
-        if not state_dir:
-            nexu_home = os.environ.get("NEXU_HOME", os.path.expanduser("~/.nexu"))
-            state_dir = os.path.join(nexu_home, "runtime", "openclaw", "state")
-
-        config_path = os.path.join(state_dir, "openclaw.json")
-        if os.path.exists(config_path):
+        config_path = _find_openclaw_config()
+        if config_path:
             with open(config_path) as f:
                 config = json.load(f)
-            # Get from channels.feishu.accounts
             accounts = config.get("channels", {}).get("feishu", {}).get("accounts", [])
             if accounts:
                 acc = accounts[0] if isinstance(accounts, list) else list(accounts.values())[0]
