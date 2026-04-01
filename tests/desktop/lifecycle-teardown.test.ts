@@ -96,9 +96,13 @@ const labels = {
 const repoControllerPattern = "/repo/apps/controller/dist/index\\.js";
 const repoOpenclawPattern =
   "/repo/openclaw-runtime/node_modules/openclaw/openclaw\\.mjs";
+const repoOpenclawGatewayPattern =
+  "/repo/openclaw-runtime/bin/openclaw-gateway";
 const packagedControllerPattern =
   "/Users/testuser/\\.nexu/runtime/controller-sidecar/dist/index\\.js";
 const packagedOpenclawPattern = "\\.nexu/(runtime/)?openclaw-sidecar";
+const packagedOpenclawGatewayPattern =
+  "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway";
 
 function setupPgrepMock(matches: Record<string, number[]>): void {
   mockExecFile.mockImplementation(
@@ -221,6 +225,7 @@ describe("teardownLaunchdServices", () => {
     setupPgrepMock({
       [packagedControllerPattern]: [99901],
       [packagedOpenclawPattern]: [99902],
+      [packagedOpenclawGatewayPattern]: [99903],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -238,6 +243,7 @@ describe("teardownLaunchdServices", () => {
     // Orphan processes should be killed
     expect(killSpy).toHaveBeenCalledWith(99901, "SIGKILL");
     expect(killSpy).toHaveBeenCalledWith(99902, "SIGKILL");
+    expect(killSpy).toHaveBeenCalledWith(99903, "SIGKILL");
 
     killSpy.mockRestore();
   });
@@ -272,7 +278,9 @@ describe("teardownLaunchdServices", () => {
     setupPgrepMock({
       [repoControllerPattern]: [10001],
       [repoOpenclawPattern]: [10002, 10003],
-      [packagedOpenclawPattern]: [10004],
+      [repoOpenclawGatewayPattern]: [10004],
+      [packagedOpenclawPattern]: [10005],
+      [packagedOpenclawGatewayPattern]: [10006],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -291,6 +299,8 @@ describe("teardownLaunchdServices", () => {
     expect(killSpy).toHaveBeenCalledWith(10002, "SIGKILL");
     expect(killSpy).toHaveBeenCalledWith(10003, "SIGKILL");
     expect(killSpy).toHaveBeenCalledWith(10004, "SIGKILL");
+    expect(killSpy).toHaveBeenCalledWith(10005, "SIGKILL");
+    expect(killSpy).toHaveBeenCalledWith(10006, "SIGKILL");
 
     killSpy.mockRestore();
   });
@@ -511,7 +521,9 @@ describe("ensureNexuProcessesDead", () => {
     setupPgrepMock({
       [repoControllerPattern]: [11111],
       [repoOpenclawPattern]: [22222],
-      [packagedOpenclawPattern]: [33333],
+      [repoOpenclawGatewayPattern]: [33333],
+      [packagedOpenclawPattern]: [44444],
+      [packagedOpenclawGatewayPattern]: [55555],
     });
 
     // After first round of kills, all processes die
@@ -531,7 +543,9 @@ describe("ensureNexuProcessesDead", () => {
             const matches: Record<string, string> = {
               [repoControllerPattern]: "11111",
               [repoOpenclawPattern]: "22222",
-              [packagedOpenclawPattern]: "33333",
+              [repoOpenclawGatewayPattern]: "33333",
+              [packagedOpenclawPattern]: "44444",
+              [packagedOpenclawGatewayPattern]: "55555",
             };
             if (matches[pattern]) {
               callback(null, { stdout: matches[pattern], stderr: "" });
@@ -697,6 +711,8 @@ describe("ensureNexuProcessesDead", () => {
       [repoControllerPattern]: [55555],
       [repoOpenclawPattern]: [55555],
       [packagedOpenclawPattern]: [55555],
+      [repoOpenclawGatewayPattern]: [55555],
+      [packagedOpenclawGatewayPattern]: [55555],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);

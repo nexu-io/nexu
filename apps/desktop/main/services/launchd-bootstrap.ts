@@ -1047,6 +1047,7 @@ function getNexuProcessPatterns(): string[] {
         "openclaw.mjs",
       ),
     ),
+    ...getNexuOpenclawProcessPatterns(),
   ]);
 
   if (process.resourcesPath) {
@@ -1070,6 +1071,7 @@ function getNexuOpenclawProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
   const patterns = new Set<string>([
     "\\.nexu/(runtime/)?openclaw-sidecar",
+    "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway",
     escapeRegexLiteral(
       path.join(
         repoRoot,
@@ -1078,6 +1080,9 @@ function getNexuOpenclawProcessPatterns(): string[] {
         "openclaw",
         "openclaw.mjs",
       ),
+    ),
+    escapeRegexLiteral(
+      path.join(repoRoot, "openclaw-runtime", "bin", "openclaw-gateway"),
     ),
   ]);
 
@@ -1091,6 +1096,17 @@ function getNexuOpenclawProcessPatterns(): string[] {
           "node_modules",
           "openclaw",
           "openclaw.mjs",
+        ),
+      ),
+    );
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw-gateway",
         ),
       ),
     );
