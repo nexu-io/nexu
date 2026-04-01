@@ -496,13 +496,11 @@ export function registerIpcHandlers(
         }
 
         case "setup:animation-complete": {
-          // Restore normal window size and vibrancy now that the
-          // white-background animation overlay has been removed.
+          // Restore vibrancy now that the white-background animation
+          // overlay has been removed.
           const win = BrowserWindow.getAllWindows()[0];
           if (win) {
-            win.setMinimumSize(1120, 760);
-            win.setSize(1400, 920, true);
-            win.center();
+            win.setMinimumSize(1120, 720);
             if (process.platform === "darwin") {
               win.setBackgroundColor("#00000000");
               win.setVibrancy("sidebar");

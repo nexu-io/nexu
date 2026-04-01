@@ -765,18 +765,11 @@ app.on("second-instance", () => {
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
-  // During setup animation, use 16:9 dimensions matching the video (1920×1080)
-  // to avoid non-uniform scaling / edge cropping. Restored to normal size
-  // when setup:animation-complete IPC fires.
-  const setupWidth = 1280;
-  const setupHeight = 720;
-  const normalWidth = 1400;
-  const normalHeight = 920;
   const window = new BrowserWindow({
-    width: needsSetupExtraction ? setupWidth : normalWidth,
-    height: needsSetupExtraction ? setupHeight : normalHeight,
-    minWidth: needsSetupExtraction ? setupWidth : 1120,
-    minHeight: needsSetupExtraction ? setupHeight : 760,
+    width: 1280,
+    height: 720,
+    minWidth: needsSetupExtraction ? 1280 : 1120,
+    minHeight: 720,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "nexu",
     titleBarStyle: "hiddenInset",
