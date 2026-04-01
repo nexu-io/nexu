@@ -25,6 +25,7 @@ import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
   setComponentUpdater,
+  setQuitHandlerOpts,
   setUpdateManager,
 } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
@@ -1156,7 +1157,7 @@ app.whenReady().then(async () => {
     // Install launchd quit handler regardless of cold-start success/failure
     // so services can always be stopped cleanly on quit.
     if (launchdResult) {
-      installLaunchdQuitHandler({
+      const quitOpts = {
         launchd: launchdResult.launchd,
         labels: launchdResult.labels,
         webServer: launchdResult.webServer,
@@ -1166,7 +1167,9 @@ app.whenReady().then(async () => {
           await diagnosticsReporter?.flushNow().catch(() => undefined);
           flushRuntimeLoggers();
         },
-      });
+      };
+      installLaunchdQuitHandler(quitOpts);
+      setQuitHandlerOpts(quitOpts);
     }
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {

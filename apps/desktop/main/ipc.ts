@@ -10,6 +10,10 @@ import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import type { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import {
+  type QuitHandlerOptions,
+  quitWithDecision,
+} from "./services/quit-handler";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
 
@@ -17,6 +21,7 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
+let quitHandlerOpts: QuitHandlerOptions | null = null;
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -102,6 +107,10 @@ export function setUpdateManager(manager: UpdateManager | null): void {
 
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
+}
+
+export function setQuitHandlerOpts(opts: QuitHandlerOptions): void {
+  quitHandlerOpts = opts;
 }
 
 function assertValidChannel(
@@ -508,6 +517,17 @@ export function registerIpcHandlers(
               win.setVibrancy("sidebar");
             }
           }
+          return undefined;
+        }
+
+        case "app:quit": {
+          const typedPayload = payload as HostInvokePayloadMap["app:quit"];
+          if (!quitHandlerOpts) {
+            app.exit(0);
+            return undefined;
+          }
+          // Fire-and-forget: quitWithDecision calls app.exit() internally.
+          void quitWithDecision(typedPayload.decision, quitHandlerOpts);
           return undefined;
         }
 

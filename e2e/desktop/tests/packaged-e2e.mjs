@@ -317,19 +317,29 @@ async function quitPackagedApp(page, app) {
   const closePromise = app.waitForEvent("close").catch(() => null);
 
   // Try IPC quit first (preferred — no dialog)
+  const electronPid = app.process().pid;
   try {
     await page.evaluate(async () => {
       await window.nexuHost.invoke("app:quit", { decision: "quit-completely" });
     });
     log("Quit via app:quit IPC");
-    await closePromise;
+    await Promise.race([
+      closePromise,
+      sleep(15_000).then(() => {
+        log("IPC quit timeout, force killing");
+        try {
+          if (electronPid) process.kill(electronPid, "SIGKILL");
+        } catch {
+          /* already dead */
+        }
+      }),
+    ]);
     return;
   } catch {
     log("app:quit IPC unavailable, using SIGTERM + osascript");
   }
 
   // Fallback: SIGTERM the Electron process to trigger before-quit → quit dialog
-  const electronPid = app.process().pid;
   if (electronPid) {
     process.kill(electronPid, "SIGTERM");
   }
@@ -341,7 +351,11 @@ async function quitPackagedApp(page, app) {
     closePromise,
     sleep(15_000).then(() => {
       log("Quit timeout, force killing");
-      if (electronPid) process.kill(electronPid, "SIGKILL").catch?.(() => {});
+      try {
+        if (electronPid) process.kill(electronPid, "SIGKILL");
+      } catch {
+        /* already dead */
+      }
     }),
   ]);
 }
