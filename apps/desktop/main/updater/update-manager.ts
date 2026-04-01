@@ -102,6 +102,8 @@ export class UpdateManager {
   private readonly launchdCtx: UpdateManagerOptions["launchd"];
   private currentFeedUrl: string;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
+  private lastProgressLogAt = 0;
+  private lastProgressLogPercent: number | null = null;
   private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -147,6 +149,15 @@ export class UpdateManager {
         url: this.currentFeedUrl,
       });
     }
+
+    this.logCheck("update feed configured", {
+      channel: this.channel,
+      source: this.source,
+      feedUrl: sanitizeFeedUrl(this.currentFeedUrl),
+      currentVersion: app.getVersion(),
+      remoteVersion: undefined,
+      remoteReleaseDate: undefined,
+    });
   }
 
   private getDiagnostic(partial?: {
@@ -177,7 +188,7 @@ export class UpdateManager {
   private bindEvents(): void {
     autoUpdater.on("checking-for-update", () => {
       const diagnostic = this.getDiagnostic();
-      this.logCheck("checking for update", diagnostic);
+      this.logCheck("update check event: checking for update", diagnostic);
       this.send("update:checking", diagnostic);
     });
 
@@ -186,7 +197,7 @@ export class UpdateManager {
         remoteVersion: info.version,
         remoteReleaseDate: info.releaseDate,
       });
-      this.logCheck("update available", diagnostic);
+      this.logCheck("update event: update available", diagnostic);
       this.send("update:available", {
         version: info.version,
         releaseNotes:
@@ -200,11 +211,26 @@ export class UpdateManager {
         remoteVersion: info.version,
         remoteReleaseDate: info.releaseDate,
       });
-      this.logCheck("update not available", diagnostic);
+      this.logCheck("update event: update not available", diagnostic);
       this.send("update:up-to-date", { diagnostic });
     });
 
     autoUpdater.on("download-progress", (progress) => {
+      const now = Date.now();
+      const percent = Math.round(progress.percent);
+      const shouldLog =
+        this.lastProgressLogPercent === null ||
+        Math.abs(percent - this.lastProgressLogPercent) >= 5 ||
+        now - this.lastProgressLogAt >= 5_000 ||
+        percent === 100;
+      if (shouldLog) {
+        this.lastProgressLogAt = now;
+        this.lastProgressLogPercent = percent;
+        this.logCheck(
+          `update event: download progress ${percent}%`,
+          this.getDiagnostic(),
+        );
+      }
       this.send("update:progress", {
         percent: progress.percent,
         bytesPerSecond: progress.bytesPerSecond,
@@ -214,6 +240,13 @@ export class UpdateManager {
     });
 
     autoUpdater.on("update-downloaded", (info) => {
+      this.logCheck(
+        "update event: downloaded",
+        this.getDiagnostic({
+          remoteVersion: info.version,
+          remoteReleaseDate: info.releaseDate,
+        }),
+      );
       this.send("update:downloaded", { version: info.version });
     });
 
@@ -239,7 +272,13 @@ export class UpdateManager {
   }
 
   async checkNow(): Promise<{ updateAvailable: boolean }> {
+    const startedAt = Date.now();
+    this.logCheck("update check start", this.getDiagnostic());
     if (this.checkInProgress) {
+      this.logCheck(
+        "update check skipped: already in progress",
+        this.getDiagnostic(),
+      );
       return this.checkInProgress;
     }
 
@@ -251,7 +290,10 @@ export class UpdateManager {
           remoteVersion,
           remoteReleaseDate: result?.updateInfo.releaseDate,
         });
-        this.logCheck("check complete", diagnostic);
+        this.logCheck(
+          `update check result: ${result === null ? "null" : remoteVersion === app.getVersion() ? "no update" : "update available"} (${Date.now() - startedAt}ms)`,
+          diagnostic,
+        );
         return {
           updateAvailable:
             result !== null && result.updateInfo.version !== app.getVersion(),

@@ -176,7 +176,9 @@ describe("bindEvents", () => {
         source: "auto-update",
         stream: "system",
         kind: "app",
-        message: expect.stringContaining("checking for update"),
+        message: expect.stringContaining(
+          "update check event: checking for update",
+        ),
       }),
     );
     expect(win.webContents.send).toHaveBeenCalledWith(
@@ -322,6 +324,11 @@ describe("bindEvents", () => {
     expect(win.webContents.send).toHaveBeenCalledWith("update:downloaded", {
       version: "1.0.0",
     });
+    expect(mockWriteDesktopMainLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("update event: downloaded"),
+      }),
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -378,6 +385,34 @@ describe("checkNow", () => {
     const result = await mgr.checkNow();
 
     expect(result).toEqual({ updateAvailable: false });
+  });
+
+  it("logs when a check is skipped because one is already in progress", async () => {
+    let resolveCheck!: (
+      value: { updateInfo: { version: string; releaseDate: string } } | null,
+    ) => void;
+    mockAutoUpdater.checkForUpdates.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
+
+    const { mgr } = await createManager();
+    const firstCheck = mgr.checkNow();
+    void mgr.checkNow();
+    resolveCheck({
+      updateInfo: { version: "1.0.0", releaseDate: "2026-03-20" },
+    });
+
+    await firstCheck;
+
+    expect(mockWriteDesktopMainLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining(
+          "update check skipped: already in progress",
+        ),
+      }),
+    );
   });
 
   it("returns { updateAvailable: false } when checkForUpdates returns null", async () => {
@@ -474,7 +509,7 @@ describe("checkNow", () => {
     expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(2);
   });
 
-  it("logs check complete with diagnostic on success", async () => {
+  it("logs check result with diagnostic on success", async () => {
     mockAutoUpdater.checkForUpdates.mockResolvedValue({
       updateInfo: { version: "1.0.0", releaseDate: "2026-03-20" },
     });
@@ -484,7 +519,9 @@ describe("checkNow", () => {
 
     expect(mockWriteDesktopMainLog).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringContaining("check complete"),
+        message: expect.stringContaining(
+          "update check result: update available",
+        ),
       }),
     );
   });
