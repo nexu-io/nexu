@@ -326,6 +326,9 @@ const en = {
   "models.byok.none": "None",
   "models.byok.refreshModels": "Refresh",
   "models.byok.fetchingModels": "Fetching models...",
+  "models.byok.refreshSuccess": "Model list refreshed: {{count}} models",
+  "models.byok.refreshFailed":
+    "Failed to refresh model list. Please try again.",
   "models.byok.updateConfig": "Update configuration",
   "models.byok.saveAndEnable": "Save",
   "models.byok.remove": "Remove",
@@ -367,6 +370,8 @@ const en = {
   "channels.comingSoon": "Microsoft Teams, Line and more coming soon",
   "channels.backToConfig": "Back to configuration",
   "channels.statusConnected": "{{platform}} Bot Connected",
+  "channels.statusConnecting": "Connecting...",
+  "channels.statusError": "Connection Error",
   "channels.configuredDate": "configured {{date}}",
   "channels.connectionActive": "connection active",
   "channels.setupGuide": "Setup Guide",
@@ -434,15 +439,14 @@ const en = {
   "skills.skillsCount": "{{count}} skills",
   "skills.searchPlaceholder": "Search",
   "skills.official": "Official",
-  "skills.custom": "Custom",
   "skills.all": "All",
   "skills.explore": "ClawHub",
   "skills.yours": "Yours",
   "skills.clawhubDisclaimer":
     "Skills come from ClawHub \u2014 network or service may occasionally be unstable. If you encounter issues, please report on",
   "skills.clawhubDisclaimerAfterLink": ".",
-  "skills.recommended": "Recommended",
-  "skills.installed": "Installed",
+  "skills.builtin": "Built-in",
+  "skills.custom": "Custom",
   "skills.installQueued": "Skill queued for installation",
   "skills.skillNotFound":
     '"{{slug}}" is not available on ClawHub. It may have been removed or renamed.',
@@ -499,6 +503,7 @@ const en = {
   "skills.uninstallAction": "Uninstall",
   "skills.installingAction": "Installing…",
   "skills.uninstallingAction": "Uninstalling…",
+  "skills.agentSkills": "Agent Skills",
 
   // ── Skill Detail Page ──
   "skillDetail.backToSkills": "Back to Skills",

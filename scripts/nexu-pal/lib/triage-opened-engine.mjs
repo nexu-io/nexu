@@ -11,6 +11,14 @@ export function createTriagePlan() {
   };
 }
 
+function isInternalEquivalentAuthor({ isInternalAuthor, issueAuthorLogin }) {
+  if (isInternalAuthor === true) {
+    return true;
+  }
+
+  return issueAuthorLogin === "app/sentry";
+}
+
 function buildTranslationComment({ translatedTitle, translatedSections }) {
   const maxCommentLength = 65_500;
   const truncationMarker = "… [truncated]";
@@ -313,13 +321,17 @@ function buildNeedsInformationComment({ missingItems, reason }) {
 export async function buildOpenedIssueTriagePlan({
   issueTitle,
   issueBody,
-  isInternalAuthor,
-  issueAuthorLogin,
-  repositoryOwner,
-  issueAuthorAssociation,
+  isInternalAuthor = false,
+  issueAuthorLogin = "",
+  repositoryOwner = "",
+  issueAuthorAssociation = "NONE",
   chat,
 }) {
   const plan = createTriagePlan();
+  const shouldShortCircuitAfterClassification = isInternalEquivalentAuthor({
+    isInternalAuthor,
+    issueAuthorLogin,
+  });
 
   const translation = await detectAndTranslate({ chat, issueTitle, issueBody });
   let englishTitle = issueTitle;
@@ -403,9 +415,15 @@ export async function buildOpenedIssueTriagePlan({
     `organization membership: ${isInternalAuthor === true ? "member" : "non-member"}`,
   );
 
-  if (isInternalAuthor === true) {
+  if (issueAuthorLogin === "app/sentry") {
     plan.diagnostics.push(
-      "organization member detected; skipped roadmap/duplicate/completeness/needs-triage checks",
+      "author is app/sentry; treated as internal-equivalent automation for triage short-circuit",
+    );
+  }
+
+  if (shouldShortCircuitAfterClassification === true) {
+    plan.diagnostics.push(
+      "internal-equivalent author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
     );
     return plan;
   }

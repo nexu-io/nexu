@@ -11,7 +11,7 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
-import { createConnection } from "node:net";
+import net, { createConnection } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
@@ -81,6 +81,10 @@ export interface LaunchdBootstrapEnv {
   skillNodePath: string;
   /** TMPDIR for openclaw temp files */
   openclawTmpDir: string;
+  /** Normalized proxy env propagated to controller/openclaw launchd services */
+  proxyEnv: Record<string, string>;
+  /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
+  log?: (message: string) => void;
 }
 
 export interface LaunchdBootstrapResult {
@@ -276,20 +280,28 @@ function isProcessAlive(pid: number): boolean {
 // Port occupier detection
 // ---------------------------------------------------------------------------
 
+/**
+ * Check if a port is occupied by attempting to bind a temporary server.
+ * Returns `{ pid: 0 }` if occupied, `null` if free.
+ *
+ * Uses net.createServer().listen() instead of lsof or net.connect because:
+ * - lsof is blocked by macOS hardened runtime in packaged Electron apps
+ * - net.connect conflicts with probePort (both use createConnection)
+ */
 async function detectPortOccupier(
   port: number,
 ): Promise<{ pid: number } | null> {
-  try {
-    const { stdout } = await execFileAsync("lsof", [
-      `-iTCP:${port}`,
-      "-sTCP:LISTEN",
-      "-t",
-    ]);
-    const pid = Number.parseInt(stdout.trim(), 10);
-    return Number.isNaN(pid) ? null : { pid };
-  } catch {
-    return null;
-  }
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => {
+      // EADDRINUSE or other bind failure — port is occupied
+      resolve({ pid: 0 });
+    });
+    server.listen(port, "127.0.0.1", () => {
+      // Successfully bound — port is free. Close immediately.
+      server.close(() => resolve(null));
+    });
+  });
 }
 
 /**
@@ -372,6 +384,7 @@ async function cleanupStalePlists(
 export async function bootstrapWithLaunchd(
   env: LaunchdBootstrapEnv,
 ): Promise<LaunchdBootstrapResult> {
+  const log = env.log ?? console.log;
   const logDir = await ensureLogDir(env.nexuHome);
   const plistDir = env.plistDir ?? getDefaultPlistDir(env.isDev);
 
@@ -415,6 +428,7 @@ export async function bootstrapWithLaunchd(
     openclawExtensionsDir: env.openclawExtensionsDir,
     skillNodePath: env.skillNodePath,
     openclawTmpDir: env.openclawTmpDir,
+    proxyEnv: env.proxyEnv,
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
@@ -510,7 +524,9 @@ export async function bootstrapWithLaunchd(
       const reason = versionMismatch
         ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
         : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)";
-      console.log(`${reason}, tearing down stale services`);
+      console.log(
+        `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
+      );
       await Promise.allSettled([
         controllerRunning
           ? launchd.bootoutService(labels.controller)
@@ -572,7 +588,7 @@ export async function bootstrapWithLaunchd(
     // corrupted). We can't know the ports they're using, so tear them down
     // and do a clean cold start with fresh ports.
     console.log(
-      "Services running but no runtime-ports.json found, tearing down for clean start",
+      `[bootstrap] teardown: no runtime-ports.json but services running (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
     );
     await Promise.allSettled([
       controllerRunning
@@ -587,6 +603,9 @@ export async function bootstrapWithLaunchd(
   // --- Per-service: validate running ones, start missing ones ---
 
   // Health check running services
+  console.log(
+    `[bootstrap] health check: controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"} useRecoveredPorts=${useRecoveredPorts}`,
+  );
   let controllerHealthy = false;
   let openclawHealthy = false;
   let needsControllerReady = true;
@@ -609,7 +628,23 @@ export async function bootstrapWithLaunchd(
   }
 
   if (openclawRunning && useRecoveredPorts) {
-    openclawHealthy = await probePort(effectivePorts.openclawPort);
+    const portListening = await probePort(effectivePorts.openclawPort);
+    // Port listening isn't enough — verify it's OUR openclaw by checking
+    // that the launchd service env matches our expected token/state dir.
+    // This prevents attaching to a global openclaw or ClawX on the same port.
+    if (portListening) {
+      const ocEnv = (await launchd.getServiceStatus(labels.openclaw)).env;
+      const expectedToken = env.gatewayToken;
+      const runningToken = ocEnv?.OPENCLAW_GATEWAY_TOKEN;
+      if (expectedToken && runningToken && runningToken !== expectedToken) {
+        console.log(
+          "OpenClaw port is listening but gateway token mismatch — not our instance",
+        );
+        openclawHealthy = false;
+      } else {
+        openclawHealthy = true;
+      }
+    }
     if (openclawHealthy) {
       console.log("OpenClaw already running and healthy");
     } else {
@@ -636,12 +671,20 @@ export async function bootstrapWithLaunchd(
     }
   }
   if (!openclawHealthy) {
+    const preOccupier = await detectPortOccupier(effectivePorts.openclawPort);
+    log(
+      `[bootstrap] pre-findFreePort: openclawPort=${effectivePorts.openclawPort} occupier=${preOccupier ? `PID ${preOccupier.pid}` : "none"}`,
+    );
     const freePort = await findFreePort(effectivePorts.openclawPort);
     if (freePort !== effectivePorts.openclawPort) {
       console.log(
         `OpenClaw port ${effectivePorts.openclawPort} occupied, using ${freePort}`,
       );
       effectivePorts.openclawPort = freePort;
+    } else {
+      log(
+        `[bootstrap] openclawPort ${effectivePorts.openclawPort} appears free, keeping`,
+      );
     }
   }
 
@@ -660,25 +703,97 @@ export async function bootstrapWithLaunchd(
     label: string,
     type: "controller" | "openclaw",
   ) => {
+    console.log(`[bootstrap] ${type} installService begin label=${label}`);
     const plist = generatePlist(type, plistEnv);
     await launchd.installService(label, plist);
+    console.log(`[bootstrap] ${type} installService done label=${label}`);
   };
 
-  const ensureRunning = async (label: string) => {
+  const ensureRunning = async (label: string, type: string) => {
     const status = await launchd.getServiceStatus(label);
+    console.log(
+      `[bootstrap] ${type} ensureRunning status=${status.status} pid=${status.pid ?? "none"} label=${label}`,
+    );
     if (status.status !== "running") {
       await launchd.startService(label);
-      console.log(`Started ${label}`);
+      const afterStatus = await launchd.getServiceStatus(label);
+      console.log(
+        `[bootstrap] ${type} kickstart done status=${afterStatus.status} pid=${afterStatus.pid ?? "none"} label=${label}`,
+      );
     }
   };
 
   if (!controllerHealthy) {
     await ensureService(labels.controller, "controller");
-    await ensureRunning(labels.controller);
+    await ensureRunning(labels.controller, "controller");
+  } else {
+    console.log("[bootstrap] controller already healthy, skipping");
   }
   if (!openclawHealthy) {
     await ensureService(labels.openclaw, "openclaw");
-    await ensureRunning(labels.openclaw);
+    await ensureRunning(labels.openclaw, "openclaw");
+
+    // Verify our openclaw actually owns the port. Another launchd service
+    // (e.g. global `ai.openclaw.gateway` with KeepAlive=true) may have
+    // raced us and grabbed the port first. If so, pick a new port and
+    // re-bootstrap our service.
+    // Wait briefly for the port to be bound (our openclaw needs time to start).
+    await new Promise((r) => setTimeout(r, 2000));
+    const occupier = await detectPortOccupier(effectivePorts.openclawPort);
+    const ocStatus = await launchd.getServiceStatus(labels.openclaw);
+    log(
+      `[bootstrap] post-launch check: port=${effectivePorts.openclawPort} occupied=${!!occupier} ocStatus=${JSON.stringify({ pid: ocStatus.pid, status: ocStatus.status })}`,
+    );
+    // Port is stolen if someone is listening but our service crashed or
+    // isn't running. We can't compare PIDs (lsof blocked by hardened
+    // runtime), so check if our service is healthy instead.
+    const portStolen =
+      occupier && (ocStatus.pid == null || ocStatus.status !== "running");
+    log(`[bootstrap] portStolen=${portStolen}`);
+    if (portStolen) {
+      log(
+        `[bootstrap] OpenClaw port ${effectivePorts.openclawPort} stolen by PID ${occupier.pid} (ours is ${ocStatus.pid}), reassigning`,
+      );
+      // Bootout crashed openclaw and wait for launchd to fully release it.
+      // Use bootoutAndWaitForExit which captures the PID before bootout
+      // so waitForExit can SIGKILL if needed (plain waitForExit without
+      // knownPid exits early on "unknown" status).
+      await launchd
+        .bootoutAndWaitForExit(labels.openclaw, 5000)
+        .catch(() => {});
+
+      const newPort = await findFreePort(effectivePorts.openclawPort + 1);
+      effectivePorts.openclawPort = newPort;
+
+      // Regenerate plists with new port for both openclaw and controller
+      const retryPlistEnv: PlistEnv = {
+        ...plistEnv,
+        openclawPort: newPort,
+      };
+
+      // Re-bootstrap openclaw on new port
+      const retryPlist = generatePlist("openclaw", retryPlistEnv);
+      await launchd.installService(labels.openclaw, retryPlist);
+      await launchd.startService(labels.openclaw);
+      await ensureRunning(labels.openclaw, "openclaw");
+
+      // Controller needs the new port — re-bootstrap it too
+      await launchd
+        .bootoutAndWaitForExit(labels.controller, 5000)
+        .catch(() => {});
+      const retryControllerPlist = generatePlist("controller", retryPlistEnv);
+      await launchd.installService(labels.controller, retryControllerPlist);
+      await launchd.startService(labels.controller);
+      await ensureRunning(labels.controller, "controller");
+      // Controller was restarted — must wait for readiness again even if
+      // it was previously healthy (attach path sets needsControllerReady=false).
+      needsControllerReady = true;
+      log(
+        `[bootstrap] OpenClaw reassigned to port ${newPort}, controller restarted`,
+      );
+    }
+  } else {
+    console.log("[bootstrap] openclaw already healthy, skipping");
   }
 
   // Start embedded web server with port retry.
@@ -1279,6 +1394,7 @@ export async function ensureExternalNodeRunner(
     "MacOS",
     binaryName,
   );
+  await fs.mkdir(path.dirname(stagingRoot), { recursive: true });
 
   // Clone the full app bundle so the runner keeps a valid macOS app layout,
   // including signed resources like _CodeSignature and Resources.

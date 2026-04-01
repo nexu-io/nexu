@@ -24,7 +24,7 @@ jobs:
           sparse-checkout: scripts
       - name: Send Feishu notification
         env:
-          WEBHOOK_URL: ${{ secrets.ISSUE_SYNC_FEISHU_BOT_WEBHOOK }}
+          WEBHOOK_URL: ${{ secrets.NOTIFY_DISCUSSION_ISSUE_FEISHU_WEBHOOK }}
           EVENT_TYPE: discussion
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}

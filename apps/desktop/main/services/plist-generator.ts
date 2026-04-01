@@ -53,6 +53,32 @@ export interface PlistEnv {
   skillNodePath: string;
   /** TMPDIR for openclaw temp files */
   openclawTmpDir: string;
+  /** Normalized proxy env propagated to child processes */
+  proxyEnv: Record<string, string>;
+}
+
+function renderProxyEnvEntries(proxyEnv: Record<string, string>): string {
+  const orderedKeys = [
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "NODE_USE_ENV_PROXY",
+  ];
+
+  return orderedKeys
+    .flatMap((key) => {
+      const value = proxyEnv[key];
+      if (!value) {
+        return [];
+      }
+
+      return [
+        `\n        <key>${key}</key>`,
+        `\n        <string>${escapeXml(value)}</string>`,
+      ];
+    })
+    .join("");
 }
 
 /**
@@ -73,6 +99,7 @@ export function generatePlist(
 function generateControllerPlist(label: string, env: PlistEnv): string {
   const logPath = path.join(env.logDir, "controller.log");
   const errorPath = path.join(env.logDir, "controller.error.log");
+  const openclawLabel = SERVICE_LABELS.openclaw(env.isDev);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -118,6 +145,8 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <string>${escapeXml(env.platformTemplatesDir)}</string>
         <key>OPENCLAW_BIN</key>
         <string>${escapeXml(env.openclawBinPath)}</string>
+        <key>OPENCLAW_LAUNCHD_LABEL</key>
+        <string>${escapeXml(openclawLabel)}</string>
         <key>OPENCLAW_ELECTRON_EXECUTABLE</key>
         <string>${escapeXml(env.nodePath)}</string>
         <key>OPENCLAW_EXTENSIONS_DIR</key>
@@ -127,7 +156,9 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>OPENCLAW_DISABLE_BONJOUR</key>
         <string>1</string>
         <key>TMPDIR</key>
-        <string>${escapeXml(env.openclawTmpDir)}</string>${
+        <string>${escapeXml(env.openclawTmpDir)}</string>${renderProxyEnvEntries(
+          env.proxyEnv,
+        )}${
           env.nexuHome
             ? `
         <key>NEXU_HOME</key>
@@ -198,7 +229,9 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <string>${escapeXml(env.nodePath)}</string>
         <string>${escapeXml(env.openclawPath)}</string>
         <string>gateway</string>
-        <string>run</string>${authArgs}
+        <string>run</string>
+        <string>--port</string>
+        <string>${env.openclawPort}</string>${authArgs}
     </array>
 
     <key>WorkingDirectory</key>
@@ -218,8 +251,18 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <string>${label}</string>
         <key>OPENCLAW_SERVICE_MARKER</key>
         <string>launchd</string>
+        <key>OPENCLAW_IMAGE_BACKEND</key>
+        <string>sips</string>${
+          env.gatewayToken
+            ? `
+        <key>OPENCLAW_GATEWAY_TOKEN</key>
+        <string>${escapeXml(env.gatewayToken)}</string>`
+            : ""
+        }
         <key>HOME</key>
-        <string>${escapeXml(os.homedir())}</string>${
+        <string>${escapeXml(os.homedir())}</string>${renderProxyEnvEntries(
+          env.proxyEnv,
+        )}${
           env.systemPath
             ? `
         <key>PATH</key>

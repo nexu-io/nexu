@@ -63,6 +63,10 @@ export async function openExternal(url: string): Promise<void> {
   await getHostBridge().invoke("shell:open-external", { url });
 }
 
+export async function notifySetupAnimationComplete(): Promise<void> {
+  await getHostBridge().invoke("setup:animation-complete", undefined);
+}
+
 export async function getRuntimeState(): Promise<RuntimeState> {
   return getHostBridge().invoke("runtime:get-state", undefined);
 }

@@ -145,8 +145,13 @@ describe("buildOpenedIssueTriagePlan", () => {
     });
 
     expect(plan.commentsToAdd).toHaveLength(1);
-    expect(plan.commentsToAdd[0]).toContain("… [truncated]");
-    expect(plan.commentsToAdd[0].length).toBeLessThanOrEqual(65500);
+    const [translationComment] = plan.commentsToAdd;
+    expect(typeof translationComment).toBe("string");
+    if (typeof translationComment !== "string") {
+      throw new Error("expected translation comment");
+    }
+    expect(translationComment).toContain("… [truncated]");
+    expect(String(translationComment).length).toBeLessThanOrEqual(65500);
   });
 
   it("returns a full plan with stub diagnostics and bug-only labeling", async () => {
@@ -244,6 +249,46 @@ describe("buildOpenedIssueTriagePlan", () => {
     expect(plan.diagnostics).toEqual(
       expect.arrayContaining([
         "information completeness: missing reproduction details",
+      ]),
+    );
+  });
+
+  it("treats app/sentry as internal-equivalent and skips needs-information or needs-triage", async () => {
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          should_translate: false,
+          detected_language: null,
+          translated_title:
+            "Error: Cannot write headers after they are sent to the client",
+          translated_body: "Sentry issue body",
+        }),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          is_bug: true,
+          reason: "clear broken behavior",
+        }),
+      );
+
+    const plan = await buildOpenedIssueTriagePlan({
+      issueTitle:
+        "Error: Cannot write headers after they are sent to the client",
+      issueBody: "Sentry issue body",
+      issueAuthorLogin: "app/sentry",
+      isInternalAuthor: false,
+      chat,
+    });
+
+    expect(plan.labelsToAdd).toEqual(["bug"]);
+    expect(plan.commentsToAdd).toEqual([]);
+    expect(chat).toHaveBeenCalledTimes(2);
+    expect(plan.diagnostics).toEqual(
+      expect.arrayContaining([
+        "organization membership: non-member",
+        "author is app/sentry; treated as internal-equivalent automation for triage short-circuit",
+        "internal-equivalent author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
       ]),
     );
   });

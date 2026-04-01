@@ -12,6 +12,7 @@ import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { isSupportedByokProviderId } from "../lib/byok-providers.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawAuthService } from "./openclaw-auth-service.js";
@@ -146,7 +147,7 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta/openai",
   ollama: OLLAMA_DEFAULT_BASE_URL,
-  siliconflow: "https://api.siliconflow.com/v1",
+  siliconflow: "https://api.siliconflow.cn/v1",
   ppio: "https://api.ppinfra.com/v3/openai",
   openrouter: "https://openrouter.ai/api/v1",
   minimax: MINI_MAX_API_BASE_URL_GLOBAL,
@@ -564,6 +565,12 @@ export class ModelProviderService {
       return { valid: false, error: "Unsupported provider" };
     }
 
+    const storedProvider = await this.configStore.getProvider(providerId);
+    const apiKey =
+      input.apiKey !== undefined
+        ? input.apiKey.trim()
+        : storedProvider?.apiKey || "";
+
     const verifyUrl =
       buildProviderUrl(
         input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
@@ -576,18 +583,18 @@ export class ModelProviderService {
     try {
       if (providerId === "ollama") {
         const headers: Record<string, string> = {};
-        if (input.apiKey && input.apiKey !== OLLAMA_DUMMY_API_KEY) {
-          headers.Authorization = `Bearer ${input.apiKey}`;
+        if (apiKey && apiKey !== OLLAMA_DUMMY_API_KEY) {
+          headers.Authorization = `Bearer ${apiKey}`;
         }
 
-        const response = await fetch(
+        const response = await proxyFetch(
           buildProviderUrl(
             input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
             "/api/tags",
           ) ?? verifyUrl,
           {
             headers: Object.keys(headers).length > 0 ? headers : undefined,
-            signal: AbortSignal.timeout(10000),
+            timeoutMs: 10000,
           },
         );
         if (!response.ok) {
@@ -607,17 +614,21 @@ export class ModelProviderService {
         };
       }
 
+      if (!apiKey) {
+        return { valid: false, error: "API key required" };
+      }
+
       const headers: Record<string, string> =
         providerId === "anthropic"
           ? {
-              "x-api-key": input.apiKey,
+              "x-api-key": apiKey,
               "anthropic-version": "2023-06-01",
             }
-          : { Authorization: `Bearer ${input.apiKey}` };
+          : { Authorization: `Bearer ${apiKey}` };
 
-      const response = await fetch(verifyUrl, {
+      const response = await proxyFetch(verifyUrl, {
         headers,
-        signal: AbortSignal.timeout(10000),
+        timeoutMs: 10000,
       });
       if (!response.ok) {
         if (providerId === "minimax" && response.status === 404) {
@@ -893,23 +904,26 @@ export class ModelProviderService {
       signal,
       MINI_MAX_OAUTH_REQUEST_TIMEOUT_MS,
     );
-    const response = await fetch(`${getMiniMaxOauthHost(region)}/oauth/code`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        "x-request-id": randomUUID(),
+    const response = await proxyFetch(
+      `${getMiniMaxOauthHost(region)}/oauth/code`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          "x-request-id": randomUUID(),
+        },
+        body: toFormUrlEncoded({
+          response_type: "code",
+          client_id: MINI_MAX_CLIENT_ID,
+          scope: MINI_MAX_OAUTH_SCOPE,
+          code_challenge: challenge,
+          code_challenge_method: "S256",
+          state,
+        }),
+        signal: requestSignal,
       },
-      body: toFormUrlEncoded({
-        response_type: "code",
-        client_id: MINI_MAX_CLIENT_ID,
-        scope: MINI_MAX_OAUTH_SCOPE,
-        code_challenge: challenge,
-        code_challenge_method: "S256",
-        state,
-      }),
-      signal: requestSignal,
-    });
+    );
 
     if (!response.ok) {
       const text = await response.text();
@@ -958,7 +972,7 @@ export class ModelProviderService {
         MINI_MAX_OAUTH_TOKEN_REQUEST_TIMEOUT_MS,
       );
 
-      const response = await fetch(
+      const response = await proxyFetch(
         `${getMiniMaxOauthHost(input.region)}/oauth/token`,
         {
           method: "POST",

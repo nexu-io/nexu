@@ -17,6 +17,7 @@ import type {
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 
 export type ChatMessage = {
   id: string;
@@ -49,6 +50,7 @@ type SanitizedUserMessageText = {
 };
 type SessionHints = {
   senderName?: string;
+  groupName?: string;
   channelType?: string;
   metadata?: SessionMetadataRecord;
   feishuMessageId?: string;
@@ -158,6 +160,7 @@ export class SessionsRuntime {
           );
           const hints: SessionHints = {
             senderName: transcriptHints.senderName ?? indexHints.senderName,
+            groupName: transcriptHints.groupName ?? indexHints.groupName,
             channelType: transcriptHints.channelType ?? indexHints.channelType,
             metadata: transcriptHints.metadata ?? indexHints.metadata,
             feishuMessageId:
@@ -173,16 +176,20 @@ export class SessionsRuntime {
           if (!channelType && hints.channelType) {
             channelType = hints.channelType;
           }
-          if (
-            this.shouldReplaceInferredTitle(title, sessionKey) &&
-            hints.senderName
-          ) {
-            title =
-              channelType === "openclaw-weixin"
-                ? hints.senderName
-                : channelType
-                  ? `${hints.senderName} · ${channelType}`
-                  : hints.senderName;
+          if (this.shouldReplaceInferredTitle(title, sessionKey)) {
+            if (hints.groupName) {
+              title =
+                channelType && channelType !== "openclaw-weixin"
+                  ? `${hints.groupName} · ${channelType}`
+                  : hints.groupName;
+            } else if (hints.senderName) {
+              title =
+                channelType === "openclaw-weixin"
+                  ? hints.senderName
+                  : channelType
+                    ? `${hints.senderName} · ${channelType}`
+                    : hints.senderName;
+            }
           }
           if (
             this.shouldReplaceInferredTitle(title, sessionKey) &&
@@ -878,6 +885,23 @@ export class SessionsRuntime {
       this.readStringValue(conversationMeta, "sender") ??
       undefined;
 
+    // Extract group name from conversation metadata, with multi-source fallback
+    const rawGroupName =
+      this.readStringValue(conversationMeta, "group_name") ??
+      this.readStringValue(conversationMeta, "chat_name") ??
+      this.readStringValue(conversationMeta, "group_subject") ??
+      this.readStringValue(conversationMeta, "conversation_label") ??
+      undefined;
+
+    // Filter out platform-internal IDs that look like identifiers rather than
+    // human-readable group names:
+    //   oc_ / ou_  — OpenClaw / Feishu internal IDs (hex suffix)
+    //   C/G/D + [A-Z0-9]{8,} — Slack IDs: channels (C), groups (G), DMs (D)
+    const isIdLike =
+      rawGroupName !== undefined &&
+      /^(?:oc_|ou_)[a-f0-9]+$|^[CGD][A-Z0-9]{8,}$/.test(rawGroupName);
+    const groupName = isIdLike ? undefined : rawGroupName;
+
     let channelType: string | undefined;
     const combined = [
       this.readStringValue(senderMeta, "label") ?? "",
@@ -915,6 +939,7 @@ export class SessionsRuntime {
 
     return {
       senderName,
+      groupName,
       channelType: this.normalizeInferredChannelType(channelType),
       metadata: this.extractExactChatTargetMetadata(
         senderMeta,
@@ -1091,7 +1116,7 @@ export class SessionsRuntime {
     }
 
     try {
-      const response = await fetch(
+      const response = await proxyFetch(
         `https://open.feishu.cn/open-apis/im/v1/messages/${encodeURIComponent(messageId)}`,
         {
           headers: {
@@ -1175,7 +1200,7 @@ export class SessionsRuntime {
     }
 
     try {
-      const response = await fetch(
+      const response = await proxyFetch(
         "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
         {
           method: "POST",

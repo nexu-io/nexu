@@ -122,6 +122,37 @@ du -sh node_modules/.pnpm/<pkg>@*/node_modules/<pkg>/
 ```
 If total size (including transitive deps) exceeds ~5 MB, consider alternatives: PATH-based invocation, optional dependencies, or lazy runtime download.
 
+## System proxy behavior
+
+Desktop proxy handling is explicit and split by network surface:
+
+- Electron / Chromium traffic reads one normalized proxy policy at startup.
+- If `HTTP_PROXY`, `HTTPS_PROXY`, or `ALL_PROXY` is present, Electron uses explicit fixed proxy rules derived from env.
+- If no proxy env var is present, Electron falls back to system proxy mode.
+- Local loopback traffic is always bypassed with `<local>`, `localhost`, `127.0.0.1`, and `::1` merged into the effective bypass list.
+- The desktop propagates normalized `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY` into the web sidecar and controller/OpenClaw process tree.
+- Controller outbound HTTP uses the shared proxy-aware fetch layer, while desktop-to-controller loopback traffic stays direct.
+
+`ALL_PROXY` is treated as the fallback proxy for both HTTP and HTTPS when scheme-specific env vars are absent.
+
+### Dev vs packaged behavior
+
+- Dev (`pnpm start`): desktop reads proxy env from the launching shell, normalizes mixed-case variants, merges loopback bypass entries, and passes the normalized uppercase env into child processes.
+- Packaged app: Electron still applies the same normalized proxy policy, but child processes rely on the env values written into the desktop runtime manifests / launchd plists rather than the user's shell preserving mixed-case env vars.
+- In both modes, the canonical `NO_PROXY` always includes `localhost,127.0.0.1,::1` even if the operator omitted them.
+
+### Proxy diagnostics
+
+`desktop-diagnostics.json` now includes a `proxy` snapshot with:
+
+- `source`: `env`, `system`, or `direct`
+- redacted proxy env values (`httpProxyRedacted`, `httpsProxyRedacted`, `allProxyRedacted`)
+- normalized bypass entries
+- Electron proxy mode / bypass rules
+- `resolveProxy(...)` results for controller, OpenClaw, and a representative external HTTPS URL
+
+Use this snapshot to confirm that local controller/OpenClaw URLs resolve to direct/bypass behavior while external URLs resolve through the expected proxy mode.
+
 ## Common troubleshooting
 
 ## Local State Map
@@ -203,10 +234,18 @@ If total size (including transitive deps) exceeds ~5 MB, consider alternatives: 
 - `desktop won't cold start`
   - Start with `pnpm logs` and `./apps/desktop/dev.sh devlog`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.
+  - If the issue may be proxy-related, inspect `desktop-diagnostics.json` `proxy.source`, `proxy.env`, `proxy.bypass`, and `proxy.resolutions` before changing runtime code.
   - If the issue looks power-management related, inspect `desktop-diagnostics.json` `sleepGuard` plus `desktop-main.log` entries with `source=sleep-guard` to confirm the blocker type, power-source transitions, and whether a `suspend` was still observed.
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
   - If `tmux session 'nexu-desktop' is not running` immediately after start, verify `pnpm -C apps/desktop exec electron --version` succeeds.
   - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm start` path.
+
+- `external requests fail only behind a corporate proxy`
+  - Confirm the launching environment or packaged launchd manifests include the expected uppercase proxy env vars.
+  - Inspect `desktop-diagnostics.json` and verify `proxy.source === "env"` when env proxying is expected.
+  - Check that `proxy.resolutions` shows local controller/OpenClaw URLs bypassed and the external URL resolved through the proxy.
+  - Confirm `NO_PROXY` still includes `localhost,127.0.0.1,::1`; removing loopback bypass should never be required.
+  - If Electron resolves external traffic through `system` mode but controller traffic still fails, compare the controller child-process env in the runtime manifests / launchd plists with the normalized desktop diagnostics snapshot.
 
 - `a runtime unit looks running but behavior is broken`
   - Check the unit's structured lifecycle/probe logs in `apps/desktop/main/runtime/` outputs before changing UI.

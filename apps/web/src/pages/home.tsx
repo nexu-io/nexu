@@ -445,6 +445,7 @@ export function HomePage() {
   );
   const connectedCount = activeChannels.length;
   const hasChannel = connectedCount > 0;
+  const shouldPollLiveStatus = hasChannel || pendingChannelId !== null;
   const connectedTypes = new Set<string>(
     activeChannels.map((c) => c.channelType),
   );
@@ -463,8 +464,8 @@ export function HomePage() {
       );
       return data as LiveStatusResponse | undefined;
     },
-    refetchInterval: hasChannel ? 3000 : false,
-    enabled: hasChannel,
+    refetchInterval: shouldPollLiveStatus ? 3000 : false,
+    enabled: shouldPollLiveStatus,
   });
 
   const liveStatusByChannelType = useMemo(() => {
@@ -842,11 +843,19 @@ export function HomePage() {
                     const statusEntry = connectedChannel
                       ? liveStatusByChannelId.get(connectedChannel.id)
                       : liveStatusByChannelType.get(ch.id);
+                    const isPendingChannel =
+                      connectedChannel?.id === pendingChannelId;
+                    const effectiveStatus: ChannelLiveStatus | undefined =
+                      isPendingChannel &&
+                      (!statusEntry || statusEntry.status === "disconnected")
+                        ? "connecting"
+                        : statusEntry?.status;
                     const statusMeta = getChannelStatusMeta(
-                      statusEntry?.status,
+                      effectiveStatus,
                       t,
                       statusEntry?.lastError,
                     );
+                    const isConnectedLive = effectiveStatus === "connected";
                     const channelChatUrl = connectedChannel
                       ? getChannelChatUrl(
                           ch.id,
@@ -902,6 +911,16 @@ export function HomePage() {
                         </div>
                         <button
                           type="button"
+                          aria-label={
+                            isConnectedLive
+                              ? t("home.disconnect")
+                              : statusMeta.label
+                          }
+                          title={
+                            isConnectedLive
+                              ? t("home.disconnect")
+                              : statusMeta.label
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
                             if (connectedChannel) {
@@ -913,9 +932,26 @@ export function HomePage() {
                             }
                           }}
                           disabled={disconnectChannel.isPending}
-                          className="rounded-[8px] px-[14px] py-[5px] text-[12px] font-medium bg-surface-2 text-text-secondary hover:text-[var(--color-danger)] hover:bg-surface-3 transition-colors shrink-0 disabled:opacity-50"
+                          className="group rounded-[8px] px-[14px] py-[5px] text-[12px] font-medium bg-surface-2 text-text-secondary hover:text-[var(--color-danger)] hover:bg-surface-3 transition-colors shrink-0 disabled:opacity-50"
                         >
-                          {statusMeta.label}
+                          {isConnectedLive ? (
+                            <>
+                              <span
+                                className="group-hover:hidden"
+                                aria-hidden="true"
+                              >
+                                {statusMeta.label}
+                              </span>
+                              <span
+                                className="hidden group-hover:inline"
+                                aria-hidden="true"
+                              >
+                                {t("home.disconnect")}
+                              </span>
+                            </>
+                          ) : (
+                            statusMeta.label
+                          )}
                         </button>
                         {ch.id !== "wechat" && channelChatUrl && (
                           <a

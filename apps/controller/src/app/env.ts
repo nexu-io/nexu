@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import dotenv from "dotenv";
 import { z } from "zod";
@@ -52,6 +53,7 @@ const envSchema = z.object({
   OPENCLAW_GATEWAY_PORT: z.coerce.number().int().positive().default(18789),
   OPENCLAW_GATEWAY_TOKEN: z.string().optional(),
   OPENCLAW_BIN: z.string().default("openclaw"),
+  OPENCLAW_LAUNCHD_LABEL: z.string().optional(),
   LITELLM_BASE_URL: z.string().optional(),
   LITELLM_API_KEY: z.string().optional(),
   RUNTIME_MANAGE_OPENCLAW_PROCESS: booleanSchema.default("false"),
@@ -91,6 +93,7 @@ export const env = {
   openclawSkillsDir: expandHomeDir(
     parsed.OPENCLAW_SKILLS_DIR ?? path.join(openclawStateDir, "skills"),
   ),
+  userSkillsDir: path.resolve(os.homedir(), ".agents", "skills"),
   openclawBuiltinExtensionsDir: parsed.OPENCLAW_EXTENSIONS_DIR
     ? expandHomeDir(parsed.OPENCLAW_EXTENSIONS_DIR)
     : null,
@@ -124,6 +127,7 @@ export const env = {
     "workspace-templates",
   ),
   openclawBin: parsed.OPENCLAW_BIN,
+  openclawLaunchdLabel: parsed.OPENCLAW_LAUNCHD_LABEL ?? null,
   litellmBaseUrl: parsed.LITELLM_BASE_URL ?? null,
   litellmApiKey: parsed.LITELLM_API_KEY ?? null,
   openclawGatewayPort: parsed.OPENCLAW_GATEWAY_PORT,

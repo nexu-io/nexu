@@ -986,4 +986,359 @@ describe("SessionsRuntime", () => {
       },
     ]);
   });
+
+  it("uses group_name as session title for group chats", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-feishu", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "group-name-test.jsonl");
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-group-name-1",
+        timestamp: "2026-03-25T10:00:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-25T10:00:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "om_grp_1",
+                    sender_id: "ou_abc123def456abc123def456abc123de",
+                    group_name: "Engineering Team",
+                    sender: "Alice",
+                    is_group_chat: true,
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "Alice (ou_abc123def456abc123def456abc123de)",
+                    id: "ou_abc123def456abc123def456abc123de",
+                    name: "Alice",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === "group-name-test");
+
+    expect(session?.title).toBe("Engineering Team · feishu");
+  });
+
+  it("filters ID-like group names and falls back to senderName", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-feishu", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "id-like-group.jsonl");
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-id-like-1",
+        timestamp: "2026-03-25T10:01:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-25T10:01:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "om_grp_2",
+                    sender_id: "ou_abc123def456abc123def456abc123de",
+                    conversation_label: "oc_22e522a5c7c13fbbfbf22d82463a5d11",
+                    sender: "Bob",
+                    is_group_chat: true,
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "Bob (ou_abc123def456abc123def456abc123de)",
+                    id: "ou_abc123def456abc123def456abc123de",
+                    name: "Bob",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === "id-like-group");
+
+    // oc_ prefix is ID-like, so groupName should be filtered out, falling back to senderName
+    expect(session?.title).toBe("Bob · feishu");
+  });
+
+  it("keeps normal group names starting with uppercase C", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-slack", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "c-name-group.jsonl");
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-c-name-1",
+        timestamp: "2026-03-25T10:02:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-25T10:02:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "slack-msg-1",
+                    chat_name: "Christmas Party Planning",
+                    sender: "Carol",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "Carol",
+                    name: "Carol",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === "c-name-group");
+
+    // "Christmas Party Planning" starts with C but is not an ID — should be kept
+    expect(session?.title).toBe("Christmas Party Planning · slack");
+  });
+
+  it("filters Slack channel IDs like C05ABCD1234", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-slack", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "slack-id-group.jsonl");
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-slack-id-1",
+        timestamp: "2026-03-25T10:03:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-25T10:03:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "slack-msg-2",
+                    conversation_label: "C05ABCD1234",
+                    sender: "Dave",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "Dave",
+                    name: "Dave",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === "slack-id-group");
+
+    // C05ABCD1234 is a Slack channel ID — should be filtered, fall back to senderName
+    expect(session?.title).toBe("Dave · slack");
+  });
+
+  it("filters Slack group/DM IDs with G and D prefixes", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-slack", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionPath = path.join(sessionsDir, "slack-group-id.jsonl");
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-slack-gid-1",
+        timestamp: "2026-03-25T10:04:00.000Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-25T10:04:00.000Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "slack-msg-3",
+                    conversation_label: "G01ABC2DEF3",
+                    sender: "Eve",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "Eve",
+                    name: "Eve",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === "slack-group-id");
+
+    // G01ABC2DEF3 is a Slack group ID — should be filtered, fall back to senderName
+    expect(session?.title).toBe("Eve · slack");
+  });
 });

@@ -41,6 +41,9 @@ export function DesktopShell() {
         void checkForUpdates();
         return;
       }
+      if (command.type === "setup:complete") {
+        return;
+      }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);

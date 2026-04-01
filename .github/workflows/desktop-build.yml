@@ -417,8 +417,10 @@ jobs:
       - name: Upload to Cloudflare R2
         if: inputs.update_feed_url != ''
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_REGION: auto
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
           CHANNEL: ${{ inputs.channel }}
           ARCH: ${{ matrix.arch }}
@@ -430,30 +432,28 @@ jobs:
         run: |
           set -euo pipefail
 
+          R2_BUCKET="s3://nexu-desktop-releases"
+
+          upload_file() {
+            local src="$1" dst="$2"
+            echo "Uploading $(basename "$src") → ${dst}"
+            aws s3 cp "$src" "${R2_BUCKET}/${dst}" --no-progress
+          }
+
           upload_prefix() {
             local prefix="$1"
 
             echo "[r2] uploading to prefix: ${prefix}/"
 
             if [ -f "apps/desktop/release/latest-mac.yml" ]; then
-              echo "Uploading latest-mac.yml → ${prefix}/latest-mac.yml"
-              npx wrangler r2 object put "nexu-desktop-releases/${prefix}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+              upload_file "apps/desktop/release/latest-mac.yml" "${prefix}/latest-mac.yml"
             fi
 
-            echo "Uploading ${VERSIONED_DMG} → ${prefix}/${VERSIONED_DMG}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_DMG}" --file "apps/desktop/channel-artifacts/${VERSIONED_DMG}" --remote
-
-            echo "Uploading ${VERSIONED_ZIP} → ${prefix}/${VERSIONED_ZIP}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_ZIP}" --file "apps/desktop/channel-artifacts/${VERSIONED_ZIP}" --remote
-
-            echo "Uploading ${LATEST_DMG} → ${prefix}/${LATEST_DMG}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_DMG}" --file "apps/desktop/channel-artifacts/${LATEST_DMG}" --remote
-
-            echo "Uploading ${LATEST_ZIP} → ${prefix}/${LATEST_ZIP}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_ZIP}" --file "apps/desktop/channel-artifacts/${LATEST_ZIP}" --remote
-
-            echo "Uploading ${{ steps.artifacts.outputs.checksum_file }} → ${prefix}/${{ steps.artifacts.outputs.checksum_file }}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.checksum_file }}" --file "apps/desktop/channel-artifacts/${{ steps.artifacts.outputs.checksum_file }}" --remote
+            upload_file "apps/desktop/channel-artifacts/${VERSIONED_DMG}" "${prefix}/${VERSIONED_DMG}"
+            upload_file "apps/desktop/channel-artifacts/${VERSIONED_ZIP}" "${prefix}/${VERSIONED_ZIP}"
+            upload_file "apps/desktop/channel-artifacts/${LATEST_DMG}" "${prefix}/${LATEST_DMG}"
+            upload_file "apps/desktop/channel-artifacts/${LATEST_ZIP}" "${prefix}/${LATEST_ZIP}"
+            upload_file "apps/desktop/channel-artifacts/${{ steps.artifacts.outputs.checksum_file }}" "${prefix}/${{ steps.artifacts.outputs.checksum_file }}"
           }
 
           # Extract R2 prefix from feed URL path (e.g. https://desktop-releases.nexu.io/nightly → nightly)

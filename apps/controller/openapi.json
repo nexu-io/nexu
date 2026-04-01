@@ -5895,10 +5895,7 @@
                   "baseUrl": {
                     "type": "string"
                   }
-                },
-                "required": [
-                  "apiKey"
-                ]
+                }
               }
             }
           }
@@ -7604,7 +7601,9 @@
                             "type": "string",
                             "enum": [
                               "managed",
-                              "custom"
+                              "custom",
+                              "workspace",
+                              "user"
                             ]
                           },
                           "name": {
@@ -7616,6 +7615,14 @@
                           "installedAt": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "agentId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "agentName": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -7623,7 +7630,9 @@
                           "source",
                           "name",
                           "description",
-                          "installedAt"
+                          "installedAt",
+                          "agentId",
+                          "agentName"
                         ]
                       }
                     },
@@ -7659,7 +7668,9 @@
                             "type": "string",
                             "enum": [
                               "managed",
-                              "custom"
+                              "custom",
+                              "workspace",
+                              "user"
                             ]
                           },
                           "status": {
@@ -7736,6 +7747,19 @@
                   "slug": {
                     "type": "string",
                     "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "managed",
+                      "custom",
+                      "workspace",
+                      "user"
+                    ]
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "nullable": true
                   }
                 },
                 "required": [
@@ -7803,6 +7827,19 @@
                   "slug": {
                     "type": "string",
                     "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "managed",
+                      "custom",
+                      "workspace",
+                      "user"
+                    ]
+                  },
+                  "agentId": {
+                    "type": "string",
+                    "nullable": true
                   }
                 },
                 "required": [
@@ -7885,6 +7922,28 @@
             "required": true,
             "name": "slug",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "managed",
+                "custom",
+                "workspace",
+                "user"
+              ]
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "agentId",
+            "in": "query"
           }
         ],
         "responses": {
@@ -7925,6 +7984,23 @@
                     "installed": {
                       "type": "boolean"
                     },
+                    "installedSource": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "managed",
+                        "custom",
+                        "workspace",
+                        "user"
+                      ]
+                    },
+                    "agentId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "uninstallable": {
+                      "type": "boolean"
+                    },
                     "skillContent": {
                       "type": "string",
                       "nullable": true
@@ -7946,6 +8022,9 @@
                     "version",
                     "updatedAt",
                     "installed",
+                    "installedSource",
+                    "agentId",
+                    "uninstallable",
                     "skillContent",
                     "files"
                   ]

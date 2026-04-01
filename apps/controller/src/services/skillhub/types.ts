@@ -15,7 +15,7 @@ export type CatalogMeta = {
   skillCount: number;
 };
 
-export type SkillSource = "managed" | "custom";
+export type SkillSource = "managed" | "custom" | "workspace" | "user";
 
 export type InstalledSkill = {
   slug: string;
@@ -23,6 +23,7 @@ export type InstalledSkill = {
   name: string;
   description: string;
   installedAt: string | null;
+  agentId: string | null;
 };
 
 export type SkillhubCatalogData = {

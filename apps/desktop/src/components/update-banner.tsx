@@ -1,4 +1,5 @@
 import type { UpdatePhase } from "../hooks/use-auto-update";
+import { resolveLocale } from "../lib/i18n";
 
 interface UpdateBannerProps {
   phase: UpdatePhase;
@@ -10,6 +11,44 @@ interface UpdateBannerProps {
   onInstall: () => void;
   onDismiss: () => void;
 }
+
+const i18n = {
+  en: {
+    badge: "Update",
+    checking: "Checking for updates...",
+    upToDate: "You're up to date",
+    downloading: "Downloading update\u2026",
+    available: (version: string) => `v${version} available`,
+    ready: (version: string) => `v${version} ready`,
+    error: "Update failed",
+    checkingDetail:
+      "Contacting the update feed and comparing the latest release...",
+    upToDateDetail: "This channel is already on the latest available version.",
+    download: "Download",
+    restart: "Restart",
+    later: "Later",
+    dismiss: "Dismiss",
+    unknownError: "Unknown error",
+    closeLabel: "Close",
+  },
+  zh: {
+    badge: "更新",
+    checking: "正在检查更新...",
+    upToDate: "已是最新版本",
+    downloading: "正在下载更新\u2026",
+    available: (version: string) => `v${version} 可更新`,
+    ready: (version: string) => `v${version} 已就绪`,
+    error: "更新失败",
+    checkingDetail: "正在联系更新服务器并对比最新版本...",
+    upToDateDetail: "当前频道已是最新可用版本。",
+    download: "下载",
+    restart: "重启安装",
+    later: "稍后",
+    dismiss: "关闭",
+    unknownError: "未知错误",
+    closeLabel: "关闭",
+  },
+};
 
 /**
  * Small pill badge shown in the brand area when the update banner is dismissed.
@@ -24,13 +63,14 @@ export function UpdateBadge({
   dismissed: boolean;
   onUndismiss: () => void;
 }) {
+  const t = resolveLocale(i18n);
   const hasUpdate =
     phase === "available" || phase === "downloading" || phase === "ready";
   if (!hasUpdate || !dismissed) return null;
 
   return (
     <button className="update-badge" onClick={onUndismiss} type="button">
-      Update
+      {t.badge}
     </button>
   );
 }
@@ -53,6 +93,7 @@ export function UpdateBanner({
     return null;
   }
 
+  const t = resolveLocale(i18n);
   const isChecking = phase === "checking";
   const isUpToDate = phase === "up-to-date";
   const isDownloading = phase === "downloading";
@@ -72,12 +113,12 @@ export function UpdateBanner({
             <span className="update-dot" />
           </span>
           <span className="update-card-title">
-            {isChecking && "Checking for updates..."}
-            {isUpToDate && "You're up to date"}
-            {isDownloading && "Downloading update\u2026"}
-            {isAvailable && `v${version} available`}
-            {isReady && `v${version} ready`}
-            {isError && "Update failed"}
+            {isChecking && t.checking}
+            {isUpToDate && t.upToDate}
+            {isDownloading && t.downloading}
+            {isAvailable && version && t.available(version)}
+            {isReady && version && t.ready(version)}
+            {isError && t.error}
           </span>
         </div>
         {!isDownloading && !isChecking && (
@@ -96,7 +137,7 @@ export function UpdateBanner({
               strokeLinecap="round"
               strokeLinejoin="round"
               role="img"
-              aria-label="Close"
+              aria-label={t.closeLabel}
             >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
@@ -107,9 +148,7 @@ export function UpdateBanner({
 
       {(isChecking || isUpToDate) && (
         <div className="update-card-message">
-          {isChecking
-            ? "Contacting the update feed and comparing the latest release..."
-            : "This channel is already on the latest available version."}
+          {isChecking ? t.checkingDetail : t.upToDateDetail}
         </div>
       )}
 
@@ -138,14 +177,14 @@ export function UpdateBanner({
             onClick={onDownload}
             type="button"
           >
-            Download
+            {t.download}
           </button>
           <button
             className="update-card-btn update-card-btn--ghost"
             onClick={onDismiss}
             type="button"
           >
-            Later
+            {t.later}
           </button>
         </div>
       )}
@@ -158,14 +197,14 @@ export function UpdateBanner({
             onClick={onInstall}
             type="button"
           >
-            Restart
+            {t.restart}
           </button>
           <button
             className="update-card-btn update-card-btn--ghost"
             onClick={onDismiss}
             type="button"
           >
-            Later
+            {t.later}
           </button>
         </div>
       )}
@@ -174,7 +213,7 @@ export function UpdateBanner({
       {isError && (
         <>
           <div className="update-card-error-msg">
-            {errorMessage ?? "Unknown error"}
+            {errorMessage ?? t.unknownError}
           </div>
           <div className="update-card-actions">
             <button
@@ -182,7 +221,7 @@ export function UpdateBanner({
               onClick={onDismiss}
               type="button"
             >
-              Dismiss
+              {t.dismiss}
             </button>
           </div>
         </>

@@ -11,7 +11,20 @@ const execFileSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", () => ({
   execFileSync: execFileSyncMock,
+  execFile: vi.fn(
+    (_cmd: unknown, _args: unknown, cb?: (...a: unknown[]) => void) => {
+      cb?.(null, "", "");
+    },
+  ),
 }));
+
+vi.mock("node:util", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:util")>();
+  return {
+    ...actual,
+    promisify: () => vi.fn().mockResolvedValue({ stdout: "", stderr: "" }),
+  };
+});
 
 vi.mock("node:fs", () => ({
   existsSync: vi.fn((target: string) => fsState.paths.has(target)),
@@ -30,8 +43,56 @@ vi.mock("node:fs", () => ({
 
 import {
   buildSkillNodePath,
+  createRuntimeUnitManifests,
   ensurePackagedOpenclawSidecar,
 } from "../../apps/desktop/main/runtime/manifests";
+import { readProxyPolicy } from "../../apps/desktop/shared/proxy-config";
+import type { DesktopRuntimeConfig } from "../../apps/desktop/shared/runtime-config";
+
+function createRuntimeConfig(): DesktopRuntimeConfig {
+  return {
+    buildInfo: {
+      version: "1.0.0",
+      source: "local-dev",
+      branch: null,
+      commit: null,
+      builtAt: null,
+    },
+    proxy: readProxyPolicy({
+      HTTP_PROXY: "http://proxy.example.com:8080",
+      HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+      ALL_PROXY: "socks5://proxy.example.com:1080",
+      NO_PROXY: "example.com",
+    }),
+    updates: {
+      autoUpdateEnabled: true,
+      channel: "stable",
+    },
+    ports: {
+      controller: 50800,
+      web: 50810,
+    },
+    urls: {
+      controllerBase: "http://127.0.0.1:50800",
+      web: "http://127.0.0.1:50810",
+      openclawBase: "http://127.0.0.1:18789",
+      updateFeed: null,
+    },
+    tokens: {
+      gateway: "gw-secret-token",
+    },
+    paths: {
+      nexuHome: "/tmp/nexu-home",
+      openclawBin: "openclaw-wrapper",
+    },
+    desktopAuth: {
+      name: "NexU Desktop",
+      email: "desktop@nexu.local",
+      password: "desktop-local-password",
+    },
+    sentryDsn: null,
+  };
+}
 
 describe("desktop runtime manifests", () => {
   beforeEach(() => {
@@ -256,6 +317,55 @@ describe("desktop runtime manifests", () => {
       );
       expect(tarCalls).toHaveLength(3);
       expect(sleepCalls).toHaveLength(2);
+    });
+  });
+
+  describe("createRuntimeUnitManifests", () => {
+    it("propagates normalized proxy env to dev web and controller manifests", () => {
+      const manifests = createRuntimeUnitManifests(
+        "/repo/apps/desktop",
+        "/tmp/user-data",
+        false,
+        createRuntimeConfig(),
+      );
+
+      const webManifest = manifests.find((manifest) => manifest.id === "web");
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(webManifest?.env).toMatchObject({
+        HTTP_PROXY: "http://proxy.example.com:8080",
+        HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+        ALL_PROXY: "socks5://proxy.example.com:1080",
+        NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+      });
+      expect(controllerManifest?.env).toMatchObject({
+        HTTP_PROXY: "http://proxy.example.com:8080",
+        HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+        ALL_PROXY: "socks5://proxy.example.com:1080",
+        NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+      });
+    });
+
+    it("propagates normalized proxy env to packaged controller manifest", () => {
+      const manifests = createRuntimeUnitManifests(
+        "/Applications/Nexu.app/Contents/Resources",
+        "/Users/testuser/Library/Application Support/@nexu/desktop",
+        true,
+        createRuntimeConfig(),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(controllerManifest?.env).toMatchObject({
+        HTTP_PROXY: "http://proxy.example.com:8080",
+        HTTPS_PROXY: "http://secure-proxy.example.com:8443",
+        ALL_PROXY: "socks5://proxy.example.com:1080",
+        NO_PROXY: "example.com,localhost,127.0.0.1,::1",
+      });
     });
   });
 });

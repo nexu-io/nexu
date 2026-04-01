@@ -10,6 +10,7 @@ import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
 import { getTagLabel } from "@/lib/skill-translations";
 import {
+  type SkillSelection,
   type TopTab,
   type YoursSubTab,
   applySkillsViewStatePatch,
@@ -20,7 +21,11 @@ import {
 } from "@/lib/skills-view-state";
 import { mapInstalledSkillSource, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import type { InstalledSkill, MinimalSkill } from "@/types/desktop";
+import type {
+  InstalledSkill,
+  MinimalSkill,
+  SkillSource,
+} from "@/types/desktop";
 import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,6 +33,13 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 50;
+type UninstallableSkillSource = Exclude<SkillSource, "curated">;
+
+function toUninstallSource(
+  source: SkillSource | null | undefined,
+): UninstallableSkillSource | undefined {
+  return source && source !== "curated" ? source : undefined;
+}
 
 function getSkillType(tags: readonly string[]): string | null {
   const primaryTag = tags[0]?.trim();
@@ -56,6 +68,7 @@ function SkillCard({
   skillSource,
   detailTo,
   isDetailAvailable,
+  installation,
 }: {
   skill: MinimalSkill;
   isInstalled: boolean;
@@ -70,6 +83,7 @@ function SkillCard({
   skillSource: "builtin" | "explore" | "custom";
   detailTo: string;
   isDetailAvailable: boolean;
+  installation?: SkillSelection;
 }) {
   const { t } = useTranslation();
   const installMutation = useInstallSkill();
@@ -114,7 +128,13 @@ function SkillCard({
   async function handleUninstall() {
     setPendingAction("uninstall");
     try {
-      await uninstallMutation.mutateAsync(skill.slug);
+      await uninstallMutation.mutateAsync({
+        slug: skill.slug,
+        ...(toUninstallSource(installation?.source)
+          ? { source: toUninstallSource(installation?.source) }
+          : {}),
+        ...(installation?.agentId ? { agentId: installation.agentId } : {}),
+      });
       track("workspace_skill_uninstall", {
         skill_name: skill.name,
         skill_source: skillSource,
@@ -226,7 +246,7 @@ function SkillCard({
   return (
     <Link
       to={detailTo}
-      state={createSkillDetailState()}
+      state={createSkillDetailState(installation)}
       draggable={false}
       className={cn(
         "card flex flex-col p-4",
@@ -332,7 +352,7 @@ export function SkillsPage() {
     return map;
   }, [data?.queue]);
   const queueSourceBySlug = useMemo(() => {
-    const map = new Map<string, "curated" | "managed" | "custom">();
+    const map = new Map<string, SkillSource>();
     for (const item of data?.queue ?? []) {
       map.set(item.slug, item.source);
     }
@@ -411,8 +431,8 @@ export function SkillsPage() {
       };
     });
 
-    if (yoursSubTab === "recommended") {
-      const recommendedSlugs = new Set(
+    if (yoursSubTab === "builtin") {
+      const builtinSlugs = new Set(
         installedSkills
           .filter((is) => is.source === "curated" || is.source === "managed")
           .map((is) => is.slug),
@@ -422,17 +442,27 @@ export function SkillsPage() {
         .map((d) => d.skill);
       return [
         ...filteredDownloading,
-        ...installed.filter((s) => recommendedSlugs.has(s.slug)),
+        ...installed.filter((s) => builtinSlugs.has(s.slug)),
       ];
     }
-    if (yoursSubTab === "installed") {
+    if (yoursSubTab === "custom") {
       const customSlugs = new Set(
         installedSkills
-          .filter((is) => is.source === "custom")
+          .filter(
+            (is) =>
+              is.source === "custom" ||
+              is.source === "workspace" ||
+              is.source === "user",
+          )
           .map((is) => is.slug),
       );
       const filteredDownloading = downloadingWithSource
-        .filter((d) => d.source === "custom")
+        .filter(
+          (d) =>
+            d.source === "custom" ||
+            d.source === "workspace" ||
+            d.source === "user",
+        )
         .map((d) => d.skill);
       return [
         ...filteredDownloading,
@@ -494,6 +524,29 @@ export function SkillsPage() {
 
   const visibleSkills = filteredSkills.slice(0, visibleCount);
 
+  const installationBySlug = useMemo(() => {
+    const map = new Map<string, SkillSelection>();
+    for (const skill of installedSkills) {
+      const existing = map.get(skill.slug);
+      if (!existing) {
+        map.set(skill.slug, {
+          source: toUninstallSource(skill.source),
+          agentId: skill.agentId,
+        });
+        continue;
+      }
+
+      if (existing.source === "workspace" && skill.source !== "workspace") {
+        map.set(skill.slug, {
+          source: toUninstallSource(skill.source),
+          agentId: skill.agentId,
+        });
+      }
+    }
+
+    return map;
+  }, [installedSkills]);
+
   // Category tabs for pills
   const categoryTabs = useMemo(() => {
     const base =
@@ -519,7 +572,7 @@ export function SkillsPage() {
   }, [topTab, exploreSkills, yourSkillsList, topTags, locale, t]);
 
   // Yours sub-tab counts (include actively downloading items)
-  const recommendedCount =
+  const builtinCount =
     installedSkills.filter(
       (is) => is.source === "curated" || is.source === "managed",
     ).length +
@@ -527,8 +580,18 @@ export function SkillsPage() {
       (qi) => qi.source === "curated" || qi.source === "managed",
     ).length;
   const customCount =
-    installedSkills.filter((is) => is.source === "custom").length +
-    activeQueueItems.filter((qi) => qi.source === "custom").length;
+    installedSkills.filter(
+      (is) =>
+        is.source === "custom" ||
+        is.source === "workspace" ||
+        is.source === "user",
+    ).length +
+    activeQueueItems.filter(
+      (qi) =>
+        qi.source === "custom" ||
+        qi.source === "workspace" ||
+        qi.source === "user",
+    ).length;
   const totalYoursCount = installedSkills.length + activeQueueItems.length;
 
   if (isLoading) {
@@ -674,7 +737,7 @@ export function SkillsPage() {
           })}
         </div>
 
-        {/* Yours sub-tabs: All / Recommended / Installed */}
+        {/* Yours sub-tabs: All / Built-in / Custom */}
         {topTab === "yours" && (
           <div className="flex items-center gap-2 mb-3">
             {(
@@ -685,13 +748,13 @@ export function SkillsPage() {
                   count: totalYoursCount,
                 },
                 {
-                  id: "recommended" as const,
-                  label: t("skills.recommended"),
-                  count: recommendedCount,
+                  id: "builtin" as const,
+                  label: t("skills.builtin"),
+                  count: builtinCount,
                 },
                 {
-                  id: "installed" as const,
-                  label: t("skills.installed"),
+                  id: "custom" as const,
+                  label: t("skills.custom"),
                   count: customCount,
                 },
               ] as const
@@ -793,54 +856,64 @@ export function SkillsPage() {
           {t("skills.clawhubDisclaimerAfterLink")}
         </p>
 
-        {/* Skill Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {visibleSkills.map((skill) => {
-            const firstTag = skill.tags[0];
-            return (
-              <SkillCard
-                key={skill.slug}
-                skill={skill}
-                isInstalled={installedSlugs.has(skill.slug)}
-                queueStatus={queueBySlug.get(skill.slug)}
-                detailTo={createSkillDetailPath(skill.slug, location.search)}
-                isDetailAvailable={!unavailableDetailSlugs.has(skill.slug)}
-                skillSource={
-                  topTab === "explore"
-                    ? "explore"
-                    : mapInstalledSkillSource(
-                        installedSkills.find((item) => item.slug === skill.slug)
-                          ?.source ??
-                          queueSourceBySlug.get(skill.slug) ??
-                          "managed",
-                      )
-                }
-                categoryLabel={
-                  firstTag ? getTagLabel(firstTag, locale) : undefined
-                }
-              />
-            );
-          })}
-        </div>
-
-        {/* Sentinel for infinite scroll */}
-        {visibleCount < filteredSkills.length && (
-          <div ref={sentinelRef} className="flex justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-text-muted" />
-          </div>
-        )}
-
-        {/* Empty state */}
-        {filteredSkills.length === 0 && (
-          <div className="text-center py-12">
-            <Search size={24} className="mx-auto text-text-muted mb-3" />
-            <div className="text-[13px] text-text-muted">
-              {topTab === "yours" && !debouncedQuery.trim()
-                ? t("skills.noInstalledSkills")
-                : t("skills.noMatchingSkills")}
+        {
+          <>
+            {/* Skill Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {visibleSkills.map((skill) => {
+                const firstTag = skill.tags[0];
+                return (
+                  <SkillCard
+                    key={skill.slug}
+                    skill={skill}
+                    isInstalled={installedSlugs.has(skill.slug)}
+                    queueStatus={queueBySlug.get(skill.slug)}
+                    detailTo={createSkillDetailPath(
+                      skill.slug,
+                      location.search,
+                      installationBySlug.get(skill.slug),
+                    )}
+                    installation={installationBySlug.get(skill.slug)}
+                    isDetailAvailable={!unavailableDetailSlugs.has(skill.slug)}
+                    skillSource={
+                      topTab === "explore"
+                        ? "explore"
+                        : mapInstalledSkillSource(
+                            installedSkills.find(
+                              (item) => item.slug === skill.slug,
+                            )?.source ??
+                              queueSourceBySlug.get(skill.slug) ??
+                              "managed",
+                          )
+                    }
+                    categoryLabel={
+                      firstTag ? getTagLabel(firstTag, locale) : undefined
+                    }
+                  />
+                );
+              })}
             </div>
-          </div>
-        )}
+
+            {/* Sentinel for infinite scroll */}
+            {visibleCount < filteredSkills.length && (
+              <div ref={sentinelRef} className="flex justify-center py-8">
+                <Loader2 size={20} className="animate-spin text-text-muted" />
+              </div>
+            )}
+
+            {/* Empty state */}
+            {filteredSkills.length === 0 && (
+              <div className="text-center py-12">
+                <Search size={24} className="mx-auto text-text-muted mb-3" />
+                <div className="text-[13px] text-text-muted">
+                  {topTab === "yours" && !debouncedQuery.trim()
+                    ? t("skills.noInstalledSkills")
+                    : t("skills.noMatchingSkills")}
+                </div>
+              </div>
+            )}
+          </>
+        }
       </div>
     </div>
   );

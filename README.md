@@ -255,6 +255,28 @@ We use GitHub as the primary hub for community interaction. Before opening a new
 | 📋 [**Roadmap & RFCs**](https://github.com/nexu-io/nexu/discussions/categories/rfc-roadmap) | Follow upcoming plans and join design discussions on proposed changes. |
 | 📧 [**support@nexu.ai**](mailto:support@nexu.ai) | For private inquiries, partnership, or anything not suited for a public thread. |
 
+### Join our community groups
+
+<table>
+  <tr>
+    <td align="center" width="220">
+      <strong>💬 WeChat Group</strong><br/><br/>
+      <img src="site/media/wechat-qr.png" width="200" height="200" alt="WeChat Community QR Code" /><br/>
+      <sub>Scan to join the WeChat community</sub>
+    </td>
+    <td align="center" width="220">
+      <strong><a href="https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=8b7k7b5b-ac27-4748-9165-78606dc16913">🪁 Feishu Group</a></strong><br/><br/>
+      <img src="site/media/feishu-qr.png" width="200" height="200" alt="Feishu Community QR Code" /><br/>
+      <sub>Scan or click to join the Feishu community</sub>
+    </td>
+    <td align="center" width="220">
+      <strong><a href="https://discord.gg/Q6AxCUuMNU">🎮 Discord</a></strong><br/><br/>
+      <img src="site/media/discord-qr.png" width="200" height="200" alt="Discord Community QR Code" /><br/>
+      <sub>Scan or click to join the Discord server</sub>
+    </td>
+  </tr>
+</table>
+
 ### Contributors
 
 <a href="https://github.com/nexu-io/nexu/graphs/contributors">

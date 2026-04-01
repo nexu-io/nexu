@@ -19,6 +19,7 @@ function createEnv(overrides: Record<string, unknown> = {}): ControllerEnv {
     openclawStateDir: "/tmp/openclaw",
     openclawConfigPath: "/tmp/openclaw/openclaw.json",
     openclawSkillsDir: "/tmp/openclaw/skills",
+    userSkillsDir: "/tmp/.agents/skills",
     openclawWorkspaceTemplatesDir: "/tmp/openclaw/workspace-templates",
     openclawBin: "openclaw",
     openclawGatewayPort: 18789,
@@ -177,7 +178,10 @@ describe("compileOpenClawConfig", () => {
       verificationToken: "verify-token",
     });
     expect(result.plugins?.entries?.feishu?.enabled).toBe(true);
-    expect(result.skills?.load?.extraDirs).toEqual(["/tmp/openclaw/skills"]);
+    expect(result.skills?.load?.extraDirs).toEqual([
+      "/tmp/openclaw/skills",
+      "/tmp/.agents/skills",
+    ]);
   });
 
   it("injects env-backed litellm routing for bare local model ids", () => {
@@ -257,6 +261,206 @@ describe("compileOpenClawConfig", () => {
     });
   });
 
+  it("uses SiliconFlow's cn API base URL by default", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+        },
+        providers: [
+          {
+            id: "provider-siliconflow",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: null,
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.siliconflow?.baseUrl).toBe(
+      "https://api.siliconflow.cn/v1",
+    );
+    expect(result.models?.providers.siliconflow?.models[0]?.id).toBe(
+      "Pro/MiniMaxAI/MiniMax-M2.5",
+    );
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+    });
+  });
+
+  it("treats the explicit SiliconFlow .cn URL as a direct official endpoint", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+        },
+        providers: [
+          {
+            id: "provider-siliconflow-cn",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: "https://api.siliconflow.cn/v1",
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.siliconflow?.baseUrl).toBe(
+      "https://api.siliconflow.cn/v1",
+    );
+    expect(result.models?.providers.byok_siliconflow).toBeUndefined();
+    expect(result.models?.providers.siliconflow?.models[0]?.id).toBe(
+      "Pro/MiniMaxAI/MiniMax-M2.5",
+    );
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+    });
+  });
+
+  it("treats the legacy SiliconFlow .com URL as a direct default endpoint", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+        },
+        providers: [
+          {
+            id: "provider-siliconflow-legacy",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: "https://api.siliconflow.com/v1",
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.siliconflow?.baseUrl).toBe(
+      "https://api.siliconflow.com/v1",
+    );
+    expect(result.models?.providers.byok_siliconflow).toBeUndefined();
+    expect(result.models?.providers.siliconflow?.models[0]?.id).toBe(
+      "Pro/MiniMaxAI/MiniMax-M2.5",
+    );
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+    });
+  });
+
+  it("treats custom SiliconFlow gateway URLs as proxied endpoints", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "byok_siliconflow/siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId:
+            "byok_siliconflow/siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+        },
+        providers: [
+          {
+            id: "provider-siliconflow-proxy",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow Proxy",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: "https://models.example.com/v1",
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.byok_siliconflow?.baseUrl).toBe(
+      "https://models.example.com/v1",
+    );
+    expect(result.models?.providers.siliconflow).toBeUndefined();
+    expect(result.models?.providers.byok_siliconflow?.models[0]?.id).toBe(
+      "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+    );
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "byok_siliconflow/siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
+    });
+  });
+
   it("ignores unsupported custom providers in compiled model config", () => {
     const result = compileOpenClawConfig(
       createConfig({
@@ -319,6 +523,164 @@ describe("compileOpenClawConfig", () => {
     expect(result.models?.providers.minimax?.baseUrl).toBe(
       "https://api.minimaxi.com/anthropic",
     );
+  });
+
+  describe("agent skill assignment", () => {
+    it("includes skills on agents when installedSlugs is provided", () => {
+      const config = createConfig();
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env, undefined, [
+        "git",
+        "npm",
+      ]);
+      expect(compiled.agents.list[0].skills).toEqual(["git", "npm"]);
+    });
+
+    it("omits skills field when installedSlugs is empty (legacy fallback)", () => {
+      const config = createConfig();
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env, undefined, []);
+      expect(compiled.agents.list[0]).not.toHaveProperty("skills");
+    });
+
+    it("omits skills field when installedSlugs is undefined", () => {
+      const config = createConfig();
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env);
+      expect(compiled.agents.list[0]).not.toHaveProperty("skills");
+    });
+
+    it("assigns same skills to all active agents", () => {
+      const now = new Date().toISOString();
+      const config = createConfig({
+        bots: [
+          {
+            id: "bot-1",
+            name: "Bot A",
+            slug: "bot-a",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "bot-2",
+            name: "Bot B",
+            slug: "bot-b",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+      const env = createEnv();
+      const compiled = compileOpenClawConfig(config, env, undefined, [
+        "calendar",
+      ]);
+      expect(compiled.agents.list).toHaveLength(2);
+      expect(compiled.agents.list[0].skills).toEqual(["calendar"]);
+      expect(compiled.agents.list[1].skills).toEqual(["calendar"]);
+    });
+  });
+
+  describe("per-agent workspace skill merge", () => {
+    it("merges shared and workspace skills for each agent", () => {
+      const now = new Date().toISOString();
+      const config = createConfig({
+        bots: [
+          {
+            id: "bot-1",
+            name: "Bot A",
+            slug: "bot-a",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "bot-2",
+            name: "Bot B",
+            slug: "bot-b",
+            poolId: null,
+            status: "active",
+            modelId: "anthropic/claude-sonnet-4",
+            systemPrompt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+      const wsMap = new Map<string, readonly string[]>([
+        ["bot-1", ["agent-tool"]],
+      ]);
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        ["shared-skill"],
+        wsMap,
+      );
+
+      const botA = compiled.agents.list.find((a) => a.id === "bot-1");
+      expect(botA?.skills).toEqual(
+        expect.arrayContaining(["shared-skill", "agent-tool"]),
+      );
+      expect(botA?.skills).toHaveLength(2);
+
+      const botB = compiled.agents.list.find((a) => a.id === "bot-2");
+      expect(botB?.skills).toEqual(["shared-skill"]);
+    });
+
+    it("deduplicates when same slug in shared and workspace", () => {
+      const config = createConfig();
+      const wsMap = new Map<string, readonly string[]>([
+        ["bot-1", ["shared-skill"]],
+      ]);
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        ["shared-skill"],
+        wsMap,
+      );
+      const agent = compiled.agents.list[0];
+      expect(agent.skills).toEqual(["shared-skill"]);
+    });
+
+    it("workspace-only skills still activate allowlist", () => {
+      const config = createConfig();
+      const wsMap = new Map<string, readonly string[]>([
+        ["bot-1", ["ws-only"]],
+      ]);
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        [],
+        wsMap,
+      );
+      expect(compiled.agents.list[0].skills).toEqual(["ws-only"]);
+    });
+
+    it("omits skills when both shared and workspace are empty", () => {
+      const config = createConfig();
+      const wsMap = new Map<string, readonly string[]>();
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        [],
+        wsMap,
+      );
+      expect(compiled.agents.list[0]).not.toHaveProperty("skills");
+    });
   });
 
   it("remaps openai models to OAuth provider ids when persisted OAuth state is connected", () => {

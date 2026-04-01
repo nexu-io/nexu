@@ -22,6 +22,10 @@ import type { Logger } from "../util/logger.js";
 import { redactBody } from "../util/redact.js";
 
 const DEFAULT_LONG_POLL_TIMEOUT_MS = 35_000;
+/** Short timeout for the first few polls so queued messages from cold-start are picked up fast. */
+const INITIAL_POLL_TIMEOUT_MS = 3_000;
+/** Number of short polls before switching to the normal long-poll timeout. */
+const INITIAL_POLL_COUNT = 3;
 const MAX_CONSECUTIVE_FAILURES = 3;
 const BACKOFF_DELAY_MS = 30_000;
 const RETRY_DELAY_MS = 2_000;
@@ -100,7 +104,9 @@ export async function monitorWeixinProvider(
 
   const configManager = new WeixinConfigManager({ baseUrl, token }, log);
 
-  let nextTimeoutMs = longPollTimeoutMs ?? DEFAULT_LONG_POLL_TIMEOUT_MS;
+  let normalTimeoutMs = longPollTimeoutMs ?? DEFAULT_LONG_POLL_TIMEOUT_MS;
+  let nextTimeoutMs = INITIAL_POLL_TIMEOUT_MS;
+  let initialPollsRemaining = INITIAL_POLL_COUNT;
   let consecutiveFailures = 0;
 
   while (!abortSignal?.aborted) {
@@ -122,8 +128,19 @@ export async function monitorWeixinProvider(
         resp.longpolling_timeout_ms != null &&
         resp.longpolling_timeout_ms > 0
       ) {
+        // Server-suggested timeout overrides both initial and normal timeouts.
+        if (normalTimeoutMs !== resp.longpolling_timeout_ms) {
+          aLog.debug(`Server poll timeout updated: ${resp.longpolling_timeout_ms}ms`);
+          normalTimeoutMs = resp.longpolling_timeout_ms;
+        }
         nextTimeoutMs = resp.longpolling_timeout_ms;
-        aLog.debug(`Updated next poll timeout: ${nextTimeoutMs}ms`);
+        initialPollsRemaining = 0;
+      } else if (initialPollsRemaining > 0) {
+        initialPollsRemaining -= 1;
+        if (initialPollsRemaining <= 0) {
+          nextTimeoutMs = normalTimeoutMs;
+          aLog.info(`Initial short-poll phase complete, switching to ${normalTimeoutMs}ms`);
+        }
       }
       const isApiError =
         (resp.ret !== undefined && resp.ret !== 0) ||
@@ -142,8 +159,18 @@ export async function monitorWeixinProvider(
           aLog.error(
             `getUpdates: session expired (errcode=${resp.errcode} ret=${resp.ret}), pausing all requests for ${Math.ceil(pauseMs / 60_000)} min`,
           );
+          // Surface the error to the runtime snapshot so live-status
+          // reports "error / session expired" instead of "connected"
+          // while the monitor is paused.
+          setStatus?.({
+            accountId,
+            running: false,
+            lastError: "not configured",
+          });
           consecutiveFailures = 0;
           await sleep(pauseMs, abortSignal);
+          // Clear error when resuming so the monitor can retry.
+          setStatus?.({ accountId, running: true, lastError: null });
           continue;
         }
 

@@ -1,4 +1,4 @@
-export type SkillSource = "curated" | "managed" | "custom";
+export type SkillSource = "curated" | "managed" | "custom" | "workspace" | "user";
 
 export type InstalledSkill = {
   slug: string;
@@ -6,6 +6,8 @@ export type InstalledSkill = {
   name: string;
   description: string;
   installedAt: string | null;
+  agentId: string | null;
+  agentName: string | null;
 };
 
 export type QueueItemStatus =

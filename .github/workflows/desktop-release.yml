@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
@@ -22,7 +23,6 @@ concurrency:
 jobs:
   release:
     strategy:
-      max-parallel: 1
       matrix:
         include:
           - runner: macos-14
@@ -394,8 +394,10 @@ jobs:
 
       - name: Upload to Cloudflare R2
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_REGION: auto
           CHANNEL: ${{ steps.artifacts.outputs.channel }}
           ARCH: ${{ matrix.arch }}
           VERSIONED_DMG: ${{ steps.artifacts.outputs.versioned_dmg }}
@@ -405,30 +407,28 @@ jobs:
         run: |
           set -euo pipefail
 
+          R2_BUCKET="s3://nexu-desktop-releases"
+
+          upload_file() {
+            local src="$1" dst="$2"
+            echo "Uploading $(basename "$src") → ${dst}"
+            aws s3 cp "$src" "${R2_BUCKET}/${dst}" --no-progress
+          }
+
           upload_prefix() {
             local prefix="$1"
 
             echo "[r2] uploading to prefix: ${prefix}/"
 
             if [ -f "apps/desktop/release/latest-mac.yml" ]; then
-              echo "Uploading latest-mac.yml → ${prefix}/latest-mac.yml"
-              npx wrangler r2 object put "nexu-desktop-releases/${prefix}/latest-mac.yml" --file "apps/desktop/release/latest-mac.yml" --remote
+              upload_file "apps/desktop/release/latest-mac.yml" "${prefix}/latest-mac.yml"
             fi
 
-            echo "Uploading ${VERSIONED_DMG} → ${prefix}/${VERSIONED_DMG}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_DMG}" --file "apps/desktop/release-artifacts/${VERSIONED_DMG}" --remote
-
-            echo "Uploading ${VERSIONED_ZIP} → ${prefix}/${VERSIONED_ZIP}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${VERSIONED_ZIP}" --file "apps/desktop/release-artifacts/${VERSIONED_ZIP}" --remote
-
-            echo "Uploading ${LATEST_DMG} → ${prefix}/${LATEST_DMG}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_DMG}" --file "apps/desktop/release-artifacts/${LATEST_DMG}" --remote
-
-            echo "Uploading ${LATEST_ZIP} → ${prefix}/${LATEST_ZIP}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${LATEST_ZIP}" --file "apps/desktop/release-artifacts/${LATEST_ZIP}" --remote
-
-            echo "Uploading ${{ steps.artifacts.outputs.checksum_file }} → ${prefix}/${{ steps.artifacts.outputs.checksum_file }}"
-            npx wrangler r2 object put "nexu-desktop-releases/${prefix}/${{ steps.artifacts.outputs.checksum_file }}" --file "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}" --remote
+            upload_file "apps/desktop/release-artifacts/${VERSIONED_DMG}" "${prefix}/${VERSIONED_DMG}"
+            upload_file "apps/desktop/release-artifacts/${VERSIONED_ZIP}" "${prefix}/${VERSIONED_ZIP}"
+            upload_file "apps/desktop/release-artifacts/${LATEST_DMG}" "${prefix}/${LATEST_DMG}"
+            upload_file "apps/desktop/release-artifacts/${LATEST_ZIP}" "${prefix}/${LATEST_ZIP}"
+            upload_file "apps/desktop/release-artifacts/${{ steps.artifacts.outputs.checksum_file }}" "${prefix}/${{ steps.artifacts.outputs.checksum_file }}"
           }
 
           upload_prefix "${CHANNEL}/${ARCH}"
@@ -437,3 +437,69 @@ jobs:
             echo "[r2] uploading legacy arm64 compatibility feed to prefix: ${CHANNEL}/"
             upload_prefix "${CHANNEL}"
           fi
+
+      - name: Purge Cloudflare CDN cache for latest artifacts
+        if: env.CLOUDFLARE_ZONE_ID != ''
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CHANNEL: ${{ steps.artifacts.outputs.channel }}
+          ARCH: ${{ matrix.arch }}
+          LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
+          LATEST_ZIP: ${{ steps.artifacts.outputs.latest_zip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_url="https://desktop-releases.nexu.io/${CHANNEL}/${ARCH}"
+          urls=(
+            "${base_url}/${LATEST_DMG}"
+            "${base_url}/${LATEST_ZIP}"
+            "${base_url}/latest-mac.yml"
+          )
+
+          if [ "${ARCH}" = "arm64" ]; then
+            legacy_base_url="https://desktop-releases.nexu.io/${CHANNEL}"
+            urls+=(
+              "${legacy_base_url}/${LATEST_DMG}"
+              "${legacy_base_url}/${LATEST_ZIP}"
+              "${legacy_base_url}/latest-mac.yml"
+            )
+          fi
+
+          files_json=$(printf '%s\n' "${urls[@]}" | jq -R . | jq -sc '.')
+          echo "[cf-purge] Purging: ${files_json}"
+
+          curl -sf -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"files\": ${files_json}}" \
+            | jq .
+
+  trigger-e2e:
+    needs: release
+    runs-on: ubuntu-latest
+    if: always() && needs.release.result == 'success'
+    steps:
+      - name: Resolve channel
+        id: channel
+        run: |
+          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}"
+          if [[ "$tag" == *-* ]]; then
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger Desktop E2E (async)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'desktop-e2e.yml',
+              ref: context.ref || 'main',
+              inputs: { mode: 'model', channel: '${{ steps.channel.outputs.channel }}' },
+            });

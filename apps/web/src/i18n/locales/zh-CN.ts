@@ -314,6 +314,8 @@ const zhCN = {
   "models.byok.none": "暂无",
   "models.byok.refreshModels": "刷新",
   "models.byok.fetchingModels": "正在获取模型列表...",
+  "models.byok.refreshSuccess": "模型列表已刷新，共 {{count}} 个模型",
+  "models.byok.refreshFailed": "刷新模型列表失败，请重试",
   "models.byok.updateConfig": "更新配置",
   "models.byok.saveAndEnable": "保存",
   "models.byok.remove": "移除",
@@ -352,6 +354,8 @@ const zhCN = {
   "channels.comingSoon": "Microsoft Teams、Line 等更多平台即将支持",
   "channels.backToConfig": "返回配置",
   "channels.statusConnected": "{{platform}} Bot 已连接",
+  "channels.statusConnecting": "连接中...",
+  "channels.statusError": "连接异常",
   "channels.configuredDate": "配置于 {{date}}",
   "channels.connectionActive": "连接正常",
   "channels.setupGuide": "配置指南",
@@ -414,15 +418,14 @@ const zhCN = {
   "skills.skillsCount": "{{count}} 个技能",
   "skills.searchPlaceholder": "搜索",
   "skills.official": "官方",
-  "skills.custom": "自定义",
   "skills.all": "全部",
   "skills.explore": "ClawHub",
   "skills.yours": "我的",
   "skills.clawhubDisclaimer":
     "Skill 来自 ClawHub，网络或服务偶有不稳定；若遇到问题，欢迎在",
   "skills.clawhubDisclaimerAfterLink": "反馈。",
-  "skills.recommended": "推荐",
-  "skills.installed": "已安装",
+  "skills.builtin": "内置",
+  "skills.custom": "自定义",
   "skills.installQueued": "技能已加入安装队列",
   "skills.skillNotFound":
     '"{{slug}}" 在 ClawHub 上不可用，可能已被移除或重命名。',
@@ -476,6 +479,7 @@ const zhCN = {
   "skills.uninstallAction": "卸载",
   "skills.installingAction": "安装中…",
   "skills.uninstallingAction": "卸载中…",
+  "skills.agentSkills": "代理技能",
 
   // ── Skill Detail Page ──
   "skillDetail.backToSkills": "返回技能列表",

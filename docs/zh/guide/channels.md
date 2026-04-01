@@ -7,4 +7,6 @@ nexu 支持同时接入多个聊天渠道，在客户端填入凭证即可完成
 - [飞书](/zh/guide/channels/feishu)
 - [Slack](/zh/guide/channels/slack)
 - [Discord](/zh/guide/channels/discord)
-- [微信](/zh/guide/channels/wechat) 🆕
+- [微信](/zh/guide/channels/wechat)
+- [Telegram](/zh/guide/channels/telegram) 🆕
+- [WhatsApp](/zh/guide/channels/whatsapp) 🆕

@@ -67,13 +67,10 @@ export function normalizeChannel(
 }
 
 export function mapInstalledSkillSource(
-  source: "curated" | "managed" | "custom",
+  source: "curated" | "managed" | "custom" | "workspace" | "user",
 ): AnalyticsSkillSource {
-  if (source === "curated") {
+  if (source === "curated" || source === "managed") {
     return "builtin";
-  }
-  if (source === "managed") {
-    return "explore";
   }
   return "custom";
 }

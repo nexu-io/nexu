@@ -1,0 +1,91 @@
+name: Desktop Auto-Tag on Release PR Merge
+
+# When a release/* PR is merged to main, automatically:
+# 1. Read the version from apps/desktop/package.json
+# 2. Push the git tag (v0.1.8, etc.)
+# 3. Create a GitHub Release using the PR body as release notes
+#
+# This bridges the gap between "merge Release PR" and "desktop-release.yml"
+# which triggers on tag push to build + sign + publish artifacts.
+#
+# IMPORTANT: Uses RELEASE_PAT (Personal Access Token) instead of GITHUB_TOKEN
+# for git push. Tags pushed by GITHUB_TOKEN don't trigger downstream workflows
+# (GitHub's anti-recursion safeguard), so we need a PAT to ensure
+# desktop-release.yml fires on the tag push event.
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  auto-tag:
+    # Only run when a release/* PR is merged (not just closed)
+    if: >-
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@v4
+        with:
+          # Use PAT for checkout so git push triggers downstream workflows
+          token: ${{ secrets.RELEASE_PAT }}
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(node -e 'process.stdout.write(require("./apps/desktop/package.json").version)')
+          tag="v${version}"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $version → tag: $tag"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.version.outputs.tag }} already exists, skipping"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push tag
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.tag }}" "${{ github.event.pull_request.merge_commit_sha }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+          echo "Pushed tag ${{ steps.version.outputs.tag }}"
+
+      - name: Create GitHub Release with PR body as release notes
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.version.outputs.tag }}"
+          pr_number="${{ github.event.pull_request.number }}"
+
+          # Extract PR body (the release notes)
+          pr_body=$(gh pr view "$pr_number" --json body --jq '.body')
+
+          # Create the release (draft: false so it publishes immediately)
+          # desktop-release.yml will detect the tag and upload build artifacts
+          gh release create "$tag" \
+            --title "$tag" \
+            --notes "$pr_body" \
+            --target "${{ github.event.pull_request.merge_commit_sha }}"
+
+          echo "Created GitHub Release $tag with notes from PR #$pr_number"

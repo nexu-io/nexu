@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { proxyFetch } from "../lib/proxy-fetch.js";
 import { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-store.js";
 
 // ── Types ───────────────────────────────────────────────────────
@@ -446,7 +447,7 @@ export class OpenClawAuthService {
         redirect_uri: OPENAI_REDIRECT_URI,
       });
 
-      const response = await fetch(OPENAI_TOKEN_URL, {
+      const response = await proxyFetch(OPENAI_TOKEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),

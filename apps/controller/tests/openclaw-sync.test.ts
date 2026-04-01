@@ -13,6 +13,7 @@ import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
+import { SkillDb } from "../src/services/skillhub/skill-db.js";
 import { CompiledOpenClawStore } from "../src/store/compiled-openclaw-store.js";
 import { NexuConfigStore } from "../src/store/nexu-config-store.js";
 
@@ -137,5 +138,46 @@ describe("OpenClawSyncService", () => {
       await readFile(env.compiledOpenclawSnapshotPath, "utf8"),
     ) as { config: Record<string, unknown> };
     expect(snapshot.config).toBeTruthy();
+  });
+
+  it("includes installed skill slugs in compiled agent config", async () => {
+    const configStore = new NexuConfigStore(env);
+    const compiledStore = new CompiledOpenClawStore(env);
+    const authProfilesStore = new OpenClawAuthProfilesStore(env);
+    const skillDb = await SkillDb.create(env.skillDbPath);
+
+    skillDb.recordInstall("web-search", "managed");
+    skillDb.recordInstall("image-gen", "managed");
+
+    const syncService = new OpenClawSyncService(
+      env,
+      configStore,
+      compiledStore,
+      new OpenClawConfigWriter(env),
+      new OpenClawAuthProfilesWriter(authProfilesStore),
+      authProfilesStore,
+      new OpenClawRuntimePluginWriter(env),
+      new OpenClawRuntimeModelWriter(env),
+      new WorkspaceTemplateWriter(env),
+      new OpenClawWatchTrigger(env),
+      new OpenClawGatewayService({
+        isConnected: () => false,
+        pushConfig: async () => false,
+      } as never),
+      skillDb,
+    );
+
+    await configStore.createBot({ name: "Assistant", slug: "assistant" });
+    await syncService.syncAllImmediate();
+
+    const config = JSON.parse(
+      await readFile(env.openclawConfigPath, "utf8"),
+    ) as ReturnType<typeof compileOpenClawConfig>;
+
+    expect(config.agents.list).toHaveLength(1);
+    expect(config.agents.list[0].skills).toEqual(
+      expect.arrayContaining(["web-search", "image-gen"]),
+    );
+    expect(config.agents.list[0].skills).toHaveLength(2);
   });
 });

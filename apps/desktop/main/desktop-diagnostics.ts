@@ -8,6 +8,7 @@ import type {
   StartupProbePayload,
 } from "../shared/host";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import type { ProxyDiagnosticsSnapshot } from "./services/proxy-manager";
 import {
   type SleepGuardSnapshot,
   createInitialSleepGuardSnapshot,
@@ -54,6 +55,7 @@ type DesktopEmbeddedContentSnapshot = {
 type DesktopDiagnosticsSnapshot = {
   updatedAt: string;
   isPackaged: boolean;
+  proxy: ProxyDiagnosticsSnapshot | null;
   coldStart: DesktopColdStartSnapshot;
   startupProbe: {
     preloadSeen: boolean;
@@ -123,6 +125,8 @@ export class DesktopDiagnosticsReporter {
     DesktopEmbeddedContentSnapshot
   >();
 
+  private proxy: ProxyDiagnosticsSnapshot | null = null;
+
   private flushScheduled = false;
 
   private flushInFlight: Promise<void> | null = null;
@@ -168,6 +172,22 @@ export class DesktopDiagnosticsReporter {
       ...snapshot,
       counters: { ...snapshot.counters },
       lastEvent: snapshot.lastEvent ? { ...snapshot.lastEvent } : null,
+    };
+    this.scheduleFlush();
+  }
+
+  setProxySnapshot(snapshot: ProxyDiagnosticsSnapshot): void {
+    this.proxy = {
+      ...snapshot,
+      env: { ...snapshot.env },
+      bypass: [...snapshot.bypass],
+      electron: {
+        ...snapshot.electron,
+        proxyBypassRules: [...snapshot.electron.proxyBypassRules],
+      },
+      resolutions: snapshot.resolutions.map((resolution) => ({
+        ...resolution,
+      })),
     };
     this.scheduleFlush();
   }
@@ -323,6 +343,20 @@ export class DesktopDiagnosticsReporter {
     return {
       updatedAt: nowIso(),
       isPackaged: app.isPackaged,
+      proxy: this.proxy
+        ? {
+            ...this.proxy,
+            env: { ...this.proxy.env },
+            bypass: [...this.proxy.bypass],
+            electron: {
+              ...this.proxy.electron,
+              proxyBypassRules: [...this.proxy.electron.proxyBypassRules],
+            },
+            resolutions: this.proxy.resolutions.map((resolution) => ({
+              ...resolution,
+            })),
+          }
+        : null,
       coldStart: { ...this.coldStart },
       startupProbe: {
         preloadSeen: this.startupProbe.preloadSeen,
