@@ -21,8 +21,7 @@ export const SEEDANCE_PROMO_CYCLE_START = new Date("2026-04-01T00:00:00+08:00");
 export const SEEDANCE_GITHUB_URL = "https://github.com/nexu-io/nexu";
 export const SEEDANCE_FEISHU_GROUP_URL =
   "https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=9bdse1f7-cd4c-4715-bfdd-cee2bd15263f";
-export const SEEDANCE_TUTORIAL_URL =
-  "https://powerformer.feishu.cn/wiki/OFxFw2MpyiFWKpk9n2Dc7joEngc";
+export const SEEDANCE_TUTORIAL_URL = "https://docs.nexu.io/zh/guide/seedance";
 
 export function getSeedancePromoCountdown(
   now: number,
