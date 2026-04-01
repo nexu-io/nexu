@@ -25,6 +25,7 @@ import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
   setComponentUpdater,
+  setGlobalShortcutManager,
   setQuitFallback,
   setQuitHandlerOpts,
   setUpdateManager,
@@ -57,6 +58,7 @@ import {
   resolveLaunchdPaths,
   teardownLaunchdServices,
 } from "./services";
+import { GlobalShortcutManager } from "./services/global-shortcut";
 import { ProxyManager } from "./services/proxy-manager";
 import {
   getLegacyNexuHomeStateDir,
@@ -267,6 +269,7 @@ let productionDebugMode = false;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
 let proxyManager: ProxyManager | null = null;
+let globalShortcutManager: GlobalShortcutManager | null = null;
 
 async function refreshProxyDiagnostics(): Promise<void> {
   if (!proxyManager) {
@@ -321,6 +324,7 @@ async function gracefulShutdown(reason: string): Promise<void> {
 
   try {
     sleepGuard?.dispose(reason);
+    globalShortcutManager?.stop();
     await diagnosticsReporter?.flushNow().catch(() => undefined);
     flushRuntimeLoggers();
 
@@ -1102,6 +1106,15 @@ app.whenReady().then(async () => {
   });
   const win = createMainWindow();
   sleepGuard.start("desktop-runtime-active");
+
+  // Initialize global shortcut manager for quick access to nexu from anywhere.
+  globalShortcutManager = new GlobalShortcutManager(
+    app.getPath("userData"),
+    () => mainWindow,
+    createMainWindow,
+  );
+  setGlobalShortcutManager(globalShortcutManager);
+  globalShortcutManager.start();
 
   void (async () => {
     const healthCheck = new StartupHealthCheck();

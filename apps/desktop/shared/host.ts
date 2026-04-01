@@ -16,6 +16,9 @@ export const hostInvokeChannels = [
   "runtime:stop-all",
   "runtime:show-log-file",
   "runtime:query-events",
+  "shortcut:get-config",
+  "shortcut:set-enabled",
+  "shortcut:set-accelerator",
   "desktop:get-cloud-status",
   "desktop:create-cloud-profile",
   "desktop:connect-cloud-profile",
@@ -62,6 +65,16 @@ export type DiagnosticsExportResult = {
   errorMessage?: string;
 };
 
+/**
+ * Configuration for global keyboard shortcuts.
+ */
+export type GlobalShortcutConfig = {
+  /** Whether the global shortcut is enabled. */
+  enabled: boolean;
+  /** The accelerator string (e.g., "CommandOrControl+Shift+N"). */
+  accelerator: string;
+};
+
 export type StartupProbeStatus = "ok" | "error";
 
 export type StartupProbePayload = {
@@ -92,6 +105,9 @@ export type HostInvokePayloadMap = {
     id: RuntimeUnitId;
   };
   "runtime:query-events": RuntimeEventQuery;
+  "shortcut:get-config": undefined;
+  "shortcut:set-enabled": { enabled: boolean };
+  "shortcut:set-accelerator": { accelerator: string };
   "desktop:get-cloud-status": undefined;
   "desktop:create-cloud-profile": {
     profile: {
@@ -166,6 +182,9 @@ export type HostInvokeResultMap = {
     ok: boolean;
   };
   "runtime:query-events": RuntimeEventQueryResult;
+  "shortcut:get-config": GlobalShortcutConfig;
+  "shortcut:set-enabled": { ok: boolean; config: GlobalShortcutConfig };
+  "shortcut:set-accelerator": { ok: boolean; config: GlobalShortcutConfig };
   "desktop:get-cloud-status": {
     connected: boolean;
     polling?: boolean;
