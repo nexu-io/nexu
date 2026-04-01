@@ -12,7 +12,7 @@ import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
   type QuitHandlerOptions,
-  quitWithDecision,
+  runTeardownAndExit,
 } from "./services/quit-handler";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
@@ -522,12 +522,18 @@ export function registerIpcHandlers(
 
         case "app:quit": {
           const typedPayload = payload as HostInvokePayloadMap["app:quit"];
-          if (!quitHandlerOpts) {
-            app.exit(0);
+          if (typedPayload.decision === "run-in-background") {
+            const bgWin = BrowserWindow.getAllWindows()[0];
+            if (bgWin) bgWin.hide();
             return undefined;
           }
-          // Fire-and-forget: quitWithDecision calls app.exit() internally.
-          void quitWithDecision(typedPayload.decision, quitHandlerOpts);
+          // quit-completely: use the fail-safe teardown path (finally → app.exit(0))
+          // so the process always exits even if teardown throws.
+          if (quitHandlerOpts) {
+            void runTeardownAndExit(quitHandlerOpts, "ipc-quit");
+          } else {
+            app.exit(0);
+          }
           return undefined;
         }
 
