@@ -23,7 +23,11 @@ import {
   type EmbeddedWebServer,
   startEmbeddedWebServer,
 } from "./embedded-web-server";
-import { LaunchdManager, SERVICE_LABELS } from "./launchd-manager";
+import {
+  LaunchdManager,
+  SERVICE_LABELS,
+  type ServiceStatus,
+} from "./launchd-manager";
 import { type PlistEnv, generatePlist } from "./plist-generator";
 
 export interface LaunchdBootstrapEnv {
@@ -164,30 +168,163 @@ async function waitForControllerReadiness(
   timeoutMs = 15000,
 ): Promise<void> {
   const startedAt = Date.now();
-  const probeUrl = `http://127.0.0.1:${port}/api/auth/get-session`;
   let attempt = 0;
+  let lastProbeUrl = `http://127.0.0.1:${port}/api/internal/desktop/ready`;
+  let lastFailureReason = "probe_timeout";
 
   while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(probeUrl, {
-        headers: { Accept: "application/json" },
-      });
-      if (response.status < 500) {
-        console.log(
-          `Controller ready via ${probeUrl} status=${response.status} after ${Date.now() - startedAt}ms`,
-        );
-        return;
-      }
-    } catch {
-      // Ignore transient failures during startup
+    const result = await probeControllerReady(port, 2000);
+    lastProbeUrl = result.probeUrl;
+    if (result.ok) {
+      console.log(
+        `Controller ready via ${result.probeUrl} status=${result.status} after ${Date.now() - startedAt}ms`,
+      );
+      return;
     }
+    lastFailureReason = result.reason;
     // Adaptive polling: start aggressive (50ms), increase to 250ms
     const delay = Math.min(50 + attempt * 50, 250);
     await new Promise((r) => setTimeout(r, delay));
     attempt++;
   }
 
-  throw new Error(`Controller readiness probe timed out for ${probeUrl}`);
+  throw new Error(
+    `Controller readiness probe timed out for ${lastProbeUrl} (reason=${lastFailureReason})`,
+  );
+}
+
+type ControllerProbeFailureReason =
+  | "port_unreachable"
+  | "probe_timeout"
+  | "probe_error"
+  | "probe_status";
+
+type ControllerStartupFailureReason =
+  | "launchd_stopped"
+  | "process_exited"
+  | ControllerProbeFailureReason;
+
+type ControllerReadyProbeResult =
+  | {
+      ok: true;
+      probeUrl: string;
+      status: number;
+    }
+  | {
+      ok: false;
+      probeUrl: string;
+      reason: ControllerProbeFailureReason;
+      status?: number;
+    };
+
+type ControllerStartupValidationResult =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      reason: ControllerStartupFailureReason;
+      launchdStatus: ServiceStatus;
+      probeUrl: string;
+      probeStatus?: number;
+    };
+
+async function probeControllerReady(
+  port: number,
+  timeoutMs = 2000,
+): Promise<ControllerReadyProbeResult> {
+  const readyUrl = `http://127.0.0.1:${port}/api/internal/desktop/ready`;
+  const sessionUrl = `http://127.0.0.1:${port}/api/auth/get-session`;
+
+  const portListening = await probePort(port);
+  if (!portListening) {
+    return {
+      ok: false,
+      probeUrl: readyUrl,
+      reason: "port_unreachable",
+    };
+  }
+
+  try {
+    const response = await fetch(readyUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.ok) {
+      return { ok: true, probeUrl: readyUrl, status: response.status };
+    }
+    if (response.status !== 404) {
+      return {
+        ok: false,
+        probeUrl: readyUrl,
+        reason: "probe_status",
+        status: response.status,
+      };
+    }
+  } catch (error) {
+    const name = error instanceof Error ? error.name : undefined;
+    return {
+      ok: false,
+      probeUrl: readyUrl,
+      reason: name === "TimeoutError" ? "probe_timeout" : "probe_error",
+    };
+  }
+
+  try {
+    const response = await fetch(sessionUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status < 500) {
+      return { ok: true, probeUrl: sessionUrl, status: response.status };
+    }
+    return {
+      ok: false,
+      probeUrl: sessionUrl,
+      reason: "probe_status",
+      status: response.status,
+    };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : undefined;
+    return {
+      ok: false,
+      probeUrl: sessionUrl,
+      reason: name === "TimeoutError" ? "probe_timeout" : "probe_error",
+    };
+  }
+}
+
+async function validateControllerStartup(opts: {
+  launchd: LaunchdManager;
+  label: string;
+  port: number;
+  probeTimeoutMs?: number;
+}): Promise<ControllerStartupValidationResult> {
+  const launchdStatus = await opts.launchd.getServiceStatus(opts.label);
+  if (launchdStatus.status === "stopped") {
+    return {
+      ok: false,
+      reason: launchdStatus.pid == null ? "launchd_stopped" : "process_exited",
+      launchdStatus,
+      probeUrl: `http://127.0.0.1:${opts.port}/api/internal/desktop/ready`,
+    };
+  }
+
+  const probe = await probeControllerReady(
+    opts.port,
+    opts.probeTimeoutMs ?? 3000,
+  );
+  if (!probe.ok) {
+    return {
+      ok: false,
+      reason: probe.reason,
+      launchdStatus,
+      probeUrl: probe.probeUrl,
+      probeStatus: probe.status,
+    };
+  }
+
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -759,9 +896,97 @@ export async function bootstrapWithLaunchd(
     }
   };
 
+  const formatControllerRecoveryFailure = (details: {
+    originalPort: number;
+    retryPort?: number;
+    reason: ControllerStartupFailureReason;
+    launchdStatus: ServiceStatus;
+    probeUrl: string;
+    probeStatus?: number;
+  }): string => {
+    const runtimePortsValue = JSON.stringify({
+      controllerPort: details.retryPort ?? effectivePorts.controllerPort,
+      openclawPort: effectivePorts.openclawPort,
+      webPort: effectivePorts.webPort,
+    });
+
+    return [
+      "Controller startup recovery failed",
+      `originalPort=${details.originalPort}`,
+      details.retryPort != null ? `retryPort=${details.retryPort}` : null,
+      `reason=${details.reason}`,
+      `launchdStatus=${details.launchdStatus.status}`,
+      `launchdPid=${details.launchdStatus.pid ?? "none"}`,
+      details.probeStatus != null ? `probeStatus=${details.probeStatus}` : null,
+      `finalProbeUrl=${details.probeUrl}`,
+      `runtimePortsValue=${runtimePortsValue}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  const validateOrRecoverController = async (): Promise<void> => {
+    const originalPort = effectivePorts.controllerPort;
+    const validation = await validateControllerStartup({
+      launchd,
+      label: labels.controller,
+      port: effectivePorts.controllerPort,
+      probeTimeoutMs: 3000,
+    });
+
+    if (validation.ok) {
+      return;
+    }
+
+    console.warn(
+      `[bootstrap] controller post-start validation failed originalPort=${originalPort} reason=${validation.reason} launchdStatus=${validation.launchdStatus.status} launchdPid=${validation.launchdStatus.pid ?? "none"} probeUrl=${validation.probeUrl}${validation.probeStatus != null ? ` probeStatus=${validation.probeStatus}` : ""}`,
+    );
+
+    await launchd
+      .bootoutAndWaitForExit(labels.controller, 5000)
+      .catch(() => {});
+
+    const retryPort = await findFreePort(originalPort + 1);
+    effectivePorts.controllerPort = retryPort;
+
+    console.warn(
+      `[bootstrap] retrying controller startup originalPort=${originalPort} retryPort=${retryPort}`,
+    );
+
+    const retryPlist = generatePlist("controller", {
+      ...plistEnv,
+      controllerPort: retryPort,
+    });
+    await launchd.installService(labels.controller, retryPlist);
+    await launchd.startService(labels.controller);
+    await ensureRunning(labels.controller, "controller");
+
+    const retryValidation = await validateControllerStartup({
+      launchd,
+      label: labels.controller,
+      port: retryPort,
+      probeTimeoutMs: 3000,
+    });
+    if (retryValidation.ok) {
+      return;
+    }
+
+    const message = formatControllerRecoveryFailure({
+      originalPort,
+      retryPort,
+      reason: retryValidation.reason,
+      launchdStatus: retryValidation.launchdStatus,
+      probeUrl: retryValidation.probeUrl,
+      probeStatus: retryValidation.probeStatus,
+    });
+    console.error(`[bootstrap] ${message}`);
+    throw new Error(message);
+  };
+
   if (!controllerHealthy) {
     await ensureService(labels.controller, "controller");
     await ensureRunning(labels.controller, "controller");
+    await validateOrRecoverController();
   } else {
     console.log("[bootstrap] controller already healthy, skipping");
   }
