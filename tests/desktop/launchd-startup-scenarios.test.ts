@@ -1039,4 +1039,103 @@ describe("Launchd Startup Scenarios", () => {
       expect.stringContaining("runtime-ports.json"),
     );
   });
+
+  // -----------------------------------------------------------------------
+  // Scenario 27: Packaged partial state + stale orphan openclaw process
+  // -----------------------------------------------------------------------
+  it("Scenario 27: packaged partial launchd state kills stale orphan openclaw and forces clean cold start", async () => {
+    const fsMock = await import("node:fs/promises");
+    const cpMock = await import("node:child_process");
+
+    const recoveredPorts = makeRuntimePorts({
+      isDev: false,
+      appVersion: "1.0.0",
+      userDataPath: "/tmp/user-data",
+      buildSource: "stable",
+      openclawStateDir: "/tmp/state",
+    });
+
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
+      .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
+      .mockResolvedValueOnce(recoveredPorts); // stale session + recovery source
+
+    // Partial stale state: controller is launchd-running, openclaw is not.
+    mockLaunchdManager.getServiceStatus
+      .mockResolvedValueOnce(
+        mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+      ) // orphan cleanup pre-check: controller
+      .mockResolvedValueOnce(mockStoppedService()) // orphan cleanup pre-check: openclaw
+      .mockResolvedValueOnce(
+        mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+      ) // partial-attach check: controller
+      .mockResolvedValueOnce(mockStoppedService()) // partial-attach check: openclaw
+      .mockResolvedValue(mockStoppedService()); // post-teardown checks
+
+    (cpMock.execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (
+        cmd: string,
+        args: string[],
+        callback: (
+          error: Error | null,
+          result: { stdout: string; stderr: string },
+        ) => void,
+      ) => {
+        // stale openclaw occupier still on recovered port
+        if (
+          cmd === "lsof" &&
+          args.some((arg: string) => arg.includes("18789"))
+        ) {
+          callback(null, { stdout: "77777\n", stderr: "" });
+          return;
+        }
+
+        // getCurrentProcessTreePids() -> no children to exclude
+        if (cmd === "pgrep" && args[0] === "-P") {
+          callback(new Error("no process"), { stdout: "", stderr: "" });
+          return;
+        }
+
+        // orphan openclaw process still present from old sidecar path
+        if (cmd === "pgrep" && args[0] === "-f") {
+          callback(null, { stdout: "77777\n", stderr: "" });
+          return;
+        }
+
+        callback(new Error("no process"), { stdout: "", stderr: "" });
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        isDev: false,
+        appVersion: "1.0.0",
+        userDataPath: "/tmp/user-data",
+        buildSource: "stable",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(result.effectivePorts.controllerPort).toBe(50800);
+    expect(result.effectivePorts.openclawPort).toBeGreaterThanOrEqual(18789);
+
+    // stale partial launchd state is torn down
+    expect(mockLaunchdManager.bootoutService).toHaveBeenCalledWith(
+      "io.nexu.controller",
+    );
+    // stale runtime metadata is removed before clean bootstrap
+    expect(fsMock.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("runtime-ports.json"),
+    );
+    // stale port occupier path executed (lsof against recovered openclaw port)
+    expect(cpMock.execFile).toHaveBeenCalledWith(
+      "lsof",
+      ["-iTCP:18789", "-sTCP:LISTEN", "-t"],
+      expect.any(Function),
+    );
+  });
 });

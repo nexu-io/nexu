@@ -461,14 +461,53 @@ export async function bootstrapWithLaunchd(
       recovered = null; // Force fresh start
     }
   }
-  const [controllerStatus, openclawStatus] = await Promise.all([
+  let [controllerStatus, openclawStatus] = await Promise.all([
     launchd.getServiceStatus(labels.controller),
     launchd.getServiceStatus(labels.openclaw),
   ]);
 
-  const controllerRunning = controllerStatus.status === "running";
-  const openclawRunning = openclawStatus.status === "running";
-  const anyRunning = controllerRunning || openclawRunning;
+  let controllerRunning = controllerStatus.status === "running";
+  let openclawRunning = openclawStatus.status === "running";
+  let anyRunning = controllerRunning || openclawRunning;
+
+  // Partial attach state is unsafe: one launchd service survived but the other
+  // did not. In practice this leaves controller attached to stale OpenClaw
+  // metadata, and OpenClaw may still exist as an orphaned process on the old
+  // gateway port. Tear everything down and force a clean cold start.
+  if (recovered && anyRunning && controllerRunning !== openclawRunning) {
+    console.warn(
+      `[bootstrap] partial launchd state detected (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"}); forcing clean cold start`,
+    );
+
+    const staleOpenclawPort = recovered.openclawPort;
+    const staleOccupier = await detectPortOccupier(staleOpenclawPort);
+    if (staleOccupier && staleOccupier.pid !== openclawStatus.pid) {
+      console.warn(
+        `[bootstrap] stale openclaw port occupier detected port=${staleOpenclawPort} pid=${staleOccupier.pid}`,
+      );
+    }
+
+    await Promise.allSettled([
+      controllerRunning
+        ? launchd.bootoutService(labels.controller)
+        : Promise.resolve(),
+      openclawRunning
+        ? launchd.bootoutService(labels.openclaw)
+        : Promise.resolve(),
+    ]);
+
+    await killOrphanOpenclawProcesses(openclawStatus.pid);
+    await deleteRuntimePorts(plistDir).catch(() => {});
+
+    recovered = null;
+    [controllerStatus, openclawStatus] = await Promise.all([
+      launchd.getServiceStatus(labels.controller),
+      launchd.getServiceStatus(labels.openclaw),
+    ]);
+    controllerRunning = controllerStatus.status === "running";
+    openclawRunning = openclawStatus.status === "running";
+    anyRunning = controllerRunning || openclawRunning;
+  }
 
   // If we have a previous session and at least one service is still running,
   // validate and reuse the recovered ports. Otherwise use fresh ports.
@@ -897,8 +936,17 @@ async function killOrphanNexuProcesses(): Promise<void> {
 // Prefix with "node" to only match actual Node.js processes.
 const NEXU_PROCESS_PATTERNS = [
   "node.*controller/dist/index.js",
+  "controller/dist/index.js",
   "node.*openclaw.mjs gateway",
+  "openclaw\\.mjs",
   "openclaw-gateway",
+  "\\.nexu/openclaw-sidecar",
+] as const;
+
+const OPENCLAW_PROCESS_PATTERNS = [
+  "openclaw\\.mjs",
+  "openclaw-gateway",
+  "\\.nexu/openclaw-sidecar",
 ] as const;
 
 /**
@@ -992,7 +1040,8 @@ async function findNexuProcessPidsByLabel(): Promise<number[]> {
  *   tree (not just the current PID). Used by killOrphanNexuProcesses to
  *   avoid killing our own child processes. Default: false.
  */
-async function findNexuProcessPids(
+async function findProcessPidsByPatterns(
+  patterns: readonly string[],
   excludeProcessTree = false,
 ): Promise<number[]> {
   const allPids = new Set<number>();
@@ -1000,7 +1049,7 @@ async function findNexuProcessPids(
     ? await getCurrentProcessTreePids()
     : new Set([process.pid]);
 
-  for (const pattern of NEXU_PROCESS_PATTERNS) {
+  for (const pattern of patterns) {
     try {
       const { stdout } = await execFileAsync("pgrep", ["-f", pattern]);
       for (const line of stdout.trim().split("\n")) {
@@ -1015,6 +1064,30 @@ async function findNexuProcessPids(
   }
 
   return Array.from(allPids);
+}
+
+async function findNexuProcessPids(
+  excludeProcessTree = false,
+): Promise<number[]> {
+  return findProcessPidsByPatterns(NEXU_PROCESS_PATTERNS, excludeProcessTree);
+}
+
+async function killOrphanOpenclawProcesses(
+  registeredPid?: number,
+): Promise<number[]> {
+  const pids = await findProcessPidsByPatterns(OPENCLAW_PROCESS_PATTERNS, true);
+  const orphanPids = pids.filter((pid) => pid !== registeredPid);
+
+  for (const pid of orphanPids) {
+    console.warn(`bootstrap: killing stale openclaw process pid=${pid}`);
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // ESRCH — already gone
+    }
+  }
+
+  return orphanPids;
 }
 
 /**
