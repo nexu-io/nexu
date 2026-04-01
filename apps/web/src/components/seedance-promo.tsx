@@ -92,6 +92,7 @@ export function SeedancePromoBanner({
   if (isDismissed) return null;
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: banner with nested interactive elements
     <div
       role="button"
       tabIndex={0}
@@ -228,12 +229,11 @@ export function SeedancePromoModal({
           onClose();
         }}
       />
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, no keyboard action needed */}
       <div
         className="relative w-full max-w-[348px] mx-4 overflow-hidden rounded-2xl border border-border bg-surface-1 shadow-[0_24px_64px_rgba(0,0,0,0.24),0_0_0_1px_rgba(0,0,0,0.06)]"
         style={{ animation: "scaleIn 220ms cubic-bezier(0.16,1,0.3,1)" }}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={() => {}}
-        role="dialog"
       >
         {/* Close button */}
         <button
