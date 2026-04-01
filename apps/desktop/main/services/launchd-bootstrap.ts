@@ -1029,13 +1029,48 @@ async function killOrphanNexuProcesses(): Promise<void> {
  * Shared between killOrphanNexuProcesses and ensureNexuProcessesDead so
  * they agree on what constitutes a "Nexu process".
  */
-// Patterns must be specific enough to avoid matching unrelated processes
-// (e.g. an editor with the file open, or a grep searching for these paths).
-// Prefix with "node" to only match actual Node.js processes.
-const NEXU_PROCESS_PATTERNS = [
-  "\\.nexu/runtime/controller-sidecar/dist/index\\.js",
-  "\\.nexu/(runtime/)?openclaw-sidecar",
-] as const;
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getNexuProcessPatterns(): string[] {
+  const repoRoot = getWorkspaceRoot();
+  const nexuHome = path.join(os.homedir(), ".nexu");
+  const patterns = new Set<string>([
+    escapeRegexLiteral(
+      path.join(nexuHome, "runtime", "controller-sidecar", "dist", "index.js"),
+    ),
+    "\\.nexu/(runtime/)?openclaw-sidecar",
+    escapeRegexLiteral(
+      path.join(repoRoot, "apps", "controller", "dist", "index.js"),
+    ),
+    escapeRegexLiteral(
+      path.join(
+        repoRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
+    ),
+  ]);
+
+  if (process.resourcesPath) {
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "controller",
+          "dist",
+          "index.js",
+        ),
+      ),
+    );
+  }
+
+  return Array.from(patterns);
+}
 
 const NEXU_MANAGED_OPENCLAW_PATH_PATTERNS = [
   "\\.nexu/(runtime/)?openclaw-sidecar",
@@ -1161,7 +1196,10 @@ async function findProcessPidsByPatterns(
 async function findNexuProcessPids(
   excludeProcessTree = false,
 ): Promise<number[]> {
-  return findProcessPidsByPatterns(NEXU_PROCESS_PATTERNS, excludeProcessTree);
+  return findProcessPidsByPatterns(
+    getNexuProcessPatterns(),
+    excludeProcessTree,
+  );
 }
 
 async function killOrphanOpenclawProcesses(opts: {
