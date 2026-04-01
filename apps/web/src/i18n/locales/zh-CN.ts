@@ -218,6 +218,26 @@ const zhCN = {
   "home.starGithub": "Star on GitHub",
   "home.starNexu": "在 GitHub 上 Star Nexu",
   "home.starCta": "帮助我们壮大开源社区 — 你的 Star 很重要",
+  "home.seedance.promo.title": "Seedance 2.0 体验 Key",
+  "home.seedance.promo.badge": "限时体验",
+  "home.seedance.promo.subtitle":
+    "nexu 已支持 Seedance 2.0。Star 后加入飞书群并填写问卷，我们会联系并发送 Key。",
+  "home.seedance.promo.dismiss": "关闭活动横幅",
+  "home.seedance.modal.title": "领取 Seedance 2.0 体验 Key",
+  "home.seedance.modal.lead": "两步就能完成：先点 Star，再走飞书群申请流程。",
+  "home.seedance.modal.step1.title": "第一步：GitHub Star 并截图",
+  "home.seedance.modal.step1.copy":
+    "在 GitHub 为 nexu star；并将点完后的仓库页面进行截图。",
+  "home.seedance.modal.step1.cta": "去 GitHub Star",
+  "home.seedance.modal.step1.done": "已点 Star",
+  "home.seedance.modal.step1.nextCta": "我已经截图，去进群填问卷",
+  "home.seedance.modal.step2.title": "第二步：加入飞书群并填写问卷",
+  "home.seedance.modal.step2.copy":
+    "加入飞书群并填写问卷后，我们会联系并发送 Key。拿到 Key 后，将其输入到 nexu Bot 即可开始体验。",
+  "home.seedance.modal.step2.cta": "点击链接加入飞书群",
+  "home.seedance.modal.step2.tutorial":
+    "查看教程：如何在 nexu Bot 中体验 Seedance 2.0",
+  "home.seedance.modal.step2.done": "好的，已了解",
   "home.recentActivity": "最近活动",
   "home.noRecentActivity": "暂无最近对话",
 

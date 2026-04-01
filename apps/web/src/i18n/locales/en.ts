@@ -223,6 +223,28 @@ const en = {
   "home.starNexu": "Star Nexu on GitHub",
   "home.starCta":
     "Help us grow the open-source community — your star makes a difference",
+  "home.seedance.promo.title": "Seedance 2.0 Experience Key",
+  "home.seedance.promo.badge": "Limited time",
+  "home.seedance.promo.subtitle":
+    "nexu now supports Seedance 2.0. Star the repo, join the Feishu group, fill the form, and we'll send you a Key.",
+  "home.seedance.promo.dismiss": "Dismiss promo",
+  "home.seedance.modal.title": "Get your Seedance 2.0 Experience Key",
+  "home.seedance.modal.lead":
+    "Two quick steps: Star the repo, then join the Feishu group to apply.",
+  "home.seedance.modal.step1.title": "Step 1: Star on GitHub & screenshot",
+  "home.seedance.modal.step1.copy":
+    "Star the nexu repo on GitHub, then take a screenshot of the page.",
+  "home.seedance.modal.step1.cta": "Star on GitHub",
+  "home.seedance.modal.step1.done": "Starred",
+  "home.seedance.modal.step1.nextCta": "I have the screenshot, join the group",
+  "home.seedance.modal.step2.title":
+    "Step 2: Join Feishu group & fill the form",
+  "home.seedance.modal.step2.copy":
+    "After joining the group and submitting the form, we'll reach out and send you a Key. Enter it in nexu Bot to start.",
+  "home.seedance.modal.step2.cta": "Join Feishu group",
+  "home.seedance.modal.step2.tutorial":
+    "Tutorial: How to use Seedance 2.0 in nexu Bot",
+  "home.seedance.modal.step2.done": "Got it",
   "home.recentActivity": "Recent Activity",
   "home.noRecentActivity": "No recent conversations",
 

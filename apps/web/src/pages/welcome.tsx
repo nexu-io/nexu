@@ -224,7 +224,27 @@ export function WelcomePage() {
       // the desktop runtime is already polling, keep the current waiting state
       // instead of resetting the browser auth flow.
       if (data?.error === "Connection attempt already in progress") {
-        toast.info(t("welcome.cloudConnectInProgress"));
+        const statusResponse = await getApiInternalDesktopCloudStatus();
+        const status = statusResponse.data;
+
+        setCloudStatus({
+          connected: Boolean(status?.connected),
+          polling: Boolean(status?.polling),
+        });
+
+        if (status?.connected) {
+          setCloudConnecting(false);
+          markSetupComplete();
+          navigate("/workspace", { replace: true });
+          return;
+        }
+
+        if (status?.polling) {
+          return;
+        }
+
+        setCloudConnecting(false);
+        setLoginError(null);
         return;
       }
       if (data?.error === "Already connected. Disconnect first.") {
@@ -246,6 +266,27 @@ export function WelcomePage() {
       if (data?.browserUrl) {
         await openExternalUrl(data.browserUrl);
         toast.info(t("welcome.browserOpened"));
+      }
+      if (!data?.browserUrl) {
+        const statusResponse = await getApiInternalDesktopCloudStatus().catch(
+          () => null,
+        );
+        const status = statusResponse?.data;
+        const connected = Boolean(status?.connected);
+        const polling = Boolean(status?.polling);
+
+        setCloudStatus({ connected, polling });
+
+        if (connected) {
+          setCloudConnecting(false);
+          markSetupComplete();
+          navigate("/workspace", { replace: true });
+          return;
+        }
+
+        if (!polling) {
+          setCloudConnecting(false);
+        }
       }
       // Keep cloudConnecting=true — polling effect will detect completion.
     } catch (_error) {
