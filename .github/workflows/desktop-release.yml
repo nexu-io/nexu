@@ -438,6 +438,45 @@ jobs:
             upload_prefix "${CHANNEL}"
           fi
 
+      - name: Purge Cloudflare CDN cache for latest artifacts
+        if: env.CLOUDFLARE_ZONE_ID != ''
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CHANNEL: ${{ steps.artifacts.outputs.channel }}
+          ARCH: ${{ matrix.arch }}
+          LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
+          LATEST_ZIP: ${{ steps.artifacts.outputs.latest_zip }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_url="https://desktop-releases.nexu.io/${CHANNEL}/${ARCH}"
+          urls=(
+            "${base_url}/${LATEST_DMG}"
+            "${base_url}/${LATEST_ZIP}"
+            "${base_url}/latest-mac.yml"
+          )
+
+          if [ "${ARCH}" = "arm64" ]; then
+            legacy_base_url="https://desktop-releases.nexu.io/${CHANNEL}"
+            urls+=(
+              "${legacy_base_url}/${LATEST_DMG}"
+              "${legacy_base_url}/${LATEST_ZIP}"
+              "${legacy_base_url}/latest-mac.yml"
+            )
+          fi
+
+          files_json=$(printf '%s\n' "${urls[@]}" | jq -R . | jq -sc '.')
+          echo "[cf-purge] Purging: ${files_json}"
+
+          curl -sf -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"files\": ${files_json}}" \
+            | jq .
+
   trigger-e2e:
     needs: release
     runs-on: ubuntu-latest
