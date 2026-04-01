@@ -327,6 +327,44 @@ async function validateControllerStartup(opts: {
   return { ok: true };
 }
 
+async function waitForControllerStartupValidation(opts: {
+  launchd: LaunchdManager;
+  label: string;
+  port: number;
+  timeoutMs?: number;
+  probeTimeoutMs?: number;
+}): Promise<ControllerStartupValidationResult> {
+  const timeoutMs = opts.timeoutMs ?? 5000;
+  const startedAt = Date.now();
+  let attempt = 0;
+  let lastResult: ControllerStartupValidationResult | null = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    lastResult = await validateControllerStartup({
+      launchd: opts.launchd,
+      label: opts.label,
+      port: opts.port,
+      probeTimeoutMs: opts.probeTimeoutMs,
+    });
+    if (lastResult.ok) {
+      return lastResult;
+    }
+
+    const delay = Math.min(100 + attempt * 100, 500);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    attempt++;
+  }
+
+  return (
+    lastResult ?? {
+      ok: false,
+      reason: "probe_timeout",
+      launchdStatus: { label: opts.label, plistPath: "", status: "unknown" },
+      probeUrl: `http://127.0.0.1:${opts.port}/api/internal/desktop/ready`,
+    }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Runtime ports metadata — persisted across sessions for attach discovery
 // ---------------------------------------------------------------------------
@@ -862,7 +900,7 @@ export async function bootstrapWithLaunchd(
   }
 
   // Build plistEnv with final resolved ports
-  const plistEnv: PlistEnv = {
+  let plistEnv: PlistEnv = {
     ...cleanupPlistEnv,
     controllerPort: effectivePorts.controllerPort,
     openclawPort: effectivePorts.openclawPort,
@@ -927,10 +965,11 @@ export async function bootstrapWithLaunchd(
 
   const validateOrRecoverController = async (): Promise<void> => {
     const originalPort = effectivePorts.controllerPort;
-    const validation = await validateControllerStartup({
+    const validation = await waitForControllerStartupValidation({
       launchd,
       label: labels.controller,
       port: effectivePorts.controllerPort,
+      timeoutMs: 5000,
       probeTimeoutMs: 3000,
     });
 
@@ -948,23 +987,25 @@ export async function bootstrapWithLaunchd(
 
     const retryPort = await findFreePort(originalPort + 1);
     effectivePorts.controllerPort = retryPort;
+    plistEnv = {
+      ...plistEnv,
+      controllerPort: retryPort,
+    };
 
     console.warn(
       `[bootstrap] retrying controller startup originalPort=${originalPort} retryPort=${retryPort}`,
     );
 
-    const retryPlist = generatePlist("controller", {
-      ...plistEnv,
-      controllerPort: retryPort,
-    });
+    const retryPlist = generatePlist("controller", plistEnv);
     await launchd.installService(labels.controller, retryPlist);
     await launchd.startService(labels.controller);
     await ensureRunning(labels.controller, "controller");
 
-    const retryValidation = await validateControllerStartup({
+    const retryValidation = await waitForControllerStartupValidation({
       launchd,
       label: labels.controller,
       port: retryPort,
+      timeoutMs: 5000,
       probeTimeoutMs: 3000,
     });
     if (retryValidation.ok) {

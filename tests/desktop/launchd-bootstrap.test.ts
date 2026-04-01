@@ -334,7 +334,7 @@ describe("bootstrapWithLaunchd", () => {
 
     // installService is always called so it can detect plist content changes
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("tears down services on NEXU_HOME mismatch", async () => {
     const fsMock = await import("node:fs/promises");

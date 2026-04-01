@@ -1361,7 +1361,7 @@ describe("Launchd Startup Scenarios", () => {
       expect.stringContaining('"controllerPort": 50801'),
       "utf8",
     );
-  });
+  }, 15000);
 
   // -----------------------------------------------------------------------
   // Scenario 31: controller port unreachable after start → retry on new port
@@ -1430,7 +1430,7 @@ describe("Launchd Startup Scenarios", () => {
       5000,
     );
     expect(result.effectivePorts.controllerPort).toBe(50801);
-  });
+  }, 15000);
 
   // -----------------------------------------------------------------------
   // Scenario 32: retry success writes effectivePorts to runtime-ports metadata
@@ -1500,7 +1500,7 @@ describe("Launchd Startup Scenarios", () => {
       expect.stringContaining('"controllerPort": 50801'),
       "utf8",
     );
-  });
+  }, 15000);
 
   // -----------------------------------------------------------------------
   // Scenario 33: retry failure throws explicit recovery error
@@ -1564,5 +1564,69 @@ describe("Launchd Startup Scenarios", () => {
     ).rejects.toThrow(
       /Controller startup recovery failed .*originalPort=50800 .*retryPort=50801 .*finalProbeUrl=http:\/\/127\.0\.0\.1:50801\/api\/internal\/desktop\/ready .*runtimePortsValue=/,
     );
-  });
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 34: transient controller warm-up does not trigger recovery
+  // -----------------------------------------------------------------------
+  it("Scenario 34: controller warm-up polling avoids unnecessary recovery", async () => {
+    const netMock = await import("node:net");
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    let readyAttempts = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        return Promise.resolve(
+          controllerStatusCalls <= 2
+            ? mockStoppedService()
+            : mockRunningService({ PORT: "50800" }),
+        );
+      }
+      openclawStatusCalls++;
+      return Promise.resolve(
+        openclawStatusCalls <= 2 ? mockStoppedService() : mockRunningService(),
+      );
+    });
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "connect") {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const url = String(input);
+        if (url.includes("/api/internal/desktop/ready")) {
+          readyAttempts++;
+          if (readyAttempts < 3) {
+            return Promise.resolve({ ok: false, status: 503 });
+          }
+        }
+        return Promise.resolve({ ok: true, status: 200 });
+      }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(result.effectivePorts.controllerPort).toBe(50800);
+    expect(
+      mockLaunchdManager.bootoutAndWaitForExit.mock.calls.some(
+        (call) => call[0] === "io.nexu.controller.dev",
+      ),
+    ).toBe(false);
+  }, 15000);
 });
