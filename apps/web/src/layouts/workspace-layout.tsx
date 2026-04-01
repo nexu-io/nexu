@@ -837,37 +837,34 @@ function WorkspaceLayoutInner() {
           ) : (
             <Link
               to="/workspace/rewards"
-              className="block rounded-lg px-3 py-2 hover:bg-surface-3 transition-colors"
+              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 hover:bg-surface-3 transition-colors"
               title={t("layout.credits.label")}
             >
-              <div className="flex items-center gap-2 mb-1.5">
-                <Coins
-                  size={13}
-                  className="text-[var(--color-brand-primary)] shrink-0"
-                />
-                {!collapsed && (
-                  <span className="text-[11px] font-medium text-text-primary truncate">
-                    {rewardsStatus.progress.earnedCredits}{" "}
-                    <span className="text-text-muted font-normal">
-                      /{" "}
-                      {rewardsStatus.progress.earnedCredits +
-                        rewardsStatus.progress.availableCredits}{" "}
-                      {t("layout.credits.label")}
-                    </span>
-                  </span>
-                )}
-              </div>
+              <Coins
+                size={14}
+                className="text-[var(--color-brand-primary)] shrink-0"
+              />
               {!collapsed && (
-                <div className="h-[4px] w-full rounded-full bg-border overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
-                    style={{
-                      width:
-                        rewardsStatus.progress.totalCount > 0
-                          ? `${Math.round((rewardsStatus.progress.claimedCount / rewardsStatus.progress.totalCount) * 100)}%`
-                          : "0%",
-                    }}
-                  />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-1 text-[11px] leading-tight truncate">
+                    <span className="font-semibold tabular-nums text-text-primary">
+                      {rewardsStatus.progress.claimedCount}
+                    </span>
+                    <span className="text-text-muted font-normal">
+                      / {rewardsStatus.progress.totalCount}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-[3px] w-full rounded-full bg-border overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
+                      style={{
+                        width:
+                          rewardsStatus.progress.totalCount > 0
+                            ? `${Math.round((rewardsStatus.progress.claimedCount / rewardsStatus.progress.totalCount) * 100)}%`
+                            : "0%",
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </Link>
