@@ -125,6 +125,7 @@ const zhCN = {
   "layout.collapseSidebar": "收起侧边栏",
   "layout.update.available": "{{version}} 可用",
   "layout.update.downloading": "正在下载更新...",
+  "layout.update.installing": "正在准备安装并重启...",
   "layout.update.readyToInstall": "更新已就绪",
   "layout.update.download": "下载",
   "layout.update.install": "重启并安装",

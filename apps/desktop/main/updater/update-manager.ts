@@ -276,7 +276,15 @@ export class UpdateManager {
   }
 
   async quitAndInstall(): Promise<void> {
-    this.logCheck("quit-and-install: starting teardown", this.getDiagnostic());
+    const startedAt = Date.now();
+    const logStep = (message: string): void => {
+      this.logCheck(
+        `quit-and-install: ${message} (+${Date.now() - startedAt}ms)`,
+        this.getDiagnostic(),
+      );
+    };
+
+    logStep("start");
 
     // --- Phase 1: Best-effort cleanup ---
     // Each step is wrapped in try/catch so a failure in one step never
@@ -286,59 +294,77 @@ export class UpdateManager {
     // 0. Stop periodic update checks so they don't fire during teardown.
     this.stopPeriodicCheck();
 
+    logStep("phase 1 cleanup start");
+
     // 1a. Tear down launchd services (bootout + SIGKILL + delete ports file).
-    if (this.launchdCtx) {
-      try {
-        await teardownLaunchdServices({
-          launchd: this.launchdCtx.manager,
-          labels: this.launchdCtx.labels,
-          plistDir: this.launchdCtx.plistDir,
-        });
-      } catch (err) {
-        this.logCheck(
-          `quit-and-install: teardown failed, proceeding: ${err instanceof Error ? err.message : String(err)}`,
-          this.getDiagnostic(),
-        );
-      }
-    }
+    const launchdCtx = this.launchdCtx;
+    const teardownPromise = launchdCtx
+      ? (async () => {
+          const teardownStartedAt = Date.now();
+          try {
+            await teardownLaunchdServices({
+              launchd: launchdCtx.manager,
+              labels: launchdCtx.labels,
+              plistDir: launchdCtx.plistDir,
+            });
+            this.logCheck(
+              `quit-and-install: launchd teardown complete (+${Date.now() - teardownStartedAt}ms)`,
+              this.getDiagnostic(),
+            );
+          } catch (err) {
+            this.logCheck(
+              `quit-and-install: launchd teardown failed, proceeding: ${err instanceof Error ? err.message : String(err)} (+${Date.now() - teardownStartedAt}ms)`,
+              this.getDiagnostic(),
+            );
+          }
+        })()
+      : Promise.resolve();
 
     // 1b. Dispose the orchestrator (stops non-launchd managed units like
     // embedded web server, utility processes). These are child processes of
     // the Electron main process and will be reaped by the OS on exit anyway,
     // so failure here is non-critical.
-    try {
-      await this.orchestrator.dispose();
-    } catch (err) {
-      this.logCheck(
-        `quit-and-install: orchestrator dispose failed, proceeding: ${err instanceof Error ? err.message : String(err)}`,
-        this.getDiagnostic(),
-      );
-    }
+    const disposeStartedAt = Date.now();
+    const disposePromise = (async () => {
+      try {
+        await this.orchestrator.dispose();
+        this.logCheck(
+          `quit-and-install: orchestrator dispose complete (+${Date.now() - disposeStartedAt}ms)`,
+          this.getDiagnostic(),
+        );
+      } catch (err) {
+        this.logCheck(
+          `quit-and-install: orchestrator dispose failed, proceeding: ${err instanceof Error ? err.message : String(err)} (+${Date.now() - disposeStartedAt}ms)`,
+          this.getDiagnostic(),
+        );
+      }
+    })();
+
+    await Promise.all([teardownPromise, disposePromise]);
+
+    logStep("phase 1 cleanup end");
 
     // --- Phase 2: Process verification ---
     // Two sweeps of SIGKILL to clear all Nexu sidecar processes. Uses both
     // authoritative sources (launchd labels, runtime-ports.json) and pgrep.
-    let { clean, remainingPids } = await ensureNexuProcessesDead();
+    const firstSweepStartedAt = Date.now();
+    let { clean, remainingPids } = await ensureNexuProcessesDead({
+      timeoutMs: 8_000,
+      intervalMs: 200,
+    });
+    this.logCheck(
+      `quit-and-install: first sweep complete in ${Date.now() - firstSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
+      this.getDiagnostic(),
+    );
 
     if (!clean) {
-      this.logCheck(
-        `quit-and-install: ${remainingPids.length} process(es) survived first sweep, retrying`,
-        this.getDiagnostic(),
-      );
+      const secondSweepStartedAt = Date.now();
       ({ clean, remainingPids } = await ensureNexuProcessesDead({
         timeoutMs: 5_000,
         intervalMs: 200,
       }));
-    }
-
-    if (clean) {
       this.logCheck(
-        "quit-and-install: all processes confirmed dead, triggering install",
-        this.getDiagnostic(),
-      );
-    } else {
-      this.logCheck(
-        `quit-and-install: ${remainingPids.length} process(es) survived both sweeps (${remainingPids.join(", ")})`,
+        `quit-and-install: second sweep complete in ${Date.now() - secondSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
         this.getDiagnostic(),
       );
     }
@@ -348,7 +374,12 @@ export class UpdateManager {
     // processes don't hold file handles to critical update paths. Use
     // lsof to check whether the .app bundle or extracted sidecar dirs
     // are actually locked.
+    const lockCheckStartedAt = Date.now();
     const { locked, lockedPaths } = await checkCriticalPathsLocked();
+    this.logCheck(
+      `quit-and-install: critical-path lock check complete in ${Date.now() - lockCheckStartedAt}ms (${locked ? `locked: ${lockedPaths.join(", ")}` : "unlocked"})`,
+      this.getDiagnostic(),
+    );
 
     if (locked) {
       // Critical paths are held open — installing now would fail or
@@ -371,6 +402,7 @@ export class UpdateManager {
 
     // Set force-quit flag so window close handlers don't intercept the exit
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+    logStep("triggering autoUpdater.quitAndInstall");
     autoUpdater.quitAndInstall(false, true);
   }
 

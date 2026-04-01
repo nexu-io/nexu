@@ -128,6 +128,7 @@ const en = {
   "layout.collapseSidebar": "Collapse sidebar",
   "layout.update.available": "{{version}} available",
   "layout.update.downloading": "Downloading update...",
+  "layout.update.installing": "Preparing to install and restart...",
   "layout.update.readyToInstall": "Update ready to install",
   "layout.update.download": "Download",
   "layout.update.install": "Restart & Install",

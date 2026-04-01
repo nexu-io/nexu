@@ -7,6 +7,7 @@ export type UpdatePhase =
   | "up-to-date"
   | "available"
   | "downloading"
+  | "installing"
   | "ready"
   | "error";
 
@@ -41,7 +42,10 @@ export function useAutoUpdate() {
       updater.onEvent("update:checking", () => {
         setState((prev) => ({
           ...prev,
-          phase: prev.userInitiated ? "checking" : prev.phase,
+          phase:
+            prev.userInitiated && prev.phase !== "installing"
+              ? "checking"
+              : prev.phase,
           errorMessage: null,
         }));
       }),
@@ -157,6 +161,7 @@ export function useAutoUpdate() {
   }, []);
 
   const install = useCallback(async () => {
+    setState((prev) => ({ ...prev, phase: "installing" }));
     try {
       await installUpdate();
     } catch {

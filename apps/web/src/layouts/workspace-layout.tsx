@@ -213,10 +213,15 @@ function UpdateFloatCard({
   desktopOffsetBottom,
   width,
 }: UpdateFloatCardProps) {
-  const updating = phase === "downloading";
+  const updating = phase === "downloading" || phase === "installing";
   const downloadProgress = Math.round(percent);
 
-  if (phase !== "available" && phase !== "downloading" && phase !== "ready") {
+  if (
+    phase !== "available" &&
+    phase !== "downloading" &&
+    phase !== "installing" &&
+    phase !== "ready"
+  ) {
     return null;
   }
 
@@ -240,13 +245,15 @@ function UpdateFloatCard({
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--color-success)]" />
             </span>
             <span className="text-[12px] font-medium text-text-primary">
-              {updating
-                ? t("layout.update.downloading")
-                : phase === "ready"
-                  ? t("layout.update.readyToInstall")
-                  : t("layout.update.available", {
-                      version: version ?? "",
-                    })}
+              {phase === "installing"
+                ? t("layout.update.installing")
+                : updating
+                  ? t("layout.update.downloading")
+                  : phase === "ready"
+                    ? t("layout.update.readyToInstall")
+                    : t("layout.update.available", {
+                        version: version ?? "",
+                      })}
             </span>
           </div>
         </div>
@@ -263,7 +270,7 @@ function UpdateFloatCard({
       {updating && (
         <div className="flex items-center justify-between mt-3 mb-1">
           <span className="text-[10px] tabular-nums text-text-muted">
-            {downloadProgress}%
+            {phase === "installing" ? "…" : `${downloadProgress}%`}
           </span>
         </div>
       )}
@@ -272,7 +279,9 @@ function UpdateFloatCard({
           <div className="h-[6px] w-full rounded-full bg-border overflow-hidden">
             <div
               className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
-              style={{ width: `${downloadProgress}%` }}
+              style={{
+                width: phase === "installing" ? "100%" : `${downloadProgress}%`,
+              }}
             />
           </div>
         </div>
@@ -335,6 +344,7 @@ function WorkspaceLayoutInner() {
   const hasUpdate =
     update.phase === "available" ||
     update.phase === "downloading" ||
+    update.phase === "installing" ||
     update.phase === "ready";
   const SIDEBAR_MIN = 160;
   const SIDEBAR_MAX = 320;

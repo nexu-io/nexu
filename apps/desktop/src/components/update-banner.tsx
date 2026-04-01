@@ -18,6 +18,7 @@ const i18n = {
     checking: "Checking for updates...",
     upToDate: "You're up to date",
     downloading: "Downloading update\u2026",
+    installing: "Preparing to install and restart…",
     available: (version: string) => `v${version} available`,
     ready: (version: string) => `v${version} ready`,
     error: "Update failed",
@@ -36,6 +37,7 @@ const i18n = {
     checking: "正在检查更新...",
     upToDate: "已是最新版本",
     downloading: "正在下载更新\u2026",
+    installing: "正在准备安装并重启…",
     available: (version: string) => `v${version} 可更新`,
     ready: (version: string) => `v${version} 已就绪`,
     error: "更新失败",
@@ -65,7 +67,10 @@ export function UpdateBadge({
 }) {
   const t = resolveLocale(i18n);
   const hasUpdate =
-    phase === "available" || phase === "downloading" || phase === "ready";
+    phase === "available" ||
+    phase === "downloading" ||
+    phase === "installing" ||
+    phase === "ready";
   if (!hasUpdate || !dismissed) return null;
 
   return (
@@ -97,6 +102,7 @@ export function UpdateBanner({
   const isChecking = phase === "checking";
   const isUpToDate = phase === "up-to-date";
   const isDownloading = phase === "downloading";
+  const isInstalling = phase === "installing";
   const isReady = phase === "ready";
   const isError = phase === "error";
   const isAvailable = phase === "available";
@@ -116,12 +122,13 @@ export function UpdateBanner({
             {isChecking && t.checking}
             {isUpToDate && t.upToDate}
             {isDownloading && t.downloading}
+            {isInstalling && t.installing}
             {isAvailable && version && t.available(version)}
             {isReady && version && t.ready(version)}
             {isError && t.error}
           </span>
         </div>
-        {!isDownloading && !isChecking && (
+        {!isDownloading && !isInstalling && !isChecking && (
           <button
             className="update-card-close"
             onClick={onDismiss}
@@ -146,23 +153,27 @@ export function UpdateBanner({
         )}
       </div>
 
-      {(isChecking || isUpToDate) && (
+      {(isChecking || isUpToDate || isInstalling) && (
         <div className="update-card-message">
-          {isChecking ? t.checkingDetail : t.upToDateDetail}
+          {isChecking
+            ? t.checkingDetail
+            : isInstalling
+              ? t.installing
+              : t.upToDateDetail}
         </div>
       )}
 
       {/* Downloading — percentage + progress bar */}
-      {isDownloading && (
+      {(isDownloading || isInstalling) && (
         <>
           <div className="update-card-percent">
-            <span>{Math.round(percent)}%</span>
+            <span>{isInstalling ? "…" : `${Math.round(percent)}%`}</span>
           </div>
           <div className="update-card-progress-wrap">
             <div className="update-card-progress-track">
               <div
                 className="update-card-progress-fill"
-                style={{ width: `${percent}%` }}
+                style={{ width: isInstalling ? "100%" : `${percent}%` }}
               />
             </div>
           </div>
