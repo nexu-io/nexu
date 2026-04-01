@@ -7,6 +7,7 @@ import "@/lib/api";
 import { getTagLabel } from "@/lib/skill-translations";
 import { getSkillsBackNavigation } from "@/lib/skills-view-state";
 import { cn } from "@/lib/utils";
+import type { SkillSource } from "@/types/desktop";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -33,9 +34,25 @@ type SkillDetail = {
   updatedAt: string;
   homepage: string;
   installed: boolean;
+  installedSource: SkillSource | null;
+  agentId: string | null;
+  uninstallable: boolean;
   skillContent: string | null;
   files: string[];
 };
+
+type UninstallableSkillSource = Exclude<SkillSource, "curated">;
+
+function toUninstallSource(
+  source: SkillSource | string | null | undefined,
+): UninstallableSkillSource | undefined {
+  return source === "managed" ||
+    source === "custom" ||
+    source === "workspace" ||
+    source === "user"
+    ? source
+    : undefined;
+}
 
 function formatCount(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
@@ -288,7 +305,23 @@ export function CommunitySkillDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
   const { t, locale } = useLocale();
+  const selectedSource = toUninstallSource(
+    searchParams.get("skillSource") ??
+      (typeof location.state === "object" &&
+      location.state !== null &&
+      "selectedSource" in location.state
+        ? String(location.state.selectedSource)
+        : null),
+  );
+  const selectedAgentId =
+    searchParams.get("agentId") ??
+    (typeof location.state === "object" &&
+    location.state !== null &&
+    "selectedAgentId" in location.state
+      ? String(location.state.selectedAgentId)
+      : null);
 
   const handleBack = () => {
     const backNavigation = getSkillsBackNavigation(
@@ -310,10 +343,14 @@ export function CommunitySkillDetailPage() {
   >(null);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["skillhub", "detail", slug],
+    queryKey: ["skillhub", "detail", slug, selectedSource, selectedAgentId],
     queryFn: async (): Promise<SkillDetail> => {
       const { data, error } = await getApiV1SkillhubSkillsBySlug({
         path: { slug: slug as string },
+        query: {
+          ...(selectedSource ? { source: selectedSource } : {}),
+          ...(selectedAgentId ? { agentId: selectedAgentId } : {}),
+        },
       });
       if (error) throw new Error("Failed to load skill");
       return data as unknown as SkillDetail;
@@ -337,7 +374,13 @@ export function CommunitySkillDetailPage() {
     if (!slug) return;
     setPendingAction("uninstall");
     try {
-      await uninstallMutation.mutateAsync(slug);
+      await uninstallMutation.mutateAsync({
+        slug,
+        ...(toUninstallSource(data?.installedSource)
+          ? { source: toUninstallSource(data?.installedSource) }
+          : {}),
+        ...(data?.agentId ? { agentId: data.agentId } : {}),
+      });
     } finally {
       setPendingAction(null);
     }
@@ -407,11 +450,11 @@ export function CommunitySkillDetailPage() {
           {data.installed ? (
             <button
               type="button"
-              disabled={isBusy}
+              disabled={isBusy || !data.uninstallable}
               onClick={() => void handleUninstall()}
               className={cn(
                 "shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium transition-colors",
-                isBusy
+                isBusy || !data.uninstallable
                   ? "bg-surface-3 text-text-muted cursor-not-allowed"
                   : "bg-red-500/10 text-red-500 hover:bg-red-500/20",
               )}

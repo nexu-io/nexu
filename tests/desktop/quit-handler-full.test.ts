@@ -145,9 +145,9 @@ describe("installLaunchdQuitHandler", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 2. Window close in packaged mode shows quit dialog (prevent default)
+  // 2. Window close in packaged mode hides to background (no dialog)
   // -------------------------------------------------------------------------
-  it("prevents default and shows quit dialog in packaged mode", async () => {
+  it("hides window to background on close in packaged mode", async () => {
     mockApp.isPackaged = true;
 
     const { installLaunchdQuitHandler } = await import(
@@ -159,9 +159,10 @@ describe("installLaunchdQuitHandler", () => {
     const event = simulateClose();
 
     expect(event.preventDefault).toHaveBeenCalled();
-    // Dialog is shown asynchronously
-    await flush();
-    expect(mockDialog.showMessageBox).toHaveBeenCalledTimes(1);
+    expect(mockWindow.hide).toHaveBeenCalledTimes(1);
+    // No dialog, no teardown, no exit
+    expect(mockTeardown).not.toHaveBeenCalled();
+    expect(mockApp.exit).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -210,130 +211,45 @@ describe("installLaunchdQuitHandler", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 5. Dialog "cancel" (response=2) does nothing
+  // 5. Multiple window closes just hide repeatedly (no state leak)
   // -------------------------------------------------------------------------
-  it("cancel response does nothing", async () => {
-    mockDialog.showMessageBox.mockResolvedValue({ response: 2 });
-
-    const opts = createQuitOpts();
-    const { installLaunchdQuitHandler } = await import(
-      "../../apps/desktop/main/services/quit-handler"
-    );
-
-    installLaunchdQuitHandler(opts as never);
-
-    simulateClose();
-    await flush();
-
-    expect(mockWindow.hide).not.toHaveBeenCalled();
-    expect(opts.onBeforeQuit).not.toHaveBeenCalled();
-    expect(mockApp.exit).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // 6. Dialog "run-in-background" (response=1) hides window
-  // -------------------------------------------------------------------------
-  it("run-in-background hides window", async () => {
-    mockDialog.showMessageBox.mockResolvedValue({ response: 1 });
-
-    const opts = createQuitOpts();
-    const { installLaunchdQuitHandler } = await import(
-      "../../apps/desktop/main/services/quit-handler"
-    );
-
-    installLaunchdQuitHandler(opts as never);
-
-    simulateClose();
-    await flush();
-
-    expect(mockWindow.hide).toHaveBeenCalledTimes(1);
-    expect(mockTeardown).not.toHaveBeenCalled();
-    expect(mockApp.exit).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // 7. Dialog "quit-completely" (response=0) full teardown sequence
-  // -------------------------------------------------------------------------
-  it("quit-completely calls onBeforeQuit, webServer.close, teardown, exit", async () => {
-    mockDialog.showMessageBox.mockResolvedValue({ response: 0 });
-
-    const opts = createQuitOpts();
-    const { installLaunchdQuitHandler } = await import(
-      "../../apps/desktop/main/services/quit-handler"
-    );
-
-    installLaunchdQuitHandler(opts as never);
-
-    simulateClose();
-    await flush();
-
-    expect(opts.onBeforeQuit).toHaveBeenCalledTimes(1);
-    expect(opts.webServer.close).toHaveBeenCalledTimes(1);
-    expect(mockTeardown).toHaveBeenCalledWith({
-      launchd: opts.launchd,
-      labels: opts.labels,
-      plistDir: "/tmp/test-plist",
-    });
-    expect(mockApp.exit).toHaveBeenCalledWith(0);
-  });
-
-  // -------------------------------------------------------------------------
-  // 8. dialogOpen guard prevents re-entrant close
-  // -------------------------------------------------------------------------
-  it("prevents re-entrant close while dialog is open", async () => {
-    // Make the dialog hang until we resolve it
-    let resolveDialog!: (value: { response: number }) => void;
-    mockDialog.showMessageBox.mockReturnValue(
-      new Promise((resolve) => {
-        resolveDialog = resolve;
-      }),
-    );
-
-    const { installLaunchdQuitHandler } = await import(
-      "../../apps/desktop/main/services/quit-handler"
-    );
-
-    installLaunchdQuitHandler(createQuitOpts() as never);
-
-    // First close triggers dialog
-    const event1 = simulateClose();
-    expect(event1.preventDefault).toHaveBeenCalled();
-
-    // Allow microtask to start the dialog
-    await flush();
-    expect(mockDialog.showMessageBox).toHaveBeenCalledTimes(1);
-
-    // Second close while dialog is open — should preventDefault but not show another dialog
-    const event2 = simulateClose();
-    expect(event2.preventDefault).toHaveBeenCalled();
-    await flush();
-    expect(mockDialog.showMessageBox).toHaveBeenCalledTimes(1); // Still just 1
-
-    // Resolve the dialog
-    resolveDialog({ response: 2 }); // cancel
-    await flush();
-  });
-
-  // -------------------------------------------------------------------------
-  // 9. before-quit in packaged mode prevents quit and shows window
-  // -------------------------------------------------------------------------
-  it("before-quit in packaged mode prevents quit and shows/closes window", async () => {
+  it("repeated window close just hides each time", async () => {
     mockApp.isPackaged = true;
-    mockWindow.isVisible.mockReturnValue(false);
 
     const { installLaunchdQuitHandler } = await import(
       "../../apps/desktop/main/services/quit-handler"
     );
 
     installLaunchdQuitHandler(createQuitOpts() as never);
+
+    simulateClose();
+    simulateClose();
+
+    expect(mockWindow.hide).toHaveBeenCalledTimes(2);
+    expect(mockTeardown).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // 9. before-quit (Cmd+Q) in packaged mode does full teardown
+  // -------------------------------------------------------------------------
+  it("before-quit in packaged mode runs teardown and exits", async () => {
+    mockApp.isPackaged = true;
+
+    const { installLaunchdQuitHandler } = await import(
+      "../../apps/desktop/main/services/quit-handler"
+    );
+
+    const opts = createQuitOpts();
+    installLaunchdQuitHandler(opts as never);
 
     const handler = getBeforeQuitHandler();
     const event = { preventDefault: vi.fn() };
     handler(event);
 
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(mockWindow.show).toHaveBeenCalled();
-    expect(mockWindow.close).toHaveBeenCalled();
+    await flush();
+    expect(mockTeardown).toHaveBeenCalledTimes(1);
+    expect(mockApp.exit).toHaveBeenCalledWith(0);
   });
 
   // -------------------------------------------------------------------------
@@ -403,62 +319,5 @@ describe("installLaunchdQuitHandler", () => {
     handler(event);
 
     expect(event.preventDefault).not.toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getQuitDialogLocale (tested indirectly via showMessageBox call content)
-// ---------------------------------------------------------------------------
-
-describe("getQuitDialogLocale", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    closeHandlers.length = 0;
-    mockGetAllWindows.mockReturnValue([mockWindow]);
-    mockApp.__nexuForceQuit = false;
-    mockApp.isPackaged = true;
-    mockTeardown.mockResolvedValue(undefined);
-  });
-
-  // -------------------------------------------------------------------------
-  // 12. Returns zh for zh-CN locale
-  // -------------------------------------------------------------------------
-  it("uses Chinese locale for zh-CN", async () => {
-    mockApp.getLocale.mockReturnValue("zh-CN");
-    mockDialog.showMessageBox.mockResolvedValue({ response: 2 }); // cancel
-
-    const { installLaunchdQuitHandler } = await import(
-      "../../apps/desktop/main/services/quit-handler"
-    );
-
-    installLaunchdQuitHandler(createQuitOpts() as never);
-
-    simulateClose();
-    await flush();
-
-    const dialogCall = mockDialog.showMessageBox.mock.calls[0][0];
-    expect(dialogCall.title).toBe("\u9000\u51FA Nexu");
-    expect(dialogCall.buttons).toContain("\u5B8C\u5168\u9000\u51FA");
-  });
-
-  // -------------------------------------------------------------------------
-  // 13. Returns en for non-zh locale
-  // -------------------------------------------------------------------------
-  it("uses English locale for non-zh locale", async () => {
-    mockApp.getLocale.mockReturnValue("en-US");
-    mockDialog.showMessageBox.mockResolvedValue({ response: 2 }); // cancel
-
-    const { installLaunchdQuitHandler } = await import(
-      "../../apps/desktop/main/services/quit-handler"
-    );
-
-    installLaunchdQuitHandler(createQuitOpts() as never);
-
-    simulateClose();
-    await flush();
-
-    const dialogCall = mockDialog.showMessageBox.mock.calls[0][0];
-    expect(dialogCall.title).toBe("Quit Nexu");
-    expect(dialogCall.buttons).toContain("Quit Completely");
   });
 });

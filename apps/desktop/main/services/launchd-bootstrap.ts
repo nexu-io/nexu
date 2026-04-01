@@ -11,7 +11,7 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
-import { createConnection } from "node:net";
+import net, { createConnection } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
@@ -81,6 +81,10 @@ export interface LaunchdBootstrapEnv {
   skillNodePath: string;
   /** TMPDIR for openclaw temp files */
   openclawTmpDir: string;
+  /** Normalized proxy env propagated to controller/openclaw launchd services */
+  proxyEnv: Record<string, string>;
+  /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
+  log?: (message: string) => void;
 }
 
 export interface LaunchdBootstrapResult {
@@ -276,20 +280,28 @@ function isProcessAlive(pid: number): boolean {
 // Port occupier detection
 // ---------------------------------------------------------------------------
 
+/**
+ * Check if a port is occupied by attempting to bind a temporary server.
+ * Returns `{ pid: 0 }` if occupied, `null` if free.
+ *
+ * Uses net.createServer().listen() instead of lsof or net.connect because:
+ * - lsof is blocked by macOS hardened runtime in packaged Electron apps
+ * - net.connect conflicts with probePort (both use createConnection)
+ */
 async function detectPortOccupier(
   port: number,
 ): Promise<{ pid: number } | null> {
-  try {
-    const { stdout } = await execFileAsync("lsof", [
-      `-iTCP:${port}`,
-      "-sTCP:LISTEN",
-      "-t",
-    ]);
-    const pid = Number.parseInt(stdout.trim(), 10);
-    return Number.isNaN(pid) ? null : { pid };
-  } catch {
-    return null;
-  }
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => {
+      // EADDRINUSE or other bind failure — port is occupied
+      resolve({ pid: 0 });
+    });
+    server.listen(port, "127.0.0.1", () => {
+      // Successfully bound — port is free. Close immediately.
+      server.close(() => resolve(null));
+    });
+  });
 }
 
 /**
@@ -372,6 +384,7 @@ async function cleanupStalePlists(
 export async function bootstrapWithLaunchd(
   env: LaunchdBootstrapEnv,
 ): Promise<LaunchdBootstrapResult> {
+  const log = env.log ?? console.log;
   const logDir = await ensureLogDir(env.nexuHome);
   const plistDir = env.plistDir ?? getDefaultPlistDir(env.isDev);
 
@@ -415,6 +428,7 @@ export async function bootstrapWithLaunchd(
     openclawExtensionsDir: env.openclawExtensionsDir,
     skillNodePath: env.skillNodePath,
     openclawTmpDir: env.openclawTmpDir,
+    proxyEnv: env.proxyEnv,
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
@@ -510,7 +524,9 @@ export async function bootstrapWithLaunchd(
       const reason = versionMismatch
         ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
         : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)";
-      console.log(`${reason}, tearing down stale services`);
+      console.log(
+        `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
+      );
       await Promise.allSettled([
         controllerRunning
           ? launchd.bootoutService(labels.controller)
@@ -572,7 +588,7 @@ export async function bootstrapWithLaunchd(
     // corrupted). We can't know the ports they're using, so tear them down
     // and do a clean cold start with fresh ports.
     console.log(
-      "Services running but no runtime-ports.json found, tearing down for clean start",
+      `[bootstrap] teardown: no runtime-ports.json but services running (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
     );
     await Promise.allSettled([
       controllerRunning
@@ -587,6 +603,9 @@ export async function bootstrapWithLaunchd(
   // --- Per-service: validate running ones, start missing ones ---
 
   // Health check running services
+  console.log(
+    `[bootstrap] health check: controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"} useRecoveredPorts=${useRecoveredPorts}`,
+  );
   let controllerHealthy = false;
   let openclawHealthy = false;
   let needsControllerReady = true;
@@ -609,7 +628,23 @@ export async function bootstrapWithLaunchd(
   }
 
   if (openclawRunning && useRecoveredPorts) {
-    openclawHealthy = await probePort(effectivePorts.openclawPort);
+    const portListening = await probePort(effectivePorts.openclawPort);
+    // Port listening isn't enough — verify it's OUR openclaw by checking
+    // that the launchd service env matches our expected token/state dir.
+    // This prevents attaching to a global openclaw or ClawX on the same port.
+    if (portListening) {
+      const ocEnv = (await launchd.getServiceStatus(labels.openclaw)).env;
+      const expectedToken = env.gatewayToken;
+      const runningToken = ocEnv?.OPENCLAW_GATEWAY_TOKEN;
+      if (expectedToken && runningToken && runningToken !== expectedToken) {
+        console.log(
+          "OpenClaw port is listening but gateway token mismatch — not our instance",
+        );
+        openclawHealthy = false;
+      } else {
+        openclawHealthy = true;
+      }
+    }
     if (openclawHealthy) {
       console.log("OpenClaw already running and healthy");
     } else {
@@ -636,12 +671,20 @@ export async function bootstrapWithLaunchd(
     }
   }
   if (!openclawHealthy) {
+    const preOccupier = await detectPortOccupier(effectivePorts.openclawPort);
+    log(
+      `[bootstrap] pre-findFreePort: openclawPort=${effectivePorts.openclawPort} occupier=${preOccupier ? `PID ${preOccupier.pid}` : "none"}`,
+    );
     const freePort = await findFreePort(effectivePorts.openclawPort);
     if (freePort !== effectivePorts.openclawPort) {
       console.log(
         `OpenClaw port ${effectivePorts.openclawPort} occupied, using ${freePort}`,
       );
       effectivePorts.openclawPort = freePort;
+    } else {
+      log(
+        `[bootstrap] openclawPort ${effectivePorts.openclawPort} appears free, keeping`,
+      );
     }
   }
 
@@ -660,25 +703,97 @@ export async function bootstrapWithLaunchd(
     label: string,
     type: "controller" | "openclaw",
   ) => {
+    console.log(`[bootstrap] ${type} installService begin label=${label}`);
     const plist = generatePlist(type, plistEnv);
     await launchd.installService(label, plist);
+    console.log(`[bootstrap] ${type} installService done label=${label}`);
   };
 
-  const ensureRunning = async (label: string) => {
+  const ensureRunning = async (label: string, type: string) => {
     const status = await launchd.getServiceStatus(label);
+    console.log(
+      `[bootstrap] ${type} ensureRunning status=${status.status} pid=${status.pid ?? "none"} label=${label}`,
+    );
     if (status.status !== "running") {
       await launchd.startService(label);
-      console.log(`Started ${label}`);
+      const afterStatus = await launchd.getServiceStatus(label);
+      console.log(
+        `[bootstrap] ${type} kickstart done status=${afterStatus.status} pid=${afterStatus.pid ?? "none"} label=${label}`,
+      );
     }
   };
 
   if (!controllerHealthy) {
     await ensureService(labels.controller, "controller");
-    await ensureRunning(labels.controller);
+    await ensureRunning(labels.controller, "controller");
+  } else {
+    console.log("[bootstrap] controller already healthy, skipping");
   }
   if (!openclawHealthy) {
     await ensureService(labels.openclaw, "openclaw");
-    await ensureRunning(labels.openclaw);
+    await ensureRunning(labels.openclaw, "openclaw");
+
+    // Verify our openclaw actually owns the port. Another launchd service
+    // (e.g. global `ai.openclaw.gateway` with KeepAlive=true) may have
+    // raced us and grabbed the port first. If so, pick a new port and
+    // re-bootstrap our service.
+    // Wait briefly for the port to be bound (our openclaw needs time to start).
+    await new Promise((r) => setTimeout(r, 2000));
+    const occupier = await detectPortOccupier(effectivePorts.openclawPort);
+    const ocStatus = await launchd.getServiceStatus(labels.openclaw);
+    log(
+      `[bootstrap] post-launch check: port=${effectivePorts.openclawPort} occupied=${!!occupier} ocStatus=${JSON.stringify({ pid: ocStatus.pid, status: ocStatus.status })}`,
+    );
+    // Port is stolen if someone is listening but our service crashed or
+    // isn't running. We can't compare PIDs (lsof blocked by hardened
+    // runtime), so check if our service is healthy instead.
+    const portStolen =
+      occupier && (ocStatus.pid == null || ocStatus.status !== "running");
+    log(`[bootstrap] portStolen=${portStolen}`);
+    if (portStolen) {
+      log(
+        `[bootstrap] OpenClaw port ${effectivePorts.openclawPort} stolen by PID ${occupier.pid} (ours is ${ocStatus.pid}), reassigning`,
+      );
+      // Bootout crashed openclaw and wait for launchd to fully release it.
+      // Use bootoutAndWaitForExit which captures the PID before bootout
+      // so waitForExit can SIGKILL if needed (plain waitForExit without
+      // knownPid exits early on "unknown" status).
+      await launchd
+        .bootoutAndWaitForExit(labels.openclaw, 5000)
+        .catch(() => {});
+
+      const newPort = await findFreePort(effectivePorts.openclawPort + 1);
+      effectivePorts.openclawPort = newPort;
+
+      // Regenerate plists with new port for both openclaw and controller
+      const retryPlistEnv: PlistEnv = {
+        ...plistEnv,
+        openclawPort: newPort,
+      };
+
+      // Re-bootstrap openclaw on new port
+      const retryPlist = generatePlist("openclaw", retryPlistEnv);
+      await launchd.installService(labels.openclaw, retryPlist);
+      await launchd.startService(labels.openclaw);
+      await ensureRunning(labels.openclaw, "openclaw");
+
+      // Controller needs the new port — re-bootstrap it too
+      await launchd
+        .bootoutAndWaitForExit(labels.controller, 5000)
+        .catch(() => {});
+      const retryControllerPlist = generatePlist("controller", retryPlistEnv);
+      await launchd.installService(labels.controller, retryControllerPlist);
+      await launchd.startService(labels.controller);
+      await ensureRunning(labels.controller, "controller");
+      // Controller was restarted — must wait for readiness again even if
+      // it was previously healthy (attach path sets needsControllerReady=false).
+      needsControllerReady = true;
+      log(
+        `[bootstrap] OpenClaw reassigned to port ${newPort}, controller restarted`,
+      );
+    }
+  } else {
+    console.log("[bootstrap] openclaw already healthy, skipping");
   }
 
   // Start embedded web server with port retry.
@@ -1218,11 +1333,11 @@ function readBundleExecutableName(appContentsPath: string): string {
  * drag-and-drop updates. The Electron Framework (~250 MB) is mmap'd into the
  * process address space, holding file references to the bundle.
  *
- * Solution: clone the Electron binary + frameworks to a `.app`-structured
- * directory under `~/.nexu/runtime/nexu-runner.app/`. On APFS (all modern
- * macOS), `cp -Rc` creates copy-on-write clones that occupy near-zero
- * additional disk space. The launchd plist then references this external
- * runner instead of `/Applications/Nexu.app`.
+ * Solution: clone the packaged app bundle to
+ * `~/.nexu/runtime/nexu-runner.app/`. On APFS (all modern macOS), `cp -Rc`
+ * creates copy-on-write clones that occupy near-zero additional disk space.
+ * The launchd plist then references this external runner instead of
+ * `/Applications/Nexu.app`.
  *
  * The runner is version-stamped so it re-clones when the app is updated.
  *
@@ -1236,9 +1351,15 @@ export async function ensureExternalNodeRunner(
   const binaryName = readBundleExecutableName(appContentsPath);
   const runnerRoot = path.join(nexuHome, "runtime", "nexu-runner.app");
   const stagingRoot = `${runnerRoot}.staging`;
-  const contentsDir = path.join(runnerRoot, "Contents");
-  const binaryPath = path.join(contentsDir, "MacOS", binaryName);
-  const stampPath = path.join(runnerRoot, ".version-stamp");
+  const binaryPath = path.join(runnerRoot, "Contents", "MacOS", binaryName);
+  // Version stamp lives OUTSIDE the .app bundle so it does not break the
+  // code signature's sealed-resources check.  Writing any file into the
+  // bundle root causes `codesign --verify` to fail with
+  // "unsealed contents present in the bundle root".
+  const stampPath = path.join(nexuHome, "runtime", ".nexu-runner-version");
+
+  assertSafeRmTarget(runnerRoot);
+  assertSafeRmTarget(stagingRoot);
 
   // Clean up leftover staging directory from an interrupted extraction
   if (existsSync(stagingRoot)) {
@@ -1266,56 +1387,42 @@ export async function ensureExternalNodeRunner(
   // Atomic extraction: build in staging directory, then rename into place.
   // If the process is killed mid-extraction, only the staging directory is
   // left behind and will be cleaned up on next startup (see above).
-  const stagingContentsDir = path.join(stagingRoot, "Contents");
-  const stagingMacosDir = path.join(stagingContentsDir, "MacOS");
-  const stagingBinaryPath = path.join(stagingMacosDir, binaryName);
-  await fs.mkdir(stagingMacosDir, { recursive: true });
+  const appBundlePath = path.dirname(appContentsPath);
+  const stagingBinaryPath = path.join(
+    stagingRoot,
+    "Contents",
+    "MacOS",
+    binaryName,
+  );
+  await fs.mkdir(path.dirname(stagingRoot), { recursive: true });
 
-  // Clone the binary (~52K)
-  const srcBinary = path.join(appContentsPath, "MacOS", binaryName);
+  // Clone the full app bundle so the runner keeps a valid macOS app layout,
+  // including signed resources like _CodeSignature and Resources.
   try {
-    await execFileAsync("cp", ["-c", srcBinary, stagingBinaryPath]);
+    await execFileAsync("cp", ["-Rc", appBundlePath, stagingRoot]);
   } catch {
     // APFS clone unavailable (e.g. non-APFS volume) — regular copy
     console.warn(
-      "APFS clone not available for binary, falling back to regular copy",
+      "APFS clone not available for runner bundle, falling back to regular copy",
     );
-    await execFileAsync("cp", [srcBinary, stagingBinaryPath]);
+    await execFileAsync("cp", ["-R", appBundlePath, stagingRoot]);
   }
 
-  // Clone all Frameworks (APFS CoW — ~0 additional disk for ~250MB)
-  const srcFrameworks = path.join(appContentsPath, "Frameworks");
-  const stagingFrameworks = path.join(stagingContentsDir, "Frameworks");
-  try {
-    await execFileAsync("cp", ["-Rc", srcFrameworks, stagingFrameworks]);
-  } catch {
-    // Fall back to regular recursive copy if -c is unsupported.
-    // This will use ~250MB of actual disk space.
-    console.warn(
-      "APFS clone not available for Frameworks (~250MB), falling back to regular copy. " +
-        "This is expected on non-APFS volumes but will use significant disk space.",
+  if (!existsSync(stagingBinaryPath)) {
+    throw new Error(
+      `Runner extraction failed: ${stagingBinaryPath} not found after clone`,
     );
-    await execFileAsync("cp", ["-R", srcFrameworks, stagingFrameworks]);
   }
-
-  // Copy Info.plist (Electron requires it in the bundle)
-  const infoPlistSrc = path.join(appContentsPath, "Info.plist");
-  if (existsSync(infoPlistSrc)) {
-    await execFileAsync("cp", [
-      infoPlistSrc,
-      path.join(stagingContentsDir, "Info.plist"),
-    ]);
-  }
-
-  // Write version stamp inside staging directory
-  const stagingStampPath = path.join(stagingRoot, ".version-stamp");
-  writeFileSync(stagingStampPath, appVersion, "utf8");
 
   // Atomic swap: remove old directory, then rename staging into place.
   // mv (rename) is atomic on the same filesystem (POSIX guarantee).
-  assertSafeRmTarget(runnerRoot);
   await execFileAsync("rm", ["-rf", runnerRoot]).catch(() => {});
   await fs.rename(stagingRoot, runnerRoot);
+
+  // Write version stamp AFTER the swap so it is only visible when the
+  // runner bundle is fully in place.  The stamp file is a sibling of the
+  // .app bundle, not inside it, to preserve the code signature.
+  writeFileSync(stampPath, appVersion, "utf8");
 
   console.log(`External node runner ready at ${binaryPath}`);
   return binaryPath;

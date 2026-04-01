@@ -126,6 +126,95 @@ describe("SkillDb", () => {
     expect(slugs).toEqual(["github", "weather"]);
   });
 
+  describe("workspace skills with agentId", () => {
+    it("records workspace install with agentId", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("my-tool", "workspace", undefined, "bot-abc");
+      const installed = db.getAllInstalled();
+      expect(installed).toHaveLength(1);
+      expect(installed[0].slug).toBe("my-tool");
+      expect(installed[0].source).toBe("workspace");
+      expect(installed[0].agentId).toBe("bot-abc");
+    });
+
+    it("returns workspace skills filtered by agentId", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("tool-a", "workspace", undefined, "bot-1");
+      db.recordInstall("tool-b", "workspace", undefined, "bot-2");
+      db.recordInstall("shared-skill", "managed");
+      const bot1Skills = db.getInstalledByAgent("bot-1");
+      expect(bot1Skills).toHaveLength(1);
+      expect(bot1Skills[0].slug).toBe("tool-a");
+      const bot2Skills = db.getInstalledByAgent("bot-2");
+      expect(bot2Skills).toHaveLength(1);
+      expect(bot2Skills[0].slug).toBe("tool-b");
+    });
+
+    it("getAllInstalled includes workspace skills", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("shared", "managed");
+      db.recordInstall("ws-tool", "workspace", undefined, "bot-1");
+      const all = db.getAllInstalled();
+      expect(all).toHaveLength(2);
+    });
+
+    it("persists agentId across close/reopen", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("tool", "workspace", undefined, "bot-x");
+      db.close();
+      const db2 = await SkillDb.create(dbPath);
+      const installed = db2.getAllInstalled();
+      expect(installed[0].agentId).toBe("bot-x");
+      db2.close();
+    });
+
+    it("legacy ledger without agentId field loads with null default", async () => {
+      const { writeFileSync } = await import("node:fs");
+      const legacyData = JSON.stringify({
+        skills: [
+          {
+            slug: "old-skill",
+            source: "managed",
+            status: "installed",
+            version: null,
+            installedAt: "2026-01-01T00:00:00.000Z",
+            uninstalledAt: null,
+          },
+        ],
+      });
+      writeFileSync(dbPath, legacyData);
+      db = await SkillDb.create(dbPath);
+      const installed = db.getAllInstalled();
+      expect(installed[0].agentId).toBeNull();
+    });
+
+    it("recordUninstall scopes workspace records by agentId", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-1");
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-2");
+
+      db.recordUninstall("shared-tool", "workspace", "bot-1");
+
+      expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
+      const bot2Skills = db.getInstalledByAgent("bot-2");
+      expect(bot2Skills).toHaveLength(1);
+      expect(bot2Skills[0].slug).toBe("shared-tool");
+    });
+
+    it("markUninstalledBySlugs scopes workspace records by agentId when provided", async () => {
+      db = await SkillDb.create(dbPath);
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-1");
+      db.recordInstall("shared-tool", "workspace", undefined, "bot-2");
+
+      db.markUninstalledBySlugs(["shared-tool"], "workspace", "bot-1");
+
+      expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
+      const bot2Skills = db.getInstalledByAgent("bot-2");
+      expect(bot2Skills).toHaveLength(1);
+      expect(bot2Skills[0].slug).toBe("shared-tool");
+    });
+  });
+
   it("supports custom source type", async () => {
     db = await SkillDb.create(dbPath);
     db.recordInstall("my-skill", "custom");
@@ -170,6 +259,7 @@ describe("SkillDb", () => {
         version: "1.2.3",
         installedAt: "2026-03-20T10:00:00.000Z",
         uninstalledAt: null,
+        agentId: null,
       },
     ]);
     // isRemovedByUser is deprecated (always returns false)

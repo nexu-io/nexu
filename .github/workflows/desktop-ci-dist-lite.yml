@@ -10,6 +10,7 @@ on:
       - "openclaw-runtime/**"
       - "openclaw-runtime-patches/**"
       - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-verify-extracted-runner.sh"
       - "scripts/desktop-ci-check.mjs"
       - "scripts/postinstall.mjs"
       - ".npmrc"
@@ -149,6 +150,12 @@ jobs:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
           NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
         run: pnpm check:dist
+
+      - name: Verify extracted runner bundle integrity
+        env:
+          NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp
+          NEXU_DESKTOP_REQUIRE_SPCTL: "0"
+        run: bash scripts/desktop-verify-extracted-runner.sh
 
       - name: Capture desktop logs
         if: always()

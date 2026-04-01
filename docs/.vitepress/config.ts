@@ -117,10 +117,19 @@ const enSidebar = [
           { text: "Feishu", link: "/guide/channels/feishu" },
           { text: "Slack", link: "/guide/channels/slack" },
           { text: "Discord", link: "/guide/channels/discord" },
+          { text: "Telegram", link: "/guide/channels/telegram" },
+          { text: "WhatsApp", link: "/guide/channels/whatsapp" },
         ],
       },
       { text: "Model Configuration", link: "/guide/models" },
       { text: "Skill Installation", link: "/guide/skills" },
+    ],
+  },
+  {
+    text: "Help",
+    items: [
+      { text: "Update Guide", link: "/guide/update" },
+      { text: "Troubleshooting", link: "/guide/troubleshooting" },
     ],
   },
   {
@@ -153,10 +162,19 @@ const jaSidebar = [
           { text: "Feishu", link: "/ja/guide/channels/feishu" },
           { text: "Slack", link: "/ja/guide/channels/slack" },
           { text: "Discord", link: "/ja/guide/channels/discord" },
+          { text: "Telegram", link: "/ja/guide/channels/telegram" },
+          { text: "WhatsApp", link: "/ja/guide/channels/whatsapp" },
         ],
       },
       { text: "モデル設定", link: "/ja/guide/models" },
       { text: "スキルインストール", link: "/ja/guide/skills" },
+    ],
+  },
+  {
+    text: "ヘルプ",
+    items: [
+      { text: "アップデートガイド", link: "/ja/guide/update" },
+      { text: "トラブルシューティング", link: "/ja/guide/troubleshooting" },
     ],
   },
   {
@@ -190,10 +208,19 @@ const zhSidebar = [
           { text: "飞书", link: "/zh/guide/channels/feishu" },
           { text: "Slack", link: "/zh/guide/channels/slack" },
           { text: "Discord", link: "/zh/guide/channels/discord" },
+          { text: "Telegram", link: "/zh/guide/channels/telegram" },
+          { text: "WhatsApp", link: "/zh/guide/channels/whatsapp" },
         ],
       },
       { text: "模型配置", link: "/zh/guide/models" },
       { text: "技能安装", link: "/zh/guide/skills" },
+    ],
+  },
+  {
+    text: "帮助",
+    items: [
+      { text: "更新指南", link: "/zh/guide/update" },
+      { text: "修复指南", link: "/zh/guide/troubleshooting" },
     ],
   },
   {

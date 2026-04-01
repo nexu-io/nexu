@@ -44,7 +44,27 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 vi.mock("node:net", () => ({
-  createConnection: vi.fn(),
+  default: {
+    createServer: vi.fn(() => ({
+      once() {},
+      listen(_p: number, _h: string, cb: () => void) {
+        setTimeout(() => cb(), 0);
+      },
+      close(cb: () => void) {
+        setTimeout(() => cb(), 0);
+      },
+    })),
+  },
+  createConnection: vi.fn(() => {
+    const socket = {
+      once(event: string, cb: () => void) {
+        if (event === "connect") setTimeout(() => cb(), 0);
+      },
+      destroy: vi.fn(),
+      setTimeout: vi.fn(),
+    };
+    return socket;
+  }),
 }));
 
 const mockLaunchdManager = {
@@ -120,6 +140,9 @@ function makeBootstrapEnv(
     openclawExtensionsDir: "/repo/node_modules/openclaw/extensions",
     skillNodePath: "/repo/apps/desktop/node_modules",
     openclawTmpDir: "/tmp/state/tmp",
+    proxyEnv: {
+      NO_PROXY: "localhost,127.0.0.1,::1",
+    },
     ...overrides,
   };
 }

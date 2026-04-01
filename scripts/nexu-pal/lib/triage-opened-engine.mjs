@@ -11,25 +11,56 @@ export function createTriagePlan() {
   };
 }
 
-function buildTranslationComment({ englishTitle, englishBody }) {
+function isInternalEquivalentAuthor({ isInternalAuthor, issueAuthorLogin }) {
+  if (isInternalAuthor === true) {
+    return true;
+  }
+
+  return issueAuthorLogin === "app/sentry";
+}
+
+function buildTranslationComment({ translatedTitle, translatedSections }) {
   const maxCommentLength = 65_500;
   const truncationMarker = "… [truncated]";
-  const title = typeof englishTitle === "string" ? englishTitle.trim() : "";
-  const body = typeof englishBody === "string" ? englishBody.trim() : "";
+  const title =
+    typeof translatedTitle === "string" ? translatedTitle.trim() : "";
+  const sections = Array.isArray(translatedSections)
+    ? translatedSections
+        .map((section) => {
+          if (!section || typeof section !== "object") {
+            return null;
+          }
+
+          const heading =
+            typeof section.heading === "string" ? section.heading.trim() : "";
+          const translatedText =
+            typeof section.translated_text === "string"
+              ? section.translated_text.trim()
+              : "";
+
+          if (translatedText === "") {
+            return null;
+          }
+
+          return {
+            heading: heading === "" ? "Section" : heading,
+            translatedText,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const body = sections
+    .map((section) => `**${section.heading}:**\n\n${section.translatedText}`)
+    .join("\n\n---\n\n");
 
   const buildComment = ({ titleText, bodyText }) =>
     [
-      "# AI Translation:",
+      "# AI Translation",
       "",
-      "---",
-      "",
-      "**Title:**",
-      "",
-      titleText,
-      "",
-      "**Body:**",
-      "",
-      bodyText,
+      "Only the non-English parts are translated below.",
+      ...(titleText ? ["", "**Title:**", "", titleText] : []),
+      ...(bodyText ? ["", "**Translated sections:**", "", bodyText] : []),
     ].join("\n");
 
   const withMarker = (text, maxLength) => {
@@ -69,7 +100,7 @@ function buildTranslationComment({ englishTitle, englishBody }) {
 
   const commentWithoutBody = buildComment({
     titleText: title,
-    bodyText: truncationMarker,
+    bodyText: body === "" ? truncationMarker : body,
   });
   if (commentWithoutBody.length <= maxCommentLength) {
     return commentWithoutBody;
@@ -85,6 +116,37 @@ function buildTranslationComment({ englishTitle, englishBody }) {
     titleText: withMarker(title, titleAllowance),
     bodyText: truncationMarker,
   });
+}
+
+function normalizeTranslatedSections(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const sections = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const heading = typeof item.heading === "string" ? item.heading.trim() : "";
+    const translatedText =
+      typeof item.translated_text === "string"
+        ? item.translated_text.trim()
+        : "";
+
+    if (translatedText === "") {
+      continue;
+    }
+
+    sections.push({
+      heading,
+      translated_text: translatedText,
+    });
+  }
+
+  return sections;
 }
 
 function toOrderedUniqueStrings(values) {
@@ -116,29 +178,35 @@ function sanitizeJsonResponse(raw) {
   return raw.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "");
 }
 
-function isInternalIssueAuthor(authorAssociation) {
-  return authorAssociation === "MEMBER" || authorAssociation === "OWNER";
-}
-
 async function detectAndTranslate({ chat, issueTitle, issueBody }) {
   const content = `Title: ${issueTitle}\n\nBody:\n${issueBody}`;
 
   const systemPrompt = `You are a language detection and translation assistant.
 
-Analyze the given GitHub issue content. Determine if a significant portion of the title or body is written in a non-English language (e.g., Chinese, Japanese, Korean, Spanish, etc.).
+Analyze the given GitHub issue content. Determine whether translation is actually needed for maintainers.
 
 Respond with a JSON object (no markdown fences):
 {
-  "is_non_english": true/false,
+  "should_translate": true/false,
   "detected_language": "language name or null",
-  "translated_title": "English translation of the title, or the original if already English",
-  "translated_body": "English translation of the body, or the original if already English"
+  "translated_title": "English translation only if the title itself needs translation; otherwise empty string",
+  "translated_body": "Full body where only non-English parts are translated into English and already-English parts stay concise and unchanged; empty string if no translation is needed",
+  "translated_sections": [
+    {
+      "heading": "Title or the nearest markdown heading / section label",
+      "translated_text": "English translation only for that non-English section"
+    }
+  ]
 }
 
 Rules:
-- If the content is already primarily in English, set is_non_english to false.
-- Minor non-English words (proper nouns, code identifiers) do not count as non-English.
+- If the issue is mostly English and the remaining non-English text is minor and does not affect the key meaning, set should_translate to false.
+- Minor non-English words, greetings, short asides, proper nouns, or code identifiers do not require translation when the issue is still clear.
 - Preserve markdown formatting in translations.
+- If translation is needed, translate only the non-English parts.
+- Split body translations by title or markdown heading when possible.
+- Keep translated_sections minimal: include only the sections that actually needed translation.
+- Do not repeat already-English sections in translated_sections.
 - Translate accurately and naturally.`;
 
   const raw = await chat(systemPrompt, content);
@@ -147,7 +215,7 @@ Rules:
     return JSON.parse(sanitizeJsonResponse(raw));
   } catch {
     return {
-      is_non_english: false,
+      should_translate: false,
       diagnostics: ["translation parse failed; treated issue as English"],
     };
   }
@@ -253,27 +321,48 @@ function buildNeedsInformationComment({ missingItems, reason }) {
 export async function buildOpenedIssueTriagePlan({
   issueTitle,
   issueBody,
-  issueAuthorAssociation,
+  isInternalAuthor = false,
+  issueAuthorLogin = "",
+  repositoryOwner = "",
+  issueAuthorAssociation = "NONE",
   chat,
 }) {
   const plan = createTriagePlan();
+  const shouldShortCircuitAfterClassification = isInternalEquivalentAuthor({
+    isInternalAuthor,
+    issueAuthorLogin,
+  });
 
   const translation = await detectAndTranslate({ chat, issueTitle, issueBody });
   let englishTitle = issueTitle;
   let englishBody = issueBody;
 
-  if (translation.is_non_english === true) {
+  if (translation.should_translate === true) {
     const hasTitle =
       typeof translation.translated_title === "string" &&
       translation.translated_title.trim() !== "";
     const hasBody =
       typeof translation.translated_body === "string" &&
       translation.translated_body.trim() !== "";
+    const normalizedTranslatedSections = normalizeTranslatedSections(
+      translation.translated_sections,
+    );
+    const translatedSections =
+      normalizedTranslatedSections.length > 0
+        ? normalizedTranslatedSections
+        : hasBody
+          ? [
+              {
+                heading: "Body",
+                translated_text: translation.translated_body.trim(),
+              },
+            ]
+          : [];
 
     englishTitle = hasTitle ? translation.translated_title : issueTitle;
     englishBody = hasBody ? translation.translated_body : issueBody;
 
-    if (hasTitle || hasBody) {
+    if (hasTitle || translatedSections.length > 0) {
       const detectedLanguage =
         typeof translation.detected_language === "string" &&
         translation.detected_language.trim() !== ""
@@ -282,8 +371,8 @@ export async function buildOpenedIssueTriagePlan({
 
       plan.commentsToAdd.push(
         buildTranslationComment({
-          englishTitle,
-          englishBody,
+          translatedTitle: hasTitle ? translation.translated_title : "",
+          translatedSections,
         }),
       );
       plan.labelsToAdd.push("ai-translated");
@@ -292,7 +381,7 @@ export async function buildOpenedIssueTriagePlan({
       );
     }
 
-    if (!(hasTitle || hasBody)) {
+    if (!(hasTitle || hasBody || translatedSections.length > 0)) {
       plan.diagnostics.push(
         "translation flagged non-English but returned empty translated strings; skipped translated content",
       );
@@ -320,10 +409,21 @@ export async function buildOpenedIssueTriagePlan({
   plan.diagnostics.push(
     `author association: ${issueAuthorAssociation ?? "unknown"}`,
   );
+  plan.diagnostics.push(`issue author login: ${issueAuthorLogin ?? "unknown"}`);
+  plan.diagnostics.push(`repository owner: ${repositoryOwner ?? "unknown"}`);
+  plan.diagnostics.push(
+    `organization membership: ${isInternalAuthor === true ? "member" : "non-member"}`,
+  );
 
-  if (isInternalIssueAuthor(issueAuthorAssociation)) {
+  if (issueAuthorLogin === "app/sentry") {
     plan.diagnostics.push(
-      "internal author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
+      "author is app/sentry; treated as internal-equivalent automation for triage short-circuit",
+    );
+  }
+
+  if (shouldShortCircuitAfterClassification === true) {
+    plan.diagnostics.push(
+      "internal-equivalent author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
     );
     return plan;
   }

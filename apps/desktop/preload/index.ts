@@ -63,6 +63,7 @@ const hostBridge: HostBridge = {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
+    needsSetupAnimation: process.env.NEXU_NEEDS_SETUP_ANIMATION === "1",
   },
 
   invoke<TChannel extends HostInvokeChannel>(

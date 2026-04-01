@@ -22,6 +22,7 @@ function createEnv(): ControllerEnv {
     openclawStateDir: "/tmp/nexu-home/runtime/openclaw/state",
     openclawConfigPath: "/tmp/nexu-home/runtime/openclaw/openclaw.json",
     openclawSkillsDir: "/tmp/nexu-home/runtime/openclaw/state/skills",
+    userSkillsDir: "/tmp/.agents/skills",
     openclawExtensionsDir: "/tmp/nexu-home/runtime/openclaw/state/extensions",
     runtimePluginTemplatesDir: "/tmp/nexu-home/runtime-plugins",
     openclawRuntimeModelStatePath:

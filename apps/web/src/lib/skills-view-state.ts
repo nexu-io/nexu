@@ -1,7 +1,7 @@
-import type { MinimalSkill } from "@/types/desktop";
+import type { MinimalSkill, SkillSource } from "@/types/desktop";
 
 export type TopTab = "explore" | "yours";
-export type YoursSubTab = "all" | "recommended" | "installed";
+export type YoursSubTab = "all" | "builtin" | "custom";
 
 export type SkillsViewState = {
   topTab: TopTab;
@@ -16,6 +16,8 @@ type SkillsHistoryState = {
 
 type SkillsDetailLocationState = {
   fromSkillsList?: boolean;
+  selectedSource?: SkillSource;
+  selectedAgentId?: string;
 };
 
 type SkillsBackNavigation =
@@ -34,7 +36,7 @@ function isTopTab(value: string | null): value is TopTab {
 }
 
 function isYoursSubTab(value: string | null): value is YoursSubTab {
-  return value === "all" || value === "recommended" || value === "installed";
+  return value === "all" || value === "builtin" || value === "custom";
 }
 
 function normalizeSearch(search: string): string {
@@ -118,12 +120,36 @@ export function applySkillsViewStatePatch(
   return createSkillsSearchParams(nextState);
 }
 
-export function createSkillDetailPath(slug: string, search: string): string {
-  return `/workspace/skills/${slug}${normalizeSearch(search)}`;
+export type SkillSelection = {
+  source?: SkillSource | null;
+  agentId?: string | null;
+};
+
+export function createSkillDetailPath(
+  slug: string,
+  search: string,
+  selection?: SkillSelection,
+): string {
+  const searchParams = new URLSearchParams(normalizeSearch(search));
+  if (selection?.source) {
+    searchParams.set("skillSource", selection.source);
+  }
+  if (selection?.agentId) {
+    searchParams.set("agentId", selection.agentId);
+  }
+
+  const query = searchParams.toString();
+  return `/workspace/skills/${slug}${query ? `?${query}` : ""}`;
 }
 
-export function createSkillDetailState(): { fromSkillsList: true } {
-  return { fromSkillsList: true };
+export function createSkillDetailState(
+  selection?: SkillSelection,
+): SkillsDetailLocationState {
+  return {
+    fromSkillsList: true,
+    ...(selection?.source ? { selectedSource: selection.source } : {}),
+    ...(selection?.agentId ? { selectedAgentId: selection.agentId } : {}),
+  };
 }
 
 export function getUnavailableSkillDetailSlugs(

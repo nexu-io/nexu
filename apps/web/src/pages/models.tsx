@@ -196,6 +196,32 @@ export function isModelSelected(
   return modelId.includes("/") !== currentModelId.includes("/");
 }
 
+function normalizeByokModelSelectionKey(
+  providerId: string,
+  modelId: string,
+): string {
+  const normalizedModelId = modelId.trim().toLowerCase();
+  if (normalizedModelId.length === 0) {
+    return normalizedModelId;
+  }
+
+  const normalizedProviderId = providerId.trim().toLowerCase();
+  return normalizedModelId.startsWith(`${normalizedProviderId}/`)
+    ? normalizedModelId
+    : `${normalizedProviderId}/${normalizedModelId}`;
+}
+
+function isByokModelSelected(
+  providerId: string,
+  modelId: string,
+  currentModelId: string,
+): boolean {
+  return (
+    normalizeByokModelSelectionKey(providerId, modelId) ===
+    normalizeByokModelSelectionKey(providerId, currentModelId)
+  );
+}
+
 function getProviderIdFromModelId(
   models: Array<{ id: string; provider: string }>,
   modelId: string,
@@ -266,7 +292,7 @@ const PROVIDER_META: Record<
     descriptionKey: "models.provider.openaiCompatible.description",
     apiDocsUrl: "https://cloud.siliconflow.cn/account/ak",
     apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.siliconflow.com/v1",
+    defaultProxyUrl: "https://api.siliconflow.cn/v1",
   },
   ppio: {
     name: "PPIO",
@@ -447,7 +473,7 @@ async function deleteProvider(providerId: ByokProviderId): Promise<void> {
 
 async function verifyApiKey(
   providerId: ByokProviderId,
-  apiKey: string,
+  apiKey?: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
   const { data, error } = await postApiV1ProvidersByProviderIdVerify({
@@ -1353,7 +1379,7 @@ function ByokProviderDetail({
   const isMiniMax = providerId === "minimax";
   const isOllama = providerId === "ollama";
   const hostBridge = getModelsHostInvokeBridge();
-  const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey;
+  const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey.trim();
 
   const { data: minimaxOauthStatus } = useQuery({
     queryKey: ["minimax-oauth-status"],
@@ -1371,9 +1397,8 @@ function ByokProviderDetail({
   const hasMiniMaxOauthAccess =
     isMiniMax &&
     (minimaxOauthStatus?.connected === true || dbProvider?.hasOauthCredential);
-  const hasSavedAccess = Boolean(
-    dbProvider?.hasApiKey || hasMiniMaxOauthAccess,
-  );
+  const hasSavedApiKey = Boolean(dbProvider?.hasApiKey);
+  const hasSavedAccess = Boolean(hasSavedApiKey || hasMiniMaxOauthAccess);
 
   const visibleMiniMaxOauthError =
     minimaxOauthStatus?.error &&
@@ -1463,6 +1488,15 @@ function ByokProviderDetail({
 
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
+  const canSubmitApiKeyConfig = Boolean(
+    isOllama || effectiveApiKey || hasSavedApiKey,
+  );
+  const canRefreshModels = Boolean(
+    isOllama || effectiveApiKey || hasSavedApiKey,
+  );
+  const isProviderConfigured = Boolean(
+    isOllama || hasSavedAccess || isOAuthConnected,
+  );
 
   // ── Z.AI Coding Plan state ───────────────────────────
   const isZaiProvider = providerId === "glm";
@@ -1570,25 +1604,31 @@ function ByokProviderDetail({
 
       return models;
     },
+    onSuccess: (models) => {
+      toast.success(t("models.byok.refreshSuccess", { count: models.length }));
+    },
+    onError: (error) => {
+      toast.error(error.message || t("models.byok.refreshFailed"));
+    },
   });
 
   // ── Save mutation ────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Auto-fetch models if none available yet
       let models = displayModels;
-      if (models.length === 0 && effectiveApiKey) {
+      if (isOllama || effectiveApiKey || hasSavedApiKey) {
         const result = await verifyApiKey(
           providerId,
           effectiveApiKey,
           baseUrl || undefined,
         );
-        if (result.valid && result.models && result.models.length > 0) {
+        if (result.valid && result.models) {
           models = result.models;
           setVerifiedModels(result.models);
         }
       }
-      return saveProvider(providerId, {
+
+      await saveProvider(providerId, {
         apiKey: effectiveApiKey || undefined,
         baseUrl: baseUrl || null,
         displayName: meta.name,
@@ -1596,8 +1636,10 @@ function ByokProviderDetail({
         authMode: "apiKey",
         modelsJson: JSON.stringify(models),
       });
+
+      return { models };
     },
-    onSuccess: () => {
+    onSuccess: ({ models }) => {
       track("workspace_provider_save", {
         provider_name: providerId,
       });
@@ -1607,9 +1649,9 @@ function ByokProviderDetail({
       setIsEditingApiKey(false);
       markSetupComplete();
       // Auto-select preferred model if no model is currently selected
-      const preferred = selectPreferredModel(displayModels);
+      const preferred = selectPreferredModel(models);
       if (preferred) {
-        onAutoSelectModel(preferred);
+        onAutoSelectModel(getScopedByokModelId(preferred));
       }
     },
   });
@@ -1728,6 +1770,14 @@ function ByokProviderDetail({
     if (stored.length > 0) return stored;
     return DEFAULT_MODELS[providerId] ?? [];
   }, [verifiedModels, dbProvider, providerId]);
+
+  const getScopedByokModelId = useCallback(
+    (modelId: string) =>
+      modelId.startsWith(`${providerId}/`)
+        ? modelId
+        : `${providerId}/${modelId}`,
+    [providerId],
+  );
 
   return (
     <div>
@@ -2203,15 +2253,11 @@ function ByokProviderDetail({
           {(!isMiniMax || authMode === "apiKey") && (
             <button
               type="button"
-              disabled={
-                saveMutation.isPending ||
-                (!isOllama && !apiKey && !dbProvider?.hasApiKey)
-              }
+              disabled={saveMutation.isPending || !canSubmitApiKeyConfig}
               onClick={() => saveMutation.mutate()}
               className={cn(
                 "flex items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-                !saveMutation.isPending &&
-                  (isOllama || apiKey || dbProvider?.hasApiKey)
+                !saveMutation.isPending && canSubmitApiKeyConfig
                   ? "bg-accent text-accent-fg hover:bg-accent/90"
                   : "bg-surface-2 text-text-muted cursor-not-allowed",
               )}
@@ -2273,11 +2319,11 @@ function ByokProviderDetail({
           </div>
           <button
             type="button"
-            disabled={refreshModelsMutation.isPending || (!isOllama && !apiKey)}
+            disabled={refreshModelsMutation.isPending || !canRefreshModels}
             onClick={() => refreshModelsMutation.mutate()}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[10px] font-medium transition-colors",
-              !refreshModelsMutation.isPending && (isOllama || apiKey)
+              !refreshModelsMutation.isPending && canRefreshModels
                 ? "text-text-secondary hover:bg-surface-2"
                 : "text-text-muted cursor-not-allowed",
             )}
@@ -2298,17 +2344,26 @@ function ByokProviderDetail({
             </div>
           )}
           {displayModels.map((modelId) => {
-            const isSelected = isModelSelected(modelId, currentModelId);
+            const scopedModelId = getScopedByokModelId(modelId);
+            const isSelected = isByokModelSelected(
+              providerId,
+              modelId,
+              currentModelId,
+            );
             return (
               <button
                 key={modelId}
                 type="button"
+                disabled={!isProviderConfigured}
                 onClick={() => {
-                  if (!isSelected) onSelectModel(modelId);
+                  if (!isProviderConfigured || isSelected) return;
+                  onSelectModel(scopedModelId);
                 }}
                 className={cn(
                   "w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors",
                   isSelected ? "bg-surface-2" : "hover:bg-surface-2",
+                  !isProviderConfigured &&
+                    "cursor-not-allowed opacity-60 hover:bg-transparent",
                 )}
               >
                 <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">

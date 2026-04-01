@@ -321,7 +321,25 @@ describe("Shutdown safety", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 18. dev-launchd.sh stop sends SIGTERM before SIGKILL
+  // 18. second-instance recreates the main window when none exists
+  // -----------------------------------------------------------------------
+  it("index.ts recreates the main window on second-instance when none exists", () => {
+    const indexTs = readFile("apps/desktop/main/index.ts");
+    const secondInstanceStart = indexTs.indexOf('app.on("second-instance"');
+    const secondInstanceBlock = indexTs.slice(
+      secondInstanceStart,
+      secondInstanceStart + 300,
+    );
+
+    expect(secondInstanceBlock).toContain(
+      "!mainWindow || mainWindow.isDestroyed()",
+    );
+    expect(secondInstanceBlock).toContain("createMainWindow()");
+    expect(secondInstanceBlock).toContain("focusMainWindow()");
+  });
+
+  // -----------------------------------------------------------------------
+  // 19. dev-launchd.sh stop sends SIGTERM before SIGKILL
   // -----------------------------------------------------------------------
   it("dev-launchd.sh stop_services sends SIGTERM before SIGKILL", () => {
     const devLaunchdSh = readFile("scripts/dev-launchd.sh");

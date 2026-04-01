@@ -33,6 +33,7 @@ import "@/lib/api";
 import {
   deleteApiV1ChannelsByChannelId,
   getApiV1Channels,
+  getApiV1ChannelsLiveStatus,
 } from "../../lib/api/sdk.gen";
 
 type Platform =
@@ -42,6 +43,16 @@ type Platform =
   | "wechat"
   | "telegram"
   | "whatsapp";
+
+type LiveStatusData = {
+  gatewayConnected: boolean;
+  channels: {
+    channelType: string;
+    channelId: string;
+    status: string;
+    lastError: string | null;
+  }[];
+};
 
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
   { id: "whatsapp", emoji: "\u{1F4DE}", desc: "Personal WhatsApp" },
@@ -93,6 +104,16 @@ export function ChannelsPage() {
     },
   });
 
+  const { data: liveStatusData } = useQuery({
+    queryKey: ["channels-live-status"],
+    queryFn: async () => {
+      const { data } = await getApiV1ChannelsLiveStatus();
+      return data as LiveStatusData | undefined;
+    },
+    refetchInterval: 3000,
+    enabled: (channelsData?.channels?.length ?? 0) > 0,
+  });
+
   const { available: quotaAvailable, resetsAt } = useBotQuota();
 
   const channels = channelsData?.channels ?? [];
@@ -129,7 +150,16 @@ export function ChannelsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
         {PLATFORMS.map((p) => {
           const isActive = platform === p.id;
-          const connected = channels.some((ch) => ch.channelType === p.id);
+          const configuredChannel = channels.find(
+            (ch) => ch.channelType === p.id,
+          );
+          const connected = !!configuredChannel;
+          const channelLive = liveStatusData?.channels?.find(
+            (e) => e.channelId === configuredChannel?.id,
+          );
+          const channelLiveStatus = liveStatusData
+            ? (channelLive?.status ?? "connecting")
+            : undefined;
           return (
             <button
               type="button"
@@ -159,10 +189,21 @@ export function ChannelsPage() {
                 </div>
               </div>
               {connected ? (
-                <CheckCircle2
-                  size={14}
-                  className="text-[var(--color-success)] shrink-0"
-                />
+                channelLiveStatus === "error" ||
+                channelLiveStatus === "disconnected" ? (
+                  <Shield size={14} className="text-red-500 shrink-0" />
+                ) : channelLiveStatus === "connecting" ||
+                  channelLiveStatus === "restarting" ? (
+                  <Loader2
+                    size={14}
+                    className="text-amber-500 shrink-0 animate-spin"
+                  />
+                ) : (
+                  <CheckCircle2
+                    size={14}
+                    className="text-[var(--color-success)] shrink-0"
+                  />
+                )
               ) : (
                 <Circle size={14} className="text-text-muted/30 shrink-0" />
               )}
@@ -231,6 +272,7 @@ export function ChannelsPage() {
           channel={currentChannel}
           queryClient={queryClient}
           onShowGuide={() => setForceGuide(true)}
+          liveStatusData={liveStatusData}
         />
       ) : null}
     </div>
@@ -244,6 +286,7 @@ function ConfiguredView({
   channel,
   queryClient,
   onShowGuide,
+  liveStatusData,
 }: {
   platform: Platform;
   channel: {
@@ -257,10 +300,21 @@ function ConfiguredView({
   };
   queryClient: ReturnType<typeof useQueryClient>;
   onShowGuide: () => void;
+  liveStatusData: LiveStatusData | undefined;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const liveEntry = liveStatusData?.channels?.find(
+    (e) => e.channelId === channel.id,
+  );
+  // Before live-status data arrives, show a neutral loading state
+  // instead of defaulting to green "connected".
+  const liveStatus = liveStatusData
+    ? (liveEntry?.status ?? "connecting")
+    : "connecting";
+  const liveError = liveEntry?.lastError ?? null;
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -346,22 +400,58 @@ function ConfiguredView({
     <>
       <div className="space-y-4 sm:space-y-5">
         {/* Status banner */}
-        <div className="flex flex-col items-start gap-3 p-4 rounded-xl border bg-[var(--color-success-subtle)] border-[var(--color-success-border)] sm:flex-row sm:items-center">
-          <div className="flex justify-center items-center w-9 h-9 rounded-lg bg-[var(--color-success-muted)] shrink-0">
-            <CheckCircle2 size={18} className="text-[var(--color-success)]" />
+        <div
+          className={`flex flex-col items-start gap-3 p-4 rounded-xl border sm:flex-row sm:items-center ${
+            liveStatus === "error" || liveStatus === "disconnected"
+              ? "bg-red-500/5 border-red-500/20"
+              : liveStatus === "connecting" || liveStatus === "restarting"
+                ? "bg-amber-500/5 border-amber-500/20"
+                : "bg-[var(--color-success-subtle)] border-[var(--color-success-border)]"
+          }`}
+        >
+          <div
+            className={`flex justify-center items-center w-9 h-9 rounded-lg shrink-0 ${
+              liveStatus === "error" || liveStatus === "disconnected"
+                ? "bg-red-500/10"
+                : liveStatus === "connecting" || liveStatus === "restarting"
+                  ? "bg-amber-500/10"
+                  : "bg-[var(--color-success-muted)]"
+            }`}
+          >
+            {liveStatus === "error" || liveStatus === "disconnected" ? (
+              <Shield size={18} className="text-red-500" />
+            ) : liveStatus === "connecting" || liveStatus === "restarting" ? (
+              <Loader2 size={18} className="text-amber-500 animate-spin" />
+            ) : (
+              <CheckCircle2 size={18} className="text-[var(--color-success)]" />
+            )}
           </div>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-text-primary">
-              {t("channels.statusConnected", {
-                platform: PLATFORM_LABELS[platform],
-              })}
+              {liveStatus === "error" || liveStatus === "disconnected"
+                ? `${PLATFORM_LABELS[platform]} ${t("channels.statusError")}`
+                : liveStatus === "connecting" || liveStatus === "restarting"
+                  ? `${PLATFORM_LABELS[platform]} ${t("channels.statusConnecting")}`
+                  : t("channels.statusConnected", {
+                      platform: PLATFORM_LABELS[platform],
+                    })}
             </div>
             <div className="text-[11px] text-text-muted mt-0.5">
-              {channel.teamName ?? channel.accountId}
-              {channel.createdAt &&
-                ` \u00B7 ${t("channels.configuredDate", { date: new Date(channel.createdAt).toLocaleDateString() })}`}
-              {" \u00B7 "}
-              {t("channels.connectionActive")}
+              {liveError ? (
+                <span className="text-red-400">{liveError}</span>
+              ) : (
+                <>
+                  {channel.teamName ?? channel.accountId}
+                  {channel.createdAt &&
+                    ` \u00B7 ${t("channels.configuredDate", { date: new Date(channel.createdAt).toLocaleDateString() })}`}
+                  {liveStatus === "connected" && (
+                    <>
+                      {" \u00B7 "}
+                      {t("channels.connectionActive")}
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
           <button

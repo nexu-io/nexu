@@ -121,6 +121,7 @@ nexu-diagnostics-<timestamp>/
 
 This is the structured desktop diagnostics snapshot. It includes:
 
+- proxy diagnostics (`source`, redacted env values, normalized bypass list, Electron proxy mode, and `resolveProxy(...)` results)
 - cold-start state
 - sleep-guard state
 - renderer load / process-gone information
@@ -155,6 +156,7 @@ The export applies basic redaction before writing files into the ZIP:
 
 - JSON fields matching token / password / secret / key / dsn-like names are replaced
 - URL-embedded token fragments inside logs and text payloads are scrubbed
+- proxy URLs inside diagnostics are exported only in redacted form (for example `http://***:***@proxy.example.com:8080`)
 
 The goal is to preserve debugging value while reducing the chance of exporting sensitive information in plain text.
 

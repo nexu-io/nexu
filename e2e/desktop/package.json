@@ -1,0 +1,24 @@
+{
+  "name": "@nexu/desktop-e2e-automation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone desktop E2E automation for Nexu.",
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "download": "bash scripts/download-nightly.sh",
+    "test": "bash scripts/run-e2e.sh full",
+    "test:smoke": "bash scripts/run-e2e.sh smoke",
+    "test:login": "bash scripts/run-e2e.sh login",
+    "test:model": "bash scripts/run-e2e.sh model",
+    "test:update": "bash scripts/run-e2e.sh update",
+    "test:resilience": "bash scripts/run-e2e.sh resilience",
+    "cleanup": "bash scripts/kill-all.sh"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "playwright": "^1.58.0"
+  }
+}

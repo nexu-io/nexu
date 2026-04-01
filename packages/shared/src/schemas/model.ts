@@ -17,6 +17,12 @@ export type ModelListResponse = z.infer<typeof modelListResponseSchema>;
 
 const PREFERRED_MODEL_ALIASES: string[][] = [
   [
+    "gemini 3 flash preview",
+    "gemini 3 flash",
+    "gemini 3-flash preview",
+    "gemini 3-flash",
+  ],
+  [
     "gemini 3.1 pro preview",
     "gemini 3 1 pro preview",
     "gemini 3.1 pro",

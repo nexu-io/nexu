@@ -143,3 +143,46 @@ export function createGitHubIssueClient({ token, repo, issueNumber }) {
     },
   };
 }
+
+export async function checkOrganizationMembership({ token, org, username }) {
+  if (!token || !org || !username) {
+    throw new Error(
+      "checkOrganizationMembership requires token, org, and username",
+    );
+  }
+
+  const response = await fetchWithTimeout(
+    `https://api.github.com/orgs/${encodeURIComponent(org)}/members/${encodeURIComponent(username)}`,
+    {
+      method: "GET",
+      redirect: "manual",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  );
+
+  if (response.status === 204) {
+    return true;
+  }
+
+  if (response.status === 404) {
+    return false;
+  }
+
+  if (
+    response.status === 301 ||
+    response.status === 302 ||
+    response.status === 307 ||
+    response.status === 308
+  ) {
+    return false;
+  }
+
+  const text = await response.text();
+  throw new Error(
+    `GitHub API GET /orgs/${org}/members/${username} failed (${response.status}): ${text}`,
+  );
+}

@@ -36,6 +36,7 @@ export const hostInvokeChannels = [
   "update:set-source",
   "component:check",
   "component:install",
+  "setup:animation-complete",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -141,6 +142,7 @@ export type HostInvokePayloadMap = {
   "update:set-source": { source: UpdateSource };
   "component:check": undefined;
   "component:install": { id: string };
+  "setup:animation-complete": undefined;
 };
 
 export type HostInvokeResultMap = {
@@ -401,6 +403,7 @@ export type HostInvokeResultMap = {
     }>;
   };
   "component:install": { ok: boolean };
+  "setup:animation-complete": undefined;
 };
 
 export type AppInfo = {
@@ -416,6 +419,13 @@ export type DiagnosticsInfo = {
   sentryMainEnabled: boolean;
   sentryDsn: string | null;
   nativeCrashPipeline: "local-only" | "sentry";
+  proxy: {
+    source: "env" | "system" | "direct";
+    httpProxyRedacted: string | null;
+    httpsProxyRedacted: string | null;
+    allProxyRedacted: string | null;
+    noProxy: string[];
+  };
 };
 
 export type DesktopSurface =
@@ -440,6 +450,9 @@ export type HostDesktopCommand =
     }
   | {
       type: "desktop:check-for-updates";
+    }
+  | {
+      type: "setup:complete";
     };
 
 export type RuntimeUnitSnapshot = Omit<RuntimeUnitState, "logTail">;
@@ -552,6 +565,7 @@ export type HostBootstrap = {
   buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
   isPackaged: boolean;
+  needsSetupAnimation: boolean;
 };
 
 export type UpdateSource = "r2" | "github";

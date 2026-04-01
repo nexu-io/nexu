@@ -51,6 +51,7 @@ const agentSchema = z
     default: z.boolean().optional(),
     workspace: z.string().optional(),
     model: agentModelSchema.optional(),
+    skills: z.array(z.string()).optional(),
   })
   .passthrough();
 

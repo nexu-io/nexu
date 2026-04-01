@@ -1,0 +1,6 @@
+node_modules/
+.tmp/
+artifacts/
+captures/
+*.log
+.DS_Store
