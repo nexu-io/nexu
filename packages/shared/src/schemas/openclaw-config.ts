@@ -248,6 +248,8 @@ const discordAccountSchema = z.object({
   enabled: z.boolean().default(true),
   token: z.string(),
   groupPolicy: z.enum(["open", "allowlist", "disabled"]).default("open"),
+  dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+  allowFrom: z.array(z.string()).optional(),
 });
 
 const discordChannelSchema = z.object({

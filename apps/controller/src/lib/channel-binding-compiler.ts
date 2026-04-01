@@ -93,6 +93,8 @@ export function compileChannelsConfig(params: {
         enabled: true,
         token: secret("botToken"),
         groupPolicy: "open",
+        dmPolicy: "open",
+        allowFrom: ["*"],
       };
       continue;
     }
@@ -126,6 +128,9 @@ export function compileChannelsConfig(params: {
         appId: secret("appId") || channel.appId || channel.accountId,
         appSecret: secret("appSecret"),
         connectionMode,
+        dmPolicy: "open",
+        groupPolicy: "open",
+        allowFrom: ["*"],
         ...(connectionMode === "webhook"
           ? {
               webhookPath: `/feishu/events/${channel.accountId}`,
@@ -167,11 +172,7 @@ export function compileChannelsConfig(params: {
             mode: useSlackSocketMode ? "socket" : "http",
             signingSecret: Object.values(slackAccounts)[0]?.signingSecret,
             enabled: true,
-            groupPolicy: "open",
             requireMention: true,
-            dmPolicy: "open",
-            allowFrom: ["*"],
-            ackReaction: "eyes",
             accounts: slackAccounts,
           },
         }
@@ -180,9 +181,6 @@ export function compileChannelsConfig(params: {
       ? {
           discord: {
             enabled: true,
-            groupPolicy: "open",
-            dmPolicy: "open",
-            allowFrom: ["*"],
             accounts: discordAccounts,
           },
         }
@@ -193,10 +191,7 @@ export function compileChannelsConfig(params: {
             enabled: true,
             streaming: true,
             renderMode: "card",
-            dmPolicy: "open",
-            groupPolicy: "open",
             requireMention: true,
-            allowFrom: ["*"],
             tools: {
               doc: true,
               chat: true,
