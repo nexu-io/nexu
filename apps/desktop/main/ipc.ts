@@ -539,6 +539,9 @@ export function registerIpcHandlers(
           } else if (quitFallback) {
             void quitFallback();
           } else {
+            console.warn(
+              "[app:quit] quit fallback unavailable, forcing app.exit(0)",
+            );
             app.exit(0);
           }
           return undefined;
