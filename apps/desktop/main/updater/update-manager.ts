@@ -324,8 +324,8 @@ export class UpdateManager {
     // embedded web server, utility processes). These are child processes of
     // the Electron main process and will be reaped by the OS on exit anyway,
     // so failure here is non-critical.
-    const disposeStartedAt = Date.now();
     const disposePromise = (async () => {
+      const disposeStartedAt = Date.now();
       try {
         await this.orchestrator.dispose();
         this.logCheck(
