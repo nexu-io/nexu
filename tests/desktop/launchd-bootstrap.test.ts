@@ -143,6 +143,7 @@ function makeBootstrapEnv(
     proxyEnv: {
       NO_PROXY: "localhost,127.0.0.1,::1",
     },
+    controllerStartupValidationTimeoutMs: 500,
     ...overrides,
   };
 }

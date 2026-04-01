@@ -89,6 +89,8 @@ export interface LaunchdBootstrapEnv {
   proxyEnv: Record<string, string>;
   /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
   log?: (message: string) => void;
+  /** Optional override for controller startup validation timeout (tests only). */
+  controllerStartupValidationTimeoutMs?: number;
 }
 
 export interface LaunchdBootstrapResult {
@@ -334,7 +336,7 @@ async function waitForControllerStartupValidation(opts: {
   timeoutMs?: number;
   probeTimeoutMs?: number;
 }): Promise<ControllerStartupValidationResult> {
-  const timeoutMs = opts.timeoutMs ?? 5000;
+  const timeoutMs = opts.timeoutMs ?? 15000;
   const startedAt = Date.now();
   let attempt = 0;
   let lastResult: ControllerStartupValidationResult | null = null;
@@ -969,7 +971,7 @@ export async function bootstrapWithLaunchd(
       launchd,
       label: labels.controller,
       port: effectivePorts.controllerPort,
-      timeoutMs: 5000,
+      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 15000,
       probeTimeoutMs: 3000,
     });
 
@@ -985,7 +987,8 @@ export async function bootstrapWithLaunchd(
       .bootoutAndWaitForExit(labels.controller, 5000)
       .catch(() => {});
 
-    const retryPort = await findFreePort(originalPort + 1);
+    const retryStartPort = Math.min(originalPort + 1, 65535);
+    const retryPort = await findFreePort(retryStartPort);
     effectivePorts.controllerPort = retryPort;
     plistEnv = {
       ...plistEnv,
@@ -1005,7 +1008,7 @@ export async function bootstrapWithLaunchd(
       launchd,
       label: labels.controller,
       port: retryPort,
-      timeoutMs: 5000,
+      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 15000,
       probeTimeoutMs: 3000,
     });
     if (retryValidation.ok) {

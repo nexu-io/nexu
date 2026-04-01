@@ -172,6 +172,7 @@ function makeBootstrapEnv(
     proxyEnv: {
       NO_PROXY: "localhost,127.0.0.1,::1",
     },
+    controllerStartupValidationTimeoutMs: 500,
     ...overrides,
   };
 }
@@ -1626,6 +1627,74 @@ describe("Launchd Startup Scenarios", () => {
     expect(
       mockLaunchdManager.bootoutAndWaitForExit.mock.calls.some(
         (call) => call[0] === "io.nexu.controller.dev",
+      ),
+    ).toBe(false);
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 35: retry port clamps at 65535 instead of probing 65536
+  // -----------------------------------------------------------------------
+  it("Scenario 35: controller retry port is clamped at 65535", async () => {
+    const netMock = await import("node:net");
+    const cpMock = await import("node:child_process");
+    const execFileMock = cpMock.execFile as unknown as ReturnType<typeof vi.fn>;
+
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        switch (controllerStatusCalls) {
+          case 1:
+          case 2:
+            return Promise.resolve(mockStoppedService());
+          case 3:
+          case 4:
+            return Promise.resolve(mockRunningService({ PORT: "65535" }));
+          default:
+            return Promise.resolve(mockRunningService({ PORT: "65535" }));
+        }
+      }
+
+      openclawStatusCalls++;
+      return Promise.resolve(
+        openclawStatusCalls <= 2 ? mockStoppedService() : mockRunningService(),
+      );
+    });
+
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ port }: { port: number }) => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "connect" && port === 65535) {
+              setTimeout(() => cb(), 0);
+            }
+            if (event === "error" && port === 65535) {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        controllerPort: 65535,
+        recoveredPorts: null,
+      }) as never,
+    );
+
+    expect(result.effectivePorts.controllerPort).toBe(65535);
+    expect(
+      execFileMock.mock.calls.some((call) =>
+        JSON.stringify(call).includes("65536"),
       ),
     ).toBe(false);
   }, 15000);
