@@ -21,6 +21,15 @@ export type UpdateState = {
   userInitiated: boolean;
 };
 
+export function restorePhaseAfterInstall(
+  state: UpdateState,
+  previousPhase: Exclude<UpdatePhase, "installing">,
+): UpdateState {
+  return state.phase === "installing"
+    ? { ...state, phase: previousPhase }
+    : state;
+}
+
 export function useAutoUpdate() {
   const [state, setState] = useState<UpdateState>({
     phase: "idle",
@@ -161,9 +170,15 @@ export function useAutoUpdate() {
   }, []);
 
   const install = useCallback(async () => {
-    setState((prev) => ({ ...prev, phase: "installing" }));
+    let previousPhase: Exclude<UpdatePhase, "installing"> = "ready";
+
+    setState((prev) => {
+      previousPhase = prev.phase === "installing" ? previousPhase : prev.phase;
+      return { ...prev, phase: "installing" };
+    });
     try {
       await installUpdate();
+      setState((prev) => restorePhaseAfterInstall(prev, previousPhase));
     } catch {
       // Errors are delivered via the update:error event
     }

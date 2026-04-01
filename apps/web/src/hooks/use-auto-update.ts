@@ -38,6 +38,15 @@ export type UpdateState = {
   errorMessage: string | null;
 };
 
+export function restorePhaseAfterInstall(
+  state: UpdateState,
+  previousPhase: Exclude<UpdatePhase, "installing">,
+): UpdateState {
+  return state.phase === "installing"
+    ? { ...state, phase: previousPhase }
+    : state;
+}
+
 /**
  * Auto-update hook that bridges to the Electron updater when running
  * inside the desktop shell. In the web-only build, `window.nexuUpdater`
@@ -153,9 +162,15 @@ export function useAutoUpdate() {
   }, [bridge]);
 
   const install = useCallback(async () => {
-    setState((prev) => ({ ...prev, phase: "installing" }));
+    let previousPhase: Exclude<UpdatePhase, "installing"> = "ready";
+
+    setState((prev) => {
+      previousPhase = prev.phase === "installing" ? previousPhase : prev.phase;
+      return { ...prev, phase: "installing" };
+    });
     try {
       await bridge?.invoke("update:install", undefined);
+      setState((prev) => restorePhaseAfterInstall(prev, previousPhase));
     } catch {
       /* errors via event */
     }
