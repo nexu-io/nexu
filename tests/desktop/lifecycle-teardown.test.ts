@@ -212,8 +212,8 @@ describe("teardownLaunchdServices", () => {
 
     // pgrep finds orphan processes
     setupPgrepMock({
-      "node.*controller/dist/index.js": [99901],
-      "node.*openclaw.mjs gateway": [99902],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [99901],
+      "\\.nexu/(runtime/)?openclaw-sidecar": [99902],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -263,9 +263,8 @@ describe("teardownLaunchdServices", () => {
   // -----------------------------------------------------------------------
   it("kills orphan processes found by pgrep", async () => {
     setupPgrepMock({
-      "node.*controller/dist/index.js": [10001],
-      "node.*openclaw.mjs gateway": [10002, 10003],
-      "openclaw-gateway": [10004],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [10001],
+      "\\.nexu/(runtime/)?openclaw-sidecar": [10002, 10003, 10004],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -318,7 +317,7 @@ describe("teardownLaunchdServices", () => {
   it("excludes own PID from orphan kill list", async () => {
     const selfPid = process.pid;
     setupPgrepMock({
-      "node.*controller/dist/index.js": [selfPid, 99999],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [selfPid, 99999],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -472,7 +471,7 @@ describe("ensureNexuProcessesDead", () => {
   it("returns clean=false with remainingPids when timeout expires", async () => {
     // Process always found
     setupPgrepMock({
-      "node.*controller/dist/index.js": [77777],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [77777],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -502,9 +501,8 @@ describe("ensureNexuProcessesDead", () => {
   // -----------------------------------------------------------------------
   it("kills processes matching all patterns", async () => {
     setupPgrepMock({
-      "node.*controller/dist/index.js": [11111],
-      "node.*openclaw.mjs gateway": [22222],
-      "openclaw-gateway": [33333],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [11111],
+      "\\.nexu/(runtime/)?openclaw-sidecar": [22222, 33333],
     });
 
     // After first round of kills, all processes die
@@ -522,9 +520,8 @@ describe("ensureNexuProcessesDead", () => {
           if (!killed) {
             const pattern = args[1];
             const matches: Record<string, string> = {
-              "node.*controller/dist/index.js": "11111",
-              "node.*openclaw.mjs gateway": "22222",
-              "openclaw-gateway": "33333",
+              "\\.nexu/runtime/controller-sidecar/dist/index\\.js": "11111",
+              "\\.nexu/(runtime/)?openclaw-sidecar": "22222\n33333",
             };
             if (matches[pattern]) {
               callback(null, { stdout: matches[pattern], stderr: "" });
@@ -616,7 +613,7 @@ describe("ensureNexuProcessesDead", () => {
   it("excludes own PID from detected processes", async () => {
     const selfPid = process.pid;
     setupPgrepMock({
-      "node.*controller/dist/index.js": [selfPid],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [selfPid],
     });
 
     const { ensureNexuProcessesDead } = await import(
@@ -687,9 +684,8 @@ describe("ensureNexuProcessesDead", () => {
   it("deduplicates PIDs found across multiple pgrep patterns", async () => {
     // Same PID 55555 matches both patterns
     setupPgrepMock({
-      "node.*controller/dist/index.js": [55555],
-      "node.*openclaw.mjs gateway": [55555],
-      "openclaw-gateway": [55555],
+      "\\.nexu/runtime/controller-sidecar/dist/index\\.js": [55555],
+      "\\.nexu/(runtime/)?openclaw-sidecar": [55555],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);

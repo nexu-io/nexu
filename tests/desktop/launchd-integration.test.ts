@@ -272,8 +272,14 @@ describe.skipIf(!IS_MACOS)("Real launchd integration", () => {
     );
 
     // Spawn a process that matches one of NEXU_PROCESS_PATTERNS:
-    // "controller/dist/index.js" — we'll spawn a node process with that in args
-    const orphanDir = join(tempDir, "controller", "dist");
+    // "\\.nexu/runtime/controller-sidecar/dist/index\\.js"
+    const orphanDir = join(
+      tempDir,
+      ".nexu",
+      "runtime",
+      "controller-sidecar",
+      "dist",
+    );
     mkdirSync(orphanDir, { recursive: true });
     writeFileSync(
       join(orphanDir, "index.js"),

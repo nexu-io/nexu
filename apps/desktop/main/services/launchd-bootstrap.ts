@@ -1033,12 +1033,8 @@ async function killOrphanNexuProcesses(): Promise<void> {
 // (e.g. an editor with the file open, or a grep searching for these paths).
 // Prefix with "node" to only match actual Node.js processes.
 const NEXU_PROCESS_PATTERNS = [
-  "node.*controller/dist/index.js",
-  "controller/dist/index.js",
-  "node.*openclaw.mjs gateway",
-  "openclaw\\.mjs",
-  "openclaw-gateway",
-  "\\.nexu/openclaw-sidecar",
+  "\\.nexu/runtime/controller-sidecar/dist/index\\.js",
+  "\\.nexu/(runtime/)?openclaw-sidecar",
 ] as const;
 
 const NEXU_MANAGED_OPENCLAW_PATH_PATTERNS = [
