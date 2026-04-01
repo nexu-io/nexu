@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 export const SEEDANCE_PROMO_DEADLINE = new Date("2026-04-07T23:59:59+08:00");
 export const SEEDANCE_PROMO_DISMISS_KEY = "nexu_seedance_promo_dismissed";
 export const SEEDANCE_PROMO_CYCLE_MS = 2 * 24 * 60 * 60 * 1000;
-export const SEEDANCE_PROMO_CYCLE_START = new Date("2026-04-02T12:00:00+08:00");
+export const SEEDANCE_PROMO_CYCLE_START = new Date("2026-04-02T10:00:00+08:00");
 
 export const SEEDANCE_GITHUB_URL = "https://github.com/nexu-io/nexu";
 export const SEEDANCE_FEISHU_GROUP_URL =
