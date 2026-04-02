@@ -309,12 +309,17 @@ type EscalationAction =
   | "notify_user"         // 任意 scope — 仅通知用户
   | "report_sentry";      // 任意 scope — 上报 Sentry
 
+// 注意：这些 action 是 Controller 的决策模型，不是直接 RPC。
+// 应用层修复由 OpenClaw 通过 run_fix(targets: [...]) 执行。
+// Controller 决定修什么、何时升级；OpenClaw doctor 负责执行。
+// Controller 仅直接执行进程级干预（restart_gateway）。
+//
 // Controller 决策矩阵：
-//   scope: channel   → 先尝试 restart_channel，失败则升级给 Desktop
-//   scope: auth      → 尝试 refresh_auth，需手动重新授权则通知用户
-//   scope: config    → 尝试 reload_config，reload 失败才 restart_gateway
-//   scope: session   → clear_session，无需重启
-//   scope: process   → restart_gateway（唯一默认需要重启的 scope）
+//   scope: channel   → run_fix(targets: [channel]) — OpenClaw doctor 处理
+//   scope: auth      → run_fix(targets: [auth]) — doctor 刷新或提示重新授权
+//   scope: config    → run_fix(targets: [config]) — doctor 重载配置
+//   scope: session   → run_fix(targets: [session]) — doctor 清理卡死 session
+//   scope: process   → prepare_for_restart → 重启 gateway（Controller 直接执行）
 ```
 
 ### 7.4 升级上下文 Schema
@@ -442,24 +447,27 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 │    → 记录恢复日志，结束                                         │
 │                                                               │
 │  结果 B：干预失败 或 重启循环耗尽                                │
-│    → Controller 通知 Desktop 升级至第三层                      │
+│    → Controller 触发第三层                                     │
 │                                                               │
 └───────────────────────────────────┬───────────────────────────┘
                                     │ 仍然异常
                                     ▼
-┌─ 第三层：Desktop — 上报 + 用户触达 ─────────────────────────┐
+┌─ 第三层：上报 + 用户触达 ────────────────────────────────────┐
 │                                                               │
-│  Desktop 从 Controller 收到升级触发。                          │
-│  触发三路并行输出：                                             │
+│  Controller 编排三路并行输出：                                  │
 │                                                               │
-│  1. Sentry：captureMessage + diagnostics ZIP 附件              │
-│    （包含来自 Controller 的升级上下文）                          │
+│  1. Controller → Desktop → Sentry                             │
+│     Desktop 将远程安全诊断载荷上传至 Sentry                     │
+│    （Sentry SDK、诊断导出是 Desktop 的职责）                    │
 │                                                               │
-│  2. IM 通知用户：                                              │
+│  2. Controller → OpenClaw channel → 用户 IM                   │
+│     Controller 告知 OpenClaw 向用户发送私聊：                   │
 │     "检测到持续性异常。回复 /diagnose 查看详情，                  │
 │      或回复 /fix 尝试修复。"                                    │
+│    （IM 消息通过 OpenClaw 现有 channel 栈发送）                 │
 │                                                               │
-│  3. 本地诊断快照（复用现有导出机制）                              │
+│  3. Desktop → 本地诊断快照                                     │
+│     完整包保存到磁盘（复用现有导出机制）                          │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
 ```

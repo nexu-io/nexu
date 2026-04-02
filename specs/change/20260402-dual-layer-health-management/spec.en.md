@@ -311,12 +311,17 @@ type EscalationAction =
   | "notify_user"         // any scope — just tell the user
   | "report_sentry";      // any scope — report to Sentry
 
+// NOTE: These actions are Controller's DECISION MODEL, not direct RPCs.
+// Application-layer repairs are executed by OpenClaw via run_fix(targets: [...]).
+// Controller decides WHAT to fix and WHEN to escalate; OpenClaw doctor does the work.
+// Controller only directly acts on process-level intervention (restart_gateway).
+//
 // Controller decision matrix:
-//   scope: channel   → try restart_channel first, then escalate to Desktop
-//   scope: auth      → try refresh_auth, notify user if manual re-auth needed
-//   scope: config    → try reload_config, restart_gateway only if reload fails
-//   scope: session   → clear_session, no restart needed
-//   scope: process   → restart_gateway (only scope that warrants it by default)
+//   scope: channel   → run_fix(targets: [channel]) — OpenClaw doctor handles it
+//   scope: auth      → run_fix(targets: [auth]) — doctor refreshes or prompts re-auth
+//   scope: config    → run_fix(targets: [config]) — doctor reloads config
+//   scope: session   → run_fix(targets: [session]) — doctor cleans stuck sessions
+//   scope: process   → prepare_for_restart → restart gateway (Controller direct action)
 ```
 
 ### 7.4 Escalation Context Schema
@@ -444,24 +449,27 @@ Layered escalation with scope-aware response:
 │    → Log recovery, END                                        │
 │                                                               │
 │  Outcome B: Intervention fails OR restart loop exhausted      │
-│    → Controller signals Desktop to escalate to Layer 3        │
+│    → Controller triggers Layer 3                              │
 │                                                               │
 └───────────────────────────────────┬───────────────────────────┘
                                     │ still broken
                                     ▼
-┌─ Layer 3: Desktop — Report + User Reach ─────────────────────┐
+┌─ Layer 3: Report + User Reach ───────────────────────────────┐
 │                                                               │
-│  Desktop receives escalation trigger from Controller.         │
-│  Triggers three parallel outputs:                             │
+│  Controller orchestrates three parallel outputs:              │
 │                                                               │
-│  1. Sentry: captureMessage + diagnostics ZIP attachment       │
-│     (includes escalation context from Controller)             │
+│  1. Controller → Desktop → Sentry                             │
+│     Desktop uploads remote-safe diagnostics to Sentry         │
+│     (this is Desktop's job: Sentry SDK, diagnostics export)   │
 │                                                               │
-│  2. IM notification to user:                                  │
+│  2. Controller → OpenClaw channel → User IM                   │
+│     Controller tells OpenClaw to send a DM to the user:       │
 │     "Detected persistent issue. Reply /diagnose for details   │
 │      or /fix to attempt repair."                              │
+│     (IM goes through existing OpenClaw channel stack)         │
 │                                                               │
-│  3. Local diagnostics snapshot (existing export mechanism)    │
+│  3. Desktop → local diagnostics snapshot                      │
+│     Full bundle saved to disk (existing export mechanism)     │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
 ```
