@@ -13,6 +13,25 @@ const openclawRuntimeNodeModules = path.join(
   "node_modules",
 );
 const openclawRuntimeRoot = path.join(openclawRuntimeNodeModules, "openclaw");
+const fakeFeishuBotSource = `
+// --- Single-agent dispatch (existing behavior) ---
+      const ctxPayload = buildCtxPayloadForAgent(
+        route.sessionKey,
+        route.accountId,
+        ctx.mentionedBot,
+      );
+`.trim();
+const fakeReplyOutcomeBundleSource = `
+const sessionKey = ctx.SessionKey;
+\tconst startTime = diagnosticsEnabled ? Date.now() : 0;
+
+const counts = dispatcher.getQueuedCounts();
+\t\tcounts.final += routedFinalCount;
+\t\trecordProcessed("completed");
+
+recordProcessed("error", { error: String(err) });
+\t\tmarkIdle("message_error");
+`.trim();
 
 async function ensureFakeOpenclawRuntime() {
   try {
@@ -23,6 +42,12 @@ async function ensureFakeOpenclawRuntime() {
   }
 
   await mkdir(path.join(openclawRuntimeRoot, "extensions", "feishu", "src"), {
+    recursive: true,
+  });
+  await mkdir(path.join(openclawRuntimeRoot, "dist", "plugin-sdk"), {
+    recursive: true,
+  });
+  await mkdir(path.join(openclawRuntimeRoot, "dist"), {
     recursive: true,
   });
 
@@ -102,6 +127,26 @@ async function ensureFakeOpenclawRuntime() {
     },
   };
 `,
+    "utf8",
+  );
+  await writeFile(
+    path.join(openclawRuntimeRoot, "extensions", "feishu", "src", "bot.ts"),
+    `${fakeFeishuBotSource}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(openclawRuntimeRoot, "dist", "plugin-sdk", "reply-test.js"),
+    `${fakeReplyOutcomeBundleSource}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(openclawRuntimeRoot, "dist", "plugin-sdk", "dispatch-test.js"),
+    `${fakeReplyOutcomeBundleSource}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(openclawRuntimeRoot, "dist", "reply-test.js"),
+    `${fakeReplyOutcomeBundleSource}\n`,
     "utf8",
   );
 
