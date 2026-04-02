@@ -21,6 +21,7 @@ describe("OpenClawRuntimePluginWriter", () => {
   beforeEach(async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), "nexu-runtime-plugin-writer-"));
     env = {
+      bundledRuntimePluginsDir: path.join(rootDir, "bundled-plugins"),
       runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
       openclawExtensionsDir: path.join(rootDir, "extensions"),
     } as ControllerEnv;
@@ -152,5 +153,84 @@ describe("OpenClawRuntimePluginWriter", () => {
     await expect(access(staleTargetDir)).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+
+  it("prefers bundled qqbot over the legacy runtime plugin source", async () => {
+    const bundledPluginDir = path.join(
+      env.bundledRuntimePluginsDir,
+      "openclaw-qqbot",
+    );
+    const legacyPluginDir = path.join(
+      env.runtimePluginTemplatesDir,
+      "openclaw-qqbot",
+    );
+
+    await mkdir(bundledPluginDir, { recursive: true });
+    await mkdir(legacyPluginDir, { recursive: true });
+    await writeFile(
+      path.join(bundledPluginDir, "manifest.txt"),
+      "bundled\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(legacyPluginDir, "manifest.txt"),
+      "legacy\n",
+      "utf8",
+    );
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    expect(
+      await readFile(
+        path.join(env.openclawExtensionsDir, "openclaw-qqbot", "manifest.txt"),
+        "utf8",
+      ),
+    ).toBe("bundled\n");
+  });
+
+  it("prefers bundled wecom over the legacy runtime plugin source", async () => {
+    const bundledPluginDir = path.join(env.bundledRuntimePluginsDir, "wecom");
+    const legacyPluginDir = path.join(env.runtimePluginTemplatesDir, "wecom");
+
+    await mkdir(bundledPluginDir, { recursive: true });
+    await mkdir(legacyPluginDir, { recursive: true });
+    await writeFile(
+      path.join(bundledPluginDir, "manifest.txt"),
+      "bundled\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(legacyPluginDir, "manifest.txt"),
+      "legacy\n",
+      "utf8",
+    );
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    expect(
+      await readFile(
+        path.join(env.openclawExtensionsDir, "wecom", "manifest.txt"),
+        "utf8",
+      ),
+    ).toBe("bundled\n");
+  });
+
+  it("still copies legacy plugins when no bundled runtime artifact exists", async () => {
+    const legacyPluginDir = path.join(
+      env.runtimePluginTemplatesDir,
+      "plugin-a",
+    );
+
+    await mkdir(legacyPluginDir, { recursive: true });
+    await writeFile(path.join(legacyPluginDir, "index.js"), "export {};\n");
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    await expect(
+      access(path.join(env.openclawExtensionsDir, "plugin-a", "index.js")),
+    ).resolves.toBeUndefined();
   });
 });

@@ -16,6 +16,12 @@ export async function bootstrapController(
   // Validate default model against available models before first sync
   await container.modelProviderService.ensureValidDefaultModel();
 
+  // Ensure bundled skills are on disk and the skill ledger is up to date
+  // BEFORE the first config push.  Without this, the compiled agent
+  // allowlist may be missing newly-bundled skills, causing them to be
+  // invisible to the running agent until a restart.
+  container.skillhubService.bootstrap();
+
   // Write config files BEFORE starting OpenClaw so it boots with the
   // correct configuration, avoiding a SIGUSR1 restart cycle on first connect.
   // Use syncAllImmediate() to bypass debounce — must complete before start().

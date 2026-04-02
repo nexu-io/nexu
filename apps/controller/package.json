@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/bundle-runtime-plugins.mjs",
+    "bundle-runtime-plugins": "node scripts/bundle-runtime-plugins.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests",
     "generate-openapi": "NODE_OPTIONS=--conditions=development tsx scripts/generate-openapi.ts"

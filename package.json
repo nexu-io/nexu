@@ -42,10 +42,13 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@dingtalk-real-ai/dingtalk-connector": "0.7.10",
     "@playwright/test": "^1.58.2",
+    "@tencent-connect/openclaw-qqbot": "1.6.7",
     "@types/node": "^25.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^3.2.4",
+    "@wecom/wecom-openclaw-plugin": "^2026.3.26",
     "concurrently": "^9.2.1",
     "vitest": "^3.0.7"
   },

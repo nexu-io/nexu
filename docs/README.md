@@ -1,25 +1,30 @@
-# Nexu Docs
+# Introduction
 
-This directory is an independent VitePress project.
+**nexu** (next to you) is an open-source desktop client (Electron) that connects **OpenClaw 🦞** agents to Feishu, Slack, Discord, and other IM channels.
 
-## Why it is independent
+It offers graphical setup, built-in Feishu Skills, multi-model support, and BYOK.
 
-- It lives under `docs/`, which is not matched by the root `pnpm-workspace.yaml`.
-- It has its own `package.json`.
-- It has its own nested `pnpm-workspace.yaml`, so running `pnpm` inside `docs/` uses this directory as the workspace root.
+Configuration and runtime state stay primarily on your machine.
 
-## Local development
+![nexu client](/assets/nexu-home.webp)
 
-```bash
-cd docs
-pnpm install
-pnpm dev
-```
+## Get Started
 
-## Build
-
-```bash
-cd docs
-pnpm build
-pnpm preview
-```
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px;">
+  <a href="/guide/quickstart" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">⚡ Quick Start</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Get your AI Agent running in one minute</p>
+  </a>
+  <a href="/guide/concepts" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">💡 Key Concepts</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Learn about Agents, Channels, Models, and Skills</p>
+  </a>
+  <a href="/guide/channels" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">🔗 Channel Configuration</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Connect Feishu, Slack, or Discord</p>
+  </a>
+  <a href="/guide/contact" style="display: block; padding: 20px; border: 1px solid var(--vp-c-divider); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.25s, box-shadow 0.25s;">
+    <p style="font-size: 16px; font-weight: 600; margin: 0 0 4px;">💬 Contact Us</p>
+    <p style="font-size: 14px; color: var(--vp-c-text-2); margin: 0;">Join the community on Feishu or Discord</p>
+  </a>
+</div>

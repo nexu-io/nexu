@@ -118,7 +118,7 @@ wait_ports_free() {
   local waited=0
   while true; do
     local busy
-    busy=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null || true)
+    busy=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -iTCP:18790 -iTCP:18791 -sTCP:LISTEN -n -P 2>/dev/null || true)
     if [ -z "$busy" ]; then break; fi
     if [ "$waited" -ge 20 ]; then
       log "WARNING: ports still occupied after 20s"
@@ -372,13 +372,15 @@ capture_logs() {
     echo "=== Launchd ==="
     launchctl list 2>/dev/null | grep nexu || echo "(none)"
     echo "=== Ports ==="
-    lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null || echo "(none)"
+    lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -iTCP:18790 -iTCP:18791 -sTCP:LISTEN -n -P 2>/dev/null || echo "(none)"
     echo "=== Controller ==="
     curl -sf http://127.0.0.1:50800/api/internal/desktop/ready 2>/dev/null || echo "(unreachable)"
     echo "=== Cloud ==="
     curl -sf http://127.0.0.1:50800/api/internal/desktop/cloud-status 2>/dev/null || echo "(unreachable)"
-    echo "=== OpenClaw ==="
-    curl -sf http://127.0.0.1:18789/health 2>/dev/null || echo "(unreachable)"
+    echo "=== OpenClaw (scan ports) ==="
+    for _p in 18789 18790 18791; do
+      curl -sf "http://127.0.0.1:$_p/health" 2>/dev/null && echo "healthy on $_p" && break
+    done || echo "(unreachable on 18789-18791)"
   } > "$state_dir/runtime-snapshot.txt" 2>&1
 
   log "Diagnostics captured"
@@ -440,13 +442,18 @@ verify_services() {
     failed=$((failed + 1))
   fi
 
-  # 3. OpenClaw gateway health
+  # 3. OpenClaw gateway health — discover actual port from runtime-ports.json
+  local oc_port="18789"
+  local plist_dir="$PERSISTENT_HOME/Library/LaunchAgents"
+  if [ -f "$plist_dir/runtime-ports.json" ]; then
+    oc_port=$(python3 -c "import json; print(json.load(open('$plist_dir/runtime-ports.json')).get('openclawPort', 18789))" 2>/dev/null || echo "18789")
+  fi
   local openclaw_health
-  openclaw_health=$(curl -sf http://127.0.0.1:18789/health 2>/dev/null || echo "")
+  openclaw_health=$(curl -sf "http://127.0.0.1:$oc_port/health" 2>/dev/null || echo "")
   if [ -n "$openclaw_health" ]; then
-    log "[$label]   openclaw gateway: healthy"
+    log "[$label]   openclaw gateway: healthy (port $oc_port)"
   else
-    log "[$label]   openclaw gateway: NOT HEALTHY (may still be starting)"
+    log "[$label]   openclaw gateway: NOT HEALTHY on port $oc_port (may still be starting)"
   fi
 
   # 4. Launchd service registration
@@ -458,7 +465,7 @@ verify_services() {
 
   # 5. Port listeners (verify actual TCP LISTEN state)
   local listeners
-  listeners=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null | grep LISTEN | wc -l | tr -d ' ')
+  listeners=$(lsof -iTCP:50800 -iTCP:50810 -iTCP:"$oc_port" -sTCP:LISTEN -n -P 2>/dev/null | grep LISTEN | wc -l | tr -d ' ')
   log "[$label]   TCP listeners on known ports: $listeners"
 
   # 6. Electron process alive
@@ -684,6 +691,209 @@ while True:
   wait_ports_free
 }
 
+# 3b. OpenClaw port conflict: occupy 18789 (global openclaw), verify Nexu auto-assigns new port
+resilience_openclaw_port_conflict() {
+  log "--- Resilience: openclaw port conflict (18789) ---"
+  resilience_reset
+
+  # Simulate a global openclaw (or ClawX) occupying the default openclaw port
+  python3 -c "
+import socket, time
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(('127.0.0.1', 18789))
+s.listen(1)
+while True:
+    time.sleep(1)
+" &
+  local blocker_pid=$!
+  sleep 1
+
+  if lsof -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null | grep -q LISTEN; then
+    log "Port 18789 occupied by blocker pid=$blocker_pid"
+  else
+    log "WARNING: failed to occupy port 18789"
+    kill "$blocker_pid" 2>/dev/null || true
+    return 1
+  fi
+
+  # Launch app — it should detect openclaw port conflict and use a different port
+  resilience_launch "$1"
+  sleep 20
+
+  local passed=false
+
+  # Controller MUST be up — hard fail if not
+  if curl -sf "http://127.0.0.1:50800/api/internal/desktop/ready" 2>/dev/null | grep -q '"ready":true'; then
+    log "Controller ready on 50800"
+  else
+    log "FAILED: controller not ready on 50800"
+    kill "$blocker_pid" 2>/dev/null || true
+    quit_app
+    bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-oc-port-conflict.log" 2>&1 || true
+    wait_ports_free
+    return 1
+  fi
+
+  # Read actual openclaw port from runtime-ports.json instead of guessing
+  local plist_dir
+  plist_dir="$PERSISTENT_HOME/Library/LaunchAgents"
+  local runtime_ports="$plist_dir/runtime-ports.json"
+  local oc_port=""
+  if [ -f "$runtime_ports" ]; then
+    oc_port=$(python3 -c "import json; print(json.load(open('$runtime_ports')).get('openclawPort',''))" 2>/dev/null)
+  fi
+
+  if [ -n "$oc_port" ] && [ "$oc_port" != "18789" ]; then
+    if curl -sf "http://127.0.0.1:$oc_port/health" 2>/dev/null; then
+      log "PASSED: openclaw running on port $oc_port (auto-assigned, 18789 was occupied)"
+      passed=true
+    else
+      log "FAILED: runtime-ports says port $oc_port but openclaw not healthy there"
+    fi
+  elif [ -n "$oc_port" ] && [ "$oc_port" = "18789" ]; then
+    log "FAILED: openclaw still assigned to 18789 despite conflict"
+  fi
+
+  if ! $passed; then
+    log "FAILED: openclaw not found on any alternative port"
+    # Check cold-start log for diagnostics
+    local cold_log="$PERSISTENT_HOME/Library/Application Support/@nexu/desktop/logs/cold-start.log"
+    if [ -f "$cold_log" ]; then
+      grep -i "findFreePort\|occupier\|portStolen\|reassign" "$cold_log" | tail -5 >&2 || true
+    fi
+  fi
+
+  # Verify blocker on 18789 was NOT killed (Nexu should coexist, not kill others)
+  if kill -0 "$blocker_pid" 2>/dev/null; then
+    log "PASSED: blocker on 18789 still alive (Nexu coexists)"
+  else
+    log "FAILED: blocker on 18789 was killed (Nexu should not kill other services)"
+    passed=false
+  fi
+
+  # Cleanup
+  kill "$blocker_pid" 2>/dev/null || true
+  wait "$blocker_pid" 2>/dev/null || true
+  quit_app
+  bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-oc-port-conflict.log" 2>&1 || true
+  wait_ports_free
+
+  $passed && return 0 || return 1
+}
+
+# 3c. Post-launch port theft: start Nexu normally, then occupy its port,
+#     force-restart openclaw to trigger recovery. Verifies the post-launch
+#     detection + reassignment path (not just findFreePort).
+resilience_openclaw_port_theft() {
+  log "--- Resilience: openclaw port theft (post-launch) ---"
+  resilience_reset
+
+  # 1. Start Nexu normally — no conflict, openclaw gets 18789
+  resilience_launch "$1"
+  sleep 15
+
+  # Verify app is healthy first
+  if ! curl -sf "http://127.0.0.1:50800/api/internal/desktop/ready" 2>/dev/null | grep -q '"ready":true'; then
+    log "FAILED: app not healthy before port theft test"
+    quit_app
+    bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-port-theft.log" 2>&1 || true
+    wait_ports_free
+    return 1
+  fi
+  log "App healthy, openclaw on 18789"
+
+  # 2. Kill our openclaw process (simulate crash)
+  local oc_pid
+  oc_pid=$(lsof -iTCP:18789 -sTCP:LISTEN -t 2>/dev/null || echo "")
+  if [ -z "$oc_pid" ]; then
+    log "FAILED: no process on 18789 to kill"
+    quit_app
+    bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-port-theft.log" 2>&1 || true
+    wait_ports_free
+    return 1
+  fi
+  kill -9 "$oc_pid" 2>/dev/null || true
+  sleep 1
+  log "Killed openclaw pid=$oc_pid"
+
+  # 3. Immediately occupy 18789 with a blocker (simulating another service
+  #    grabbing the port before launchd restarts our openclaw)
+  python3 -c "
+import socket, time
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(('127.0.0.1', 18789))
+s.listen(1)
+while True:
+    time.sleep(1)
+" &
+  local blocker_pid=$!
+  sleep 1
+  log "Blocker occupying 18789, pid=$blocker_pid"
+
+  # 4. Force Quit and re-launch app — this triggers cold start with port
+  #    theft detection since the port is now occupied by the blocker
+  quit_app
+  sleep 3
+  # Clean runtime-ports so it does a fresh cold start
+  local plist_dir="$PERSISTENT_HOME/Library/LaunchAgents"
+  rm -f "$plist_dir/runtime-ports.json" 2>/dev/null
+  launchctl bootout "gui/$(id -u)/io.nexu.openclaw" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)/io.nexu.controller" 2>/dev/null || true
+  rm -f "$plist_dir/io.nexu."*.plist 2>/dev/null
+  sleep 2
+
+  resilience_launch "$1"
+  sleep 20
+
+  local passed=false
+
+  # Controller must be ready
+  if ! curl -sf "http://127.0.0.1:50800/api/internal/desktop/ready" 2>/dev/null | grep -q '"ready":true'; then
+    log "FAILED: controller not ready after port theft recovery"
+    kill "$blocker_pid" 2>/dev/null || true
+    quit_app
+    bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-port-theft.log" 2>&1 || true
+    wait_ports_free
+    return 1
+  fi
+
+  # Read actual port from runtime-ports.json
+  local runtime_ports="$plist_dir/runtime-ports.json"
+  local oc_port=""
+  if [ -f "$runtime_ports" ]; then
+    oc_port=$(python3 -c "import json; print(json.load(open('$runtime_ports')).get('openclawPort',''))" 2>/dev/null)
+  fi
+
+  if [ -n "$oc_port" ] && [ "$oc_port" != "18789" ]; then
+    if curl -sf "http://127.0.0.1:$oc_port/health" 2>/dev/null; then
+      log "PASSED: after port theft, openclaw recovered on port $oc_port"
+      passed=true
+    else
+      log "FAILED: runtime-ports says $oc_port but openclaw not healthy"
+    fi
+  else
+    log "FAILED: openclaw still on 18789 or port unknown (oc_port=$oc_port)"
+  fi
+
+  # Blocker should still be alive
+  if kill -0 "$blocker_pid" 2>/dev/null; then
+    log "PASSED: blocker on 18789 still alive"
+  else
+    log "WARNING: blocker was killed"
+  fi
+
+  # Cleanup
+  kill "$blocker_pid" 2>/dev/null || true
+  wait "$blocker_pid" 2>/dev/null || true
+  quit_app
+  bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all-port-theft.log" 2>&1 || true
+  wait_ports_free
+
+  $passed && return 0 || return 1
+}
+
 # 4. Stale runtime-ports.json: write fake state, verify app recovers
 resilience_stale_state() {
   log "--- Resilience: stale runtime-ports.json ---"
@@ -811,7 +1021,7 @@ resilience_update_residual() {
 
   # Check if ports are still held by residual services
   local ports_held
-  ports_held=$(lsof -iTCP:50800 -iTCP:18789 -sTCP:LISTEN -n -P 2>/dev/null | grep -c LISTEN || echo 0)
+  ports_held=$(lsof -iTCP:50800 -iTCP:18789 -iTCP:18790 -iTCP:18791 -sTCP:LISTEN -n -P 2>/dev/null | grep -c LISTEN || echo 0)
   log "Ports still held by residual services: $ports_held"
 
   # Now simulate "updated app" starting — it should teardown old services and start fresh
@@ -849,6 +1059,8 @@ run_resilience() {
   resilience_crash_recovery "$app_path" || failed=$((failed + 1))
   resilience_orphan_cleanup "$app_path" || failed=$((failed + 1))
   resilience_port_conflict "$app_path" || failed=$((failed + 1))
+  resilience_openclaw_port_conflict "$app_path" || failed=$((failed + 1))
+  resilience_openclaw_port_theft "$app_path" || failed=$((failed + 1))
   resilience_stale_state "$app_path" || failed=$((failed + 1))
   resilience_double_launch "$app_path" || failed=$((failed + 1))
   resilience_update_residual "$app_path" || failed=$((failed + 1))

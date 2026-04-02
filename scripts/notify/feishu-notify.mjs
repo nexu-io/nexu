@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { checkOrganizationMembership } from "../nexu-pal/lib/github-client.mjs";
+import { isSentryAutomationAuthor } from "../nexu-pal/lib/internal-equivalent-author.mjs";
 
 /**
  * Send a Feishu interactive card notification via incoming webhook.
@@ -36,10 +37,20 @@ if (!webhookUrl) {
   process.exit(1);
 }
 
-if (!ghToken || !repositoryOwner || !author) {
-  console.error(
-    "GITHUB_TOKEN, GITHUB_REPOSITORY_OWNER, and AUTHOR are required",
+if (!author) {
+  console.error("AUTHOR is required");
+  process.exit(1);
+}
+
+if (isSentryAutomationAuthor(author)) {
+  console.log(
+    `Skipping Feishu notification for internal-equivalent author: ${author}`,
   );
+  process.exit(0);
+}
+
+if (!ghToken || !repositoryOwner) {
+  console.error("GITHUB_TOKEN and GITHUB_REPOSITORY_OWNER are required");
   process.exit(1);
 }
 

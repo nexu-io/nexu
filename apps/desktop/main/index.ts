@@ -25,6 +25,8 @@ import { exportDiagnostics } from "./diagnostics-export";
 import {
   registerIpcHandlers,
   setComponentUpdater,
+  setQuitFallback,
+  setQuitHandlerOpts,
   setUpdateManager,
 } from "./ipc";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
@@ -685,6 +687,11 @@ async function runLaunchdColdStart(): Promise<void> {
     skillNodePath,
     openclawTmpDir,
     proxyEnv,
+    amplitudeApiKey:
+      process.env.AMPLITUDE_API_KEY ??
+      runtimeConfig.amplitudeApiKey ??
+      undefined,
+    log: (message: string) => logColdStart(message),
     nodeV8Coverage: process.env.NODE_V8_COVERAGE,
     desktopE2ECoverage: process.env.NEXU_DESKTOP_E2E_COVERAGE,
     desktopE2ECoverageRunId: process.env.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
@@ -769,18 +776,11 @@ app.on("second-instance", () => {
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
-  // During setup animation, use 16:9 dimensions matching the video (1920×1080)
-  // to avoid non-uniform scaling / edge cropping. Restored to normal size
-  // when setup:animation-complete IPC fires.
-  const setupWidth = 1280;
-  const setupHeight = 720;
-  const normalWidth = 1400;
-  const normalHeight = 920;
   const window = new BrowserWindow({
-    width: needsSetupExtraction ? setupWidth : normalWidth,
-    height: needsSetupExtraction ? setupHeight : normalHeight,
-    minWidth: needsSetupExtraction ? setupWidth : 1120,
-    minHeight: needsSetupExtraction ? setupHeight : 760,
+    width: 1280,
+    height: 720,
+    minWidth: needsSetupExtraction ? 1280 : 1120,
+    minHeight: 720,
     backgroundColor: isMacOS ? "#00000000" : "#0B1020",
     title: "nexu",
     titleBarStyle: "hiddenInset",
@@ -1092,6 +1092,14 @@ app.whenReady().then(async () => {
     diagnosticsReporter,
     coldStartReady,
   );
+  // Provide orchestrator-mode quit fallback for app:quit IPC when launchd
+  // quit handler is not available (e.g. CI, orchestrator mode).
+  setQuitFallback(() =>
+    gracefulShutdown("ipc-quit").finally(() => {
+      (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+      app.exit(0);
+    }),
+  );
   const unsubscribeDiagnostics = diagnosticsReporter.start();
   sleepGuard = new SleepGuard({
     powerMonitor,
@@ -1160,7 +1168,7 @@ app.whenReady().then(async () => {
     // Install launchd quit handler regardless of cold-start success/failure
     // so services can always be stopped cleanly on quit.
     if (launchdResult) {
-      installLaunchdQuitHandler({
+      const quitOpts = {
         launchd: launchdResult.launchd,
         labels: launchdResult.labels,
         webServer: launchdResult.webServer,
@@ -1171,7 +1179,9 @@ app.whenReady().then(async () => {
           flushRuntimeLoggers();
           flushV8CoverageIfEnabled();
         },
-      });
+      };
+      installLaunchdQuitHandler(quitOpts);
+      setQuitHandlerOpts(quitOpts);
     }
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {

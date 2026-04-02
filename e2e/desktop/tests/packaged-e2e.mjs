@@ -574,19 +574,29 @@ async function quitPackagedApp(page, app, coverageCollector) {
   const closePromise = app.waitForEvent("close").catch(() => null);
 
   // Try IPC quit first (preferred — no dialog)
+  const electronPid = app.process().pid;
   try {
     await page.evaluate(async () => {
       await window.nexuHost.invoke("app:quit", { decision: "quit-completely" });
     });
     log("Quit via app:quit IPC");
-    await closePromise;
+    await Promise.race([
+      closePromise,
+      sleep(15_000).then(() => {
+        log("IPC quit timeout, force killing");
+        try {
+          if (electronPid) process.kill(electronPid, "SIGKILL");
+        } catch {
+          /* already dead */
+        }
+      }),
+    ]);
     return;
   } catch {
     log("app:quit IPC unavailable, using SIGTERM + osascript");
   }
 
   // Fallback: SIGTERM the Electron process to trigger before-quit → quit dialog
-  const electronPid = app.process().pid;
   if (electronPid) {
     process.kill(electronPid, "SIGTERM");
   }
@@ -598,13 +608,18 @@ async function quitPackagedApp(page, app, coverageCollector) {
     closePromise,
     sleep(15_000).then(() => {
       log("Quit timeout, force killing");
-      if (electronPid) process.kill(electronPid, "SIGKILL").catch?.(() => {});
+      try {
+        if (electronPid) process.kill(electronPid, "SIGKILL");
+      } catch {
+        /* already dead */
+      }
     }),
   ]);
 }
 
 async function waitForDesktopReady() {
-  await waitFor(async () => {
+  // Controller readiness — also returns runtime ports
+  const readyPayload = await waitFor(async () => {
     const r = await fetch("http://127.0.0.1:50800/api/internal/desktop/ready");
     if (!r.ok) return false;
     const p = await r.json();
@@ -616,10 +631,14 @@ async function waitForDesktopReady() {
     return r.ok;
   }, "web ready");
 
+  // Discover actual openclaw port from controller readiness payload or
+  // fall back to scanning common ports. The port may differ from 18789
+  // if another service occupied it.
+  const ocPort = readyPayload?.openclawPort ?? 18789;
   await waitFor(async () => {
-    const r = await fetch("http://127.0.0.1:18789/health");
+    const r = await fetch(`http://127.0.0.1:${ocPort}/health`);
     return r.ok;
-  }, "openclaw health");
+  }, `openclaw health (port ${ocPort})`);
 }
 
 // ---------------------------------------------------------------------------

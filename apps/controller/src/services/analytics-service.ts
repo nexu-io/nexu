@@ -14,7 +14,7 @@ type AnalyticsChannel =
   | "discord"
   | "telegram"
   | "whatsapp";
-type AnalyticsSkillSource = "builtin" | "explore" | "custom";
+type AnalyticsSkillSource = "builtin" | "explore" | "custom" | "chat";
 type InternalSkillSource = "curated" | "managed" | "custom";
 
 type AnalyticsState = {
@@ -249,7 +249,7 @@ export class AnalyticsService {
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
       await this.sendEvent(
         profile.id,
-        "session_start",
+        "nexu_first_conversation_start",
         {
           channel: firstSessionCandidate.channel,
           model_provider: firstSessionCandidate.providerName,

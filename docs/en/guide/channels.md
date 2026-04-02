@@ -1,8 +1,8 @@
 # Channel Configuration
 
-nexu supports multiple chat channels simultaneously — just enter your credentials in the client to connect.
+nexu supports connecting multiple chat channels at the same time. Just enter the required credentials in the client to complete the setup.
 
-Click the links below for detailed setup guides:
+Click one of the links below for a detailed setup guide:
 
 - [Feishu](/guide/channels/feishu)
 - [Slack](/guide/channels/slack)

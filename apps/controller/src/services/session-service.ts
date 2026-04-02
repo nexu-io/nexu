@@ -56,4 +56,32 @@ export class SessionService {
   async getChatHistory(id: string, limit?: number) {
     return this.sessionsRuntime.getChatHistory(id, limit);
   }
+
+  async getChatHistoryBySessionKey(
+    botId: string,
+    sessionKey: string,
+    limit?: number,
+  ) {
+    return this.sessionsRuntime.getChatHistoryBySessionKey(
+      botId,
+      sessionKey,
+      limit,
+    );
+  }
+
+  async appendCompatTranscript(input: {
+    botId: string;
+    sessionKey: string;
+    title: string;
+    channelType: string;
+    channelId?: string | null;
+    metadata?: Record<string, unknown>;
+    userText: string;
+    assistantText: string;
+    provider?: string | null;
+    model?: string | null;
+    api?: string | null;
+  }) {
+    return this.sessionsRuntime.appendCompatTranscript(input);
+  }
 }

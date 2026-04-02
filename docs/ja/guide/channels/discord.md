@@ -1,54 +1,71 @@
 # Discord
 
-Discord ボットを nexu に接続するには、**Application ID** と **Bot Token** が必要です。
+Application ID と Bot Token を取得すれば、Discord ボットを nexu に接続できます。
 
-## ステップ 1：Discord アプリケーションを作成
+## ステップ 1: Discord アプリを作成する
 
-1. [Discord Developer Portal](https://discord.com/developers/applications) にアクセスし、「New Application」をクリックします。
-![Discord Applications page](/assets/discord/step1-applications.webp)
+1. [Discord Developer Portal](https://discord.com/developers/applications) を開き、**New Application** をクリックします。
 
-2. アプリケーション名を入力し、「Create」をクリックします。
-![Create application](/assets/discord/step1-create-app.webp)
+![Discord Applications ページ](/assets/discord/step1-applications.webp)
 
-3. 「General Information」ページで **Application ID** をコピーして保存します。
-![Get Application ID](/assets/discord/step1-general-info.webp)
+2. アプリ名を入力して **Create** をクリックします。
 
-4. 左メニューから「Bot」を開き、「Reset Token」で Bot Token を生成し、**Bot Token** をコピーします。
-![Generate Bot Token](/assets/discord/step3-bot-token.webp)
+![アプリを作成](/assets/discord/step1-create-app.webp)
 
-## ステップ 2：nexu に認証情報を追加
+3. **General Information** ページで次の値を控えます。
 
-nexu クライアントを開き、Discord チャンネル設定に App ID と Bot Token を入力し、「接続」をクリックします。
-![Add credentials in nexu](/assets/discord/step2-nexu-connect.webp)
+   - **Application ID**
 
-## ステップ 3：権限を設定しボットを招待
+![Application ID を取得](/assets/discord/step1-general-info.webp)
 
-1. Discord Developer Portal に戻り、「Bot」ページで次の特権ゲートウェイインテントを有効にします：**Message Content Intent**
-![Enable Message Content Intent](/assets/discord/step4-intents.webp)
+4. 左側メニューの **Bot** を開き、**Reset Token** を押して Bot Token を生成し、控えておきます。
 
-2. 左メニューから「OAuth2」に移動し、Scopes で `bot` を選択、Bot Permissions で `Administrator` を選択します。
-![Select Scopes & Bot Permissions](/assets/discord/step5-scopes.webp)
+   - **Bot Token**
 
-3. ページ下部に表示された URL をコピーし、ブラウザで開きます。
-![Copy generated URL](/assets/discord/step5-generated-url.webp)
+![Bot Token を生成](/assets/discord/step3-bot-token.webp)
 
-4. サーバーを選び、「続行」をクリックします。
-![Select server](/assets/discord/step3-select-server.webp)
+## ステップ 2: nexu に認証情報を入力する
 
-5. 権限を確認し、「認証」をクリックしてボットを追加します。
-![Authorize bot](/assets/discord/step3-authorize.webp)
+nexu クライアントを開き、Discord チャンネル設定に App ID と Bot Token を入力して **Connect** をクリックします。
 
-## ステップ 4：テスト
+![nexu に認証情報を入力](/assets/discord/step2-nexu-connect.webp)
 
-接続後、nexu クライアントで「チャット」をクリックし、Discord に移動してボットと会話を始めます 🎉
-![Discord connected](/assets/discord/step4-connected.webp)
+## ステップ 3: 権限を設定してボットを招待する
 
-## FAQ
+1. Discord Developer Portal に戻り、**Bot** ページの下部で次の Privileged Gateway Intent を有効にします。
 
-**Q: パブリックサーバーは必要ですか？**
+   - **Message Content Intent**
 
-いいえ。nexu は Discord Gateway（WebSocket）を使用するため、パブリック IP やコールバック URL は不要です。
+![Message Content Intent を有効化](/assets/discord/step4-intents.webp)
 
-**Q: ボットがメッセージに返信しません？**
+2. 左側メニューの **OAuth2** を開き、Scopes で `bot` を選び、下の Bot Permissions で `Administrator` を選択します。
 
-Message Content Intent が有効になっていることを確認してください。有効でないとボットはメッセージ内容を読み取れません。
+![Scopes と Bot Permissions を選択](/assets/discord/step5-scopes.webp)
+
+3. ページ下部で生成された URL をコピーし、ブラウザで開きます。
+
+![生成された URL をコピー](/assets/discord/step5-generated-url.webp)
+
+4. サーバーを選択して **Continue** をクリックします。
+
+![サーバーを選択](/assets/discord/step3-select-server.webp)
+
+5. 権限一覧を確認し、**Authorize** をクリックしてボットを招待します。
+
+![ボットを認可](/assets/discord/step3-authorize.webp)
+
+## ステップ 4: テストする
+
+接続に成功したら、nexu クライアントで **Chat** をクリックして Discord でボットと会話できます。
+
+![Discord 接続完了](/assets/discord/step4-connected.webp)
+
+## よくある質問
+
+**Q: 公開サーバーは必要ですか？**
+
+不要です。nexu は Discord Gateway（WebSocket）を使うため、公開 IP やコールバック URL は必要ありません。
+
+**Q: ボットがメッセージに返信しません。**
+
+**Message Content Intent** が有効になっているか確認してください。これが無効だと、ボットはメッセージ本文を読めません。

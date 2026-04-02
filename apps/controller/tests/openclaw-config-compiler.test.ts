@@ -184,6 +184,97 @@ describe("compileOpenClawConfig", () => {
     ]);
   });
 
+  it("compiles qqbot channels and enables the canonical qq plugin id", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [
+          {
+            id: "qq-channel-1",
+            botId: "bot-1",
+            channelType: "qqbot",
+            accountId: "default",
+            status: "connected",
+            teamName: null,
+            appId: "123456",
+            botUserId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        secrets: {
+          "channel:qq-channel-1:appId": "123456",
+          "channel:qq-channel-1:clientSecret": "qq-secret",
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.channels.qqbot).toMatchObject({
+      enabled: true,
+      appId: "123456",
+      clientSecret: "qq-secret",
+      dmPolicy: "open",
+      groupPolicy: "open",
+      historyLimit: 50,
+      markdownSupport: true,
+    });
+    expect(result.bindings).toContainEqual({
+      agentId: "bot-1",
+      match: {
+        channel: "qqbot",
+        accountId: "default",
+      },
+    });
+    expect(result.plugins?.allow).toContain("openclaw-qqbot");
+    expect(result.plugins?.entries?.["openclaw-qqbot"]?.enabled).toBe(true);
+  });
+
+  it("compiles wecom channels and enables the canonical wecom plugin id", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [
+          {
+            id: "wecom-channel-1",
+            botId: "bot-1",
+            channelType: "wecom",
+            accountId: "default",
+            status: "connected",
+            teamName: null,
+            appId: "wecom-bot-123",
+            botUserId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        secrets: {
+          "channel:wecom-channel-1:botId": "wecom-bot-123",
+          "channel:wecom-channel-1:secret": "wecom-secret",
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.channels.wecom).toMatchObject({
+      enabled: true,
+      botId: "wecom-bot-123",
+      secret: "wecom-secret",
+      dmPolicy: "open",
+      groupPolicy: "open",
+      sendThinkingMessage: true,
+    });
+    expect(result.bindings).toContainEqual({
+      agentId: "bot-1",
+      match: {
+        channel: "wecom",
+        accountId: "default",
+      },
+    });
+    expect(result.plugins?.allow).toContain("wecom");
+    expect(result.plugins?.entries?.wecom?.enabled).toBe(true);
+  });
+
   it("injects env-backed litellm routing for bare local model ids", () => {
     const result = compileOpenClawConfig(
       createConfig({
@@ -222,6 +313,50 @@ describe("compileOpenClawConfig", () => {
     expect(result.agents.list[0]?.model).toEqual({
       primary: "litellm/anthropic/claude-sonnet-4",
     });
+  });
+
+  it("compiles dingtalk channels and enables the canonical dingtalk plugin id", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [
+          {
+            id: "dingtalk-channel-1",
+            botId: "bot-1",
+            channelType: "dingtalk",
+            accountId: "default",
+            status: "connected",
+            teamName: null,
+            appId: "ding-client-id",
+            botUserId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        secrets: {
+          "channel:dingtalk-channel-1:clientId": "ding-client-id",
+          "channel:dingtalk-channel-1:clientSecret": "ding-client-secret",
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.channels["dingtalk-connector"]).toMatchObject({
+      enabled: true,
+      clientId: "ding-client-id",
+      clientSecret: "ding-client-secret",
+      dmPolicy: "open",
+      groupPolicy: "open",
+    });
+    expect(result.bindings).toContainEqual({
+      agentId: "bot-1",
+      match: {
+        channel: "dingtalk-connector",
+        accountId: "default",
+      },
+    });
+    expect(result.plugins?.allow).toContain("dingtalk-connector");
+    expect(result.plugins?.entries?.["dingtalk-connector"]?.enabled).toBe(true);
   });
 
   it("does not remap openai models to OAuth providers without persisted OAuth state", () => {

@@ -231,15 +231,9 @@ export class SkillDirWatcher {
       return;
     }
 
-    this.sharedWatcher = watch(
-      this.skillsDir,
-      { recursive: true },
-      (_event, filename) => {
-        if (filename?.endsWith("SKILL.md")) {
-          this.scheduleSync();
-        }
-      },
-    );
+    this.sharedWatcher = watch(this.skillsDir, { recursive: true }, () => {
+      this.scheduleSync();
+    });
 
     this.sharedWatcher.on("error", (err: unknown) => {
       this.log(
@@ -251,15 +245,9 @@ export class SkillDirWatcher {
     this.log("info", `Watching skills directory: ${this.skillsDir}`);
 
     if (this.userSkillsDir && existsSync(this.userSkillsDir)) {
-      this.userWatcher = watch(
-        this.userSkillsDir,
-        { recursive: true },
-        (_event, filename) => {
-          if (filename?.endsWith("SKILL.md")) {
-            this.scheduleSync();
-          }
-        },
-      );
+      this.userWatcher = watch(this.userSkillsDir, { recursive: true }, () => {
+        this.scheduleSync();
+      });
 
       this.userWatcher.on("error", (err: unknown) => {
         this.log(
@@ -275,16 +263,8 @@ export class SkillDirWatcher {
       this.workspaceWatcher = watch(
         this.openclawStateDir,
         { recursive: true },
-        (_event, filename) => {
-          const normalized = filename?.replaceAll("\\", "/");
-          if (
-            normalized &&
-            /(^|\/)agents\/[^/]+\/skills\/[^/]+(?:\/SKILL\.md)?$/.test(
-              normalized,
-            )
-          ) {
-            this.scheduleSync();
-          }
+        () => {
+          this.scheduleSync();
         },
       );
 

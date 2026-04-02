@@ -398,6 +398,8 @@ function resolveNodeCompiledRepoPath(url, repoRoot) {
   const suffixMappings = [
     ["/dist-electron/main/", "apps/desktop/dist-electron/main/"],
     ["/dist-electron/preload/", "apps/desktop/dist-electron/preload/"],
+    ["/runtime/controller-sidecar/dist/", "apps/controller/dist/"],
+    ["/controller-sidecar/dist/", "apps/controller/dist/"],
     ["/runtime/controller/dist/", "apps/controller/dist/"],
     ["/apps/controller/dist/", "apps/controller/dist/"],
     ["/controller/dist/", "apps/controller/dist/"],

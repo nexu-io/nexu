@@ -8,11 +8,16 @@ coverage:
       desktop-e2e:
         flags:
           - desktop-e2e
+        target: auto
+        threshold: 2%
     patch:
       desktop-e2e:
         flags:
           - desktop-e2e
+        target: 70%
+        threshold: 5%
 
 comment:
   layout: "reach,diff,flags,files"
   require_changes: true
+  behavior: default

@@ -128,6 +128,7 @@ const en = {
   "layout.collapseSidebar": "Collapse sidebar",
   "layout.update.available": "{{version}} available",
   "layout.update.downloading": "Downloading update...",
+  "layout.update.installing": "Preparing to install and restart...",
   "layout.update.readyToInstall": "Update ready to install",
   "layout.update.download": "Download",
   "layout.update.install": "Restart & Install",
@@ -175,6 +176,9 @@ const en = {
   "home.channel.wechat": "WeChat",
   "home.channel.telegram": "Telegram",
   "home.channel.whatsapp": "WhatsApp",
+  "home.channel.dingtalk": "DingTalk",
+  "home.channel.qqbot": "QQ",
+  "home.channel.wecom": "WeCom",
   "home.channel.addBot": "Add nexu Bot",
   "home.tab.channels": "Channels",
   "home.tab.models": "Models & Key",
@@ -222,6 +226,28 @@ const en = {
   "home.starNexu": "Star Nexu on GitHub",
   "home.starCta":
     "Help us grow the open-source community — your star makes a difference",
+  "home.seedance.promo.title": "Seedance 2.0 Experience Key",
+  "home.seedance.promo.badge": "Limited time",
+  "home.seedance.promo.subtitle":
+    "nexu now supports Seedance 2.0. Star the repo, join the Feishu group, fill the form, and we'll send you a Key.",
+  "home.seedance.promo.dismiss": "Dismiss promo",
+  "home.seedance.modal.title": "Get your Seedance 2.0 Experience Key",
+  "home.seedance.modal.lead":
+    "Two quick steps: Star the repo, then join the Feishu group to apply.",
+  "home.seedance.modal.step1.title": "Step 1: Star on GitHub & screenshot",
+  "home.seedance.modal.step1.copy":
+    "Star the nexu repo on GitHub, then take a screenshot of the page.",
+  "home.seedance.modal.step1.cta": "Star on GitHub",
+  "home.seedance.modal.step1.done": "Starred",
+  "home.seedance.modal.step1.nextCta": "I have the screenshot, join the group",
+  "home.seedance.modal.step2.title":
+    "Step 2: Join Feishu group & fill the form",
+  "home.seedance.modal.step2.copy":
+    "After joining the group and submitting the form, we'll reach out and send you a Key. Enter it in nexu Bot to start.",
+  "home.seedance.modal.step2.cta": "Join Feishu group",
+  "home.seedance.modal.step2.tutorial":
+    "Tutorial: How to use Seedance 2.0 in nexu Bot",
+  "home.seedance.modal.step2.done": "Got it",
   "home.recentActivity": "Recent Activity",
   "home.noRecentActivity": "No recent conversations",
 
@@ -760,6 +786,72 @@ const en = {
 
   // ── WhatsApp Setup ──
   "whatsappSetup.title": "Connect WhatsApp",
+
+  // ── QQ Setup ──
+  "qqbotSetup.title": "Connect QQ",
+  "qqbotSetup.desc":
+    "Create a QQ bot app, paste the App ID and Secret here, then let Nexu reply through the bundled OpenClaw plugin.",
+  "qqbotSetup.quickSetup": "Quick setup",
+  "qqbotSetup.step1": "Open QQ Bot Platform",
+  "qqbotSetup.step2": "Create or open your bot application.",
+  "qqbotSetup.step3": "Copy the App ID and App Secret.",
+  "qqbotSetup.step4": "Paste the credentials below and verify the connection.",
+  "qqbotSetup.appIdLabel": "App ID",
+  "qqbotSetup.appIdPlaceholder": "e.g. 1024",
+  "qqbotSetup.appSecretLabel": "App Secret",
+  "qqbotSetup.appSecretPlaceholder": "Your app secret",
+  "qqbotSetup.credentialsRequired": "QQ App ID and App Secret are required",
+  "qqbotSetup.testConnectivity": "Test Connectivity",
+  "qqbotSetup.testSuccess": "QQ credentials are valid",
+  "qqbotSetup.testFailed": "Failed to verify QQ credentials",
+  "qqbotSetup.connect": "Connect QQ",
+  "qqbotSetup.connectSuccess": "QQ connected",
+  "qqbotSetup.connectFailed": "Failed to connect QQ",
+
+  // ── DingTalk Setup ──
+  "dingtalkSetup.title": "Connect DingTalk",
+  "dingtalkSetup.desc":
+    "Create a DingTalk app in Open Platform, then paste the Client ID and Client Secret here.",
+  "dingtalkSetup.quickSetup": "Quick setup",
+  "dingtalkSetup.step1": "Open DingTalk Open Platform",
+  "dingtalkSetup.step2": "Create or open a robot-enabled application.",
+  "dingtalkSetup.step3":
+    "Copy the Client ID and Client Secret from app credentials.",
+  "dingtalkSetup.step4":
+    "Paste the credentials below and verify the connection.",
+  "dingtalkSetup.clientIdLabel": "Client ID",
+  "dingtalkSetup.clientIdPlaceholder": "e.g. dingxxxxxxxxxxxxxxxx",
+  "dingtalkSetup.clientSecretLabel": "Client Secret",
+  "dingtalkSetup.clientSecretPlaceholder": "Your client secret",
+  "dingtalkSetup.credentialsRequired":
+    "DingTalk Client ID and Client Secret are required",
+  "dingtalkSetup.testConnectivity": "Test Connectivity",
+  "dingtalkSetup.testSuccess": "DingTalk credentials are valid",
+  "dingtalkSetup.testFailed": "Failed to verify DingTalk credentials",
+  "dingtalkSetup.connect": "Connect DingTalk",
+  "dingtalkSetup.connectSuccess": "DingTalk connected",
+  "dingtalkSetup.connectFailed": "Failed to connect DingTalk",
+
+  // ── WeCom Setup ──
+  "wecomSetup.title": "Connect WeCom",
+  "wecomSetup.desc":
+    "Enter your WeCom bot credentials to enable replies through the bundled OpenClaw plugin.",
+  "wecomSetup.quickSetup": "Quick setup",
+  "wecomSetup.step1": "Open WeCom Developer Center.",
+  "wecomSetup.step2": "Create or open your bot application.",
+  "wecomSetup.step3": "Copy the Bot ID and Secret.",
+  "wecomSetup.step4": "Paste the credentials below and verify the connection.",
+  "wecomSetup.botIdLabel": "Bot ID",
+  "wecomSetup.botIdPlaceholder": "e.g. ww1234567890abcdef",
+  "wecomSetup.secretLabel": "Secret",
+  "wecomSetup.secretPlaceholder": "Your bot secret",
+  "wecomSetup.credentialsRequired": "WeCom Bot ID and Secret are required",
+  "wecomSetup.testConnectivity": "Test Connectivity",
+  "wecomSetup.testSuccess": "WeCom credentials look valid",
+  "wecomSetup.testFailed": "Failed to verify WeCom credentials",
+  "wecomSetup.connect": "Connect WeCom",
+  "wecomSetup.connectSuccess": "WeCom connected",
+  "wecomSetup.connectFailed": "Failed to connect WeCom",
 
   // ── Common UI ──
   "common.closeDialog": "Close dialog",
