@@ -486,6 +486,7 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 - **限流**：所有触发类型合计每小时最多 3 个 Sentry 事件
 - **恢复重置**：`RECOVERY_HYSTERESIS` 结束且持续 healthy 后重置所有计数器和标志
 - **冷却期**：Sentry 上报后，同一 `dedupeKey` 抑制 30 分钟
+- **IM 通知冷却**：IM 通知与 Sentry 共用相同的 `dedupeKey` 和 30 分钟冷却期。同一个 bot 反复断连不会刷屏——每个 episode 只通知一次，冷却期结束或问题变化后才再次通知。
 
 ### 9.3 诊断载荷
 
@@ -498,9 +499,11 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 
 ## 10. IM 命令
 
+**仅限私聊**：`/diagnose` 和 `/fix` 仅在与 bot 的私聊（DM）中响应。在群聊中，bot 忽略这些命令或回复："请私聊我执行此命令。"这避免了共享 channel 中的误操作。
+
 ### 10.1 `/diagnose` — 自检报告
 
-**触发**：用户在任意已连接 IM channel 中发送 `/diagnose`。
+**触发**：用户在与 bot 的私聊中发送 `/diagnose`。
 
 **流程**：
 1. Controller 调用 OpenClaw `run_diagnose(depth: "full")`
@@ -525,7 +528,7 @@ Controller 探针：0 次连续失败
 
 ### 10.2 `/fix` — 触发修复
 
-**触发**：用户在任意已连接 IM channel 中发送 `/fix`。
+**触发**：用户在与 bot 的私聊中发送 `/fix`。
 
 **流程**：
 1. Controller 调用 OpenClaw `run_fix`，内部运行 **doctor** 诊断修复流程

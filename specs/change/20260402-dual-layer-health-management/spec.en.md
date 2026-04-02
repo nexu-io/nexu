@@ -488,6 +488,7 @@ Only report when escalation has genuinely failed — not on every diagnostic eve
 - **Rate limit**: max 3 Sentry events per hour across all trigger types
 - **Recovery reset**: all counters and flags reset after `RECOVERY_HYSTERESIS` elapses with healthy status
 - **Cooldown**: after a Sentry report, suppress same `dedupeKey` for 30 minutes
+- **IM notify cooldown**: IM notifications share the same `dedupeKey` and 30-minute cooldown as Sentry. Same bot disconnecting repeatedly does not spam the user — one notification per episode, silence until cooldown expires or the issue changes.
 
 ### 9.3 Diagnostics Payload
 
@@ -500,9 +501,11 @@ Reuse existing `diagnostics-export.ts` with additions:
 
 ## 10. IM Commands
 
+**DM only**: `/diagnose` and `/fix` only respond in direct messages (DM / private chat) with the bot. In group channels, the bot ignores these commands or replies: "Please DM me to run this command." This prevents accidental or unintended repair actions in shared channels.
+
 ### 10.1 `/diagnose` — Self-Check Report
 
-**Trigger**: user sends `/diagnose` in any connected IM channel.
+**Trigger**: user sends `/diagnose` in a DM with the bot.
 
 **Flow**:
 1. Controller calls OpenClaw `run_diagnose(depth: "full")`
@@ -527,7 +530,7 @@ Escalations: none
 
 ### 10.2 `/fix` — Trigger Repair
 
-**Trigger**: user sends `/fix` in any connected IM channel.
+**Trigger**: user sends `/fix` in a DM with the bot.
 
 **Flow**:
 1. Controller calls OpenClaw `run_fix` which runs the **doctor** diagnostic and repair flow internally
