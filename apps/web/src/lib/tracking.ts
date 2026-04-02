@@ -34,6 +34,21 @@ type AnalyticsInitOptions = {
 let analyticsInitialized = false;
 let currentUserId: string | null = null;
 let persistentSuperProperties: Properties | null = null;
+let currentPersonPropertiesKey: string | null = null;
+
+function buildPersonPropertiesKey(
+  properties: Properties | undefined,
+): string | null {
+  if (!properties) {
+    return null;
+  }
+
+  return JSON.stringify(
+    Object.entries(properties).sort(([left], [right]) =>
+      left.localeCompare(right),
+    ),
+  );
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -144,7 +159,13 @@ export function identify(properties: Record<string, unknown>): void {
     return;
   }
 
+  const nextPersonPropertiesKey = buildPersonPropertiesKey(normalized);
+  if (currentPersonPropertiesKey === nextPersonPropertiesKey) {
+    return;
+  }
+
   posthog.setPersonProperties(normalized);
+  currentPersonPropertiesKey = nextPersonPropertiesKey;
 }
 
 export function setUserId(userId: string): void {
@@ -157,6 +178,7 @@ export function setUserId(userId: string): void {
     if (persistentSuperProperties) {
       posthog.register(persistentSuperProperties);
     }
+    currentPersonPropertiesKey = null;
   }
 
   if (currentUserId === userId) {
@@ -169,6 +191,7 @@ export function setUserId(userId: string): void {
 
 export function resetAnalytics(): void {
   currentUserId = null;
+  currentPersonPropertiesKey = null;
 
   if (!analyticsInitialized) {
     return;

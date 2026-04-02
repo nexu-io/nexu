@@ -70,6 +70,17 @@ let rendererSentryInitialized = false;
 let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
 let currentPosthogUserId: string | null = null;
+let currentPosthogPersonPropertiesKey: string | null = null;
+
+function buildPostHogPersonPropertiesKey(input: {
+  email?: string | null;
+  name?: string | null;
+}): string {
+  return JSON.stringify([
+    ["email", input.email ?? null],
+    ["name", input.name ?? null],
+  ]);
+}
 
 function sendRendererStartupProbe(
   stage: string,
@@ -169,12 +180,14 @@ function syncPostHogIdentity(input: {
     posthog.reset();
     posthog.register(posthogSuperProperties);
     currentPosthogUserId = null;
+    currentPosthogPersonPropertiesKey = null;
     return;
   }
 
   if (currentPosthogUserId && currentPosthogUserId !== userId) {
     posthog.reset();
     posthog.register(posthogSuperProperties);
+    currentPosthogPersonPropertiesKey = null;
   }
 
   if (currentPosthogUserId !== userId) {
@@ -182,10 +195,20 @@ function syncPostHogIdentity(input: {
     currentPosthogUserId = userId;
   }
 
+  const nextPersonPropertiesKey = buildPostHogPersonPropertiesKey({
+    email: input.userEmail ?? null,
+    name: input.userName ?? null,
+  });
+
+  if (currentPosthogPersonPropertiesKey === nextPersonPropertiesKey) {
+    return;
+  }
+
   posthog.setPersonProperties({
     email: input.userEmail ?? null,
     name: input.userName ?? null,
   });
+  currentPosthogPersonPropertiesKey = nextPersonPropertiesKey;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
