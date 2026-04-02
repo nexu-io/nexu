@@ -3,6 +3,9 @@ import { Identify } from "@amplitude/unified";
 
 export type AnalyticsAuthSource = "welcome_page" | "settings";
 export type AnalyticsChannel =
+  | "qqbot"
+  | "dingtalk"
+  | "wecom"
   | "wechat"
   | "feishu"
   | "slack"
@@ -55,6 +58,9 @@ export function normalizeChannel(
     return "wechat";
   }
   if (
+    channel === "qqbot" ||
+    channel === "dingtalk" ||
+    channel === "wecom" ||
     channel === "feishu" ||
     channel === "slack" ||
     channel === "discord" ||

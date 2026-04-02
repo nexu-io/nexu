@@ -98,6 +98,9 @@ export const env = {
     ? expandHomeDir(parsed.OPENCLAW_EXTENSIONS_DIR)
     : null,
   openclawExtensionsDir: path.join(openclawStateDir, "extensions"),
+  bundledRuntimePluginsDir: workspaceRoot
+    ? path.join(workspaceRoot, "apps", "controller", ".dist-runtime", "plugins")
+    : path.resolve(process.cwd(), "plugins"),
   runtimePluginTemplatesDir: workspaceRoot
     ? path.join(
         workspaceRoot,

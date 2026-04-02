@@ -27,7 +27,6 @@ export function useCloudConnect({
       const { data } = await postApiInternalDesktopCloudConnect();
 
       if (data?.error === "Connection attempt already in progress") {
-        setCloudConnecting(false);
         toast.info(t("welcome.cloudConnectInProgress"));
         return;
       }

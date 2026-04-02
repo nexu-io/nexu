@@ -7,6 +7,7 @@ import { isSupportedByokProviderId } from "./byok-providers.js";
 import {
   compileChannelBindings,
   compileChannelsConfig,
+  resolveManagedChannelPluginId,
 } from "./channel-binding-compiler.js";
 import { normalizeProviderBaseUrl } from "./provider-base-url.js";
 
@@ -415,10 +416,20 @@ function compilePlugins(
       provider.oauthCredential !== null,
   );
 
+  const connectedPluginIds = [
+    ...new Set(
+      config.channels
+        .filter((channel) => channel.status === "connected")
+        .map((channel) => resolveManagedChannelPluginId(channel.channelType))
+        .filter((pluginId): pluginId is string => pluginId !== null),
+    ),
+  ];
+
   return {
     load: {
       paths: [env.openclawExtensionsDir],
     },
+    ...(connectedPluginIds.length > 0 ? { allow: connectedPluginIds } : {}),
     entries: {
       feishu: {
         enabled: true,
@@ -426,6 +437,27 @@ function compilePlugins(
       "openclaw-weixin": {
         enabled: true,
       },
+      ...(connectedPluginIds.includes("dingtalk-connector")
+        ? {
+            "dingtalk-connector": {
+              enabled: true,
+            },
+          }
+        : {}),
+      ...(connectedPluginIds.includes("wecom")
+        ? {
+            wecom: {
+              enabled: true,
+            },
+          }
+        : {}),
+      ...(connectedPluginIds.includes("openclaw-qqbot")
+        ? {
+            "openclaw-qqbot": {
+              enabled: true,
+            },
+          }
+        : {}),
       "nexu-runtime-model": {
         enabled: true,
       },
@@ -556,6 +588,7 @@ export function compileOpenClawConfig(
     channels: compileChannelsConfig({
       channels: config.channels,
       secrets: config.secrets,
+      controllerBaseUrl: `http://127.0.0.1:${env.port}`,
     }),
     bindings: compileChannelBindings(config.bots, config.channels),
     plugins: compilePlugins(config, env),

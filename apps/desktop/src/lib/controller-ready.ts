@@ -65,11 +65,14 @@ async function probeControllerReady(
 async function pollUntilReady(opts: {
   readyUrl: string;
   fetchImpl: ControllerReadyFetch;
-  attemptTimeoutMs: number;
+  attemptTimeoutMs?: number;
   pollIntervalMs: number;
   requestTimeoutMs: number;
 }): Promise<boolean> {
-  const deadline = Date.now() + opts.attemptTimeoutMs;
+  const deadline =
+    typeof opts.attemptTimeoutMs === "number"
+      ? Date.now() + opts.attemptTimeoutMs
+      : Number.POSITIVE_INFINITY;
 
   while (true) {
     const ready = await probeControllerReady(
@@ -102,11 +105,14 @@ export async function ensureDesktopControllerReady(
 
   for (let attempt = 0; attempt <= recoveryAttempts; attempt += 1) {
     options.onStatusChange?.("polling");
+    const isFinalAttempt = attempt === recoveryAttempts;
+    const pollTimeoutMs =
+      startController !== null && isFinalAttempt ? undefined : attemptTimeoutMs;
 
     const ready = await pollUntilReady({
       readyUrl: options.readyUrl,
       fetchImpl,
-      attemptTimeoutMs,
+      attemptTimeoutMs: pollTimeoutMs,
       pollIntervalMs,
       requestTimeoutMs,
     });

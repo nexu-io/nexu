@@ -87,6 +87,8 @@ export interface LaunchdBootstrapEnv {
   openclawTmpDir: string;
   /** Normalized proxy env propagated to controller/openclaw launchd services */
   proxyEnv: Record<string, string>;
+  /** Amplitude API key for controller analytics */
+  amplitudeApiKey?: string;
   /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
   log?: (message: string) => void;
   /** Optional override for controller startup validation timeout (tests only). */
@@ -606,6 +608,7 @@ export async function bootstrapWithLaunchd(
     skillNodePath: env.skillNodePath,
     openclawTmpDir: env.openclawTmpDir,
     proxyEnv: env.proxyEnv,
+    amplitudeApiKey: env.amplitudeApiKey,
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 

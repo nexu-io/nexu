@@ -98,6 +98,42 @@ describe("NexuConfigStore", () => {
     expect(await store.listChannels()).toHaveLength(1);
   });
 
+  it("persists qqbot channels with app secrets in the secret store", async () => {
+    const store = new NexuConfigStore(env);
+
+    const channel = await store.connectQqbot({
+      appId: "123456",
+      appSecret: "qq-secret",
+    });
+
+    expect(channel.channelType).toBe("qqbot");
+    expect(channel.accountId).toBe("default");
+    expect(channel.appId).toBe("123456");
+    expect(await store.getSecret(`channel:${channel.id}:appId`)).toBe("123456");
+    expect(await store.getSecret(`channel:${channel.id}:clientSecret`)).toBe(
+      "qq-secret",
+    );
+  });
+
+  it("persists wecom channels with bot secrets in the secret store", async () => {
+    const store = new NexuConfigStore(env);
+
+    const channel = await store.connectWecom({
+      botId: "wecom-bot-123",
+      secret: "wecom-secret",
+    });
+
+    expect(channel.channelType).toBe("wecom");
+    expect(channel.accountId).toBe("default");
+    expect(channel.appId).toBe("wecom-bot-123");
+    expect(await store.getSecret(`channel:${channel.id}:botId`)).toBe(
+      "wecom-bot-123",
+    );
+    expect(await store.getSecret(`channel:${channel.id}:secret`)).toBe(
+      "wecom-secret",
+    );
+  });
+
   it("clears an existing provider API key when null is explicitly provided", async () => {
     const store = new NexuConfigStore(env);
 

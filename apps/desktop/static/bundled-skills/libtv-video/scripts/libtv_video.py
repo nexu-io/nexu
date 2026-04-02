@@ -67,22 +67,32 @@ def _load_sessions():
     with open(path, "r") as f:
         return json.load(f)
 
-def _save_session(session_id, project_uuid="", status="active", text=""):
+def _save_session(session_id, project_uuid="", status="active", text="",
+                   result_urls=None, completed_at=""):
     sessions = _load_sessions()
     for s in sessions:
         if s["session_id"] == session_id:
             s["status"] = status
             if project_uuid:
                 s["project_uuid"] = project_uuid
+            if result_urls:
+                s["result_urls"] = result_urls
+            if completed_at:
+                s["completed_at"] = completed_at
             break
     else:
-        sessions.append({
+        entry = {
             "session_id": session_id,
             "project_uuid": project_uuid,
             "status": status,
             "text": text[:80],
             "created_at": datetime.now().isoformat(),
-        })
+        }
+        if result_urls:
+            entry["result_urls"] = result_urls
+        if completed_at:
+            entry["completed_at"] = completed_at
+        sessions.append(entry)
     sessions = sessions[-50:]
     path = _sessions_file_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -97,11 +107,13 @@ def _get_pending_sessions():
 # ── URL extraction ──
 
 LIBTV_RES_PATTERN = re.compile(
-    r"https://libtv-res\.liblib\.art/[^\s\"'<>)]+\.(?:png|jpg|jpeg|webp|mp4|mov|webm)"
+    r"https://libtv-res\.liblib\.art/sd-gen-save-img/[^\s\"'<>)]+"
 )
 
 def extract_result_urls(messages):
     """Extract all result media URLs from session messages."""
+    if not messages:
+        return []
     urls = []
     for msg in messages:
         content = msg.get("content", "")
@@ -115,11 +127,11 @@ def extract_result_urls(messages):
             try:
                 data = json.loads(content)
                 task_result = data.get("task_result", {})
-                for img in task_result.get("images", []):
+                for img in task_result.get("images") or []:
                     preview = img.get("previewPath", "")
                     if preview:
                         urls.append(preview)
-                for vid in task_result.get("videos", []):
+                for vid in task_result.get("videos") or []:
                     preview = vid.get("previewPath", vid.get("url", ""))
                     if preview:
                         urls.append(preview)
@@ -389,10 +401,15 @@ def cmd_query_session(args):
         path += f"?afterSeq={args.after_seq}"
 
     result = call_gateway("GET", path)
-    messages = result.get("messages", [])
+    messages = result.get("messages") or []
 
     # Extract result URLs
     urls = extract_result_urls(messages)
+
+    # Persist results to local so recover can read without API
+    if urls:
+        _save_session(session_id, project_uuid=args.project_id or "", status="completed",
+                      result_urls=urls, completed_at=datetime.now().isoformat())
 
     out = {"messages": messages}
     if args.project_id:
@@ -457,11 +474,12 @@ def cmd_wait_and_deliver(args):
 
     for i in range(max_polls):
         result = call_gateway("GET", f"/libtv/v1/session/{session_id}")
-        messages = result.get("messages", [])
+        messages = result.get("messages") or []
         urls = extract_result_urls(messages)
 
         if urls:
-            _save_session(session_id, project_uuid=project_uuid, status="completed")
+            _save_session(session_id, project_uuid=project_uuid, status="completed",
+                          result_urls=urls, completed_at=datetime.now().isoformat())
             deliver_results(urls, project_uuid=project_uuid)
 
             # Auto-download
@@ -494,12 +512,58 @@ def cmd_wait_and_deliver(args):
 
 
 def cmd_recover(args):
-    pending = _get_pending_sessions()
-    if not pending:
-        print("No pending sessions found.")
+    sessions = _load_sessions()
+    if not sessions:
+        print("No sessions found.")
         return
 
-    print(f"Found {len(pending)} pending session(s):")
+    # Show completed sessions from local (no API call needed)
+    completed = [s for s in sessions if s["status"] in ("completed", "failed", "timeout")]
+    pending = [s for s in sessions if s["status"] not in ("completed", "failed", "timeout")]
+
+    if completed:
+        print(f"📋 {len(completed)} completed session(s) (from local):")
+        for s in completed[-10:]:
+            sid = s["session_id"]
+            project_uuid = s.get("project_uuid", "")
+            local_urls = s.get("result_urls", [])
+            status = s["status"]
+            text = s.get("text", "")
+
+            if status == "completed" and local_urls:
+                print(f"  ✅ {sid[:16]}... Completed ({text})")
+                for url in local_urls:
+                    print(f"     🎬 {url}")
+                if project_uuid:
+                    print(f"     🎨 Canvas: {PROJECT_CANVAS_BASE}{project_uuid}")
+            elif status == "failed":
+                print(f"  ❌ {sid[:16]}... Failed ({text})")
+            elif status == "timeout":
+                print(f"  ⏰ {sid[:16]}... Timeout ({text})")
+            else:
+                # Completed but no local URLs — re-fetch once
+                try:
+                    result = call_gateway("GET", f"/libtv/v1/session/{sid}")
+                    messages = result.get("messages") or []
+                    urls = extract_result_urls(messages)
+                    if urls:
+                        _save_session(sid, project_uuid=project_uuid, status="completed",
+                                      result_urls=urls, completed_at=datetime.now().isoformat())
+                        print(f"  ✅ {sid[:16]}... Completed ({text})")
+                        for url in urls:
+                            print(f"     🎬 {url}")
+                    else:
+                        print(f"  ✅ {sid[:16]}... Completed, no result URLs ({text})")
+                except Exception as e:
+                    print(f"  ✅ {sid[:16]}... Completed, fetch error: {e}")
+
+    if not pending:
+        if not completed:
+            print("No sessions found.")
+        return
+
+    # Check pending sessions via API
+    print(f"\n🔍 {len(pending)} pending session(s) (checking API...):")
     for s in pending:
         sid = s["session_id"]
         project_uuid = s.get("project_uuid", "")
@@ -507,11 +571,12 @@ def cmd_recover(args):
 
         try:
             result = call_gateway("GET", f"/libtv/v1/session/{sid}")
-            messages = result.get("messages", [])
+            messages = result.get("messages") or []
             urls = extract_result_urls(messages)
 
             if urls:
-                _save_session(sid, project_uuid=project_uuid, status="completed")
+                _save_session(sid, project_uuid=project_uuid, status="completed",
+                              result_urls=urls, completed_at=datetime.now().isoformat())
                 print(f"  ✅ {sid[:16]}... Completed!")
                 for url in urls:
                     print(f"     🎬 {url}")
@@ -523,6 +588,44 @@ def cmd_recover(args):
                     print(f"     🎨 Canvas: {PROJECT_CANVAS_BASE}{project_uuid}")
         except Exception as e:
             print(f"  ❌ {sid[:16]}... Error checking status: {e}")
+
+def cmd_tasks(args):
+    result = call_gateway("GET", "/api/v1/tasks")
+    tasks = result.get("tasks", [])
+
+    if not tasks:
+        print("No tasks found for this key.")
+        return
+
+    print(f"Found {len(tasks)} task(s):\n")
+    for t in tasks:
+        tid = t.get("id", "?")
+        status = t.get("status", "?")
+        backend = t.get("backend", "libtv")
+        created = t.get("created_at", "?")
+        completed = t.get("completed_at")
+        video_url = t.get("video_url")
+        error = t.get("error_message")
+
+        # Persist completed task results to local for offline recovery
+        if status == "completed" and video_url:
+            _save_session(tid, status="completed",
+                          result_urls=[video_url], completed_at=completed or "")
+
+        status_icon = {
+            "completed": "✅", "failed": "❌", "composing": "⏳",
+            "rendering": "⏳", "pending": "🔄",
+        }.get(status, "❓")
+
+        print(f"  {status_icon} {tid[:16]}...  [{backend}] {status}  ({created})")
+        if completed:
+            print(f"     ⏱️ Completed: {completed}")
+        if video_url:
+            print(f"     🎬 {video_url}")
+        if error:
+            print(f"     ❌ {error}")
+
+
 
 def cmd_change_project(args):
     result = call_gateway("POST", "/libtv/v1/session/change-project", json_data={})
@@ -584,6 +687,10 @@ def main():
     p.add_argument("--session-id", required=True, help="Session ID")
     p.add_argument("--project-id", default="", help="Project UUID")
 
+    # tasks
+    sub.add_parser("tasks", help="List all tasks for current key")
+
+
     # recover
     sub.add_parser("recover", help="Recover and check pending sessions")
 
@@ -602,6 +709,7 @@ def main():
         "query-session": cmd_query_session,
         "download-results": cmd_download_results,
         "wait-and-deliver": cmd_wait_and_deliver,
+        "tasks": cmd_tasks,
         "recover": cmd_recover,
         "change-project": cmd_change_project,
     }

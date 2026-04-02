@@ -113,6 +113,49 @@ When generation completes, show both:
 
 Do NOT show the project canvas link while generation is in progress.
 
+### URL Rules
+
+The only valid result URL prefix is `https://libtv-res.liblib.art/sd-gen-save-img/`. Any other domain (e.g. `medeo-res.liblib.art`) is a gateway proxy URL and must be ignored.
+
+**Always present the URL exactly as extracted by the script.** Do not:
+- Rewrite or transform URLs
+- Use proxy/cache domain URLs as results
+- Fabricate URLs by guessing paths
+
+The `extract_result_urls()` function in the script extracts only `libtv-res.liblib.art/sd-gen-save-img/` URLs. Trust its output.
+
+## Multi-Session Discipline (CRITICAL)
+
+When running multiple video generations concurrently, you MUST follow these rules strictly:
+
+### 1. Track Every Session Separately
+
+Maintain a clear mapping for each generation request:
+- **User request** (what the user asked for, e.g. "scene 1: palace", "scene 2: garden")
+- **Session ID** (returned by `create-session`)
+- **Project UUID** (returned by `create-session`)
+
+### 2. Never Mix Sessions
+
+Before presenting results, always verify:
+- The result URLs came from the correct session ID for that specific request
+- Do NOT copy-paste URLs from one session's output into another session's reply
+
+### 3. Label Results Clearly
+
+When presenting results from multiple concurrent sessions, always label which result belongs to which request:
+```
+Scene 1 (palace): [video URL from session A]
+Scene 2 (garden): [video URL from session B]
+```
+
+### 4. Handle Partial Completion
+
+If some sessions complete before others:
+- Present completed results immediately, clearly labeled
+- Note which sessions are still in progress
+- Do NOT hold all results until every session finishes
+
 ## Error Handling
 
 When any command returns an error:
@@ -143,6 +186,7 @@ When any command returns an error:
 | Query session | `query-session SESSION_ID` | No |
 | Download results | `download-results SESSION_ID` | No |
 | Wait and deliver | `wait-and-deliver --session-id ID --project-id UUID` | Yes |
+| List all tasks | `tasks` | No |
 | Recover sessions | `recover` | No |
 | Change project | `change-project` | No |
 
