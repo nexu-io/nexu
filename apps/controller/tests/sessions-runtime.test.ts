@@ -44,6 +44,7 @@ describe("SessionsRuntime", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     if (rootDir) {
       await rm(rootDir, { recursive: true, force: true });
       rootDir = null;
@@ -1340,5 +1341,193 @@ describe("SessionsRuntime", () => {
 
     // G01ABC2DEF3 is a Slack group ID — should be filtered, fall back to senderName
     expect(session?.title).toBe("Eve · slack");
+  });
+
+  it("replaces qqbot opaque ids with a friendlier user label", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-qq", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionKey = "qqbot-opaque-user";
+    const sessionPath = path.join(sessionsDir, `${sessionKey}.jsonl`);
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-qqbot-1",
+        timestamp: "2026-03-31T12:00:22.688Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-31T12:00:22.688Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "qqbot-msg-1",
+                    sender_id: "68B6446D467308C61B580FB6D56AEA49",
+                    sender: "68B6446D467308C61B580FB6D56AEA49",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "68B6446D467308C61B580FB6D56AEA49",
+                    id: "68B6446D467308C61B580FB6D56AEA49",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "68B6446D467308C61B580FB6D56AEA49 · qqbot",
+          channelType: "qqbot",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === sessionKey);
+
+    expect(session?.title).toBe("QQ user 68B6446D");
+  });
+
+  it("prefers qqbot known-user nicknames over opaque ids", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const homeDir = path.join(rootDir, "home");
+    vi.stubEnv("HOME", homeDir);
+
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const knownUsersDir = path.join(homeDir, ".openclaw", "qqbot", "data");
+    await mkdir(knownUsersDir, { recursive: true });
+    await writeFile(
+      path.join(knownUsersDir, "known-users.json"),
+      JSON.stringify(
+        [
+          {
+            openid: "68B6446D467308C61B580FB6D56AEA49",
+            type: "c2c",
+            nickname: "Ray",
+            accountId: "default",
+          },
+        ],
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "bot-qq", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionKey = "qqbot-known-user";
+    const sessionPath = path.join(sessionsDir, `${sessionKey}.jsonl`);
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-qqbot-2",
+        timestamp: "2026-03-31T12:15:22.688Z",
+        message: {
+          role: "user",
+          timestamp: Date.parse("2026-03-31T12:15:22.688Z"),
+          content: [
+            {
+              type: "text",
+              text: [
+                "Conversation info (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    message_id: "qqbot-msg-2",
+                    sender_id: "68B6446D467308C61B580FB6D56AEA49",
+                    sender: "68B6446D467308C61B580FB6D56AEA49",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+                "",
+                "Sender (untrusted metadata):",
+                "```json",
+                JSON.stringify(
+                  {
+                    label: "68B6446D467308C61B580FB6D56AEA49",
+                    id: "68B6446D467308C61B580FB6D56AEA49",
+                  },
+                  null,
+                  2,
+                ),
+                "```",
+              ].join("\n"),
+            },
+          ],
+        },
+      })}\n`,
+      "utf8",
+    );
+
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      JSON.stringify(
+        {
+          title: "68B6446D467308C61B580FB6D56AEA49 · qqbot",
+          channelType: "qqbot",
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((s) => s.sessionKey === sessionKey);
+
+    expect(session?.title).toBe("Ray");
   });
 });

@@ -1,5 +1,6 @@
 import type {
   BindingConfig,
+  ChannelType,
   DiscordAccountConfig,
   FeishuAccountConfig,
   OpenClawConfig,
@@ -14,6 +15,45 @@ export const NEXU_INTERNAL_ACCOUNT_PREFIX = "__nexu_internal_";
 
 const INTERNAL_FEISHU_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}feishu_prewarm__`;
 const INTERNAL_WECHAT_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}wechat_prewarm__`;
+
+export const MANAGED_CHANNEL_PLUGIN_IDS: Partial<Record<ChannelType, string>> =
+  {
+    dingtalk: "dingtalk-connector",
+    wecom: "wecom",
+    qqbot: "openclaw-qqbot",
+    wechat: "openclaw-weixin",
+  };
+
+export const QQBOT_DEFAULT_ACCOUNT_ID = "default";
+
+export function resolveOpenClawChannelKey(channelType: ChannelType): string {
+  if (channelType === "wechat") {
+    return "openclaw-weixin";
+  }
+  if (channelType === "dingtalk") {
+    return "dingtalk-connector";
+  }
+  return channelType;
+}
+
+export function resolveOpenClawRuntimeAccountId(
+  channelType: ChannelType,
+  accountId: string,
+): string {
+  if (channelType === "qqbot") {
+    return QQBOT_DEFAULT_ACCOUNT_ID;
+  }
+  if (channelType === "dingtalk" && accountId === "default") {
+    return "__default__";
+  }
+  return accountId;
+}
+
+export function resolveManagedChannelPluginId(
+  channelType: ChannelType,
+): string | null {
+  return MANAGED_CHANNEL_PLUGIN_IDS[channelType] ?? null;
+}
 
 function buildSecretLookup(secrets: Record<string, string>, channelId: string) {
   return (suffix: string): string =>
@@ -36,11 +76,11 @@ export function compileChannelBindings(
     .map((channel) => ({
       agentId: channel.botId,
       match: {
-        channel:
-          channel.channelType === "wechat"
-            ? "openclaw-weixin"
-            : channel.channelType,
-        accountId: channel.accountId,
+        channel: resolveOpenClawChannelKey(channel.channelType),
+        accountId: resolveOpenClawRuntimeAccountId(
+          channel.channelType,
+          channel.accountId,
+        ),
       },
     }));
 }
@@ -48,6 +88,7 @@ export function compileChannelBindings(
 export function compileChannelsConfig(params: {
   channels: ChannelResponse[];
   secrets: Record<string, string>;
+  controllerBaseUrl: string;
 }): OpenClawConfig["channels"] {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
@@ -55,6 +96,11 @@ export function compileChannelsConfig(params: {
   const telegramAccounts: Record<string, TelegramAccountConfig> = {};
   const whatsappAccounts: Record<string, WhatsappAccountConfig> = {};
   const wechatAccounts: Record<string, { enabled: boolean }> = {};
+  let dingtalkChannel:
+    | OpenClawConfig["channels"]["dingtalk-connector"]
+    | undefined;
+  let wecomChannel: OpenClawConfig["channels"]["wecom"] | undefined;
+  let qqbotChannel: OpenClawConfig["channels"]["qqbot"] | undefined;
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
   const useSlackSocketMode =
     typeof socketAppToken === "string" && socketAppToken.length > 0;
@@ -116,6 +162,49 @@ export function compileChannelsConfig(params: {
       whatsappAccounts[channel.accountId] = {
         enabled: true,
         authDir: secret("authDir") || undefined,
+      };
+      continue;
+    }
+
+    if (channel.channelType === "dingtalk") {
+      dingtalkChannel = {
+        enabled: true,
+        clientId: secret("clientId") || channel.appId || "",
+        clientSecret: secret("clientSecret"),
+        enableMediaUpload: false,
+        gatewayBaseUrl: params.controllerBaseUrl,
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        groupPolicy: "open",
+      };
+      continue;
+    }
+
+    if (channel.channelType === "wecom") {
+      wecomChannel = {
+        enabled: true,
+        botId: secret("botId") || channel.appId || "",
+        secret: secret("secret"),
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        groupPolicy: "open",
+        groupAllowFrom: ["*"],
+        sendThinkingMessage: true,
+      };
+      continue;
+    }
+
+    if (channel.channelType === "qqbot") {
+      qqbotChannel = {
+        enabled: true,
+        appId: secret("appId") || channel.appId || "",
+        clientSecret: secret("clientSecret"),
+        dmPolicy: "open",
+        allowFrom: ["*"],
+        groupPolicy: "open",
+        groupAllowFrom: ["*"],
+        historyLimit: 50,
+        markdownSupport: true,
       };
       continue;
     }
@@ -237,6 +326,9 @@ export function compileChannelsConfig(params: {
           },
         }
       : {}),
+    ...(dingtalkChannel ? { "dingtalk-connector": dingtalkChannel } : {}),
+    ...(wecomChannel ? { wecom: wecomChannel } : {}),
+    ...(qqbotChannel ? { qqbot: qqbotChannel } : {}),
     "openclaw-weixin": {
       enabled: true,
       accounts: wechatAccounts,

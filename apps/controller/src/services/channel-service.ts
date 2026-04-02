@@ -16,10 +16,13 @@ import { promisify } from "node:util";
 import type {
   BotQuotaResponse,
   ChannelResponse,
+  ConnectDingtalkInput,
   ConnectDiscordInput,
   ConnectFeishuInput,
+  ConnectQqbotInput,
   ConnectSlackInput,
   ConnectTelegramInput,
+  ConnectWecomInput,
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
@@ -51,6 +54,10 @@ const WHATSAPP_RUNTIME_RESTART_TIMEOUT_MS = 45_000;
 const WHATSAPP_RUNTIME_RESTART_POLL_MS = 500;
 const WHATSAPP_READY_TIMEOUT_MS = 45_000;
 const WHATSAPP_READY_POLL_MS = 1_500;
+const DINGTALK_PLUGIN_ID = "dingtalk-connector";
+const WECOM_PLUGIN_ID = "wecom";
+const LEGACY_WECOM_PLUGIN_ID = "wecom-openclaw-plugin";
+const QQBOT_PLUGIN_ID = "openclaw-qqbot";
 
 type ActiveWechatLogin = {
   sessionKey: string;
@@ -278,6 +285,47 @@ function isTemporaryWhatsAppAuthDir(authDir: string): boolean {
 
 function resolveWhatsAppLoginSessionRoot(authDir: string): string {
   return path.dirname(path.dirname(authDir));
+}
+
+function hasPluginManifestWithId(
+  dirPath: string,
+  pluginIds: readonly string[],
+): boolean {
+  try {
+    const manifestPath = path.join(dirPath, "openclaw.plugin.json");
+    const raw = readFileSync(manifestPath, "utf-8");
+    const parsed = JSON.parse(raw) as { id?: unknown };
+    return pluginIds.includes(parsed.id as string);
+  } catch {
+    return false;
+  }
+}
+
+function resolveInstalledPluginDir(
+  env: ControllerEnv,
+  pluginId: string,
+  aliases: string[] = [],
+  manifestIds: string[] = [pluginId],
+): string | null {
+  const candidateDirNames = [...new Set([pluginId, ...aliases])];
+  const candidateRoots = [
+    env.openclawExtensionsDir,
+    env.openclawBuiltinExtensionsDir,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const root of candidateRoots) {
+    for (const dirName of candidateDirNames) {
+      const dirPath = path.join(root, dirName);
+      if (
+        existsSync(dirPath) &&
+        hasPluginManifestWithId(dirPath, manifestIds)
+      ) {
+        return dirPath;
+      }
+    }
+  }
+
+  return null;
 }
 
 function writeWeChatAccount(
@@ -895,6 +943,73 @@ export class ChannelService {
     return channel;
   }
 
+  async connectQqbot(input: ConnectQqbotInput) {
+    this.ensureQqbotPluginInstalled();
+    const { appId, appSecret } = await this.verifyQqbotCredentials(input);
+
+    const channel = await this.configStore.connectQqbot({
+      appId,
+      appSecret,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
+  async connectDingtalk(input: ConnectDingtalkInput) {
+    this.ensureDingtalkPluginInstalled();
+    const { clientId, clientSecret } =
+      await this.verifyDingtalkCredentials(input);
+
+    const channel = await this.configStore.connectDingtalk({
+      clientId,
+      clientSecret,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
+  async testQqbotConnectivity(input: ConnectQqbotInput) {
+    this.ensureQqbotPluginInstalled();
+    const { appId } = await this.verifyQqbotCredentials(input);
+    return {
+      success: true,
+      message: `QQ credentials are valid for App ID ${appId}`,
+    };
+  }
+
+  async testDingtalkConnectivity(input: ConnectDingtalkInput) {
+    this.ensureDingtalkPluginInstalled();
+    const { clientId } = await this.verifyDingtalkCredentials(input);
+    return {
+      success: true,
+      message: `DingTalk credentials are valid for Client ID ${clientId}`,
+    };
+  }
+
+  async connectWecom(input: ConnectWecomInput) {
+    this.ensureWecomPluginInstalled();
+    const { botId, secret } = this.verifyWecomCredentials(input);
+
+    const channel = await this.configStore.connectWecom({
+      botId,
+      secret,
+    });
+    await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    await this.syncService.syncAll();
+    return channel;
+  }
+
+  async testWecomConnectivity(input: ConnectWecomInput) {
+    this.ensureWecomPluginInstalled();
+    const { botId } = this.verifyWecomCredentials(input);
+    return {
+      success: true,
+      message: `WeCom credentials are configured for Bot ID ${botId}`,
+    };
+  }
+
   async whatsappQrStart() {
     // Force a clean auth dir before creating a new QR login session.
     // This avoids stale or corrupted default credentials from mismatching the
@@ -1266,5 +1381,112 @@ export class ChannelService {
       { channelType: "whatsapp", accountId, authDir },
       "whatsapp_qr_start_auth_dir_cleared",
     );
+  }
+
+  private ensureQqbotPluginInstalled(): void {
+    const pluginDir = resolveInstalledPluginDir(this.env, QQBOT_PLUGIN_ID, [
+      "qqbot",
+    ]);
+    if (!pluginDir) {
+      throw new Error(`QQ plugin not installed: ${QQBOT_PLUGIN_ID}`);
+    }
+  }
+
+  private ensureDingtalkPluginInstalled(): void {
+    const pluginDir = resolveInstalledPluginDir(this.env, DINGTALK_PLUGIN_ID, [
+      "dingtalk",
+    ]);
+    if (!pluginDir) {
+      throw new Error(`DingTalk plugin not installed: ${DINGTALK_PLUGIN_ID}`);
+    }
+  }
+
+  private ensureWecomPluginInstalled(): void {
+    const pluginDir = resolveInstalledPluginDir(
+      this.env,
+      WECOM_PLUGIN_ID,
+      [LEGACY_WECOM_PLUGIN_ID],
+      [WECOM_PLUGIN_ID, LEGACY_WECOM_PLUGIN_ID],
+    );
+    if (!pluginDir) {
+      throw new Error(`WeCom plugin not installed: ${WECOM_PLUGIN_ID}`);
+    }
+  }
+
+  private verifyWecomCredentials(input: ConnectWecomInput): {
+    botId: string;
+    secret: string;
+  } {
+    const botId = input.botId.trim();
+    const secret = input.secret.trim();
+    if (!botId || !secret) {
+      throw new Error("WeCom Bot ID and Secret are required");
+    }
+    return { botId, secret };
+  }
+
+  private async verifyQqbotCredentials(input: ConnectQqbotInput): Promise<{
+    appId: string;
+    appSecret: string;
+  }> {
+    const appId = input.appId.trim();
+    const appSecret = input.appSecret.trim();
+    const response = await proxyFetch(
+      "https://bots.qq.com/app/getAppAccessToken",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appId,
+          clientSecret: appSecret,
+        }),
+        timeoutMs: 5000,
+      },
+    );
+    const payload = (await response.json()) as {
+      access_token?: string;
+      code?: number;
+      message?: string;
+    };
+    if (!response.ok || !payload.access_token) {
+      throw new Error(
+        `Invalid QQ credentials: ${payload.message ?? `HTTP ${response.status}`}`,
+      );
+    }
+
+    return { appId, appSecret };
+  }
+
+  private async verifyDingtalkCredentials(
+    input: ConnectDingtalkInput,
+  ): Promise<{
+    clientId: string;
+    clientSecret: string;
+  }> {
+    const clientId = input.clientId.trim();
+    const clientSecret = input.clientSecret.trim();
+    if (!clientId || !clientSecret) {
+      throw new Error("DingTalk Client ID and Client Secret are required");
+    }
+
+    const response = await proxyFetch(
+      `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(clientId)}&appsecret=${encodeURIComponent(clientSecret)}`,
+      {
+        method: "GET",
+        timeoutMs: 5000,
+      },
+    );
+    const payload = (await response.json()) as {
+      access_token?: string;
+      errcode?: number;
+      errmsg?: string;
+    };
+    if (!response.ok || !payload.access_token) {
+      throw new Error(
+        `Invalid DingTalk credentials: ${payload.errmsg ?? `HTTP ${response.status}`}`,
+      );
+    }
+
+    return { clientId, clientSecret };
   }
 }

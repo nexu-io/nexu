@@ -4,9 +4,12 @@ export const channelTypeSchema = z.enum([
   "slack",
   "discord",
   "feishu",
+  "dingtalk",
+  "wecom",
   "wechat",
   "telegram",
   "whatsapp",
+  "qqbot",
 ]);
 
 export const channelStatusSchema = z.enum([
@@ -38,6 +41,16 @@ export const connectFeishuSchema = z.object({
   verificationToken: z.string().optional(),
 });
 
+export const connectWecomSchema = z.object({
+  botId: z.string().min(1),
+  secret: z.string().min(1),
+});
+
+export const connectDingtalkSchema = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+});
+
 export const connectWechatSchema = z.object({
   accountId: z.string().min(1),
 });
@@ -48,6 +61,26 @@ export const connectTelegramSchema = z.object({
 
 export const connectWhatsappSchema = z.object({
   accountId: z.string().min(1),
+});
+
+export const connectQqbotSchema = z.object({
+  appId: z.string().min(1),
+  appSecret: z.string().min(1),
+});
+
+export const qqbotConnectivityResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+});
+
+export const wecomConnectivityResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+});
+
+export const dingtalkConnectivityResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
 });
 
 export const whatsappQrWaitRequestSchema = z.object({
@@ -106,9 +139,21 @@ export type ChannelStatus = z.infer<typeof channelStatusSchema>;
 export type ConnectSlackInput = z.infer<typeof connectSlackSchema>;
 export type ConnectDiscordInput = z.infer<typeof connectDiscordSchema>;
 export type ConnectFeishuInput = z.infer<typeof connectFeishuSchema>;
+export type ConnectWecomInput = z.infer<typeof connectWecomSchema>;
+export type ConnectDingtalkInput = z.infer<typeof connectDingtalkSchema>;
 export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
 export type ConnectTelegramInput = z.infer<typeof connectTelegramSchema>;
 export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
+export type ConnectQqbotInput = z.infer<typeof connectQqbotSchema>;
+export type WecomConnectivityResponse = z.infer<
+  typeof wecomConnectivityResponseSchema
+>;
+export type DingtalkConnectivityResponse = z.infer<
+  typeof dingtalkConnectivityResponseSchema
+>;
+export type QqbotConnectivityResponse = z.infer<
+  typeof qqbotConnectivityResponseSchema
+>;
 export type WhatsappQrWaitRequest = z.infer<typeof whatsappQrWaitRequestSchema>;
 export type WechatQrStartResponse = z.infer<typeof wechatQrStartResponseSchema>;
 export type WechatQrWaitResponse = z.infer<typeof wechatQrWaitResponseSchema>;

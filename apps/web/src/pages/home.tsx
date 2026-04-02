@@ -1,13 +1,19 @@
 import { ActivityFeed } from "@/components/activity-feed";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
+import { DingtalkSetupView } from "@/components/channel-setup/dingtalk-setup-view";
+import { QqbotSetupView } from "@/components/channel-setup/qqbot-setup-view";
 import { TelegramSetupView } from "@/components/channel-setup/telegram-setup-view";
 import { WechatSetupView } from "@/components/channel-setup/wechat-setup-view";
+import { WecomSetupView } from "@/components/channel-setup/wecom-setup-view";
 import { WhatsappSetupView } from "@/components/channel-setup/whatsapp-setup-view";
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { InlineModelSelector } from "@/components/inline-model-selector";
 import {
+  DingtalkIcon,
+  QqbotIcon,
   TelegramIcon,
   WechatIcon,
+  WecomIcon,
   WhatsAppIcon,
 } from "@/components/platform-icons";
 import {
@@ -123,7 +129,10 @@ const FEISHU_ICON = (
   />
 );
 
+const DINGTALK_ICON = <DingtalkIcon size={16} />;
+const QQBOT_ICON = <QqbotIcon size={16} />;
 const TELEGRAM_ICON = <TelegramIcon size={16} />;
+const WECOM_ICON = <WecomIcon size={16} />;
 const WHATSAPP_ICON = <WhatsAppIcon size={16} />;
 /** WeChat mark uses a wide viewBox; bump px so it matches visual weight of 16px square logos. */
 type HomeChannelIconBox = "standard" | "compact";
@@ -154,6 +163,24 @@ const ONBOARDING_CHANNELS = [
     id: "telegram",
     name: "Telegram",
     icon: TELEGRAM_ICON,
+    recommended: false,
+  },
+  {
+    id: "dingtalk",
+    name: "DingTalk",
+    icon: DINGTALK_ICON,
+    recommended: false,
+  },
+  {
+    id: "qqbot",
+    name: "QQ",
+    icon: QQBOT_ICON,
+    recommended: false,
+  },
+  {
+    id: "wecom",
+    name: "WeCom",
+    icon: WECOM_ICON,
     recommended: false,
   },
   {
@@ -193,6 +220,24 @@ function getChannelOptions(t: (key: string) => string) {
       id: "telegram",
       name: t("home.channel.telegram"),
       icon: TELEGRAM_ICON,
+      recommended: false,
+    },
+    {
+      id: "dingtalk",
+      name: t("home.channel.dingtalk"),
+      icon: DINGTALK_ICON,
+      recommended: false,
+    },
+    {
+      id: "qqbot",
+      name: t("home.channel.qqbot"),
+      icon: QQBOT_ICON,
+      recommended: false,
+    },
+    {
+      id: "wecom",
+      name: t("home.channel.wecom"),
+      icon: WECOM_ICON,
       recommended: false,
     },
     {
@@ -275,6 +320,9 @@ export function HomePage() {
   const [wechatQrOpen, setWechatQrOpen] = useState(false);
   const [telegramOpen, setTelegramOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [dingtalkOpen, setDingtalkOpen] = useState(false);
+  const [qqbotOpen, setQqbotOpen] = useState(false);
+  const [wecomOpen, setWecomOpen] = useState(false);
   const [seedancePromoOpen, setSeedancePromoOpen] = useState(false);
   const [showSeedancePromo, setShowSeedancePromo] = useState(() => {
     try {
@@ -681,6 +729,12 @@ export function HomePage() {
                         setTelegramOpen(true);
                       } else if (ch.id === "whatsapp") {
                         setWhatsappOpen(true);
+                      } else if (ch.id === "dingtalk") {
+                        setDingtalkOpen(true);
+                      } else if (ch.id === "qqbot") {
+                        setQqbotOpen(true);
+                      } else if (ch.id === "wecom") {
+                        setWecomOpen(true);
                       } else {
                         setModalChannel(
                           ch.id as "feishu" | "slack" | "discord",
@@ -758,6 +812,36 @@ export function HomePage() {
             onClose={() => setWhatsappOpen(false)}
             onConnected={() => {
               setWhatsappOpen(false);
+              void handleConnected();
+            }}
+          />
+        )}
+
+        {qqbotOpen && (
+          <QqbotModal
+            onClose={() => setQqbotOpen(false)}
+            onConnected={() => {
+              setQqbotOpen(false);
+              void handleConnected();
+            }}
+          />
+        )}
+
+        {dingtalkOpen && (
+          <DingtalkModal
+            onClose={() => setDingtalkOpen(false)}
+            onConnected={() => {
+              setDingtalkOpen(false);
+              void handleConnected();
+            }}
+          />
+        )}
+
+        {wecomOpen && (
+          <WecomModal
+            onClose={() => setWecomOpen(false)}
+            onConnected={() => {
+              setWecomOpen(false);
               void handleConnected();
             }}
           />
@@ -1046,6 +1130,12 @@ export function HomePage() {
                           setTelegramOpen(true);
                         } else if (ch.id === "whatsapp") {
                           setWhatsappOpen(true);
+                        } else if (ch.id === "dingtalk") {
+                          setDingtalkOpen(true);
+                        } else if (ch.id === "qqbot") {
+                          setQqbotOpen(true);
+                        } else if (ch.id === "wecom") {
+                          setWecomOpen(true);
                         } else {
                           setModalChannel(
                             ch.id as "feishu" | "slack" | "discord",
@@ -1121,6 +1211,36 @@ export function HomePage() {
           onClose={() => setWhatsappOpen(false)}
           onConnected={() => {
             setWhatsappOpen(false);
+            void handleConnected();
+          }}
+        />
+      )}
+
+      {qqbotOpen && (
+        <QqbotModal
+          onClose={() => setQqbotOpen(false)}
+          onConnected={() => {
+            setQqbotOpen(false);
+            void handleConnected();
+          }}
+        />
+      )}
+
+      {dingtalkOpen && (
+        <DingtalkModal
+          onClose={() => setDingtalkOpen(false)}
+          onConnected={() => {
+            setDingtalkOpen(false);
+            void handleConnected();
+          }}
+        />
+      )}
+
+      {wecomOpen && (
+        <WecomModal
+          onClose={() => setWecomOpen(false)}
+          onConnected={() => {
+            setWecomOpen(false);
             void handleConnected();
           }}
         />
@@ -1388,6 +1508,156 @@ function WhatsappModal({
         </div>
         <div className="p-5">
           <WhatsappSetupView onConnected={onConnected} />
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
+function QqbotModal({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const dialogRef = useModalDialog(onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-[560px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div
+            id={titleId}
+            className="text-[14px] font-semibold text-text-primary"
+          >
+            {t("qqbotSetup.title")}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.closeDialog")}
+            className="text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          <QqbotSetupView onConnected={onConnected} />
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
+function DingtalkModal({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const dialogRef = useModalDialog(onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-[560px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div
+            id={titleId}
+            className="text-[14px] font-semibold text-text-primary"
+          >
+            {t("dingtalkSetup.title")}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.closeDialog")}
+            className="text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          <DingtalkSetupView onConnected={onConnected} />
+        </div>
+      </dialog>
+    </div>
+  );
+}
+
+function WecomModal({
+  onClose,
+  onConnected,
+}: {
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const { t } = useTranslation();
+  const titleId = useId();
+  const dialogRef = useModalDialog(onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary to Escape key */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        ref={dialogRef}
+        tabIndex={-1}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-[560px] rounded-2xl border border-border bg-surface-1 shadow-xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div
+            id={titleId}
+            className="text-[14px] font-semibold text-text-primary"
+          >
+            {t("wecomSetup.title")}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.closeDialog")}
+            className="text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5">
+          <WecomSetupView onConnected={onConnected} />
         </div>
       </dialog>
     </div>
