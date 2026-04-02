@@ -315,6 +315,50 @@ describe("compileOpenClawConfig", () => {
     });
   });
 
+  it("compiles dingtalk channels and enables the canonical dingtalk plugin id", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [
+          {
+            id: "dingtalk-channel-1",
+            botId: "bot-1",
+            channelType: "dingtalk",
+            accountId: "default",
+            status: "connected",
+            teamName: null,
+            appId: "ding-client-id",
+            botUserId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        secrets: {
+          "channel:dingtalk-channel-1:clientId": "ding-client-id",
+          "channel:dingtalk-channel-1:clientSecret": "ding-client-secret",
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.channels["dingtalk-connector"]).toMatchObject({
+      enabled: true,
+      clientId: "ding-client-id",
+      clientSecret: "ding-client-secret",
+      dmPolicy: "open",
+      groupPolicy: "open",
+    });
+    expect(result.bindings).toContainEqual({
+      agentId: "bot-1",
+      match: {
+        channel: "dingtalk-connector",
+        accountId: "default",
+      },
+    });
+    expect(result.plugins?.allow).toContain("dingtalk-connector");
+    expect(result.plugins?.entries?.["dingtalk-connector"]?.enabled).toBe(true);
+  });
+
   it("does not remap openai models to OAuth providers without persisted OAuth state", () => {
     const result = compileOpenClawConfig(
       createConfig({

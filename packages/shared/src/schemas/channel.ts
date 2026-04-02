@@ -4,6 +4,7 @@ export const channelTypeSchema = z.enum([
   "slack",
   "discord",
   "feishu",
+  "dingtalk",
   "wecom",
   "wechat",
   "telegram",
@@ -45,6 +46,11 @@ export const connectWecomSchema = z.object({
   secret: z.string().min(1),
 });
 
+export const connectDingtalkSchema = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+});
+
 export const connectWechatSchema = z.object({
   accountId: z.string().min(1),
 });
@@ -68,6 +74,11 @@ export const qqbotConnectivityResponseSchema = z.object({
 });
 
 export const wecomConnectivityResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+});
+
+export const dingtalkConnectivityResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
 });
@@ -129,12 +140,16 @@ export type ConnectSlackInput = z.infer<typeof connectSlackSchema>;
 export type ConnectDiscordInput = z.infer<typeof connectDiscordSchema>;
 export type ConnectFeishuInput = z.infer<typeof connectFeishuSchema>;
 export type ConnectWecomInput = z.infer<typeof connectWecomSchema>;
+export type ConnectDingtalkInput = z.infer<typeof connectDingtalkSchema>;
 export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
 export type ConnectTelegramInput = z.infer<typeof connectTelegramSchema>;
 export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
 export type ConnectQqbotInput = z.infer<typeof connectQqbotSchema>;
 export type WecomConnectivityResponse = z.infer<
   typeof wecomConnectivityResponseSchema
+>;
+export type DingtalkConnectivityResponse = z.infer<
+  typeof dingtalkConnectivityResponseSchema
 >;
 export type QqbotConnectivityResponse = z.infer<
   typeof qqbotConnectivityResponseSchema

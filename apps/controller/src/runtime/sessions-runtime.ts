@@ -1,6 +1,8 @@
+import crypto from "node:crypto";
 import type { Dirent } from "node:fs";
 import {
   access,
+  appendFile,
   mkdir,
   open,
   readFile,
@@ -90,8 +92,6 @@ const UUID_LIKE_TITLE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QQBOT_OPEN_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const QQBOT_TARGET_PATTERN = /^qqbot:(c2c|group):([0-9a-f-]+)$/i;
-const ID_LIKE_CHANNEL_TITLE_PATTERN =
-  /^(?:[0-9a-f]{32}|qqbot:(?:c2c|group):[0-9a-f-]+)\s+·\s+qqbot$/i;
 const FEISHU_MENTION_TAGS_SYSTEM_LINE =
   /\n*\[System: The content may include mention tags in the form <at user_id="[^"]+">[^<]+<\/at>\. Treat these as real mentions of Feishu entities \(users or bots\)\.\]\s*$/u;
 const FEISHU_SELF_MENTION_SYSTEM_LINE =
@@ -424,6 +424,110 @@ export class SessionsRuntime {
       ),
       sessionKey: session.sessionKey,
     };
+  }
+
+  async getChatHistoryBySessionKey(
+    botId: string,
+    sessionKey: string,
+    limit?: number,
+  ): Promise<{ messages: ChatMessage[]; sessionKey: string | null }> {
+    const session = await this.getSessionByKey(botId, sessionKey);
+    if (!session) {
+      return { messages: [], sessionKey: null };
+    }
+    const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
+    return {
+      messages: await this.readMessages(
+        filePath,
+        limit ?? 200,
+        session.channelType,
+      ),
+      sessionKey: session.sessionKey,
+    };
+  }
+
+  async appendCompatTranscript(input: {
+    botId: string;
+    sessionKey: string;
+    title: string;
+    channelType: string;
+    channelId?: string | null;
+    metadata?: Record<string, unknown>;
+    userText: string;
+    assistantText: string;
+    provider?: string | null;
+    model?: string | null;
+    api?: string | null;
+  }): Promise<void> {
+    const filePath = this.getSessionFilePath(input.botId, input.sessionKey);
+    await mkdir(path.dirname(filePath), { recursive: true });
+
+    let existingFile = true;
+    try {
+      await stat(filePath);
+    } catch {
+      existingFile = false;
+    }
+
+    if (!existingFile) {
+      const sessionEntry = {
+        type: "session",
+        version: 3,
+        id: input.sessionKey,
+        timestamp: new Date().toISOString(),
+        cwd: path.join(this.env.openclawStateDir, "agents", input.botId),
+      };
+      await writeFile(filePath, `${JSON.stringify(sessionEntry)}\n`, "utf8");
+    }
+
+    const nowIso = new Date().toISOString();
+    const rootId = crypto.randomBytes(4).toString("hex");
+    const userId = crypto.randomBytes(4).toString("hex");
+    const assistantId = crypto.randomBytes(4).toString("hex");
+    const transcript = [
+      JSON.stringify({
+        type: "message",
+        id: userId,
+        parentId: rootId,
+        timestamp: nowIso,
+        message: {
+          role: "user",
+          content: [{ type: "text", text: input.userText }],
+          timestamp: Date.now(),
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: assistantId,
+        parentId: userId,
+        timestamp: nowIso,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: input.assistantText }],
+          ...(input.api ? { api: input.api } : {}),
+          ...(input.provider ? { provider: input.provider } : {}),
+          ...(input.model ? { model: input.model } : {}),
+          timestamp: Date.now(),
+        },
+      }),
+    ].join("\n");
+    await appendFile(filePath, `${transcript}\n`, "utf8");
+
+    const existing = await this.readSessionMetadata(filePath);
+    await this.writeSessionMetadata(filePath, {
+      ...existing,
+      title: input.title,
+      channelType: input.channelType,
+      channelId: input.channelId ?? null,
+      status: "active",
+      lastMessageAt: nowIso,
+      metadata: {
+        ...(existing.metadata ?? {}),
+        ...(input.metadata ?? {}),
+      },
+      createdAt: existing.createdAt ?? nowIso,
+      updatedAt: nowIso,
+    });
   }
 
   private async readMessages(
@@ -1121,9 +1225,7 @@ export class SessionsRuntime {
     }
 
     return (
-      normalized === sessionKey ||
-      UUID_LIKE_TITLE_PATTERN.test(normalized) ||
-      ID_LIKE_CHANNEL_TITLE_PATTERN.test(normalized)
+      normalized === sessionKey || UUID_LIKE_TITLE_PATTERN.test(normalized)
     );
   }
 

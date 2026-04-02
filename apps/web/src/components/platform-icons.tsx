@@ -7,6 +7,7 @@ export type PlatformIconName =
   | "slack"
   | "discord"
   | "feishu"
+  | "dingtalk"
   | "wecom"
   | "qqbot"
   | "wechat"
@@ -67,6 +68,18 @@ export function WecomIcon({ size = 16 }: { size?: number }) {
       height={size}
       alt="WeCom"
       src="/wecom-logo.svg"
+      style={{ objectFit: "contain" }}
+    />
+  );
+}
+
+export function DingtalkIcon({ size = 16 }: { size?: number }) {
+  return (
+    <img
+      width={size}
+      height={size}
+      alt="DingTalk"
+      src="/dingtalk-logo.svg"
       style={{ objectFit: "contain" }}
     />
   );
@@ -205,6 +218,8 @@ export function PlatformIcon({
       return <DiscordIcon size={size} />;
     case "feishu":
       return <FeishuIcon size={size} />;
+    case "dingtalk":
+      return <DingtalkIcon size={size} />;
     case "wecom":
       return <WecomIcon size={size} />;
     case "qqbot":

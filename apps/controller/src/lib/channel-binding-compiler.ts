@@ -18,6 +18,7 @@ const INTERNAL_WECHAT_PREWARM_ACCOUNT_ID = `${NEXU_INTERNAL_ACCOUNT_PREFIX}wecha
 
 export const MANAGED_CHANNEL_PLUGIN_IDS: Partial<Record<ChannelType, string>> =
   {
+    dingtalk: "dingtalk-connector",
     wecom: "wecom",
     qqbot: "openclaw-qqbot",
     wechat: "openclaw-weixin",
@@ -26,7 +27,13 @@ export const MANAGED_CHANNEL_PLUGIN_IDS: Partial<Record<ChannelType, string>> =
 export const QQBOT_DEFAULT_ACCOUNT_ID = "default";
 
 export function resolveOpenClawChannelKey(channelType: ChannelType): string {
-  return channelType === "wechat" ? "openclaw-weixin" : channelType;
+  if (channelType === "wechat") {
+    return "openclaw-weixin";
+  }
+  if (channelType === "dingtalk") {
+    return "dingtalk-connector";
+  }
+  return channelType;
 }
 
 export function resolveOpenClawRuntimeAccountId(
@@ -35,6 +42,9 @@ export function resolveOpenClawRuntimeAccountId(
 ): string {
   if (channelType === "qqbot") {
     return QQBOT_DEFAULT_ACCOUNT_ID;
+  }
+  if (channelType === "dingtalk" && accountId === "default") {
+    return "__default__";
   }
   return accountId;
 }
@@ -78,6 +88,7 @@ export function compileChannelBindings(
 export function compileChannelsConfig(params: {
   channels: ChannelResponse[];
   secrets: Record<string, string>;
+  controllerBaseUrl: string;
 }): OpenClawConfig["channels"] {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
@@ -85,6 +96,9 @@ export function compileChannelsConfig(params: {
   const telegramAccounts: Record<string, TelegramAccountConfig> = {};
   const whatsappAccounts: Record<string, WhatsappAccountConfig> = {};
   const wechatAccounts: Record<string, { enabled: boolean }> = {};
+  let dingtalkChannel:
+    | OpenClawConfig["channels"]["dingtalk-connector"]
+    | undefined;
   let wecomChannel: OpenClawConfig["channels"]["wecom"] | undefined;
   let qqbotChannel: OpenClawConfig["channels"]["qqbot"] | undefined;
   const socketAppToken = process.env.SLACK_SOCKET_MODE_APP_TOKEN;
@@ -152,27 +166,16 @@ export function compileChannelsConfig(params: {
       continue;
     }
 
-    if (channel.channelType === "feishu") {
-      const connectionMode =
-        secret("connectionMode") === "webhook" ? "webhook" : "websocket";
-      feishuAccounts[channel.accountId] = {
-        enabled: channel.status === "connected",
-        appId: secret("appId") || channel.appId || channel.accountId,
-        appSecret: secret("appSecret"),
-        connectionMode,
+    if (channel.channelType === "dingtalk") {
+      dingtalkChannel = {
+        enabled: true,
+        clientId: secret("clientId") || channel.appId || "",
+        clientSecret: secret("clientSecret"),
+        enableMediaUpload: false,
+        gatewayBaseUrl: params.controllerBaseUrl,
         dmPolicy: "open",
-        groupPolicy: "open",
         allowFrom: ["*"],
-        ...(connectionMode === "webhook"
-          ? {
-              webhookPath: `/feishu/events/${channel.accountId}`,
-              webhookPort: 18790,
-              webhookHost: "0.0.0.0",
-              ...(secret("verificationToken")
-                ? { verificationToken: secret("verificationToken") }
-                : {}),
-            }
-          : {}),
+        groupPolicy: "open",
       };
       continue;
     }
@@ -202,6 +205,31 @@ export function compileChannelsConfig(params: {
         groupAllowFrom: ["*"],
         historyLimit: 50,
         markdownSupport: true,
+      };
+      continue;
+    }
+
+    if (channel.channelType === "feishu") {
+      const connectionMode =
+        secret("connectionMode") === "webhook" ? "webhook" : "websocket";
+      feishuAccounts[channel.accountId] = {
+        enabled: channel.status === "connected",
+        appId: secret("appId") || channel.appId || channel.accountId,
+        appSecret: secret("appSecret"),
+        connectionMode,
+        dmPolicy: "open",
+        groupPolicy: "open",
+        allowFrom: ["*"],
+        ...(connectionMode === "webhook"
+          ? {
+              webhookPath: `/feishu/events/${channel.accountId}`,
+              webhookPort: 18790,
+              webhookHost: "0.0.0.0",
+              ...(secret("verificationToken")
+                ? { verificationToken: secret("verificationToken") }
+                : {}),
+            }
+          : {}),
       };
     }
   }
@@ -298,6 +326,7 @@ export function compileChannelsConfig(params: {
           },
         }
       : {}),
+    ...(dingtalkChannel ? { "dingtalk-connector": dingtalkChannel } : {}),
     ...(wecomChannel ? { wecom: wecomChannel } : {}),
     ...(qqbotChannel ? { qqbot: qqbotChannel } : {}),
     "openclaw-weixin": {

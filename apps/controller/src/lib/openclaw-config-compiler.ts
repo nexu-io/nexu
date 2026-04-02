@@ -437,6 +437,13 @@ function compilePlugins(
       "openclaw-weixin": {
         enabled: true,
       },
+      ...(connectedPluginIds.includes("dingtalk-connector")
+        ? {
+            "dingtalk-connector": {
+              enabled: true,
+            },
+          }
+        : {}),
       ...(connectedPluginIds.includes("wecom")
         ? {
             wecom: {
@@ -581,6 +588,7 @@ export function compileOpenClawConfig(
     channels: compileChannelsConfig({
       channels: config.channels,
       secrets: config.secrets,
+      controllerBaseUrl: `http://127.0.0.1:${env.port}`,
     }),
     bindings: compileChannelBindings(config.bots, config.channels),
     plugins: compilePlugins(config, env),

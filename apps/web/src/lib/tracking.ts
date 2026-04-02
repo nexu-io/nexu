@@ -3,14 +3,15 @@ import { Identify } from "@amplitude/unified";
 
 export type AnalyticsAuthSource = "welcome_page" | "settings";
 export type AnalyticsChannel =
+  | "qqbot"
+  | "dingtalk"
+  | "wecom"
   | "wechat"
   | "feishu"
-  | "wecom"
   | "slack"
   | "discord"
   | "telegram"
-  | "whatsapp"
-  | "qqbot";
+  | "whatsapp";
 export type AnalyticsSidebarTarget =
   | "home"
   | "conversations"
@@ -57,13 +58,14 @@ export function normalizeChannel(
     return "wechat";
   }
   if (
-    channel === "feishu" ||
+    channel === "qqbot" ||
+    channel === "dingtalk" ||
     channel === "wecom" ||
+    channel === "feishu" ||
     channel === "slack" ||
     channel === "discord" ||
     channel === "telegram" ||
-    channel === "whatsapp" ||
-    channel === "qqbot"
+    channel === "whatsapp"
   ) {
     return channel;
   }

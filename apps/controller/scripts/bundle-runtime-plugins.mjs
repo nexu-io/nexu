@@ -13,6 +13,10 @@ const requireFromRepo = createRequire(path.join(repoRoot, "package.json"));
 
 const bundledPlugins = [
   {
+    id: "dingtalk-connector",
+    npmName: "@dingtalk-real-ai/dingtalk-connector",
+  },
+  {
     id: "wecom",
     npmName: "@wecom/wecom-openclaw-plugin",
   },

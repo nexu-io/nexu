@@ -1,3 +1,4 @@
+import { DingtalkSetupView } from "@/components/channel-setup/dingtalk-setup-view";
 import { DiscordSetupView } from "@/components/channel-setup/discord-setup-view";
 import { FeishuSetupView } from "@/components/channel-setup/feishu-setup-view";
 import { QqbotSetupView } from "@/components/channel-setup/qqbot-setup-view";
@@ -42,6 +43,7 @@ type Platform =
   | "slack"
   | "discord"
   | "feishu"
+  | "dingtalk"
   | "wecom"
   | "wechat"
   | "telegram"
@@ -50,9 +52,6 @@ type Platform =
 
 type LiveStatusData = {
   gatewayConnected: boolean;
-  agent?: {
-    alive: boolean;
-  };
   channels: {
     channelType: string;
     channelId: string;
@@ -61,26 +60,13 @@ type LiveStatusData = {
   }[];
 };
 
-function normalizeChannelsPageStatus(
-  status: string | undefined,
-  agentAlive: boolean | undefined,
-): string {
-  if (
-    agentAlive === false &&
-    (!status || status === "disconnected" || status === "restarting")
-  ) {
-    return "connecting";
-  }
-
-  return status ?? "connecting";
-}
-
 const PLATFORMS: { id: Platform; emoji: string; desc: string }[] = [
   { id: "whatsapp", emoji: "\u{1F4DE}", desc: "Personal WhatsApp" },
   { id: "wechat", emoji: "\u{1F4AC}", desc: "Personal WeChat" },
   { id: "telegram", emoji: "\u{2708}\u{FE0F}", desc: "Telegram Bot" },
-  { id: "wecom", emoji: "\u{1F4BC}", desc: "WeCom Bot" },
+  { id: "dingtalk", emoji: "\u{1F4F1}", desc: "DingTalk Bot" },
   { id: "qqbot", emoji: "\u{1F427}", desc: "QQ Bot" },
+  { id: "wecom", emoji: "\u{1F4BC}", desc: "WeCom Bot" },
   { id: "feishu", emoji: "\u{1F426}", desc: "Feishu Bot" },
   { id: "slack", emoji: "#", desc: "Workspace Bot" },
   { id: "discord", emoji: "\u{1F3AE}", desc: "Server Bot" },
@@ -90,6 +76,7 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   slack: "Slack",
   discord: "Discord",
   feishu: "Feishu",
+  dingtalk: "DingTalk",
   wecom: "WeCom",
   wechat: "WeChat",
   telegram: "Telegram",
@@ -183,10 +170,7 @@ export function ChannelsPage() {
             (e) => e.channelId === configuredChannel?.id,
           );
           const channelLiveStatus = liveStatusData
-            ? normalizeChannelsPageStatus(
-                channelLive?.status,
-                liveStatusData.agent?.alive,
-              )
+            ? (channelLive?.status ?? "connecting")
             : undefined;
           return (
             <button
@@ -278,13 +262,18 @@ export function ChannelsPage() {
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
-        ) : platform === "wecom" ? (
-          <WecomSetupView
+        ) : platform === "dingtalk" ? (
+          <DingtalkSetupView
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
         ) : platform === "qqbot" ? (
           <QqbotSetupView
+            onConnected={handleConnected}
+            disabled={quotaLimited}
+          />
+        ) : platform === "wecom" ? (
+          <WecomSetupView
             onConnected={handleConnected}
             disabled={quotaLimited}
           />
@@ -347,11 +336,10 @@ function ConfiguredView({
   const liveEntry = liveStatusData?.channels?.find(
     (e) => e.channelId === channel.id,
   );
+  // Before live-status data arrives, show a neutral loading state
+  // instead of defaulting to green "connected".
   const liveStatus = liveStatusData
-    ? normalizeChannelsPageStatus(
-        liveEntry?.status,
-        liveStatusData.agent?.alive,
-      )
+    ? (liveEntry?.status ?? "connecting")
     : "connecting";
   const liveError = liveEntry?.lastError ?? null;
 

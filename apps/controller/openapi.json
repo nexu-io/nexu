@@ -617,6 +617,89 @@
         }
       }
     },
+    "/v1/chat/completions": {
+      "post": {
+        "tags": [
+          "Compat"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "system",
+                            "user",
+                            "assistant",
+                            "tool"
+                          ]
+                        },
+                        "content": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "nullable": true
+                              }
+                            }
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "tool_call_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "content"
+                      ]
+                    }
+                  },
+                  "stream": {
+                    "type": "boolean"
+                  },
+                  "user": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "messages"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OpenAI-compatible streaming chat completions",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/desktop-authorize": {
       "post": {
         "tags": [
@@ -2842,6 +2925,7 @@
                               "slack",
                               "discord",
                               "feishu",
+                              "dingtalk",
                               "wecom",
                               "wechat",
                               "telegram",
@@ -3028,6 +3112,7 @@
                         "slack",
                         "discord",
                         "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",
@@ -3155,6 +3240,7 @@
                         "slack",
                         "discord",
                         "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",
@@ -3286,6 +3372,7 @@
                         "slack",
                         "discord",
                         "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",
@@ -3333,6 +3420,512 @@
                     "teamName",
                     "createdAt",
                     "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/telegram/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "botToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected telegram channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "dingtalk",
+                        "wecom",
+                        "wechat",
+                        "telegram",
+                        "whatsapp",
+                        "qqbot"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/dingtalk/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "clientSecret": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "clientId",
+                  "clientSecret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected dingtalk channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "dingtalk",
+                        "wecom",
+                        "wechat",
+                        "telegram",
+                        "whatsapp",
+                        "qqbot"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/dingtalk/test": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "clientSecret": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "clientId",
+                  "clientSecret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DingTalk connectivity test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/qqbot/connect": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "appSecret": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "appId",
+                  "appSecret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected qqbot channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "botId": {
+                      "type": "string"
+                    },
+                    "channelType": {
+                      "type": "string",
+                      "enum": [
+                        "slack",
+                        "discord",
+                        "feishu",
+                        "dingtalk",
+                        "wecom",
+                        "wechat",
+                        "telegram",
+                        "whatsapp",
+                        "qqbot"
+                      ]
+                    },
+                    "accountId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "disconnected",
+                        "error"
+                      ]
+                    },
+                    "teamName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "appId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "botUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "botId",
+                    "channelType",
+                    "accountId",
+                    "status",
+                    "teamName",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/channels/qqbot/test": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "appId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "appSecret": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "appId",
+                  "appSecret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "QQ connectivity test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
                   ]
                 }
               }
@@ -3407,388 +4000,7 @@
                         "slack",
                         "discord",
                         "feishu",
-                        "wecom",
-                        "wechat",
-                        "telegram",
-                        "whatsapp",
-                        "qqbot"
-                      ]
-                    },
-                    "accountId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "connected",
-                        "disconnected",
-                        "error"
-                      ]
-                    },
-                    "teamName": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appId": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "botUserId": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "botId",
-                    "channelType",
-                    "accountId",
-                    "status",
-                    "teamName",
-                    "createdAt",
-                    "updatedAt"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Invalid credentials or plugin missing",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/channels/wecom/test": {
-      "post": {
-        "tags": [
-          "Channels"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "botId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "secret": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "botId",
-                  "secret"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "WeCom connectivity test result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Invalid credentials or plugin missing",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/channels/qqbot/connect": {
-      "post": {
-        "tags": [
-          "Channels"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "appId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "appSecret": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "appId",
-                  "appSecret"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Connected qqbot channel",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "botId": {
-                      "type": "string"
-                    },
-                    "channelType": {
-                      "type": "string",
-                      "enum": [
-                        "slack",
-                        "discord",
-                        "feishu",
-                        "wecom",
-                        "wechat",
-                        "telegram",
-                        "whatsapp",
-                        "qqbot"
-                      ]
-                    },
-                    "accountId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "connected",
-                        "disconnected",
-                        "error"
-                      ]
-                    },
-                    "teamName": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appId": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "botUserId": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "botId",
-                    "channelType",
-                    "accountId",
-                    "status",
-                    "teamName",
-                    "createdAt",
-                    "updatedAt"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Invalid credentials or plugin missing",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/channels/qqbot/test": {
-      "post": {
-        "tags": [
-          "Channels"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "appId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "appSecret": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "appId",
-                  "appSecret"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "QQ bot connectivity test result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Invalid credentials or plugin missing",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/channels/telegram/connect": {
-      "post": {
-        "tags": [
-          "Channels"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "botToken": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "botToken"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Connected telegram channel",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "botId": {
-                      "type": "string"
-                    },
-                    "channelType": {
-                      "type": "string",
-                      "enum": [
-                        "slack",
-                        "discord",
-                        "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",
@@ -3862,6 +4074,78 @@
         }
       }
     },
+    "/api/v1/channels/wecom/test": {
+      "post": {
+        "tags": [
+          "Channels"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "secret": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "botId",
+                  "secret"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "WeCom connectivity test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/channels/{channelId}/status": {
       "get": {
         "tags": [
@@ -3897,6 +4181,7 @@
                         "slack",
                         "discord",
                         "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",
@@ -4210,6 +4495,7 @@
                         "slack",
                         "discord",
                         "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",
@@ -4449,6 +4735,7 @@
                         "slack",
                         "discord",
                         "feishu",
+                        "dingtalk",
                         "wecom",
                         "wechat",
                         "telegram",

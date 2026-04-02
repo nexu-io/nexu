@@ -356,6 +356,19 @@ const qqbotChannelSchema = z
   })
   .passthrough();
 
+const dingtalkChannelSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    clientId: z.string(),
+    clientSecret: z.string(),
+    gatewayToken: z.string().optional(),
+    gatewayBaseUrl: z.string().optional(),
+    dmPolicy: z.enum(["pairing", "allowlist", "open"]).optional(),
+    allowFrom: z.array(z.string()).optional(),
+    groupPolicy: z.enum(["open", "allowlist", "disabled"]).optional(),
+  })
+  .passthrough();
+
 const wecomChannelSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -374,6 +387,7 @@ const channelsConfigSchema = z
     slack: slackChannelSchema.optional(),
     discord: discordChannelSchema.optional(),
     feishu: feishuChannelSchema.optional(),
+    "dingtalk-connector": dingtalkChannelSchema.optional(),
     wecom: wecomChannelSchema.optional(),
     telegram: telegramChannelSchema.optional(),
     whatsapp: whatsappChannelSchema.optional(),

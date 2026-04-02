@@ -249,8 +249,9 @@ type Platform =
   | "telegram"
   | "web"
   | "feishu"
-  | "wecom"
+  | "dingtalk"
   | "wechat"
+  | "wecom"
   | "qqbot";
 
 interface PlatformConfig {
@@ -279,12 +280,6 @@ const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
     label: "Discord",
     openLabel: "Open in Discord",
   },
-  qqbot: {
-    badgeClass:
-      "border-[rgba(17,24,39,0.14)] bg-[rgba(17,24,39,0.08)] text-[#111827]",
-    label: "QQ",
-    openLabel: "Open in QQ",
-  },
   whatsapp: {
     badgeClass:
       "border-[rgba(37,211,102,0.14)] bg-[rgba(37,211,102,0.08)] text-[#25D366]",
@@ -303,11 +298,23 @@ const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
     label: "Feishu",
     openLabel: "Open in Feishu",
   },
+  dingtalk: {
+    badgeClass:
+      "border-[rgba(44,44,44,0.14)] bg-[rgba(44,44,44,0.08)] text-[#2C2C2C]",
+    label: "DingTalk",
+    openLabel: "Open in DingTalk",
+  },
   wecom: {
     badgeClass:
       "border-[rgba(7,193,96,0.14)] bg-[rgba(7,193,96,0.08)] text-[#07C160]",
     label: "WeCom",
     openLabel: "Open in WeCom",
+  },
+  qqbot: {
+    badgeClass:
+      "border-[rgba(24,144,255,0.14)] bg-[rgba(24,144,255,0.08)] text-[#1890FF]",
+    label: "QQ",
+    openLabel: "Open in QQ",
   },
   wechat: {
     badgeClass:

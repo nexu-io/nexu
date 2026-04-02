@@ -3,6 +3,7 @@ import {
   botQuotaResponseSchema,
   channelListResponseSchema,
   channelResponseSchema,
+  connectDingtalkSchema,
   connectDiscordSchema,
   connectFeishuSchema,
   connectQqbotSchema,
@@ -11,6 +12,7 @@ import {
   connectWechatSchema,
   connectWecomSchema,
   connectWhatsappSchema,
+  dingtalkConnectivityResponseSchema,
   qqbotConnectivityResponseSchema,
   slackOAuthUrlResponseSchema,
   wechatQrStartResponseSchema,
@@ -218,6 +220,216 @@ export function registerChannelRoutes(
   app.openapi(
     createRoute({
       method: "post",
+      path: "/api/v1/channels/telegram/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          required: true,
+          content: { "application/json": { schema: connectTelegramSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected telegram channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectTelegram(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "Telegram connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/dingtalk/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectDingtalkSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected dingtalk channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectDingtalk(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "DingTalk connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/dingtalk/test",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectDingtalkSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: dingtalkConnectivityResponseSchema },
+          },
+          description: "DingTalk connectivity test result",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.testDingtalkConnectivity(
+            c.req.valid("json"),
+          ),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error
+                ? error.message
+                : "DingTalk connectivity test failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/qqbot/connect",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectQqbotSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: { "application/json": { schema: channelResponseSchema } },
+          description: "Connected qqbot channel",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.connectQqbot(c.req.valid("json")),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "QQ connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/channels/qqbot/test",
+      tags: ["Channels"],
+      request: {
+        body: {
+          content: { "application/json": { schema: connectQqbotSchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: qqbotConnectivityResponseSchema },
+          },
+          description: "QQ connectivity test result",
+        },
+        409: {
+          content: { "application/json": { schema: errorSchema } },
+          description: "Invalid credentials",
+        },
+      },
+    }),
+    async (c) => {
+      try {
+        return c.json(
+          await container.channelService.testQqbotConnectivity(
+            c.req.valid("json"),
+          ),
+          200,
+        );
+      } catch (error) {
+        return c.json(
+          {
+            message:
+              error instanceof Error ? error.message : "QQ connect failed",
+          },
+          409,
+        );
+      }
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/api/v1/channels/wecom/connect",
       tags: ["Channels"],
       request: {
@@ -232,7 +444,7 @@ export function registerChannelRoutes(
         },
         409: {
           content: { "application/json": { schema: errorSchema } },
-          description: "Invalid credentials or plugin missing",
+          description: "Invalid credentials",
         },
       },
     }),
@@ -273,7 +485,7 @@ export function registerChannelRoutes(
         },
         409: {
           content: { "application/json": { schema: errorSchema } },
-          description: "Invalid credentials or plugin missing",
+          description: "Invalid credentials",
         },
       },
     }),
@@ -292,132 +504,6 @@ export function registerChannelRoutes(
               error instanceof Error
                 ? error.message
                 : "WeCom connectivity test failed",
-          },
-          409,
-        );
-      }
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/api/v1/channels/qqbot/connect",
-      tags: ["Channels"],
-      request: {
-        body: {
-          content: { "application/json": { schema: connectQqbotSchema } },
-        },
-      },
-      responses: {
-        200: {
-          content: { "application/json": { schema: channelResponseSchema } },
-          description: "Connected qqbot channel",
-        },
-        409: {
-          content: { "application/json": { schema: errorSchema } },
-          description: "Invalid credentials or plugin missing",
-        },
-      },
-    }),
-    async (c) => {
-      try {
-        return c.json(
-          await container.channelService.connectQqbot(c.req.valid("json")),
-          200,
-        );
-      } catch (error) {
-        return c.json(
-          {
-            message:
-              error instanceof Error ? error.message : "QQ bot connect failed",
-          },
-          409,
-        );
-      }
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/api/v1/channels/qqbot/test",
-      tags: ["Channels"],
-      request: {
-        body: {
-          content: { "application/json": { schema: connectQqbotSchema } },
-        },
-      },
-      responses: {
-        200: {
-          content: {
-            "application/json": { schema: qqbotConnectivityResponseSchema },
-          },
-          description: "QQ bot connectivity test result",
-        },
-        409: {
-          content: { "application/json": { schema: errorSchema } },
-          description: "Invalid credentials or plugin missing",
-        },
-      },
-    }),
-    async (c) => {
-      try {
-        return c.json(
-          await container.channelService.testQqbotConnectivity(
-            c.req.valid("json"),
-          ),
-          200,
-        );
-      } catch (error) {
-        return c.json(
-          {
-            message:
-              error instanceof Error
-                ? error.message
-                : "QQ bot connectivity test failed",
-          },
-          409,
-        );
-      }
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/api/v1/channels/telegram/connect",
-      tags: ["Channels"],
-      request: {
-        body: {
-          required: true,
-          content: { "application/json": { schema: connectTelegramSchema } },
-        },
-      },
-      responses: {
-        200: {
-          content: { "application/json": { schema: channelResponseSchema } },
-          description: "Connected telegram channel",
-        },
-        409: {
-          content: { "application/json": { schema: errorSchema } },
-          description: "Invalid credentials",
-        },
-      },
-    }),
-    async (c) => {
-      try {
-        return c.json(
-          await container.channelService.connectTelegram(c.req.valid("json")),
-          200,
-        );
-      } catch (error) {
-        return c.json(
-          {
-            message:
-              error instanceof Error
-                ? error.message
-                : "Telegram connect failed",
           },
           409,
         );

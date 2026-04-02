@@ -66,9 +66,10 @@ type Platform =
   | "discord"
   | "whatsapp"
   | "telegram"
-  | "qqbot"
-  | "wecom"
   | "feishu"
+  | "dingtalk"
+  | "wecom"
+  | "qqbot"
   | "wechat"
   | "openclaw-weixin"
   | "web";
@@ -76,9 +77,10 @@ type Platform =
 const PLATFORM_LABELS: Record<Platform, string> = {
   discord: "Discord",
   slack: "Slack",
-  qqbot: "QQ",
-  wecom: "WeCom",
   feishu: "Feishu",
+  dingtalk: "DingTalk",
+  wecom: "WeCom",
+  qqbot: "QQ",
   wechat: "WeChat",
   "openclaw-weixin": "WeChat",
   whatsapp: "WhatsApp",

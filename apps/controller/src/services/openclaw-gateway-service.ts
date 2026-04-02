@@ -11,10 +11,6 @@
 
 import { createHash } from "node:crypto";
 import type { OpenClawConfig } from "@nexu/shared";
-import {
-  resolveOpenClawChannelKey,
-  resolveOpenClawRuntimeAccountId,
-} from "../lib/channel-binding-compiler.js";
 import { logger } from "../lib/logger.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
 import type { ControllerRuntimeState } from "../runtime/state.js";
@@ -116,17 +112,28 @@ function isImplicitlyReadyChannelType(channelType: string): boolean {
   return channelType === "feishu";
 }
 
-function findChannelSnapshot(
-  channelType: string,
-  persistedAccountId: string,
-  accounts: ChannelAccountSnapshot[],
-): ChannelAccountSnapshot | undefined {
-  const runtimeAccountId = resolveOpenClawRuntimeAccountId(
-    channelType as Parameters<typeof resolveOpenClawRuntimeAccountId>[0],
-    persistedAccountId,
-  );
+function isConfiguredAsConnectedChannelType(channelType: string): boolean {
+  return channelType === "dingtalk";
+}
 
-  return accounts.find((entry) => entry.accountId === runtimeAccountId);
+function resolveOpenClawChannelType(channelType: string): string {
+  if (channelType === "wechat") {
+    return "openclaw-weixin";
+  }
+  if (channelType === "dingtalk") {
+    return "dingtalk-connector";
+  }
+  return channelType;
+}
+
+function resolveOpenClawAccountId(
+  channelType: string,
+  accountId: string,
+): string {
+  if (channelType === "dingtalk" && accountId === "default") {
+    return "__default__";
+  }
+  return accountId;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,22 +216,12 @@ export class OpenClawGatewayService {
     channelType: string,
     accountId?: string,
   ): Promise<LogoutChannelAccountResult> {
-    const channel = resolveOpenClawChannelKey(
-      channelType.trim() as Parameters<typeof resolveOpenClawChannelKey>[0],
-    );
-    const runtimeAccountId = accountId
-      ? resolveOpenClawRuntimeAccountId(
-          channelType.trim() as Parameters<
-            typeof resolveOpenClawRuntimeAccountId
-          >[0],
-          accountId,
-        )
-      : undefined;
+    const channel = resolveOpenClawChannelType(channelType.trim());
     return this.wsClient.request<LogoutChannelAccountResult>(
       "channels.logout",
       {
         channel,
-        ...(runtimeAccountId ? { accountId: runtimeAccountId } : {}),
+        ...(accountId ? { accountId } : {}),
       },
       { timeoutMs: 5000 },
     );
@@ -277,16 +274,16 @@ export class OpenClawGatewayService {
       return {
         gatewayConnected: true,
         channels: channels.map((channel) => {
-          const openclawChannelId = resolveOpenClawChannelKey(
-            channel.channelType as Parameters<
-              typeof resolveOpenClawChannelKey
-            >[0],
+          const openclawChannelId = resolveOpenClawChannelType(
+            channel.channelType,
           );
-          const accounts = status.channelAccounts?.[openclawChannelId] ?? [];
-          const snapshot = findChannelSnapshot(
+          const openclawAccountId = resolveOpenClawAccountId(
             channel.channelType,
             channel.accountId,
-            accounts,
+          );
+          const accounts = status.channelAccounts?.[openclawChannelId] ?? [];
+          const snapshot = accounts.find(
+            (entry) => entry.accountId === openclawAccountId,
           );
 
           if (!snapshot) {
@@ -341,7 +338,13 @@ export class OpenClawGatewayService {
           // (they use long-polling/WS to Feishu servers, not a direct
           // inbound connection), running + configured + no error means
           // the channel is operational.
-          const operationalWithoutProbe = running && configured && !lastError;
+          const operationalWithoutProbe =
+            (running && configured && !lastError) ||
+            (isConfiguredAsConnectedChannelType(channel.channelType) &&
+              configured &&
+              !lastError);
+          const effectiveRunning =
+            enabled && (running || operationalWithoutProbe);
           const ready =
             enabled &&
             (connected ||
@@ -370,7 +373,7 @@ export class OpenClawGatewayService {
             status: derivedStatus,
             ready,
             connected: enabled && connected,
-            running: enabled && running,
+            running: effectiveRunning,
             configured,
             lastError: friendlyError,
           };
@@ -424,11 +427,13 @@ export class OpenClawGatewayService {
 
     try {
       const status = await this.getChannelsStatus();
-      const openclawId = resolveOpenClawChannelKey(
-        channelType as Parameters<typeof resolveOpenClawChannelKey>[0],
+      const openclawId = resolveOpenClawChannelType(channelType);
+      const openclawAccountId = resolveOpenClawAccountId(
+        channelType,
+        accountId,
       );
       const accounts = status.channelAccounts?.[openclawId] ?? [];
-      const snapshot = findChannelSnapshot(channelType, accountId, accounts);
+      const snapshot = accounts.find((a) => a.accountId === openclawAccountId);
 
       if (!snapshot) {
         if (isImplicitlyReadyChannelType(channelType)) {
@@ -472,12 +477,16 @@ export class OpenClawGatewayService {
         snapshot.running === true &&
         snapshot.configured === true &&
         snapshot.probe?.ok === true;
-      const ready = isConnected || isWebhookReady;
+      const isConfiguredReady =
+        isConfiguredAsConnectedChannelType(channelType) &&
+        snapshot.configured === true &&
+        !snapshot.lastError;
+      const ready = isConnected || isWebhookReady || isConfiguredReady;
 
       return {
         ready,
         connected: snapshot.connected ?? false,
-        running: snapshot.running ?? false,
+        running: snapshot.running ?? (isConfiguredReady ? true : false),
         configured: snapshot.configured ?? false,
         lastError: snapshot.lastError ?? null,
         gatewayConnected: true,
