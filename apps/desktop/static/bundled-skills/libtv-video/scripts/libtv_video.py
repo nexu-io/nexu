@@ -555,6 +555,7 @@ def cmd_tasks(args):
             print(f"     ❌ {error}")
 
 
+
 def cmd_change_project(args):
     result = call_gateway("POST", "/libtv/v1/session/change-project", json_data={})
     project_uuid = result.get("projectUuid", "")
@@ -617,6 +618,7 @@ def main():
 
     # tasks
     sub.add_parser("tasks", help="List all tasks for current key")
+
 
     # recover
     sub.add_parser("recover", help="Recover and check pending sessions")

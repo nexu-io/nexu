@@ -1,10 +1,10 @@
 # Seedance 2.0 Video Generation
 
-Want to try Seedance 2.0 video generation? Follow the steps below to set it up, then you can start generating videos directly with `nexu`.
+Want to try Seedance 2.0? Follow the steps below and you can start generating videos directly in `nexu`.
 
 ## Before You Start
 
-Make sure you already have the following:
+Before you start, make sure you have:
 
 - The nexu client installed
 - A nexu account that you can sign in with
@@ -12,102 +12,99 @@ Make sure you already have the following:
 
 If you have not installed the client yet, visit the [nexu website](https://nexu.io/) or the [GitHub repository](https://github.com/nexu-io/nexu) to learn more, then download the latest version from the [download page](https://nexu.io/download).
 
-## Step 1: Sign in to nexu
+## Step 1: Apply for a Seedance 2.0 Trial Key
 
-Open the client and choose **Sign in to nexu**.
-
-After signing in successfully, you will enter the nexu workspace and can continue with the rest of the setup.
-
-## Step 2: Apply for a Seedance 2.0 Trial Key
-
-On the client home page, find the **Seedance 2.0** campaign banner and click it to start the application flow.
+On the client home page, find the **Seedance 2.0** banner and click it to start the application flow.
 
 ![Seedance 2.0 banner on the home page](/assets/seedance/home-banner.webp)
 
-You will need to complete the following:
+You will need to:
 
 1. Star the `nexu` repository on GitHub
 2. Join the group, check the pinned message, open the form link, and submit your information
 3. Wait for the review process
 
-After approval, the Seedance 2.0 trial key will be sent to the email address you provided in the form.
-
 ![Apply for a trial key: go to GitHub and star nexu](/assets/seedance/apply-key-step1-star.webp)
+
+**GitHub Star screenshot requirements (required for review)**: When you submit your application, include a screenshot of the repository page that clearly shows the **repository name**, **Star status** (for example, that you have starred the repository), and your **signed-in GitHub identity**. **All of these are required** for the screenshot to pass review; missing any of them may affect approval. Example below:
+
+![Example of a GitHub Star screenshot that meets review requirements](/assets/seedance/github-star-review-example.webp)
+
+After approval, the trial key will be sent to the email address you provided in the form.
 
 After starring the repository, click the button in the popup to join the group.
 
 ![Apply for a trial key: click the button to join the group](/assets/seedance/apply-key-step2-join-group.webp)
 
-Once you are in the group, check the pinned message to find the form link and continue the process.
+Once you are in the group, check the pinned message, open the form link, and submit your information.
 
-![Apply for a trial key: check the pinned group message for the form link](/assets/seedance/apply-key-step2-pinned-message.webp)
+## Step 2: Configure an IM Channel First
 
-## Step 3: Configure an IM Channel First
+It is recommended to configure one IM channel first. That way, once your key arrives, you can send it to `nexu` right away for activation.
 
-Before your key arrives, it is recommended to finish setting up one IM channel first. That way, once you receive the key, you can immediately send it to `nexu` for activation.
+Choose the channel you use most often and follow the on-screen steps. For details, see [Channel Configuration](/guide/channels).
 
-Choose the channel you use most often and complete the setup by following the on-screen instructions. For detailed guidance, see [Channel Configuration](/guide/channels).
+![Configure an IM channel and enter the chat](/assets/seedance/im-channel-config.webp)
 
-## Step 4: Send the Key to `nexu`
+## Step 3: Send the Key to `nexu`
 
-Once you receive the email, copy your Seedance 2.0 trial key, open the IM conversation you configured earlier, and send the key to `nexu`.
+`nexu` currently accesses Seedance 2.0 through the `Libtv skill`. Once you get the key, send it in your configured IM chat like this:
 
-If activation succeeds, you can start using Seedance 2.0 directly in the conversation.
+> This is the Libtv skill key provided by nexu official: `<your-key>`
 
-## Step 5: Generate Your First Video
+The key can be either the official trial key or your own Libtv Access Key.
+
+![Send the Libtv skill key to nexu](/assets/seedance/libtv-skill-key.webp)
+
+Once you receive the email, copy your Seedance 2.0 trial key and send it in the IM conversation you configured earlier.
+
+Once activation succeeds, you can start generating videos.
+
+## Step 4: Generate Your First Video
 
 After activation, simply send a video generation request to `nexu`.
 
-For example:
+You can directly use the following text as your prompt:
 
-> Use Seedance 2.0 to generate a video of SpongeBob and Patrick kissing.
+> **Use the Seedance 2.0 model in the Libtv skill** to generate a breathtaking youth anime short film: on a midsummer evening, the sky glows with a dreamy orange-pink and blue gradient, and a gentle breeze lifts the school uniforms and hair of a teenage boy and girl as they run side by side between a sunset-washed school rooftop and seaside streets. The scene should feel full of youthful emotion, freedom, and heart-racing romance. Start with a close-up of their eyes, capturing bright pupils, flushed cheeks, and subtle breathing, then transition into smooth tracking shots, circular camera movement, slow-motion running, and upward shots of the sky and birds. Include drifting flower petals, floating sunlight particles, lens flares, moving tree shadows, city neon, and summer festival lights. The overall style should be a high-quality Japanese anime film with clean delicate linework, transparent and saturated color, dreamy lighting, natural character motion, and sincere emotion, filled with youth, romance, intensity, and hope. Use cinematic composition, ultra-high detail, strong atmosphere, fluid animation, elegant transitions, and striking visuals.
 
-![Seedance 2.0 video generation task](/assets/seedance/generate-video.webp)
+![Seedance 2.0 video generation task](/assets/seedance/generate-video-anime-prompt.webp)
 
-If you want more stable and predictable results, write a more complete prompt and include as much of the following as possible:
-
-- Characters
-- Actions
-- Scene
-- Style
-- Camera language
-- Duration
-
-For example:
-
-> Use Seedance 2.0 to generate a cartoon-style video of SpongeBob and Patrick kissing on the beach, with exaggerated facial expressions, a slow camera push-in, and a duration of 5 seconds.
+If you are using the 2 official trial credits, you may receive a canvas link while the video is being generated. This link points to the nexu official Libtv canvas, which you cannot access, so you can safely ignore it.
 
 ## Prompt Writing Tips
 
-For video generation, the more specific your prompt is, the easier it is for Seedance 2.0 to understand the result you want. A good structure is:
+If you want more stable and predictable results, include these elements in your prompt:
 
-1. Describe who the main subject is
-2. Explain what the subject is doing
-3. Add the location or environment
-4. Specify the overall visual style
-5. Add camera movement or shot language
-6. State the desired duration
+1. Subject
+2. Action
+3. Scene
+4. Style
+5. Camera language
+6. Duration
 
-You can also expand a simple request into a fuller prompt. For example, instead of "generate a kissing video", try something like "two cartoon characters kissing on the beach at sunset, exaggerated expressions, slow push-in shot, 5 seconds".
+You can also start with a simple request and expand it into a fuller prompt. For example, turn "generate a kissing video" into "two cartoon characters kissing on the beach at sunset, exaggerated expressions, slow push-in shot, 5 seconds".
 
 ## FAQ
 
 **Q: How long does it take to receive the key after submitting the form?**
 
-Your submission will be reviewed by the team, which usually takes around 2 hours. Once approved, the key will be sent to the email address you provided in the form.
-
-**Q: What should I do if I have not received the key?**
-
-Please check your spam folder first. If it is still missing, ask the team for help in the group.
+It usually takes about 2 hours. Once approved, the key will be sent to the email address you provided in the form.
 
 **Q: Do I need to configure an IM channel first?**
 
-It is strongly recommended. Since the key must be sent to `nexu` before you can start using it, configuring the IM channel first makes the process much smoother.
+Yes. The key must be sent to `nexu` before you can use it, so configuring an IM channel first makes the process smoother.
 
-**Q: Why should I write more detailed prompts?**
+**Q: How many times can I use the official trial key? Why can I not open the returned canvas link?**
 
-More complete prompts usually produce more stable results and outputs that are closer to what you expect.
+`nexu` accesses Seedance 2.0 through the `Libtv skill`. After you star the GitHub repository, the official trial usually includes 2 video generation attempts. The returned canvas link points to the nexu official Libtv canvas, which is not accessible with your account, so you can ignore it.
 
-**Q: How many times can I use the official trial key?**
+**Q: How can I get my own Libtv Access Key and view the result in the canvas?**
 
-The official trial key is only meant for evaluation, and it usually includes just 2 video generation attempts.
+Go to the [LibTV website](https://www.liblib.tv/) and sign in to your account. The Access Key is usually available near the avatar in the top-right corner. After you send your own Access Key to `nexu`, you can open the returned canvas link and view your result in the Libtv canvas.
+
+## Still have questions?
+
+If you have any other questions or want the latest support:
+
+[![Contact us](/assets/seedance/contact-us.webp)](/guide/contact)

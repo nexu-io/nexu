@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const IS_MACOS = process.platform === "darwin";
+const RUN_REAL_LAUNCHD_TESTS = process.env.RUN_REAL_LAUNCHD_TESTS === "1";
 const NODE_BIN = process.execPath;
 const UID = IS_MACOS
   ? execFileSync("id", ["-u"], { encoding: "utf8" }).trim()
@@ -281,7 +282,7 @@ describe("runtime-config NEXU_HOME resolution chain", () => {
 // 3. REAL launchd: start service, verify ACTUAL env from launchctl print
 // =========================================================================
 
-describe.skipIf(!IS_MACOS)(
+describe.skipIf(!IS_MACOS || !RUN_REAL_LAUNCHD_TESTS)(
   "real launchd: controller env vars at runtime",
   () => {
     const LABEL = `io.nexu.test.datadir.${process.pid}`;

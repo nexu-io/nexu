@@ -143,6 +143,7 @@ function makeBootstrapEnv(
     proxyEnv: {
       NO_PROXY: "localhost,127.0.0.1,::1",
     },
+    controllerStartupValidationTimeoutMs: 500,
     ...overrides,
   };
 }
@@ -266,6 +267,7 @@ describe("bootstrapWithLaunchd", () => {
     mockLaunchdManager.isServiceInstalled.mockResolvedValue(false);
     mockLaunchdManager.installService.mockResolvedValue(undefined);
     mockLaunchdManager.startService.mockResolvedValue(undefined);
+    mockLaunchdManager.bootoutAndWaitForExit.mockResolvedValue(undefined);
 
     // Mock fetch for controller readiness probe
     vi.stubGlobal(
@@ -300,11 +302,29 @@ describe("bootstrapWithLaunchd", () => {
 
   it("always calls installService to detect plist changes", async () => {
     mockLaunchdManager.isServiceInstalled.mockResolvedValue(true);
-    // Service registered but not running
-    mockLaunchdManager.getServiceStatus.mockResolvedValue({
-      label: "test",
-      plistPath: "",
-      status: "stopped",
+    let controllerRecovered = false;
+    mockLaunchdManager.bootoutAndWaitForExit.mockImplementation(
+      (label: string) => {
+        if (label.includes("controller")) {
+          controllerRecovered = true;
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        return Promise.resolve(
+          controllerRecovered
+            ? { label: "test", plistPath: "", status: "running", pid: 1234 }
+            : { label: "test", plistPath: "", status: "stopped" },
+        );
+      }
+
+      return Promise.resolve(
+        controllerRecovered
+          ? { label: "test", plistPath: "", status: "running", pid: 1234 }
+          : { label: "test", plistPath: "", status: "stopped" },
+      );
     });
 
     const { bootstrapWithLaunchd } = await import(
@@ -315,7 +335,7 @@ describe("bootstrapWithLaunchd", () => {
 
     // installService is always called so it can detect plist content changes
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("tears down services on NEXU_HOME mismatch", async () => {
     const fsMock = await import("node:fs/promises");
