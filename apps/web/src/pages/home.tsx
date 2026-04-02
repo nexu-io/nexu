@@ -859,6 +859,14 @@ export function HomePage() {
           </div>
         </div>
 
+        {showSeedancePromo ? (
+          <SeedancePromoBanner
+            isDismissed={false}
+            onOpen={() => setSeedancePromoOpen(true)}
+            onDismiss={dismissSeedancePromo}
+          />
+        ) : null}
+
         {/* ═══ MIDDLE: Channels panel ═══ */}
         <div className="card card-static">
           <div className="px-5 pt-4 pb-3">
@@ -1063,14 +1071,6 @@ export function HomePage() {
             )}
           </div>
         </div>
-
-        {showSeedancePromo ? (
-          <SeedancePromoBanner
-            isDismissed={false}
-            onOpen={() => setSeedancePromoOpen(true)}
-            onDismiss={dismissSeedancePromo}
-          />
-        ) : null}
 
         {/* Activity Feed */}
         <ActivityFeed />
