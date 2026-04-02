@@ -538,9 +538,10 @@ def cmd_tasks(args):
     for t in tasks:
         tid = t.get("id", "?")
         status = t.get("status", "?")
-        backend = t.get("backend", "medeo")
+        backend = t.get("backend", "libtv")
         created = t.get("created_at", "?")
-        video_url = t.get("libtv_video_url") or t.get("medeo_video_url") or t.get("r2_video_url")
+        completed = t.get("completed_at")
+        video_url = t.get("video_url")
         error = t.get("error_message")
 
         status_icon = {
@@ -549,6 +550,8 @@ def cmd_tasks(args):
         }.get(status, "❓")
 
         print(f"  {status_icon} {tid[:16]}...  [{backend}] {status}  ({created})")
+        if completed:
+            print(f"     ⏱️ Completed: {completed}")
         if video_url:
             print(f"     🎬 {video_url}")
         if error:
