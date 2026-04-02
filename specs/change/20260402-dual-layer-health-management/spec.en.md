@@ -655,32 +655,37 @@ If OpenClaw upstream changes are delayed, each phase has a documented fallback t
 
 - **OpenClaw upstream**: enhance `/health` to return `HealthStatus` enum, `statusSince`, `degradedReasons`, `selfHealingInProgress`, `escalationRequested`
 - **Nexu (Controller)**: update probe logic to respect semantic states, enforce TTLs via `statusSince`, implement anti-flap rules
-- **Fallback**: if upstream is delayed, Controller adds its own timeout-based degraded detection (less accurate but functional)
-- **Validation**: no more false-positive wedge alarms during config reload or channel reconnection
+- **Minimum contract**: OpenClaw `/health` returns `{ status: HealthStatus, statusSince: number }`. Controller reads these two fields and applies TTL-based probe logic. This is the smallest unit that eliminates false-positive wedge alarms.
+- **Fallback (upstream delayed)**: Controller adds its own timeout-based degraded detection — if probe succeeds but no `status` field, treat as `healthy`; if probe fails for > `MAX_DEGRADED_DURATION`, treat as `unhealthy`. Less accurate but functional.
+- **Acceptance**: Controller never fires wedge alarm during OpenClaw config reload or channel reconnection when `/health` returns `degraded`/`recovering`/`maintenance`.
 
 ### Phase 2: Coordination Protocol
 
-- **OpenClaw upstream**: emit `self_healing_*`, `escalation_requested`, `maintenance_*` events; accept `host_sleep_resumed`, `prepare_for_restart`, `reset_transient_health_counters` commands
+- **OpenClaw upstream**: emit `self_healing_*`, `escalation_requested`, `maintenance_*` events via stdout `NEXU_EVENT`; accept `host_sleep_resumed`, `prepare_for_restart`, `reset_transient_health_counters` commands
 - **Nexu (Controller)**: consume events, implement scope-aware escalation decisions, forward host signals from Desktop
 - **Nexu (Desktop)**: send sleep/wake and renderer signals to Controller
-- **Fallback**: if upstream events are delayed, Controller infers escalation from health status TTL expiry
-- **Validation**: Controller correctly pauses wedge counting during self-healing; scope-aware response avoids unnecessary restarts
+- **Minimum contract**: OpenClaw emits `escalation_requested { scope, reason, dedupeKey }` on stdout. Controller parses it and decides response based on scope. This is the smallest unit that enables scope-aware recovery instead of always restarting.
+- **Fallback (upstream delayed)**: Controller infers escalation from health status TTL expiry — if `unhealthy` persists for > threshold, Controller acts as if `escalation_requested { scope: "process" }` was received (always restart).
+- **Acceptance**: Controller pauses wedge counting on `self_healing_started`; scope:channel escalation triggers `run_fix(targets: [channel])` not gateway restart.
 
 ### Phase 3: Escalation & Reporting
 
 - **Nexu only** (no upstream dependency beyond Phase 2 events)
 - Implement layered recovery flow (Layer 1 → 2 → 3)
 - Wire Sentry reporting to Layer 3 triggers only (per reporting policy)
-- Include `EscalationContext` in diagnostics ZIP
-- **Validation**: Sentry events only fire on genuine unrecoverable failures
+- Include `EscalationContext` in remote-safe diagnostics payload
+- **Minimum contract**: Controller emits a `report_to_sentry` signal to Desktop with `{ trigger, dedupeKey, context }`. Desktop uploads remote-safe payload. This is the smallest unit that enables remote failure visibility.
+- **Fallback (Phase 2 incomplete)**: if no `EscalationContext` available, Sentry event contains trigger type + Controller-generated dedupeKey only (no structured app-layer context).
+- **Acceptance**: Sentry events only fire on Layer 3 triggers; zero Sentry events for self-healed issues.
 
 ### Phase 4: IM Commands
 
 - **OpenClaw upstream**: implement `run_diagnose` and `run_fix` server methods
-- **Nexu (Controller)**: register `/diagnose` and `/fix` command routing, authorization enforcement
+- **Nexu (Controller)**: register `/diagnose` and `/fix` command routing
 - **Nexu (Desktop)**: contribute host context to `/diagnose` output
-- **Fallback**: without upstream `run_diagnose`/`run_fix`, commands return Controller-only perspective and can only do process-level actions
-- **Validation**: authorized operator can diagnose and repair from IM without touching CLI or desktop UI
+- **Minimum contract**: Controller receives `/fix` from user via OpenClaw channel, calls `run_fix`. OpenClaw returns `{ fixed: string[], failed: string[] }`. Controller relays result to user via same channel. This is the smallest unit that enables user-triggered repair.
+- **Fallback (upstream delayed)**: `/diagnose` returns Controller-only perspective (probe history, process stats, health status). `/fix` can only do host-layer actions (process restart, port conflict resolution) — no app-layer doctor.
+- **Acceptance**: user sends `/fix` in DM, receives actionable result within 30s.
 
 ---
 

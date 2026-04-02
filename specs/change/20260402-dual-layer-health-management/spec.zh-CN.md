@@ -653,32 +653,37 @@ Controller 探针：0 次连续失败
 
 - **OpenClaw 上游**：增强 `/health` 返回 `HealthStatus` 枚举、`statusSince`、`degradedReasons`、`selfHealingInProgress`、`escalationRequested`
 - **Nexu (Controller)**：更新探针逻辑以感知语义状态，通过 `statusSince` 执行 TTL，实现防抖规则
-- **Fallback**：如上游延迟，Controller 添加自己的基于超时的降级检测（精度较低但可用）
-- **验证**：配置重载或 channel 重连期间不再产生误报 wedge 告警
+- **最小契约**：OpenClaw `/health` 返回 `{ status: HealthStatus, statusSince: number }`。Controller 读取这两个字段并应用基于 TTL 的探针逻辑。这是消除误报 wedge 告警的最小可交付单元。
+- **Fallback（上游延迟）**：Controller 添加自己的基于超时的降级检测——探针成功但无 `status` 字段时视为 `healthy`；探针失败超过 `MAX_DEGRADED_DURATION` 时视为 `unhealthy`。精度较低但可用。
+- **验收标准**：当 `/health` 返回 `degraded`/`recovering`/`maintenance` 时，Controller 在 OpenClaw 配置重载或 channel 重连期间不触发 wedge 告警。
 
 ### 阶段 2：协调协议
 
-- **OpenClaw 上游**：发出 `self_healing_*`、`escalation_requested`、`maintenance_*` 事件；接受 `host_sleep_resumed`、`prepare_for_restart`、`reset_transient_health_counters` 命令
+- **OpenClaw 上游**：通过 stdout `NEXU_EVENT` 发出 `self_healing_*`、`escalation_requested`、`maintenance_*` 事件；接受 `host_sleep_resumed`、`prepare_for_restart`、`reset_transient_health_counters` 命令
 - **Nexu (Controller)**：消费事件，实现感知 scope 的升级决策，从 Desktop 转发宿主信号
 - **Nexu (Desktop)**：向 Controller 发送 sleep/wake 和 renderer 信号
-- **Fallback**：如上游事件延迟，Controller 从健康状态 TTL 超时推断升级需求
-- **验证**：Controller 在自愈期间正确暂停 wedge 计数；感知 scope 的响应避免不必要的重启
+- **最小契约**：OpenClaw 在 stdout 发出 `escalation_requested { scope, reason, dedupeKey }`。Controller 解析后根据 scope 决定响应。这是实现 scope 感知恢复（而非总是重启）的最小可交付单元。
+- **Fallback（上游延迟）**：Controller 从健康状态 TTL 超时推断升级需求——如果 `unhealthy` 持续超过阈值，Controller 视为收到 `escalation_requested { scope: "process" }`（始终重启）。
+- **验收标准**：收到 `self_healing_started` 时 Controller 暂停 wedge 计数；scope:channel 的升级触发 `run_fix(targets: [channel])` 而非 gateway 重启。
 
 ### 阶段 3：升级与上报
 
 - **仅 Nexu**（超出阶段 2 事件外无上游依赖）
 - 实现分层恢复流程（第一层 → 第二层 → 第三层）
 - 仅将 Sentry 上报接入第三层触发条件（按上报策略）
-- 将 `EscalationContext` 纳入 diagnostics ZIP
-- **验证**：Sentry 事件仅在真正不可恢复的故障时触发
+- 将 `EscalationContext` 纳入远程安全诊断载荷
+- **最小契约**：Controller 向 Desktop 发出 `report_to_sentry` 信号，携带 `{ trigger, dedupeKey, context }`。Desktop 上传远程安全载荷。这是实现远程故障可见性的最小可交付单元。
+- **Fallback（阶段 2 未完成）**：如无 `EscalationContext`，Sentry 事件仅包含触发类型 + Controller 生成的 dedupeKey（无结构化应用层上下文）。
+- **验收标准**：Sentry 事件仅在第三层触发条件下产生；自愈成功的问题零 Sentry 事件。
 
 ### 阶段 4：IM 命令
 
 - **OpenClaw 上游**：实现 `run_diagnose` 和 `run_fix` server method
-- **Nexu (Controller)**：注册 `/diagnose` 和 `/fix` 命令路由，授权执行
+- **Nexu (Controller)**：注册 `/diagnose` 和 `/fix` 命令路由
 - **Nexu (Desktop)**：向 `/diagnose` 输出贡献宿主上下文
-- **Fallback**：无上游 `run_diagnose`/`run_fix` 时，命令返回仅 Controller 视角，仅可执行进程级操作
-- **验证**：授权操作员可以从 IM 直接诊断和修复，无需接触 CLI 或桌面 UI
+- **最小契约**：Controller 通过 OpenClaw channel 接收用户的 `/fix`，调用 `run_fix`。OpenClaw 返回 `{ fixed: string[], failed: string[] }`。Controller 通过同一 channel 向用户回传结果。这是实现用户触发修复的最小可交付单元。
+- **Fallback（上游延迟）**：`/diagnose` 返回仅 Controller 视角（探针历史、进程统计、健康状态）。`/fix` 仅可执行宿主层操作（进程重启、端口冲突解决）——无应用层 doctor。
+- **验收标准**：用户在 DM 中发送 `/fix`，30 秒内收到可操作的结果。
 
 ---
 
