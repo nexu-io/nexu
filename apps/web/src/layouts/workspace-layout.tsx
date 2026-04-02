@@ -1,15 +1,15 @@
 import { BrandMark } from "@/components/brand-mark";
 import { PlatformIcon } from "@/components/platform-icons";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
+import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
-import { syncDesktopCloudQueries } from "@/hooks/use-desktop-cloud-status";
+import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
-import { openExternalUrl } from "@/lib/desktop-links";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   BookOpen,
   ChevronRight,
@@ -39,11 +39,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import "@/lib/api";
-import {
-  getApiV1Me,
-  getApiV1Sessions,
-  postApiInternalDesktopCloudConnect,
-} from "../../lib/api/sdk.gen";
+import { getApiV1Me, getApiV1Sessions } from "../../lib/api/sdk.gen";
 
 interface SidebarSession {
   id: string;
@@ -339,12 +335,8 @@ function WorkspaceLayoutInner() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
-  const [cloudConnecting, setCloudConnecting] = useState(false);
-  const {
-    status: rewardsStatus,
-    loading: rewardsLoading,
-    refresh: refreshRewards,
-  } = useDesktopRewardsStatus();
+  const { status: rewardsStatus, loading: rewardsLoading } =
+    useDesktopRewardsStatus();
   const update = useAutoUpdate();
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const hasUpdate =
@@ -407,10 +399,19 @@ function WorkspaceLayoutInner() {
   const langRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const { data: skillsData } = useCommunitySkills();
+  const {
+    data: desktopCloudStatus,
+    isLoading: cloudStatusLoading,
+    refetch: refetchDesktopCloudStatus,
+  } = useDesktopCloudStatus();
   const installedSkillsCount = skillsData?.installedSkills?.length ?? 0;
+  const cloudConnected = desktopCloudStatus?.connected ?? false;
+  const { cloudConnecting, handleCloudConnect } = useCloudConnect({
+    cloudConnected,
+    onPoll: refetchDesktopCloudStatus,
+  });
 
   useEffect(() => {
     if (!isDesktopClient) {
@@ -508,43 +509,6 @@ function WorkspaceLayoutInner() {
     location.pathname.includes("/models") ||
     location.pathname.includes("/settings");
 
-  const handleCloudConnect = async () => {
-    setCloudConnecting(true);
-    try {
-      const { data } = await postApiInternalDesktopCloudConnect();
-      if (data?.error === "Already connected. Disconnect first.") {
-        await syncDesktopCloudQueries(queryClient);
-        setCloudConnecting(false);
-        return;
-      }
-      if (data?.browserUrl) {
-        openExternalUrl(data.browserUrl);
-      }
-    } catch {
-      setCloudConnecting(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!cloudConnecting || rewardsStatus.viewer.cloudConnected) {
-      return;
-    }
-    const interval = window.setInterval(() => {
-      void refreshRewards();
-    }, 2000);
-    return () => window.clearInterval(interval);
-  }, [cloudConnecting, refreshRewards, rewardsStatus.viewer.cloudConnected]);
-
-  useEffect(() => {
-    if (!cloudConnecting || !rewardsStatus.viewer.cloudConnected) {
-      return;
-    }
-
-    void syncDesktopCloudQueries(queryClient).finally(() => {
-      setCloudConnecting(false);
-    });
-  }, [cloudConnecting, queryClient, rewardsStatus.viewer.cloudConnected]);
-
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     track("workspace_logout_click");
@@ -561,9 +525,13 @@ function WorkspaceLayoutInner() {
     ? `${rewardsStatus.cloudBalance.totalBalance} ${t("layout.sidebar.balanceUnit")}`
     : t("layout.sidebar.balancePlaceholder");
   const shouldShowRewardsBanner =
-    rewardsStatus.viewer.cloudConnected &&
+    cloudConnected &&
     rewardsStatus.progress.totalCount > 0 &&
     rewardsStatus.progress.claimedCount < rewardsStatus.progress.totalCount;
+  const rewardsCardLoading =
+    cloudStatusLoading ||
+    desktopCloudStatus === undefined ||
+    (cloudConnected && rewardsLoading);
 
   const showEmptyState =
     sessions.length === 0 &&
@@ -827,7 +795,7 @@ function WorkspaceLayoutInner() {
           className="px-3 pb-1 shrink-0"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          {rewardsLoading ? (
+          {rewardsCardLoading ? (
             <div
               data-rewards-card-loading="true"
               className="w-full rounded-[14px] border border-border-subtle bg-gradient-to-r from-surface-2 via-surface-1 to-surface-2 px-3 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
@@ -848,7 +816,7 @@ function WorkspaceLayoutInner() {
                 </div>
               </div>
             </div>
-          ) : !rewardsStatus.viewer.cloudConnected ? (
+          ) : !cloudConnected ? (
             <button
               type="button"
               onClick={() => void handleCloudConnect()}

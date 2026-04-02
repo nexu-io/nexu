@@ -3,7 +3,7 @@ import { ArrowUpRight, Gift } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-function formatRewardAmount(value: number): string {
+export function formatRewardAmount(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 

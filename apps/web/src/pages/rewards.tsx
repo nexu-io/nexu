@@ -3,12 +3,13 @@ import {
   WechatIcon,
   WhatsAppIcon,
 } from "@/components/platform-icons";
-import { syncDesktopCloudQueries } from "@/hooks/use-desktop-cloud-status";
+import { formatRewardAmount } from "@/components/rewards/home-rewards-teaser";
+import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
+import { downloadRandomRewardShareAsset } from "@/lib/reward-share-assets";
 import { cn } from "@/lib/utils";
 import type { RewardTaskStatus } from "@nexu/shared";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarCheck2,
   Download,
@@ -17,11 +18,10 @@ import {
   Github,
   Loader2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { postApiInternalDesktopCloudConnect } from "../../lib/api/sdk.gen";
 
 const REWARD_GROUPS: Array<{
   key: RewardTaskStatus["group"];
@@ -31,10 +31,6 @@ const REWARD_GROUPS: Array<{
   { key: "opensource", labelKey: "rewards.group.opensource" },
   { key: "social", labelKey: "rewards.group.social" },
 ];
-
-function formatRewardAmount(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
 
 function XIcon({ size = 16 }: { size?: number }) {
   return (
@@ -115,73 +111,6 @@ function RewardTaskIcon({
   }
 }
 
-function downloadShareCard(): Promise<void> {
-  if (typeof document === "undefined") {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve, reject) => {
-    const width = 1080;
-    const height = 1080;
-    const padding = 88;
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      reject(new Error("Failed to create share card"));
-      return;
-    }
-
-    const gradient = context.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, "#f8f6ef");
-    gradient.addColorStop(1, "#ebe7db");
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, width, height);
-
-    context.fillStyle = "#18181b";
-    context.font = "700 68px Georgia, serif";
-    context.fillText("nexu", padding, 176);
-
-    context.fillStyle = "#57534e";
-    context.font = "500 34px system-ui, sans-serif";
-    context.fillText("The desktop-first OpenClaw workspace", padding, 244);
-
-    context.fillStyle = "#78716c";
-    context.font = "500 28px system-ui, sans-serif";
-    [
-      "Bridge your agent to WeChat, Feishu, Slack and Discord.",
-      "Use nexu hosted models or bring your own keys.",
-      "",
-      "github.com/nexu-io/nexu",
-    ].forEach((line, index) => {
-      if (line) {
-        context.fillText(line, padding, 360 + index * 48);
-      }
-    });
-
-    context.fillStyle = "#111827";
-    context.font = "700 32px system-ui, sans-serif";
-    context.fillText("Star, share, and unlock more credits.", padding, 900);
-
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("Failed to export share card"));
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "nexu-share-card.png";
-      anchor.click();
-      URL.revokeObjectURL(url);
-      resolve();
-    }, "image/png");
-  });
-}
-
 function RewardConfirmModal({
   task,
   submitting,
@@ -246,7 +175,7 @@ function RewardConfirmModal({
               type="button"
               onClick={async () => {
                 try {
-                  await downloadShareCard();
+                  downloadRandomRewardShareAsset();
                   setImageDownloaded(true);
                 } catch {
                   toast.error(t("rewards.downloadFailed"));
@@ -289,13 +218,17 @@ function RewardConfirmModal({
 
 export function RewardsPage() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const { status, loading, refresh, claimTask, claimingTaskId } =
     useDesktopRewardsStatus();
   const [confirmTaskId, setConfirmTaskId] = useState<
     RewardTaskStatus["id"] | null
   >(null);
-  const [cloudConnecting, setCloudConnecting] = useState(false);
+
+  const { cloudConnecting, handleCloudConnect } = useCloudConnect({
+    cloudConnected: status.viewer.cloudConnected,
+    onPoll: refresh,
+    onConnected: refresh,
+  });
 
   const confirmTask = useMemo(
     () => status.tasks.find((task) => task.id === confirmTaskId) ?? null,
@@ -308,60 +241,6 @@ export function RewardsPage() {
       tasks: status.tasks.filter((task) => task.group === group.key),
     })).filter((group) => group.tasks.length > 0);
   }, [status.tasks]);
-
-  useEffect(() => {
-    if (!cloudConnecting || status.viewer.cloudConnected) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      void refresh();
-    }, 2000);
-    return () => window.clearInterval(interval);
-  }, [cloudConnecting, refresh, status.viewer.cloudConnected]);
-
-  useEffect(() => {
-    if (!cloudConnecting || !status.viewer.cloudConnected) {
-      return;
-    }
-
-    void syncDesktopCloudQueries(queryClient).finally(() => {
-      setCloudConnecting(false);
-    });
-  }, [cloudConnecting, queryClient, status.viewer.cloudConnected]);
-
-  const handleCloudConnect = async () => {
-    setCloudConnecting(true);
-    try {
-      const { data } = await postApiInternalDesktopCloudConnect();
-
-      if (data?.error === "Connection attempt already in progress") {
-        toast.info(t("welcome.cloudConnectInProgress"));
-        return;
-      }
-
-      if (data?.error === "Already connected. Disconnect first.") {
-        await syncDesktopCloudQueries(queryClient);
-        setCloudConnecting(false);
-        await refresh();
-        return;
-      }
-
-      if (data?.error) {
-        setCloudConnecting(false);
-        toast.error(data.error);
-        return;
-      }
-
-      if (data?.browserUrl) {
-        await openExternalUrl(data.browserUrl);
-        toast.info(t("welcome.browserOpened"));
-      }
-    } catch {
-      setCloudConnecting(false);
-      toast.error(t("welcome.cloudConnectError"));
-    }
-  };
 
   const handleTaskAction = async (task: RewardTaskStatus) => {
     if (task.isClaimed) {

@@ -115,6 +115,17 @@ function renderWorkspaceLayout(
     } | null;
     tasks?: Array<Record<string, unknown>>;
   },
+  cloudStatus?: {
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    cloudUrl?: string;
+    linkUrl?: string | null;
+    activeProfileName?: string;
+    profiles?: Array<Record<string, unknown>>;
+  },
 ): string {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -144,6 +155,15 @@ function renderWorkspaceLayout(
     queryClient.setQueryData(["desktop-rewards"], {
       tasks: [],
       ...rewardsStatus,
+    });
+  }
+  if (cloudStatus) {
+    queryClient.setQueryData(["desktop-cloud-status"], {
+      cloudUrl: "http://localhost:5176",
+      linkUrl: "http://localhost:8080",
+      activeProfileName: "Local",
+      profiles: [],
+      ...cloudStatus,
     });
   }
 
@@ -185,24 +205,30 @@ describe("WorkspaceLayout", () => {
   });
 
   it("keeps the rewards page route without rendering a main navigation tab", () => {
-    const markup = renderWorkspaceLayout("/workspace/rewards", {
-      viewer: {
-        cloudConnected: true,
-        activeModelId: "link/gemini",
-        activeModelProviderId: "link",
-        usingManagedModel: true,
+    const markup = renderWorkspaceLayout(
+      "/workspace/rewards",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 4,
+          totalCount: 10,
+          earnedCredits: 700,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
       },
-      progress: {
-        claimedCount: 4,
-        totalCount: 10,
-        earnedCredits: 700,
+      {
+        connected: true,
       },
-      cloudBalance: {
-        totalBalance: 200,
-        totalRecharged: 900,
-        totalConsumed: 700,
-      },
-    });
+    );
 
     expect(markup).not.toContain("layout.nav.rewards");
     expect(markup).toContain("Rewards body");
@@ -210,20 +236,26 @@ describe("WorkspaceLayout", () => {
   });
 
   it("renders the logged-out sidebar growth card", () => {
-    const markup = renderWorkspaceLayout("/workspace/sessions/sess-1", {
-      viewer: {
-        cloudConnected: false,
-        activeModelId: null,
-        activeModelProviderId: null,
-        usingManagedModel: false,
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: false,
+          activeModelId: null,
+          activeModelProviderId: null,
+          usingManagedModel: false,
+        },
+        progress: {
+          claimedCount: 0,
+          totalCount: 11,
+          earnedCredits: 0,
+        },
+        cloudBalance: null,
       },
-      progress: {
-        claimedCount: 0,
-        totalCount: 11,
-        earnedCredits: 0,
+      {
+        connected: false,
       },
-      cloudBalance: null,
-    });
+    );
 
     expect(markup).toContain("layout.sidebar.loginTitle");
     expect(markup).toContain("layout.sidebar.loginSubtitle");
@@ -239,24 +271,30 @@ describe("WorkspaceLayout", () => {
   });
 
   it("renders the logged-in rewards banner with a separate balance entry", () => {
-    const markup = renderWorkspaceLayout("/workspace/sessions/sess-1", {
-      viewer: {
-        cloudConnected: true,
-        activeModelId: "link/gemini",
-        activeModelProviderId: "link",
-        usingManagedModel: true,
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 4,
+          totalCount: 10,
+          earnedCredits: 700,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
       },
-      progress: {
-        claimedCount: 4,
-        totalCount: 10,
-        earnedCredits: 700,
+      {
+        connected: true,
       },
-      cloudBalance: {
-        totalBalance: 200,
-        totalRecharged: 900,
-        totalConsumed: 700,
-      },
-    });
+    );
 
     expect(markup).toContain("layout.sidebar.rewardsTitle");
     expect(markup).toContain("4/10");
@@ -266,22 +304,84 @@ describe("WorkspaceLayout", () => {
   });
 
   it("renders a balance placeholder when rewards status has no balance yet", () => {
-    const markup = renderWorkspaceLayout("/workspace/sessions/sess-1", {
-      viewer: {
-        cloudConnected: true,
-        activeModelId: "link/gemini",
-        activeModelProviderId: "link",
-        usingManagedModel: true,
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 1,
+          totalCount: 10,
+          earnedCredits: 100,
+        },
+        cloudBalance: null,
       },
-      progress: {
-        claimedCount: 1,
-        totalCount: 10,
-        earnedCredits: 100,
+      {
+        connected: true,
       },
-      cloudBalance: null,
-    });
+    );
 
     expect(markup).toContain("layout.sidebar.balancePlaceholder");
+  });
+
+  it("prefers desktop cloud status over stale rewards state when the user has logged out", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 4,
+          totalCount: 10,
+          earnedCredits: 700,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
+      },
+      {
+        connected: false,
+      },
+    );
+
+    expect(markup).toContain("layout.sidebar.loginTitle");
+    expect(markup).not.toContain("layout.sidebar.rewardsTitle");
+  });
+
+  it("prefers desktop cloud status over stale rewards state when the user has logged in", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: false,
+          activeModelId: null,
+          activeModelProviderId: null,
+          usingManagedModel: false,
+        },
+        progress: {
+          claimedCount: 0,
+          totalCount: 11,
+          earnedCredits: 0,
+        },
+        cloudBalance: null,
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).toContain("layout.sidebar.rewardsTitle");
+    expect(markup).not.toContain("layout.sidebar.loginTitle");
   });
 
   it("renders WhatsApp sessions with the correct sidebar icon and label", () => {
