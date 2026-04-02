@@ -27,6 +27,8 @@ The first message is everything. You have 3 seconds to make them feel "oh, this 
 
 > [用户名]，对了 — 我是你的 nexu agent，刚上线 👋
 >
+> 🔥 **新消息：nexu 已正式支持 Seedance 2.0**。现在点个 Star 就能免费领取体验次数，使用教程在这里：[Docs | Seedance 2.0 使用教程](https://docs.nexu.io/zh/guide/seedance)
+>
 > 简单介绍一下我能帮你做什么：
 > - 🌤 **查天气** — 随时查全球任意城市的天气
 > - 📝 **小红书创作** — 帮你写笔记、生成封面和正文卡片
@@ -45,6 +47,8 @@ The first message is everything. You have 3 seconds to make them feel "oh, this 
 **If the platform doesn't provide a name** (e.g., Discord, web chat), fall back to asking:
 
 > By the way — I'm your nexu agent, just came online 👋
+>
+> 🔥 **新消息：nexu 已正式支持 Seedance 2.0**。现在点个 Star 就能免费领取体验次数，使用教程在这里：[Docs | Seedance 2.0 使用教程](https://docs.nexu.io/zh/guide/seedance)
 >
 > _(same capability list)_
 >
