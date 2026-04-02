@@ -610,14 +610,6 @@ export function HomePage() {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
-          {showSeedancePromo ? (
-            <SeedancePromoBanner
-              isDismissed={false}
-              onOpen={() => setSeedancePromoOpen(true)}
-              onDismiss={dismissSeedancePromo}
-            />
-          ) : null}
-
           {/* ═══ TOP: Hero — Bot idle, waiting to be activated ═══ */}
           <div className="flex flex-col items-center text-center">
             <div
@@ -723,6 +715,14 @@ export function HomePage() {
           </div>
         </div>
 
+        {showSeedancePromo ? (
+          <SeedancePromoBanner
+            isDismissed={false}
+            onOpen={() => setSeedancePromoOpen(true)}
+            onDismiss={dismissSeedancePromo}
+          />
+        ) : null}
+
         {modalChannel && (
           <ChannelConnectModal
             channelType={modalChannel}
@@ -781,14 +781,6 @@ export function HomePage() {
         className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 sm:pb-8 space-y-6"
         style={{ paddingTop: isDesktopClient ? "2rem" : "1.5rem" }}
       >
-        {showSeedancePromo ? (
-          <SeedancePromoBanner
-            isDismissed={false}
-            onOpen={() => setSeedancePromoOpen(true)}
-            onDismiss={dismissSeedancePromo}
-          />
-        ) : null}
-
         {/* ═══ TOP: Hero — Bot running (horizontal layout) ═══ */}
         <div className="flex items-center gap-4">
           <div
@@ -1071,6 +1063,14 @@ export function HomePage() {
             )}
           </div>
         </div>
+
+        {showSeedancePromo ? (
+          <SeedancePromoBanner
+            isDismissed={false}
+            onOpen={() => setSeedancePromoOpen(true)}
+            onDismiss={dismissSeedancePromo}
+          />
+        ) : null}
 
         {/* Activity Feed */}
         <ActivityFeed />
