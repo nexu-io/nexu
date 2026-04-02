@@ -342,6 +342,18 @@ const en = {
   "budget.confirm.cancel": "Not yet",
   "budget.confirm.checkinDesc":
     "Confirm today's check-in to add +${n} to your reward balance. This can be claimed once per day.",
+  "budget.confirm.checkingTitle": "Checking task completion",
+  "budget.confirm.checkingDesc":
+    "Please wait while we confirm the task status for you.",
+  "budget.confirm.checkingImageDesc":
+    "Please wait while we confirm the share-card submission flow.",
+  "budget.confirm.checkingCheckinDesc":
+    "Please wait while we confirm today's check-in status.",
+  "budget.confirm.checking": "Checking...",
+  "budget.confirm.claimingTitle": "Claiming reward",
+  "budget.confirm.claimingDesc":
+    "Please wait while the reward credits sync to your account.",
+  "budget.confirm.claiming": "Claiming...",
   "budget.banner.warningTitle": "Credits running low",
   "budget.banner.depletedTitle": "Credits depleted",
   "budget.banner.warningHeadline":

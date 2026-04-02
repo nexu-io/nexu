@@ -4,6 +4,11 @@ import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
 import { downloadRandomRewardShareAsset } from "@/lib/reward-share-assets";
+import {
+  type RewardConfirmPhase,
+  completeRewardWithVirtualCheck,
+  getRewardCheckingDescriptionKey,
+} from "@/lib/reward-virtual-check";
 import { cn } from "@/lib/utils";
 import type { RewardTaskStatus } from "@nexu/shared";
 import { Check, Download, ExternalLink, Loader2 } from "lucide-react";
@@ -23,12 +28,12 @@ const REWARD_GROUPS: Array<{
 
 function RewardConfirmModal({
   task,
-  submitting,
+  phase,
   onCancel,
   onConfirm,
 }: {
   task: RewardTaskStatus;
-  submitting: boolean;
+  phase: RewardConfirmPhase;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
 }) {
@@ -37,22 +42,45 @@ function RewardConfirmModal({
   const amount = formatRewardAmount(task.reward);
   const isDaily = task.repeatMode === "daily";
   const isImage = task.shareMode === "image";
-  const descKey = isDaily
-    ? "budget.confirm.checkinDesc"
-    : isImage
-      ? "budget.confirm.imageDesc"
-      : task.requiresScreenshot
-        ? "budget.confirm.screenshotDesc"
-        : "budget.confirm.desc";
+  const isChecking = phase === "checking";
+  const isClaiming = phase === "claiming";
+  const isBusy = isChecking || isClaiming;
+  const descKey = isChecking
+    ? getRewardCheckingDescriptionKey(task)
+    : isClaiming
+      ? "budget.confirm.claimingDesc"
+      : isDaily
+        ? "budget.confirm.checkinDesc"
+        : isImage
+          ? "budget.confirm.imageDesc"
+          : task.requiresScreenshot
+            ? "budget.confirm.screenshotDesc"
+            : "budget.confirm.desc";
   const canConfirm = !isImage || imageDownloaded;
+  const title = isChecking
+    ? t("budget.confirm.checkingTitle")
+    : isClaiming
+      ? t("budget.confirm.claimingTitle")
+      : t("budget.confirm.title").replace(
+          "{channel}",
+          t(`reward.${task.id}.name`),
+        );
+  const confirmLabel = isChecking
+    ? t("budget.confirm.checking")
+    : isClaiming
+      ? t("budget.confirm.claiming")
+      : t("budget.confirm.done");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      data-reward-confirm-phase={phase}
+    >
       <button
         type="button"
         aria-label="Close reward confirmation"
         className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
-        onClick={onCancel}
+        onClick={isBusy ? undefined : onCancel}
       />
       <div className="relative mx-4 w-full max-w-[340px] rounded-2xl border border-border bg-surface-1 p-5 shadow-[var(--shadow-dropdown)] animate-in fade-in zoom-in-95 duration-200">
         <div className="flex flex-col items-center text-center">
@@ -64,14 +92,15 @@ function RewardConfirmModal({
                 : "border-[var(--color-success)]/20 bg-[var(--color-success)]/8",
             )}
           >
-            <RewardTaskIcon icon={task.icon} size={22} />
+            {isBusy ? (
+              <Loader2 size={18} className="animate-spin text-text-secondary" />
+            ) : (
+              <RewardTaskIcon icon={task.icon} size={22} />
+            )}
           </div>
 
           <h2 className="mb-1 text-[14px] font-semibold text-text-primary">
-            {t("budget.confirm.title").replace(
-              "{channel}",
-              t(`reward.${task.id}.name`),
-            )}
+            {title}
           </h2>
           <p className="text-[12px] leading-relaxed text-text-secondary">
             {t(descKey).replace("${n}", amount)}
@@ -80,7 +109,7 @@ function RewardConfirmModal({
             +{amount} {t("layout.sidebar.balanceUnit")}
           </div>
 
-          {isImage && !imageDownloaded ? (
+          {isImage && !imageDownloaded && !isBusy ? (
             <button
               type="button"
               onClick={async () => {
@@ -98,7 +127,7 @@ function RewardConfirmModal({
             </button>
           ) : null}
 
-          {isImage && imageDownloaded ? (
+          {isImage && imageDownloaded && !isBusy ? (
             <div className="mb-3 flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-success)]">
               <Check size={14} />
               {t("budget.confirm.downloadImage")} ✓
@@ -108,21 +137,20 @@ function RewardConfirmModal({
           <div className="flex w-full items-center gap-2">
             <button
               type="button"
+              disabled={isBusy}
               onClick={onCancel}
-              className="h-[36px] flex-1 rounded-[10px] border border-border px-4 text-[13px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
+              className="h-[36px] flex-1 rounded-[10px] border border-border px-4 text-[13px] font-medium text-text-secondary transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("budget.confirm.cancel")}
             </button>
             <button
               type="button"
-              disabled={!canConfirm || submitting}
+              disabled={!canConfirm || isBusy}
               onClick={() => void onConfirm()}
               className="inline-flex h-[36px] flex-1 items-center justify-center gap-2 rounded-[10px] bg-neutral-900 px-4 text-[13px] font-medium text-white transition-all hover:bg-neutral-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#909CA3] disabled:text-white/95 disabled:hover:bg-[#909CA3]"
             >
-              {submitting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : null}
-              {t("budget.confirm.done")}
+              {isBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+              {confirmLabel}
             </button>
           </div>
         </div>
@@ -138,6 +166,7 @@ export function RewardsPage() {
   const [confirmTaskId, setConfirmTaskId] = useState<
     RewardTaskStatus["id"] | null
   >(null);
+  const [confirmPhase, setConfirmPhase] = useState<RewardConfirmPhase>("idle");
 
   const { cloudConnecting, handleCloudConnect } = useCloudConnect({
     cloudConnected: status.viewer.cloudConnected,
@@ -166,6 +195,7 @@ export function RewardsPage() {
       await openExternalUrl(task.actionUrl);
     }
 
+    setConfirmPhase("idle");
     setConfirmTaskId(task.id);
   };
 
@@ -439,15 +469,37 @@ export function RewardsPage() {
 
       {confirmTask ? (
         <RewardConfirmModal
+          key={confirmTask.id}
           task={confirmTask}
-          submitting={claimingTaskId === confirmTask.id}
-          onCancel={() => setConfirmTaskId(null)}
+          phase={
+            claimingTaskId === confirmTask.id && confirmPhase === "idle"
+              ? "claiming"
+              : confirmPhase
+          }
+          onCancel={() => {
+            setConfirmPhase("idle");
+            setConfirmTaskId(null);
+          }}
           onConfirm={async () => {
+            if (confirmPhase !== "idle") {
+              return;
+            }
+
+            setConfirmPhase("checking");
+
             try {
-              const result = await claimTask(confirmTask.id);
+              const result = await completeRewardWithVirtualCheck({
+                task: confirmTask,
+                claim: () => claimTask(confirmTask.id),
+                onPhaseChange: (phase) => {
+                  if (phase === "claiming") {
+                    setConfirmPhase("claiming");
+                  }
+                },
+              });
               if (!result.ok) {
                 toast.error(t("rewards.claimFailed"));
-                setConfirmTaskId(null);
+                setConfirmPhase("idle");
                 return;
               }
               if (result.alreadyClaimed) {
@@ -455,9 +507,11 @@ export function RewardsPage() {
               } else {
                 toast.success(t("rewards.claimSuccess"));
               }
+              setConfirmPhase("idle");
               setConfirmTaskId(null);
             } catch {
               toast.error(t("rewards.claimFailed"));
+              setConfirmPhase("idle");
             }
           }}
         />

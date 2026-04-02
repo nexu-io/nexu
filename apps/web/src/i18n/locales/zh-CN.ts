@@ -333,6 +333,14 @@ const zhCN = {
   "budget.confirm.cancel": "稍后再说",
   "budget.confirm.checkinDesc":
     "确认今日打卡后，+${n} 会加入你的奖励额度。每天可领取一次。",
+  "budget.confirm.checkingTitle": "正在检查任务完成情况",
+  "budget.confirm.checkingDesc": "请稍候，我们正在为你确认任务状态。",
+  "budget.confirm.checkingImageDesc": "请稍候，我们正在确认分享卡提交流程。",
+  "budget.confirm.checkingCheckinDesc": "请稍候，我们正在确认今日打卡状态。",
+  "budget.confirm.checking": "检查中...",
+  "budget.confirm.claimingTitle": "正在领取奖励",
+  "budget.confirm.claimingDesc": "请稍候，奖励额度正在同步到你的账户。",
+  "budget.confirm.claiming": "领取中...",
   "budget.banner.warningTitle": "云端额度即将耗尽",
   "budget.banner.depletedTitle": "云端额度已用尽",
   "budget.banner.warningHeadline":
