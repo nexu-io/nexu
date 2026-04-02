@@ -55,6 +55,8 @@ export interface PlistEnv {
   openclawTmpDir: string;
   /** Normalized proxy env propagated to child processes */
   proxyEnv: Record<string, string>;
+  /** Amplitude API key for controller analytics */
+  amplitudeApiKey?: string;
 }
 
 function renderProxyEnvEntries(proxyEnv: Record<string, string>): string {
@@ -175,6 +177,12 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
             ? `
         <key>PATH</key>
         <string>${escapeXml(env.systemPath)}</string>`
+            : ""
+        }${
+          env.amplitudeApiKey
+            ? `
+        <key>AMPLITUDE_API_KEY</key>
+        <string>${escapeXml(env.amplitudeApiKey)}</string>`
             : ""
         }
         <key>NODE_ENV</key>

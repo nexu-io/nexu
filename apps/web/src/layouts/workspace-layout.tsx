@@ -407,6 +407,10 @@ function WorkspaceLayoutInner() {
   const installedSkillsCount = skillsData?.installedSkills?.length ?? 0;
 
   useEffect(() => {
+    track("workspace_view");
+  }, []);
+
+  useEffect(() => {
     if (!isDesktopClient) {
       return;
     }
