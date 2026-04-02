@@ -9,27 +9,37 @@
 
 ---
 
-## 1. Problem
+## 1. Vision
 
-Nexu Desktop (Controller) and OpenClaw (Gateway) both perform health monitoring independently, but lack shared context and coordination:
+When something goes wrong in Nexu, the system should detect it, try to fix it, and — only if it can't — tell us exactly what happened. The user shouldn't need to notice, export logs, or file a ticket. The target experience is:
 
-- **Desktop** runs HTTP probes every 5s against OpenClaw's `/health` endpoint. It counts consecutive failures and declares a "wedge" after 12 failures (~108s). But it cannot distinguish a real deadlock from a config reload, channel reconnection, or auth refresh — all of which cause transient probe failures.
+```
+Auto-detect → Self-heal → Escalate → Remote report → IM notify → User-triggered repair
+```
 
-- **OpenClaw** has sophisticated internal monitoring (channel health, session stuck detection, tool loop circuit breakers, auth expiry) and can self-heal many conditions. But it cannot detect its own process-level wedge, and has no way to escalate to Desktop when internal recovery fails.
+This is an **end-to-end self-healing loop**: the system resolves most issues silently, surfaces the rest to the team via Sentry and to the user via IM, and gives the user a one-command repair path (`/diagnose`, `/fix`) without leaving the chat.
 
-- **Result**: false-positive wedge alarms on benign operations, no escalation path from OpenClaw to Desktop, no coordinated recovery flow, and no unified route to remote reporting or user interaction.
+## 2. Current Gap
 
----
+Today, neither OpenClaw nor Desktop can deliver this loop alone:
 
-## 2. Goals
+- **OpenClaw** has strong internal monitoring (channel health, session stuck detection, tool loop circuit breakers, auth expiry) and can self-heal many application-level faults. But it cannot detect its own process-level wedge, has no way to escalate when internal recovery fails, and does not report to any remote system.
 
-1. **Layered anomaly detection** — OpenClaw handles application-internal faults; Desktop handles process-external faults.
-2. **Layered self-healing** — OpenClaw retries/restarts/circuit-breaks internally; Desktop does process-level intervention only when OpenClaw cannot recover.
-3. **Semantic coordination** — a formal protocol replaces implicit probe-only monitoring, eliminating false positives from benign transient states.
-4. **Unified escalation path** — detect → self-heal → escalate → Desktop intervention → remote report.
-5. **User-reachable repair** — IM commands (`/diagnose`, `/fix`) give users a self-service diagnostic and repair entry point.
+- **Desktop** runs HTTP probes against OpenClaw and can restart the process. But it treats health as binary alive/dead — it cannot tell a real deadlock from a config reload or channel reconnection, leading to false-positive alarms on benign operations.
 
-## 3. Non-Goals
+- **The gap is coordination**: both sides have capabilities, but no shared language. Desktop doesn't know OpenClaw is self-healing; OpenClaw can't ask Desktop for help. There is no unified escalation path, no remote reporting trigger, and no user-facing repair entry point.
+
+This is a solvable integration problem, not a missing-capability problem.
+
+## 3. Goals
+
+1. **End-to-end self-healing loop** — from anomaly detection through self-repair to remote reporting and user-reachable IM commands, as a single coherent system.
+2. **Layered responsibility** — OpenClaw owns application-internal faults; Desktop owns process-external faults. Each layer tries to resolve before escalating.
+3. **Semantic health coordination** — a formal protocol between OpenClaw and Desktop replaces implicit probe-only monitoring, so Desktop understands what OpenClaw is doing and vice versa.
+4. **Minimal noise** — only report what the system truly cannot fix. Self-healed issues produce no alerts, no Sentry events, no user interruptions.
+5. **User-reachable repair** — IM commands (`/diagnose`, `/fix`) let users inspect and repair from chat, without touching CLI or desktop UI.
+
+## 4. Non-Goals
 
 - Not building a full monitoring platform (Datadog continues that role).
 - Not having OpenClaw upload directly to Sentry — Desktop owns remote reporting.
@@ -38,7 +48,7 @@ Nexu Desktop (Controller) and OpenClaw (Gateway) both perform health monitoring 
 
 ---
 
-## 4. Architecture
+## 5. Architecture
 
 ### Responsibility Boundary
 
@@ -75,9 +85,9 @@ OpenClaw ─── WS/event channel ──→ Desktop  (abnormal signals, escala
 
 ---
 
-## 5. Health Model
+## 6. Health Model
 
-### 5.1 Health Status Enum
+### 6.1 Health Status Enum
 
 OpenClaw's `/health` response transitions from a binary alive/dead to a semantic state machine:
 
@@ -93,7 +103,7 @@ type HealthStatus = "healthy" | "degraded" | "recovering" | "maintenance" | "unh
 | `maintenance` | Intentional operation (config reload, upgrade) | Suppress alarms entirely |
 | `unhealthy` | Self-healing exhausted, needs external help | Begin Desktop-level intervention |
 
-### 5.2 Enhanced Health Response Schema
+### 6.2 Enhanced Health Response Schema
 
 ```typescript
 interface HealthResponse {
@@ -118,7 +128,7 @@ interface HealthResponse {
 }
 ```
 
-### 5.3 Desktop Probe Behavior (updated from PR #725)
+### 6.3 Desktop Probe Behavior (updated from PR #725)
 
 ```
 on probe response:
@@ -148,9 +158,9 @@ on probe response:
 
 ---
 
-## 6. Coordination Protocol
+## 7. Coordination Protocol
 
-### 6.1 OpenClaw → Desktop Events
+### 7.1 OpenClaw → Desktop Events
 
 Structured events emitted over the existing WS/event channel:
 
@@ -205,7 +215,7 @@ interface MaintenanceFinished {
 }
 ```
 
-### 6.2 Desktop → OpenClaw Commands
+### 7.2 Desktop → OpenClaw Commands
 
 RPC methods added to OpenClaw's `server-methods/`:
 
@@ -245,7 +255,7 @@ interface ResetTransientHealthCounters {
 
 ---
 
-## 7. Recovery Flow
+## 8. Recovery Flow
 
 Layered escalation with noise minimization:
 
@@ -304,9 +314,9 @@ Layered escalation with noise minimization:
 
 ---
 
-## 8. Reporting Policy
+## 9. Reporting Policy
 
-### 8.1 Sentry Trigger Conditions
+### 9.1 Sentry Trigger Conditions
 
 Only report when escalation has genuinely failed — not on every diagnostic event:
 
@@ -318,14 +328,14 @@ Only report when escalation has genuinely failed — not on every diagnostic eve
 | `renderer_crash_before_ready` | Electron renderer process died before initialization complete |
 | `restart_loop_exhausted` | Desktop restarted gateway N times within window, still unhealthy |
 
-### 8.2 Deduplication & Rate Limiting
+### 9.2 Deduplication & Rate Limiting
 
 - **Per-episode dedup**: one Sentry event per failure episode (reuse PR #725's `wedgeReported` flag pattern)
 - **Rate limit**: max 3 Sentry events per hour across all trigger types
 - **Recovery reset**: all counters and flags reset when health returns to "healthy"
 - **Cooldown**: after a Sentry report, suppress same trigger type for 30 minutes
 
-### 8.3 Diagnostics Payload
+### 9.3 Diagnostics Payload
 
 Reuse existing `diagnostics-export.ts` with additions:
 
@@ -334,9 +344,9 @@ Reuse existing `diagnostics-export.ts` with additions:
 
 ---
 
-## 9. IM Commands
+## 10. IM Commands
 
-### 9.1 `/diagnose` — Self-Check Report
+### 10.1 `/diagnose` — Self-Check Report
 
 **Trigger**: user sends `/diagnose` in any connected IM channel.
 
@@ -361,7 +371,7 @@ Self-healing: 1 active recovery (telegram channel restart)
 Escalations: none
 ```
 
-### 9.2 `/fix` — Trigger Repair
+### 10.2 `/fix` — Trigger Repair
 
 **Trigger**: user sends `/fix` in any connected IM channel.
 
@@ -382,7 +392,7 @@ Escalations: none
 
 ---
 
-## 10. Rollout
+## 11. Rollout
 
 ### Phase 1: Health Semantics
 
@@ -414,7 +424,7 @@ Escalations: none
 
 ---
 
-## 11. Outstanding Questions
+## 12. Outstanding Questions
 
 1. Should `maintenance_started` / `maintenance_finished` be auto-emitted by OpenClaw on config reload, or explicitly triggered?
 2. What's the right `escalation_requested` timeout — how long should OpenClaw try before giving up?
@@ -424,7 +434,7 @@ Escalations: none
 
 ---
 
-## 12. References
+## 13. References
 
 - OpenClaw health infrastructure: `src/commands/health.ts`, `src/gateway/server-methods/health.ts`, `src/gateway/channel-health-monitor.ts`
 - OpenClaw diagnostic events: `src/infra/diagnostic-events.ts`, `src/logging/diagnostic.ts`
