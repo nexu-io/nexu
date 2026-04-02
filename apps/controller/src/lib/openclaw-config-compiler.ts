@@ -461,6 +461,12 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
+      "nexu-credit-guard": {
+        enabled: true,
+        config: {
+          contactUrl: "https://nexu.app/contact",
+        },
+      },
       ...(hasMiniMaxOauth
         ? {
             "minimax-portal-auth": {

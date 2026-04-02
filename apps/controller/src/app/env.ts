@@ -114,6 +114,10 @@ export const env = {
     openclawStateDir,
     "nexu-runtime-model.json",
   ),
+  creditGuardStatePath: path.join(
+    openclawStateDir,
+    "nexu-credit-guard-state.json",
+  ),
   skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
   skillDbPath: path.join(nexuHomeDir, "skill-ledger.json"),
   analyticsStatePath: path.join(nexuHomeDir, "analytics-state.json"),
