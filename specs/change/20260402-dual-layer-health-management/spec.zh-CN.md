@@ -482,7 +482,7 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 
 ### 9.2 去重与限流
 
-- **按 episode 去重**：每个故障 episode 只产生一个 Sentry 事件，以 `EscalationRequested` 中的 `dedupeKey` 为键
+- **按 episode 去重**：每个故障 episode 只产生一个 Sentry 事件。OpenClaw 发起的升级以 `EscalationRequested` 中的 `dedupeKey` 为键；Controller 原生触发（`wedge_confirmed`、`cold_start_failed`、`restart_loop_exhausted`、`renderer_crash_before_ready`）由 Controller 自行生成 dedupeKey，格式为 `{trigger_type}:{episode_start_timestamp}`
 - **限流**：所有触发类型合计每小时最多 3 个 Sentry 事件
 - **恢复重置**：`RECOVERY_HYSTERESIS` 结束且持续 healthy 后重置所有计数器和标志
 - **冷却期**：Sentry 上报后，同一 `dedupeKey` 抑制 30 分钟
@@ -490,10 +490,20 @@ Controller 将相关信号转发给 OpenClaw（如 `host_sleep_resumed`），其
 
 ### 9.3 诊断载荷
 
-复用现有 `diagnostics-export.ts`，增加：
+分两级：**远程安全子集**用于 Sentry，**完整包**仅本地导出。
 
-- 已有：运行时状态、最近事件、启动状态、renderer 故障、健康指标
-- 新增：触发事件的 `EscalationContext`、自愈尝试历史、最近 N 次带语义状态和 `statusSince` 时间戳的健康响应
+**远程安全载荷（Sentry 附件）**：
+- 触发事件的 `EscalationContext`（发出时已脱敏，< 4KB）
+- 自愈尝试历史（事件类型 + 时间戳，不含消息内容）
+- 最近 20 次带语义状态和 `statusSince` 的健康响应
+- 大小上限：**256KB**。超出时优先截断最旧的健康响应。
+- 上传前经过现有脱敏层处理。
+- 不含用户消息内容、auth token、session 载荷。
+
+**完整诊断包（仅本地）**：
+- 远程安全载荷的全部内容，加上：完整运行时状态、renderer 故障、最近事件、启动状态
+- 通过现有 `diagnostics-export.ts` 导出到本地磁盘
+- 仅通过用户手动操作"帮助 → 导出诊断"上传
 
 ---
 

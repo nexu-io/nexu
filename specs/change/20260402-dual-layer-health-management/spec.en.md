@@ -484,7 +484,7 @@ Only report when escalation has genuinely failed — not on every diagnostic eve
 
 ### 9.2 Deduplication & Rate Limiting
 
-- **Per-episode dedup**: one Sentry event per failure episode, keyed by `dedupeKey` from `EscalationRequested`
+- **Per-episode dedup**: one Sentry event per failure episode. For OpenClaw-originated escalations, keyed by `dedupeKey` from `EscalationRequested`. For Controller-native triggers (`wedge_confirmed`, `cold_start_failed`, `restart_loop_exhausted`, `renderer_crash_before_ready`), Controller generates its own dedupeKey as `{trigger_type}:{timestamp_of_episode_start}`
 - **Rate limit**: max 3 Sentry events per hour across all trigger types
 - **Recovery reset**: all counters and flags reset after `RECOVERY_HYSTERESIS` elapses with healthy status
 - **Cooldown**: after a Sentry report, suppress same `dedupeKey` for 30 minutes
@@ -492,10 +492,20 @@ Only report when escalation has genuinely failed — not on every diagnostic eve
 
 ### 9.3 Diagnostics Payload
 
-Reuse existing `diagnostics-export.ts` with additions:
+Two tiers: a **remote-safe subset** for Sentry, and the **full bundle** for local export only.
 
-- Existing: runtime state, recent events, startup state, renderer failures, health metrics
-- Added: `EscalationContext` from the triggering event, self-healing attempt history, last N health responses with semantic status and `statusSince` timestamps
+**Remote-safe payload (Sentry attachment)**:
+- `EscalationContext` from the triggering event (already redacted at emission, < 4KB)
+- Self-healing attempt history (event types + timestamps, no message content)
+- Last 20 health responses with semantic status and `statusSince`
+- Size cap: **256KB max**. If exceeded, truncate oldest health responses first.
+- Passes through the existing redaction layer before upload.
+- No user message content, no auth tokens, no session payloads.
+
+**Full diagnostics bundle (local only)**:
+- Everything in the remote-safe payload, plus: full runtime state, renderer failures, recent events, startup state
+- Exported via existing `diagnostics-export.ts` to local disk
+- Only uploaded manually by user through "Help → Export Diagnostics"
 
 ---
 
