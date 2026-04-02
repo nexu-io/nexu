@@ -20,16 +20,20 @@ After any API route/schema change: `pnpm generate-types` then `pnpm typecheck`.
 
 | Route | Page | Purpose |
 |-------|------|---------|
-| `/` | Redirect | Redirects to `/workspace` |
-| `/auth` | Auth | Register / login |
-| `/onboarding` | Onboarding | New user setup |
-| `/workspace` | Sessions | Bot conversation sessions |
+| `/` | Welcome | Desktop-first entry point for Cloud sign-in or BYOK setup |
+| `/claim` | Slack Claim | Claim a pending Slack workspace invitation |
+| `/feishu/bind` | Feishu Bind | Handles Feishu bind result feedback |
+| `/workspace` | Home | Workspace dashboard and channel status |
+| `/workspace/home` | Home | Workspace dashboard and channel status |
 | `/workspace/sessions` | Sessions | Bot conversation sessions |
 | `/workspace/sessions/:id` | Sessions | Session detail |
 | `/workspace/channels` | Channels | Multi-platform channel management (Slack, Discord, Feishu) |
 | `/workspace/channels/slack/callback` | Slack OAuth Callback | Handles Slack redirect |
 | `/workspace/integrations` | Integrations | Composio toolkit connections (OAuth) |
 | `/workspace/oauth-callback/:integrationId` | OAuth Callback | Handles Composio OAuth redirect |
+| `/workspace/rewards` | Rewards | Reward task center for daily, open-source, and social claims |
+| `/workspace/settings` | Models / Settings | General profile and model provider settings |
+| `/workspace/models` | Models / Settings | General profile and model provider settings |
 | `/workspace/skills` | Skills | Skill catalog |
 | `/workspace/skills/:slug` | Skill Detail | Individual skill info and actions |
 

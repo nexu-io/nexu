@@ -11,6 +11,7 @@ import { HomePage } from "./pages/home";
 import { IntegrationsPage } from "./pages/integrations";
 import { ModelsPage } from "./pages/models";
 import { OAuthCallbackPage } from "./pages/oauth-callback";
+import { RewardsPage } from "./pages/rewards";
 import { SessionsPage } from "./pages/sessions";
 import { SkillsPage } from "./pages/skills";
 import { SlackClaimPage } from "./pages/slack-claim";
@@ -27,6 +28,7 @@ function DocumentTitleSync() {
       "/workspace": t("title.home"),
       "/workspace/home": t("title.home"),
       "/workspace/integrations": t("title.integrations"),
+      "/workspace/rewards": t("title.rewards"),
       "/workspace/skills": t("title.skills"),
       "/workspace/settings": t("title.settings"),
       "/workspace/models": t("title.settings"),
@@ -72,6 +74,7 @@ export function App() {
                 path="/workspace/integrations"
                 element={<IntegrationsPage />}
               />
+              <Route path="/workspace/rewards" element={<RewardsPage />} />
               <Route path="/workspace/settings" element={<ModelsPage />} />
               <Route path="/workspace/models" element={<ModelsPage />} />
               <Route path="/workspace/skills" element={<SkillsPage />} />

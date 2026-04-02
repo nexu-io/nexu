@@ -93,7 +93,40 @@ function installBrowserStubs() {
   });
 }
 
-function renderWorkspaceLayout(): string {
+function renderWorkspaceLayout(
+  initialEntry = "/workspace/sessions/sess-1",
+  rewardsStatus?: {
+    viewer: {
+      cloudConnected: boolean;
+      activeModelId: string | null;
+      activeModelProviderId: string | null;
+      usingManagedModel: boolean;
+    };
+    progress: {
+      claimedCount: number;
+      totalCount: number;
+      earnedCredits: number;
+      availableCredits?: number;
+    };
+    cloudBalance: {
+      totalBalance: number;
+      totalRecharged: number;
+      totalConsumed: number;
+    } | null;
+    tasks?: Array<Record<string, unknown>>;
+  },
+  cloudStatus?: {
+    connected: boolean;
+    polling?: boolean;
+    userName?: string | null;
+    userEmail?: string | null;
+    connectedAt?: string | null;
+    cloudUrl?: string;
+    linkUrl?: string | null;
+    activeProfileName?: string;
+    profiles?: Array<Record<string, unknown>>;
+  },
+): string {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -118,15 +151,34 @@ function renderWorkspaceLayout(): string {
     email: "alice@example.com",
     name: "Alice",
   });
+  if (rewardsStatus) {
+    queryClient.setQueryData(["desktop-rewards"], {
+      tasks: [],
+      ...rewardsStatus,
+    });
+  }
+  if (cloudStatus) {
+    queryClient.setQueryData(["desktop-cloud-status"], {
+      cloudUrl: "http://localhost:5176",
+      linkUrl: "http://localhost:8080",
+      activeProfileName: "Local",
+      profiles: [],
+      ...cloudStatus,
+    });
+  }
 
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/workspace/sessions/sess-1"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route element={<WorkspaceLayout />}>
             <Route
               path="/workspace/sessions/:id"
               element={<div>Session body</div>}
+            />
+            <Route
+              path="/workspace/rewards"
+              element={<div>Rewards body</div>}
             />
           </Route>
         </Routes>
@@ -150,6 +202,204 @@ describe("WorkspaceLayout", () => {
     expect(markup).toContain('data-session-state="active"');
     expect(markup).toContain("<title>Slack</title>");
     expect(markup).toContain("Design sync thread");
+  });
+
+  it("keeps the rewards page route without rendering a main navigation tab", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/rewards",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 4,
+          totalCount: 10,
+          earnedCredits: 700,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).not.toContain("layout.nav.rewards");
+    expect(markup).toContain("Rewards body");
+    expect(markup).toContain("layout.sidebar.rewardsTitle");
+  });
+
+  it("renders the logged-out sidebar growth card", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: false,
+          activeModelId: null,
+          activeModelProviderId: null,
+          usingManagedModel: false,
+        },
+        progress: {
+          claimedCount: 0,
+          totalCount: 11,
+          earnedCredits: 0,
+        },
+        cloudBalance: null,
+      },
+      {
+        connected: false,
+      },
+    );
+
+    expect(markup).toContain("layout.sidebar.loginTitle");
+    expect(markup).toContain("layout.sidebar.loginSubtitle");
+    expect(markup).toContain('data-sidebar-growth-card="login"');
+    expect(markup).not.toContain("layout.sidebar.rewardsTitle");
+  });
+
+  it("renders a loading shell instead of a fake zero-state card before rewards resolve", () => {
+    const markup = renderWorkspaceLayout();
+
+    expect(markup).toContain('data-rewards-card-loading="true"');
+    expect(markup).not.toContain("layout.sidebar.loginTitle");
+    expect(markup).not.toContain("layout.sidebar.rewardsTitle");
+  });
+
+  it("renders the connected rewards shell immediately while balance data is still syncing", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      undefined,
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).not.toContain('data-rewards-card-loading="true"');
+    expect(markup).toContain('data-sidebar-growth-card="rewards"');
+    expect(markup).toContain("layout.sidebar.rewardsTitle");
+    expect(markup).toContain("0 layout.sidebar.balanceUnit");
+  });
+
+  it("renders the logged-in rewards card with a separate balance entry", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 4,
+          totalCount: 10,
+          earnedCredits: 700,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).toContain('data-sidebar-growth-card="rewards"');
+    expect(markup).toContain("layout.sidebar.rewardsTitle");
+    expect(markup).toContain("4/10");
+    expect(markup).toContain('data-sidebar-rewards-balance="true"');
+    expect(markup).toContain("layout.sidebar.balanceLabel");
+    expect(markup).toContain("200 layout.sidebar.balanceUnit");
+    expect(markup).not.toContain("layout.sidebar.loginTitle");
+  });
+
+  it("renders zero balance when connected but cloud balance is null", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 1,
+          totalCount: 10,
+          earnedCredits: 100,
+        },
+        cloudBalance: null,
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).toContain("0 layout.sidebar.balanceUnit");
+  });
+
+  it("prefers desktop cloud status over stale rewards state when the user has logged out", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 4,
+          totalCount: 10,
+          earnedCredits: 700,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
+      },
+      {
+        connected: false,
+      },
+    );
+
+    expect(markup).toContain("layout.sidebar.loginTitle");
+    expect(markup).not.toContain("layout.sidebar.rewardsTitle");
+  });
+
+  it("prefers desktop cloud status over stale rewards state when the user has logged in", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: false,
+          activeModelId: null,
+          activeModelProviderId: null,
+          usingManagedModel: false,
+        },
+        progress: {
+          claimedCount: 0,
+          totalCount: 11,
+          earnedCredits: 0,
+        },
+        cloudBalance: null,
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).toContain("layout.sidebar.rewardsTitle");
+    expect(markup).not.toContain("layout.sidebar.loginTitle");
   });
 
   it("renders WhatsApp sessions with the correct sidebar icon and label", () => {

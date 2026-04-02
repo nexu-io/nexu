@@ -9,8 +9,12 @@ import type {
   ConnectQqbotInput,
   ConnectSlackInput,
   ConnectWecomInput,
+  DesktopRewardClaimProof,
+  DesktopRewardsStatus,
+  RewardTaskId,
 } from "@nexu/shared";
 import {
+  type claimDesktopRewardResponseSchema,
   type cloudProfileSchema,
   type connectIntegrationResponseSchema,
   type connectIntegrationSchema,
@@ -25,7 +29,12 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { resolveManagedCloudModel } from "../lib/managed-models.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
+import {
+  type RewardStatusResponse,
+  createCloudRewardService,
+} from "../services/cloud-reward-service.js";
 import { LowDbStore } from "./lowdb-store.js";
 import {
   type CloudProfileEntry,
@@ -71,6 +80,10 @@ type CloudPollingState = {
   deviceSecret: string;
   abortController: AbortController;
 };
+
+type DesktopRewardClaimResponse = z.infer<
+  typeof claimDesktopRewardResponseSchema
+>;
 
 const defaultCloudProfile: CloudProfileEntry = {
   name: "Default",
@@ -275,6 +288,48 @@ function serializeProvider(
     updatedAt: provider.updatedAt,
     apiKey: provider.apiKey,
     models: provider.models,
+  };
+}
+
+function convertCloudStatusToDesktop(
+  cloudStatus: RewardStatusResponse,
+  viewer: {
+    cloudConnected: boolean;
+    activeModelId: string | null;
+    activeManagedModel: { provider?: string } | null | undefined;
+  },
+): DesktopRewardsStatus {
+  const { cloudConnected, activeModelId, activeManagedModel } = viewer;
+  return {
+    viewer: {
+      cloudConnected,
+      activeModelId,
+      activeModelProviderId:
+        activeManagedModel?.provider ??
+        (activeManagedModel ? "nexu" : (activeModelId?.split("/")[0] ?? null)),
+      usingManagedModel: activeManagedModel != null,
+    },
+    progress: cloudStatus.progress,
+    tasks: cloudStatus.tasks.map((task) => ({
+      id: task.id as RewardTaskId,
+      group: task.groupId as "daily" | "opensource" | "social",
+      icon: task.icon ?? "gift",
+      reward: task.rewardPoints,
+      shareMode: task.shareMode as "link" | "tweet" | "image",
+      repeatMode: task.repeatMode as "once" | "daily" | "weekly",
+      requiresScreenshot: task.shareMode === "image",
+      actionUrl: task.url,
+      isClaimed: task.isClaimed,
+      lastClaimedAt: task.lastClaimedAt,
+      claimCount: task.claimCount,
+    })),
+    cloudBalance: cloudStatus.cloudBalance
+      ? {
+          totalBalance: cloudStatus.cloudBalance.totalBalance,
+          totalRecharged: cloudStatus.cloudBalance.totalRecharged,
+          totalConsumed: cloudStatus.cloudBalance.totalConsumed,
+        }
+      : null,
   };
 }
 
@@ -1394,6 +1449,122 @@ export class NexuConfigStore {
           connectedAt: session?.connectedAt ?? null,
           modelCount: session?.models?.length ?? 0,
         };
+      }),
+    };
+  }
+
+  async getDesktopRewardsStatus(): Promise<DesktopRewardsStatus> {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+    const activeModelId = config.runtime.defaultModelId || null;
+    const activeManagedModel = resolveManagedCloudModel(
+      activeModelId,
+      cloud.models ?? [],
+    );
+
+    if (cloud.connected && cloud.apiKey) {
+      const { activeProfile } =
+        await this.readConfiguredDesktopCloudProfile(config);
+      const cloudUrl = activeProfile.cloudUrl.replace(/\/+$/, "");
+      const service = createCloudRewardService({
+        cloudUrl,
+        apiKey: cloud.apiKey,
+      });
+      const cloudResult = await service.getRewardsStatus();
+
+      if (cloudResult.ok) {
+        const cloudStatus = cloudResult.data;
+        return convertCloudStatusToDesktop(cloudStatus, {
+          cloudConnected: true,
+          activeModelId,
+          activeManagedModel,
+        });
+      }
+
+      if (cloudResult.reason === "auth_failed") {
+        return {
+          viewer: {
+            cloudConnected: cloud.connected,
+            activeModelId,
+            activeModelProviderId:
+              activeManagedModel?.provider ??
+              (activeManagedModel
+                ? "nexu"
+                : (activeModelId?.split("/")[0] ?? null)),
+            usingManagedModel: activeManagedModel !== null,
+          },
+          progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+          tasks: [],
+          cloudBalance: null,
+        };
+      }
+    }
+
+    return {
+      viewer: {
+        cloudConnected: cloud.connected,
+        activeModelId,
+        activeModelProviderId:
+          activeManagedModel?.provider ??
+          (activeManagedModel
+            ? "nexu"
+            : (activeModelId?.split("/")[0] ?? null)),
+        usingManagedModel: activeManagedModel !== null,
+      },
+      progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+      tasks: [],
+      cloudBalance: null,
+    };
+  }
+
+  async claimDesktopReward(
+    taskId: RewardTaskId,
+    proof?: DesktopRewardClaimProof,
+  ): Promise<DesktopRewardClaimResponse> {
+    const config = await this.getConfig();
+    const cloud = readDesktopCloud(config);
+
+    if (!cloud.connected || !cloud.apiKey) {
+      return {
+        ok: false,
+        alreadyClaimed: false,
+        status: await this.getDesktopRewardsStatus(),
+      };
+    }
+
+    const { activeProfile } =
+      await this.readConfiguredDesktopCloudProfile(config);
+    const cloudUrl = activeProfile.cloudUrl.replace(/\/+$/, "");
+    const service = createCloudRewardService({
+      cloudUrl,
+      apiKey: cloud.apiKey,
+    });
+    const result = await service.claimReward(taskId, proof);
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        alreadyClaimed: false,
+        status: await this.getDesktopRewardsStatus(),
+      };
+    }
+
+    const claimData = result.data;
+    const config2 = await this.getConfig();
+    const cloud2 = readDesktopCloud(config2);
+    const activeModelId2 = config2.runtime.defaultModelId || null;
+    const activeManagedModel2 = resolveManagedCloudModel(
+      activeModelId2,
+      cloud2.models ?? [],
+    );
+
+    return {
+      ok: claimData.ok,
+      alreadyClaimed: claimData.alreadyClaimed,
+      status: convertCloudStatusToDesktop(claimData.status, {
+        cloudConnected: true,
+        activeModelId: activeModelId2,
+        activeManagedModel: activeManagedModel2,
       }),
     };
   }

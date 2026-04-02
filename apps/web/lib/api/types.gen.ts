@@ -1029,6 +1029,156 @@ export type PutApiInternalDesktopDefaultModelResponses = {
 
 export type PutApiInternalDesktopDefaultModelResponse = PutApiInternalDesktopDefaultModelResponses[keyof PutApiInternalDesktopDefaultModelResponses];
 
+export type GetApiInternalDesktopRewardsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards';
+};
+
+export type GetApiInternalDesktopRewardsResponses = {
+    /**
+     * Desktop rewards status
+     */
+    200: {
+        viewer: {
+            cloudConnected: boolean;
+            activeModelId: string;
+            activeModelProviderId: string;
+            usingManagedModel: boolean;
+        };
+        progress: {
+            claimedCount: number;
+            totalCount: number;
+            earnedCredits: number;
+            availableCredits?: number;
+        };
+        tasks: Array<{
+            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
+            group: 'daily' | 'opensource' | 'social';
+            icon: string;
+            reward: number;
+            shareMode: 'link' | 'tweet' | 'image';
+            repeatMode: 'once' | 'daily' | 'weekly';
+            requiresScreenshot: boolean;
+            actionUrl?: string;
+            isClaimed: boolean;
+            lastClaimedAt: string;
+            claimCount: number;
+        }>;
+        cloudBalance?: {
+            totalBalance: number;
+            totalRecharged: number;
+            totalConsumed: number;
+        };
+        autoFallbackTriggered?: boolean;
+    };
+};
+
+export type GetApiInternalDesktopRewardsResponse = GetApiInternalDesktopRewardsResponses[keyof GetApiInternalDesktopRewardsResponses];
+
+export type PostApiInternalDesktopRewardsGithubStarSessionData = {
+    body?: {
+        [key: string]: unknown;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/github-star-session';
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionErrors = {
+    /**
+     * GitHub star verification is temporarily unavailable
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionError = PostApiInternalDesktopRewardsGithubStarSessionErrors[keyof PostApiInternalDesktopRewardsGithubStarSessionErrors];
+
+export type PostApiInternalDesktopRewardsGithubStarSessionResponses = {
+    /**
+     * Prepare a GitHub star verification session
+     */
+    200: {
+        sessionId: string;
+        baselineStars: number;
+        expiresAt: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionResponse = PostApiInternalDesktopRewardsGithubStarSessionResponses[keyof PostApiInternalDesktopRewardsGithubStarSessionResponses];
+
+export type PostApiInternalDesktopRewardsClaimData = {
+    body?: {
+        taskId: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
+        proof?: {
+            url?: string;
+            githubSessionId?: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/claim';
+};
+
+export type PostApiInternalDesktopRewardsClaimErrors = {
+    /**
+     * Invalid claim proof
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsClaimError = PostApiInternalDesktopRewardsClaimErrors[keyof PostApiInternalDesktopRewardsClaimErrors];
+
+export type PostApiInternalDesktopRewardsClaimResponses = {
+    /**
+     * Claim a desktop reward
+     */
+    200: {
+        ok: boolean;
+        alreadyClaimed: boolean;
+        status: {
+            viewer: {
+                cloudConnected: boolean;
+                activeModelId: string;
+                activeModelProviderId: string;
+                usingManagedModel: boolean;
+            };
+            progress: {
+                claimedCount: number;
+                totalCount: number;
+                earnedCredits: number;
+                availableCredits?: number;
+            };
+            tasks: Array<{
+                id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'xiaohongshu' | 'lingying' | 'jike' | 'wechat' | 'feishu' | 'facebook' | 'whatsapp';
+                group: 'daily' | 'opensource' | 'social';
+                icon: string;
+                reward: number;
+                shareMode: 'link' | 'tweet' | 'image';
+                repeatMode: 'once' | 'daily' | 'weekly';
+                requiresScreenshot: boolean;
+                actionUrl?: string;
+                isClaimed: boolean;
+                lastClaimedAt: string;
+                claimCount: number;
+            }>;
+            cloudBalance?: {
+                totalBalance: number;
+                totalRecharged: number;
+                totalConsumed: number;
+            };
+            autoFallbackTriggered?: boolean;
+        };
+    };
+};
+
+export type PostApiInternalDesktopRewardsClaimResponse = PostApiInternalDesktopRewardsClaimResponses[keyof PostApiInternalDesktopRewardsClaimResponses];
+
 export type GetApiV1ChannelsData = {
     body?: never;
     path?: never;
@@ -1543,6 +1693,9 @@ export type GetApiV1BotQuotaResponses = {
     200: {
         available: boolean;
         resetsAt: string;
+        usingByok?: boolean;
+        byokAvailable?: boolean;
+        autoFallbackTriggered?: boolean;
     };
 };
 
@@ -2361,6 +2514,46 @@ export type PostApiV1ProvidersByProviderIdVerifyResponses = {
 };
 
 export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
+
+export type PostApiV1QuotaFallbackToByokData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/fallback-to-byok';
+};
+
+export type PostApiV1QuotaFallbackToByokResponses = {
+    /**
+     * Trigger automatic fallback to BYOK provider
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaFallbackToByokResponse = PostApiV1QuotaFallbackToByokResponses[keyof PostApiV1QuotaFallbackToByokResponses];
+
+export type PostApiV1QuotaRestoreManagedData = {
+    body?: {
+        managedModelId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/restore-managed';
+};
+
+export type PostApiV1QuotaRestoreManagedResponses = {
+    /**
+     * Restore default model to managed (cloud) model
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaRestoreManagedResponse = PostApiV1QuotaRestoreManagedResponses[keyof PostApiV1QuotaRestoreManagedResponses];
 
 export type PostApiV1ProvidersByProviderIdOauthStartData = {
     body?: never;
