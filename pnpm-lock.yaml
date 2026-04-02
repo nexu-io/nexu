@@ -118,6 +118,9 @@ importers:
       pino:
         specifier: ^10.3.1
         version: 10.3.1
+      posthog-js:
+        specifier: ^1.364.6
+        version: 1.364.6
       react:
         specifier: ^19.2.4
         version: 19.2.4

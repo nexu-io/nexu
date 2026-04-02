@@ -566,10 +566,15 @@ async function ensureBuildConfig() {
       merged.NEXU_DESKTOP_BUILD_TIME ??
       existingConfig.NEXU_DESKTOP_BUILD_TIME ??
       defaultMetadata.NEXU_DESKTOP_BUILD_TIME,
-    ...((merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY)
+    ...((merged.POSTHOG_API_KEY ?? existingConfig.POSTHOG_API_KEY)
       ? {
-          AMPLITUDE_API_KEY:
-            merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY,
+          POSTHOG_API_KEY:
+            merged.POSTHOG_API_KEY ?? existingConfig.POSTHOG_API_KEY,
+        }
+      : {}),
+    ...((merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST)
+      ? {
+          POSTHOG_HOST: merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST,
         }
       : {}),
   };

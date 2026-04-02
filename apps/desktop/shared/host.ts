@@ -567,6 +567,8 @@ export type HostBridge = {
 export type HostBootstrap = {
   buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
+  posthogApiKey: string | null;
+  posthogHost: string | null;
   isPackaged: boolean;
   needsSetupAnimation: boolean;
 };

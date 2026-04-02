@@ -91,6 +91,8 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
       password: "desktop-local-password",
     },
     sentryDsn: null,
+    posthogApiKey: null,
+    posthogHost: null,
   };
 }
 

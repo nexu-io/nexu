@@ -1,7 +1,6 @@
-import * as amplitude from "@amplitude/unified";
-import { Identify } from "@amplitude/unified";
 import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import posthog, { type PostHogConfig } from "posthog-js";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
@@ -45,12 +44,21 @@ import {
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
-const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
+const posthogApiKey =
+  import.meta.env.VITE_POSTHOG_API_KEY ??
+  (typeof window === "undefined"
+    ? null
+    : window.nexuHost.bootstrap.posthogApiKey);
+const posthogHost =
+  import.meta.env.VITE_POSTHOG_HOST ??
+  (typeof window === "undefined"
+    ? null
+    : window.nexuHost.bootstrap.posthogHost);
 const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
 
 let rendererSentryInitialized = false;
-let amplitudeTelemetryInitialized = false;
+let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
 
 function sendRendererStartupProbe(
@@ -108,19 +116,25 @@ function initializeRendererSentry(dsn: string): void {
   rendererSentryInitialized = true;
 }
 
-function initializeAmplitudeTelemetry(): void {
-  if (amplitudeTelemetryInitialized || !amplitudeApiKey) {
+function initializePostHogTelemetry(): void {
+  if (posthogTelemetryInitialized || !posthogApiKey) {
     return;
   }
 
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
-  });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
-  amplitudeTelemetryInitialized = true;
+  const config: Partial<PostHogConfig> = {
+    autocapture: true,
+    disable_session_recording: false,
+    loaded: (client) => {
+      client.register({ environment: import.meta.env.MODE });
+    },
+  };
+
+  if (posthogHost) {
+    config.api_host = posthogHost;
+  }
+
+  posthog.init(posthogApiKey, config);
+  posthogTelemetryInitialized = true;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -1339,21 +1353,21 @@ function RendererTelemetryBootstrap() {
       }
     }
 
-    if (!amplitudeApiKey || amplitudeTelemetryInitialized) {
+    if (!posthogApiKey || posthogTelemetryInitialized) {
       return;
     }
 
-    sendRendererStartupProbe("renderer:amplitude-init:start", "ok");
+    sendRendererStartupProbe("renderer:posthog-init:start", "ok");
     try {
-      initializeAmplitudeTelemetry();
-      sendRendererStartupProbe("renderer:amplitude-init:success", "ok");
+      initializePostHogTelemetry();
+      sendRendererStartupProbe("renderer:posthog-init:success", "ok");
     } catch (error) {
       sendRendererStartupProbe(
-        "renderer:amplitude-init:error",
+        "renderer:posthog-init:error",
         "error",
         error instanceof Error ? (error.stack ?? error.message) : String(error),
       );
-      console.error("[desktop] renderer Amplitude init failed", error);
+      console.error("[desktop] renderer PostHog init failed", error);
     }
   }, []);
 
