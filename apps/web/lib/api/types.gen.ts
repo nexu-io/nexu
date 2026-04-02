@@ -2132,6 +2132,113 @@ export type GetApiV1SessionsByIdMessagesResponses = {
 
 export type GetApiV1SessionsByIdMessagesResponse = GetApiV1SessionsByIdMessagesResponses[keyof GetApiV1SessionsByIdMessagesResponses];
 
+export type PostApiInternalChannelsFeishuSendCardData = {
+    body: {
+        botId: string;
+        card: {
+            [key: string]: unknown;
+        };
+        to: string;
+        receiveIdType?: 'chat_id' | 'open_id' | 'user_id' | 'union_id' | 'email';
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/channels/feishu/send-card';
+};
+
+export type PostApiInternalChannelsFeishuSendCardResponses = {
+    /**
+     * Feishu card send result
+     */
+    200: {
+        messageId: string;
+    };
+    /**
+     * Feishu card send failed due to internal configuration
+     */
+    500: {
+        message: string;
+    };
+    /**
+     * Feishu card send failed due to upstream error
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuSendCardResponse = PostApiInternalChannelsFeishuSendCardResponses[keyof PostApiInternalChannelsFeishuSendCardResponses];
+
+export type PostApiInternalChannelsFeishuSendCardErrors = {
+    /**
+     * Feishu card send failed due to internal configuration
+     */
+    500: {
+        message: string;
+    };
+    /**
+     * Feishu card send failed due to upstream error
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuSendCardError = PostApiInternalChannelsFeishuSendCardErrors[keyof PostApiInternalChannelsFeishuSendCardErrors];
+
+export type PostApiInternalChannelsFeishuUpdateCardData = {
+    body: {
+        botId: string;
+        messageId: string;
+        card: {
+            [key: string]: unknown;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/channels/feishu/update-card';
+};
+
+export type PostApiInternalChannelsFeishuUpdateCardResponses = {
+    /**
+     * Feishu card update result
+     */
+    200: {
+        ok: boolean;
+    };
+    /**
+     * Feishu card update failed due to internal configuration
+     */
+    500: {
+        message: string;
+    };
+    /**
+     * Feishu card update failed due to upstream error
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuUpdateCardResponse = PostApiInternalChannelsFeishuUpdateCardResponses[keyof PostApiInternalChannelsFeishuUpdateCardResponses];
+
+export type PostApiInternalChannelsFeishuUpdateCardErrors = {
+    /**
+     * Feishu card update failed due to internal configuration
+     */
+    500: {
+        message: string;
+    };
+    /**
+     * Feishu card update failed due to upstream error
+     */
+    502: {
+        message: string;
+    };
+};
+
+export type PostApiInternalChannelsFeishuUpdateCardError = PostApiInternalChannelsFeishuUpdateCardErrors[keyof PostApiInternalChannelsFeishuUpdateCardErrors];
+
 export type GetApiV1ModelsData = {
     body?: never;
     path?: never;

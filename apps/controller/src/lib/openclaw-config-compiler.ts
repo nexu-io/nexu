@@ -461,6 +461,9 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
+      "nexu-feishu-card": {
+        enabled: true,
+      },
       ...(hasMiniMaxOauth
         ? {
             "minimax-portal-auth": {

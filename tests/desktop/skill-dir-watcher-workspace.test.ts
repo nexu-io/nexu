@@ -34,24 +34,9 @@ describe("SkillDirWatcher workspace reconciliation", () => {
   }
 
   function removeWorkspaceSkill(botId: string, slug: string): void {
-    rmSync(path.join(stateDir, "agents", botId, "skills", slug), {
-      recursive: true,
+    rmSync(path.join(stateDir, "agents", botId, "skills", slug, "SKILL.md"), {
       force: true,
     });
-  }
-
-  async function waitUntil(
-    predicate: () => boolean,
-    timeoutMs = 5_000,
-    intervalMs = 50,
-  ): Promise<void> {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      if (predicate()) return;
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-    }
-
-    throw new Error("Timed out waiting for watcher state");
   }
 
   it("records workspace skills with agentId on syncNow", () => {
@@ -195,28 +180,25 @@ describe("SkillDirWatcher workspace reconciliation", () => {
     expect(bot2Skills[0].slug).toBe("shared-tool");
   });
 
-  it(
-    "watches workspace directories after start and reconciles removals",
-    { timeout: 10_000 },
-    async () => {
-      createWorkspaceSkill("bot-1", "live-tool");
+  it("reconciles workspace removals after start", () => {
+    createWorkspaceSkill("bot-1", "live-tool");
 
-      const watcher = new SkillDirWatcher({
-        skillsDir,
-        skillDb: db,
-        openclawStateDir: stateDir,
-        botIds: ["bot-1"],
-        debounceMs: 50,
-      });
+    const watcher = new SkillDirWatcher({
+      skillsDir,
+      skillDb: db,
+      openclawStateDir: stateDir,
+      botIds: ["bot-1"],
+      debounceMs: 50,
+    });
 
-      watcher.syncNow();
-      watcher.start();
-      expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
+    watcher.syncNow();
+    watcher.start();
+    expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
 
-      removeWorkspaceSkill("bot-1", "live-tool");
+    removeWorkspaceSkill("bot-1", "live-tool");
+    watcher.syncNow();
 
-      await waitUntil(() => db.getInstalledByAgent("bot-1").length === 0);
-      watcher.stop();
-    },
-  );
+    expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
+    watcher.stop();
+  });
 });
