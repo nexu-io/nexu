@@ -62,6 +62,8 @@ type ResolvedSkillInfo = {
   source: string | null;
 };
 
+const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
+
 const EMPTY_ANALYTICS_STATE: AnalyticsState = {
   sessionStartSent: false,
   sentUserMessageIds: [],
@@ -160,7 +162,7 @@ export class AnalyticsService {
   ) {}
 
   async poll(): Promise<void> {
-    if (!this.env.posthogApiKey || !this.env.posthogHost) {
+    if (!this.env.posthogApiKey) {
       return;
     }
 
@@ -553,7 +555,7 @@ export class AnalyticsService {
   }
 
   private getPosthogCaptureUrl(): string | null {
-    const host = this.env.posthogHost?.trim();
+    const host = this.env.posthogHost?.trim() || DEFAULT_POSTHOG_HOST;
     if (!host) {
       return null;
     }

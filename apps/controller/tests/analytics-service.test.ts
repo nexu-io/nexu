@@ -107,6 +107,9 @@ describe("AnalyticsService transport", () => {
   });
 
   it("does not send when host is not configured", async () => {
+    vi.mocked(proxyFetch).mockResolvedValue(
+      new Response(null, { status: 200 }),
+    );
     const service = new AnalyticsService(
       createEnv({ posthogHost: undefined }),
       {
@@ -125,7 +128,9 @@ describe("AnalyticsService transport", () => {
       Date.now(),
     );
 
-    expect(proxyFetch).not.toHaveBeenCalled();
+    expect(proxyFetch).toHaveBeenCalledTimes(1);
+    const [url] = vi.mocked(proxyFetch).mock.calls[0] ?? [];
+    expect(url).toBe("https://us.i.posthog.com/i/v0/e/");
   });
 
   it("does not send when API key is not configured", async () => {
