@@ -126,6 +126,15 @@ describe("RewardsPage", () => {
     expect(markup).toContain("reward.whatsapp.name");
   });
 
+  it("renders svg-based reward icons for Xiaohongshu and Jike instead of letter placeholders", () => {
+    const markup = renderRewardsPage();
+
+    expect(markup).toContain('data-reward-task-icon="xiaohongshu"');
+    expect(markup).toContain('data-reward-task-icon="jike"');
+    expect(markup).not.toContain(">R<");
+    expect(markup).not.toContain(">J<");
+  });
+
   it("renders the source reward rules link in the header", () => {
     const markup = renderRewardsPage();
 

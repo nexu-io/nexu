@@ -259,6 +259,7 @@ describe("WorkspaceLayout", () => {
 
     expect(markup).toContain("layout.sidebar.loginTitle");
     expect(markup).toContain("layout.sidebar.loginSubtitle");
+    expect(markup).toContain('data-sidebar-growth-card="login"');
     expect(markup).not.toContain("layout.sidebar.rewardsTitle");
   });
 
@@ -270,7 +271,7 @@ describe("WorkspaceLayout", () => {
     expect(markup).not.toContain("layout.sidebar.rewardsTitle");
   });
 
-  it("renders the logged-in rewards banner with a separate balance entry", () => {
+  it("renders the logged-in rewards card with a separate balance entry", () => {
     const markup = renderWorkspaceLayout(
       "/workspace/sessions/sess-1",
       {
@@ -296,8 +297,10 @@ describe("WorkspaceLayout", () => {
       },
     );
 
+    expect(markup).toContain('data-sidebar-growth-card="rewards"');
     expect(markup).toContain("layout.sidebar.rewardsTitle");
     expect(markup).toContain("4/10");
+    expect(markup).toContain('data-sidebar-rewards-balance="true"');
     expect(markup).toContain("layout.sidebar.balanceLabel");
     expect(markup).toContain("200 layout.sidebar.balanceUnit");
     expect(markup).not.toContain("layout.sidebar.loginTitle");

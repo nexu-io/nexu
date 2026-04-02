@@ -1,5 +1,6 @@
+import { openExternalUrl } from "@/lib/desktop-links";
 import { cn } from "@/lib/utils";
-import { Cpu, Gift, X, Zap } from "lucide-react";
+import { ArrowUpRight, Settings2, X, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
@@ -10,20 +11,18 @@ export interface BudgetWarningBannerProps {
 
 const statusConfig = {
   warning: {
-    titleKey: "budget.banner.warningTitle",
-    descriptionKey: "budget.banner.warningDescription",
-    border: "border-[#f5dfa0]",
-    bg: "bg-[linear-gradient(135deg,#fffbec_0%,#fff8dc_100%)]",
-    textClass: "text-[#7a5a08]",
-    taskClass: "bg-[#eab308] text-[#3b2f0b] hover:bg-[#dca40a]",
+    headlineKey: "budget.banner.warningHeadline",
+    border: "border-[var(--color-warning)]/25",
+    bg: "bg-[var(--color-warning)]/6",
+    accentColor: "var(--color-warning)",
+    primaryClass: "bg-[#EDC337] text-[#3B2F0B] hover:bg-[#dfb72e]",
   },
   depleted: {
-    titleKey: "budget.banner.depletedTitle",
-    descriptionKey: "budget.banner.depletedDescription",
-    border: "border-[#f5c6c0]",
-    bg: "bg-[linear-gradient(135deg,#fff5f4_0%,#fff0ee_100%)]",
-    textClass: "text-[#9b2c1e]",
-    taskClass: "bg-[#ff5a3d] text-white hover:bg-[#ed4729]",
+    headlineKey: "budget.banner.depletedHeadline",
+    border: "border-[var(--color-danger)]/25",
+    bg: "bg-[var(--color-danger)]/6",
+    accentColor: "var(--color-danger)",
+    primaryClass: "bg-[#F93920] text-white hover:bg-[#ea311a]",
   },
 } as const;
 
@@ -34,13 +33,12 @@ export function BudgetWarningBanner({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const config = statusConfig[status];
-  const accentColor =
-    status === "depleted" ? "var(--color-danger)" : "var(--color-warning)";
   const buttonClass =
     "inline-flex items-center justify-center gap-1.5 rounded-[8px] px-[14px] py-[5px] text-[12px] font-medium transition-colors";
 
   return (
     <div
+      data-budget-banner-status={status}
       className={cn(
         "relative rounded-xl border px-5 py-4",
         config.border,
@@ -61,37 +59,23 @@ export function BudgetWarningBanner({
           <div
             className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px]"
             style={{
-              background: `color-mix(in srgb, ${accentColor} 15%, transparent)`,
+              background: `color-mix(in srgb, ${config.accentColor} 15%, transparent)`,
             }}
           >
-            <Zap size={14} style={{ color: accentColor }} />
+            <Zap size={14} style={{ color: config.accentColor }} />
           </div>
-          <div
-            className={cn(
-              "pt-[3px] text-[13px] font-semibold",
-              config.textClass,
-            )}
-          >
-            {t(config.titleKey)}
+          <div className="pt-[3px] text-[13px] font-semibold leading-snug">
+            <span style={{ color: config.accentColor }}>
+              {t(config.headlineKey)}
+            </span>
           </div>
         </div>
 
         <div className="mt-3 pl-10">
-          <p className={cn("text-[12px] leading-[1.6]", config.textClass)}>
-            {t(config.descriptionKey)}
-          </p>
-          <div className="mb-1.5 mt-3 text-[11px] text-text-tertiary">
+          <div className="mb-1.5 text-[11px] text-text-tertiary">
             {t("budget.banner.actionsLabel")}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => navigate("/workspace/rewards")}
-              className={cn(buttonClass, config.taskClass)}
-            >
-              <Gift size={12} />
-              {t("budget.banner.earnCredits")}
-            </button>
             <button
               type="button"
               onClick={() => navigate("/workspace/models?tab=providers")}
@@ -100,8 +84,18 @@ export function BudgetWarningBanner({
                 "border border-border bg-white text-text-secondary hover:bg-surface-1",
               )}
             >
-              <Cpu size={12} />
+              <Settings2 size={12} />
               {t("budget.banner.byok")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void openExternalUrl("https://nexu.io");
+              }}
+              className={cn(buttonClass, config.primaryClass)}
+            >
+              <ArrowUpRight size={12} />
+              {t("budget.banner.upgrade")}
             </button>
           </div>
         </div>

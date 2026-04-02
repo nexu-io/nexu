@@ -802,71 +802,76 @@ function WorkspaceLayoutInner() {
 
         {/* Sidebar growth card */}
         <div
-          className="px-3 pb-1 shrink-0"
+          className="pb-1 shrink-0"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
           {rewardsCardLoading ? (
-            <div
-              data-rewards-card-loading="true"
-              className="w-full rounded-[14px] border border-border-subtle bg-gradient-to-r from-surface-2 via-surface-1 to-surface-2 px-3 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
-            >
-              <div className="animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="h-7 w-7 rounded-[8px] bg-border/80" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-24 rounded-full bg-border/80" />
-                    <div className="h-2.5 w-20 rounded-full bg-border/60" />
-                  </div>
-                  <div className="h-3 w-8 rounded-full bg-border/70" />
+            <div data-rewards-card-loading="true" className="animate-pulse">
+              <div className="mx-3 mb-2 flex items-center gap-3 rounded-[12px] border border-[#F5DFC0]/40 bg-gradient-to-br from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] px-3.5 py-3">
+                <div className="h-7 w-7 rounded-[8px] bg-[#F6D7A8]" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-28 rounded-full bg-[#E7D4B5]" />
+                  <div className="h-2.5 w-14 rounded-full bg-[#F0E1C8]" />
                 </div>
-                <div className="mt-3 h-px bg-border/70" />
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="h-2.5 w-14 rounded-full bg-border/60" />
-                  <div className="h-2.5 w-16 rounded-full bg-border/70" />
+                <div className="h-3 w-8 rounded-full bg-[#E7D4B5]" />
+              </div>
+              <div className="px-3 mb-1.5">
+                <div className="w-full rounded-[8px] px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2.5 w-2.5 rounded-full bg-border/70" />
+                      <div className="h-2.5 w-12 rounded-full bg-border/70" />
+                    </div>
+                    <div className="h-2.5 w-16 rounded-full bg-border/60" />
+                  </div>
                 </div>
               </div>
             </div>
           ) : !cloudConnected ? (
-            <button
-              type="button"
-              onClick={() => void handleCloudConnect()}
-              className="group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-primary)]"
-            >
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-border bg-surface-2">
-                {cloudConnecting ? (
-                  <Sparkles
-                    size={12}
-                    className="animate-pulse text-text-secondary"
-                  />
-                ) : (
-                  <img
-                    src="/brand/logo-black-1.svg"
-                    alt="nexu"
-                    className="h-3.5 w-3.5"
-                  />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-medium text-text-secondary">
-                  {t("layout.sidebar.loginTitle")}
+            <div className="px-3 mb-1.5">
+              <button
+                type="button"
+                data-sidebar-growth-card="login"
+                onClick={() => void handleCloudConnect()}
+                className="group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-primary)]"
+              >
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-border bg-surface-2">
+                  {cloudConnecting ? (
+                    <Sparkles
+                      size={12}
+                      className="animate-pulse text-text-secondary"
+                    />
+                  ) : (
+                    <img
+                      src="/brand/logo-black-1.svg"
+                      alt="nexu"
+                      className="h-3.5 w-3.5"
+                    />
+                  )}
                 </div>
-                <div className="mt-0.5 text-[10px] leading-none text-text-muted">
-                  {cloudConnecting
-                    ? t("layout.sidebar.loginPending")
-                    : t("layout.sidebar.loginSubtitle")}
+                <div className="min-w-0 flex-1 text-left">
+                  <div className="truncate text-[11px] font-medium text-text-secondary">
+                    {t("layout.sidebar.loginTitle")}
+                  </div>
+                  <div className="mt-0.5 text-[10px] leading-none text-text-muted">
+                    {cloudConnecting
+                      ? t("layout.sidebar.loginPending")
+                      : t("layout.sidebar.loginSubtitle")}
+                  </div>
                 </div>
-              </div>
-              <ChevronRight
-                size={12}
-                className="shrink-0 text-text-muted transition-transform duration-200 group-hover:translate-x-0.5"
-              />
-            </button>
+                <ChevronRight
+                  size={12}
+                  className="shrink-0 text-text-muted transition-transform duration-200 group-hover:translate-x-0.5"
+                />
+              </button>
+            </div>
           ) : (
             <div>
               {shouldShowRewardsBanner && (
                 <Link
                   to="/workspace/rewards"
-                  className="group mb-2 flex items-center gap-3 rounded-[12px] border border-[#F5DFC0]/50 bg-[linear-gradient(135deg,#FFF8F0_0%,#FFFAF5_50%,#FFF5EB_100%)] px-3.5 py-3 shadow-[0_1px_3px_rgba(245,200,120,0.08)] transition-all duration-200 hover:border-[#F0D0A0]/60 hover:shadow-[0_2px_8px_rgba(245,200,120,0.15)]"
+                  data-sidebar-growth-card="rewards"
+                  className="group mx-3 mb-2 flex items-center gap-3 rounded-[12px] border border-[#F5DFC0]/50 bg-gradient-to-br from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] px-3.5 py-3 shadow-[0_1px_3px_rgba(245,200,120,0.08)] transition-all duration-200 hover:border-[#F0D0A0]/60 hover:shadow-[0_2px_8px_rgba(245,200,120,0.15)]"
                   onClick={() => {
                     track("workspace_rewards_click");
                     track("workspace_sidebar_click", { target: "rewards" });
@@ -887,28 +892,31 @@ function WorkspaceLayoutInner() {
                   />
                 </Link>
               )}
-              <Link
-                to="/workspace/rewards"
-                className="block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5"
-                onClick={() => {
-                  track("workspace_rewards_click");
-                  track("workspace_sidebar_click", { target: "credits" });
-                }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="text-[11px] text-[var(--color-brand-primary)]">
-                      ✦
-                    </span>
-                    <span className="truncate text-[11px] font-semibold leading-none text-text-secondary">
-                      {t("layout.sidebar.balanceLabel")}
+              <div className="px-3 mb-1.5 relative">
+                <Link
+                  to="/workspace/rewards"
+                  data-sidebar-rewards-balance="true"
+                  className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5"
+                  onClick={() => {
+                    track("workspace_rewards_click");
+                    track("workspace_sidebar_click", { target: "credits" });
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="text-[11px] text-[var(--color-brand-primary)]">
+                        ✦
+                      </span>
+                      <span className="truncate text-[11px] font-semibold leading-none text-text-secondary">
+                        {t("layout.sidebar.balanceLabel")}
+                      </span>
+                    </div>
+                    <span className="shrink-0 tabular-nums text-[11px] font-medium leading-none text-text-secondary">
+                      {rewardBalanceValue}
                     </span>
                   </div>
-                  <span className="shrink-0 tabular-nums text-[11px] font-medium leading-none text-text-secondary">
-                    {rewardBalanceValue}
-                  </span>
-                </div>
-              </Link>
+                </Link>
+              </div>
             </div>
           )}
         </div>

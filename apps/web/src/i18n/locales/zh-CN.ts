@@ -330,6 +330,10 @@ const zhCN = {
     "确认今日打卡后，+${n} 会加入你的奖励额度。每天可领取一次。",
   "budget.banner.warningTitle": "云端额度即将耗尽",
   "budget.banner.depletedTitle": "云端额度已用尽",
+  "budget.banner.warningHeadline":
+    "套餐额度即将耗尽，可采取以下方式避免任务中断",
+  "budget.banner.depletedHeadline":
+    "套餐额度已用尽（明天重置），可采取以下方式继续使用",
   "budget.banner.description":
     "完成任务赚取更多积分，或使用自带 API Key (BYOK) 继续使用。",
   "budget.banner.warningDescription":

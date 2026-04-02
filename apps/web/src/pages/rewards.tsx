@@ -1,23 +1,12 @@
-import {
-  FeishuIcon,
-  WechatIcon,
-  WhatsAppIcon,
-} from "@/components/platform-icons";
 import { formatRewardAmount } from "@/components/rewards/home-rewards-teaser";
+import { RewardTaskIcon } from "@/components/rewards/reward-task-icon";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { openExternalUrl } from "@/lib/desktop-links";
 import { downloadRandomRewardShareAsset } from "@/lib/reward-share-assets";
 import { cn } from "@/lib/utils";
 import type { RewardTaskStatus } from "@nexu/shared";
-import {
-  CalendarCheck2,
-  Download,
-  ExternalLink,
-  Gift,
-  Github,
-  Loader2,
-} from "lucide-react";
+import { Check, Download, ExternalLink, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -31,85 +20,6 @@ const REWARD_GROUPS: Array<{
   { key: "opensource", labelKey: "rewards.group.opensource" },
   { key: "social", labelKey: "rewards.group.social" },
 ];
-
-function XIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#000000">
-      <title>X</title>
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-function RedditIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#FF4500">
-      <title>Reddit</title>
-      <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 0-.463.327.327 0 0 0-.462 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.231-.094z" />
-    </svg>
-  );
-}
-
-function LinkedInIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#0A66C2">
-      <title>LinkedIn</title>
-      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-    </svg>
-  );
-}
-
-function FacebookIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#1877F2">
-      <title>Facebook</title>
-      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-    </svg>
-  );
-}
-
-function RewardTaskIcon({
-  icon,
-  size = 16,
-}: {
-  icon: RewardTaskStatus["icon"];
-  size?: number;
-}) {
-  switch (icon) {
-    case "calendar":
-      return <CalendarCheck2 size={size} className="text-amber-500" />;
-    case "github":
-      return <Github size={size} className="text-[#111827]" />;
-    case "x":
-      return <XIcon size={size} />;
-    case "reddit":
-      return <RedditIcon size={size} />;
-    case "xiaohongshu":
-      return (
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-[#ff2442] text-[10px] font-bold text-white">
-          R
-        </span>
-      );
-    case "lingying":
-      return <LinkedInIcon size={size} />;
-    case "jike":
-      return (
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#ffe411] text-[10px] font-bold text-black">
-          J
-        </span>
-      );
-    case "wechat":
-      return <WechatIcon size={size + 2} />;
-    case "feishu":
-      return <FeishuIcon size={size + 2} />;
-    case "facebook":
-      return <FacebookIcon size={size} />;
-    case "whatsapp":
-      return <WhatsAppIcon size={size + 2} />;
-    default:
-      return <Gift size={size} className="text-text-secondary" />;
-  }
-}
 
 function RewardConfirmModal({
   task,
@@ -137,40 +47,40 @@ function RewardConfirmModal({
   const canConfirm = !isImage || imageDownloaded;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
         type="button"
         aria-label="Close reward confirmation"
         className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
         onClick={onCancel}
       />
-      <div className="relative w-full max-w-[360px] rounded-[24px] border border-border bg-white p-5 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
+      <div className="relative mx-4 w-full max-w-[340px] rounded-2xl border border-border bg-surface-1 p-5 shadow-[var(--shadow-dropdown)] animate-in fade-in zoom-in-95 duration-200">
         <div className="flex flex-col items-center text-center">
           <div
             className={cn(
-              "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border",
+              "mb-4 flex h-11 w-11 items-center justify-center rounded-xl border",
               isDaily
-                ? "border-amber-200/80 bg-amber-50"
+                ? "border-amber-200/60 bg-amber-50"
                 : "border-[var(--color-success)]/20 bg-[var(--color-success)]/8",
             )}
           >
             <RewardTaskIcon icon={task.icon} size={22} />
           </div>
 
-          <h2 className="text-[14px] font-semibold text-text-primary">
+          <h2 className="mb-1 text-[14px] font-semibold text-text-primary">
             {t("budget.confirm.title").replace(
               "{channel}",
               t(`reward.${task.id}.name`),
             )}
           </h2>
-          <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
+          <p className="text-[12px] leading-relaxed text-text-secondary">
             {t(descKey).replace("${n}", amount)}
           </p>
-          <div className="mt-3 inline-flex items-center rounded-full bg-[var(--color-success)]/8 px-3 py-1 text-[13px] font-semibold leading-none text-[var(--color-success)]">
-            +${amount}
+          <div className="mb-4 mt-1 inline-flex items-center rounded-full bg-[var(--color-success)]/8 px-3 py-1 text-[13px] font-semibold leading-none text-[var(--color-success)] tabular-nums">
+            +{amount} {t("layout.sidebar.balanceUnit")}
           </div>
 
-          {isImage ? (
+          {isImage && !imageDownloaded ? (
             <button
               type="button"
               onClick={async () => {
@@ -181,20 +91,25 @@ function RewardConfirmModal({
                   toast.error(t("rewards.downloadFailed"));
                 }
               }}
-              className="mt-4 inline-flex h-[38px] w-full items-center justify-center gap-2 rounded-[12px] bg-[var(--color-brand-primary)] px-4 text-[13px] font-medium text-white transition hover:opacity-90"
+              className="mb-3 flex h-[36px] w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--color-brand-primary)] text-[13px] font-medium text-white transition-all hover:opacity-90 active:scale-[0.98]"
             >
               <Download size={14} />
-              {imageDownloaded
-                ? `${t("budget.confirm.downloadImage")} ✓`
-                : t("budget.confirm.downloadImage")}
+              {t("budget.confirm.downloadImage")}
             </button>
           ) : null}
 
-          <div className="mt-4 flex w-full items-center gap-2">
+          {isImage && imageDownloaded ? (
+            <div className="mb-3 flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-success)]">
+              <Check size={14} />
+              {t("budget.confirm.downloadImage")} ✓
+            </div>
+          ) : null}
+
+          <div className="flex w-full items-center gap-2">
             <button
               type="button"
               onClick={onCancel}
-              className="h-[38px] flex-1 rounded-[12px] border border-border px-4 text-[13px] font-medium text-text-secondary transition hover:bg-surface-2"
+              className="h-[36px] flex-1 rounded-[10px] border border-border px-4 text-[13px] font-medium text-text-secondary transition-colors hover:bg-surface-2"
             >
               {t("budget.confirm.cancel")}
             </button>
@@ -202,7 +117,7 @@ function RewardConfirmModal({
               type="button"
               disabled={!canConfirm || submitting}
               onClick={() => void onConfirm()}
-              className="inline-flex h-[38px] flex-1 items-center justify-center gap-2 rounded-[12px] bg-neutral-900 px-4 text-[13px] font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-[36px] flex-1 items-center justify-center gap-2 rounded-[10px] bg-neutral-900 px-4 text-[13px] font-medium text-white transition-all hover:bg-neutral-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#909CA3] disabled:text-white/95 disabled:hover:bg-[#909CA3]"
             >
               {submitting ? (
                 <Loader2 size={14} className="animate-spin" />

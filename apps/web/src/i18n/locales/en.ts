@@ -339,6 +339,10 @@ const en = {
     "Confirm today's check-in to add +${n} to your reward balance. This can be claimed once per day.",
   "budget.banner.warningTitle": "Credits running low",
   "budget.banner.depletedTitle": "Credits depleted",
+  "budget.banner.warningHeadline":
+    "Hosted credits are running low. Take one of the actions below to avoid interruptions.",
+  "budget.banner.depletedHeadline":
+    "Hosted credits are used up for now (reset tomorrow). Take one of the actions below to keep going.",
   "budget.banner.description":
     "Complete tasks to earn more credits, or use your own API key (BYOK) to continue.",
   "budget.banner.warningDescription":
