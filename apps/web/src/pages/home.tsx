@@ -713,15 +713,15 @@ export function HomePage() {
               </div>
             </div>
           </div>
-        </div>
 
-        {showSeedancePromo ? (
-          <SeedancePromoBanner
-            isDismissed={false}
-            onOpen={() => setSeedancePromoOpen(true)}
-            onDismiss={dismissSeedancePromo}
-          />
-        ) : null}
+          {showSeedancePromo ? (
+            <SeedancePromoBanner
+              isDismissed={false}
+              onOpen={() => setSeedancePromoOpen(true)}
+              onDismiss={dismissSeedancePromo}
+            />
+          ) : null}
+        </div>
 
         {modalChannel && (
           <ChannelConnectModal
@@ -858,6 +858,14 @@ export function HomePage() {
             </div>
           </div>
         </div>
+
+        {showSeedancePromo ? (
+          <SeedancePromoBanner
+            isDismissed={false}
+            onOpen={() => setSeedancePromoOpen(true)}
+            onDismiss={dismissSeedancePromo}
+          />
+        ) : null}
 
         {/* ═══ MIDDLE: Channels panel ═══ */}
         <div className="card card-static">
@@ -1063,14 +1071,6 @@ export function HomePage() {
             )}
           </div>
         </div>
-
-        {showSeedancePromo ? (
-          <SeedancePromoBanner
-            isDismissed={false}
-            onOpen={() => setSeedancePromoOpen(true)}
-            onDismiss={dismissSeedancePromo}
-          />
-        ) : null}
 
         {/* Activity Feed */}
         <ActivityFeed />
