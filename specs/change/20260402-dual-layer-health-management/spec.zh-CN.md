@@ -140,6 +140,10 @@ interface HealthResponse {
     // OpenClaw 已感知并在处理 — 不计为失败
     保持 consecutiveFailures 不变（不递增）
     将 wedge 阈值延长至 24（双倍宽限期）
+    // 但是：抑制时间上限为 SELF_HEAL_TIMEOUT（默认 10 分钟）。
+    // 如果 degraded+selfHealing 持续超过此时间，视为 unhealthy。
+    if degradedDuration >= SELF_HEAL_TIMEOUT:
+      触发 Desktop 级干预
 
   if status == "maintenance":
     // 有意操作 — 完全抑制
@@ -195,6 +199,9 @@ interface EscalationRequested {
   type: "escalation_requested";
   reason: string;            // "channel_restart_loop_exhausted" | "auth_refresh_failed"
   context: Record<string, unknown>;  // Sentry/诊断的上下文
+  // 重要：context 在发出前必须经过脱敏 — 不得包含 token、secret 或凭据。
+  // 必须使用现有的脱敏层（redaction.ts）作为强制过滤器，
+  // 仅允许白名单字段通过。
   suggestedAction?: "restart_gateway" | "notify_user" | "report_sentry";
   timestamp: number;
 }
@@ -375,8 +382,11 @@ Desktop 探针：0 次连续失败
 
 **触发**：用户在任意已连接 IM channel 中发送 `/fix`。
 
+**授权**：`/fix`（和 `/diagnose`）需要操作员级别授权。只有指定的管理员用户或白名单 channel 可以执行这些命令。在共享 channel 中，gateway 必须在执行任何修复操作前验证发送者身份是否在操作员白名单中。未授权的发送者收到"权限不足"响应。
+
 **流程**：
-1. Gateway 调用 OpenClaw `run_fix(scope: "safe")`
+1. 验证发送者是否为授权操作员（未授权则拒绝）
+2. Gateway 调用 OpenClaw `run_fix(scope: "safe")`
 2. OpenClaw 执行安全修复（auth 刷新、channel 重启、session 清理）
 3. 结果返回至 IM
 4. 如果安全修复不够，IM 询问："部分问题需要重启 gateway（短暂断连）。是否继续？回复 `/fix confirm`"

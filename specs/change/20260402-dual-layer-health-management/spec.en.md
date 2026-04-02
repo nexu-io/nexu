@@ -140,6 +140,10 @@ on probe response:
     // OpenClaw is aware and working on it — don't count as failure
     hold consecutiveFailures (no increment)
     extend wedge threshold to 24 (double grace period)
+    // BUT: cap suppression at SELF_HEAL_TIMEOUT (default 10 min).
+    // If degraded+selfHealing persists beyond this, treat as unhealthy.
+    if degradedDuration >= SELF_HEAL_TIMEOUT:
+      trigger Desktop-level intervention
 
   if status == "maintenance":
     // intentional operation — fully suppress
@@ -195,6 +199,9 @@ interface EscalationRequested {
   type: "escalation_requested";
   reason: string;            // "channel_restart_loop_exhausted" | "auth_refresh_failed"
   context: Record<string, unknown>;  // diagnostic context for Sentry/diagnostics
+  // IMPORTANT: context MUST be redacted before emission — no tokens, secrets,
+  // or credentials. Use the existing redaction layer (redaction.ts) as the
+  // mandatory filter. Only allowlisted fields pass through.
   suggestedAction?: "restart_gateway" | "notify_user" | "report_sentry";
   timestamp: number;
 }
@@ -375,8 +382,11 @@ Escalations: none
 
 **Trigger**: user sends `/fix` in any connected IM channel.
 
+**Authorization**: `/fix` (and `/diagnose`) require operator-level authorization. Only designated admin users or allowlisted channels may execute these commands. In shared channels, the gateway MUST verify the sender identity against an operator allowlist before executing any repair action. Unauthorized senders receive a "permission denied" response.
+
 **Flow**:
-1. Gateway calls OpenClaw `run_fix(scope: "safe")`
+1. Verify sender is an authorized operator (reject if not)
+2. Gateway calls OpenClaw `run_fix(scope: "safe")`
 2. OpenClaw executes safe repairs (auth refresh, channel restart, session cleanup)
 3. Results returned to IM
 4. If safe repairs insufficient, IM asks: "Some issues require restarting the gateway (brief disconnection). Proceed? Reply `/fix confirm`"
