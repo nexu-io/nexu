@@ -116,6 +116,13 @@ function buildLinkModelsUrl(baseUrl: string): string {
   ).toString();
 }
 
+function buildCloudMeUrl(baseUrl: string): string {
+  return new URL(
+    "api/v1/me",
+    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
+  ).toString();
+}
+
 type CloudPollResponse = {
   status: string;
   apiKey?: string;
@@ -403,6 +410,12 @@ export class NexuConfigStore {
     const { activeProfile } =
       await this.readConfiguredDesktopCloudProfile(config);
     return linkUrl ?? activeProfile.linkUrl ?? activeProfile.cloudUrl;
+  }
+
+  private async resolveDesktopCloudApiUrl(config: NexuConfig): Promise<string> {
+    const { activeProfile } =
+      await this.readConfiguredDesktopCloudProfile(config);
+    return activeProfile.cloudUrl;
   }
 
   async reconcileConfiguredDesktopCloudState(): Promise<void> {
@@ -1497,6 +1510,26 @@ export class NexuConfigStore {
     }
   }
 
+  private async fetchDesktopCloudUserId(
+    cloudApiUrl: string,
+    apiKey: string,
+  ): Promise<string | null> {
+    try {
+      const res = await proxyFetch(buildCloudMeUrl(cloudApiUrl), {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        timeoutMs: 10000,
+      });
+      if (!res.ok) {
+        return null;
+      }
+
+      const data = (await res.json()) as { id?: unknown };
+      return typeof data.id === "string" && data.id.length > 0 ? data.id : null;
+    } catch {
+      return null;
+    }
+  }
+
   private async hydrateDesktopCloudModels(forceRefresh = false): Promise<void> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
@@ -1504,11 +1537,14 @@ export class NexuConfigStore {
       config,
       cloud.linkUrl,
     );
+    const cloudApiUrl = await this.resolveDesktopCloudApiUrl(config);
+    let userId = cloud.userId ?? null;
 
     if (cloud.connected && cloud.linkUrl !== linkUrl) {
       await this.setDesktopCloudState({
         connected: cloud.connected,
         polling: cloud.polling,
+        userId,
         userName: cloud.userName ?? null,
         userEmail: cloud.userEmail ?? null,
         connectedAt: cloud.connectedAt ?? null,
@@ -1516,6 +1552,27 @@ export class NexuConfigStore {
         apiKey: cloud.apiKey ?? null,
         models: cloud.models ?? [],
       });
+    }
+
+    if (cloud.connected && cloud.apiKey && !userId) {
+      const fetchedUserId = await this.fetchDesktopCloudUserId(
+        cloudApiUrl,
+        cloud.apiKey,
+      );
+      if (fetchedUserId) {
+        userId = fetchedUserId;
+        await this.setDesktopCloudState({
+          connected: cloud.connected,
+          polling: cloud.polling,
+          userId,
+          userName: cloud.userName ?? null,
+          userEmail: cloud.userEmail ?? null,
+          connectedAt: cloud.connectedAt ?? null,
+          linkUrl,
+          apiKey: cloud.apiKey,
+          models: cloud.models ?? [],
+        });
+      }
     }
 
     if (
@@ -1534,7 +1591,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: cloud.connected,
       polling: cloud.polling,
-      userId: cloud.userId ?? null,
+      userId,
       userName: cloud.userName ?? null,
       userEmail: cloud.userEmail ?? null,
       connectedAt: cloud.connectedAt ?? null,

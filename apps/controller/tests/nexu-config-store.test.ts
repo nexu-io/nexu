@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import { NexuConfigStore } from "../src/store/nexu-config-store.js";
 
@@ -16,8 +16,6 @@ describe("NexuConfigStore", () => {
       port: 3010,
       host: "127.0.0.1",
       webUrl: "http://localhost:5173",
-      nexuCloudUrl: "https://nexu.io",
-      nexuLinkUrl: "https://link.nexu.io",
       nexuHomeDir: path.join(rootDir, ".nexu"),
       nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
       artifactsIndexPath: path.join(
@@ -34,13 +32,11 @@ describe("NexuConfigStore", () => {
       openclawStateDir: path.join(rootDir, ".openclaw"),
       openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
       openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
+      userSkillsDir: path.join(rootDir, ".agents", "skills"),
+      openclawBuiltinExtensionsDir: null,
       openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
+      bundledRuntimePluginsDir: path.join(rootDir, "bundled-runtime-plugins"),
       runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
-      openclawCuratedSkillsDir: path.join(
-        rootDir,
-        ".openclaw",
-        "bundled-skills",
-      ),
       openclawRuntimeModelStatePath: path.join(
         rootDir,
         ".openclaw",
@@ -48,6 +44,7 @@ describe("NexuConfigStore", () => {
       ),
       skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
       skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+      analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
       staticSkillsDir: undefined,
       platformTemplatesDir: undefined,
       openclawWorkspaceTemplatesDir: path.join(
@@ -65,10 +62,15 @@ describe("NexuConfigStore", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
+      openclawLaunchdLabel: null,
+      posthogApiKey: undefined,
+      posthogHost: undefined,
     };
   });
 
   afterEach(async () => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     await rm(rootDir, { recursive: true, force: true });
   });
 
@@ -304,5 +306,65 @@ describe("NexuConfigStore", () => {
       "Default",
       "Staging",
     ]);
+  });
+
+  it("backfills missing desktop cloud userId from /api/v1/me during bootstrap", async () => {
+    const store = new NexuConfigStore(env);
+
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [],
+          runtime: {},
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-03-23T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "secret-api-key",
+              models: [{ id: "m1", name: "Model 1" }],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      expect(String(input)).toBe("https://nexu.io/api/v1/me");
+      expect(init?.headers).toEqual({ Authorization: "Bearer secret-api-key" });
+      return new Response(JSON.stringify({ id: "user-backfilled" }), {
+        status: 200,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await store.prepareDesktopCloudModelsForBootstrap();
+
+    const config = await store.getConfig();
+    const desktop = config.desktop as {
+      cloud?: {
+        userId?: string | null;
+        models?: Array<{ id: string; name: string }>;
+      };
+    };
+    expect(desktop.cloud?.userId).toBe("user-backfilled");
+    expect(desktop.cloud?.models).toEqual([{ id: "m1", name: "Model 1" }]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
