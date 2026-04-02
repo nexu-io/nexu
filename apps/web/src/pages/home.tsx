@@ -278,7 +278,7 @@ export function HomePage() {
   const [seedancePromoOpen, setSeedancePromoOpen] = useState(false);
   const [showSeedancePromo, setShowSeedancePromo] = useState(() => {
     try {
-      return localStorage.getItem(SEEDANCE_PROMO_DISMISS_KEY) !== "1";
+      return sessionStorage.getItem(SEEDANCE_PROMO_DISMISS_KEY) !== "1";
     } catch {
       return true;
     }
@@ -511,7 +511,7 @@ export function HomePage() {
   const dismissSeedancePromo = useCallback(() => {
     setShowSeedancePromo(false);
     try {
-      localStorage.setItem(SEEDANCE_PROMO_DISMISS_KEY, "1");
+      sessionStorage.setItem(SEEDANCE_PROMO_DISMISS_KEY, "1");
     } catch {
       // noop
     }
