@@ -241,6 +241,12 @@ Use this snapshot to confirm that local controller/OpenClaw URLs resolve to dire
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
   - If `pnpm exec electron` works but `pnpm dev start desktop` still fails to boot, rebuild `@nexu/desktop` explicitly and inspect the current session `desktop.log`.
 
+- `pnpm dev start openclaw` fails before controller regenerates config
+  - This can happen when stale local state under `<repo>/.tmp/dev/openclaw/state/` is read first.
+  - Stop OpenClaw, then remove the stale `openclaw.json`, `openclaw-weixin/`, and `extensions/openclaw-weixin/` entries under that state directory.
+  - Retry after cleanup; if the problem persists, the broader fallback is removing `<repo>/.tmp/dev/openclaw/` entirely.
+  - This recovery restores startup, but it may not fix the underlying cause if stale state is recreated again.
+
 - `external requests fail only behind a corporate proxy`
   - Confirm the launching environment or packaged launchd manifests include the expected uppercase proxy env vars.
   - Inspect `desktop-diagnostics.json` and verify `proxy.source === "env"` when env proxying is expected.

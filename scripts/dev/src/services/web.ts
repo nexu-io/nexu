@@ -19,6 +19,7 @@ import {
   createWebInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
+import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
 import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
@@ -110,6 +111,7 @@ export async function startWebDevProcess(options: {
       ...process.env,
       NODE_OPTIONS: createNodeOptions(),
       ...createWebInjectedEnv(),
+      ...createDesktopInjectedEnv(),
       NEXU_DEV_WEB_RUN_ID: runId,
       NEXU_DEV_SESSION_ID: sessionId,
       NEXU_DEV_SERVICE: "web",

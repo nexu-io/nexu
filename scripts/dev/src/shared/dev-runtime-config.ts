@@ -216,6 +216,7 @@ export function createDesktopInjectedEnv(): NodeJS.ProcessEnv {
   const config = getScriptsDevRuntimeConfig();
 
   return {
+    VITE_DESKTOP_PLATFORM: process.platform,
     NEXU_DESKTOP_RUNTIME_MODE: "external",
     NEXU_DESKTOP_EXTERNAL_RUNTIME: "1",
     NEXU_CONTROLLER_PORT: String(config.controllerPort),
