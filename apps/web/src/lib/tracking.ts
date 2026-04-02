@@ -154,6 +154,9 @@ export function setUserId(userId: string): void {
 
   if (currentUserId && currentUserId !== userId) {
     posthog.reset();
+    if (persistentSuperProperties) {
+      posthog.register(persistentSuperProperties);
+    }
   }
 
   if (currentUserId === userId) {
