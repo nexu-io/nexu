@@ -27,6 +27,8 @@ type AnalyticsInitOptions = {
   apiKey: string;
   apiHost?: string;
   environment: string;
+  appName?: string;
+  appVersion?: string;
 };
 
 let analyticsInitialized = false;
@@ -91,12 +93,18 @@ export function initializeAnalytics({
   apiKey,
   apiHost,
   environment,
+  appName,
+  appVersion,
 }: AnalyticsInitOptions): void {
   if (analyticsInitialized || apiKey.trim().length === 0) {
     return;
   }
 
-  persistentSuperProperties = { environment };
+  persistentSuperProperties = normalizeProperties({
+    environment,
+    appName,
+    appVersion,
+  }) ?? { environment };
 
   const config: Partial<PostHogConfig> = {
     disable_session_recording: false,

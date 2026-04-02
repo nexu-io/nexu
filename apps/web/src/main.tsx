@@ -3,10 +3,11 @@ import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
+import { getApiInternalDesktopCloudStatus } from "../lib/api/sdk.gen";
+import webPackageJson from "../package.json";
 import { App } from "./app";
 import "./lib/api";
 import { LocaleProvider } from "./hooks/use-locale";
-import { authClient } from "./lib/auth-client";
 import {
   identify,
   initializeAnalytics,
@@ -22,37 +23,57 @@ if (posthogApiKey) {
     apiKey: posthogApiKey,
     apiHost: import.meta.env.VITE_POSTHOG_HOST,
     environment: import.meta.env.MODE,
+    appName: webPackageJson.name.replace("@nexu/", "nexu-"),
+    appVersion: webPackageJson.version,
   });
 }
 
 function AnalyticsSessionSync() {
-  const { data: session, isPending } = authClient.useSession();
-
   useEffect(() => {
-    if (isPending) {
-      return;
-    }
+    let cancelled = false;
 
-    const user = session?.user;
-    const userEmail = typeof user?.email === "string" ? user.email : null;
-    const userName = typeof user?.name === "string" ? user.name : null;
-    const userId =
-      user && typeof user.id === "string" && user.id.length > 0
-        ? user.id
-        : null;
+    const syncAnalyticsIdentity = async () => {
+      try {
+        const { data } = await getApiInternalDesktopCloudStatus();
+        if (cancelled) {
+          return;
+        }
 
-    if (!userId) {
-      resetAnalytics();
-      return;
-    }
+        const userId =
+          typeof data?.userId === "string" && data.userId.length > 0
+            ? data.userId
+            : null;
+        const userEmail =
+          typeof data?.userEmail === "string" ? data.userEmail : null;
+        const userName =
+          typeof data?.userName === "string" ? data.userName : null;
 
-    setUserId(userId);
+        if (!userId) {
+          resetAnalytics();
+          return;
+        }
 
-    identify({
-      email: userEmail,
-      name: userName,
-    });
-  }, [isPending, session]);
+        setUserId(userId);
+        identify({
+          email: userEmail,
+          name: userName,
+        });
+      } catch {
+        // Ignore transient fetch errors. Keep existing identity until a
+        // successful status refresh says otherwise.
+      }
+    };
+
+    void syncAnalyticsIdentity();
+    const interval = window.setInterval(() => {
+      void syncAnalyticsIdentity();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   return null;
 }

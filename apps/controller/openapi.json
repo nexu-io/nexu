@@ -1315,6 +1315,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -1380,6 +1384,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -1496,6 +1504,10 @@
                         "polling": {
                           "type": "boolean"
                         },
+                        "userId": {
+                          "type": "string",
+                          "nullable": true
+                        },
                         "userName": {
                           "type": "string",
                           "nullable": true
@@ -1561,6 +1573,10 @@
                               },
                               "polling": {
                                 "type": "boolean"
+                              },
+                              "userId": {
+                                "type": "string",
+                                "nullable": true
                               },
                               "userName": {
                                 "type": "string",
@@ -1631,6 +1647,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -1696,6 +1716,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -1798,6 +1822,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -1863,6 +1891,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -1974,6 +2006,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2039,6 +2075,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2127,6 +2167,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2192,6 +2236,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2307,6 +2355,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2372,6 +2424,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2460,6 +2516,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2525,6 +2585,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2634,6 +2698,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2699,6 +2767,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",

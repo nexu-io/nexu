@@ -27,6 +27,7 @@ import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
   getAppInfo,
+  getDesktopCloudStatus,
   getDiagnosticsInfo,
   getRuntimeConfig,
   getRuntimeState,
@@ -56,10 +57,19 @@ const posthogHost =
     : window.nexuHost.bootstrap.posthogHost);
 const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
+const posthogSuperProperties = {
+  environment: import.meta.env.MODE,
+  appName: "nexu-desktop",
+  appVersion:
+    typeof window === "undefined"
+      ? "unknown"
+      : window.nexuHost.bootstrap.buildInfo.version,
+};
 
 let rendererSentryInitialized = false;
 let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
+let currentPosthogUserId: string | null = null;
 
 function sendRendererStartupProbe(
   stage: string,
@@ -125,7 +135,7 @@ function initializePostHogTelemetry(): void {
     autocapture: true,
     disable_session_recording: false,
     loaded: (client) => {
-      client.register({ environment: import.meta.env.MODE });
+      client.register(posthogSuperProperties);
     },
   };
 
@@ -135,6 +145,47 @@ function initializePostHogTelemetry(): void {
 
   posthog.init(posthogApiKey, config);
   posthogTelemetryInitialized = true;
+}
+
+function syncPostHogIdentity(input: {
+  userId?: string | null;
+  userEmail?: string | null;
+  userName?: string | null;
+}): void {
+  if (!posthogTelemetryInitialized) {
+    return;
+  }
+
+  const userId =
+    typeof input.userId === "string" && input.userId.trim().length > 0
+      ? input.userId
+      : null;
+
+  if (!userId) {
+    if (currentPosthogUserId === null) {
+      return;
+    }
+
+    posthog.reset();
+    posthog.register(posthogSuperProperties);
+    currentPosthogUserId = null;
+    return;
+  }
+
+  if (currentPosthogUserId && currentPosthogUserId !== userId) {
+    posthog.reset();
+    posthog.register(posthogSuperProperties);
+  }
+
+  if (currentPosthogUserId !== userId) {
+    posthog.identify(userId);
+    currentPosthogUserId = userId;
+  }
+
+  posthog.setPersonProperties({
+    email: input.userEmail ?? null,
+    name: input.userName ?? null,
+  });
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -1374,6 +1425,42 @@ function RendererTelemetryBootstrap() {
   return null;
 }
 
+function RendererAnalyticsIdentitySync() {
+  useEffect(() => {
+    let cancelled = false;
+
+    const sync = async () => {
+      try {
+        const data = await getDesktopCloudStatus();
+        if (cancelled) {
+          return;
+        }
+
+        syncPostHogIdentity({
+          userId: data.userId ?? null,
+          userEmail: data.userEmail ?? null,
+          userName: data.userName ?? null,
+        });
+      } catch {
+        // Ignore transient fetch errors. Keep existing identity until a
+        // successful status refresh says otherwise.
+      }
+    };
+
+    void sync();
+    const interval = window.setInterval(() => {
+      void sync();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  return null;
+}
+
 function RendererStartupSentinel() {
   useEffect(() => {
     if (rendererCommitReported) {
@@ -1401,6 +1488,7 @@ ReactDOM.createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <RendererStartupSentinel />
       <RendererTelemetryBootstrap />
+      <RendererAnalyticsIdentitySync />
       <RootApp />
     </QueryClientProvider>
   </React.StrictMode>,

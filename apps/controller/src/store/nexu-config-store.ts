@@ -58,6 +58,7 @@ type CloudModel = { id: string; name: string; provider?: string };
 type DesktopCloudState = {
   connected: boolean;
   polling: boolean;
+  userId?: string | null;
   userName?: string | null;
   userEmail?: string | null;
   connectedAt?: string | null;
@@ -118,6 +119,7 @@ function buildLinkModelsUrl(baseUrl: string): string {
 type CloudPollResponse = {
   status: string;
   apiKey?: string;
+  userId?: string;
   userName?: string;
   userEmail?: string;
   cloudModels?: CloudModel[];
@@ -149,6 +151,7 @@ function normalizeDesktopCloudState(
   return {
     connected: cloud?.connected === true,
     polling: cloud?.polling === true,
+    userId: typeof cloud?.userId === "string" ? cloud.userId : null,
     userName: typeof cloud?.userName === "string" ? cloud.userName : null,
     userEmail: typeof cloud?.userEmail === "string" ? cloud.userEmail : null,
     connectedAt:
@@ -366,6 +369,7 @@ export class NexuConfigStore {
           cloud: {
             connected: input.connected,
             polling: input.polling,
+            userId: input.userId ?? null,
             userName: input.userName ?? null,
             userEmail: input.userEmail ?? null,
             connectedAt: input.connectedAt ?? null,
@@ -378,6 +382,7 @@ export class NexuConfigStore {
             [activeProfileName]: {
               connected: input.connected,
               polling: input.polling,
+              userId: input.userId ?? null,
               userName: input.userName ?? null,
               userEmail: input.userEmail ?? null,
               connectedAt: input.connectedAt ?? null,
@@ -421,6 +426,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: endpointChanged ? false : cloud.connected,
       polling: false,
+      userId: endpointChanged ? null : (cloud.userId ?? null),
       userName: endpointChanged ? null : (cloud.userName ?? null),
       userEmail: endpointChanged ? null : (cloud.userEmail ?? null),
       connectedAt: endpointChanged ? null : (cloud.connectedAt ?? null),
@@ -433,6 +439,7 @@ export class NexuConfigStore {
   private async setDesktopCloudState(input: {
     connected: boolean;
     polling: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -503,6 +510,7 @@ export class NexuConfigStore {
           await this.setDesktopCloudState({
             connected: true,
             polling: false,
+            userId: data.userId ?? null,
             userName: data.userName ?? null,
             userEmail: data.userEmail ?? null,
             connectedAt: now(),
@@ -523,6 +531,7 @@ export class NexuConfigStore {
           await this.setDesktopCloudState({
             connected: false,
             polling: false,
+            userId: null,
             userName: null,
             userEmail: null,
             connectedAt: null,
@@ -543,6 +552,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: false,
       polling: false,
+      userId: null,
       userName: null,
       userEmail: null,
       connectedAt: null,
@@ -1373,6 +1383,7 @@ export class NexuConfigStore {
     return {
       connected: cloud.connected,
       polling: cloud.polling,
+      userId: cloud.userId ?? null,
       userName: cloud.userName ?? null,
       userEmail: cloud.userEmail ?? null,
       connectedAt: cloud.connectedAt ?? null,
@@ -1389,6 +1400,7 @@ export class NexuConfigStore {
           ...profile,
           connected: session?.connected === true,
           polling: session?.polling === true,
+          userId: session?.userId ?? null,
           userName: session?.userName ?? null,
           userEmail: session?.userEmail ?? null,
           connectedAt: session?.connectedAt ?? null,
@@ -1522,6 +1534,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: cloud.connected,
       polling: cloud.polling,
+      userId: cloud.userId ?? null,
       userName: cloud.userName ?? null,
       userEmail: cloud.userEmail ?? null,
       connectedAt: cloud.connectedAt ?? null,
@@ -1579,6 +1592,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: false,
       polling: true,
+      userId: null,
       userName: null,
       userEmail: null,
       connectedAt: null,
@@ -1773,6 +1787,7 @@ export class NexuConfigStore {
             ? {
                 connected: false,
                 polling: false,
+                userId: null,
                 userName: null,
                 userEmail: null,
                 connectedAt: null,
@@ -1827,6 +1842,7 @@ export class NexuConfigStore {
             ? {
                 connected: nextSession.connected,
                 polling: nextSession.polling,
+                userId: nextSession.userId ?? null,
                 userName: nextSession.userName ?? null,
                 userEmail: nextSession.userEmail ?? null,
                 connectedAt: nextSession.connectedAt ?? null,
@@ -1837,6 +1853,7 @@ export class NexuConfigStore {
             : {
                 connected: false,
                 polling: false,
+                userId: null,
                 userName: null,
                 userEmail: null,
                 connectedAt: null,
@@ -1863,6 +1880,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: switchedCloud.connected,
       polling: false,
+      userId: switchedCloud.userId ?? null,
       userName: switchedCloud.userName ?? null,
       userEmail: switchedCloud.userEmail ?? null,
       connectedAt: switchedCloud.connectedAt ?? null,
@@ -1930,6 +1948,7 @@ export class NexuConfigStore {
             [name]: {
               connected: false,
               polling: false,
+              userId: null,
               userName: null,
               userEmail: null,
               connectedAt: null,
@@ -1955,6 +1974,7 @@ export class NexuConfigStore {
     await this.setDesktopCloudState({
       connected: false,
       polling: false,
+      userId: null,
       userName: null,
       userEmail: null,
       connectedAt: null,
