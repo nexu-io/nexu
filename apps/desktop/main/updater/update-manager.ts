@@ -102,6 +102,8 @@ export class UpdateManager {
   private readonly launchdCtx: UpdateManagerOptions["launchd"];
   private currentFeedUrl: string;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
+  private lastProgressLogAt = 0;
+  private lastProgressLogPercent: number | null = null;
   private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -147,6 +149,15 @@ export class UpdateManager {
         url: this.currentFeedUrl,
       });
     }
+
+    this.logCheck("update feed configured", {
+      channel: this.channel,
+      source: this.source,
+      feedUrl: sanitizeFeedUrl(this.currentFeedUrl),
+      currentVersion: app.getVersion(),
+      remoteVersion: undefined,
+      remoteReleaseDate: undefined,
+    });
   }
 
   private getDiagnostic(partial?: {
@@ -177,7 +188,7 @@ export class UpdateManager {
   private bindEvents(): void {
     autoUpdater.on("checking-for-update", () => {
       const diagnostic = this.getDiagnostic();
-      this.logCheck("checking for update", diagnostic);
+      this.logCheck("update check event: checking for update", diagnostic);
       this.send("update:checking", diagnostic);
     });
 
@@ -186,7 +197,7 @@ export class UpdateManager {
         remoteVersion: info.version,
         remoteReleaseDate: info.releaseDate,
       });
-      this.logCheck("update available", diagnostic);
+      this.logCheck("update event: update available", diagnostic);
       this.send("update:available", {
         version: info.version,
         releaseNotes:
@@ -200,11 +211,26 @@ export class UpdateManager {
         remoteVersion: info.version,
         remoteReleaseDate: info.releaseDate,
       });
-      this.logCheck("update not available", diagnostic);
+      this.logCheck("update event: update not available", diagnostic);
       this.send("update:up-to-date", { diagnostic });
     });
 
     autoUpdater.on("download-progress", (progress) => {
+      const now = Date.now();
+      const percent = Math.round(progress.percent);
+      const shouldLog =
+        this.lastProgressLogPercent === null ||
+        Math.abs(percent - this.lastProgressLogPercent) >= 5 ||
+        now - this.lastProgressLogAt >= 5_000 ||
+        percent === 100;
+      if (shouldLog) {
+        this.lastProgressLogAt = now;
+        this.lastProgressLogPercent = percent;
+        this.logCheck(
+          `update event: download progress ${percent}%`,
+          this.getDiagnostic(),
+        );
+      }
       this.send("update:progress", {
         percent: progress.percent,
         bytesPerSecond: progress.bytesPerSecond,
@@ -214,6 +240,13 @@ export class UpdateManager {
     });
 
     autoUpdater.on("update-downloaded", (info) => {
+      this.logCheck(
+        "update event: downloaded",
+        this.getDiagnostic({
+          remoteVersion: info.version,
+          remoteReleaseDate: info.releaseDate,
+        }),
+      );
       this.send("update:downloaded", { version: info.version });
     });
 
@@ -239,7 +272,13 @@ export class UpdateManager {
   }
 
   async checkNow(): Promise<{ updateAvailable: boolean }> {
+    const startedAt = Date.now();
+    this.logCheck("update check start", this.getDiagnostic());
     if (this.checkInProgress) {
+      this.logCheck(
+        "update check skipped: already in progress",
+        this.getDiagnostic(),
+      );
       return this.checkInProgress;
     }
 
@@ -251,7 +290,10 @@ export class UpdateManager {
           remoteVersion,
           remoteReleaseDate: result?.updateInfo.releaseDate,
         });
-        this.logCheck("check complete", diagnostic);
+        this.logCheck(
+          `update check result: ${result === null ? "null" : remoteVersion === app.getVersion() ? "no update" : "update available"} (${Date.now() - startedAt}ms)`,
+          diagnostic,
+        );
         return {
           updateAvailable:
             result !== null && result.updateInfo.version !== app.getVersion(),
@@ -276,7 +318,15 @@ export class UpdateManager {
   }
 
   async quitAndInstall(): Promise<void> {
-    this.logCheck("quit-and-install: starting teardown", this.getDiagnostic());
+    const startedAt = Date.now();
+    const logStep = (message: string): void => {
+      this.logCheck(
+        `quit-and-install: ${message} (+${Date.now() - startedAt}ms)`,
+        this.getDiagnostic(),
+      );
+    };
+
+    logStep("start");
 
     // --- Phase 1: Best-effort cleanup ---
     // Each step is wrapped in try/catch so a failure in one step never
@@ -286,59 +336,77 @@ export class UpdateManager {
     // 0. Stop periodic update checks so they don't fire during teardown.
     this.stopPeriodicCheck();
 
+    logStep("phase 1 cleanup start");
+
     // 1a. Tear down launchd services (bootout + SIGKILL + delete ports file).
-    if (this.launchdCtx) {
-      try {
-        await teardownLaunchdServices({
-          launchd: this.launchdCtx.manager,
-          labels: this.launchdCtx.labels,
-          plistDir: this.launchdCtx.plistDir,
-        });
-      } catch (err) {
-        this.logCheck(
-          `quit-and-install: teardown failed, proceeding: ${err instanceof Error ? err.message : String(err)}`,
-          this.getDiagnostic(),
-        );
-      }
-    }
+    const launchdCtx = this.launchdCtx;
+    const teardownPromise = launchdCtx
+      ? (async () => {
+          const teardownStartedAt = Date.now();
+          try {
+            await teardownLaunchdServices({
+              launchd: launchdCtx.manager,
+              labels: launchdCtx.labels,
+              plistDir: launchdCtx.plistDir,
+            });
+            this.logCheck(
+              `quit-and-install: launchd teardown complete (+${Date.now() - teardownStartedAt}ms)`,
+              this.getDiagnostic(),
+            );
+          } catch (err) {
+            this.logCheck(
+              `quit-and-install: launchd teardown failed, proceeding: ${err instanceof Error ? err.message : String(err)} (+${Date.now() - teardownStartedAt}ms)`,
+              this.getDiagnostic(),
+            );
+          }
+        })()
+      : Promise.resolve();
 
     // 1b. Dispose the orchestrator (stops non-launchd managed units like
     // embedded web server, utility processes). These are child processes of
     // the Electron main process and will be reaped by the OS on exit anyway,
     // so failure here is non-critical.
-    try {
-      await this.orchestrator.dispose();
-    } catch (err) {
-      this.logCheck(
-        `quit-and-install: orchestrator dispose failed, proceeding: ${err instanceof Error ? err.message : String(err)}`,
-        this.getDiagnostic(),
-      );
-    }
+    const disposePromise = (async () => {
+      const disposeStartedAt = Date.now();
+      try {
+        await this.orchestrator.dispose();
+        this.logCheck(
+          `quit-and-install: orchestrator dispose complete (+${Date.now() - disposeStartedAt}ms)`,
+          this.getDiagnostic(),
+        );
+      } catch (err) {
+        this.logCheck(
+          `quit-and-install: orchestrator dispose failed, proceeding: ${err instanceof Error ? err.message : String(err)} (+${Date.now() - disposeStartedAt}ms)`,
+          this.getDiagnostic(),
+        );
+      }
+    })();
+
+    await Promise.all([teardownPromise, disposePromise]);
+
+    logStep("phase 1 cleanup end");
 
     // --- Phase 2: Process verification ---
     // Two sweeps of SIGKILL to clear all Nexu sidecar processes. Uses both
     // authoritative sources (launchd labels, runtime-ports.json) and pgrep.
-    let { clean, remainingPids } = await ensureNexuProcessesDead();
+    const firstSweepStartedAt = Date.now();
+    let { clean, remainingPids } = await ensureNexuProcessesDead({
+      timeoutMs: 8_000,
+      intervalMs: 200,
+    });
+    this.logCheck(
+      `quit-and-install: first sweep complete in ${Date.now() - firstSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
+      this.getDiagnostic(),
+    );
 
     if (!clean) {
-      this.logCheck(
-        `quit-and-install: ${remainingPids.length} process(es) survived first sweep, retrying`,
-        this.getDiagnostic(),
-      );
+      const secondSweepStartedAt = Date.now();
       ({ clean, remainingPids } = await ensureNexuProcessesDead({
         timeoutMs: 5_000,
         intervalMs: 200,
       }));
-    }
-
-    if (clean) {
       this.logCheck(
-        "quit-and-install: all processes confirmed dead, triggering install",
-        this.getDiagnostic(),
-      );
-    } else {
-      this.logCheck(
-        `quit-and-install: ${remainingPids.length} process(es) survived both sweeps (${remainingPids.join(", ")})`,
+        `quit-and-install: second sweep complete in ${Date.now() - secondSweepStartedAt}ms (${clean ? "clean" : `survivors: ${remainingPids.join(", ")}`})`,
         this.getDiagnostic(),
       );
     }
@@ -348,7 +416,12 @@ export class UpdateManager {
     // processes don't hold file handles to critical update paths. Use
     // lsof to check whether the .app bundle or extracted sidecar dirs
     // are actually locked.
+    const lockCheckStartedAt = Date.now();
     const { locked, lockedPaths } = await checkCriticalPathsLocked();
+    this.logCheck(
+      `quit-and-install: critical-path lock check complete in ${Date.now() - lockCheckStartedAt}ms (${locked ? `locked: ${lockedPaths.join(", ")}` : "unlocked"})`,
+      this.getDiagnostic(),
+    );
 
     if (locked) {
       // Critical paths are held open — installing now would fail or
@@ -371,6 +444,7 @@ export class UpdateManager {
 
     // Set force-quit flag so window close handlers don't intercept the exit
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+    logStep("triggering autoUpdater.quitAndInstall");
     autoUpdater.quitAndInstall(false, true);
   }
 

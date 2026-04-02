@@ -26,6 +26,7 @@ type BuildConfig = {
   NEXU_DESKTOP_BUILD_COMMIT?: string;
   NEXU_DESKTOP_BUILD_TIME?: string;
   NEXU_DESKTOP_UPDATE_CHANNEL?: UpdateChannelName;
+  AMPLITUDE_API_KEY?: string;
 };
 
 function readBuildConfigString(
@@ -86,6 +87,7 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
       NEXU_DESKTOP_UPDATE_CHANNEL: readUpdateChannel(
         readBuildConfigString(record, "NEXU_DESKTOP_UPDATE_CHANNEL"),
       ),
+      AMPLITUDE_API_KEY: readBuildConfigString(record, "AMPLITUDE_API_KEY"),
     };
   } catch {
     return {};
@@ -205,6 +207,7 @@ export type DesktopRuntimeConfig = {
     password: string;
   };
   sentryDsn: string | null;
+  amplitudeApiKey: string | null;
 };
 
 export function getDesktopRuntimeConfig(
@@ -307,5 +310,7 @@ export function getDesktopRuntimeConfig(
       env.NEXU_DESKTOP_SENTRY_DSN ??
       buildConfig.NEXU_DESKTOP_SENTRY_DSN ??
       null,
+    amplitudeApiKey:
+      env.AMPLITUDE_API_KEY ?? buildConfig.AMPLITUDE_API_KEY ?? null,
   };
 }

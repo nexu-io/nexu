@@ -23,7 +23,11 @@ import {
   type EmbeddedWebServer,
   startEmbeddedWebServer,
 } from "./embedded-web-server";
-import { LaunchdManager, SERVICE_LABELS } from "./launchd-manager";
+import {
+  LaunchdManager,
+  SERVICE_LABELS,
+  type ServiceStatus,
+} from "./launchd-manager";
 import { type PlistEnv, generatePlist } from "./plist-generator";
 
 export interface LaunchdBootstrapEnv {
@@ -83,8 +87,12 @@ export interface LaunchdBootstrapEnv {
   openclawTmpDir: string;
   /** Normalized proxy env propagated to controller/openclaw launchd services */
   proxyEnv: Record<string, string>;
+  /** Amplitude API key for controller analytics */
+  amplitudeApiKey?: string;
   /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
   log?: (message: string) => void;
+  /** Optional override for controller startup validation timeout (tests only). */
+  controllerStartupValidationTimeoutMs?: number;
 }
 
 export interface LaunchdBootstrapResult {
@@ -164,30 +172,201 @@ async function waitForControllerReadiness(
   timeoutMs = 15000,
 ): Promise<void> {
   const startedAt = Date.now();
-  const probeUrl = `http://127.0.0.1:${port}/api/auth/get-session`;
   let attempt = 0;
+  let lastProbeUrl = `http://127.0.0.1:${port}/api/internal/desktop/ready`;
+  let lastFailureReason = "probe_timeout";
 
   while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const response = await fetch(probeUrl, {
-        headers: { Accept: "application/json" },
-      });
-      if (response.status < 500) {
-        console.log(
-          `Controller ready via ${probeUrl} status=${response.status} after ${Date.now() - startedAt}ms`,
-        );
-        return;
-      }
-    } catch {
-      // Ignore transient failures during startup
+    const result = await probeControllerReady(port, 2000);
+    lastProbeUrl = result.probeUrl;
+    if (result.ok) {
+      console.log(
+        `Controller ready via ${result.probeUrl} status=${result.status} after ${Date.now() - startedAt}ms`,
+      );
+      return;
     }
+    lastFailureReason = result.reason;
     // Adaptive polling: start aggressive (50ms), increase to 250ms
     const delay = Math.min(50 + attempt * 50, 250);
     await new Promise((r) => setTimeout(r, delay));
     attempt++;
   }
 
-  throw new Error(`Controller readiness probe timed out for ${probeUrl}`);
+  throw new Error(
+    `Controller readiness probe timed out for ${lastProbeUrl} (reason=${lastFailureReason})`,
+  );
+}
+
+type ControllerProbeFailureReason =
+  | "port_unreachable"
+  | "probe_timeout"
+  | "probe_error"
+  | "probe_status";
+
+type ControllerStartupFailureReason =
+  | "launchd_stopped"
+  | "process_exited"
+  | ControllerProbeFailureReason;
+
+type ControllerReadyProbeResult =
+  | {
+      ok: true;
+      probeUrl: string;
+      status: number;
+    }
+  | {
+      ok: false;
+      probeUrl: string;
+      reason: ControllerProbeFailureReason;
+      status?: number;
+    };
+
+type ControllerStartupValidationResult =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      reason: ControllerStartupFailureReason;
+      launchdStatus: ServiceStatus;
+      probeUrl: string;
+      probeStatus?: number;
+    };
+
+async function probeControllerReady(
+  port: number,
+  timeoutMs = 2000,
+): Promise<ControllerReadyProbeResult> {
+  const readyUrl = `http://127.0.0.1:${port}/api/internal/desktop/ready`;
+  const sessionUrl = `http://127.0.0.1:${port}/api/auth/get-session`;
+
+  const portListening = await probePort(port);
+  if (!portListening) {
+    return {
+      ok: false,
+      probeUrl: readyUrl,
+      reason: "port_unreachable",
+    };
+  }
+
+  try {
+    const response = await fetch(readyUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.ok) {
+      return { ok: true, probeUrl: readyUrl, status: response.status };
+    }
+    if (response.status !== 404) {
+      return {
+        ok: false,
+        probeUrl: readyUrl,
+        reason: "probe_status",
+        status: response.status,
+      };
+    }
+  } catch (error) {
+    const name = error instanceof Error ? error.name : undefined;
+    return {
+      ok: false,
+      probeUrl: readyUrl,
+      reason: name === "TimeoutError" ? "probe_timeout" : "probe_error",
+    };
+  }
+
+  try {
+    const response = await fetch(sessionUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.status < 500) {
+      return { ok: true, probeUrl: sessionUrl, status: response.status };
+    }
+    return {
+      ok: false,
+      probeUrl: sessionUrl,
+      reason: "probe_status",
+      status: response.status,
+    };
+  } catch (error) {
+    const name = error instanceof Error ? error.name : undefined;
+    return {
+      ok: false,
+      probeUrl: sessionUrl,
+      reason: name === "TimeoutError" ? "probe_timeout" : "probe_error",
+    };
+  }
+}
+
+async function validateControllerStartup(opts: {
+  launchd: LaunchdManager;
+  label: string;
+  port: number;
+  probeTimeoutMs?: number;
+}): Promise<ControllerStartupValidationResult> {
+  const launchdStatus = await opts.launchd.getServiceStatus(opts.label);
+  if (launchdStatus.status === "stopped") {
+    return {
+      ok: false,
+      reason: launchdStatus.pid == null ? "launchd_stopped" : "process_exited",
+      launchdStatus,
+      probeUrl: `http://127.0.0.1:${opts.port}/api/internal/desktop/ready`,
+    };
+  }
+
+  const probe = await probeControllerReady(
+    opts.port,
+    opts.probeTimeoutMs ?? 3000,
+  );
+  if (!probe.ok) {
+    return {
+      ok: false,
+      reason: probe.reason,
+      launchdStatus,
+      probeUrl: probe.probeUrl,
+      probeStatus: probe.status,
+    };
+  }
+
+  return { ok: true };
+}
+
+async function waitForControllerStartupValidation(opts: {
+  launchd: LaunchdManager;
+  label: string;
+  port: number;
+  timeoutMs?: number;
+  probeTimeoutMs?: number;
+}): Promise<ControllerStartupValidationResult> {
+  const timeoutMs = opts.timeoutMs ?? 15000;
+  const startedAt = Date.now();
+  let attempt = 0;
+  let lastResult: ControllerStartupValidationResult | null = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    lastResult = await validateControllerStartup({
+      launchd: opts.launchd,
+      label: opts.label,
+      port: opts.port,
+      probeTimeoutMs: opts.probeTimeoutMs,
+    });
+    if (lastResult.ok) {
+      return lastResult;
+    }
+
+    const delay = Math.min(100 + attempt * 100, 500);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    attempt++;
+  }
+
+  return (
+    lastResult ?? {
+      ok: false,
+      reason: "probe_timeout",
+      launchdStatus: { label: opts.label, plistPath: "", status: "unknown" },
+      probeUrl: `http://127.0.0.1:${opts.port}/api/internal/desktop/ready`,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -429,6 +608,7 @@ export async function bootstrapWithLaunchd(
     skillNodePath: env.skillNodePath,
     openclawTmpDir: env.openclawTmpDir,
     proxyEnv: env.proxyEnv,
+    amplitudeApiKey: env.amplitudeApiKey,
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 
@@ -464,22 +644,64 @@ export async function bootstrapWithLaunchd(
         `Stale session detected: previous Electron pid=${recovered.electronPid} is dead, ` +
           `metadata age=${Math.round(metadataAgeMs / 1000)}s. Cleaning up launchd services.`,
       );
-      await Promise.allSettled([
-        launchd.bootoutService(labels.controller),
-        launchd.bootoutService(labels.openclaw),
-      ]);
+      await bootoutServicesAndWait({
+        launchd,
+        labels,
+        controllerRunning: true,
+        openclawRunning: true,
+      });
       await deleteRuntimePorts(plistDir);
       recovered = null; // Force fresh start
     }
   }
-  const [controllerStatus, openclawStatus] = await Promise.all([
+  let [controllerStatus, openclawStatus] = await Promise.all([
     launchd.getServiceStatus(labels.controller),
     launchd.getServiceStatus(labels.openclaw),
   ]);
 
-  const controllerRunning = controllerStatus.status === "running";
-  const openclawRunning = openclawStatus.status === "running";
-  const anyRunning = controllerRunning || openclawRunning;
+  let controllerRunning = controllerStatus.status === "running";
+  let openclawRunning = openclawStatus.status === "running";
+  let anyRunning = controllerRunning || openclawRunning;
+
+  // Partial attach state is unsafe: one launchd service survived but the other
+  // did not. In practice this leaves controller attached to stale OpenClaw
+  // metadata, and OpenClaw may still exist as an orphaned process on the old
+  // gateway port. Tear everything down and force a clean cold start.
+  if (recovered && anyRunning && controllerRunning !== openclawRunning) {
+    console.warn(
+      `[bootstrap] partial launchd state detected (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"}); forcing clean cold start`,
+    );
+
+    const staleOpenclawPort = recovered.openclawPort;
+    const staleOccupier = await detectPortOccupier(staleOpenclawPort);
+    if (staleOccupier && staleOccupier.pid !== openclawStatus.pid) {
+      console.warn(
+        `[bootstrap] stale openclaw port occupier detected port=${staleOpenclawPort} pid=${staleOccupier.pid}`,
+      );
+    }
+
+    await bootoutServicesAndWait({
+      launchd,
+      labels,
+      controllerRunning,
+      openclawRunning,
+    });
+
+    await killOrphanOpenclawProcesses({
+      registeredPid: openclawStatus.pid,
+      extraPids: staleOccupier ? [staleOccupier.pid] : [],
+    });
+    await deleteRuntimePorts(plistDir).catch(() => {});
+
+    recovered = null;
+    [controllerStatus, openclawStatus] = await Promise.all([
+      launchd.getServiceStatus(labels.controller),
+      launchd.getServiceStatus(labels.openclaw),
+    ]);
+    controllerRunning = controllerStatus.status === "running";
+    openclawRunning = openclawStatus.status === "running";
+    anyRunning = controllerRunning || openclawRunning;
+  }
 
   // If we have a previous session and at least one service is still running,
   // validate and reuse the recovered ports. Otherwise use fresh ports.
@@ -527,14 +749,12 @@ export async function bootstrapWithLaunchd(
       console.log(
         `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
       );
-      await Promise.allSettled([
-        controllerRunning
-          ? launchd.bootoutService(labels.controller)
-          : Promise.resolve(),
-        openclawRunning
-          ? launchd.bootoutService(labels.openclaw)
-          : Promise.resolve(),
-      ]);
+      await bootoutServicesAndWait({
+        launchd,
+        labels,
+        controllerRunning,
+        openclawRunning,
+      });
       await deleteRuntimePorts(plistDir).catch(() => {});
       // Fall through to fresh start below (useRecoveredPorts remains false)
     } else {
@@ -573,14 +793,12 @@ export async function bootstrapWithLaunchd(
         console.log(
           `NEXU_HOME mismatch (expected=${expectedNexuHome} actual=${runningNexuHome}), tearing down stale services`,
         );
-        await Promise.allSettled([
-          controllerRunning
-            ? launchd.bootoutService(labels.controller)
-            : Promise.resolve(),
-          openclawRunning
-            ? launchd.bootoutService(labels.openclaw)
-            : Promise.resolve(),
-        ]);
+        await bootoutServicesAndWait({
+          launchd,
+          labels,
+          controllerRunning,
+          openclawRunning,
+        });
       }
     } // end: version match — proceed with attach
   } else if (anyRunning && !recovered) {
@@ -590,14 +808,12 @@ export async function bootstrapWithLaunchd(
     console.log(
       `[bootstrap] teardown: no runtime-ports.json but services running (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
     );
-    await Promise.allSettled([
-      controllerRunning
-        ? launchd.bootoutService(labels.controller)
-        : Promise.resolve(),
-      openclawRunning
-        ? launchd.bootoutService(labels.openclaw)
-        : Promise.resolve(),
-    ]);
+    await bootoutServicesAndWait({
+      launchd,
+      labels,
+      controllerRunning,
+      openclawRunning,
+    });
   }
 
   // --- Per-service: validate running ones, start missing ones ---
@@ -689,7 +905,7 @@ export async function bootstrapWithLaunchd(
   }
 
   // Build plistEnv with final resolved ports
-  const plistEnv: PlistEnv = {
+  let plistEnv: PlistEnv = {
     ...cleanupPlistEnv,
     controllerPort: effectivePorts.controllerPort,
     openclawPort: effectivePorts.openclawPort,
@@ -723,9 +939,101 @@ export async function bootstrapWithLaunchd(
     }
   };
 
+  const formatControllerRecoveryFailure = (details: {
+    originalPort: number;
+    retryPort?: number;
+    reason: ControllerStartupFailureReason;
+    launchdStatus: ServiceStatus;
+    probeUrl: string;
+    probeStatus?: number;
+  }): string => {
+    const runtimePortsValue = JSON.stringify({
+      controllerPort: details.retryPort ?? effectivePorts.controllerPort,
+      openclawPort: effectivePorts.openclawPort,
+      webPort: effectivePorts.webPort,
+    });
+
+    return [
+      "Controller startup recovery failed",
+      `originalPort=${details.originalPort}`,
+      details.retryPort != null ? `retryPort=${details.retryPort}` : null,
+      `reason=${details.reason}`,
+      `launchdStatus=${details.launchdStatus.status}`,
+      `launchdPid=${details.launchdStatus.pid ?? "none"}`,
+      details.probeStatus != null ? `probeStatus=${details.probeStatus}` : null,
+      `finalProbeUrl=${details.probeUrl}`,
+      `runtimePortsValue=${runtimePortsValue}`,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
+  const validateOrRecoverController = async (): Promise<void> => {
+    const originalPort = effectivePorts.controllerPort;
+    const validation = await waitForControllerStartupValidation({
+      launchd,
+      label: labels.controller,
+      port: effectivePorts.controllerPort,
+      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 15000,
+      probeTimeoutMs: 3000,
+    });
+
+    if (validation.ok) {
+      return;
+    }
+
+    console.warn(
+      `[bootstrap] controller post-start validation failed originalPort=${originalPort} reason=${validation.reason} launchdStatus=${validation.launchdStatus.status} launchdPid=${validation.launchdStatus.pid ?? "none"} probeUrl=${validation.probeUrl}${validation.probeStatus != null ? ` probeStatus=${validation.probeStatus}` : ""}`,
+    );
+
+    await launchd
+      .bootoutAndWaitForExit(labels.controller, 5000)
+      .catch(() => {});
+
+    const retryStartPort = Math.min(originalPort + 1, 65535);
+    const retryPort = await findFreePort(retryStartPort);
+    effectivePorts.controllerPort = retryPort;
+    plistEnv = {
+      ...plistEnv,
+      controllerPort: retryPort,
+    };
+
+    console.warn(
+      `[bootstrap] retrying controller startup originalPort=${originalPort} retryPort=${retryPort}`,
+    );
+
+    const retryPlist = generatePlist("controller", plistEnv);
+    await launchd.installService(labels.controller, retryPlist);
+    await launchd.startService(labels.controller);
+    await ensureRunning(labels.controller, "controller");
+
+    const retryValidation = await waitForControllerStartupValidation({
+      launchd,
+      label: labels.controller,
+      port: retryPort,
+      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 15000,
+      probeTimeoutMs: 3000,
+    });
+    if (retryValidation.ok) {
+      return;
+    }
+
+    const message = formatControllerRecoveryFailure({
+      originalPort,
+      retryPort,
+      reason: retryValidation.reason,
+      launchdStatus: retryValidation.launchdStatus,
+      probeUrl: retryValidation.probeUrl,
+      probeStatus: retryValidation.probeStatus,
+    });
+    console.error(`[bootstrap] ${message}`);
+    throw new Error(message);
+  };
+
   if (!controllerHealthy) {
     await ensureService(labels.controller, "controller");
     await ensureRunning(labels.controller, "controller");
+    await validateOrRecoverController();
   } else {
     console.log("[bootstrap] controller already healthy, skipping");
   }
@@ -987,14 +1295,97 @@ async function killOrphanNexuProcesses(): Promise<void> {
  * Shared between killOrphanNexuProcesses and ensureNexuProcessesDead so
  * they agree on what constitutes a "Nexu process".
  */
-// Patterns must be specific enough to avoid matching unrelated processes
-// (e.g. an editor with the file open, or a grep searching for these paths).
-// Prefix with "node" to only match actual Node.js processes.
-const NEXU_PROCESS_PATTERNS = [
-  "node.*controller/dist/index.js",
-  "node.*openclaw.mjs gateway",
-  "openclaw-gateway",
-] as const;
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getNexuProcessPatterns(): string[] {
+  const repoRoot = getWorkspaceRoot();
+  const nexuHome = path.join(os.homedir(), ".nexu");
+  const patterns = new Set<string>([
+    escapeRegexLiteral(
+      path.join(nexuHome, "runtime", "controller-sidecar", "dist", "index.js"),
+    ),
+    "\\.nexu/(runtime/)?openclaw-sidecar",
+    escapeRegexLiteral(
+      path.join(repoRoot, "apps", "controller", "dist", "index.js"),
+    ),
+    escapeRegexLiteral(
+      path.join(
+        repoRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
+    ),
+    ...getNexuOpenclawProcessPatterns(),
+  ]);
+
+  if (process.resourcesPath) {
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "controller",
+          "dist",
+          "index.js",
+        ),
+      ),
+    );
+  }
+
+  return Array.from(patterns);
+}
+
+function getNexuOpenclawProcessPatterns(): string[] {
+  const repoRoot = getWorkspaceRoot();
+  const patterns = new Set<string>([
+    "\\.nexu/(runtime/)?openclaw-sidecar",
+    "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway",
+    escapeRegexLiteral(
+      path.join(
+        repoRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
+    ),
+    escapeRegexLiteral(
+      path.join(repoRoot, "openclaw-runtime", "bin", "openclaw-gateway"),
+    ),
+  ]);
+
+  if (process.resourcesPath) {
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      ),
+    );
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw-gateway",
+        ),
+      ),
+    );
+  }
+
+  return Array.from(patterns);
+}
 
 /**
  * Collect the current process tree PIDs (current PID + all descendants) so
@@ -1087,7 +1478,8 @@ async function findNexuProcessPidsByLabel(): Promise<number[]> {
  *   tree (not just the current PID). Used by killOrphanNexuProcesses to
  *   avoid killing our own child processes. Default: false.
  */
-async function findNexuProcessPids(
+async function findProcessPidsByPatterns(
+  patterns: readonly string[],
   excludeProcessTree = false,
 ): Promise<number[]> {
   const allPids = new Set<number>();
@@ -1095,7 +1487,7 @@ async function findNexuProcessPids(
     ? await getCurrentProcessTreePids()
     : new Set([process.pid]);
 
-  for (const pattern of NEXU_PROCESS_PATTERNS) {
+  for (const pattern of patterns) {
     try {
       const { stdout } = await execFileAsync("pgrep", ["-f", pattern]);
       for (const line of stdout.trim().split("\n")) {
@@ -1110,6 +1502,63 @@ async function findNexuProcessPids(
   }
 
   return Array.from(allPids);
+}
+
+async function findNexuProcessPids(
+  excludeProcessTree = false,
+): Promise<number[]> {
+  return findProcessPidsByPatterns(
+    getNexuProcessPatterns(),
+    excludeProcessTree,
+  );
+}
+
+async function killOrphanOpenclawProcesses(opts: {
+  registeredPid?: number;
+  extraPids?: number[];
+}): Promise<number[]> {
+  const pids = await findProcessPidsByPatterns(
+    getNexuOpenclawProcessPatterns(),
+    true,
+  );
+  const candidatePids = new Set(pids);
+  for (const pid of opts.extraPids ?? []) {
+    if (pid > 0) {
+      candidatePids.add(pid);
+    }
+  }
+  const orphanPids = Array.from(candidatePids).filter(
+    (pid) => pid !== opts.registeredPid,
+  );
+
+  for (const pid of orphanPids) {
+    console.warn(`bootstrap: killing stale openclaw process pid=${pid}`);
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // ESRCH — already gone
+    }
+  }
+
+  return orphanPids;
+}
+
+async function bootoutServicesAndWait(opts: {
+  launchd: LaunchdManager;
+  labels: { controller: string; openclaw: string };
+  controllerRunning: boolean;
+  openclawRunning: boolean;
+  timeoutMs?: number;
+}): Promise<void> {
+  const timeoutMs = opts.timeoutMs ?? 5000;
+  await Promise.allSettled([
+    opts.controllerRunning
+      ? opts.launchd.bootoutAndWaitForExit(opts.labels.controller, timeoutMs)
+      : Promise.resolve(),
+    opts.openclawRunning
+      ? opts.launchd.bootoutAndWaitForExit(opts.labels.openclaw, timeoutMs)
+      : Promise.resolve(),
+  ]);
 }
 
 /**

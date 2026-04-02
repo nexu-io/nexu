@@ -566,6 +566,12 @@ async function ensureBuildConfig() {
       merged.NEXU_DESKTOP_BUILD_TIME ??
       existingConfig.NEXU_DESKTOP_BUILD_TIME ??
       defaultMetadata.NEXU_DESKTOP_BUILD_TIME,
+    ...((merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY)
+      ? {
+          AMPLITUDE_API_KEY:
+            merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY,
+        }
+      : {}),
   };
 
   await writeFile(configPath, JSON.stringify(config, null, 2));

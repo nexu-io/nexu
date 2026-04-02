@@ -110,6 +110,19 @@ export class SkillhubService {
     );
   }
 
+  /**
+   * Synchronise disk state with the ledger and copy bundled skills into the
+   * skills directory.  Must run BEFORE the first OpenClaw config push so that
+   * the compiled agent allowlist already contains every installed skill.
+   *
+   * Safe to call multiple times — every operation is idempotent.
+   */
+  bootstrap(): void {
+    if (process.env.CI) return;
+    this.dirWatcher.syncNow();
+    this.initialize();
+  }
+
   start(): void {
     this.catalogManager.start();
     if (process.env.CI) return;
@@ -123,12 +136,10 @@ export class SkillhubService {
       });
     }
 
-    // Reconcile disk state with ledger FIRST on every startup.
-    // This ensures on-disk skills are recorded before curated enqueue
-    // checks the ledger, preventing unnecessary re-downloads.
+    // bootstrap() already ran syncNow + initialize before the first config
+    // push, but re-running here is harmless (idempotent) and catches any
+    // skills that appeared between bootstrap() and start().
     this.dirWatcher.syncNow();
-
-    // Copy static skills + enqueue missing curated skills (idempotent)
     this.initialize();
 
     // Always start watching for external skill changes (agent installs)

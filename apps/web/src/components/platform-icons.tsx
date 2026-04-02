@@ -7,6 +7,9 @@ export type PlatformIconName =
   | "slack"
   | "discord"
   | "feishu"
+  | "dingtalk"
+  | "wecom"
+  | "qqbot"
   | "wechat"
   | "openclaw-weixin"
   | "whatsapp"
@@ -53,6 +56,30 @@ export function FeishuIcon({ size = 16 }: { size?: number }) {
       height={size}
       alt="Feishu"
       src="/feishu-logo.png"
+      style={{ objectFit: "contain" }}
+    />
+  );
+}
+
+export function WecomIcon({ size = 16 }: { size?: number }) {
+  return (
+    <img
+      width={size}
+      height={size}
+      alt="WeCom"
+      src="/wecom-logo.svg"
+      style={{ objectFit: "contain" }}
+    />
+  );
+}
+
+export function DingtalkIcon({ size = 16 }: { size?: number }) {
+  return (
+    <img
+      width={size}
+      height={size}
+      alt="DingTalk"
+      src="/dingtalk-logo.svg"
       style={{ objectFit: "contain" }}
     />
   );
@@ -150,6 +177,18 @@ export function TelegramIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function QqbotIcon({ size = 16 }: { size?: number }) {
+  return (
+    <img
+      width={size}
+      height={size}
+      alt="QQ"
+      src="/qq-logo.svg"
+      style={{ objectFit: "contain" }}
+    />
+  );
+}
+
 export function WebIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" role="img">
@@ -179,6 +218,12 @@ export function PlatformIcon({
       return <DiscordIcon size={size} />;
     case "feishu":
       return <FeishuIcon size={size} />;
+    case "dingtalk":
+      return <DingtalkIcon size={size} />;
+    case "wecom":
+      return <WecomIcon size={size} />;
+    case "qqbot":
+      return <QqbotIcon size={size} />;
     case "wechat":
     case "openclaw-weixin":
       return <WechatIcon size={size} />;

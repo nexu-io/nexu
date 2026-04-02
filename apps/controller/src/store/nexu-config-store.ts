@@ -3,9 +3,12 @@ import path from "node:path";
 import type {
   BotResponse,
   ChannelResponse,
+  ConnectDingtalkInput,
   ConnectDiscordInput,
   ConnectFeishuInput,
+  ConnectQqbotInput,
   ConnectSlackInput,
+  ConnectWecomInput,
 } from "@nexu/shared";
 import {
   type cloudProfileSchema,
@@ -34,6 +37,8 @@ import {
   nexuConfigSchema,
   type storedProviderResponseSchema,
 } from "./schemas.js";
+
+const DEFAULT_MANAGED_CHANNEL_ACCOUNT_ID = "default";
 
 type ProviderResponse = z.infer<typeof providerResponseSchema>;
 type UpsertProviderBody = z.infer<typeof upsertProviderBodySchema>;
@@ -977,6 +982,108 @@ export class NexuConfigStore {
                 input.verificationToken,
             }
           : {}),
+      },
+    }));
+
+    return channel;
+  }
+
+  async connectQqbot(input: ConnectQqbotInput): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "qqbot",
+      accountId: DEFAULT_MANAGED_CHANNEL_ACCOUNT_ID,
+      status: "connected",
+      teamName: null,
+      appId: input.appId,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) => existing.channelType !== channel.channelType,
+        ),
+        channel,
+      ],
+      secrets: {
+        ...config.secrets,
+        [`channel:${channel.id}:appId`]: input.appId,
+        [`channel:${channel.id}:clientSecret`]: input.appSecret,
+      },
+    }));
+
+    return channel;
+  }
+
+  async connectDingtalk(input: ConnectDingtalkInput): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "dingtalk",
+      accountId: DEFAULT_MANAGED_CHANNEL_ACCOUNT_ID,
+      status: "connected",
+      teamName: null,
+      appId: input.clientId,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) => existing.channelType !== channel.channelType,
+        ),
+        channel,
+      ],
+      secrets: {
+        ...config.secrets,
+        [`channel:${channel.id}:clientId`]: input.clientId,
+        [`channel:${channel.id}:clientSecret`]: input.clientSecret,
+      },
+    }));
+
+    return channel;
+  }
+
+  async connectWecom(input: ConnectWecomInput): Promise<ChannelResponse> {
+    const bot = await this.getOrCreateDefaultBot();
+    const connectedAt = now();
+    const channel: ChannelResponse = {
+      id: crypto.randomUUID(),
+      botId: bot.id,
+      channelType: "wecom",
+      accountId: DEFAULT_MANAGED_CHANNEL_ACCOUNT_ID,
+      status: "connected",
+      teamName: null,
+      appId: input.botId,
+      botUserId: null,
+      createdAt: connectedAt,
+      updatedAt: connectedAt,
+    };
+
+    await this.store.update((config) => ({
+      ...config,
+      channels: [
+        ...config.channels.filter(
+          (existing) => existing.channelType !== channel.channelType,
+        ),
+        channel,
+      ],
+      secrets: {
+        ...config.secrets,
+        [`channel:${channel.id}:botId`]: input.botId,
+        [`channel:${channel.id}:secret`]: input.secret,
       },
     }));
 

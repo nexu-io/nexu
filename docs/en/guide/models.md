@@ -4,35 +4,35 @@ Nexu supports two model integration paths: **Nexu Official** (managed models, si
 
 ## Step 1: Open Settings
 
-Click **Settings** in the left sidebar of the Nexu client to open the AI Model Providers configuration page.
+Click **Settings** in the left sidebar of the nexu client to open the AI Model Providers configuration page.
 
-![Open Settings page](/assets/nexu-settings-open.webp)
+![Open the Settings page](/assets/nexu-settings-open.webp)
 
 ## Step 2: Choose an Integration Mode
 
-### Option A — Nexu Official (Recommended)
+### Option A: Nexu Official
 
 Select **Nexu Official** from the provider list on the left, then click **Sign in to Nexu** to authenticate.
 
-Once signed in, no API key is needed — models like Claude Sonnet 4.6, Claude Opus 4.6, and Claude Haiku 4.5 are available immediately.
+Once signed in, no API key is needed. Managed models become available immediately.
 
 ![Nexu Official model configuration](/assets/nexu-models-official.webp)
 
-### Option B — Bring Your Own Key (BYOK)
+### Option B: Bring Your Own Key
 
 Select **Anthropic**, **OpenAI**, **Google AI**, or another provider from the list:
 
-1. Paste your key in the **API Key** field.
-2. Modify the **API Proxy URL** if you need a custom proxy.
-3. Click **Save** — Nexu will automatically verify the key and load the available model list.
+1. Paste your key into the **API Key** field.
+2. Modify **API Proxy URL** if you need a custom proxy.
+3. Click **Save**. nexu will verify the key and load the available model list automatically.
 
-![BYOK configuration](/assets/nexu-models-byok.webp)
+![BYOK model configuration](/assets/nexu-models-byok.webp)
 
 ## Step 3: Select the Active Model
 
-After a successful connection, use the **Nexu Bot Model** dropdown at the top of the Settings page to choose the model your Agent will use. You can switch across providers at any time.
+After a successful connection, use the **Nexu Bot Model** dropdown at the top of the Settings page to choose the model your Agent should use.
 
-![Select active model](/assets/nexu-model-select.webp)
+![Choose the active model](/assets/nexu-model-select.webp)
 
 ## Supported Providers
 
@@ -42,23 +42,25 @@ After a successful connection, use the **Nexu Bot Model** dropdown at the top of
 | OpenAI | `https://api.openai.com/v1` | `sk-...` |
 | Google AI | `https://generativelanguage.googleapis.com/v1beta` | `AIza...` |
 | xAI | `https://api.x.ai/v1` | `xai-...` |
+| Custom | Your OpenAI-compatible endpoint | Depends on the provider |
 
 ## Best Practices
 
-- Use least-privilege API keys to minimize unnecessary access scope.
-- Never expose keys in screenshots, support tickets, or git history.
-- When adding a BYOK provider, click **Verify Connection** first to confirm connectivity before saving.
+- Use least-privilege API keys whenever possible.
+- Never expose keys in screenshots, tickets, or git history.
+- When adding a BYOK provider, verify connectivity before saving.
+- Use **Custom** if you need a proxy, self-hosted gateway, or another OpenAI-compatible inference service.
 
 ## FAQ
 
 **Q: Which mode should I start with?**
 
-We recommend Nexu Official — just sign in and high-quality models are ready to use with zero configuration.
+Nexu Official is the easiest place to start: just sign in and begin using managed models.
 
 **Q: Can I configure multiple BYOK providers at the same time?**
 
-Yes. Anthropic, OpenAI, Google AI, and others can be configured independently. Switch between them anytime via the **Nexu Bot Model** dropdown.
+Yes. Providers can be configured independently, and you can switch between them through the model selector.
 
-**Q: Are API keys uploaded to Nexu servers?**
+**Q: Are API keys uploaded to nexu servers?**
 
-No. API keys are stored exclusively on your local device and are never transmitted to Nexu servers.
+No. API keys are stored on your local device and are not uploaded to nexu servers.

@@ -240,6 +240,32 @@ export type PostApiV1BotsByBotIdResumeResponses = {
 
 export type PostApiV1BotsByBotIdResumeResponse = PostApiV1BotsByBotIdResumeResponses[keyof PostApiV1BotsByBotIdResumeResponses];
 
+export type PostV1ChatCompletionsData = {
+    body: {
+        model?: string;
+        messages: Array<{
+            role: 'system' | 'user' | 'assistant' | 'tool';
+            content: string | Array<unknown>;
+            name?: string;
+            tool_call_id?: string;
+        }>;
+        stream?: boolean;
+        user?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/chat/completions';
+};
+
+export type PostV1ChatCompletionsResponses = {
+    /**
+     * OpenAI-compatible streaming chat completions
+     */
+    200: string;
+};
+
+export type PostV1ChatCompletionsResponse = PostV1ChatCompletionsResponses[keyof PostV1ChatCompletionsResponses];
+
 export type PostApiV1AuthDesktopAuthorizeData = {
     body?: {
         deviceId: string;
@@ -1018,7 +1044,7 @@ export type GetApiV1ChannelsResponses = {
         channels: Array<{
             id: string;
             botId: string;
-            channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+            channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
             accountId: string;
             status: 'pending' | 'connected' | 'disconnected' | 'error';
             teamName: string;
@@ -1102,7 +1128,7 @@ export type PostApiV1ChannelsSlackConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1145,7 +1171,7 @@ export type PostApiV1ChannelsDiscordConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1188,7 +1214,7 @@ export type PostApiV1ChannelsFeishuConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1228,7 +1254,7 @@ export type PostApiV1ChannelsTelegramConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1240,6 +1266,228 @@ export type PostApiV1ChannelsTelegramConnectResponses = {
 };
 
 export type PostApiV1ChannelsTelegramConnectResponse = PostApiV1ChannelsTelegramConnectResponses[keyof PostApiV1ChannelsTelegramConnectResponses];
+
+export type PostApiV1ChannelsDingtalkConnectData = {
+    body?: {
+        clientId: string;
+        clientSecret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/dingtalk/connect';
+};
+
+export type PostApiV1ChannelsDingtalkConnectErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsDingtalkConnectError = PostApiV1ChannelsDingtalkConnectErrors[keyof PostApiV1ChannelsDingtalkConnectErrors];
+
+export type PostApiV1ChannelsDingtalkConnectResponses = {
+    /**
+     * Connected dingtalk channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsDingtalkConnectResponse = PostApiV1ChannelsDingtalkConnectResponses[keyof PostApiV1ChannelsDingtalkConnectResponses];
+
+export type PostApiV1ChannelsDingtalkTestData = {
+    body?: {
+        clientId: string;
+        clientSecret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/dingtalk/test';
+};
+
+export type PostApiV1ChannelsDingtalkTestErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsDingtalkTestError = PostApiV1ChannelsDingtalkTestErrors[keyof PostApiV1ChannelsDingtalkTestErrors];
+
+export type PostApiV1ChannelsDingtalkTestResponses = {
+    /**
+     * DingTalk connectivity test result
+     */
+    200: {
+        success: boolean;
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsDingtalkTestResponse = PostApiV1ChannelsDingtalkTestResponses[keyof PostApiV1ChannelsDingtalkTestResponses];
+
+export type PostApiV1ChannelsQqbotConnectData = {
+    body?: {
+        appId: string;
+        appSecret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/qqbot/connect';
+};
+
+export type PostApiV1ChannelsQqbotConnectErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotConnectError = PostApiV1ChannelsQqbotConnectErrors[keyof PostApiV1ChannelsQqbotConnectErrors];
+
+export type PostApiV1ChannelsQqbotConnectResponses = {
+    /**
+     * Connected qqbot channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotConnectResponse = PostApiV1ChannelsQqbotConnectResponses[keyof PostApiV1ChannelsQqbotConnectResponses];
+
+export type PostApiV1ChannelsQqbotTestData = {
+    body?: {
+        appId: string;
+        appSecret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/qqbot/test';
+};
+
+export type PostApiV1ChannelsQqbotTestErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotTestError = PostApiV1ChannelsQqbotTestErrors[keyof PostApiV1ChannelsQqbotTestErrors];
+
+export type PostApiV1ChannelsQqbotTestResponses = {
+    /**
+     * QQ connectivity test result
+     */
+    200: {
+        success: boolean;
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsQqbotTestResponse = PostApiV1ChannelsQqbotTestResponses[keyof PostApiV1ChannelsQqbotTestResponses];
+
+export type PostApiV1ChannelsWecomConnectData = {
+    body?: {
+        botId: string;
+        secret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/wecom/connect';
+};
+
+export type PostApiV1ChannelsWecomConnectErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWecomConnectError = PostApiV1ChannelsWecomConnectErrors[keyof PostApiV1ChannelsWecomConnectErrors];
+
+export type PostApiV1ChannelsWecomConnectResponses = {
+    /**
+     * Connected wecom channel
+     */
+    200: {
+        id: string;
+        botId: string;
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
+        accountId: string;
+        status: 'pending' | 'connected' | 'disconnected' | 'error';
+        teamName: string;
+        appId?: string;
+        botUserId?: string;
+        createdAt: string;
+        updatedAt: string;
+    };
+};
+
+export type PostApiV1ChannelsWecomConnectResponse = PostApiV1ChannelsWecomConnectResponses[keyof PostApiV1ChannelsWecomConnectResponses];
+
+export type PostApiV1ChannelsWecomTestData = {
+    body?: {
+        botId: string;
+        secret: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/channels/wecom/test';
+};
+
+export type PostApiV1ChannelsWecomTestErrors = {
+    /**
+     * Invalid credentials
+     */
+    409: {
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWecomTestError = PostApiV1ChannelsWecomTestErrors[keyof PostApiV1ChannelsWecomTestErrors];
+
+export type PostApiV1ChannelsWecomTestResponses = {
+    /**
+     * WeCom connectivity test result
+     */
+    200: {
+        success: boolean;
+        message: string;
+    };
+};
+
+export type PostApiV1ChannelsWecomTestResponse = PostApiV1ChannelsWecomTestResponses[keyof PostApiV1ChannelsWecomTestResponses];
 
 export type GetApiV1ChannelsByChannelIdStatusData = {
     body?: never;
@@ -1268,7 +1516,7 @@ export type GetApiV1ChannelsByChannelIdStatusResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1412,7 +1660,7 @@ export type PostApiV1ChannelsWhatsappConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;
@@ -1516,7 +1764,7 @@ export type PostApiV1ChannelsWechatConnectResponses = {
     200: {
         id: string;
         botId: string;
-        channelType: 'slack' | 'discord' | 'feishu' | 'wechat' | 'telegram' | 'whatsapp';
+        channelType: 'slack' | 'discord' | 'feishu' | 'dingtalk' | 'wecom' | 'wechat' | 'telegram' | 'whatsapp' | 'qqbot';
         accountId: string;
         status: 'pending' | 'connected' | 'disconnected' | 'error';
         teamName: string;

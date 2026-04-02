@@ -49,7 +49,7 @@ on:
     secrets:
       CLOUDFLARE_ZONE_ID:
         required: false
-      CLOUDFLARE_API_TOKEN:
+      CLOUDFLARE_PURGE_API_TOKEN:
         required: false
 
 permissions:
@@ -471,7 +471,7 @@ jobs:
         if: inputs.update_feed_url != '' && env.CLOUDFLARE_ZONE_ID != ''
         env:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_PURGE_API_TOKEN: ${{ secrets.CLOUDFLARE_PURGE_API_TOKEN }}
           UPDATE_FEED_URL: ${{ inputs.update_feed_url }}
           LATEST_DMG: ${{ steps.artifacts.outputs.latest_dmg }}
           LATEST_ZIP: ${{ steps.artifacts.outputs.latest_zip }}
@@ -497,14 +497,60 @@ jobs:
           fi
 
           files_json=$(printf '%s\n' "${urls[@]}" | jq -R . | jq -sc '.')
+          payload=$(jq -cn --argjson files "$files_json" '{ files: $files }')
+          api_url="https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache"
+          max_attempts=5
+          purge_succeeded=0
+
           echo "[cf-purge] Purging: ${files_json}"
 
-          curl -sf -X POST \
-            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"files\": ${files_json}}" \
-            | jq .
+          for attempt in $(seq 1 "$max_attempts"); do
+            response_file=$(mktemp)
+            http_code="$({
+              curl \
+                --http1.1 \
+                --silent \
+                --show-error \
+                --location \
+                --retry 3 \
+                --retry-delay 2 \
+                --retry-all-errors \
+                --connect-timeout 15 \
+                --max-time 120 \
+                --output "$response_file" \
+                --write-out '%{http_code}' \
+                -X POST \
+                "$api_url" \
+                -H "Authorization: Bearer ${CLOUDFLARE_PURGE_API_TOKEN}" \
+                -H "Content-Type: application/json" \
+                --data "$payload"
+            } || true)"
+
+            echo "[cf-purge] attempt ${attempt}/${max_attempts} http=${http_code:-curl-failed}"
+
+            if [ -s "$response_file" ]; then
+              jq . "$response_file" || true
+            else
+              echo "[cf-purge] empty response body"
+            fi
+
+            if [ "$http_code" = "200" ] && jq -e '.success == true' "$response_file" >/dev/null 2>&1; then
+              purge_succeeded=1
+              rm -f "$response_file"
+              break
+            fi
+
+            rm -f "$response_file"
+
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep $((attempt * 2))
+            fi
+          done
+
+          if [ "$purge_succeeded" -ne 1 ]; then
+            echo "[cf-purge] failed after ${max_attempts} attempts" >&2
+            exit 1
+          fi
 
       - name: Publish Cloudflare download links
         if: inputs.update_feed_url != ''

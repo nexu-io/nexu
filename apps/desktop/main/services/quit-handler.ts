@@ -42,7 +42,7 @@ export type QuitDecision = "quit-completely" | "run-in-background" | "cancel";
  * Always ends with `app.exit(0)` in `finally`, so even if teardown throws,
  * the app won't hang.
  */
-async function runTeardownAndExit(
+export async function runTeardownAndExit(
   opts: QuitHandlerOptions,
   logLabel: string,
 ): Promise<void> {

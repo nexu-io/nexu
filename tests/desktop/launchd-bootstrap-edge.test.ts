@@ -838,7 +838,9 @@ describe("ensureNexuProcessesDead", () => {
     setupPgrepSequence([
       [], // controller pattern
       [], // openclaw.mjs pattern
-      [], // openclaw-gateway pattern
+      [], // openclaw path pattern
+      [], // repo openclaw-gateway pattern
+      [], // packaged openclaw-gateway pattern
     ]);
 
     const { ensureNexuProcessesDead } = await import(
@@ -861,15 +863,18 @@ describe("ensureNexuProcessesDead", () => {
     process.kill = mockKill as unknown as typeof process.kill;
 
     try {
-      // First round of pgrep (3 patterns): processes found
-      // Second round of pgrep (3 patterns): still found (after SIGKILL)
-      // Third round of pgrep (3 patterns): gone
+      // First round of pgrep (5 patterns): processes found
+      // Second round of pgrep (5 patterns): gone
       setupPgrepSequence([
-        // Round 0, first findNexuProcessPids call (3 pattern checks)
+        // Round 0, first findNexuProcessPids call (5 pattern checks)
         [99001],
         [99002],
         [],
-        // Round 1, second findNexuProcessPids call after interval (3 pattern checks)
+        [],
+        [],
+        // Round 1, second findNexuProcessPids call after interval (5 pattern checks)
+        [],
+        [],
         [],
         [],
         [],
@@ -917,12 +922,12 @@ describe("ensureNexuProcessesDead", () => {
             pgrepCallCount++;
             // Return processes for the first many calls (inside the timeout loop),
             // then return empty for final check.
-            // With 3 patterns per findNexuProcessPids call, and a very short
+            // With 5 patterns per findNexuProcessPids call, and a very short
             // timeout + interval, the loop runs ~1-2 times.
             // The final check (after the while loop) should return empty.
-            // We'll make the first 6 calls return PIDs (2 rounds of 3 patterns),
+            // We'll make the first 10 calls return PIDs (2 rounds of 5 patterns),
             // and anything after return empty.
-            if (pgrepCallCount <= 6) {
+            if (pgrepCallCount <= 10) {
               callback?.(null, { stdout: "88001\n", stderr: "" });
             } else {
               callback?.(Object.assign(new Error("exit 1"), { code: 1 }), {

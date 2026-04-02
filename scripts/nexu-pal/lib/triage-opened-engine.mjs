@@ -1,3 +1,7 @@
+import {
+  isInternalEquivalentAuthor,
+  isSentryAutomationAuthor,
+} from "./internal-equivalent-author.mjs";
 import { detectDuplicate } from "./signals/duplicate-detector.mjs";
 import { matchRoadmap } from "./signals/roadmap-matcher.mjs";
 
@@ -9,14 +13,6 @@ export function createTriagePlan() {
     closeIssue: false,
     diagnostics: [],
   };
-}
-
-function isInternalEquivalentAuthor({ isInternalAuthor, issueAuthorLogin }) {
-  if (isInternalAuthor === true) {
-    return true;
-  }
-
-  return issueAuthorLogin === "app/sentry";
 }
 
 function buildTranslationComment({ translatedTitle, translatedSections }) {
@@ -415,9 +411,9 @@ export async function buildOpenedIssueTriagePlan({
     `organization membership: ${isInternalAuthor === true ? "member" : "non-member"}`,
   );
 
-  if (issueAuthorLogin === "app/sentry") {
+  if (isSentryAutomationAuthor(issueAuthorLogin)) {
     plan.diagnostics.push(
-      "author is app/sentry; treated as internal-equivalent automation for triage short-circuit",
+      "author is sentry[bot]; treated as internal-equivalent automation for triage short-circuit",
     );
   }
 

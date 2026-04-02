@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -158,7 +158,15 @@ async function createTestContainer(
     runtimeHealth,
     openclawProcess,
     agentService: new AgentService(configStore, openclawSyncService),
-    channelService: new ChannelService(configStore, openclawSyncService),
+    channelService: new ChannelService(
+      env,
+      configStore,
+      openclawSyncService,
+      gatewayService,
+      openclawProcess,
+      runtimeHealth,
+      wsClient,
+    ),
     channelFallbackService,
     sessionService: new SessionService(sessionsRuntime),
     runtimeConfigService: new RuntimeConfigService(
@@ -370,6 +378,220 @@ describe("controller route compatibility", () => {
       },
     );
     expect(deleteProfile.status).toBe(200);
+  });
+
+  it("supports qqbot connect when the plugin is installed", async () => {
+    await mkdir(
+      path.join(container.env.openclawExtensionsDir, "openclaw-qqbot"),
+      {
+        recursive: true,
+      },
+    );
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "openclaw-qqbot",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "openclaw-qqbot", channels: ["qqbot"] }),
+      "utf8",
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url.includes("bots.qq.com/app/getAppAccessToken")) {
+          return new Response(
+            JSON.stringify({ access_token: "qq-access-token" }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/qqbot/connect", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        appId: "123456",
+        appSecret: "qq-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      channelType: string;
+      appId?: string;
+    };
+    expect(payload.channelType).toBe("qqbot");
+    expect(payload.appId).toBe("123456");
+  });
+
+  it("supports wecom connect when the plugin is installed", async () => {
+    await mkdir(path.join(container.env.openclawExtensionsDir, "wecom"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "wecom",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "wecom", channels: ["wecom"] }),
+      "utf8",
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/wecom/connect", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        botId: "wecom-bot-123",
+        secret: "wecom-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      channelType: string;
+      appId?: string;
+    };
+    expect(payload.channelType).toBe("wecom");
+    expect(payload.appId).toBe("wecom-bot-123");
+  });
+
+  it("supports wecom connectivity tests when the plugin is installed", async () => {
+    await mkdir(path.join(container.env.openclawExtensionsDir, "wecom"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "wecom",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "wecom", channels: ["wecom"] }),
+      "utf8",
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/wecom/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        botId: "wecom-bot-123",
+        secret: "wecom-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      success: boolean;
+      message: string;
+    };
+    expect(payload.success).toBe(true);
+    expect(payload.message).toContain("wecom-bot-123");
+  });
+
+  it("supports qqbot connectivity tests when the plugin is installed", async () => {
+    await mkdir(
+      path.join(container.env.openclawExtensionsDir, "openclaw-qqbot"),
+      {
+        recursive: true,
+      },
+    );
+    await writeFile(
+      path.join(
+        container.env.openclawExtensionsDir,
+        "openclaw-qqbot",
+        "openclaw.plugin.json",
+      ),
+      JSON.stringify({ id: "openclaw-qqbot", channels: ["qqbot"] }),
+      "utf8",
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url.includes("bots.qq.com/app/getAppAccessToken")) {
+          return new Response(
+            JSON.stringify({ access_token: "qq-access-token" }),
+            { status: 200 },
+          );
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }),
+    );
+
+    const app = createApp(container);
+    const response = await app.request("/api/v1/channels/qqbot/test", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        appId: "123456",
+        appSecret: "qq-secret",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      success: boolean;
+      message: string;
+    };
+    expect(payload.success).toBe(true);
+    expect(payload.message).toContain("123456");
+  });
+
+  it("maps legacy qqbot account ids to the runtime default account for live status", async () => {
+    const gatewayService = new OpenClawGatewayService(
+      {
+        isConnected: () => true,
+        request: vi.fn(async () => ({
+          channelOrder: ["qqbot"],
+          channels: {},
+          channelAccounts: {
+            qqbot: [
+              {
+                accountId: "default",
+                enabled: true,
+                configured: true,
+                running: true,
+                connected: true,
+                lastError: null,
+              },
+            ],
+          },
+        })),
+      } as never,
+      createRuntimeState(),
+    );
+
+    const result = await gatewayService.getAllChannelsLiveStatus([
+      {
+        id: "qq-channel-1",
+        channelType: "qqbot",
+        accountId: "qqbot-123456",
+      },
+    ]);
+
+    expect(result.gatewayConnected).toBe(true);
+    expect(result.channels).toEqual([
+      {
+        channelType: "qqbot",
+        channelId: "qq-channel-1",
+        accountId: "qqbot-123456",
+        status: "connected",
+        ready: true,
+        connected: true,
+        running: true,
+        configured: true,
+        lastError: null,
+      },
+    ]);
   });
 
   it("does not expose the removed internal skill compatibility endpoints", async () => {

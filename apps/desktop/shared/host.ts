@@ -37,6 +37,7 @@ export const hostInvokeChannels = [
   "component:check",
   "component:install",
   "setup:animation-complete",
+  "app:quit",
 ] as const;
 
 export type HostInvokeChannel = (typeof hostInvokeChannels)[number];
@@ -143,6 +144,7 @@ export type HostInvokePayloadMap = {
   "component:check": undefined;
   "component:install": { id: string };
   "setup:animation-complete": undefined;
+  "app:quit": { decision: "quit-completely" | "run-in-background" };
 };
 
 export type HostInvokeResultMap = {
@@ -404,6 +406,7 @@ export type HostInvokeResultMap = {
   };
   "component:install": { ok: boolean };
   "setup:animation-complete": undefined;
+  "app:quit": undefined;
 };
 
 export type AppInfo = {

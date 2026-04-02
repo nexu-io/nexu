@@ -48,36 +48,24 @@ vi.mock("node:fs/promises", () => ({
   rename: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("node:net", () => ({
-  default: {
-    createServer: vi.fn(() => {
-      // Default: port is free (server binds successfully)
-      const handlers: Record<string, ((...a: unknown[]) => void)[]> = {};
-      return {
-        once(event: string, cb: (...a: unknown[]) => void) {
-          if (!handlers[event]) handlers[event] = [];
-          handlers[event].push(cb);
-        },
-        listen(_port: number, _host: string, cb: () => void) {
-          setTimeout(() => cb(), 0);
-        },
-        close(cb: () => void) {
-          setTimeout(() => cb(), 0);
-        },
-      };
-    }),
-  },
-  createConnection: vi.fn((...args: unknown[]) => {
+vi.mock("node:net", () => {
+  const createServer = vi.fn(() => ({
+    once() {},
+    listen(_port: number, _host: string, cb: () => void) {
+      setTimeout(() => cb(), 0);
+    },
+    close(cb: () => void) {
+      setTimeout(() => cb(), 0);
+    },
+  }));
+  const createConnection = vi.fn(() => {
+    // Return a mock socket that emits "connect" immediately
     const handlers: Record<string, (() => void)[]> = {};
-    // Default: port is free (error on connect). Used by detectPortOccupier.
-    // probePort (health check) uses a separate mock path via the "connect" event.
-    // Individual tests override this mock for port-conflict scenarios.
-    const port = typeof args[0] === "number" ? args[0] : 0;
     const socket = {
       once(event: string, cb: () => void) {
         if (!handlers[event]) handlers[event] = [];
         handlers[event].push(cb);
-        // Auto-emit "connect" for probePort health checks (attach path)
+        // Auto-emit "connect" on next tick to simulate healthy port
         if (event === "connect") {
           setTimeout(() => cb(), 0);
         }
@@ -86,8 +74,17 @@ vi.mock("node:net", () => ({
       setTimeout: vi.fn(),
     };
     return socket;
-  }),
-}));
+  });
+
+  return {
+    default: {
+      createServer,
+      createConnection,
+    },
+    createServer,
+    createConnection,
+  };
+});
 
 const mockLaunchdManager = {
   getServiceStatus: vi.fn(),
@@ -175,6 +172,7 @@ function makeBootstrapEnv(
     proxyEnv: {
       NO_PROXY: "localhost,127.0.0.1,::1",
     },
+    controllerStartupValidationTimeoutMs: 500,
     ...overrides,
   };
 }
@@ -220,7 +218,7 @@ function mockUnknownService() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
+describe("Launchd Startup Scenarios", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mockWebServer.port = 50810;
@@ -332,7 +330,13 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
     // Controller health probe FAILS
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+      vi.fn((input: string | URL) => {
+        const url = String(input);
+        if (url.includes("/health")) {
+          return Promise.reject(new Error("ECONNREFUSED"));
+        }
+        return Promise.resolve({ status: 200, ok: true });
+      }),
     );
 
     const { bootstrapWithLaunchd } = await import(
@@ -342,7 +346,7 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
     await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     // Should have bootout the unhealthy controller
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     // Should have reinstalled
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   });
@@ -407,7 +411,23 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
 
     // Services already registered
     mockLaunchdManager.isServiceInstalled.mockResolvedValue(true);
-    mockLaunchdManager.getServiceStatus.mockResolvedValue(mockStoppedService());
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        return Promise.resolve(
+          controllerStatusCalls <= 2
+            ? mockStoppedService()
+            : mockRunningService(),
+        );
+      }
+
+      openclawStatusCalls++;
+      return Promise.resolve(
+        openclawStatusCalls <= 2 ? mockStoppedService() : mockRunningService(),
+      );
+    });
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -444,7 +464,7 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
       makeBootstrapEnv({ nexuHome: "/correct/nexu-home" }) as never,
     );
 
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     // Should still install and start services after teardown
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   });
@@ -464,7 +484,7 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
     await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     // Should teardown orphaned services
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     // Then do clean install
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   });
@@ -643,28 +663,32 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
   // -----------------------------------------------------------------------
   it("Scenario 15: controller port conflict resolved via findFreePort", async () => {
     const netMock = await import("node:net");
-    (
-      netMock.default.createServer as ReturnType<typeof vi.fn>
-    ).mockImplementation(() => {
-      const handlers: Record<string, ((...a: unknown[]) => void)[]> = {};
-      return {
-        once(event: string, cb: (...a: unknown[]) => void) {
-          if (!handlers[event]) handlers[event] = [];
-          handlers[event].push(cb);
-        },
-        listen(port: number, _host: string, cb: () => void) {
-          if (port === 50800) {
-            // Controller port occupied — emit error
-            setTimeout(() => handlers.error?.[0]?.(new Error("EADDRINUSE")), 0);
-          } else {
+    let listenCallCount = 0;
+    (netMock.createServer as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+        return {
+          once(event: string, cb: (...args: unknown[]) => void) {
+            if (!handlers[event]) handlers[event] = [];
+            handlers[event].push(cb);
+          },
+          listen(port: number, _host: string, cb: () => void) {
+            listenCallCount++;
+            if (port === 50800) {
+              setTimeout(
+                () => handlers.error?.[0]?.(new Error("EADDRINUSE")),
+                0,
+              );
+            } else {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          close(cb: () => void) {
             setTimeout(() => cb(), 0);
-          }
-        },
-        close(cb: () => void) {
-          setTimeout(() => cb(), 0);
-        },
-      };
-    });
+          },
+        };
+      },
+    );
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -672,7 +696,9 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
 
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
+    // Controller should have been moved to 50801
     expect(result.effectivePorts.controllerPort).toBe(50801);
+    expect(listenCallCount).toBeGreaterThanOrEqual(2);
   });
 
   // -----------------------------------------------------------------------
@@ -680,27 +706,30 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
   // -----------------------------------------------------------------------
   it("Scenario 16: openclaw port conflict resolved via findFreePort", async () => {
     const netMock = await import("node:net");
-    (
-      netMock.default.createServer as ReturnType<typeof vi.fn>
-    ).mockImplementation(() => {
-      const handlers: Record<string, ((...a: unknown[]) => void)[]> = {};
-      return {
-        once(event: string, cb: (...a: unknown[]) => void) {
-          if (!handlers[event]) handlers[event] = [];
-          handlers[event].push(cb);
-        },
-        listen(port: number, _host: string, cb: () => void) {
-          if (port === 18789) {
-            setTimeout(() => handlers.error?.[0]?.(new Error("EADDRINUSE")), 0);
-          } else {
+    (netMock.createServer as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+        return {
+          once(event: string, cb: (...args: unknown[]) => void) {
+            if (!handlers[event]) handlers[event] = [];
+            handlers[event].push(cb);
+          },
+          listen(port: number, _host: string, cb: () => void) {
+            if (port === 18789) {
+              setTimeout(
+                () => handlers.error?.[0]?.(new Error("EADDRINUSE")),
+                0,
+              );
+            } else {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          close(cb: () => void) {
             setTimeout(() => cb(), 0);
-          }
-        },
-        close(cb: () => void) {
-          setTimeout(() => cb(), 0);
-        },
-      };
-    });
+          },
+        };
+      },
+    );
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -775,7 +804,7 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
     );
 
     expect(result.isAttach).toBe(false);
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
   });
 
@@ -814,7 +843,7 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
     );
 
     expect(result.isAttach).toBe(false);
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
   });
 
@@ -838,7 +867,13 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
       .mockResolvedValueOnce(
         mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
       ) // controller health recheck
-      .mockResolvedValue(mockStoppedService()); // openclaw subsequent
+      .mockResolvedValueOnce(mockStoppedService()) // openclaw subsequent
+      .mockResolvedValueOnce(mockStoppedService()) // controller after cleanup
+      .mockResolvedValueOnce(mockStoppedService()) // openclaw after cleanup
+      .mockResolvedValueOnce(mockRunningService({ PORT: "50800" })) // controller ensure
+      .mockResolvedValueOnce(mockRunningService({ PORT: "50800" })) // controller validate
+      .mockResolvedValueOnce(mockStoppedService()) // openclaw ensure
+      .mockResolvedValue(mockRunningService()); // openclaw running afterwards
 
     const { bootstrapWithLaunchd } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
@@ -1061,45 +1096,178 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
     expect(result.isAttach).toBe(false);
-    expect(mockLaunchdManager.bootoutService).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(fsMock.unlink).toHaveBeenCalledWith(
       expect.stringContaining("runtime-ports.json"),
     );
   });
 
   // -----------------------------------------------------------------------
-  // Scenario 27: Global openclaw steals port after launch → auto-reassign
-  // Simulates: `openclaw install` registered ai.openclaw.gateway with
-  // KeepAlive=true on the same port. After Nexu's openclaw starts, the
-  // global service races and grabs the port. Bootstrap detects the PID
-  // mismatch and reassigns to a new port.
+  // Scenario 27: Packaged partial state + stale orphan openclaw process
   // -----------------------------------------------------------------------
-  it("Scenario 27: port stolen — openclaw crashed, port occupied → reassignment", async () => {
+  it("Scenario 27: packaged partial launchd state kills stale orphan openclaw and forces clean cold start", async () => {
+    const fsMock = await import("node:fs/promises");
+    const cpMock = await import("node:child_process");
     const netMock = await import("node:net");
-    const connectCallCount = 0;
 
-    // 18789 is occupied — createServer.listen fails on 18789
-    (
-      netMock.default.createServer as ReturnType<typeof vi.fn>
-    ).mockImplementation(() => {
-      const handlers: Record<string, ((...a: unknown[]) => void)[]> = {};
-      return {
-        once(event: string, cb: (...a: unknown[]) => void) {
-          if (!handlers[event]) handlers[event] = [];
-          handlers[event].push(cb);
-        },
-        listen(port: number, _host: string, cb: () => void) {
-          if (port === 18789) {
-            setTimeout(() => handlers.error?.[0]?.(new Error("EADDRINUSE")), 0);
-          } else {
-            setTimeout(() => cb(), 0);
-          }
-        },
-        close(cb: () => void) {
-          setTimeout(() => cb(), 0);
-        },
-      };
+    const recoveredPorts = makeRuntimePorts({
+      isDev: false,
+      appVersion: "1.0.0",
+      userDataPath: "/tmp/user-data",
+      buildSource: "stable",
+      openclawStateDir: "/tmp/state",
     });
+
+    (fsMock.readFile as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: controller plist
+      .mockRejectedValueOnce(new Error("ENOENT")) // cleanup: openclaw plist
+      .mockResolvedValueOnce(recoveredPorts); // stale session + recovery source
+
+    // Partial stale state: controller is launchd-running, openclaw is not.
+    mockLaunchdManager.getServiceStatus
+      .mockResolvedValueOnce(
+        mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+      ) // orphan cleanup pre-check: controller
+      .mockResolvedValueOnce(mockStoppedService()) // orphan cleanup pre-check: openclaw
+      .mockResolvedValueOnce(
+        mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
+      ) // partial-attach check: controller
+      .mockResolvedValueOnce(mockStoppedService()) // partial-attach check: openclaw
+      .mockResolvedValueOnce(mockStoppedService()) // post-teardown controller
+      .mockResolvedValueOnce(mockStoppedService()) // post-teardown openclaw
+      .mockResolvedValueOnce(mockRunningService({ PORT: "50800" })) // controller ensure
+      .mockResolvedValueOnce(mockRunningService({ PORT: "50800" })) // controller validate
+      .mockResolvedValueOnce(mockStoppedService()) // openclaw ensure
+      .mockResolvedValue(mockRunningService()); // openclaw running afterwards
+
+    (netMock.createServer as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+        return {
+          once(event: string, cb: (...args: unknown[]) => void) {
+            if (!handlers[event]) handlers[event] = [];
+            handlers[event].push(cb);
+          },
+          listen(port: number, _host: string, cb: () => void) {
+            if (port === 18789) {
+              setTimeout(
+                () => handlers.error?.[0]?.(new Error("EADDRINUSE")),
+                0,
+              );
+            } else {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          close(cb: () => void) {
+            setTimeout(() => cb(), 0);
+          },
+        };
+      },
+    );
+
+    (cpMock.execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (
+        cmd: string,
+        args: string[],
+        callback: (
+          error: Error | null,
+          result: { stdout: string; stderr: string },
+        ) => void,
+      ) => {
+        // stale openclaw occupier still on recovered port
+        if (
+          cmd === "lsof" &&
+          args.some((arg: string) => arg.includes("18789"))
+        ) {
+          callback(null, { stdout: "77777\n", stderr: "" });
+          return;
+        }
+
+        // getCurrentProcessTreePids() -> no children to exclude
+        if (cmd === "pgrep" && args[0] === "-P") {
+          callback(new Error("no process"), { stdout: "", stderr: "" });
+          return;
+        }
+
+        // orphan openclaw process still present from dev runtime path
+        if (cmd === "pgrep" && args[0] === "-f") {
+          if (
+            args[1]?.includes(
+              "openclaw-runtime/node_modules/openclaw/openclaw\\.mjs",
+            )
+          ) {
+            callback(null, { stdout: "77777\n", stderr: "" });
+            return;
+          }
+
+          callback(new Error("no process"), { stdout: "", stderr: "" });
+          return;
+        }
+
+        callback(new Error("no process"), { stdout: "", stderr: "" });
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        isDev: false,
+        appVersion: "1.0.0",
+        userDataPath: "/tmp/user-data",
+        buildSource: "stable",
+      }) as never,
+    );
+
+    expect(result.isAttach).toBe(false);
+    expect(result.effectivePorts.controllerPort).toBe(50800);
+    expect(result.effectivePorts.openclawPort).toBeGreaterThanOrEqual(18789);
+
+    // stale partial launchd state is torn down and waits for exit
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledWith(
+      "io.nexu.controller",
+      5000,
+    );
+    // stale runtime metadata is removed before clean bootstrap
+    expect(fsMock.unlink).toHaveBeenCalledWith(
+      expect.stringContaining("runtime-ports.json"),
+    );
+    expect(netMock.createServer).toHaveBeenCalled();
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledTimes(1);
+  });
+
+  // -----------------------------------------------------------------------
+  // Scenario 28: Global openclaw steals port after launch → auto-reassign
+  // -----------------------------------------------------------------------
+  it("Scenario 28: port stolen — openclaw crashed, port occupied → reassignment", async () => {
+    const netMock = await import("node:net");
+
+    (netMock.createServer as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        const handlers: Record<string, ((...a: unknown[]) => void)[]> = {};
+        return {
+          once(event: string, cb: (...a: unknown[]) => void) {
+            if (!handlers[event]) handlers[event] = [];
+            handlers[event].push(cb);
+          },
+          listen(port: number, _host: string, cb: () => void) {
+            if (port === 18789) {
+              setTimeout(
+                () => handlers.error?.[0]?.(new Error("EADDRINUSE")),
+                0,
+              );
+            } else {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          close(cb: () => void) {
+            setTimeout(() => cb(), 0);
+          },
+        };
+      },
+    );
 
     mockLaunchdManager.getServiceStatus.mockResolvedValue({
       status: "running",
@@ -1112,27 +1280,25 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
 
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
-    // findFreePort should skip 18789 (occupied) and use 18790
     expect(result.effectivePorts.openclawPort).toBe(18790);
   });
 
   // -----------------------------------------------------------------------
-  // Scenario 28: Our openclaw owns the port → no reassignment
+  // Scenario 29: Our openclaw owns the port → no reassignment needed
   // -----------------------------------------------------------------------
-  it("Scenario 28: openclaw owns its port, no reassignment needed", async () => {
-    // Reset createServer to default (port free) after Scenario 27 overrode it
+  it("Scenario 29: openclaw owns its port, no reassignment needed", async () => {
     const netMock = await import("node:net");
-    (
-      netMock.default.createServer as ReturnType<typeof vi.fn>
-    ).mockImplementation(() => ({
-      once() {},
-      listen(_p: number, _h: string, cb: () => void) {
-        setTimeout(() => cb(), 0);
-      },
-      close(cb: () => void) {
-        setTimeout(() => cb(), 0);
-      },
-    }));
+    (netMock.createServer as ReturnType<typeof vi.fn>).mockImplementation(
+      () => ({
+        once() {},
+        listen(_p: number, _h: string, cb: () => void) {
+          setTimeout(() => cb(), 0);
+        },
+        close(cb: () => void) {
+          setTimeout(() => cb(), 0);
+        },
+      }),
+    );
 
     mockLaunchdManager.getServiceStatus.mockResolvedValue({
       status: "running",
@@ -1145,7 +1311,391 @@ describe("Launchd Startup Scenarios", { timeout: 10_000 }, () => {
 
     const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
 
-    // Port should stay at default — no conflict
     expect(result.effectivePorts.openclawPort).toBe(18789);
   });
+
+  // -----------------------------------------------------------------------
+  // Scenario 30: controller exits immediately after start → retry on new port
+  // -----------------------------------------------------------------------
+  it("Scenario 30: controller launchd stop after start triggers single retry on new port", async () => {
+    const fsMock = await import("node:fs/promises");
+    let controllerRecovered = false;
+
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.bootoutAndWaitForExit.mockImplementation(
+      (label: string) => {
+        if (label.includes("controller")) {
+          controllerRecovered = true;
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        return Promise.resolve(
+          controllerRecovered
+            ? mockRunningService({ PORT: "50801" })
+            : mockStoppedService(),
+        );
+      }
+
+      openclawStatusCalls++;
+      switch (openclawStatusCalls) {
+        case 1:
+          return Promise.resolve(mockStoppedService());
+        case 2:
+          return Promise.resolve(mockStoppedService());
+        default:
+          return Promise.resolve(mockRunningService());
+      }
+    });
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(result.effectivePorts.controllerPort).toBe(50801);
+    expect(fsMock.writeFile).toHaveBeenCalledWith(
+      expect.stringContaining("runtime-ports.json.tmp"),
+      expect.stringContaining('"controllerPort": 50801'),
+      "utf8",
+    );
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 31: controller port unreachable after start → retry on new port
+  // -----------------------------------------------------------------------
+  it("Scenario 31: controller port unreachable while launchd is running triggers retry", async () => {
+    const netMock = await import("node:net");
+
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        switch (controllerStatusCalls) {
+          case 1:
+            return Promise.resolve(mockStoppedService());
+          case 2:
+            return Promise.resolve(mockStoppedService());
+          case 3:
+            return Promise.resolve(mockRunningService({ PORT: "50800" }));
+          case 4:
+            return Promise.resolve(mockRunningService({ PORT: "50800" }));
+          case 5:
+            return Promise.resolve(mockRunningService({ PORT: "50801" }));
+          default:
+            return Promise.resolve(mockRunningService({ PORT: "50801" }));
+        }
+      }
+
+      openclawStatusCalls++;
+      switch (openclawStatusCalls) {
+        case 1:
+          return Promise.resolve(mockStoppedService());
+        case 2:
+          return Promise.resolve(mockStoppedService());
+        default:
+          return Promise.resolve(mockRunningService());
+      }
+    });
+
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ port }: { port: number }) => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "connect" && port === 50801) {
+              setTimeout(() => cb(), 0);
+            }
+            if (event === "error" && port === 50800) {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalledWith(
+      "io.nexu.controller.dev",
+      5000,
+    );
+    expect(result.effectivePorts.controllerPort).toBe(50801);
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 32: retry success writes effectivePorts to runtime-ports metadata
+  // -----------------------------------------------------------------------
+  it("Scenario 32: controller retry success persists new port in runtime metadata", async () => {
+    const fsMock = await import("node:fs/promises");
+    const netMock = await import("node:net");
+
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        switch (controllerStatusCalls) {
+          case 1:
+            return Promise.resolve(mockStoppedService());
+          case 2:
+            return Promise.resolve(mockStoppedService());
+          case 3:
+            return Promise.resolve(mockRunningService({ PORT: "50800" }));
+          case 4:
+            return Promise.resolve(mockRunningService({ PORT: "50800" }));
+          case 5:
+            return Promise.resolve(mockRunningService({ PORT: "50801" }));
+          default:
+            return Promise.resolve(mockRunningService({ PORT: "50801" }));
+        }
+      }
+
+      openclawStatusCalls++;
+      switch (openclawStatusCalls) {
+        case 1:
+          return Promise.resolve(mockStoppedService());
+        case 2:
+          return Promise.resolve(mockStoppedService());
+        default:
+          return Promise.resolve(mockRunningService());
+      }
+    });
+
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ port }: { port: number }) => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "connect" && port === 50801) {
+              setTimeout(() => cb(), 0);
+            }
+            if (event === "error" && port === 50800) {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(fsMock.writeFile).toHaveBeenCalledWith(
+      expect.stringContaining("runtime-ports.json.tmp"),
+      expect.stringContaining('"controllerPort": 50801'),
+      "utf8",
+    );
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 33: retry failure throws explicit recovery error
+  // -----------------------------------------------------------------------
+  it("Scenario 33: controller retry failure reports recovery details", async () => {
+    const netMock = await import("node:net");
+
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        switch (controllerStatusCalls) {
+          case 1:
+            return Promise.resolve(mockStoppedService());
+          case 2:
+            return Promise.resolve(mockStoppedService());
+          case 3:
+            return Promise.resolve(mockRunningService({ PORT: "50800" }));
+          case 4:
+            return Promise.resolve(mockRunningService({ PORT: "50800" }));
+          case 5:
+            return Promise.resolve(mockRunningService({ PORT: "50801" }));
+          default:
+            return Promise.resolve(mockRunningService({ PORT: "50801" }));
+        }
+      }
+
+      openclawStatusCalls++;
+      switch (openclawStatusCalls) {
+        case 1:
+          return Promise.resolve(mockStoppedService());
+        case 2:
+          return Promise.resolve(mockStoppedService());
+        default:
+          return Promise.resolve(mockRunningService());
+      }
+    });
+
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ port }: { port: number }) => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "error" && (port === 50800 || port === 50801)) {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await expect(
+      bootstrapWithLaunchd(makeBootstrapEnv() as never),
+    ).rejects.toThrow(
+      /Controller startup recovery failed .*originalPort=50800 .*retryPort=50801 .*finalProbeUrl=http:\/\/127\.0\.0\.1:50801\/api\/internal\/desktop\/ready .*runtimePortsValue=/,
+    );
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 34: transient controller warm-up does not trigger recovery
+  // -----------------------------------------------------------------------
+  it("Scenario 34: controller warm-up polling avoids unnecessary recovery", async () => {
+    const netMock = await import("node:net");
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    let readyAttempts = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        return Promise.resolve(
+          controllerStatusCalls <= 2
+            ? mockStoppedService()
+            : mockRunningService({ PORT: "50800" }),
+        );
+      }
+      openclawStatusCalls++;
+      return Promise.resolve(
+        openclawStatusCalls <= 2 ? mockStoppedService() : mockRunningService(),
+      );
+    });
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      () => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "connect") {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const url = String(input);
+        if (url.includes("/api/internal/desktop/ready")) {
+          readyAttempts++;
+          if (readyAttempts < 3) {
+            return Promise.resolve({ ok: false, status: 503 });
+          }
+        }
+        return Promise.resolve({ ok: true, status: 200 });
+      }),
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(makeBootstrapEnv() as never);
+
+    expect(result.effectivePorts.controllerPort).toBe(50800);
+    expect(
+      mockLaunchdManager.bootoutAndWaitForExit.mock.calls.some(
+        (call) => call[0] === "io.nexu.controller.dev",
+      ),
+    ).toBe(false);
+  }, 15000);
+
+  // -----------------------------------------------------------------------
+  // Scenario 35: retry port clamps at 65535 instead of probing 65536
+  // -----------------------------------------------------------------------
+  it("Scenario 35: controller retry port is clamped at 65535", async () => {
+    const netMock = await import("node:net");
+    const cpMock = await import("node:child_process");
+    const execFileMock = cpMock.execFile as unknown as ReturnType<typeof vi.fn>;
+
+    let controllerStatusCalls = 0;
+    let openclawStatusCalls = 0;
+    mockLaunchdManager.getServiceStatus.mockImplementation((label: string) => {
+      if (label.includes("controller")) {
+        controllerStatusCalls++;
+        switch (controllerStatusCalls) {
+          case 1:
+          case 2:
+            return Promise.resolve(mockStoppedService());
+          case 3:
+          case 4:
+            return Promise.resolve(mockRunningService({ PORT: "65535" }));
+          default:
+            return Promise.resolve(mockRunningService({ PORT: "65535" }));
+        }
+      }
+
+      openclawStatusCalls++;
+      return Promise.resolve(
+        openclawStatusCalls <= 2 ? mockStoppedService() : mockRunningService(),
+      );
+    });
+
+    (netMock.createConnection as ReturnType<typeof vi.fn>).mockImplementation(
+      ({ port }: { port: number }) => {
+        const socket = {
+          once(event: string, cb: () => void) {
+            if (event === "connect" && port === 65535) {
+              setTimeout(() => cb(), 0);
+            }
+            if (event === "error" && port === 65535) {
+              setTimeout(() => cb(), 0);
+            }
+          },
+          destroy: vi.fn(),
+          setTimeout: vi.fn(),
+        };
+        return socket;
+      },
+    );
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    const result = await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        controllerPort: 65535,
+        recoveredPorts: null,
+      }) as never,
+    );
+
+    expect(result.effectivePorts.controllerPort).toBe(65535);
+    expect(
+      execFileMock.mock.calls.some((call) =>
+        JSON.stringify(call).includes("65536"),
+      ),
+    ).toBe(false);
+  }, 15000);
 });

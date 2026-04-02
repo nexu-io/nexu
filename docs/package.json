@@ -5,8 +5,9 @@
   "type": "module",
   "packageManager": "pnpm@10.26.0",
   "scripts": {
-    "dev": "node ./scripts/dev.mjs",
-    "build": "vitepress build .",
+    "validate:docs": "node ./scripts/validate-doc-pages.mjs",
+    "dev": "node ./scripts/validate-doc-pages.mjs && node ./scripts/dev.mjs",
+    "build": "node ./scripts/validate-doc-pages.mjs && vitepress build .",
     "preview": "vitepress preview .",
     "normalize-assets": "node ./scripts/normalize-assets.mjs",
     "normalize-assets:watch": "node ./scripts/watch-assets.mjs"

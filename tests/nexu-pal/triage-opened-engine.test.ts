@@ -253,7 +253,7 @@ describe("buildOpenedIssueTriagePlan", () => {
     );
   });
 
-  it("treats app/sentry as internal-equivalent and skips needs-information or needs-triage", async () => {
+  it("treats sentry[bot] as internal-equivalent and skips needs-information or needs-triage", async () => {
     const chat = vi
       .fn()
       .mockResolvedValueOnce(
@@ -276,7 +276,7 @@ describe("buildOpenedIssueTriagePlan", () => {
       issueTitle:
         "Error: Cannot write headers after they are sent to the client",
       issueBody: "Sentry issue body",
-      issueAuthorLogin: "app/sentry",
+      issueAuthorLogin: "sentry[bot]",
       isInternalAuthor: false,
       chat,
     });
@@ -287,7 +287,7 @@ describe("buildOpenedIssueTriagePlan", () => {
     expect(plan.diagnostics).toEqual(
       expect.arrayContaining([
         "organization membership: non-member",
-        "author is app/sentry; treated as internal-equivalent automation for triage short-circuit",
+        "author is sentry[bot]; treated as internal-equivalent automation for triage short-circuit",
         "internal-equivalent author detected; skipped roadmap/duplicate/completeness/needs-triage checks",
       ]),
     );

@@ -10,6 +10,10 @@ import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import type { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import {
+  type QuitHandlerOptions,
+  runTeardownAndExit,
+} from "./services/quit-handler";
 import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
 
@@ -17,6 +21,8 @@ const validChannels = new Set<string>(hostInvokeChannels);
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
+let quitHandlerOpts: QuitHandlerOptions | null = null;
+let quitFallback: (() => Promise<void>) | null = null;
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -102,6 +108,14 @@ export function setUpdateManager(manager: UpdateManager | null): void {
 
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
+}
+
+export function setQuitHandlerOpts(opts: QuitHandlerOptions): void {
+  quitHandlerOpts = opts;
+}
+
+export function setQuitFallback(fallback: () => Promise<void>): void {
+  quitFallback = fallback;
 }
 
 function assertValidChannel(
@@ -496,17 +510,37 @@ export function registerIpcHandlers(
         }
 
         case "setup:animation-complete": {
-          // Restore normal window size and vibrancy now that the
-          // white-background animation overlay has been removed.
+          // Restore vibrancy now that the white-background animation
+          // overlay has been removed.
           const win = BrowserWindow.getAllWindows()[0];
           if (win) {
-            win.setMinimumSize(1120, 760);
-            win.setSize(1400, 920, true);
-            win.center();
+            win.setMinimumSize(1120, 720);
             if (process.platform === "darwin") {
               win.setBackgroundColor("#00000000");
               win.setVibrancy("sidebar");
             }
+          }
+          return undefined;
+        }
+
+        case "app:quit": {
+          const typedPayload = payload as HostInvokePayloadMap["app:quit"];
+          if (typedPayload.decision === "run-in-background") {
+            const bgWin = BrowserWindow.getAllWindows()[0];
+            if (bgWin) bgWin.hide();
+            return undefined;
+          }
+          // quit-completely: use the fail-safe teardown path (finally → app.exit(0))
+          // so the process always exits even if teardown throws.
+          if (quitHandlerOpts) {
+            void runTeardownAndExit(quitHandlerOpts, "ipc-quit");
+          } else if (quitFallback) {
+            void quitFallback();
+          } else {
+            console.warn(
+              "[app:quit] quit fallback unavailable, forcing app.exit(0)",
+            );
+            app.exit(0);
           }
           return undefined;
         }

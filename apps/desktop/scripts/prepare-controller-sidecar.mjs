@@ -16,9 +16,15 @@ const controllerDistRoot = resolve(controllerRoot, "dist");
 const sharedRoot = resolve(nexuRoot, "packages/shared");
 const sharedDistRoot = resolve(sharedRoot, "dist");
 const controllerStaticRoot = resolve(controllerRoot, "static");
+const controllerBundledPluginsRoot = resolve(
+  controllerRoot,
+  ".dist-runtime",
+  "plugins",
+);
 const sidecarRoot = getSidecarRoot("controller");
 const sidecarDistRoot = resolve(sidecarRoot, "dist");
 const sidecarStaticRoot = resolve(sidecarRoot, "static");
+const sidecarPluginsRoot = resolve(sidecarRoot, "plugins");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const controllerNodeModules = resolve(controllerRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
@@ -42,6 +48,10 @@ async function ensureBuildArtifacts() {
     missing.push("apps/controller/node_modules");
   }
 
+  if (!(await pathExists(controllerBundledPluginsRoot))) {
+    missing.push("apps/controller/.dist-runtime/plugins");
+  }
+
   if (missing.length > 0) {
     throw new Error(
       `Missing controller sidecar prerequisites: ${missing.join(", ")}. Build/install nexu first.`,
@@ -58,6 +68,13 @@ async function prepareControllerSidecar() {
 
   if (await pathExists(controllerStaticRoot)) {
     await cp(controllerStaticRoot, sidecarStaticRoot, {
+      recursive: true,
+      dereference: true,
+    });
+  }
+
+  if (await pathExists(controllerBundledPluginsRoot)) {
+    await cp(controllerBundledPluginsRoot, sidecarPluginsRoot, {
       recursive: true,
       dereference: true,
     });

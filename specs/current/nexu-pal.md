@@ -23,7 +23,7 @@ Runs in order:
 
 3. **Intent classification** — Sends the normalized English title and body to the LLM and assigns only the `bug` label when the issue clearly describes broken behavior.
 
-4. **Internal-member short-circuit** — The workflow checks whether `issue.user.login` belongs to the repository owner's GitHub organization via the org-membership API. If the author is an org member, the opened-issue flow stops after translation + bug classification. The same short-circuit also applies to the repository-managed `app/sentry` issue source. These internal-equivalent issues skip known-issue matching, completeness checks, and `needs-triage` labeling.
+4. **Internal-member short-circuit** — The workflow checks whether `issue.user.login` belongs to the repository owner's GitHub organization via the org-membership API. If the author is an org member, the opened-issue flow stops after translation + bug classification. The same short-circuit also applies to Sentry automation issues authored by `sentry[bot]` (GitHub App actor). These internal-equivalent issues skip known-issue matching, completeness checks, and `needs-triage` labeling.
 
 5. **Completeness check** — For authors that are not internal or internal-equivalent, uses the LLM to decide whether the issue is too incomplete to continue triage. If so, adds `needs-information`, posts a follow-up comment, and pauses there.
 
@@ -60,10 +60,10 @@ Current transitions:
 
 Four GitHub Actions send Feishu webhook notifications for GitHub content:
 
-1. **Issue notification** — On `issues: [opened]`, sends the existing issue card to the issue notification webhook (`NOTIFY_ISSUE_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member. This suppression remains org-membership-based; the `app/sentry` internal-equivalent triage shortcut does not change the notification rule.
+1. **Issue notification** — On `issues: [opened]`, sends the existing issue card to the issue notification webhook (`NOTIFY_ISSUE_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member or `sentry[bot]`.
 2. **Needs-triage issue notification** — On `issues: [labeled]`, when the added label is `needs-triage`, sends a triage card to either the bug or non-bug webhook based on the issue's current labels. The workflow maps GitHub secrets to internal env vars `BUG_WEBHOOK` and `REQ_WEBHOOK`.
-3. **Discussion notification** — On `discussion: [created]`, sends the existing discussion card format using the discussion category in place of labels to the discussion notification webhook (`NOTIFY_DISCUSSION_ISSUE_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member.
-4. **Pull request notification** — On `pull_request: [opened]`, sends the existing card format using pull request labels to the pull-request notification webhook (`NOTIFY_PR_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member.
+3. **Discussion notification** — On `discussion: [created]`, sends the existing discussion card format using the discussion category in place of labels to the discussion notification webhook (`NOTIFY_DISCUSSION_ISSUE_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member or `sentry[bot]`.
+4. **Pull request notification** — On `pull_request: [opened]`, sends the existing card format using pull request labels to the pull-request notification webhook (`NOTIFY_PR_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member or `sentry[bot]`.
 
 The issue/discussion/pull-request workflows run `node scripts/notify/feishu-notify.mjs`. The triage workflow runs `node scripts/notify/feishu-triage-notify.mjs`.
 
@@ -83,7 +83,7 @@ The issue/discussion/pull-request workflows run `node scripts/notify/feishu-noti
 
 The three **nexu-pal** workflows create a short-lived token via `actions/create-github-app-token@v1` using secrets `NEXU_PAL_APP_ID` and `NEXU_PAL_PRIVATE_KEY_PEM`. All GitHub API calls and the first-interaction action use this App token.
 
-The issue / discussion / pull-request Feishu notification workflows also create a short-lived GitHub App token so they can reuse the org-membership check and suppress notifications for organization-member internal authors. The `needs-triage` Feishu workflow continues to use GitHub Actions event data plus Feishu incoming-webhook secrets.
+The issue / discussion / pull-request Feishu notification workflows also create a short-lived GitHub App token so they can reuse the org-membership check and suppress notifications for organization-member internal authors; they also suppress `sentry[bot]` as internal-equivalent automation. The `needs-triage` Feishu workflow continues to use GitHub Actions event data plus Feishu incoming-webhook secrets.
 
 ## Secrets
 

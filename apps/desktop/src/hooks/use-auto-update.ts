@@ -7,6 +7,7 @@ export type UpdatePhase =
   | "up-to-date"
   | "available"
   | "downloading"
+  | "installing"
   | "ready"
   | "error";
 
@@ -19,6 +20,15 @@ export type UpdateState = {
   dismissed: boolean;
   userInitiated: boolean;
 };
+
+export function restorePhaseAfterInstall(
+  state: UpdateState,
+  previousPhase: Exclude<UpdatePhase, "installing">,
+): UpdateState {
+  return state.phase === "installing"
+    ? { ...state, phase: previousPhase }
+    : state;
+}
 
 export function useAutoUpdate() {
   const [state, setState] = useState<UpdateState>({
@@ -41,7 +51,10 @@ export function useAutoUpdate() {
       updater.onEvent("update:checking", () => {
         setState((prev) => ({
           ...prev,
-          phase: prev.userInitiated ? "checking" : prev.phase,
+          phase:
+            prev.userInitiated && prev.phase !== "installing"
+              ? "checking"
+              : prev.phase,
           errorMessage: null,
         }));
       }),
@@ -157,8 +170,15 @@ export function useAutoUpdate() {
   }, []);
 
   const install = useCallback(async () => {
+    let previousPhase: Exclude<UpdatePhase, "installing"> = "ready";
+
+    setState((prev) => {
+      previousPhase = prev.phase === "installing" ? previousPhase : prev.phase;
+      return { ...prev, phase: "installing" };
+    });
     try {
       await installUpdate();
+      setState((prev) => restorePhaseAfterInstall(prev, previousPhase));
     } catch {
       // Errors are delivered via the update:error event
     }

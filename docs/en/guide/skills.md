@@ -1,42 +1,42 @@
 # Skill Installation
 
-Skills extend your Agent's capabilities — from web search and document generation to Lark Bitable operations and third-party API calls. Installing a skill takes just a few seconds.
+Skills extend your Agent's capabilities, from web search and document generation to Lark Bitable operations and third-party API calls. Installing one usually takes only a few seconds.
 
 ## Step 1: Open the Skills Page
 
-Click **Skills** in the left sidebar of the Nexu client to enter the Skill Hub.
+Click **Skills** in the left sidebar of the nexu client to enter the skill hub.
 
-The **Explore** tab shows all available public skills. You can filter by category (Office & Collaboration, Files & Knowledge, Creative & Design, Business Analysis, Audio & Video, etc.) or search by keyword.
+The **Explore** tab shows all available public skills. You can filter by category or search by keyword.
 
 ![Nexu skill catalog](/assets/nexu-skills.webp)
 
 ## Step 2: Find and Install a Skill
 
-Browse or search for the skill you need, then click the **Install** button on the card. Skills support hot-loading — they take effect immediately without restarting the Agent.
+Browse or search for the skill you need, then click **Install** on the card. Skills are hot-loaded and become available immediately.
 
 ![Search and install a skill](/assets/nexu-skills-search.webp)
 
 ## Step 3: Confirm Installation
 
-Switch to the **Yours** tab to see your installed skills. You can enable or disable individual skills at any time using the toggle.
+Switch to the **Yours** tab to view installed skills. You can enable or disable a skill at any time.
 
 ![Installed skills](/assets/nexu-skills-installed.webp)
 
-## Step 4: Use in Conversation
+## Step 4: Use It in Conversation
 
-Once a skill is installed, simply describe what you need in a channel conversation — the Agent will automatically select the right skill to complete the task.
+Once a skill is installed, simply describe what you need in a channel conversation. The Agent will automatically choose the right skill for the task.
 
-![Skill in action during conversation](/assets/nexu-skills-chat.webp)
+![Using a skill in chat](/assets/nexu-skills-chat.webp)
 
 ## FAQ
 
 **Q: Do I need to restart the Agent after installing a skill?**
 
-No. Skills support hot-loading — the Agent will recognize and enable new skills immediately.
+No. Skills support hot-loading and become available immediately.
 
 **Q: Can I install skills outside the catalog?**
 
-Yes. Nexu supports local custom skill development for personalized needs. See the developer documentation for details.
+Yes. nexu supports local custom skill development for more advanced or specialized needs.
 
 **Q: How do I uninstall a skill?**
 
