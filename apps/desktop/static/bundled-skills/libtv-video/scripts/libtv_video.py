@@ -102,6 +102,8 @@ LIBTV_RES_PATTERN = re.compile(
 
 def extract_result_urls(messages):
     """Extract all result media URLs from session messages."""
+    if not messages:
+        return []
     urls = []
     for msg in messages:
         content = msg.get("content", "")
@@ -115,11 +117,11 @@ def extract_result_urls(messages):
             try:
                 data = json.loads(content)
                 task_result = data.get("task_result", {})
-                for img in task_result.get("images", []):
+                for img in task_result.get("images") or []:
                     preview = img.get("previewPath", "")
                     if preview:
                         urls.append(preview)
-                for vid in task_result.get("videos", []):
+                for vid in task_result.get("videos") or []:
                     preview = vid.get("previewPath", vid.get("url", ""))
                     if preview:
                         urls.append(preview)
@@ -389,7 +391,7 @@ def cmd_query_session(args):
         path += f"?afterSeq={args.after_seq}"
 
     result = call_gateway("GET", path)
-    messages = result.get("messages", [])
+    messages = result.get("messages") or []
 
     # Extract result URLs
     urls = extract_result_urls(messages)
@@ -457,7 +459,7 @@ def cmd_wait_and_deliver(args):
 
     for i in range(max_polls):
         result = call_gateway("GET", f"/libtv/v1/session/{session_id}")
-        messages = result.get("messages", [])
+        messages = result.get("messages") or []
         urls = extract_result_urls(messages)
 
         if urls:
@@ -507,7 +509,7 @@ def cmd_recover(args):
 
         try:
             result = call_gateway("GET", f"/libtv/v1/session/{sid}")
-            messages = result.get("messages", [])
+            messages = result.get("messages") or []
             urls = extract_result_urls(messages)
 
             if urls:
@@ -523,6 +525,35 @@ def cmd_recover(args):
                     print(f"     🎨 Canvas: {PROJECT_CANVAS_BASE}{project_uuid}")
         except Exception as e:
             print(f"  ❌ {sid[:16]}... Error checking status: {e}")
+
+def cmd_tasks(args):
+    result = call_gateway("GET", "/api/v1/tasks")
+    tasks = result.get("tasks", [])
+
+    if not tasks:
+        print("No tasks found for this key.")
+        return
+
+    print(f"Found {len(tasks)} task(s):\n")
+    for t in tasks:
+        tid = t.get("id", "?")
+        status = t.get("status", "?")
+        backend = t.get("backend", "medeo")
+        created = t.get("created_at", "?")
+        video_url = t.get("libtv_video_url") or t.get("medeo_video_url") or t.get("r2_video_url")
+        error = t.get("error_message")
+
+        status_icon = {
+            "completed": "✅", "failed": "❌", "composing": "⏳",
+            "rendering": "⏳", "pending": "🔄",
+        }.get(status, "❓")
+
+        print(f"  {status_icon} {tid[:16]}...  [{backend}] {status}  ({created})")
+        if video_url:
+            print(f"     🎬 {video_url}")
+        if error:
+            print(f"     ❌ {error}")
+
 
 def cmd_change_project(args):
     result = call_gateway("POST", "/libtv/v1/session/change-project", json_data={})
@@ -584,6 +615,9 @@ def main():
     p.add_argument("--session-id", required=True, help="Session ID")
     p.add_argument("--project-id", default="", help="Project UUID")
 
+    # tasks
+    sub.add_parser("tasks", help="List all tasks for current key")
+
     # recover
     sub.add_parser("recover", help="Recover and check pending sessions")
 
@@ -602,6 +636,7 @@ def main():
         "query-session": cmd_query_session,
         "download-results": cmd_download_results,
         "wait-and-deliver": cmd_wait_and_deliver,
+        "tasks": cmd_tasks,
         "recover": cmd_recover,
         "change-project": cmd_change_project,
     }
