@@ -4,6 +4,7 @@ import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
+import { resetAnalytics } from "@/lib/tracking";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -508,6 +509,7 @@ function WorkspaceLayoutInner() {
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     track("workspace_logout_click");
+    resetAnalytics();
     await authClient.signOut();
     window.location.href = "/";
   };

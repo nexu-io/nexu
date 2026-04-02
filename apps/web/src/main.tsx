@@ -1,25 +1,60 @@
-import * as amplitude from "@amplitude/unified";
-import { Identify } from "@amplitude/unified";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import { App } from "./app";
 import "./lib/api";
 import { LocaleProvider } from "./hooks/use-locale";
+import { authClient } from "./lib/auth-client";
+import {
+  identify,
+  initializeAnalytics,
+  resetAnalytics,
+  setUserId,
+} from "./lib/tracking";
 import "./i18n";
 import "./index.css";
 
-const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
-if (amplitudeApiKey) {
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
+const posthogApiKey = import.meta.env.VITE_POSTHOG_API_KEY;
+if (posthogApiKey) {
+  initializeAnalytics({
+    apiKey: posthogApiKey,
+    apiHost: import.meta.env.VITE_POSTHOG_HOST,
+    environment: import.meta.env.MODE,
   });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
+}
+
+function AnalyticsSessionSync() {
+  const { data: session, isPending } = authClient.useSession();
+
+  useEffect(() => {
+    if (isPending) {
+      return;
+    }
+
+    const user = session?.user;
+    const userEmail = typeof user?.email === "string" ? user.email : null;
+    const userName = typeof user?.name === "string" ? user.name : null;
+    const userId =
+      user && typeof user.id === "string" && user.id.length > 0
+        ? user.id
+        : null;
+
+    if (!userId) {
+      resetAnalytics();
+      return;
+    }
+
+    setUserId(userId);
+
+    identify({
+      email: userEmail,
+      name: userName,
+    });
+  }, [isPending, session]);
+
+  return null;
 }
 
 const queryClient = new QueryClient({
@@ -40,6 +75,7 @@ ReactDOM.createRoot(root).render(
     <LocaleProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <AnalyticsSessionSync />
           <App />
           <Toaster position="top-right" />
         </BrowserRouter>

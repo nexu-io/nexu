@@ -1,5 +1,8 @@
-import * as amplitude from "@amplitude/unified";
-import { Identify } from "@amplitude/unified";
+import posthog, {
+  type PostHogConfig,
+  type Properties,
+  type Property,
+} from "posthog-js";
 
 export type AnalyticsAuthSource = "welcome_page" | "settings";
 export type AnalyticsChannel =
@@ -17,23 +20,151 @@ export type AnalyticsSidebarTarget =
 export type AnalyticsGitHubSource = "sidebar" | "home_card" | "settings";
 export type AnalyticsSkillSource = "builtin" | "explore" | "custom";
 
+type AnalyticsInitOptions = {
+  apiKey: string;
+  apiHost?: string;
+  environment: string;
+};
+
+let analyticsInitialized = false;
+let currentUserId: string | null = null;
+let persistentSuperProperties: Properties | null = null;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function toAnalyticsProperty(value: unknown): Property | undefined {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const normalized = value.flatMap((item) => {
+      const property = toAnalyticsProperty(item);
+      return property === undefined ? [] : [property];
+    });
+    return normalized;
+  }
+
+  if (isPlainObject(value)) {
+    const normalized: Properties = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const property = toAnalyticsProperty(nestedValue);
+      if (property !== undefined) {
+        normalized[key] = property;
+      }
+    }
+    return normalized;
+  }
+
+  return undefined;
+}
+
+function normalizeProperties(
+  properties?: Record<string, unknown>,
+): Properties | undefined {
+  if (!properties) {
+    return undefined;
+  }
+
+  const normalized: Properties = {};
+  for (const [key, value] of Object.entries(properties)) {
+    const property = toAnalyticsProperty(value);
+    if (property !== undefined) {
+      normalized[key] = property;
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+export function initializeAnalytics({
+  apiKey,
+  apiHost,
+  environment,
+}: AnalyticsInitOptions): void {
+  if (analyticsInitialized || apiKey.trim().length === 0) {
+    return;
+  }
+
+  persistentSuperProperties = { environment };
+
+  const config: Partial<PostHogConfig> = {
+    autocapture: false,
+    disable_session_recording: false,
+    loaded: (client) => {
+      if (persistentSuperProperties) {
+        client.register(persistentSuperProperties);
+      }
+    },
+  };
+
+  if (apiHost) {
+    config.api_host = apiHost;
+  }
+
+  posthog.init(apiKey, config);
+  analyticsInitialized = true;
+}
+
 export function track(
   event: string,
   properties?: Record<string, unknown>,
 ): void {
-  amplitude.track(event, properties);
+  if (!analyticsInitialized) {
+    return;
+  }
+
+  posthog.capture(event, normalizeProperties(properties));
 }
 
 export function identify(properties: Record<string, unknown>): void {
-  const id = new Identify();
-  for (const [key, value] of Object.entries(properties)) {
-    id.set(key, value as string);
+  if (!analyticsInitialized) {
+    return;
   }
-  amplitude.identify(id);
+
+  const normalized = normalizeProperties(properties);
+  if (!normalized) {
+    return;
+  }
+
+  posthog.setPersonProperties(normalized);
 }
 
 export function setUserId(userId: string): void {
-  amplitude.setUserId(userId);
+  if (!analyticsInitialized || userId.trim().length === 0) {
+    return;
+  }
+
+  if (currentUserId && currentUserId !== userId) {
+    posthog.reset();
+  }
+
+  if (currentUserId === userId) {
+    return;
+  }
+
+  posthog.identify(userId);
+  currentUserId = userId;
+}
+
+export function resetAnalytics(): void {
+  currentUserId = null;
+
+  if (!analyticsInitialized) {
+    return;
+  }
+
+  posthog.reset();
+  if (persistentSuperProperties) {
+    posthog.register(persistentSuperProperties);
+  }
 }
 
 export function normalizeAuthSource(
