@@ -85,6 +85,13 @@ export class OpenClawProcessManager {
     };
   }
   /**
+   * Return the PID of the managed OpenClaw child process, or null if not running.
+   */
+  getPid(): number | null {
+    return this.child?.pid ?? null;
+  }
+
+  /**
    * Check whether the managed OpenClaw process is currently alive.
    * Returns true if a child process exists and its pid responds to signal 0.
    */

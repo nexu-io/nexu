@@ -47,11 +47,9 @@ export async function bootstrapController(
     }
   });
 
-  // When WS handshake completes, push current config (skipped if unchanged)
-  // and mark boot as complete so health loop treats future gateway-unreachable
-  // as "unhealthy" instead of "starting".
+  // When WS handshake completes, push current config (skipped if unchanged).
+  // Boot phase is driven by the HTTP health probe in the health loop — not here.
   container.wsClient.onConnected(() => {
-    container.runtimeState.bootPhase = "ready";
     void container.openclawSyncService.syncAll().catch(() => {});
   });
 

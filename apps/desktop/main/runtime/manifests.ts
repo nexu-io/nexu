@@ -509,7 +509,7 @@ export function createRuntimeUnitManifests(
         OPENCLAW_DISABLE_BONJOUR: "1",
         TMPDIR: openclawTempDir,
         RUNTIME_MANAGE_OPENCLAW_PROCESS: "true",
-        RUNTIME_GATEWAY_PROBE_ENABLED: "false",
+        RUNTIME_GATEWAY_PROBE_ENABLED: "true",
         ...(openclawNodePath ? { PATH: openclawNodePath } : {}),
         ...childProcessProxyEnv,
       },

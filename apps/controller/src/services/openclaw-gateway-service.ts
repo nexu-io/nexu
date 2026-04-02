@@ -125,9 +125,22 @@ export class OpenClawGatewayService {
     private readonly runtimeState: ControllerRuntimeState,
   ) {}
 
-  /** Whether the WS client has completed handshake and is ready for RPC. */
+  /**
+   * Whether the gateway is considered reachable.
+   *
+   * Returns true if either:
+   * - WS handshake is complete (ready for RPC), OR
+   * - HTTP health probe reports the gateway is active
+   *
+   * This lets the frontend show "connected" as soon as the gateway is
+   * serving, even if the WS client hasn't reconnected yet (e.g. after
+   * sleep/wake recovery).
+   */
   isConnected(): boolean {
-    return this.wsClient.isConnected();
+    return (
+      this.wsClient.isConnected() ||
+      this.runtimeState.gatewayStatus === "active"
+    );
   }
 
   /**
