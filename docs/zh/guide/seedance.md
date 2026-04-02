@@ -34,8 +34,6 @@
 
 进入群聊后，查看置顶消息，打开问卷链接并填写信息。
 
-![申请体验 Key：进群后查看置顶消息获取问卷链接](/assets/seedance/apply-key-step2-pinned-message.webp)
-
 ## 第二步：先配置一个 IM 渠道
 
 建议先配置一个 IM 渠道。这样收到 Key 后，就能直接发给 `nexu` 完成激活。
@@ -100,3 +98,7 @@
 **Q: 如何获取自己的 Libtv Access Key，并在画布中查看生成结果？**
 
 前往 [LibTV 官网](https://www.liblib.tv/) 登录账号后，通常可以在右上角头像附近找到自己的 Access Key。把这个 key 发送给 `nexu` 后，再收到画布链接时，就可以在 Libtv 画布中查看自己的生成结果。
+
+## 还有疑问？
+
+如果你还有其他问题，或希望获取最新支持，欢迎查看 [联系我们](/zh/guide/contact)。

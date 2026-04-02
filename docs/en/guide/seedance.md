@@ -34,8 +34,6 @@ After starring the repository, click the popup button to join the group.
 
 Once you are in the group, check the pinned message, open the form link, and submit your information.
 
-![Apply for a trial key: check the pinned group message for the form link](/assets/seedance/apply-key-step2-pinned-message.webp)
-
 ## Step 2: Configure an IM Channel First
 
 It is recommended to configure one IM channel first. That way, once your key arrives, you can send it to `nexu` right away for activation.
@@ -100,3 +98,7 @@ Yes. The key must be sent to `nexu` before you can use it, so configuring an IM 
 **Q: How can I get my own Libtv Access Key and view the result in the canvas?**
 
 Go to the [LibTV website](https://www.liblib.tv/) and sign in to your account. The Access Key is usually available near the avatar in the top-right corner. After you send your own Access Key to `nexu`, you can open the returned canvas link and view your result in the Libtv canvas.
+
+## Still have questions?
+
+If you have any other questions or want the latest support, see [Contact us](/guide/contact).
