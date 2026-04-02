@@ -1,7 +1,6 @@
-import * as amplitude from "@amplitude/unified";
-import { Identify } from "@amplitude/unified";
 import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import posthog, { type PostHogConfig } from "posthog-js";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
@@ -28,6 +27,7 @@ import { useAutoUpdate } from "./hooks/use-auto-update";
 import {
   checkComponentUpdates,
   getAppInfo,
+  getDesktopCloudStatus,
   getDiagnosticsInfo,
   getRuntimeConfig,
   getRuntimeState,
@@ -45,13 +45,42 @@ import {
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
-const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
+const posthogApiKey =
+  import.meta.env.VITE_POSTHOG_API_KEY ??
+  (typeof window === "undefined"
+    ? null
+    : window.nexuHost.bootstrap.posthogApiKey);
+const posthogHost =
+  import.meta.env.VITE_POSTHOG_HOST ??
+  (typeof window === "undefined"
+    ? null
+    : window.nexuHost.bootstrap.posthogHost);
 const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
+const posthogSuperProperties = {
+  environment: import.meta.env.MODE,
+  appName: "nexu-desktop",
+  appVersion:
+    typeof window === "undefined"
+      ? "unknown"
+      : window.nexuHost.bootstrap.buildInfo.version,
+};
 
 let rendererSentryInitialized = false;
-let amplitudeTelemetryInitialized = false;
+let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
+let currentPosthogUserId: string | null = null;
+let currentPosthogPersonPropertiesKey: string | null = null;
+
+function buildPostHogPersonPropertiesKey(input: {
+  email?: string | null;
+  name?: string | null;
+}): string {
+  return JSON.stringify([
+    ["email", input.email ?? null],
+    ["name", input.name ?? null],
+  ]);
+}
 
 function sendRendererStartupProbe(
   stage: string,
@@ -108,19 +137,78 @@ function initializeRendererSentry(dsn: string): void {
   rendererSentryInitialized = true;
 }
 
-function initializeAmplitudeTelemetry(): void {
-  if (amplitudeTelemetryInitialized || !amplitudeApiKey) {
+function initializePostHogTelemetry(): void {
+  if (posthogTelemetryInitialized || !posthogApiKey) {
     return;
   }
 
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
+  const config: Partial<PostHogConfig> = {
+    autocapture: true,
+    disable_session_recording: false,
+    loaded: (client) => {
+      client.register(posthogSuperProperties);
+    },
+  };
+
+  if (posthogHost) {
+    config.api_host = posthogHost;
+  }
+
+  posthog.init(posthogApiKey, config);
+  posthogTelemetryInitialized = true;
+}
+
+function syncPostHogIdentity(input: {
+  userId?: string | null;
+  userEmail?: string | null;
+  userName?: string | null;
+}): void {
+  if (!posthogTelemetryInitialized) {
+    return;
+  }
+
+  const userId =
+    typeof input.userId === "string" && input.userId.trim().length > 0
+      ? input.userId
+      : null;
+
+  if (!userId) {
+    if (currentPosthogUserId === null) {
+      return;
+    }
+
+    posthog.reset();
+    posthog.register(posthogSuperProperties);
+    currentPosthogUserId = null;
+    currentPosthogPersonPropertiesKey = null;
+    return;
+  }
+
+  if (currentPosthogUserId && currentPosthogUserId !== userId) {
+    posthog.reset();
+    posthog.register(posthogSuperProperties);
+    currentPosthogPersonPropertiesKey = null;
+  }
+
+  if (currentPosthogUserId !== userId) {
+    posthog.identify(userId);
+    currentPosthogUserId = userId;
+  }
+
+  const nextPersonPropertiesKey = buildPostHogPersonPropertiesKey({
+    email: input.userEmail ?? null,
+    name: input.userName ?? null,
   });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
-  amplitudeTelemetryInitialized = true;
+
+  if (currentPosthogPersonPropertiesKey === nextPersonPropertiesKey) {
+    return;
+  }
+
+  posthog.setPersonProperties({
+    email: input.userEmail ?? null,
+    name: input.userName ?? null,
+  });
+  currentPosthogPersonPropertiesKey = nextPersonPropertiesKey;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -1339,22 +1427,58 @@ function RendererTelemetryBootstrap() {
       }
     }
 
-    if (!amplitudeApiKey || amplitudeTelemetryInitialized) {
+    if (!posthogApiKey || posthogTelemetryInitialized) {
       return;
     }
 
-    sendRendererStartupProbe("renderer:amplitude-init:start", "ok");
+    sendRendererStartupProbe("renderer:posthog-init:start", "ok");
     try {
-      initializeAmplitudeTelemetry();
-      sendRendererStartupProbe("renderer:amplitude-init:success", "ok");
+      initializePostHogTelemetry();
+      sendRendererStartupProbe("renderer:posthog-init:success", "ok");
     } catch (error) {
       sendRendererStartupProbe(
-        "renderer:amplitude-init:error",
+        "renderer:posthog-init:error",
         "error",
         error instanceof Error ? (error.stack ?? error.message) : String(error),
       );
-      console.error("[desktop] renderer Amplitude init failed", error);
+      console.error("[desktop] renderer PostHog init failed", error);
     }
+  }, []);
+
+  return null;
+}
+
+function RendererAnalyticsIdentitySync() {
+  useEffect(() => {
+    let cancelled = false;
+
+    const sync = async () => {
+      try {
+        const data = await getDesktopCloudStatus();
+        if (cancelled) {
+          return;
+        }
+
+        syncPostHogIdentity({
+          userId: data.userId ?? null,
+          userEmail: data.userEmail ?? null,
+          userName: data.userName ?? null,
+        });
+      } catch {
+        // Ignore transient fetch errors. Keep existing identity until a
+        // successful status refresh says otherwise.
+      }
+    };
+
+    void sync();
+    const interval = window.setInterval(() => {
+      void sync();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
   return null;
@@ -1387,6 +1511,7 @@ ReactDOM.createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <RendererStartupSentinel />
       <RendererTelemetryBootstrap />
+      <RendererAnalyticsIdentitySync />
       <RootApp />
     </QueryClientProvider>
   </React.StrictMode>,

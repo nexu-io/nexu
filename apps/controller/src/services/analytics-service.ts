@@ -62,6 +62,8 @@ type ResolvedSkillInfo = {
   source: string | null;
 };
 
+const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
+
 const EMPTY_ANALYTICS_STATE: AnalyticsState = {
   sessionStartSent: false,
   sentUserMessageIds: [],
@@ -160,7 +162,7 @@ export class AnalyticsService {
   ) {}
 
   async poll(): Promise<void> {
-    if (!this.env.amplitudeApiKey) {
+    if (!this.env.posthogApiKey) {
       return;
     }
 
@@ -209,7 +211,7 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendEvent(
+        await this.sendAnalyticsEvent(
           profile.id,
           "user_message_sent",
           {
@@ -230,7 +232,7 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendEvent(
+        await this.sendAnalyticsEvent(
           profile.id,
           "skill_use",
           {
@@ -247,7 +249,7 @@ export class AnalyticsService {
     }
 
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
-      await this.sendEvent(
+      await this.sendAnalyticsEvent(
         profile.id,
         "nexu_first_conversation_start",
         {
@@ -552,33 +554,41 @@ export class AnalyticsService {
     return "builtin";
   }
 
-  private async sendEvent(
-    userId: string,
+  private getPosthogCaptureUrl(): string | null {
+    const host = this.env.posthogHost?.trim() || DEFAULT_POSTHOG_HOST;
+    if (!host) {
+      return null;
+    }
+    return `${host.replace(/\/+$/, "")}/i/v0/e/`;
+  }
+
+  private async sendAnalyticsEvent(
+    distinctId: string,
     eventType: string,
     eventProperties: Record<string, unknown>,
-    time: number,
+    timestampMs: number,
   ): Promise<void> {
+    const captureUrl = this.getPosthogCaptureUrl();
+    if (!captureUrl || !this.env.posthogApiKey) {
+      return;
+    }
+
     try {
-      const response = await proxyFetch(
-        "https://api2.amplitude.com/2/httpapi",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            api_key: this.env.amplitudeApiKey,
-            events: [
-              {
-                user_id: userId,
-                event_type: eventType,
-                event_properties: eventProperties,
-                time,
-              },
-            ],
-          }),
+      const response = await proxyFetch(captureUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          api_key: this.env.posthogApiKey,
+          distinct_id: distinctId,
+          event: eventType,
+          properties: {
+            ...eventProperties,
+          },
+          timestamp: new Date(timestampMs).toISOString(),
+        }),
+      });
 
       if (!response.ok) {
         logger.warn(

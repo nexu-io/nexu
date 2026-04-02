@@ -55,8 +55,10 @@ export interface PlistEnv {
   openclawTmpDir: string;
   /** Normalized proxy env propagated to child processes */
   proxyEnv: Record<string, string>;
-  /** Amplitude API key for controller analytics */
-  amplitudeApiKey?: string;
+  /** PostHog API key for controller analytics */
+  posthogApiKey?: string;
+  /** PostHog host for controller analytics */
+  posthogHost?: string;
 }
 
 function renderProxyEnvEntries(proxyEnv: Record<string, string>): string {
@@ -179,10 +181,16 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <string>${escapeXml(env.systemPath)}</string>`
             : ""
         }${
-          env.amplitudeApiKey
+          env.posthogApiKey
             ? `
-        <key>AMPLITUDE_API_KEY</key>
-        <string>${escapeXml(env.amplitudeApiKey)}</string>`
+        <key>POSTHOG_API_KEY</key>
+        <string>${escapeXml(env.posthogApiKey)}</string>`
+            : ""
+        }${
+          env.posthogHost
+            ? `
+        <key>POSTHOG_HOST</key>
+        <string>${escapeXml(env.posthogHost)}</string>`
             : ""
         }
         <key>NODE_ENV</key>

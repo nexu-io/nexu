@@ -1,25 +1,81 @@
-import * as amplitude from "@amplitude/unified";
-import { Identify } from "@amplitude/unified";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
+import { getApiInternalDesktopCloudStatus } from "../lib/api/sdk.gen";
+import webPackageJson from "../package.json";
 import { App } from "./app";
 import "./lib/api";
 import { LocaleProvider } from "./hooks/use-locale";
+import {
+  identify,
+  initializeAnalytics,
+  resetAnalytics,
+  setUserId,
+} from "./lib/tracking";
 import "./i18n";
 import "./index.css";
 
-const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
-if (amplitudeApiKey) {
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
+const posthogApiKey = import.meta.env.VITE_POSTHOG_API_KEY;
+if (posthogApiKey) {
+  initializeAnalytics({
+    apiKey: posthogApiKey,
+    apiHost: import.meta.env.VITE_POSTHOG_HOST,
+    environment: import.meta.env.MODE,
+    appName: webPackageJson.name.replace("@nexu/", "nexu-"),
+    appVersion: webPackageJson.version,
   });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
+}
+
+function AnalyticsSessionSync() {
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncAnalyticsIdentity = async () => {
+      try {
+        const { data } = await getApiInternalDesktopCloudStatus();
+        if (cancelled) {
+          return;
+        }
+
+        const userId =
+          typeof data?.userId === "string" && data.userId.length > 0
+            ? data.userId
+            : null;
+        const userEmail =
+          typeof data?.userEmail === "string" ? data.userEmail : null;
+        const userName =
+          typeof data?.userName === "string" ? data.userName : null;
+
+        if (!userId) {
+          resetAnalytics();
+          return;
+        }
+
+        setUserId(userId);
+        identify({
+          email: userEmail,
+          name: userName,
+        });
+      } catch {
+        // Ignore transient fetch errors. Keep existing identity until a
+        // successful status refresh says otherwise.
+      }
+    };
+
+    void syncAnalyticsIdentity();
+    const interval = window.setInterval(() => {
+      void syncAnalyticsIdentity();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  return null;
 }
 
 const queryClient = new QueryClient({
@@ -40,6 +96,7 @@ ReactDOM.createRoot(root).render(
     <LocaleProvider>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <AnalyticsSessionSync />
           <App />
           <Toaster position="top-right" />
         </BrowserRouter>

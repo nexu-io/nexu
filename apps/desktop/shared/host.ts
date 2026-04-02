@@ -169,6 +169,7 @@ export type HostInvokeResultMap = {
   "desktop:get-cloud-status": {
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -186,6 +187,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -196,6 +198,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -213,6 +216,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -230,6 +234,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -247,6 +252,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -258,6 +264,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -275,6 +282,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -286,6 +294,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -303,6 +312,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -314,6 +324,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -331,6 +342,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -342,6 +354,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -359,6 +372,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -567,6 +581,8 @@ export type HostBridge = {
 export type HostBootstrap = {
   buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
+  posthogApiKey: string | null;
+  posthogHost: string | null;
   isPackaged: boolean;
   needsSetupAnimation: boolean;
 };

@@ -108,6 +108,7 @@ export const cloudProfileSchema = z.object({
 export const cloudProfileStatusSchema = cloudProfileSchema.extend({
   connected: z.boolean(),
   polling: z.boolean().optional(),
+  userId: z.string().nullable().optional(),
   userName: z.string().nullable().optional(),
   userEmail: z.string().nullable().optional(),
   connectedAt: z.string().nullable().optional(),
@@ -117,6 +118,7 @@ export const cloudProfileStatusSchema = cloudProfileSchema.extend({
 export const cloudStatusResponseSchema = z.object({
   connected: z.boolean(),
   polling: z.boolean().optional(),
+  userId: z.string().nullable().optional(),
   userName: z.string().nullable().optional(),
   userEmail: z.string().nullable().optional(),
   connectedAt: z.string().nullable().optional(),

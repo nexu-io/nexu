@@ -62,6 +62,8 @@ const hostBridge: HostBridge = {
   bootstrap: {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
+    posthogApiKey: runtimeConfig.posthogApiKey,
+    posthogHost: runtimeConfig.posthogHost,
     isPackaged: !process.defaultApp,
     needsSetupAnimation: process.env.NEXU_NEEDS_SETUP_ANIMATION === "1",
   },
