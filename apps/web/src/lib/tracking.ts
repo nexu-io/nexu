@@ -99,7 +99,6 @@ export function initializeAnalytics({
   persistentSuperProperties = { environment };
 
   const config: Partial<PostHogConfig> = {
-    autocapture: false,
     disable_session_recording: false,
     loaded: (client) => {
       if (persistentSuperProperties) {
