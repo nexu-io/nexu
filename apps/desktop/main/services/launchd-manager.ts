@@ -26,8 +26,9 @@ export class LaunchdManager {
   private readonly plistDir: string;
   private readonly uid: number;
   private readonly domain: string;
+  private readonly log: (message: string) => void;
 
-  constructor(opts?: { plistDir?: string }) {
+  constructor(opts?: { plistDir?: string; log?: (message: string) => void }) {
     if (process.platform !== "darwin") {
       throw new Error("LaunchdManager only works on macOS");
     }
@@ -35,6 +36,7 @@ export class LaunchdManager {
       opts?.plistDir ?? path.join(os.homedir(), "Library/LaunchAgents");
     this.uid = os.userInfo().uid;
     this.domain = `gui/${this.uid}`;
+    this.log = opts?.log ?? console.log;
   }
 
   /**
@@ -59,11 +61,14 @@ export class LaunchdManager {
 
       if (existingContent === plistContent) {
         // Plist unchanged and already registered — nothing to do
+        this.log(`installService: plist unchanged for ${label}, skipping`);
         return;
       }
 
       // Content changed or file missing: bootout old, write new, re-bootstrap
-      console.log(`Plist content changed for ${label}, bootout + re-bootstrap`);
+      this.log(
+        `installService: plist content changed for ${label}, bootout + re-bootstrap`,
+      );
       try {
         await this.bootoutService(label);
         // Brief wait for launchd to finish teardown
@@ -84,14 +89,15 @@ export class LaunchdManager {
           this.domain,
           plistPath,
         ]);
-        if (stdout) console.log(`Bootstrap ${label}:`, stdout);
-        if (stderr) console.warn(`Bootstrap ${label} warnings:`, stderr);
+        if (stdout) this.log(`installService: bootstrap ${label}: ${stdout}`);
+        if (stderr)
+          this.log(`installService: bootstrap ${label} warnings: ${stderr}`);
         return;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (attempt === 0 && /Input\/output error|error: 5/.test(message)) {
-          console.warn(
-            `Bootstrap ${label} hit stale state, clearing and retrying`,
+          this.log(
+            `installService: bootstrap ${label} hit stale state (error: 5), clearing and retrying`,
           );
           try {
             await this.bootoutService(label);
@@ -101,7 +107,7 @@ export class LaunchdManager {
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
-        console.error(`Failed to bootstrap ${label}:`, message);
+        this.log(`installService: failed to bootstrap ${label}: ${message}`);
         throw err;
       }
     }
@@ -112,6 +118,7 @@ export class LaunchdManager {
    * Tolerates "not found" errors — the service may already be unregistered.
    */
   async bootoutService(label: string): Promise<void> {
+    this.log(`bootoutService: attempting bootout label=${label}`);
     try {
       await execFileAsync("launchctl", ["bootout", `${this.domain}/${label}`]);
     } catch (err: unknown) {
@@ -124,7 +131,7 @@ export class LaunchdManager {
         /service not found/i.test(message) ||
         /not bootstrapped/i.test(message);
       if (isAlreadyGone) {
-        console.debug(
+        this.log(
           `bootoutService: ${label} already unregistered (${message.trim()})`,
         );
         return;
@@ -276,8 +283,10 @@ export class LaunchdManager {
   async isServiceRegistered(label: string): Promise<boolean> {
     try {
       await execFileAsync("launchctl", ["print", `${this.domain}/${label}`]);
+      this.log(`isServiceRegistered: label=${label} registered=true`);
       return true;
     } catch {
+      this.log(`isServiceRegistered: label=${label} registered=false`);
       return false;
     }
   }
