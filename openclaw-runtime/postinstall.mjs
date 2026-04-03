@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { installRuntime } from "./install-runtime.mjs";
 import { computeFingerprint } from "./postinstall-cache.mjs";
 import { exists } from "./utils.mjs";
 
@@ -9,7 +10,6 @@ const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const nodeModulesDir = path.join(runtimeDir, "node_modules");
 const cacheFileName = ".postinstall-cache.json";
 const cacheFilePath = path.join(runtimeDir, cacheFileName);
-const lockfilePath = path.join(runtimeDir, "package-lock.json");
 const criticalRuntimeFiles = [
   path.join("node_modules", "openclaw", "dist"),
   path.join("node_modules", "@whiskeysockets", "baileys", "lib", "index.js"),
@@ -60,29 +60,6 @@ async function run(command, args) {
   });
 }
 
-async function installRuntime() {
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-
-  if (await exists(lockfilePath)) {
-    try {
-      await run(npmCommand, ["ci", "--no-audit", "--no-fund"]);
-      return;
-    } catch (error) {
-      console.warn(
-        "openclaw-runtime npm ci failed, falling back to npm install --prefer-offline.",
-      );
-      console.warn(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  await run(npmCommand, [
-    "install",
-    "--no-audit",
-    "--no-fund",
-    "--prefer-offline",
-  ]);
-}
-
 async function hasCompleteRuntimeInstall() {
   for (const relativePath of criticalRuntimeFiles) {
     if (!(await exists(path.join(runtimeDir, relativePath)))) {
@@ -91,7 +68,6 @@ async function hasCompleteRuntimeInstall() {
   }
   return true;
 }
-
 try {
   const fingerprint = await computeFingerprint(runtimeDir);
   const cachedFingerprint = await readCachedFingerprint();
@@ -123,7 +99,7 @@ try {
     console.log("openclaw-runtime inputs changed, running install:pruned.");
   }
 
-  await installRuntime();
+  await installRuntime("pruned");
   await run(process.execPath, ["./prune-runtime.mjs"]);
 
   await writeFile(

@@ -1,6 +1,10 @@
 import { resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
+function normalizePath(value: string | null): string | null {
+  return value?.replace(/\\/g, "/").replace(/^[A-Za-z]:/, "") ?? null;
+}
+
 // Re-implement the pure functions from catalog-manager.ts for testing.
 // These are private in the source module but the logic is critical to test.
 
@@ -67,10 +71,10 @@ describe("desktop skillhub slug validation", () => {
     const skillsDir = "/data/openclaw/skills";
 
     it("resolves valid slug to path inside skills directory", () => {
-      expect(resolveSkillPath(skillsDir, "ontology")).toBe(
+      expect(normalizePath(resolveSkillPath(skillsDir, "ontology"))).toBe(
         "/data/openclaw/skills/ontology",
       );
-      expect(resolveSkillPath(skillsDir, "tavily-search")).toBe(
+      expect(normalizePath(resolveSkillPath(skillsDir, "tavily-search"))).toBe(
         "/data/openclaw/skills/tavily-search",
       );
     });
@@ -86,7 +90,7 @@ describe("desktop skillhub slug validation", () => {
     });
 
     it("works with skills directory that has trailing separator", () => {
-      expect(resolveSkillPath(`${skillsDir}/`, "ontology")).toBe(
+      expect(normalizePath(resolveSkillPath(`${skillsDir}/`, "ontology"))).toBe(
         "/data/openclaw/skills/ontology",
       );
     });
@@ -94,7 +98,7 @@ describe("desktop skillhub slug validation", () => {
     it("works with spaces in skills directory path", () => {
       const dirWithSpaces =
         "/Users/test/Library/Application Support/@nexu/desktop/runtime/openclaw/state/skills";
-      expect(resolveSkillPath(dirWithSpaces, "ontology")).toBe(
+      expect(normalizePath(resolveSkillPath(dirWithSpaces, "ontology"))).toBe(
         `${dirWithSpaces}/ontology`,
       );
       expect(resolveSkillPath(dirWithSpaces, "../../..")).toBeNull();

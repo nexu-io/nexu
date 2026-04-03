@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmod,
   cp,
@@ -7,6 +8,7 @@ import {
   readFile,
   readdir,
   rename,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -22,6 +24,7 @@ import {
   resetDir,
   shouldCopyRuntimeDependencies,
 } from "./lib/sidecar-paths.mjs";
+import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
 const openclawRuntimeNodeModules = resolve(openclawRuntimeRoot, "node_modules");
@@ -34,6 +37,20 @@ const openclawPackagePatchRoot = resolve(
   openclawRuntimePatchesRoot,
   "openclaw",
 );
+const buildCacheRoot = resolve(
+  process.env.NEXU_DEV_CACHE_DIR ?? resolve(repoRoot, ".cache", "nexu-dev"),
+);
+const openclawSidecarCacheRoot = resolve(buildCacheRoot, "openclaw-sidecar");
+const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-03-30-openclaw-sidecar-cache-v2";
+const OPENCLAW_SIDECAR_ARCHIVE_FORMAT =
+  resolveBuildTargetPlatform({
+    env: process.env,
+    platform: process.platform,
+  }) === "win"
+    ? "zip"
+    : "tar.gz";
+const OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME =
+  OPENCLAW_SIDECAR_ARCHIVE_FORMAT === "zip" ? "payload.zip" : "payload.tar.gz";
 const REPLY_OUTCOME_HELPER_SEARCH = `
 const sessionKey = ctx.SessionKey;
 	const startTime = diagnosticsEnabled ? Date.now() : 0;
@@ -239,6 +256,12 @@ const inheritEntitlementsPath = resolve(
 const shouldArchiveOpenclawSidecar =
   process.env.NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR !== "0" &&
   process.env.NEXU_DESKTOP_ARCHIVE_OPENCLAW_SIDECAR?.toLowerCase() !== "false";
+const shouldDisableOpenclawSidecarCache =
+  process.env.NEXU_DEV_DISABLE_CACHE === "1" ||
+  process.env.NEXU_DEV_DISABLE_CACHE?.toLowerCase() === "true";
+const shouldLogOpenclawSidecarProbes =
+  process.env.NEXU_DESKTOP_SIDECAR_PROBES === "1" ||
+  process.env.NEXU_DESKTOP_SIDECAR_PROBES?.toLowerCase() === "true";
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(2)}s`;
@@ -334,6 +357,209 @@ async function collectFiles(rootPath) {
   return files;
 }
 
+async function collectDirectoryStats(rootPath) {
+  let fileCount = 0;
+  let totalBytes = 0;
+  const entries = await readdir(rootPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = resolve(rootPath, entry.name);
+
+    if (entry.isDirectory()) {
+      const childStats = await collectDirectoryStats(entryPath);
+      fileCount += childStats.fileCount;
+      totalBytes += childStats.totalBytes;
+      continue;
+    }
+
+    if (entry.isFile()) {
+      const entryStats = await stat(entryPath);
+      fileCount += 1;
+      totalBytes += entryStats.size;
+    }
+  }
+
+  return { fileCount, totalBytes };
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(2)} ${units[unitIndex]}`;
+}
+
+async function hashFingerprintInputs(files) {
+  const hash = createHash("sha256");
+  hash.update(`${OPENCLAW_SIDECAR_CACHE_VERSION}\n`);
+
+  for (const filePath of [...files].sort((left, right) =>
+    left.localeCompare(right),
+  )) {
+    if (!(await pathExists(filePath))) {
+      continue;
+    }
+
+    hash.update(`${relative(repoRoot, filePath)}\n`);
+    hash.update(await readFile(filePath));
+    hash.update("\n");
+  }
+
+  return hash.digest("hex");
+}
+
+async function collectOpenclawSidecarFingerprintInputs() {
+  const files = [
+    resolve(openclawRuntimeRoot, ".postinstall-cache.json"),
+    resolve(openclawRuntimeRoot, "package.json"),
+    resolve(openclawRoot, "package.json"),
+    resolve(electronRoot, "package.json"),
+    fileURLToPath(import.meta.url),
+    resolve(electronRoot, "scripts", "lib", "sidecar-paths.mjs"),
+    resolve(electronRoot, "scripts", "platforms", "desktop-platform.mjs"),
+    resolve(electronRoot, "scripts", "platforms", "platform-resolver.mjs"),
+    resolve(electronRoot, "scripts", "platforms", "filesystem-compat.mjs"),
+  ];
+
+  if (await pathExists(openclawPackagePatchRoot)) {
+    files.push(...(await collectFiles(openclawPackagePatchRoot)));
+  }
+
+  return files;
+}
+
+async function computeOpenclawSidecarFingerprint() {
+  return hashFingerprintInputs(await collectOpenclawSidecarFingerprintInputs());
+}
+
+function getOpenclawSidecarCacheEntryRoot(fingerprint) {
+  return resolve(openclawSidecarCacheRoot, fingerprint);
+}
+
+async function tryRestoreCachedArchivedOpenclawSidecar(fingerprint) {
+  if (shouldDisableOpenclawSidecarCache || !shouldArchiveOpenclawSidecar) {
+    console.log(
+      `[openclaw-sidecar][cache] bypass fingerprint=${fingerprint} disableCache=${shouldDisableOpenclawSidecarCache} archive=${shouldArchiveOpenclawSidecar}`,
+    );
+    return false;
+  }
+
+  const cacheEntryRoot = getOpenclawSidecarCacheEntryRoot(fingerprint);
+  const cachedSidecarRoot = resolve(cacheEntryRoot, "sidecar");
+
+  const archiveMetadataPath = resolve(cachedSidecarRoot, "archive.json");
+  const cachedPackageJsonPath = resolve(cachedSidecarRoot, "package.json");
+  const cacheManifestPath = resolve(cacheEntryRoot, "manifest.json");
+  const hasArchiveMetadata = await pathExists(archiveMetadataPath);
+  const hasCachedPackageJson = await pathExists(cachedPackageJsonPath);
+  const hasCacheManifest = await pathExists(cacheManifestPath);
+
+  if (!hasArchiveMetadata || !hasCachedPackageJson || !hasCacheManifest) {
+    console.log(
+      `[openclaw-sidecar][cache] miss fingerprint=${fingerprint} reason=incomplete-cache-entry root=${cacheEntryRoot} archiveJson=${hasArchiveMetadata} packageJson=${hasCachedPackageJson} manifest=${hasCacheManifest}`,
+    );
+    return false;
+  }
+
+  let archiveMetadata;
+  try {
+    archiveMetadata = JSON.parse(await readFile(archiveMetadataPath, "utf8"));
+  } catch {
+    console.log(
+      `[openclaw-sidecar][cache] miss fingerprint=${fingerprint} reason=invalid-archive-metadata path=${archiveMetadataPath}`,
+    );
+    return false;
+  }
+
+  const archivePayloadPath =
+    archiveMetadata && typeof archiveMetadata.path === "string"
+      ? resolve(cachedSidecarRoot, archiveMetadata.path)
+      : null;
+
+  if (
+    !archiveMetadata ||
+    typeof archiveMetadata.path !== "string" ||
+    !archivePayloadPath ||
+    !(await pathExists(archivePayloadPath))
+  ) {
+    console.log(
+      `[openclaw-sidecar][cache] miss fingerprint=${fingerprint} reason=missing-archive-payload path=${archivePayloadPath ?? "<invalid>"}`,
+    );
+    return false;
+  }
+
+  await resetDir(sidecarRoot);
+  await cp(cachedSidecarRoot, sidecarRoot, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log(
+    `[openclaw-sidecar][cache] hit fingerprint=${fingerprint} source=${cacheEntryRoot}`,
+  );
+  return true;
+}
+
+async function writeOpenclawSidecarCacheEntry(fingerprint) {
+  if (shouldDisableOpenclawSidecarCache || !shouldArchiveOpenclawSidecar) {
+    return;
+  }
+
+  const cacheEntryRoot = getOpenclawSidecarCacheEntryRoot(fingerprint);
+  const cacheStageRoot = resolve(
+    openclawSidecarCacheRoot,
+    `.stage-${fingerprint}`,
+  );
+  const payloadPath = resolve(sidecarRoot, OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME);
+  const payloadStats = await stat(payloadPath);
+
+  await removePathIfExists(cacheStageRoot);
+  await mkdir(cacheStageRoot, { recursive: true });
+  const cacheSidecarRoot = resolve(cacheStageRoot, "sidecar");
+  await mkdir(cacheSidecarRoot, { recursive: true });
+  await Promise.all([
+    cp(
+      resolve(sidecarRoot, "archive.json"),
+      resolve(cacheSidecarRoot, "archive.json"),
+    ),
+    cp(
+      resolve(sidecarRoot, "package.json"),
+      resolve(cacheSidecarRoot, "package.json"),
+    ),
+    cp(
+      payloadPath,
+      resolve(cacheSidecarRoot, OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME),
+    ),
+  ]);
+  await writeFile(
+    resolve(cacheStageRoot, "manifest.json"),
+    `${JSON.stringify(
+      {
+        fingerprint,
+        format: OPENCLAW_SIDECAR_ARCHIVE_FORMAT,
+        payloadBytes: payloadStats.size,
+        createdAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  await removePathIfExists(cacheEntryRoot);
+  await rename(cacheStageRoot, cacheEntryRoot);
+  console.log(
+    `[openclaw-sidecar][cache] stored fingerprint=${fingerprint} payload=${formatBytes(payloadStats.size)}`,
+  );
+}
+
 const nativeBinaryNamePattern = /\.(?:node|dylib|so|dll)$/u;
 const nativeBinaryBasenames = new Set(["spawn-helper"]);
 
@@ -343,6 +569,44 @@ function isNativeBinaryCandidate(filePath) {
     nativeBinaryNamePattern.test(baseName) ||
     nativeBinaryBasenames.has(baseName)
   );
+}
+
+async function resolve7ZipCommand() {
+  const candidates =
+    process.platform === "win32" ? ["7z.exe", "7z"] : ["7zz", "7z"];
+
+  for (const candidate of candidates) {
+    try {
+      await runAndCapture(candidate, ["i"]);
+      return candidate;
+    } catch {}
+  }
+
+  return null;
+}
+
+async function createOpenclawSidecarArchive(archivePath) {
+  if (OPENCLAW_SIDECAR_ARCHIVE_FORMAT === "zip") {
+    const sevenZipCommand = await resolve7ZipCommand();
+
+    if (sevenZipCommand) {
+      await run(sevenZipCommand, ["a", "-tzip", "-mx=1", archivePath, "."], {
+        cwd: sidecarRoot,
+      });
+      return;
+    }
+
+    const quotedSidecarRoot = sidecarRoot.replace(/'/gu, "''");
+    const quotedArchivePath = archivePath.replace(/'/gu, "''");
+    await run("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      `Add-Type -AssemblyName 'System.IO.Compression.FileSystem'; if (Test-Path -LiteralPath '${quotedArchivePath}') { Remove-Item -LiteralPath '${quotedArchivePath}' -Force }; [System.IO.Compression.ZipFile]::CreateFromDirectory('${quotedSidecarRoot}', '${quotedArchivePath}', [System.IO.Compression.CompressionLevel]::Fastest, $false)`,
+    ]);
+    return;
+  }
+
+  await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
 }
 
 async function resolveCodesignIdentity() {
@@ -462,7 +726,12 @@ async function ensureCodesignIdentity() {
 }
 
 async function signOpenclawNativeBinaries() {
-  if (process.platform !== "darwin") {
+  if (
+    resolveBuildTargetPlatform({
+      env: process.env,
+      platform: process.platform,
+    }) !== "mac"
+  ) {
     return;
   }
 
@@ -775,6 +1044,15 @@ async function prepareOpenclawSidecar() {
     );
   }
 
+  const cacheFingerprint = await timedStep(
+    "compute sidecar cache fingerprint",
+    async () => computeOpenclawSidecarFingerprint(),
+  );
+
+  if (await tryRestoreCachedArchivedOpenclawSidecar(cacheFingerprint)) {
+    return;
+  }
+
   await timedStep("reset sidecar root", async () => {
     await resetDir(sidecarRoot);
     await mkdir(sidecarBinDir, { recursive: true });
@@ -793,6 +1071,12 @@ async function prepareOpenclawSidecar() {
         },
       );
       await rename(stagedOpenclawRoot, resolve(sidecarNodeModules, "openclaw"));
+      if (shouldLogOpenclawSidecarProbes) {
+        const copyStats = await collectDirectoryStats(sidecarNodeModules);
+        console.log(
+          `[openclaw-sidecar][probe] node_modules files=${copyStats.fileCount} bytes=${copyStats.totalBytes} (${formatBytes(copyStats.totalBytes)})`,
+        );
+      }
     });
   } finally {
     await removePathIfExists(stageRoot);
@@ -867,18 +1151,31 @@ exit 127
   if (shouldCopyRuntimeDependencies() && shouldArchiveOpenclawSidecar) {
     const archivePath = resolve(
       dirname(sidecarRoot),
-      "openclaw-sidecar.tar.gz",
+      `openclaw-sidecar.${OPENCLAW_SIDECAR_ARCHIVE_FORMAT}`,
     );
     await timedStep("archive openclaw sidecar", async () => {
       await removePathIfExists(archivePath);
-      await run("tar", ["-czf", archivePath, "-C", sidecarRoot, "."]);
+      let preArchiveStats = null;
+      if (shouldLogOpenclawSidecarProbes) {
+        preArchiveStats = await collectDirectoryStats(sidecarRoot);
+        console.log(
+          `[openclaw-sidecar][probe] pre-archive files=${preArchiveStats.fileCount} bytes=${preArchiveStats.totalBytes} (${formatBytes(preArchiveStats.totalBytes)})`,
+        );
+      }
+      await createOpenclawSidecarArchive(archivePath);
+      if (shouldLogOpenclawSidecarProbes) {
+        const archiveStats = await stat(archivePath);
+        console.log(
+          `[openclaw-sidecar][probe] archive bytes=${archiveStats.size} (${formatBytes(archiveStats.size)}) ratio=${(archiveStats.size / Math.max(preArchiveStats?.totalBytes ?? 1, 1)).toFixed(3)}`,
+        );
+      }
       await resetDir(sidecarRoot);
       await writeFile(
         resolve(sidecarRoot, "archive.json"),
         `${JSON.stringify(
           {
-            format: "tar.gz",
-            path: "payload.tar.gz",
+            format: OPENCLAW_SIDECAR_ARCHIVE_FORMAT,
+            path: OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME,
           },
           null,
           2,
@@ -888,7 +1185,11 @@ exit 127
         resolve(sidecarRoot, "package.json"),
         '{\n  "name": "openclaw-sidecar",\n  "private": true\n}\n',
       );
-      await rename(archivePath, resolve(sidecarRoot, "payload.tar.gz"));
+      await rename(
+        archivePath,
+        resolve(sidecarRoot, OPENCLAW_SIDECAR_ARCHIVE_FILE_NAME),
+      );
+      await writeOpenclawSidecarCacheEntry(cacheFingerprint);
     });
   } else if (shouldCopyRuntimeDependencies()) {
     console.log(

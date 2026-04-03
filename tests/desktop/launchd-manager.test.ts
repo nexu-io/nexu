@@ -23,25 +23,34 @@ const originalPlatform = process.platform;
 describe("LaunchdManager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     // Set platform to darwin for tests
-    Object.defineProperty(process, "platform", { value: "darwin" });
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
   });
 
   afterEach(() => {
-    Object.defineProperty(process, "platform", { value: originalPlatform });
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
   });
 
-  it("throws on non-darwin platform", async () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
+  it("still constructs on non-darwin when given a plist directory", async () => {
+    Object.defineProperty(process, "platform", {
+      value: "linux",
+      configurable: true,
+    });
 
     // Dynamic import to test constructor
     const { LaunchdManager } = await import(
       "../../apps/desktop/main/services/launchd-manager"
     );
 
-    expect(() => new LaunchdManager()).toThrow(
-      "LaunchdManager only works on macOS",
-    );
+    const manager = new LaunchdManager({ plistDir: "/tmp/test" });
+    expect(manager.getPlistDir().replace(/\\/g, "/")).toBe("/tmp/test");
   });
 
   it("uses correct default plist directory", async () => {
@@ -50,7 +59,9 @@ describe("LaunchdManager", () => {
     );
 
     const manager = new LaunchdManager();
-    expect(manager.getPlistDir()).toBe("/Users/testuser/Library/LaunchAgents");
+    expect(manager.getPlistDir().replace(/\\/g, "/")).toBe(
+      "/Users/testuser/Library/LaunchAgents",
+    );
   });
 
   it("uses custom plist directory when provided", async () => {

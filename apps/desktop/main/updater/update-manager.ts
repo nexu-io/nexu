@@ -5,6 +5,7 @@ import type {
   UpdateCheckDiagnostic,
   UpdateSource,
 } from "../../shared/host";
+import type { PrepareForUpdateInstallArgs } from "../platforms/types";
 import type { RuntimeOrchestrator } from "../runtime/daemon-supervisor";
 import { writeDesktopMainLog } from "../runtime/runtime-logger";
 import {
@@ -28,6 +29,9 @@ export interface UpdateManagerOptions {
     labels: { controller: string; openclaw: string };
     plistDir: string;
   };
+  prepareForUpdateInstall?: (
+    args: PrepareForUpdateInstallArgs,
+  ) => Promise<void>;
 }
 
 function getMacFeedArch(arch: string = process.arch): "arm64" | "x64" {
@@ -100,6 +104,7 @@ export class UpdateManager {
   private readonly checkIntervalMs: number;
   private readonly initialDelayMs: number;
   private readonly launchdCtx: UpdateManagerOptions["launchd"];
+  private readonly options?: UpdateManagerOptions;
   private currentFeedUrl: string;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private lastProgressLogAt = 0;
@@ -121,6 +126,7 @@ export class UpdateManager {
     this.checkIntervalMs = options?.checkIntervalMs ?? 15 * 60 * 1000;
     this.initialDelayMs = options?.initialDelayMs ?? 0;
     this.launchdCtx = options?.launchd;
+    this.options = options;
     this.currentFeedUrl = getDefaultR2FeedUrl(this.channel);
 
     autoUpdater.autoDownload = options?.autoDownload ?? false;
@@ -327,6 +333,14 @@ export class UpdateManager {
     };
 
     logStep("start");
+
+    await this.options?.prepareForUpdateInstall?.({
+      app,
+      orchestrator: this.orchestrator,
+      logLifecycleStep: (message: string) => {
+        this.logCheck(message, this.getDiagnostic());
+      },
+    });
 
     // --- Phase 1: Best-effort cleanup ---
     // Each step is wrapped in try/catch so a failure in one step never

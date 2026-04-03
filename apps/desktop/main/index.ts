@@ -29,6 +29,9 @@ import {
   setQuitHandlerOpts,
   setUpdateManager,
 } from "./ipc";
+import { getDesktopRuntimePlatformAdapter } from "./platforms";
+import { resolveLaunchdPaths } from "./platforms/mac/launchd-paths";
+import type { PrepareForUpdateInstallArgs } from "./platforms/types";
 import { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
   buildSkillNodePath,
@@ -53,10 +56,9 @@ import {
   getDefaultPlistDir,
   getLogDir,
   installLaunchdQuitHandler,
-  isLaunchdBootstrapEnabled,
-  resolveLaunchdPaths,
   teardownLaunchdServices,
 } from "./services";
+import { isLaunchdBootstrapEnabled } from "./services/launchd-bootstrap";
 import { ProxyManager } from "./services/proxy-manager";
 import {
   getLegacyNexuHomeStateDir,
@@ -99,6 +101,8 @@ const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
 // recovery via runtime-ports.json and handles leftover processes gracefully.
 // Probing here would waste time and the results get overridden by attach anyway.
 const useLaunchdMode = isLaunchdBootstrapEnabled();
+const runtimeLifecycle =
+  getDesktopRuntimePlatformAdapter(baseRuntimeConfig).lifecycle;
 const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
   ? {
       allocations: [] as PortAllocation[],
@@ -1182,6 +1186,11 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
+          ? async (args: PrepareForUpdateInstallArgs) => {
+              await runtimeLifecycle.prepareForUpdateInstall?.(args);
+            }
+          : undefined,
         launchd: launchdResult
           ? {
               manager: launchdResult.launchd,

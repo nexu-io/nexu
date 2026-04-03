@@ -31,7 +31,11 @@ describe("SkillDb", () => {
   });
 
   afterEach(() => {
-    db?.close();
+    try {
+      db?.close();
+    } catch {
+      // best effort for migration tests that exercise legacy bootstrap paths
+    }
     rmSync(tempDir, { recursive: true, force: true });
   });
 

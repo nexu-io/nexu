@@ -3,9 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS=--conditions=development concurrently --kill-others --names controller,web --prefix-colors blue,green \"pnpm --filter @nexu/controller dev\" \"pnpm --filter @nexu/web dev\"",
-    "dev:controller": "pnpm --filter @nexu/controller dev",
-    "dev:desktop": "pnpm --filter @nexu/desktop dev",
+    "dev": "pnpm --dir ./scripts/dev exec tsx ./src/index.ts",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
@@ -18,27 +16,22 @@
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
     "openclaw-runtime:reinstall": "npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned",
     "postinstall": "node scripts/postinstall.mjs",
-    "prepare": "cp scripts/pre-commit .git/hooks/pre-commit 2>/dev/null; chmod +x .git/hooks/pre-commit 2>/dev/null; true",
+    "prepare": "node ./scripts/setup-git-hooks.mjs",
     "start": "./scripts/dev-launchd.sh start",
-    "start:bg": "./scripts/dev-launchd-bg.sh start",
     "stop": "./scripts/dev-launchd.sh stop",
-    "stop:bg": "./scripts/dev-launchd-bg.sh stop",
     "restart": "./scripts/dev-launchd.sh restart",
-    "restart:bg": "./scripts/dev-launchd-bg.sh restart",
     "status": "./scripts/dev-launchd.sh status",
-    "status:bg": "./scripts/dev-launchd-bg.sh status",
     "logs": "./scripts/dev-launchd.sh logs",
-    "logs:bg": "./scripts/dev-launchd-bg.sh logs",
-    "reset-state": "./apps/desktop/dev.sh reset-state",
-    "check:dev": "./scripts/desktop-check-dev.sh",
-    "check:dist": "./scripts/desktop-check-dist.sh",
+    "check:dev": "node ./scripts/desktop-check-dev.mjs",
+    "check:dist": "node ./scripts/desktop-check-dist.mjs",
     "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
     "dist:mac": "pnpm --filter @nexu/desktop dist:mac",
     "dist:mac:arm64": "pnpm --filter @nexu/desktop dist:mac:arm64",
     "dist:mac:x64": "pnpm --filter @nexu/desktop dist:mac:x64",
     "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
     "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
-    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64"
+    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64",
+    "dist:win:local": "pnpm --filter @nexu/desktop dist:win:local"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -50,6 +43,7 @@
     "@vitest/coverage-v8": "^3.2.4",
     "@wecom/wecom-openclaw-plugin": "^2026.3.26",
     "concurrently": "^9.2.1",
+    "tsx": "^4.21.0",
     "vitest": "^3.0.7"
   },
   "engines": {
@@ -63,7 +57,8 @@
       "@biomejs/biome",
       "better-sqlite3",
       "electron",
-      "esbuild"
+      "esbuild",
+      "sharp"
     ],
     "overrides": {
       "react": "^19.2.4",

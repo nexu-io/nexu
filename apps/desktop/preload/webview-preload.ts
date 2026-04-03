@@ -32,6 +32,10 @@ const hostBridge: HostBridge = {
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
     needsSetupAnimation: false,
+    webviewPreloadUrl: new URL(
+      "./webview-preload.js",
+      import.meta.url,
+    ).toString(),
   },
 
   invoke<TChannel extends HostInvokeChannel>(

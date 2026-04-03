@@ -3,6 +3,7 @@ dist/
 .next/
 dist-electron/
 .tmp/
+.cache/
 *.tsbuildinfo
 .env
 .env.*
@@ -36,3 +37,4 @@ apps/desktop/build-config.json
 .claude/settings.local.json
 .claude/worktrees
 .claude/worktrees/
+.task/

@@ -178,6 +178,7 @@ function parseEnvBoolean(value: string | undefined): boolean | null {
 }
 
 export type DesktopRuntimeConfig = {
+  runtimeMode: "internal" | "external";
   buildInfo: DesktopBuildInfo;
   proxy: ProxyPolicy;
   updates: {
@@ -219,6 +220,12 @@ export function getDesktopRuntimeConfig(
     useBuildConfig?: boolean;
   },
 ): DesktopRuntimeConfig {
+  const runtimeMode =
+    env.NEXU_DESKTOP_RUNTIME_MODE === "external" ||
+    env.NEXU_DESKTOP_EXTERNAL_RUNTIME === "1" ||
+    env.NEXU_DESKTOP_EXTERNAL_RUNTIME?.toLowerCase() === "true"
+      ? "external"
+      : "internal";
   const buildConfig =
     defaults?.useBuildConfig === false
       ? {}
@@ -262,6 +269,7 @@ export function getDesktopRuntimeConfig(
   };
 
   return {
+    runtimeMode,
     buildInfo: {
       version:
         defaults?.appVersion ??
