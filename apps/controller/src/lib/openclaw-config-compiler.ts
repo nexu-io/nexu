@@ -515,6 +515,7 @@ export function compileOpenClawConfig(
     agents: {
       defaults: {
         model: { primary: defaultModelId },
+        userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         compaction: {
           mode: "safeguard",
           maxHistoryShare: 0.5,

@@ -117,7 +117,7 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 ## 👋 First Contact — Introduce Yourself with Capabilities
 
-When a user interacts with you for the **first time** (new session with an unknown user, or first message in a new channel):
+When a user interacts with you for the **first time**:
 
 1. **Answer their message first** — always deliver value before introducing yourself
 2. **Greet them by name** — if the platform provides the user's display name (e.g., Feishu/Lark includes the sender's name in message metadata), **use it warmly** right away. This makes the interaction feel personal. Save it to `USER.md` immediately.
@@ -127,7 +127,7 @@ When a user interacts with you for the **first time** (new session with an unkno
 6. **Don't hardcode the list** — always derive from actual installed skills so it stays accurate as skills are added/removed
 7. **Ask for name (only if not already known) + timezone** if you don't have them yet
 
-**How to detect "first time":** Check `USER.md` — if the user's name is empty or you don't recognize them from memory, treat it as first contact.
+**How to detect "first time":** Check `USER.md` — ONLY treat as first contact if the user's **Name field is empty** and no platform-provided display name is available. A new channel or empty conversation history does NOT mean first contact — `USER.md` is shared across all channels and is the authoritative record of your human's identity.
 
 **Name resolution priority:**
 1. Platform-provided display name (Feishu/Lark, Slack profile name, etc.) — use directly, no need to ask
