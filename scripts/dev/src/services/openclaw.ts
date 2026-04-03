@@ -15,6 +15,7 @@ import {
   terminateProcess,
   waitForProcessStart,
 } from "@nexu/dev-utils";
+import { resolveOpenClawRepoLocalLayout } from "@nexu/openclaw-runtime";
 import { ensure } from "@nexu/shared";
 
 import {
@@ -58,6 +59,15 @@ function createOpenclawCommand(sessionId: string): {
   args: string[];
 } {
   const { cliPath } = resolveTsxPaths();
+  const logger = getScriptsDevLogger({
+    component: "openclaw-service",
+    service: "openclaw",
+  });
+
+  logger.info("selected tsx supervisor entrypoint for openclaw dev startup", {
+    command: process.execPath,
+    args: [cliPath, openclawSupervisorPath],
+  });
 
   return {
     command: process.execPath,
@@ -118,6 +128,49 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
   }
 
   throw new Error(`openclaw gateway did not open port ${port}`);
+}
+
+async function waitForOpenclawPortProcessLaunch(
+  supervisorPid: number,
+): Promise<void> {
+  const logger = getScriptsDevLogger({
+    component: "openclaw-service",
+    service: "openclaw",
+  });
+  const port = getScriptsDevRuntimeConfig().openclawPort;
+  const attempts = 30;
+  const delayMs = 250;
+  const waitStartedAt = Date.now();
+
+  for (let index = 0; index < attempts; index += 1) {
+    if (await getOpenclawHealthStatus()) {
+      return;
+    }
+
+    if (!isProcessRunning(supervisorPid)) {
+      throw new Error("openclaw supervisor exited before health check passed");
+    }
+
+    if ((index + 1) % 4 === 0) {
+      logger.info("waiting for openclaw health endpoint", {
+        supervisorPid,
+        port,
+        elapsedMs: Date.now() - waitStartedAt,
+      });
+    }
+
+    if (index < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  if (!isProcessRunning(supervisorPid)) {
+    throw new Error("openclaw supervisor exited before health check passed");
+  }
+
+  throw new Error(
+    `openclaw health endpoint did not become ready at ${getScriptsDevRuntimeConfig().openclawBaseUrl}/health`,
+  );
 }
 
 async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
@@ -208,14 +261,10 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     component: "openclaw-service",
     service: "openclaw",
   });
+  const layout = resolveOpenClawRepoLocalLayout();
   const stage = await prepareOpenclawRuntimeStage({
-    sourceOpenclawRoot: join(
-      repoRootPath,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-    ),
-    patchRoot: join(repoRootPath, "openclaw-runtime-patches"),
+    sourceOpenclawRoot: layout.openclawStageSourceRootPath,
+    patchRoot: layout.openclawPatchRootPath,
     targetStageRoot: getOpenclawRuntimeStageRootPath(),
     log: (message) => logger.info(message),
   });
@@ -268,6 +317,13 @@ export async function startOpenclawDevProcess(options: {
   const openclawEntryPath = await prepareOpenclawEntryPath();
 
   logOpenclawTiming("filesystem-ready", startedAt);
+  logger.info(
+    "prepared openclaw runtime entry path from @nexu/openclaw-runtime",
+    {
+      openclawEntryPath,
+      runtimeStageRoot: getOpenclawRuntimeStageRootPath(),
+    },
+  );
 
   const processHandle = await spawnHiddenProcess({
     command: commandSpec.command,
@@ -309,10 +365,8 @@ export async function startOpenclawDevProcess(options: {
   try {
     listenerPid = await waitForOpenclawPortPid(supervisorPid);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `${message}. Inspect ${logFilePath} for OpenClaw startup details.`,
-    );
+    await waitForOpenclawPortProcessLaunch(supervisorPid);
+    listenerPid = await waitForOpenclawPortPid(supervisorPid);
   }
 
   logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);

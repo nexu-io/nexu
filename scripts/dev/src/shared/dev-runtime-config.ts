@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { devTmpPath, repoRootPath } from "@nexu/dev-utils";
+import { resolveOpenClawRepoLocalLayout } from "@nexu/openclaw-runtime";
 
 import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
 
@@ -125,19 +126,15 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     mergedEnv.NEXU_DEV_OPENCLAW_LOG_DIR,
     join(devTmpPath, "openclaw", "logs"),
   );
+  const defaultLayout = resolveOpenClawRepoLocalLayout();
   const openclawEntryPath = resolvePath(
     mergedEnv.NEXU_DEV_OPENCLAW_ENTRY_PATH,
-    join(
-      repoRootPath,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    ),
+    defaultLayout.openclawEntryPath,
   );
   const openclawBuiltinExtensionsDir = resolvePath(
     mergedEnv.OPENCLAW_EXTENSIONS_DIR,
-    join(dirname(openclawEntryPath), "extensions"),
+    resolveOpenClawRepoLocalLayout({ openclawEntryPath })
+      .openclawBuiltinExtensionsDir,
   );
 
   cachedConfig = {

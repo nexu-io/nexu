@@ -5,6 +5,7 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { resolveOpenClawEntryPath } from "@nexu/openclaw-runtime";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 
@@ -35,20 +36,6 @@ function findWorkspaceRoot(startDir: string): string | null {
   }
 
   return null;
-}
-
-function resolveOpenclawEntryFromBin(binPath: string): string | null {
-  const resolvedBinPath = path.resolve(binPath.trim());
-  if (resolvedBinPath.endsWith(".mjs") && existsSync(resolvedBinPath)) {
-    return resolvedBinPath;
-  }
-
-  const entry = path.resolve(
-    path.dirname(resolvedBinPath),
-    "..",
-    "node_modules/openclaw/openclaw.mjs",
-  );
-  return existsSync(entry) ? entry : null;
 }
 
 export interface OpenClawRuntimeEvent {
@@ -136,45 +123,36 @@ export class OpenClawProcessManager {
     let extraEnv: Record<string, string> = {};
 
     if (electronExec) {
-      const openclawEntryFromBin = resolveOpenclawEntryFromBin(
-        this.env.openclawBin,
-      );
-      if (openclawEntryFromBin) {
-        cmd = electronExec;
-        args = [openclawEntryFromBin, "gateway", "run"];
-        extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
-      } else {
-        const workspaceRoot =
+      const entry = resolveOpenClawEntryPath({
+        openclawBin: this.env.openclawBin,
+        workspaceRoot:
           process.env.NEXU_WORKSPACE_ROOT?.trim() ||
-          findWorkspaceRoot(process.cwd());
-        const runtimeEntryPath = workspaceRoot
-          ? path.join(
-              workspaceRoot,
-              "openclaw-runtime",
-              "node_modules",
-              "openclaw",
-              "openclaw.mjs",
-            )
-          : null;
-
-        if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
-          cmd = electronExec;
-          args = [runtimeEntryPath, "gateway", "run"];
-          extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
-        } else {
-          // Resolve the openclaw entry point relative to the bin script
-          const entry = resolveOpenclawEntryFromBin(this.env.openclawBin);
-          if (!entry) {
-            throw new Error(
-              "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
-            );
-          }
-          cmd = electronExec;
-          args = [entry, "gateway", "run"];
-          extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
-        }
+          findWorkspaceRoot(process.cwd()),
+      });
+      if (!entry) {
+        throw new Error(
+          "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
+        );
       }
+      logger.info(
+        {
+          openclawBin: this.env.openclawBin,
+          entry,
+          electronExec,
+        },
+        "controller resolved openclaw entry via @nexu/openclaw-runtime",
+      );
+      cmd = electronExec;
+      args = [entry, "gateway", "run"];
+      extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
     } else {
+      logger.info(
+        {
+          openclawBin: this.env.openclawBin,
+          electronExec: null,
+        },
+        "controller using direct openclaw binary path",
+      );
       cmd = this.env.openclawBin;
       args = ["gateway", "run"];
     }
