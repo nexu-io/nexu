@@ -13,6 +13,7 @@
     "lint:fix": "biome check --write --unsafe .",
     "format": "biome check --write .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage --coverage.reporter=lcov",
     "generate-types": "pnpm --filter @nexu/controller generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:cached",
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
