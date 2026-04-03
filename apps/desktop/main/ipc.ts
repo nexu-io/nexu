@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/electron/main";
 import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
 import {
+  type GlobalShortcutConfig,
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
   type StartupProbePayload,
@@ -10,6 +11,7 @@ import type { DesktopRuntimeConfig } from "../shared/runtime-config";
 import type { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
+import type { GlobalShortcutManager } from "./services/global-shortcut";
 import {
   type QuitHandlerOptions,
   runTeardownAndExit,
@@ -23,6 +25,7 @@ let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
 let quitHandlerOpts: QuitHandlerOptions | null = null;
 let quitFallback: (() => Promise<void>) | null = null;
+let globalShortcutManager: GlobalShortcutManager | null = null;
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -112,6 +115,10 @@ export function setComponentUpdater(updater: ComponentUpdater): void {
 
 export function setQuitHandlerOpts(opts: QuitHandlerOptions): void {
   quitHandlerOpts = opts;
+}
+
+export function setGlobalShortcutManager(manager: GlobalShortcutManager | null): void {
+  globalShortcutManager = manager;
 }
 
 export function setQuitFallback(fallback: () => Promise<void>): void {
@@ -269,6 +276,35 @@ export function registerIpcHandlers(
           const typedPayload =
             payload as HostInvokePayloadMap["runtime:query-events"];
           return orchestrator.queryEvents(typedPayload);
+        }
+
+        case "shortcut:get-config": {
+          if (!globalShortcutManager) {
+            return { enabled: true, accelerator: "CommandOrControl+Shift+N" } as GlobalShortcutConfig;
+          }
+          return globalShortcutManager.getConfig();
+        }
+
+        case "shortcut:set-enabled": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["shortcut:set-enabled"];
+          if (!globalShortcutManager) {
+            return { ok: false, config: { enabled: typedPayload.enabled, accelerator: "CommandOrControl+Shift+N" } };
+          }
+          const ok = globalShortcutManager.setEnabled(typedPayload.enabled);
+          const config = globalShortcutManager.getConfig();
+          return { ok, config };
+        }
+
+        case "shortcut:set-accelerator": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["shortcut:set-accelerator"];
+          if (!globalShortcutManager) {
+            return { ok: false, config: { enabled: true, accelerator: typedPayload.accelerator } };
+          }
+          const ok = globalShortcutManager.setAccelerator(typedPayload.accelerator);
+          const config = globalShortcutManager.getConfig();
+          return { ok, config };
         }
 
         case "desktop:get-cloud-status": {
