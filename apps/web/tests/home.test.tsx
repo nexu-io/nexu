@@ -178,6 +178,35 @@ describe("HomePage", () => {
     expect(markup).toContain('muted=""');
     expect(markup).toContain('loop=""');
   });
+
+  it("renders the budget banner below the hero block on the home page", () => {
+    const markup = renderHomePage({
+      viewer: {
+        cloudConnected: true,
+        activeModelId: "link/gemini",
+        activeModelProviderId: "link",
+        usingManagedModel: true,
+      },
+      progress: {
+        claimedCount: 6,
+        totalCount: 10,
+        earnedCredits: 1200,
+      },
+      cloudBalance: {
+        totalBalance: 5,
+        totalRecharged: 1205,
+        totalConsumed: 1200,
+      },
+    });
+
+    expect(markup).toContain('data-budget-banner-status="warning"');
+    expect(markup.indexOf("nexu alpha")).toBeLessThan(
+      markup.indexOf('data-budget-banner-status="warning"'),
+    );
+    expect(markup.indexOf('data-budget-banner-status="warning"')).toBeLessThan(
+      markup.indexOf("Channels"),
+    );
+  });
 });
 
 describe("RewardsPage", () => {

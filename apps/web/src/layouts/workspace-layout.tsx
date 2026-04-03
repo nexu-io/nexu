@@ -1457,7 +1457,10 @@ function WorkspaceLayoutInner() {
           </div>
 
           <main className="flex-1 overflow-y-auto min-h-0">
-            {shouldShowPrompt && budgetStatus !== "healthy" ? (
+            {shouldShowPrompt &&
+            budgetStatus !== "healthy" &&
+            location.pathname !== "/workspace" &&
+            location.pathname !== "/workspace/home" ? (
               <div className="mx-auto max-w-4xl px-4 pb-0 pt-4 sm:px-6 md:px-8">
                 <BudgetWarningBanner
                   status={budgetStatus}

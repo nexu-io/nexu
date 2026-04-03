@@ -172,6 +172,7 @@ function renderWorkspaceLayout(
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route element={<WorkspaceLayout />}>
+            <Route path="/workspace" element={<div>Home body</div>} />
             <Route
               path="/workspace/sessions/:id"
               element={<div>Session body</div>}
@@ -343,6 +344,64 @@ describe("WorkspaceLayout", () => {
     );
 
     expect(markup).not.toContain('data-budget-banner-status="depleted"');
+  });
+
+  it("does not render the global budget banner at the top of the home page", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/home",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 6,
+          totalCount: 11,
+          earnedCredits: 1200,
+        },
+        cloudBalance: {
+          totalBalance: 5,
+          totalRecharged: 1205,
+          totalConsumed: 1200,
+        },
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).not.toContain('data-budget-banner-status="warning"');
+  });
+
+  it("does not render the global budget banner at the top of the default workspace route", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 6,
+          totalCount: 11,
+          earnedCredits: 1200,
+        },
+        cloudBalance: {
+          totalBalance: 5,
+          totalRecharged: 1205,
+          totalConsumed: 1200,
+        },
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).not.toContain('data-budget-banner-status="warning"');
   });
 
   it("renders the logged-in rewards card with a separate balance entry", () => {
