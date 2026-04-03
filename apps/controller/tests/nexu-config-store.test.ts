@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import { NexuConfigStore } from "../src/store/nexu-config-store.js";
 
@@ -304,5 +304,195 @@ describe("NexuConfigStore", () => {
       "Default",
       "Staging",
     ]);
+  });
+
+  it("claimDesktopReward returns ok:false when cloud is not connected", async () => {
+    const store = new NexuConfigStore(env);
+
+    const result = await store.claimDesktopReward("daily_checkin");
+    expect(result.ok).toBe(false);
+    expect(result.alreadyClaimed).toBe(false);
+  });
+
+  it("getDesktopRewardsStatus returns empty fallback when cloud is not connected", async () => {
+    const store = new NexuConfigStore(env);
+
+    const status = await store.getDesktopRewardsStatus();
+    expect(status.viewer.cloudConnected).toBe(false);
+    expect(status.tasks).toHaveLength(0);
+    expect(status.progress.earnedCredits).toBe(0);
+    expect(status.cloudBalance).toBeNull();
+  });
+
+  it("treats link-prefixed default models as managed even before cloud inventory hydrates", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          runtime: {
+            defaultModelId: "link/gemini-3-flash-preview",
+          },
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    const status = await store.getDesktopRewardsStatus();
+    expect(status.viewer.cloudConnected).toBe(true);
+    expect(status.viewer.activeModelId).toBe("link/gemini-3-flash-preview");
+    expect(status.viewer.usingManagedModel).toBe(true);
+  });
+
+  it("getDesktopRewardsStatus preserves connected state when cloud returns 401 auth_failed", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "expired-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+          }),
+      ),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.viewer.cloudConnected).toBe(true);
+      expect(status.tasks).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("claimDesktopReward uses status from claim response without extra fetch", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+
+    const mockTask = {
+      id: "daily_checkin",
+      displayName: "Daily Check-in",
+      groupId: "daily",
+      rewardPoints: 100,
+      repeatMode: "daily",
+      shareMode: "link",
+      icon: "calendar",
+      url: null,
+      isClaimed: true,
+      claimCount: 1,
+      lastClaimedAt: "2026-04-01T00:00:00.000Z",
+    };
+
+    const claimResponse = {
+      ok: true,
+      alreadyClaimed: false,
+      status: {
+        tasks: [mockTask],
+        progress: { claimedCount: 1, totalCount: 1, earnedCredits: 100 },
+        cloudBalance: null,
+      },
+    };
+
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCallCount = 0;
+    let claimBody: unknown = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        fetchCallCount += 1;
+        claimBody = init?.body ?? null;
+        return new Response(JSON.stringify(claimResponse), { status: 200 });
+      }),
+    );
+
+    try {
+      const result = await store.claimDesktopReward("daily_checkin", {
+        url: "https://x.com/nexu_io/status/1900000000000000000",
+      });
+      expect(result.ok).toBe(true);
+      expect(result.alreadyClaimed).toBe(false);
+      expect(result.status.tasks).toHaveLength(1);
+      expect(result.status.tasks[0]?.isClaimed).toBe(true);
+      expect(result.status.progress.claimedCount).toBe(1);
+      // Only one fetch call for claim — no extra status fetch
+      expect(fetchCallCount).toBe(1);
+      expect(claimBody).toBe(
+        JSON.stringify({
+          taskId: "daily_checkin",
+          proofUrl: "https://x.com/nexu_io/status/1900000000000000000",
+        }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

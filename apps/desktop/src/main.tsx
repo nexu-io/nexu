@@ -2,7 +2,13 @@ import * as amplitude from "@amplitude/unified";
 import { Identify } from "@amplitude/unified";
 import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactDOM from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import setupLoopVideoUrl from "../assets/setup-animation-loop.mp4";
@@ -25,6 +31,7 @@ import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { SurfaceFrame } from "./components/surface-frame";
 import { UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
+import { ensureDesktopControllerReady } from "./lib/controller-ready";
 import {
   checkComponentUpdates,
   getAppInfo,
@@ -48,6 +55,8 @@ import "./runtime-page.css";
 const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
 const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
+
+type ControllerSurfaceState = "polling" | "recovering" | "failed";
 
 let rendererSentryInitialized = false;
 let amplitudeTelemetryInitialized = false;
@@ -1049,42 +1058,62 @@ function DesktopShell() {
   // Note: getRuntimeConfig() IPC handler waits for cold-start to complete, so
   // runtimeConfig always has the final ports (including any fallback).
   const [controllerReady, setControllerReady] = useState(false);
+  const [controllerSurfaceState, setControllerSurfaceState] =
+    useState<ControllerSurfaceState>("polling");
+  const [controllerRetryNonce, setControllerRetryNonce] = useState(0);
+  const controllerRetryNonceRef = useRef(controllerRetryNonce);
+
+  useEffect(() => {
+    controllerRetryNonceRef.current = controllerRetryNonce;
+  }, [controllerRetryNonce]);
+
+  const handleRetryController = useCallback(() => {
+    setControllerReady(false);
+    setControllerSurfaceState("polling");
+    setControllerRetryNonce((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     if (!runtimeConfig) return;
     if (controllerReady) return;
 
+    const retryNonce = controllerRetryNonce;
     let cancelled = false;
+    setControllerSurfaceState("polling");
     const readyUrl = new URL(
       "/api/internal/desktop/ready",
       runtimeConfig.urls.web,
     ).toString();
 
-    async function poll() {
-      while (!cancelled) {
-        try {
-          const res = await fetch(readyUrl, {
-            signal: AbortSignal.timeout(3000),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.ready) {
-              if (!cancelled) setControllerReady(true);
-              return;
-            }
-          }
-        } catch {
-          // Controller or web sidecar not ready yet — keep polling
+    void ensureDesktopControllerReady({
+      readyUrl,
+      startController: async () => {
+        await startUnit("controller");
+      },
+      onStatusChange: (status) => {
+        if (!cancelled && controllerRetryNonceRef.current === retryNonce) {
+          setControllerSurfaceState(status);
         }
-        await new Promise((r) => setTimeout(r, 1000));
+      },
+    }).then((ready) => {
+      if (cancelled || controllerRetryNonceRef.current !== retryNonce) {
+        return;
       }
-    }
 
-    void poll();
+      if (ready) {
+        setControllerReady(true);
+        setControllerSurfaceState("polling");
+        return;
+      }
+
+      setControllerSurfaceState("failed");
+      setActiveSurface((surface) => (surface === "web" ? "control" : surface));
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [runtimeConfig, controllerReady]);
+  }, [runtimeConfig, controllerReady, controllerRetryNonce]);
 
   const desktopWebUrl =
     runtimeConfig && controllerReady
@@ -1194,13 +1223,50 @@ function DesktopShell() {
           <CloudProfilePage />
         </div>
         <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
-          <SurfaceFrame
-            description="Authenticated workspace surface served by the repo-local web sidecar."
-            src={desktopWebUrl}
-            title="nexu Web"
-            version={webSurfaceVersion}
-            preload={getWebviewPreloadUrl()}
-          />
+          {desktopWebUrl ? (
+            <SurfaceFrame
+              description="Authenticated workspace surface served by the repo-local web sidecar."
+              src={desktopWebUrl}
+              title="nexu Web"
+              version={webSurfaceVersion}
+              preload={getWebviewPreloadUrl()}
+            />
+          ) : (
+            <section className="runtime-empty-state">
+              <span className="runtime-eyebrow">Workspace</span>
+              <h2>
+                {controllerSurfaceState === "recovering"
+                  ? "Restarting controller..."
+                  : controllerSurfaceState === "failed"
+                    ? "Controller unavailable"
+                    : "Starting controller..."}
+              </h2>
+              <p>
+                {controllerSurfaceState === "recovering"
+                  ? "The local controller stopped cleanly, so desktop is starting it again before mounting the workspace."
+                  : controllerSurfaceState === "failed"
+                    ? "Workspace startup timed out because the local controller did not come back. Retry it here or switch to the control plane."
+                    : "Desktop is waiting for the local controller to report ready before loading the workspace surface."}
+              </p>
+              <div className="runtime-actions">
+                <button
+                  disabled={controllerSurfaceState === "recovering"}
+                  onClick={handleRetryController}
+                  type="button"
+                >
+                  {controllerSurfaceState === "recovering"
+                    ? "Restarting..."
+                    : "Retry controller"}
+                </button>
+                <button
+                  onClick={() => setActiveSurface("control")}
+                  type="button"
+                >
+                  Open control plane
+                </button>
+              </div>
+            </section>
+          )}
         </div>
         <div
           style={{

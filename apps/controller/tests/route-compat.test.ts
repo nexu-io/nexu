@@ -187,6 +187,13 @@ async function createTestContainer(
     skillhubService,
     openclawSyncService,
     openclawAuthService,
+    quotaFallbackService: {
+      triggerFallback: vi.fn(),
+    } as never,
+    githubStarVerificationService: {
+      prepareSession: vi.fn(),
+      verifySession: vi.fn(),
+    } as never,
     wsClient,
     gatewayService,
     runtimeState,
@@ -645,5 +652,39 @@ describe("controller route compatibility", () => {
     expect(payload.workspacePath).toBe(
       path.join(rootDir, ".openclaw", "agents", bot.id),
     );
+  });
+
+  it("serves desktop rewards status and claim routes (cloud proxy mode)", async () => {
+    const app = createApp(container);
+
+    // Without cloud connection, status returns empty fallback
+    const statusResponse = await app.request("/api/internal/desktop/rewards");
+    expect(statusResponse.status).toBe(200);
+    const statusPayload = (await statusResponse.json()) as {
+      tasks: Array<{ id: string; isClaimed: boolean }>;
+      viewer: { cloudConnected: boolean; usingManagedModel: boolean };
+      cloudBalance: null;
+    };
+    expect(statusPayload.tasks).toHaveLength(0);
+    expect(statusPayload.viewer.cloudConnected).toBe(false);
+    expect(statusPayload.viewer.usingManagedModel).toBe(false);
+    expect(statusPayload.cloudBalance).toBeNull();
+
+    // Without cloud connection, claim returns ok:false
+    const claimResponse = await app.request(
+      "/api/internal/desktop/rewards/claim",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ taskId: "daily_checkin" }),
+      },
+    );
+    expect(claimResponse.status).toBe(200);
+    const claimPayload = (await claimResponse.json()) as {
+      ok: boolean;
+      alreadyClaimed: boolean;
+    };
+    expect(claimPayload.ok).toBe(false);
+    expect(claimPayload.alreadyClaimed).toBe(false);
   });
 });
