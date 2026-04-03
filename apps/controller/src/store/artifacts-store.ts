@@ -119,4 +119,26 @@ export class ArtifactsStore {
 
     return deleted;
   }
+
+  async deleteArtifactsByIds(ids: string[]): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const idSet = new Set(ids);
+    let deletedCount = 0;
+
+    await this.store.update((data) => ({
+      ...data,
+      artifacts: data.artifacts.filter((artifact) => {
+        if (idSet.has(artifact.id)) {
+          deletedCount += 1;
+          return false;
+        }
+        return true;
+      }),
+    }));
+
+    return deletedCount;
+  }
 }

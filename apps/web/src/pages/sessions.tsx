@@ -4,20 +4,23 @@ import { getChannelChatUrl } from "@/lib/channel-links";
 import { getSessionFolderUrl, openLocalFolderUrl } from "@/lib/desktop-links";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   CheckCircle2,
   FolderOpen,
   Loader2,
   MessageSquare,
+  Trash2,
   WifiOff,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  deleteApiV1SessionsById,
   getApiV1Channels,
   getApiV1SessionsById,
   getApiV1SessionsByIdMessages,
@@ -586,8 +589,11 @@ function ChatBubble({
 
 export function SessionsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
   const endRef = useRef<HTMLDivElement>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (id) track("session_detail_view");
@@ -628,6 +634,45 @@ export function SessionsPage() {
       return data;
     },
     enabled: !!id,
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async ({
+      sessionId,
+      botId,
+    }: {
+      sessionId: string;
+      botId: string;
+    }) => {
+      const { data } = await deleteApiV1SessionsById({
+        path: { id: sessionId },
+        query: { botId },
+      });
+      if (!data?.ok) {
+        throw new Error("Session delete failed");
+      }
+      return data;
+    },
+    onSuccess: async (_data, variables) => {
+      const { sessionId } = variables;
+      setShowDeleteConfirm(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sidebar-sessions"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["session-meta", sessionId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["chat-history", sessionId],
+        }),
+      ]);
+      toast.success("Conversation deleted.");
+      if (id === sessionId) {
+        navigate("/workspace/sessions", { replace: true });
+      }
+    },
+    onError: () => {
+      toast.error("Failed to delete conversation.");
+    },
   });
 
   const messages = ((chatData as Record<string, unknown> | undefined)
@@ -676,6 +721,10 @@ export function SessionsPage() {
     "inline-flex h-12 items-center justify-center gap-3 rounded-[18px] border bg-white px-5 text-[13px] font-medium text-text-primary shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-colors",
     "border-[rgba(15,23,42,0.1)] hover:bg-[rgba(248,250,252,0.9)]",
   );
+  const dangerButtonClassName = cn(
+    buttonClassName,
+    "border-[rgba(220,38,38,0.2)] text-[#B42318] hover:bg-[rgba(254,242,242,0.9)]",
+  );
 
   const handleOpenFolder = async (): Promise<void> => {
     if (!sessionFolderUrl) {
@@ -699,6 +748,15 @@ export function SessionsPage() {
     }
 
     toast.info("This channel does not expose a direct chat link yet.");
+  };
+
+  const handleDeleteSession = (): void => {
+    if (!id || !session?.botId || deleteSessionMutation.isPending) {
+      toast.error("Failed to delete conversation.");
+      return;
+    }
+
+    deleteSessionMutation.mutate({ sessionId: id, botId: session.botId });
   };
 
   return (
@@ -738,6 +796,84 @@ export function SessionsPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Dialog.Root
+              open={showDeleteConfirm}
+              onOpenChange={setShowDeleteConfirm}
+            >
+              <Dialog.Trigger asChild>
+                <button
+                  type="button"
+                  data-delete-session-trigger="true"
+                  className={dangerButtonClassName}
+                >
+                  <Trash2 className="size-[18px]" />
+                  <span>Delete</span>
+                </button>
+              </Dialog.Trigger>
+              <Dialog.Portal>
+                <Dialog.Overlay className="absolute inset-0 z-20 bg-[rgba(15,23,42,0.38)]" />
+                <Dialog.Content
+                  data-delete-session-confirm="true"
+                  className="absolute inset-0 z-30 flex items-center justify-center px-6 focus:outline-none"
+                >
+                  <div className="w-full max-w-md rounded-[24px] border border-[rgba(15,23,42,0.08)] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-[rgba(254,226,226,0.9)] text-[#B42318]">
+                        <Trash2 className="size-5" />
+                      </div>
+                      <div>
+                        <Dialog.Title className="text-[16px] font-semibold text-text-primary">
+                          Delete this conversation?
+                        </Dialog.Title>
+                        <Dialog.Description className="mt-2 text-[13px] leading-6 text-text-secondary">
+                          This will permanently delete the chat history and any
+                          related local generated artwork or artifact files
+                          managed by Nexu. This action cannot be undone.
+                        </Dialog.Description>
+                      </div>
+                    </div>
+                    <div className="mt-6 flex items-center justify-end gap-3">
+                      <Dialog.Close asChild>
+                        <button
+                          type="button"
+                          disabled={deleteSessionMutation.isPending}
+                          className={cn(
+                            buttonClassName,
+                            "h-10 rounded-[14px] px-4 shadow-none",
+                            deleteSessionMutation.isPending &&
+                              "cursor-not-allowed opacity-60",
+                          )}
+                        >
+                          Cancel
+                        </button>
+                      </Dialog.Close>
+                      <button
+                        type="button"
+                        onClick={handleDeleteSession}
+                        disabled={deleteSessionMutation.isPending}
+                        className={cn(
+                          dangerButtonClassName,
+                          "h-10 rounded-[14px] px-4 shadow-none",
+                          deleteSessionMutation.isPending &&
+                            "cursor-not-allowed opacity-60",
+                        )}
+                      >
+                        {deleteSessionMutation.isPending ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                        <span>
+                          {deleteSessionMutation.isPending
+                            ? "Deleting..."
+                            : "Delete conversation"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
             <button
               type="button"
               data-session-folder-url={sessionFolderUrl ?? undefined}

@@ -17,6 +17,7 @@ const querySchema = z.object({
 });
 
 const sessionIdParamSchema = z.object({ id: z.string() });
+const sessionDeleteQuerySchema = z.object({ botId: z.string().min(1) });
 const errorSchema = z.object({ message: z.string() });
 
 export function registerSessionRoutes(
@@ -207,7 +208,10 @@ export function registerSessionRoutes(
       method: "delete",
       path: "/api/v1/sessions/{id}",
       tags: ["Sessions"],
-      request: { params: sessionIdParamSchema },
+      request: {
+        params: sessionIdParamSchema,
+        query: sessionDeleteQuerySchema,
+      },
       responses: {
         200: {
           content: {
@@ -219,8 +223,9 @@ export function registerSessionRoutes(
     }),
     async (c) => {
       const { id } = c.req.valid("param");
+      const { botId } = c.req.valid("query");
       return c.json(
-        { ok: await container.sessionService.deleteSession(id) },
+        { ok: await container.sessionService.deleteSession(id, botId) },
         200,
       );
     },

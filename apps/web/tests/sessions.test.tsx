@@ -32,6 +32,11 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("../lib/api/sdk.gen", () => ({
+  deleteApiV1SessionsById: vi.fn(async () => ({
+    data: {
+      ok: true,
+    },
+  })),
   getApiV1Channels: vi.fn(async () => ({
     data: undefined,
   })),
@@ -113,6 +118,7 @@ describe("SessionsPage", () => {
     expect(markup).not.toContain("[message_id:");
     expect(markup).toContain("google-calendar");
     expect(markup).toContain("Open in Slack");
+    expect(markup).toContain("Delete");
   });
 
   it("renders assistant tool activity as a compact execution chip", () => {

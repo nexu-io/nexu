@@ -133,6 +133,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     configStore,
     sessionsRuntime,
   );
+  const artifactService = new ArtifactService(artifactsStore, env);
   const modelProviderService = new ModelProviderService(
     configStore,
     env,
@@ -169,7 +170,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       wsClient,
     ),
     channelFallbackService,
-    sessionService: new SessionService(sessionsRuntime),
+    sessionService: new SessionService(sessionsRuntime, artifactService),
     runtimeConfigService: new RuntimeConfigService(
       configStore,
       openclawSyncService,
@@ -184,7 +185,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       openclawProcess,
     ),
     analyticsService,
-    artifactService: new ArtifactService(artifactsStore),
+    artifactService,
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,
     openclawSyncService,

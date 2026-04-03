@@ -1989,7 +1989,9 @@ export type DeleteApiV1SessionsByIdData = {
     path: {
         id: string;
     };
-    query?: never;
+    query: {
+        botId: string;
+    };
     url: '/api/v1/sessions/{id}';
 };
 

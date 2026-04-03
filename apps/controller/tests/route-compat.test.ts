@@ -44,8 +44,6 @@ async function createTestContainer(
     port: 3010,
     host: "127.0.0.1",
     webUrl: "http://localhost:5173",
-    nexuCloudUrl: "https://nexu.io",
-    nexuLinkUrl: "https://link.nexu.io",
     nexuHomeDir: path.join(rootDir, ".nexu"),
     nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
     artifactsIndexPath: path.join(rootDir, ".nexu", "artifacts", "index.json"),
@@ -59,7 +57,6 @@ async function createTestContainer(
     openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
     openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
     runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
-    openclawCuratedSkillsDir: path.join(rootDir, ".openclaw", "bundled-skills"),
     openclawRuntimeModelStatePath: path.join(
       rootDir,
       ".openclaw",
@@ -67,6 +64,7 @@ async function createTestContainer(
     ),
     skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
     skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+    analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
     staticSkillsDir: undefined,
     platformTemplatesDir: undefined,
     openclawWorkspaceTemplatesDir: path.join(
@@ -84,6 +82,7 @@ async function createTestContainer(
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
+    amplitudeApiKey: undefined,
   };
 
   const configStore = new NexuConfigStore(env);
@@ -104,10 +103,13 @@ async function createTestContainer(
     isConnected: () => false,
     stop: vi.fn(),
   } as unknown as ControllerContainer["wsClient"];
-  const gatewayService = new OpenClawGatewayService({
-    isConnected: () => false,
-    request: vi.fn(),
-  } as never);
+  const gatewayService = new OpenClawGatewayService(
+    {
+      isConnected: () => false,
+      request: vi.fn(),
+    } as never,
+    runtimeState,
+  );
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -123,7 +125,9 @@ async function createTestContainer(
   );
   const modelProviderService = new ModelProviderService(
     configStore,
-    env.nodeEnv,
+    env,
+    openclawSyncService,
+    openclawProcess,
   );
   const runtimeModelStateService = new RuntimeModelStateService(env);
   const channelFallbackService = new ChannelFallbackService(
@@ -148,6 +152,11 @@ async function createTestContainer(
     start: vi.fn(),
   } as unknown as SkillhubService;
   const openclawAuthService = new OpenClawAuthService(env, authProfilesStore);
+  modelProviderService.setAuthService(openclawAuthService);
+  const analyticsService = {
+    poll: vi.fn(async () => {}),
+  } as unknown as ControllerContainer["analyticsService"];
+  const artifactService = new ArtifactService(artifactsStore, env);
 
   return {
     env,
@@ -168,7 +177,7 @@ async function createTestContainer(
       wsClient,
     ),
     channelFallbackService,
-    sessionService: new SessionService(sessionsRuntime),
+    sessionService: new SessionService(sessionsRuntime, artifactService),
     runtimeConfigService: new RuntimeConfigService(
       configStore,
       openclawSyncService,
@@ -182,7 +191,8 @@ async function createTestContainer(
       modelProviderService,
       openclawProcess,
     ),
-    artifactService: new ArtifactService(artifactsStore),
+    analyticsService,
+    artifactService,
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,
     openclawSyncService,

@@ -401,10 +401,15 @@ export class SessionsRuntime {
     if (!session) {
       return false;
     }
-    const filePath = this.getSessionFilePath(session.botId, session.sessionKey);
+
+    await this.deleteSessionFiles(session.botId, session.sessionKey);
+    return true;
+  }
+
+  async deleteSessionFiles(botId: string, sessionKey: string): Promise<void> {
+    const filePath = this.getSessionFilePath(botId, sessionKey);
     await rm(filePath, { force: true });
     await rm(sessionMetadataPath(filePath), { force: true });
-    return true;
   }
 
   async getChatHistory(
@@ -890,6 +895,18 @@ export class SessionsRuntime {
   async getSession(id: string): Promise<SessionResponse | null> {
     const sessions = await this.listSessions();
     return sessions.find((session) => session.id === id) ?? null;
+  }
+
+  async getSessionForBot(
+    botId: string,
+    id: string,
+  ): Promise<SessionResponse | null> {
+    const sessions = await this.listSessions();
+    return (
+      sessions.find(
+        (session) => session.id === id && session.botId === botId,
+      ) ?? null
+    );
   }
 
   private async getSessionByKey(
