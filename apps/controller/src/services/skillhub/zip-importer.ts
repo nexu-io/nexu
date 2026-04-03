@@ -1,12 +1,44 @@
-import { execFileSync } from "node:child_process";
 import {
+  cpSync,
+  createWriteStream,
   existsSync,
   mkdirSync,
   readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { basename, posix, resolve } from "node:path";
+import path from "node:path";
+import { pipeline } from "node:stream/promises";
+
+const require = createRequire(import.meta.url);
+const yauzl = require("yauzl") as {
+  open: (
+    path: string,
+    options: { lazyEntries: boolean },
+    callback: (error: Error | null, zipFile?: YauzlZipFile) => void,
+  ) => void;
+};
+
+type YauzlEntry = {
+  fileName: string;
+};
+
+type YauzlZipFile = {
+  readEntry: () => void;
+  on: (event: "entry", listener: (entry: YauzlEntry) => void) => void;
+  once: (
+    event: "end" | "error",
+    listener: (() => void) | ((error: Error) => void),
+  ) => void;
+  openReadStream: (
+    entry: YauzlEntry,
+    callback: (error: Error | null, stream?: NodeJS.ReadableStream) => void,
+  ) => void;
+  close: () => void;
+};
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 const MAX_ZIP_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -58,20 +90,118 @@ function isUnsafeZipEntryPath(entryPath: string): boolean {
   return normalizedPath.length === 0;
 }
 
-function readZipEntries(zipPath: string): string[] {
-  const output = execFileSync("unzip", ["-Z1", zipPath], {
-    encoding: "utf8",
+async function readZipEntries(zipPath: string): Promise<string[]> {
+  return new Promise<string[]>((resolveEntries, rejectEntries) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (openError, zipFile) => {
+      if (openError || !zipFile) {
+        rejectEntries(
+          openError ?? new Error(`Unable to open zip archive ${zipPath}`),
+        );
+        return;
+      }
+
+      const entries: string[] = [];
+
+      zipFile.once("error", (error) => {
+        zipFile.close();
+        rejectEntries(error);
+      });
+      zipFile.once("end", () => {
+        zipFile.close();
+        resolveEntries(entries);
+      });
+      zipFile.on("entry", (entry) => {
+        if (entry.fileName) {
+          entries.push(entry.fileName);
+        }
+        zipFile.readEntry();
+      });
+
+      zipFile.readEntry();
+    });
   });
-  return output
-    .split(/\r?\n/u)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
 }
 
-export function importSkillZip(
+async function extractZipToDir(
+  zipPath: string,
+  destDir: string,
+): Promise<void> {
+  await new Promise<void>((resolveExtract, rejectExtract) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (openError, zipFile) => {
+      if (openError || !zipFile) {
+        rejectExtract(
+          openError ?? new Error(`Unable to open zip archive ${zipPath}`),
+        );
+        return;
+      }
+
+      const closeWithError = (error: Error) => {
+        zipFile.close();
+        rejectExtract(error);
+      };
+
+      zipFile.once("error", closeWithError);
+      zipFile.once("end", () => {
+        zipFile.close();
+        resolveExtract();
+      });
+      zipFile.on("entry", (entry) => {
+        void (async () => {
+          const normalizedPath = entry.fileName.replace(/\\/gu, "/");
+          if (!normalizedPath || normalizedPath === ".") {
+            zipFile.readEntry();
+            return;
+          }
+
+          if (isUnsafeZipEntryPath(normalizedPath)) {
+            throw new Error(
+              `Refusing to extract unsafe path: ${entry.fileName}`,
+            );
+          }
+
+          const destinationPath = resolve(destDir, normalizedPath);
+
+          if (normalizedPath.endsWith("/")) {
+            await mkdir(destinationPath, { recursive: true });
+            zipFile.readEntry();
+            return;
+          }
+
+          await mkdir(path.dirname(destinationPath), { recursive: true });
+          zipFile.openReadStream(entry, async (streamError, readStream) => {
+            if (streamError || !readStream) {
+              closeWithError(
+                streamError ??
+                  new Error(`Unable to read zip entry ${entry.fileName}`),
+              );
+              return;
+            }
+
+            try {
+              await pipeline(readStream, createWriteStream(destinationPath));
+              zipFile.readEntry();
+            } catch (error) {
+              closeWithError(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+            }
+          });
+        })().catch((error) => {
+          closeWithError(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        });
+      });
+
+      zipFile.readEntry();
+    });
+  });
+}
+
+export async function importSkillZip(
   zipBuffer: Buffer,
   skillsDir: string,
-): ZipImportResult {
+): Promise<ZipImportResult> {
   if (zipBuffer.length > MAX_ZIP_SIZE) {
     return {
       ok: false,
@@ -87,14 +217,14 @@ export function importSkillZip(
 
     const zipPath = resolve(stagingDir, "upload.zip");
     writeFileSync(zipPath, zipBuffer);
-    const zipEntries = readZipEntries(zipPath);
+    const zipEntries = await readZipEntries(zipPath);
     if (zipEntries.some(isUnsafeZipEntryPath)) {
       return {
         ok: false,
         error: "Zip contains unsafe paths",
       };
     }
-    execFileSync("unzip", ["-o", zipPath, "-d", stagingDir]);
+    await extractZipToDir(zipPath, stagingDir);
 
     // Validate no files escaped staging dir (zip-slip defense)
     const normalizedStaging = stagingDir.endsWith("/")
@@ -158,7 +288,7 @@ export function importSkillZip(
     }
     mkdirSync(destDir, { recursive: true });
 
-    execFileSync("cp", ["-R", `${skillRoot}/.`, destDir]);
+    cpSync(skillRoot, destDir, { recursive: true });
 
     return { ok: true, slug };
   } catch (error: unknown) {

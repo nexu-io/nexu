@@ -536,7 +536,7 @@ export class CatalogManager {
     zipBuffer: Buffer,
   ): Promise<{ ok: boolean; slug?: string; error?: string }> {
     this.log("info", "importing custom skill from zip");
-    const result = extractZip(zipBuffer, this.skillsDir);
+    const result = await extractZip(zipBuffer, this.skillsDir);
     if (result.ok && result.slug) {
       this.db.recordInstall(result.slug, "custom");
       this.log("info", `custom skill imported: ${result.slug}`);
