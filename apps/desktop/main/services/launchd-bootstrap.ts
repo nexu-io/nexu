@@ -514,6 +514,7 @@ async function cleanupStalePlists(
   plistDir: string,
   labels: { controller: string; openclaw: string },
   plistEnv: PlistEnv,
+  log: (message: string) => void = console.log,
 ): Promise<void> {
   let cleaned = false;
   for (const [type, label] of Object.entries(labels) as [
@@ -533,7 +534,7 @@ async function cleanupStalePlists(
       continue; // Content matches — not stale
     }
 
-    console.log(`Stale plist detected for ${label}, cleaning up`);
+    log(`Stale plist detected for ${label}, cleaning up`);
     try {
       await launchd.bootoutService(label);
     } catch {
@@ -570,6 +571,7 @@ export async function bootstrapWithLaunchd(
   // Create launchd manager
   const launchd = new LaunchdManager({
     plistDir,
+    log,
   });
 
   const labels = {
@@ -610,7 +612,7 @@ export async function bootstrapWithLaunchd(
     proxyEnv: env.proxyEnv,
     amplitudeApiKey: env.amplitudeApiKey,
   };
-  await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
+  await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv, log);
 
   // --- Kill orphan processes that are NOT managed by launchd ---
   // Only kill processes that are NOT currently registered launchd services.
@@ -640,7 +642,7 @@ export async function bootstrapWithLaunchd(
     const previousElectronDead = !isProcessAlive(recovered.electronPid);
     const metadataAgeMs = Date.now() - new Date(recovered.writtenAt).getTime();
     if (previousElectronDead && metadataAgeMs > STALE_SESSION_THRESHOLD_MS) {
-      console.log(
+      log(
         `Stale session detected: previous Electron pid=${recovered.electronPid} is dead, ` +
           `metadata age=${Math.round(metadataAgeMs / 1000)}s. Cleaning up launchd services.`,
       );
@@ -668,14 +670,14 @@ export async function bootstrapWithLaunchd(
   // metadata, and OpenClaw may still exist as an orphaned process on the old
   // gateway port. Tear everything down and force a clean cold start.
   if (recovered && anyRunning && controllerRunning !== openclawRunning) {
-    console.warn(
+    log(
       `[bootstrap] partial launchd state detected (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"}); forcing clean cold start`,
     );
 
     const staleOpenclawPort = recovered.openclawPort;
     const staleOccupier = await detectPortOccupier(staleOpenclawPort);
     if (staleOccupier && staleOccupier.pid !== openclawStatus.pid) {
-      console.warn(
+      log(
         `[bootstrap] stale openclaw port occupier detected port=${staleOpenclawPort} pid=${staleOccupier.pid}`,
       );
     }
@@ -746,7 +748,7 @@ export async function bootstrapWithLaunchd(
       const reason = versionMismatch
         ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
         : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)";
-      console.log(
+      log(
         `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
       );
       await bootoutServicesAndWait({
@@ -763,8 +765,8 @@ export async function bootstrapWithLaunchd(
       // ports since launchd keeps those running, but we'll need a fresh web port.
       const previousElectronAlive = isProcessAlive(recovered.electronPid);
       if (!previousElectronAlive) {
-        console.log(
-          `Previous Electron (pid=${recovered.electronPid}) is dead, web port ${recovered.webPort} likely stale`,
+        log(
+          `[bootstrap] previous Electron (pid=${recovered.electronPid}) is dead, web port ${recovered.webPort} likely stale`,
         );
       }
 
@@ -785,13 +787,13 @@ export async function bootstrapWithLaunchd(
           webPort: previousElectronAlive ? recovered.webPort : env.webPort,
         };
         useRecoveredPorts = true;
-        console.log(
-          `Recovering ports from previous session (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort} web=${effectivePorts.webPort})`,
+        log(
+          `[bootstrap] recovering ports from previous session (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort} web=${effectivePorts.webPort})`,
         );
       } else {
         // NEXU_HOME mismatch — tear down stale services
-        console.log(
-          `NEXU_HOME mismatch (expected=${expectedNexuHome} actual=${runningNexuHome}), tearing down stale services`,
+        log(
+          `[bootstrap] NEXU_HOME mismatch (expected=${expectedNexuHome} actual=${runningNexuHome}), tearing down stale services`,
         );
         await bootoutServicesAndWait({
           launchd,
@@ -805,7 +807,7 @@ export async function bootstrapWithLaunchd(
     // Services running but no runtime-ports.json (e.g. file was deleted or
     // corrupted). We can't know the ports they're using, so tear them down
     // and do a clean cold start with fresh ports.
-    console.log(
+    log(
       `[bootstrap] teardown: no runtime-ports.json but services running (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
     );
     await bootoutServicesAndWait({
@@ -819,7 +821,7 @@ export async function bootstrapWithLaunchd(
   // --- Per-service: validate running ones, start missing ones ---
 
   // Health check running services
-  console.log(
+  log(
     `[bootstrap] health check: controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"} useRecoveredPorts=${useRecoveredPorts}`,
   );
   let controllerHealthy = false;
@@ -831,10 +833,10 @@ export async function bootstrapWithLaunchd(
       effectivePorts.controllerPort,
     );
     if (controllerHealthy) {
-      console.log("Controller already running and healthy");
+      log("[bootstrap] controller already running and healthy");
       needsControllerReady = false;
     } else {
-      console.log("Controller running but unhealthy, restarting...");
+      log("[bootstrap] controller running but unhealthy, restarting...");
       try {
         await launchd.bootoutService(labels.controller);
       } catch {
@@ -853,8 +855,8 @@ export async function bootstrapWithLaunchd(
       const expectedToken = env.gatewayToken;
       const runningToken = ocEnv?.OPENCLAW_GATEWAY_TOKEN;
       if (expectedToken && runningToken && runningToken !== expectedToken) {
-        console.log(
-          "OpenClaw port is listening but gateway token mismatch — not our instance",
+        log(
+          "[bootstrap] OpenClaw port is listening but gateway token mismatch — not our instance",
         );
         openclawHealthy = false;
       } else {
@@ -862,9 +864,9 @@ export async function bootstrapWithLaunchd(
       }
     }
     if (openclawHealthy) {
-      console.log("OpenClaw already running and healthy");
+      log("[bootstrap] OpenClaw already running and healthy");
     } else {
-      console.log("OpenClaw running but port not listening, restarting...");
+      log("[bootstrap] OpenClaw running but port not listening, restarting...");
       try {
         await launchd.bootoutService(labels.openclaw);
       } catch {
@@ -880,8 +882,8 @@ export async function bootstrapWithLaunchd(
   if (!controllerHealthy) {
     const freePort = await findFreePort(effectivePorts.controllerPort);
     if (freePort !== effectivePorts.controllerPort) {
-      console.log(
-        `Controller port ${effectivePorts.controllerPort} occupied, using ${freePort}`,
+      log(
+        `[bootstrap] controller port ${effectivePorts.controllerPort} occupied, using ${freePort}`,
       );
       effectivePorts.controllerPort = freePort;
     }
@@ -893,8 +895,8 @@ export async function bootstrapWithLaunchd(
     );
     const freePort = await findFreePort(effectivePorts.openclawPort);
     if (freePort !== effectivePorts.openclawPort) {
-      console.log(
-        `OpenClaw port ${effectivePorts.openclawPort} occupied, using ${freePort}`,
+      log(
+        `[bootstrap] OpenClaw port ${effectivePorts.openclawPort} occupied, using ${freePort}`,
       );
       effectivePorts.openclawPort = freePort;
     } else {
@@ -919,21 +921,21 @@ export async function bootstrapWithLaunchd(
     label: string,
     type: "controller" | "openclaw",
   ) => {
-    console.log(`[bootstrap] ${type} installService begin label=${label}`);
+    log(`[bootstrap] ${type} installService begin label=${label}`);
     const plist = generatePlist(type, plistEnv);
     await launchd.installService(label, plist);
-    console.log(`[bootstrap] ${type} installService done label=${label}`);
+    log(`[bootstrap] ${type} installService done label=${label}`);
   };
 
   const ensureRunning = async (label: string, type: string) => {
     const status = await launchd.getServiceStatus(label);
-    console.log(
+    log(
       `[bootstrap] ${type} ensureRunning status=${status.status} pid=${status.pid ?? "none"} label=${label}`,
     );
     if (status.status !== "running") {
       await launchd.startService(label);
       const afterStatus = await launchd.getServiceStatus(label);
-      console.log(
+      log(
         `[bootstrap] ${type} kickstart done status=${afterStatus.status} pid=${afterStatus.pid ?? "none"} label=${label}`,
       );
     }
@@ -982,7 +984,7 @@ export async function bootstrapWithLaunchd(
       return;
     }
 
-    console.warn(
+    log(
       `[bootstrap] controller post-start validation failed originalPort=${originalPort} reason=${validation.reason} launchdStatus=${validation.launchdStatus.status} launchdPid=${validation.launchdStatus.pid ?? "none"} probeUrl=${validation.probeUrl}${validation.probeStatus != null ? ` probeStatus=${validation.probeStatus}` : ""}`,
     );
 
@@ -998,7 +1000,7 @@ export async function bootstrapWithLaunchd(
       controllerPort: retryPort,
     };
 
-    console.warn(
+    log(
       `[bootstrap] retrying controller startup originalPort=${originalPort} retryPort=${retryPort}`,
     );
 
@@ -1026,7 +1028,7 @@ export async function bootstrapWithLaunchd(
       probeUrl: retryValidation.probeUrl,
       probeStatus: retryValidation.probeStatus,
     });
-    console.error(`[bootstrap] ${message}`);
+    log(`[bootstrap] ${message}`);
     throw new Error(message);
   };
 
@@ -1035,7 +1037,7 @@ export async function bootstrapWithLaunchd(
     await ensureRunning(labels.controller, "controller");
     await validateOrRecoverController();
   } else {
-    console.log("[bootstrap] controller already healthy, skipping");
+    log("[bootstrap] controller already healthy, skipping");
   }
   if (!openclawHealthy) {
     await ensureService(labels.openclaw, "openclaw");
@@ -1101,7 +1103,7 @@ export async function bootstrapWithLaunchd(
       );
     }
   } else {
-    console.log("[bootstrap] openclaw already healthy, skipping");
+    log("[bootstrap] openclaw already healthy, skipping");
   }
 
   // Start embedded web server with port retry.
@@ -1127,8 +1129,8 @@ export async function bootstrapWithLaunchd(
       if (code !== "EADDRINUSE") {
         throw err;
       }
-      console.log(
-        `Web port ${tryPort} occupied, trying next${offset === WEB_PORT_ATTEMPTS - 2 ? " (then OS-assigned fallback)" : ""}`,
+      log(
+        `[bootstrap] web port ${tryPort} occupied, trying next${offset === WEB_PORT_ATTEMPTS - 2 ? " (then OS-assigned fallback)" : ""}`,
       );
     }
   }
@@ -1152,15 +1154,15 @@ export async function bootstrapWithLaunchd(
   // Update effective port to actual bound port (may differ if OS-assigned)
   effectivePorts.webPort = webServer.port;
 
-  console.log(
-    `Services ready (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort})`,
+  log(
+    `[bootstrap] services ready (controller=${effectivePorts.controllerPort} openclaw=${effectivePorts.openclawPort})`,
   );
 
   // Controller readiness
   const controllerReady: Promise<ControllerReadyResult> = needsControllerReady
     ? waitForControllerReadiness(effectivePorts.controllerPort)
         .then(() => {
-          console.log("Controller is ready");
+          log("[bootstrap] controller is ready");
           return { ok: true } as const;
         })
         .catch((error: unknown) => ({
@@ -1823,6 +1825,7 @@ export async function ensureExternalNodeRunner(
       existsSync(binaryPath) &&
       readFileSync(stampPath, "utf8").trim() === appVersion
     ) {
+      console.log(`External node runner already up-to-date for v${appVersion}`);
       return binaryPath;
     }
   } catch {
@@ -1914,6 +1917,7 @@ async function ensureExternalControllerSidecar(
       existsSync(entryPath) &&
       readFileSync(stampPath, "utf8").trim() === appVersion
     ) {
+      console.log(`Controller sidecar already up-to-date for v${appVersion}`);
       return { controllerRoot, entryPath };
     }
   } catch {

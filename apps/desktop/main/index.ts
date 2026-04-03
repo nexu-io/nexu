@@ -611,6 +611,9 @@ async function runLaunchdColdStart(): Promise<void> {
     electronRoot,
     app.getVersion(),
   );
+  logColdStart(
+    `resolved launchd paths: nodePath=${paths.nodePath} controllerEntryPath=${paths.controllerEntryPath} openclawPath=${paths.openclawPath}`,
+  );
 
   const nexuHome = runtimeConfig.paths.nexuHome.replace(
     /^~/,
