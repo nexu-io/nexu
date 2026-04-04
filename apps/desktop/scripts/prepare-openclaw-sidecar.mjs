@@ -190,6 +190,12 @@ const EMPTY_PAYLOADS_FALLBACK_SEARCH =
   '\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
 const EMPTY_PAYLOADS_FALLBACK_REPLACEMENT =
   '\tif (!runResult?.payloads?.length && runResult?.meta?.error) {\n\t\tconst _errMsg = runResult.meta.error.message || runResult.meta.error;\n\t\treturn {\n\t\t\tkind: "final",\n\t\t\tpayload: { text: typeof _errMsg === "string" ? _errMsg : "⚠️ An error occurred. Please try again." }\n\t\t};\n\t}\n\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
+// Compaction status feedback: send a typing delta to the channel when
+// compaction starts so the user sees "⏳ Compacting..." instead of silence.
+const COMPACTION_FEEDBACK_SEARCH =
+  'if ((typeof evt.data.phase === "string" ? evt.data.phase : "") === "end") autoCompactionCompleted = true;';
+const COMPACTION_FEEDBACK_REPLACEMENT =
+  '{ const _cp = typeof evt.data.phase === "string" ? evt.data.phase : ""; if (_cp === "start") { const _cl = globalThis.__nexuCgLocale || "zh-CN"; params.typingSignals.signalTextDelta(_cl === "en" ? "\\u23f3 Compacting conversation history..." : "\\u23f3 \\u6b63\\u5728\\u6574\\u7406\\u5bf9\\u8bdd\\u8bb0\\u5f55...").catch(() => {}); } if (_cp === "end") autoCompactionCompleted = true; }';
 // Dispatcher empty payloads patch: when payloadArray is empty but there's
 // an error in meta, push the error text as a fallback payload instead of
 // silently returning (which causes the bot to go silent).
@@ -1112,6 +1118,19 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
 
         console.log(
           `[openclaw-sidecar] patched failover error priority in ${bundleName}`,
+        );
+      }
+
+      if (source.includes(COMPACTION_FEEDBACK_SEARCH)) {
+        source = applyExactReplacement(
+          source,
+          COMPACTION_FEEDBACK_SEARCH,
+          COMPACTION_FEEDBACK_REPLACEMENT,
+          `${bundleName}: compaction status feedback`,
+        );
+
+        console.log(
+          `[openclaw-sidecar] patched compaction status feedback in ${bundleName}`,
         );
       }
 
