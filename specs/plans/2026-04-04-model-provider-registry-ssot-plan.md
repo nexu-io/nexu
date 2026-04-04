@@ -137,7 +137,7 @@ This architecture makes the system harder to evolve, especially for:
 ## Goals
 
 1. Introduce a centralized provider registry, similar to Qclaw.
-2. Make adding a new provider a small registry-first change.
+2. Make adding a new provider a registry-first change with explicit follow-on runtime adapter work when needed.
 3. Make OpenClaw model config the single source of truth for configured providers.
 4. Simplify Nexu ↔ OpenClaw config sync so the sync layer transports state instead of redefining provider semantics.
 5. Remove duplicated provider definitions across controller and web.
@@ -254,10 +254,7 @@ That is the right direction for Nexu as well.
 
 #### 1. Shared registry consumed by both UI and backend
 
-`/Users/mrc/Projects/ClawX/electron/shared/providers/registry.ts`
-and
-`/Users/mrc/Projects/ClawX/electron/utils/provider-registry.ts`
-show a practical split:
+ClawX's shared provider-registry modules show a practical split:
 
 - one shared definition list for provider identity, UI metadata, env vars, default base URLs, auth modes, and backend runtime config
 - a thin backend adapter on top for runtime-only helper functions
@@ -266,10 +263,7 @@ This is a strong confirmation that Nexu should not keep separate web/controller 
 
 #### 2. Provider-account / provider-instance modeling
 
-`/Users/mrc/Projects/ClawX/electron/shared/providers/types.ts`
-and
-`/Users/mrc/Projects/ClawX/electron/services/providers/provider-store.ts`
-separate:
+ClawX's shared provider types and provider-store implementation separate:
 
 - provider/vendor type
 - saved account/instance id
@@ -283,8 +277,7 @@ This is especially relevant for Nexu custom providers. It reinforces that user-c
 
 #### 3. Stable runtime key derivation for custom instances
 
-`/Users/mrc/Projects/ClawX/electron/services/providers/provider-runtime-sync.ts`
-derives a unique OpenClaw runtime provider key for unregistered/custom providers.
+ClawX's provider-runtime sync derives a unique OpenClaw runtime provider key for unregistered/custom providers.
 
 Important idea:
 
@@ -295,8 +288,7 @@ Nexu should borrow this principle, even if it uses a different final key format 
 
 #### 4. Protocol-aware validation is a first-class concern
 
-`/Users/mrc/Projects/ClawX/electron/services/providers/provider-validation.ts`
-does not validate all providers the same way. It distinguishes at least:
+ClawX's provider-validation flow does not validate all providers the same way. It distinguishes at least:
 
 - `openai-completions`
 - `openai-responses`
@@ -307,7 +299,7 @@ This is especially relevant for `custom-openai` and `custom-anthropic`: the prot
 
 #### 5. Backward-compatible API migration strategy
 
-`/Users/mrc/Projects/ClawX/electron/api/routes/providers.ts` keeps:
+ClawX's providers API keeps:
 
 - newer `provider-accounts` routes
 - deprecated legacy provider routes
@@ -456,6 +448,7 @@ So the registry should distinguish between:
 - all controller support checks must come from this registry
 - all web display metadata must come from this registry
 - all provider-specific compiler behavior must be derived from registry policy, not ad hoc branching scattered across files
+- the registry is necessary but not sufficient for full provider enablement; controller verify/discovery/auth adapters still need explicit implementation where provider behavior differs
 
 ## 2. Introduce one canonical provider-id normalizer
 
@@ -472,7 +465,7 @@ Examples Nexu needs immediately:
 - `qwen -> qwen-portal`
 - `kimi -> moonshot` only as a legacy Nexu migration rule, not as a universal canonical identity rule
 - `glm -> zai`
-- `minimax-portal -> minimax`
+- `minimax-portal` should remain distinct from `minimax`; they are related product surfaces, but OpenClaw treats them as separate runtime/auth-profile concepts
 - `bytedance` / `doubao` -> `volcengine`
 - `bedrock` / `aws-bedrock` -> `amazon-bedrock`
 - `z.ai` / `z-ai` -> `zai`
@@ -506,40 +499,93 @@ config.models = {
     openai: {
       enabled: true,
       baseUrl: "https://api.openai.com/v1",
-      authMode: "api-key",
-      apiKeyRef: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
-      models: [{ id: "gpt-4o" }, { id: "gpt-4.1" }],
+      auth: "api-key",
+      apiKey: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
+      models: [
+        {
+          id: "gpt-4o",
+          name: "gpt-4o",
+          reasoning: false,
+          input: ["text", "image"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 128000,
+          maxTokens: 16384,
+        },
+      ],
     },
     minimax: {
       enabled: true,
-      authMode: "oauth",
+      auth: "oauth",
       oauthRegion: "cn",
       oauthProfileRef: "auth://minimax/default",
-      models: [{ id: "MiniMax-M2.5" }],
+      baseUrl: "https://api.minimaxi.com/anthropic",
+      models: [
+        {
+          id: "MiniMax-M2.5",
+          name: "MiniMax-M2.5",
+          api: "anthropic-messages",
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 0,
+          maxTokens: 0,
+        },
+      ],
     },
     "custom-openai/openai-team-proxy": {
       enabled: true,
       displayName: "OpenAI via Team Proxy",
       baseUrl: "https://my-proxy.example.com/v1",
-      authMode: "api-key",
-      apiKeyRef: { source: "env", provider: "default", id: "OPENAI_PROXY_API_KEY" },
-      models: [{ id: "gpt-4o" }],
+      auth: "api-key",
+      apiKey: { source: "env", provider: "default", id: "OPENAI_PROXY_API_KEY" },
+      models: [
+        {
+          id: "gpt-4o",
+          name: "gpt-4o",
+          reasoning: false,
+          input: ["text", "image"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 128000,
+          maxTokens: 16384,
+        },
+      ],
     },
     "custom-openai/my-team-gateway": {
       enabled: true,
       displayName: "My Team Gateway",
       baseUrl: "https://llm.example.com/v1",
-      authMode: "api-key",
-      apiKeyRef: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
-      models: [{ id: "gpt-4o-mini" }],
+      auth: "api-key",
+      apiKey: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
+      models: [
+        {
+          id: "gpt-4o-mini",
+          name: "gpt-4o-mini",
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 128000,
+          maxTokens: 16384,
+        },
+      ],
     },
     "custom-anthropic/siliconflow-claude": {
       enabled: true,
       displayName: "SiliconFlow Claude",
       baseUrl: "https://api.siliconflow.cn",
-      authMode: "api-key",
-      apiKeyRef: { source: "env", provider: "default", id: "ANTHROPIC_API_KEY" },
-      models: [{ id: "claude-sonnet-compatible" }],
+      auth: "api-key",
+      apiKey: { source: "env", provider: "default", id: "ANTHROPIC_API_KEY" },
+      models: [
+        {
+          id: "claude-sonnet-compatible",
+          name: "claude-sonnet-compatible",
+          api: "anthropic-messages",
+          reasoning: false,
+          input: ["text", "image"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 0,
+          maxTokens: 0,
+        },
+      ],
     },
   },
 }
@@ -547,7 +593,7 @@ config.models = {
 
 Notes:
 
-- `enabled`, `authMode`, `oauthRegion`, and similar editor metadata may exist in Nexu persistence even if OpenClaw ignores some of them directly
+- `enabled`, `auth`, `oauthRegion`, and similar editor metadata may exist in Nexu persistence even if OpenClaw ignores some of them directly
 - secrets should remain outside plain config when possible; use refs or the existing secure persistence path
 - the top-level persisted shape should still be OpenClaw-aligned enough that writing OpenClaw config becomes mostly structural copying + secret resolution
 
@@ -574,9 +620,9 @@ Suggested instance fields in persisted config:
 - `providerTemplateId`: `custom-openai` or `custom-anthropic`
 - `instanceId`: stable user-created id
 - `displayName`: user-facing label such as `Custom1`
-- `baseUrl` / `baseUrlEnv`
-- `credentialSource`
-- `apiKeyEnv` / `apiKeyRef`
+- `baseUrl`
+- `apiKey`
+- optional editor-only helper fields such as `apiKeyEnv`, `tokenEnv`, or `baseUrlEnv` before they are materialized into canonical persisted config
 - `apiKind`: derived from template but may also be persisted for migration clarity
 
 This keeps custom providers compatible with a centralized registry while still allowing arbitrary user-created endpoints.
@@ -834,6 +880,23 @@ Recommended key model:
 
 This avoids pretending that all custom providers are the same provider entry.
 
+### Registry support vs full provider enablement
+
+Adding a provider to the registry should not be described as the whole integration.
+
+In the current Nexu repo, provider-specific behavior also lives in controller services such as:
+
+- `apps/controller/src/services/model-provider-service.ts`
+- `apps/controller/src/services/openclaw-auth-service.ts`
+
+So the rollout model should be explicit:
+
+1. **registry support** — identity, aliases, UI metadata, default endpoints, runtime policy
+2. **controller adapter support** — verification, model discovery, OAuth/auth-profile wiring, protocol-specific validation, error handling
+3. **product exposure** — UI visibility, defaults, and copy
+
+This keeps the spec honest about scope and prevents "registry entry landed" from being mistaken for "provider is fully supported end to end".
+
 ## Provider Inventory: Qclaw Additions Missing in Nexu
 
 Qclaw providers not currently represented in Nexu's support list:
@@ -861,7 +924,12 @@ From the vendored OpenClaw package and its implicit provider helpers, Nexu shoul
 
 - `nvidia`
 - `amazon-bedrock`
+- `litellm`
+- `vercel-ai-gateway` / `ai-gateway`
+- `synthetic`
+- `opencode` / `opencode-zen`
 - `kimi-coding`
+- `minimax-portal`
 - `cloudflare-ai-gateway`
 - `kilocode`
 - `github-copilot`
@@ -898,7 +966,9 @@ This enables:
 
 - unified identity handling
 - runtime/status mapping
-- future provider enablement without architecture work
+- future provider enablement without another architecture rewrite
+
+It does **not** by itself complete provider integration. Providers with custom verification, discovery, auth-profile, or protocol behavior still need controller/runtime adapter work before UI exposure.
 
 ### Layer 2. Product exposure
 
@@ -1005,11 +1075,13 @@ Outcome:
 5. keep writing both shapes temporarily if needed for rollback safety
 6. add support for composite custom-provider instance keys
 7. define persisted-key <-> runtime-key mapping rules
+8. add explicit saved-model-ref migration rules for `bot.modelId`, `runtime.defaultModelId`, and any other persisted provider-prefixed model selections
 
 Outcome:
 
 - compiler/provider logic runs on one shape
 - legacy configs continue to work
+- saved model refs continue to resolve after canonical-id normalization and `byok_*` cleanup
 
 ## Phase 2. Web migration
 
@@ -1035,6 +1107,7 @@ Outcome:
 3. stop persisting the legacy `config.providers` array
 4. keep migration-on-read for old configs for one release window
 5. add an explicit migration version marker
+6. finish cutover of legacy saved model refs onto canonical provider identities and runtime-safe custom-instance refs
 
 Outcome:
 
@@ -1167,6 +1240,12 @@ For this plan, the safe scope is:
 - avoid inventing a second permanent secret-resolution stack in Nexu
 - defer any polished generic packaged-desktop secret-store UX until its runtime injection semantics are explicitly designed
 
+The practical near-term recommendation is:
+
+- provider structure lives in `config.models.providers`
+- credentials primarily live in OpenClaw-native `auth-profiles.json` and `SecretRef` / `SecretInput` references
+- env-backed secrets remain supported, but as one OpenClaw-native secret source rather than as a separate Nexu credential platform
+
 ### Why env-backed consumption is safer
 
 - secrets do not need to live in user-editable JSON files
@@ -1181,10 +1260,9 @@ The canonical provider config should describe **what secret is needed**, not nec
 
 Preferred order of secret sources for provider credentials:
 
-1. OAuth/auth-profile state when the provider supports it
-2. controller-managed secret store / secure OS-backed storage
-3. process environment variables
-4. plain-text config only as a compatibility fallback during migration
+1. OpenClaw auth-profile state when the provider supports it
+2. OpenClaw `SecretRef` / `SecretInput` references resolved from env/file/exec sources
+3. plain-text config only as a compatibility fallback during migration
 
 ### Registry metadata for env consumption
 
@@ -1203,7 +1281,7 @@ Examples:
 
 - `openai` -> `OPENAI_API_KEY`
 - `anthropic` -> `ANTHROPIC_API_KEY`
-- `google`/Gemini -> `GEMINI_API_KEY`
+- `gemini` -> `GEMINI_API_KEY`
 - `openrouter` -> `OPENROUTER_API_KEY`
 - `mistral` -> `MISTRAL_API_KEY`
 - `xai` -> `XAI_API_KEY`
@@ -1223,7 +1301,7 @@ Instead of this:
   "models": {
     "providers": {
       "openai": {
-        "apiKey": "sk-..."
+        "credentialValue": "sk-..."
       }
     }
   }
@@ -1237,50 +1315,47 @@ Prefer this:
   "models": {
     "providers": {
       "openai": {
-        "credentialSource": "secret-input",
-        "apiKeyEnv": "OPENAI_API_KEY"
+        "apiKey": { "source": "env", "provider": "default", "id": "OPENAI_API_KEY" },
+        "baseUrl": "https://api.openai.com/v1"
       },
-      "custom-anthropic": {
-        "credentialSource": "secret-input",
-        "apiKeyEnv": "ANTHROPIC_API_KEY",
-        "baseUrlSource": "env",
-        "baseUrlEnv": "ANTHROPIC_BASE_URL"
+      "custom-anthropic/siliconflow-claude": {
+        "apiKey": { "source": "env", "provider": "default", "id": "ANTHROPIC_API_KEY" },
+        "baseUrl": "https://api.anthropic-compatible.example/v1"
       }
     }
   }
 }
 ```
 
-Or, when using an explicit OpenClaw `SecretRef`:
+Editor/request DTOs may still accept helpers like `apiKeyEnv` or `baseUrlEnv`, but those should be normalized into the canonical persisted shape above before storage.
+
+For example, an editor payload like:
 
 ```json
 {
-  "models": {
-    "providers": {
-      "openai": {
-        "credentialSource": "secret-input",
-        "apiKeyRef": { "source": "env", "provider": "default", "id": "OPENAI_API_KEY" }
-      }
-    }
-  }
+  "apiKeyEnv": "OPENAI_API_KEY"
+}
+```
+
+would compile to:
+
+```json
+{
+  "apiKey": { "source": "env", "provider": "default", "id": "OPENAI_API_KEY" }
 }
 ```
 
 ### Proposed source fields
 
-For each sensitive provider field, support explicit source metadata rather than implicit mixed behavior.
+For the **canonical persisted schema**, prefer raw OpenClaw-native fields:
 
-Suggested fields:
-
-- `credentialSource`: `"oauth-profile" | "secret-input" | "legacy-inline"`
-- `apiKeyEnv?: string`
-- `apiKeyRef?: SecretRef`
-- `apiKey?: string` (legacy fallback only)
-- `baseUrlSource?: "config" | "env"`
-- `baseUrlEnv?: string`
+- `auth?: ModelProviderAuthMode`
+- `apiKey?: SecretInput` (including `SecretRef`; plain string only as a legacy fallback)
 - `baseUrl?: string`
+- `oauthProfileRef?: string`
+- `headers?: Record<string, SecretInput>`
 
-This keeps the config self-describing without embedding secrets by default.
+If the UI wants convenience helpers such as `apiKeyEnv`, `tokenEnv`, or `baseUrlEnv`, those should live in editor/request DTOs and compile into the canonical persisted fields above before hitting storage.
 
 ### Materialization behavior in compiler
 
@@ -1288,16 +1363,16 @@ This keeps the config self-describing without embedding secrets by default.
 
 Suggested resolution algorithm:
 
-1. if `credentialSource === "oauth-profile"`, read OAuth credential or auth-profile state
-2. if `credentialSource === "secret-input"`, resolve `apiKeyRef` / `apiKeyEnv` via OpenClaw `SecretRef` semantics
-3. if `credentialSource === "legacy-inline"`, use raw `apiKey`
-5. if no explicit source is set, fall back to registry `primaryEnvKey`, then legacy persisted fields for migration compatibility
+1. if `auth === "oauth"`, write/read the matching auth-profile wiring
+2. if `apiKey` is a `SecretRef` / `SecretInput`, preserve it directly for api-key, token, or header-based auth
+3. if `apiKey` is a plain string, treat it only as a legacy-inline compatibility fallback
+4. if no explicit credential field is set, fall back to registry hints plus legacy persisted fields for migration compatibility
 
 For base URLs:
 
-1. if `baseUrlSource === "env"`, read `baseUrlEnv`
-2. otherwise use persisted `baseUrl`
-3. otherwise use registry default base URL(s)
+1. use persisted `baseUrl` when provided
+2. otherwise use registry default base URL(s)
+3. any env-based base-url helpers should be resolved before persistence into canonical config
 
 ### Validation rules
 
@@ -1305,11 +1380,9 @@ The controller should validate source declarations before sync.
 
 Examples:
 
-- if `credentialSource === "env"`, the selected env key must be non-empty and present at runtime
-- if `credentialSource === "secret-input"`, the referenced env/file/exec secret input must resolve
-- if `credentialSource === "oauth-profile"`, provider must support OAuth and credential state must exist
-- if `baseUrlSource === "env"`, the env value must parse as a valid URL
-- do not allow `apiKey` plain-text writes in normal UI flows except behind legacy import/migration paths
+- if `apiKey` is a `SecretRef`, the referenced env/file/exec secret input must resolve
+- if `auth === "oauth"`, provider must support OAuth and `oauthProfileRef` / credential state must exist
+- do not allow plain-text `apiKey` string writes in normal UI flows except behind legacy import/migration paths
 
 ### UI behavior
 
@@ -1354,16 +1427,17 @@ For custom provider instances:
 
 This logic should live in one shared controller/backend validation module, not inside page components.
 
-### Desktop/runtime env injection
+### Desktop/runtime secret handling scope
 
-For desktop-first Nexu, env consumption works best when secrets are injected only into the controller/OpenClaw runtime processes.
+For desktop-first Nexu, the important requirement is that secrets only need to reach the controller/OpenClaw runtime boundary, not the web layer.
 
-Recommended runtime model:
+This plan intentionally does **not** assume a finished generic packaged-desktop env-injection system for arbitrary provider credentials.
 
-- secrets are loaded by the controller at startup from secure storage or configured env bindings
-- controller resolves env-backed provider credentials before writing runtime materialized config
-- when possible, OpenClaw child processes receive secrets via process env instead of persisted file content
-- if OpenClaw requires file-level `apiKey` values, materialize them only into the final runtime file under the isolated runtime state directory, never back into user-facing Nexu config
+Near-term runtime model:
+
+- controller persists provider structure and references
+- OpenClaw-native auth profiles and secret refs remain the primary credential transport
+- any broader packaged-desktop secret-store or env-injection UX should be designed separately before this spec claims it as default behavior
 
 ### Logging and diagnostics rules
 
@@ -1380,13 +1454,13 @@ Rules:
 
 During migration from today's `config.providers` model:
 
-1. continue reading plain-text `apiKey` fields for compatibility
+1. continue reading plain-text legacy credential fields (`apiKey`, etc.) for compatibility
 2. when editing a provider in new UI flows, encourage migration to OpenClaw `SecretRef` / auth-profile-backed auth
 3. optionally offer a one-click migration path:
    - move raw secret into secure store
-   - replace raw `apiKey` with `apiKeyRef`
-4. mark raw `apiKey` persistence as deprecated
-5. eventually restrict raw `apiKey` writes to import/debug-only paths
+   - replace raw inline credential values with OpenClaw-native `apiKey: SecretRef`
+4. mark raw inline credential persistence as deprecated
+5. eventually restrict raw inline credential writes to import/debug-only paths
 
 ### Success criterion for env consumption
 
@@ -1411,18 +1485,12 @@ This is intentionally a draft, not a final API contract. The goal is to make the
 - compatible with API-key, OAuth, and custom endpoint providers
 - supports migration from legacy plain-text provider config
 
+Note: this draft targets the **canonical persisted config**. Editor APIs may still allow lighter temporary inputs during migration, but the persisted and compiled shape should converge on full OpenClaw-compatible model definitions.
+
 ### Draft Zod schema
 
 ```ts
 import { z } from "zod";
-
-export const providerCredentialSourceSchema = z.enum([
-  "oauth-profile",
-  "secret-input",
-  "legacy-inline",
-]);
-
-export const providerBaseUrlSourceSchema = z.enum(["config", "env"]);
 
 export const providerAuthModeSchema = z.enum([
   "api-key",
@@ -1469,73 +1537,65 @@ export const modelProviderConfigSchema = z
     instanceId: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
 
-    authMode: providerAuthModeSchema.optional(),
-    credentialSource: providerCredentialSourceSchema.optional(),
+    auth: providerAuthModeSchema.optional(),
 
     api: modelApiSchema.optional(),
 
-    apiKeyEnv: z.string().min(1).optional(),
-    apiKeyRef: z.object({
-      source: z.enum(["env", "file", "exec"]),
-      provider: z.string().min(1),
-      id: z.string().min(1),
-    }).optional(),
-    apiKey: z.string().min(1).optional(),
+    apiKey: z.union([
+      z.string().min(1),
+      z.object({
+        source: z.enum(["env", "file", "exec"]),
+        provider: z.string().min(1),
+        id: z.string().min(1),
+      }),
+    ]).optional(),
 
-    baseUrlSource: providerBaseUrlSourceSchema.optional(),
-    baseUrlEnv: z.string().min(1).optional(),
     baseUrl: z.string().url().optional(),
 
     oauthRegion: providerOauthRegionSchema.nullable().optional(),
     oauthProfileRef: z.string().min(1).optional(),
 
     displayName: z.string().min(1).optional(),
-    headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(
+      z.string(),
+      z.union([
+        z.string(),
+        z.object({
+          source: z.enum(["env", "file", "exec"]),
+          provider: z.string().min(1),
+          id: z.string().min(1),
+        }),
+      ]),
+    ).optional(),
     models: z.array(modelProviderModelEntrySchema).default([]),
-
-    bedrockDiscovery: z.object({
-      enabled: z.boolean().optional(),
-      region: z.string().optional(),
-      providerFilter: z.array(z.string()).optional(),
-      refreshInterval: z.number().optional(),
-      defaultContextWindow: z.number().optional(),
-      defaultMaxTokens: z.number().optional(),
-    }).optional(),
 
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.credentialSource === "oauth-profile" && !value.oauthProfileRef) {
+    if (value.auth === "oauth" && !value.oauthProfileRef) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["oauthProfileRef"],
-        message:
-          "oauthProfileRef is required when credentialSource is 'oauth-profile'",
+        message: "oauthProfileRef is required when auth is 'oauth'",
       });
     }
 
-    if (value.credentialSource === "secret-input" && !value.apiKeyRef && !value.apiKeyEnv) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["apiKeyRef"],
-        message:
-          "apiKeyRef or apiKeyEnv is required when credentialSource is 'secret-input'",
-      });
-    }
-
-    if (value.credentialSource === "legacy-inline" && !value.apiKey) {
+    if (
+      (value.auth === "api-key" || value.auth === "token") &&
+      !value.apiKey
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["apiKey"],
-        message: "apiKey is required when credentialSource is 'legacy-inline'",
+        message: "apiKey is required when auth is 'api-key' or 'token'",
       });
     }
 
-    if (value.baseUrlSource === "env" && !value.baseUrlEnv) {
+    if (!value.baseUrl) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["baseUrlEnv"],
-        message: "baseUrlEnv is required when baseUrlSource is 'env'",
+        path: ["baseUrl"],
+        message: "baseUrl is required in canonical persisted provider config",
       });
     }
   });
@@ -1548,6 +1608,14 @@ export const modelsProviderMapSchema = z.record(
 export const persistedModelsConfigSchema = z.object({
   mode: z.enum(["merge", "replace"]).default("merge"),
   providers: modelsProviderMapSchema.default({}),
+  bedrockDiscovery: z.object({
+    enabled: z.boolean().optional(),
+    region: z.string().optional(),
+    providerFilter: z.array(z.string()).optional(),
+    refreshInterval: z.number().optional(),
+    defaultContextWindow: z.number().optional(),
+    defaultMaxTokens: z.number().optional(),
+  }).optional(),
 });
 ```
 
@@ -1555,12 +1623,10 @@ export const persistedModelsConfigSchema = z.object({
 
 #### 1. Provider ids stay as map keys
 
-The `providers` object should remain keyed by normalized canonical provider id or provider key:
+The `providers` object should remain keyed by normalized canonical provider id or provider instance key:
 
 - `openai`
 - `anthropic`
-- `custom-openai`
-- `custom-anthropic`
 - `custom-openai/my-team-gateway`
 - `custom-anthropic/siliconflow-claude`
 
@@ -1576,18 +1642,20 @@ For custom providers, the recommendation is:
 - map key = instance key
 - `providerTemplateId` = protocol family template
 - `instanceId` = stable custom instance id
+- bare template keys such as `custom-openai` and `custom-anthropic` belong in the registry, not in persisted `providers`
 
 This supports both registry-derived behavior and user-defined multiplicity.
 
-#### 2. `apiKey` stays only for compatibility
+#### 2. Inline credential values stay only for compatibility
 
-`apiKey` is still present in the draft schema, but only as a transitional compatibility field.
+`credentialValue` is still present in the draft schema, but only as a transitional compatibility field.
 
 Normal UI flows should prefer:
 
-- `apiKeyEnv`
-- `apiKeyRef`
+- OpenClaw-native `apiKey: SecretInput`
 - OAuth-backed references
+
+Any `apiKeyEnv` / `tokenEnv` helpers should stay editor-only and be normalized into canonical `apiKey` / `SecretRef` storage before persistence.
 
 #### 3. `headers` is intentionally optional
 
@@ -1662,10 +1730,20 @@ export const providerRegistryResponseSchema = z.object({
 ```json
 {
   "enabled": true,
-  "authMode": "api-key",
-  "credentialSource": "secret-input",
-  "apiKeyEnv": "OPENAI_API_KEY",
-  "models": [{ "id": "gpt-4o" }, { "id": "gpt-4.1" }]
+  "auth": "api-key",
+  "apiKey": { "source": "env", "provider": "default", "id": "OPENAI_API_KEY" },
+  "baseUrl": "https://api.openai.com/v1",
+  "models": [
+    {
+      "id": "gpt-4o",
+      "name": "gpt-4o",
+      "reasoning": false,
+      "input": ["text", "image"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 128000,
+      "maxTokens": 16384
+    }
+  ]
 }
 ```
 
@@ -1677,12 +1755,20 @@ export const providerRegistryResponseSchema = z.object({
   "providerTemplateId": "custom-openai",
   "instanceId": "my-team-gateway",
   "displayName": "My Team Gateway",
-  "authMode": "api-key",
-  "credentialSource": "secret-input",
-  "apiKeyEnv": "OPENAI_API_KEY",
-  "baseUrlSource": "env",
-  "baseUrlEnv": "OPENAI_BASE_URL",
-  "models": [{ "id": "my-model" }]
+  "auth": "api-key",
+  "apiKey": { "source": "env", "provider": "default", "id": "OPENAI_API_KEY" },
+  "baseUrl": "https://gateway.example.com/v1",
+  "models": [
+    {
+      "id": "my-model",
+      "name": "my-model",
+      "reasoning": false,
+      "input": ["text"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 0,
+      "maxTokens": 0
+    }
+  ]
 }
 ```
 
@@ -1694,12 +1780,21 @@ export const providerRegistryResponseSchema = z.object({
   "providerTemplateId": "custom-anthropic",
   "instanceId": "siliconflow-claude",
   "displayName": "SiliconFlow Claude",
-  "authMode": "api-key",
-  "credentialSource": "secret-input",
-  "apiKeyEnv": "ANTHROPIC_API_KEY",
-  "baseUrlSource": "env",
-  "baseUrlEnv": "ANTHROPIC_BASE_URL",
-  "models": [{ "id": "claude-custom" }]
+  "auth": "api-key",
+  "apiKey": { "source": "env", "provider": "default", "id": "ANTHROPIC_API_KEY" },
+  "baseUrl": "https://api.anthropic-compatible.example/v1",
+  "models": [
+    {
+      "id": "claude-custom",
+      "name": "claude-custom",
+      "api": "anthropic-messages",
+      "reasoning": false,
+      "input": ["text", "image"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 0,
+      "maxTokens": 0
+    }
+  ]
 }
 ```
 
@@ -1708,11 +1803,22 @@ export const providerRegistryResponseSchema = z.object({
 ```json
 {
   "enabled": true,
-  "authMode": "oauth",
-  "credentialSource": "oauth",
+  "auth": "oauth",
   "oauthRegion": "cn",
   "oauthProfileRef": "auth://minimax/default",
-  "models": [{ "id": "MiniMax-M2.5" }]
+  "baseUrl": "https://api.minimaxi.com/anthropic",
+  "models": [
+    {
+      "id": "MiniMax-M2.5",
+      "name": "MiniMax-M2.5",
+      "api": "anthropic-messages",
+      "reasoning": false,
+      "input": ["text"],
+      "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+      "contextWindow": 0,
+      "maxTokens": 0
+    }
+  ]
 }
 ```
 
@@ -1720,14 +1826,11 @@ export const providerRegistryResponseSchema = z.object({
 
 Before finalizing the schema in code, confirm:
 
-1. exact compile-time/runtime mapping strategy for legacy `byok_*` refs during migration, assuming `byok_*` stays compile-only going forward
+1. exact compile-time/runtime migration strategy for legacy `byok_*` refs, given the decision that `byok_*` stays compile-only going forward
 2. whether base URLs should allow non-URL local values during development-only flows
 3. whether `headers` should be user-editable or controller-internal only
 4. whether `metadata` should remain in the stable schema or be limited to migration adapters
-5. whether secrets should resolve only through OpenClaw `SecretRef` / auth-profile-backed mechanisms, with plain `apiKey` writes fully blocked in normal UI flows
-6. whether OpenClaw runtime keys should preserve readable composite names or always normalize to a runtime-safe derived key
-7. exact precedence between canonical persisted providers, auth profiles, and OpenClaw implicit provider discovery
-8. whether canonical persisted model entries should always store full `ModelDefinitionConfig` or allow temporary id-only editor entries with compiler enrichment
+5. which runtime-safe key format to standardize on for custom-provider instances, assuming runtime keys must remain deterministic and reversible in diagnostics
 
 ## Testing Plan
 
