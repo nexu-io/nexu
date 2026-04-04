@@ -530,6 +530,7 @@ export function compileOpenClawConfig(
             enabled: true,
           },
         },
+        timeoutSeconds: 120,
         humanDelay: {
           mode: "off",
         },
