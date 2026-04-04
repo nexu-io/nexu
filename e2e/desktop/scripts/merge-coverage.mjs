@@ -335,7 +335,7 @@ async function buildArtifactSourceMapsIndex({ artifactsDir, repoRoot }) {
   return mapIndex;
 }
 
-function resolveCompiledRepoPath(sourceMapsRelative) {
+export function resolveCompiledRepoPath(sourceMapsRelative) {
   if (sourceMapsRelative.startsWith("dist/")) {
     return `apps/desktop/${sourceMapsRelative}`;
   }
@@ -348,7 +348,7 @@ function resolveCompiledRepoPath(sourceMapsRelative) {
   return null;
 }
 
-function buildArtifactMatchSuffixes(sourceMapsRelative) {
+export function buildArtifactMatchSuffixes(sourceMapsRelative) {
   const suffixes = new Set([sourceMapsRelative]);
 
   if (sourceMapsRelative.startsWith("dist/")) {
@@ -379,7 +379,7 @@ function normalizeCompiledRepoPath(relativePath) {
   return null;
 }
 
-function resolveNodeCompiledRepoPath(url, repoRoot) {
+export function resolveNodeCompiledRepoPath(url, repoRoot) {
   const normalizedUrl = toPosixPath(
     (fromFileUrl(url) ?? url ?? "").replace(/\\/g, "/"),
   );
@@ -418,7 +418,7 @@ function resolveNodeCompiledRepoPath(url, repoRoot) {
   return null;
 }
 
-function pickArtifactSourceMap(url, mapIndex) {
+export function pickArtifactSourceMap(url, mapIndex) {
   if (typeof url !== "string") {
     return null;
   }
@@ -435,7 +435,7 @@ function pickArtifactSourceMap(url, mapIndex) {
   return ranked[0]?.entry ?? null;
 }
 
-function getNodeSourceMapEntry(rawNodeCoverage, url, repoRoot) {
+export function getNodeSourceMapEntry(rawNodeCoverage, url, repoRoot) {
   const cache = rawNodeCoverage?.["source-map-cache"];
   if (!cache || typeof cache !== "object") {
     return null;
@@ -866,4 +866,9 @@ async function main() {
   log(`Merged coverage for ${files.length} file(s)`);
 }
 
-await main();
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  await main();
+}
