@@ -203,6 +203,13 @@ const EMPTY_PAYLOAD_ARRAY_SEARCH =
   'const payloadArray = runResult.payloads ?? [];\n\t\t\tif (payloadArray.length === 0) return;';
 const EMPTY_PAYLOAD_ARRAY_REPLACEMENT =
   'const payloadArray = runResult.payloads ?? [];\n\t\t\tif (payloadArray.length === 0) {\n\t\t\t\tconst _fallbackErr = runResult.meta?.error?.message || runResult.meta?.error;\n\t\t\t\tif (_fallbackErr) {\n\t\t\t\t\tpayloadArray.push({ text: typeof _fallbackErr === "string" ? _fallbackErr : "\\u26a0\\ufe0f An error occurred. Please try again.", isError: true });\n\t\t\t\t} else {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t}';
+// Compaction independent message: when compaction starts in the followup
+// runner, send an independent message via sendFollowupPayloads so ALL
+// channels (including WeChat) see the status, not just streaming channels.
+const FOLLOWUP_COMPACTION_FEEDBACK_SEARCH =
+  'if (evt.stream === "compaction") {\n\t\t\t\t\t\t\tif ((typeof evt.data.phase === "string" ? evt.data.phase : "") === "end") memoryCompactionCompleted = true;\n\t\t\t\t\t\t}';
+const FOLLOWUP_COMPACTION_FEEDBACK_REPLACEMENT =
+  'if (evt.stream === "compaction") {\n\t\t\t\t\t\t\tconst _phase = typeof evt.data.phase === "string" ? evt.data.phase : "";\n\t\t\t\t\t\t\tif (_phase === "start") { const _l = globalThis.__nexuCgLocale || "zh-CN"; sendFollowupPayloads([{ text: _l === "en" ? "\\u23f3 Compacting conversation, estimated ~30s..." : "\\u23f3 \\u6b63\\u5728\\u6574\\u7406\\u5bf9\\u8bdd\\u8bb0\\u5f55\\uff0c\\u9884\\u8ba130\\u79d2\\u5185\\u5b8c\\u6210..." }], queued).catch(() => {}); }\n\t\t\t\t\t\t\tif (_phase === "end") memoryCompactionCompleted = true;\n\t\t\t\t\t\t}';
 // Stop followup turn on empty payloads: when all LLM calls fail and
 // payloads are empty, just return instead of triggering a followup turn
 // which causes an infinite retry loop.
@@ -1138,6 +1145,19 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
 
         console.log(
           `[openclaw-sidecar] patched compaction status feedback in ${bundleName}`,
+        );
+      }
+
+      if (source.includes(FOLLOWUP_COMPACTION_FEEDBACK_SEARCH)) {
+        source = applyExactReplacement(
+          source,
+          FOLLOWUP_COMPACTION_FEEDBACK_SEARCH,
+          FOLLOWUP_COMPACTION_FEEDBACK_REPLACEMENT,
+          `${bundleName}: followup compaction independent message`,
+        );
+
+        console.log(
+          `[openclaw-sidecar] patched followup compaction feedback in ${bundleName}`,
         );
       }
 
