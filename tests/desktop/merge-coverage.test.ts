@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +11,21 @@ import {
 } from "../../e2e/desktop/scripts/merge-coverage.mjs";
 
 describe("merge coverage helpers", () => {
+  const desktopDistScriptUrl = pathToFileURL(
+    join(process.cwd(), "apps", "desktop", "dist", "assets", "index.js"),
+  ).href;
+  const controllerSidecarScriptUrl = pathToFileURL(
+    join(
+      process.cwd(),
+      ".tmp",
+      "nexu-home",
+      "runtime",
+      "controller-sidecar",
+      "dist",
+      "index.js",
+    ),
+  ).href;
+
   it("maps web-dist artifacts to apps/web/dist", () => {
     expect(resolveCompiledRepoPath("web-dist/assets/index-abc123.js")).toBe(
       "apps/web/dist/assets/index-abc123.js",
@@ -37,12 +54,9 @@ describe("merge coverage helpers", () => {
       matchSuffixes: ["dist/assets/index.js"],
     };
 
-    expect(
-      pickArtifactSourceMap("file:///tmp/apps/desktop/dist/assets/index.js", [
-        shorter,
-        longer,
-      ]),
-    ).toBe(longer);
+    expect(pickArtifactSourceMap(desktopDistScriptUrl, [shorter, longer])).toBe(
+      longer,
+    );
 
     expect(
       pickArtifactSourceMap("http://127.0.0.1:50810/assets/index.js", [
@@ -62,11 +76,9 @@ describe("merge coverage helpers", () => {
   });
 
   it("returns node source-map entries with remapped compiled path and line lengths", () => {
-    const scriptUrl =
-      "file:///Users/test/.nexu/runtime/controller-sidecar/dist/index.js";
     const rawNodeCoverage = {
       "source-map-cache": {
-        [scriptUrl]: {
+        [controllerSidecarScriptUrl]: {
           lineLengths: [42, 13],
           data: JSON.stringify({
             version: 3,
@@ -78,7 +90,11 @@ describe("merge coverage helpers", () => {
       },
     };
 
-    const entry = getNodeSourceMapEntry(rawNodeCoverage, scriptUrl, "/repo");
+    const entry = getNodeSourceMapEntry(
+      rawNodeCoverage,
+      controllerSidecarScriptUrl,
+      "/repo",
+    );
 
     expect(entry?.compiledRepoPath).toBe("apps/controller/dist/index.js");
     expect(entry?.lineLengths).toEqual([42, 13]);

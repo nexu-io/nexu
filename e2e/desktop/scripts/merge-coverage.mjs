@@ -87,7 +87,11 @@ function fromFileUrl(value) {
     return null;
   }
   if (value.startsWith("file://")) {
-    return fileURLToPath(value);
+    try {
+      return fileURLToPath(value);
+    } catch {
+      return value;
+    }
   }
   return value;
 }
