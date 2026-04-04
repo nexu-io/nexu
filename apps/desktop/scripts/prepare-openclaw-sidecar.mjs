@@ -190,6 +190,13 @@ const EMPTY_PAYLOADS_FALLBACK_SEARCH =
   '\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
 const EMPTY_PAYLOADS_FALLBACK_REPLACEMENT =
   '\tif (!runResult?.payloads?.length && runResult?.meta?.error) {\n\t\tconst _errMsg = runResult.meta.error.message || runResult.meta.error;\n\t\treturn {\n\t\t\tkind: "final",\n\t\t\tpayload: { text: typeof _errMsg === "string" ? _errMsg : "⚠️ An error occurred. Please try again." }\n\t\t};\n\t}\n\treturn {\n\t\tkind: "success",\n\t\trunId,\n\t\trunResult,';
+// Dispatcher empty payloads patch: when payloadArray is empty but there's
+// an error in meta, push the error text as a fallback payload instead of
+// silently returning (which causes the bot to go silent).
+const EMPTY_PAYLOAD_ARRAY_SEARCH =
+  'const payloadArray = runResult.payloads ?? [];\n\t\t\tif (payloadArray.length === 0) return;';
+const EMPTY_PAYLOAD_ARRAY_REPLACEMENT =
+  'const payloadArray = runResult.payloads ?? [];\n\t\t\tif (payloadArray.length === 0) {\n\t\t\t\tconst _fallbackErr = runResult.meta?.error?.message || runResult.meta?.error;\n\t\t\t\tif (_fallbackErr) {\n\t\t\t\t\tpayloadArray.push({ text: typeof _fallbackErr === "string" ? _fallbackErr : "\\u26a0\\ufe0f An error occurred. Please try again.", isError: true });\n\t\t\t\t} else {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t}';
 // Locale reader: reads nexu-credit-guard-state.json from OPENCLAW_STATE_DIR.
 // Cached by mtime. Falls back to "zh-CN" if file missing or unreadable.
 const LOCALE_READER_LINES = [
@@ -1131,6 +1138,19 @@ async function patchReplyOutcomeBridge(openclawPackageRoot) {
 
         console.log(
           `[openclaw-sidecar] patched empty payloads fallback in ${bundleName}`,
+        );
+      }
+
+      if (source.includes(EMPTY_PAYLOAD_ARRAY_SEARCH)) {
+        source = applyExactReplacement(
+          source,
+          EMPTY_PAYLOAD_ARRAY_SEARCH,
+          EMPTY_PAYLOAD_ARRAY_REPLACEMENT,
+          `${bundleName}: empty payload array fallback`,
+        );
+
+        console.log(
+          `[openclaw-sidecar] patched empty payload array fallback in ${bundleName}`,
         );
       }
 
