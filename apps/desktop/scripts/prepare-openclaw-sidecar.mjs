@@ -152,17 +152,17 @@ const CONTEXT_OVERFLOW_PATCHES = [
     search:
       '⚠️ Context limit exceeded. I\'ve reset our conversation to start fresh - please try again.\\n\\nTo prevent this, increase your compaction buffer by setting `agents.defaults.compaction.reserveTokensFloor` to 20000 or higher in your config.',
     zhReplace:
-      "⚠️ 本次提交的内容过多，系统暂时无法处理。请缩短消息内容、减少附件或分几次发送后再试。如仍无法解决，请查看 https://docs.nexu.io/zh/guide/contact",
+      "⚠️ 当前对话内容已超出模型处理上限，自动整理未能成功，已为你重置会话。请重新发送消息继续使用。如反复出现，请尝试缩短单条消息或开启新对话。",
     enReplace:
-      "⚠️ The request is too large. Please shorten your message, reduce attachments, or split into multiple messages. If the issue persists, see https://docs.nexu.io/guide/contact",
+      "⚠️ Conversation too long for this model. Auto-compaction failed, session has been reset. Please resend your message. If this keeps happening, try shorter messages or start a new conversation.",
   },
   {
     search:
       '⚠️ Context limit exceeded during compaction. I\'ve reset our conversation to start fresh - please try again.\\n\\nTo prevent this, increase your compaction buffer by setting `agents.defaults.compaction.reserveTokensFloor` to 20000 or higher in your config.',
     zhReplace:
-      "⚠️ 本次提交的内容过多，系统暂时无法处理。请缩短消息内容、减少附件或分几次发送后再试。如仍无法解决，请查看 https://docs.nexu.io/zh/guide/contact",
+      "⚠️ 当前对话内容已超出模型处理上限，自动整理未能成功，已为你重置会话。请重新发送消息继续使用。如反复出现，请尝试缩短单条消息或开启新对话。",
     enReplace:
-      "⚠️ The request is too large. Please shorten your message, reduce attachments, or split into multiple messages. If the issue persists, see https://docs.nexu.io/guide/contact",
+      "⚠️ Conversation too long for this model. Auto-compaction failed, session has been reset. Please resend your message. If this keeps happening, try shorter messages or start a new conversation.",
   },
 ];
 const FORMATTED_ASSISTANT_ERROR_PRIORITY_SEARCH =
