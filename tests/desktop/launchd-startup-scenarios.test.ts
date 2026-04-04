@@ -219,8 +219,14 @@ function mockUnknownService() {
 // ---------------------------------------------------------------------------
 
 describe("Launchd Startup Scenarios", () => {
+  const originalPlatform = process.platform;
+
   beforeEach(async () => {
     vi.clearAllMocks();
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
     mockWebServer.port = 50810;
 
     // Restore embedded web server mock (some tests override it)
@@ -252,6 +258,10 @@ describe("Launchd Startup Scenarios", () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
     vi.unstubAllGlobals();
   });
 

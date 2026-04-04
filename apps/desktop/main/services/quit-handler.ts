@@ -23,6 +23,10 @@ export interface QuitHandlerOptions {
   onBeforeQuit?: () => void | Promise<void>;
   /** Called to signal that the app should actually close windows on quit */
   onForceQuit?: () => void;
+  /** Called when the platform lifecycle owns the quit-completely path. */
+  onQuitCompletely?: () => void | Promise<void>;
+  /** Called when the platform lifecycle owns the background path. */
+  onRunInBackground?: () => void | Promise<void>;
 }
 
 export type QuitDecision = "quit-completely" | "run-in-background" | "cancel";
@@ -90,6 +94,7 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
       // Services keep running so bots stay online.
       // "Quit Completely" is only triggered via Cmd+Q / Dock Quit.
       event.preventDefault();
+      void opts.onRunInBackground?.();
       window.hide();
     });
   };
@@ -114,6 +119,7 @@ export function installLaunchdQuitHandler(opts: QuitHandlerOptions): void {
     // Packaged Cmd+Q / Dock Quit → full teardown and exit.
     event.preventDefault();
     opts.onForceQuit?.();
+    void opts.onQuitCompletely?.();
     void runTeardownAndExit(opts, "packaged-quit");
   });
 }
@@ -138,6 +144,7 @@ export async function quitWithDecision(
   }
 
   if (decision === "quit-completely") {
+    await opts.onQuitCompletely?.();
     await teardownLaunchdServices({
       launchd: opts.launchd,
       labels: opts.labels,
@@ -150,6 +157,7 @@ export async function quitWithDecision(
   }
 
   // run-in-background: hide window, keep services running
+  await opts.onRunInBackground?.();
   const win = BrowserWindow.getAllWindows()[0];
   if (win) win.hide();
 }

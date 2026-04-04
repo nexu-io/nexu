@@ -1,8 +1,20 @@
+import { logger } from "../lib/logger.js";
 import type { ControllerContainer } from "./container.js";
 
 export async function bootstrapController(
   container: ControllerContainer,
 ): Promise<() => void> {
+  logger.info(
+    {
+      openclawOwnershipMode: container.env.openclawOwnershipMode,
+      openclawBaseUrl: container.env.openclawBaseUrl,
+      openclawConfigPath: container.env.openclawConfigPath,
+      openclawStateDir: container.env.openclawStateDir,
+      openclawLogDir: container.env.openclawLogDir,
+    },
+    "controller_bootstrap_runtime_contract",
+  );
+
   // Run independent prep tasks in parallel to shave off startup time.
   // All three are independent: process cleanup, plugin files, cloud model fetch.
   await Promise.all([
@@ -34,8 +46,12 @@ export async function bootstrapController(
   // restarts from async setup (cloud connect, model selection, bot creation).
   container.openclawSyncService.beginSettling();
 
-  container.openclawProcess.enableAutoRestart();
-  container.openclawProcess.start();
+  if (container.openclawProcess.managesProcess()) {
+    container.openclawProcess.enableAutoRestart();
+    container.openclawProcess.start();
+  } else {
+    logger.info({}, "controller_bootstrap_attaching_external_openclaw");
+  }
   container.channelFallbackService.start();
 
   // Start WS client — connects to OpenClaw gateway

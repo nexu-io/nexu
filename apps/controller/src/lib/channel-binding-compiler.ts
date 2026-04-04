@@ -278,17 +278,6 @@ export function compileChannelsConfig(params: {
       ? {
           feishu: {
             enabled: true,
-            streaming: true,
-            renderMode: "card",
-            requireMention: true,
-            tools: {
-              doc: true,
-              chat: true,
-              wiki: true,
-              drive: true,
-              perm: true,
-              scopes: true,
-            },
             accounts: feishuAccounts,
           },
         }

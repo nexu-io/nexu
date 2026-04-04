@@ -9,8 +9,6 @@ async function main(): Promise<void> {
   const container = await createContainer();
   const stopBackgroundLoops = await bootstrapController(container);
   const app = createApp(container);
-  let shutdownInProgress = false;
-
   const server = serve(
     {
       fetch: app.fetch,
@@ -25,14 +23,36 @@ async function main(): Promise<void> {
     },
   );
 
+  let shuttingDown = false;
+
+  const closeServer = () =>
+    new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+
   const shutdown = async () => {
-    if (shutdownInProgress) {
+    if (shuttingDown) {
       return;
     }
-    shutdownInProgress = true;
 
+    shuttingDown = true;
     stopBackgroundLoops();
-    server.close();
+
+    try {
+      await closeServer();
+    } catch (error: unknown) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "controller shutdown server close failed",
+      );
+    }
 
     try {
       await container.openclawProcess.stop();

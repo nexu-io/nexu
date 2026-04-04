@@ -5,6 +5,20 @@ import { resolve } from "node:path";
 const repoRoot = process.cwd();
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
+function createCommandSpec(command, args) {
+  if (
+    process.platform === "win32" &&
+    (command === "npm" || command === "npm.cmd")
+  ) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", ["npm", ...args].join(" ")],
+    };
+  }
+
+  return { command, args };
+}
+
 function isTruthy(value) {
   if (!value) {
     return false;
@@ -25,7 +39,8 @@ async function pathExists(targetPath) {
 
 async function run(command, args) {
   await new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, {
+    const commandSpec = createCommandSpec(command, args);
+    const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: repoRoot,
       stdio: "inherit",
       env: process.env,
@@ -88,6 +103,14 @@ async function installWeixinRuntimePlugin() {
   ]);
 }
 
+async function buildDevUtils() {
+  await run(process.execPath, [
+    resolve(repoRoot, "node_modules", "typescript", "bin", "tsc"),
+    "-p",
+    "./packages/dev-utils/tsconfig.json",
+  ]);
+}
+
 if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
   console.log(
     "Skipping runtime postinstall via NEXU_SKIP_RUNTIME_POSTINSTALL.",
@@ -97,3 +120,4 @@ if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
 
 await installOpenClawRuntime();
 await installWeixinRuntimePlugin();
+await buildDevUtils();

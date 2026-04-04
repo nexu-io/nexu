@@ -23,6 +23,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+function normalizePath(value: string | undefined): string | undefined {
+  return value?.replace(/\\/g, "/");
+}
+
 const IS_MACOS = process.platform === "darwin";
 const RUN_REAL_LAUNCHD_TESTS = process.env.RUN_REAL_LAUNCHD_TESTS === "1";
 const NODE_BIN = process.execPath;
@@ -165,8 +169,8 @@ describe("controller plist: real function output", () => {
     const err = plist.match(
       /<key>StandardErrorPath<\/key>\s*\n\s*<string>([^<]*)/,
     )?.[1];
-    expect(out).toBe("/var/log/nexu/controller.log");
-    expect(err).toBe("/var/log/nexu/controller.error.log");
+    expect(normalizePath(out)).toBe("/var/log/nexu/controller.log");
+    expect(normalizePath(err)).toBe("/var/log/nexu/controller.error.log");
   });
 });
 
@@ -249,7 +253,7 @@ describe("openclaw plist: real function output", () => {
     const out = plist.match(
       /<key>StandardOutPath<\/key>\s*\n\s*<string>([^<]*)/,
     )?.[1];
-    expect(out).toBe("/var/log/nexu/openclaw.log");
+    expect(normalizePath(out)).toBe("/var/log/nexu/openclaw.log");
   });
 });
 
