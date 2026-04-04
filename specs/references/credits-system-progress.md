@@ -129,15 +129,40 @@ https://github.com/nexu-io/nexu/pull/834
 - `--mode random`：随机错误
 
 ### 自动化测试消息发送
+
+**模拟用户发消息给机器人**（触发 agent 回复）：
 ```bash
-# 通过 openclaw CLI 直接发消息到飞书（不需要手动操作飞书）
+# 通过 openclaw agent 命令模拟用户消息 → agent 处理 → 回复到飞书
+OPENCLAW_CONFIG_PATH=.tmp/desktop/nexu-home/runtime/openclaw/state/openclaw.json \
+OPENCLAW_STATE_DIR=.tmp/desktop/nexu-home/runtime/openclaw/state \
+./openclaw-wrapper agent \
+  -m "你的消息内容" \
+  --agent 2e18466f-29a0-4a26-8ebc-f398e6747d45 \
+  --to "oc_4e4588adb88ddd3f8093c834441bf64a" \
+  --channel feishu \
+  --deliver
+```
+- `--agent` 指定飞书绑定的 agent ID（从 openclaw.json 的 agents.list 获取）
+- `--to` 指定飞书 chat ID（从日志 `feishu[...]: received message from ... in oc_xxx` 获取）
+- `--deliver` 让 agent 把回复发到飞书 channel
+- 不加 `--deliver` 则只在终端显示 agent 回复
+
+**机器人主动发消息**（不触发 agent）：
+```bash
 OPENCLAW_CONFIG_PATH=.tmp/desktop/nexu-home/runtime/openclaw/state/openclaw.json \
 OPENCLAW_STATE_DIR=.tmp/desktop/nexu-home/runtime/openclaw/state \
 ./openclaw-wrapper message send \
   --target "oc_4e4588adb88ddd3f8093c834441bf64a" \
   --channel feishu \
-  --message "测试消息" \
+  --message "机器人主动发的消息" \
   --json
+```
+
+**切换模型**（通过 controller API）：
+```bash
+curl -X PUT http://localhost:50800/api/internal/desktop/default-model \
+  -H "Content-Type: application/json" \
+  -d '{"modelId": "link/gemini-3-flash-preview"}'
 ```
 
 ### Compaction 反馈实现方案（确认可行）
