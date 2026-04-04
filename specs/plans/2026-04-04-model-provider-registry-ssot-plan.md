@@ -25,6 +25,13 @@ Qclaw shows a better direction:
 - centralized provider alias normalization (`/Users/mrc/Projects/qiuzhi2046/Qclaw/src/lib/model-provider-aliases.ts`)
 - UI/runtime extraction derived from OpenClaw model config and runtime status rather than separate duplicated provider definitions
 
+ClawX adds a few additional useful patterns:
+
+- a shared provider-definition registry reused by backend and UI (`/Users/mrc/Projects/ClawX/electron/shared/providers/registry.ts`)
+- an explicit **provider account** concept for multiple saved accounts/instances (`/Users/mrc/Projects/ClawX/electron/shared/providers/types.ts`)
+- runtime sync code that gives each custom/unregistered provider instance a stable runtime key (`/Users/mrc/Projects/ClawX/electron/services/providers/provider-runtime-sync.ts`)
+- protocol-aware validation for OpenAI-compatible, Responses-compatible, and Anthropic-compatible endpoints (`/Users/mrc/Projects/ClawX/electron/services/providers/provider-validation.ts`)
+
 ## Problem Statement
 
 Nexu currently has three coupled but different provider systems:
@@ -156,6 +163,117 @@ derive configured providers from:
 
 That is the right direction for Nexu as well.
 
+### ClawX reference patterns worth copying
+
+#### 1. Shared registry consumed by both UI and backend
+
+`/Users/mrc/Projects/ClawX/electron/shared/providers/registry.ts`
+and
+`/Users/mrc/Projects/ClawX/electron/utils/provider-registry.ts`
+show a practical split:
+
+- one shared definition list for provider identity, UI metadata, env vars, default base URLs, auth modes, and backend runtime config
+- a thin backend adapter on top for runtime-only helper functions
+
+This is a strong confirmation that Nexu should not keep separate web/controller provider maps.
+
+#### 2. Provider-account / provider-instance modeling
+
+`/Users/mrc/Projects/ClawX/electron/shared/providers/types.ts`
+and
+`/Users/mrc/Projects/ClawX/electron/services/providers/provider-store.ts`
+separate:
+
+- provider/vendor type
+- saved account/instance id
+- display label
+- auth mode
+- base URL
+- protocol
+- model / fallback models
+
+This is especially relevant for Nexu custom providers. It reinforces that user-created provider instances should be first-class saved records rather than being forced into one static provider slot.
+
+#### 3. Stable runtime key derivation for custom instances
+
+`/Users/mrc/Projects/ClawX/electron/services/providers/provider-runtime-sync.ts`
+derives a unique OpenClaw runtime provider key for unregistered/custom providers.
+
+Important idea:
+
+- saved provider instance identity and runtime provider key are related but not always identical
+- custom providers need a deterministic runtime key strategy so multiple saved instances can coexist safely in `models.providers`
+
+Nexu should borrow this principle, even if it uses a different final key format than ClawX.
+
+#### 4. Protocol-aware validation is a first-class concern
+
+`/Users/mrc/Projects/ClawX/electron/services/providers/provider-validation.ts`
+does not validate all providers the same way. It distinguishes at least:
+
+- `openai-completions`
+- `openai-responses`
+- `anthropic-messages`
+- provider-specific auth styles such as query-key or Anthropic headers
+
+This is especially relevant for `custom-openai` and `custom-anthropic`: the protocol family must drive validation behavior, endpoint normalization, and UX hints.
+
+#### 5. Backward-compatible API migration strategy
+
+`/Users/mrc/Projects/ClawX/electron/api/routes/providers.ts` keeps:
+
+- newer `provider-accounts` routes
+- deprecated legacy provider routes
+
+That is a good migration pattern for Nexu too: ship the better config/account model first, then keep transitional facades long enough to migrate consumers safely.
+
+### ClawX patterns to avoid copying directly
+
+ClawX is helpful, but Nexu should not copy everything as-is.
+
+#### 1. Single generic `custom` provider type is too coarse
+
+ClawX uses one generic `custom` provider type in `electron/shared/providers/registry.ts`.
+
+For Nexu, that is not enough because:
+
+- OpenAI-compatible and Anthropic-compatible endpoints have meaningfully different protocol semantics
+- validation and endpoint normalization need protocol awareness
+- custom provider UX should make the compatibility family explicit
+
+Nexu should keep separate templates/families:
+
+- `custom-openai`
+- `custom-anthropic`
+
+#### 2. Runtime-key hashing should not become the canonical product identity
+
+ClawX uses generated runtime keys such as hashed `custom-xxxxxxxx` forms.
+
+That is useful internally, but for Nexu the user-facing persisted identity should remain more readable and stable, such as:
+
+- `custom-openai/my-team-gateway`
+- `custom-anthropic/siliconflow-claude`
+
+If Nexu later needs a different compile-time/runtime key for OpenClaw compatibility, that key should remain a materialization detail rather than the primary persisted product identity.
+
+#### 3. Do not let a separate account model become a second long-lived source of truth
+
+ClawX's provider-account model is useful conceptually, but Nexu should avoid introducing:
+
+- one account store
+- one provider config store
+- one compiled OpenClaw store
+
+all as equal first-class truths.
+
+For Nexu, the right adaptation is:
+
+- canonical OpenClaw-aligned provider config remains the source of truth
+- provider-instance/account semantics are represented within that canonical config shape
+
+not as a separate parallel persistence system.
+
 ## Desired End State
 
 ### Principle
@@ -226,6 +344,25 @@ For custom compatibility endpoints, the registry must support distinct protocol 
 
 These should be separate registry entries because they differ in runtime API semantics, request shaping, and compatibility expectations.
 
+In addition, the product should support **user-defined custom provider instances**, not just one built-in static custom provider entry.
+
+That means the system must support multiple saved custom providers such as:
+
+- `Custom0`
+- `Custom1`
+- team-specific gateways
+- self-hosted vendor-compatible endpoints
+
+Each custom provider instance should declare which protocol family it implements:
+
+- OpenAI-compatible
+- Anthropic-compatible
+
+So the registry should distinguish between:
+
+- **provider templates / provider families**: `custom-openai`, `custom-anthropic`
+- **user-created provider instances**: `custom-openai/my-team-gateway`, `custom-anthropic/siliconflow-claude`, etc.
+
 ### Rules
 
 - all provider id normalization must go through this registry
@@ -266,6 +403,7 @@ Target state:
 - persist provider configuration in an OpenClaw-aligned structure inside Nexu config
 - make that structure the canonical editable state
 - compile only thin runtime projections where necessary
+- support both built-in provider entries and user-created custom provider instances
 
 Suggested new persisted shape inside Nexu config:
 
@@ -294,6 +432,23 @@ config.models = {
       apiKeyRef: "secret://providers/byok_openai/api-key",
       models: [{ id: "gpt-4o" }],
     },
+    "custom-openai/my-team-gateway": {
+      enabled: true,
+      displayName: "My Team Gateway",
+      baseUrl: "https://llm.example.com/v1",
+      authMode: "apiKey",
+      apiKeyRef: "secret://providers/custom-openai/my-team-gateway/api-key",
+      models: [{ id: "gpt-4o-mini" }],
+    },
+    "custom-anthropic/siliconflow-claude": {
+      enabled: true,
+      displayName: "SiliconFlow Claude",
+      baseUrl: "https://api.siliconflow.cn",
+      authMode: "apiKey",
+      apiKeyRef:
+        "secret://providers/custom-anthropic/siliconflow-claude/api-key",
+      models: [{ id: "claude-sonnet-compatible" }],
+    },
   },
 }
 ```
@@ -303,6 +458,62 @@ Notes:
 - `enabled`, `authMode`, `oauthRegion`, and similar editor metadata may exist in Nexu persistence even if OpenClaw ignores some of them directly
 - secrets should remain outside plain config when possible; use refs or the existing secure persistence path
 - the top-level persisted shape should still be OpenClaw-aligned enough that writing OpenClaw config becomes mostly structural copying + secret resolution
+
+### Custom provider instance model
+
+To support the UX shown in the reference image, Nexu should treat custom providers as first-class saved instances rather than a single toggleable built-in row.
+
+Required capabilities:
+
+- users can create multiple custom providers
+- each custom provider has its own display name
+- each custom provider has its own base URL
+- each custom provider has its own auth/secret source
+- each custom provider chooses an API protocol family (`openai-completions` or `anthropic-messages`)
+- each custom provider maintains its own enabled state and model list
+
+Recommended distinction:
+
+- **registry/template identity** answers: what kind of provider is this?
+- **instance identity** answers: which saved custom endpoint is this?
+
+Suggested instance fields in persisted config:
+
+- `providerTemplateId`: `custom-openai` or `custom-anthropic`
+- `instanceId`: stable user-created id
+- `displayName`: user-facing label such as `Custom1`
+- `baseUrl` / `baseUrlEnv`
+- `credentialSource`
+- `apiKeyEnv` / `apiKeySecretRef`
+- `apiKind`: derived from template but may also be persisted for migration clarity
+
+This keeps custom providers compatible with a centralized registry while still allowing arbitrary user-created endpoints.
+
+### Runtime key strategy for custom instances
+
+ClawX confirms that multi-instance custom providers need a dedicated runtime-key strategy.
+
+Nexu should make this explicit in the plan.
+
+Recommended rule:
+
+- persisted key stays human-readable and stable
+- compiler may derive a different OpenClaw runtime key only if required for compatibility or collision avoidance
+- the mapping from persisted key -> runtime key must be deterministic and reversible in diagnostics
+
+Recommended examples:
+
+- persisted key: `custom-openai/my-team-gateway`
+- runtime key: either the same key if OpenClaw tolerates it, or a derived key such as `custom-openai__my-team-gateway`
+
+- persisted key: `custom-anthropic/siliconflow-claude`
+- runtime key: either the same key or a normalized derived runtime-safe key
+
+Non-negotiable constraints:
+
+- two custom instances must never collide at runtime
+- runtime diagnostics must still be able to map runtime key back to saved instance
+- model refs must remain deterministic across restarts
 
 ## 4. Treat compiler as a thin projection layer
 
@@ -358,6 +569,7 @@ The web page should ask:
 - which of them are visible in this product tier?
 - which of them are configured in saved model config?
 - which of them are active/authenticated in runtime status?
+- which custom provider instances exist for a given custom template/family?
 
 Not:
 
@@ -406,6 +618,22 @@ Helper APIs should include:
 - `getProviderUiMetadata(id)`
 - `getProviderRuntimePolicy(id)`
 
+For custom providers, add template-oriented helpers such as:
+
+- `isCustomProviderTemplate(id)`
+- `getCustomProviderProtocolFamily(id)`
+- `buildCustomProviderKey(templateId, instanceId)`
+- `parseCustomProviderKey(key)`
+
+Recommended key model:
+
+- built-in providers use stable keys such as `openai`, `anthropic`, `mistral`
+- custom instances use composite keys such as:
+  - `custom-openai/<instance-id>`
+  - `custom-anthropic/<instance-id>`
+
+This avoids pretending that all custom providers are the same provider entry.
+
 ## Provider Inventory: Qclaw Additions Missing in Nexu
 
 Qclaw providers not currently represented in Nexu's support list:
@@ -428,6 +656,11 @@ Qclaw providers not currently represented in Nexu's support list:
 In addition, Nexu should add a new registry/provider concept that does not currently exist in either hardcoded Nexu support lists or the Qclaw reference list:
 
 - `custom-anthropic`
+
+Nexu should also explicitly support **multiple user-created instances** under:
+
+- `custom-openai/*`
+- `custom-anthropic/*`
 
 Notes:
 
@@ -462,6 +695,22 @@ Rationale:
 - some may need auth-policy/product-copy decisions before broad UI exposure
 
 `custom-anthropic` should be exposed alongside `custom-openai` in the early phase because it is architecturally important for the new registry design even if the initial UX is minimal.
+
+For product UX, custom providers should be shown as a dedicated subsection that supports:
+
+- listing saved custom instances
+- adding a new custom instance
+- editing an existing custom instance
+- choosing protocol family: OpenAI-compatible vs Anthropic-compatible
+
+This should match the reference interaction pattern more closely than a single hardcoded `custom-openai` row.
+
+ClawX also suggests one additional refinement: treat the custom provider list as an **account/instance list**, not as pseudo-built-in vendors. In practice this means the UI should clearly separate:
+
+- built-in provider families/vendors
+- saved provider instances/accounts
+
+This will scale better once users have multiple custom gateways or multiple accounts for the same vendor.
 
 ## API and Persistence Changes
 
@@ -499,6 +748,17 @@ Target direction:
   - `PUT /api/v1/model-providers/config`
   - optional scoped helpers for updating one provider entry
 
+ClawX suggests an additional useful route model for editor ergonomics:
+
+- instance-oriented helper routes for CRUD, validation, and default selection
+
+Recommended optional helpers:
+
+- `POST /api/v1/model-providers/instances`
+- `PUT /api/v1/model-providers/instances/{instanceKey}`
+- `DELETE /api/v1/model-providers/instances/{instanceKey}`
+- `POST /api/v1/model-providers/instances/{instanceKey}/validate`
+
 This makes the API mirror the new source of truth.
 
 ## Migration Plan
@@ -510,6 +770,7 @@ This makes the API mirror the new source of truth.
 3. add tests for normalization and registry completeness
 4. move provider display metadata out of `apps/web/src/pages/models.tsx`
 5. replace `byok-providers.ts` support checks with registry lookups
+6. define custom-provider instance key format and parsing helpers
 
 Outcome:
 
@@ -524,6 +785,8 @@ Outcome:
    - legacy `config.providers` -> normalized model-provider config
 4. make compiler consume only the normalized model-provider config
 5. keep writing both shapes temporarily if needed for rollback safety
+6. add support for composite custom-provider instance keys
+7. define persisted-key <-> runtime-key mapping rules
 
 Outcome:
 
@@ -536,6 +799,12 @@ Outcome:
 2. drive provider cards/forms from registry metadata
 3. remove page-local provider metadata maps and most provider-specific branching
 4. make model grouping and configured-provider extraction work from saved config + runtime status
+5. add custom-provider instance CRUD UX:
+   - add custom provider
+   - select protocol family
+   - edit display name / base URL / credential source
+   - list multiple custom providers
+6. add protocol-aware validation UX and messages for custom providers
 
 Outcome:
 
@@ -587,6 +856,8 @@ Changes:
 - consume normalized model-provider config only
 - move hardcoded defaults/remapping/capabilities into shared registry
 - keep only runtime materialization logic here
+- add deterministic persisted-key -> runtime-key mapping for multi-instance custom providers
+- keep runtime-safe key derivation observable in diagnostics
 
 ### `apps/controller/src/services/openclaw-sync-service.ts`
 
@@ -602,6 +873,7 @@ Changes:
 
 - add registry/config-document routes
 - keep existing CRUD routes as transitional façade if needed
+- add instance-level validate helpers with protocol-aware validation behavior
 
 ### `apps/web/src/pages/models.tsx`
 
@@ -610,6 +882,8 @@ Changes:
 - render provider list/forms from shared registry data
 - remove hardcoded `PROVIDER_META`
 - reduce provider-specific conditionals to registry capability checks
+- add a custom-provider instance list separated from built-in providers
+- support add/edit/delete flows for `custom-openai/*` and `custom-anthropic/*`
 
 ## Sync Model: Before vs After
 
@@ -804,6 +1078,37 @@ Preferred UX:
 - UI should allow choosing a custom env key when needed for advanced setups
 - UI should avoid ever re-showing stored secret values
 
+For custom provider instances specifically:
+
+- the create form should ask for protocol family first: OpenAI-compatible or Anthropic-compatible
+- the form should then show the correct base URL hint and env variable suggestions for that protocol family
+- users should be able to create multiple named custom providers rather than overwriting a single global custom slot
+- the list UI should clearly separate built-in providers from user-created custom providers
+- validation should probe the correct protocol family automatically:
+  - OpenAI-compatible -> `/models`, `/chat/completions`, or `/responses`-aware probing
+  - Anthropic-compatible -> `/v1/messages`-aware probing with Anthropic auth headers
+
+### Protocol-aware validation design
+
+ClawX provides a useful reference here: provider validation should be protocol-aware, not vendor-name-aware only.
+
+Nexu should make validation strategy a registry-driven concern.
+
+Recommended validation profiles:
+
+- `openai-completions`
+- `openai-responses`
+- `anthropic-messages`
+- `google-query-key`
+- provider-specific edge cases only where truly necessary
+
+For custom provider instances:
+
+- `custom-openai/*` should validate as OpenAI-compatible
+- `custom-anthropic/*` should validate as Anthropic-compatible
+
+This logic should live in one shared controller/backend validation module, not inside page components.
+
 ### Desktop/runtime env injection
 
 For desktop-first Nexu, env consumption works best when secrets are injected only into the controller/OpenClaw runtime processes.
@@ -887,6 +1192,8 @@ export const modelProviderModelEntrySchema = z.object({
 
 export const modelProviderConfigSchema = z
   .object({
+    providerTemplateId: z.string().min(1).optional(),
+    instanceId: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
 
     authMode: providerAuthModeSchema.optional(),
@@ -969,8 +1276,18 @@ The `providers` object should remain keyed by normalized canonical provider id o
 - `custom-openai`
 - `custom-anthropic`
 - `byok_openai` if proxied/custom routing remains a distinct persisted identity
+- `custom-openai/my-team-gateway`
+- `custom-anthropic/siliconflow-claude`
 
 This keeps the structure close to OpenClaw `models.providers`.
+
+For custom providers, the recommendation is:
+
+- map key = instance key
+- `providerTemplateId` = protocol family template
+- `instanceId` = stable custom instance id
+
+This supports both registry-derived behavior and user-defined multiplicity.
 
 #### 2. `apiKey` stays only for compatibility
 
@@ -1062,6 +1379,9 @@ export const providerRegistryResponseSchema = z.object({
 ```json
 {
   "enabled": true,
+  "providerTemplateId": "custom-openai",
+  "instanceId": "my-team-gateway",
+  "displayName": "My Team Gateway",
   "authMode": "apiKey",
   "credentialSource": "env",
   "apiKeyEnv": "OPENAI_API_KEY",
@@ -1076,6 +1396,9 @@ export const providerRegistryResponseSchema = z.object({
 ```json
 {
   "enabled": true,
+  "providerTemplateId": "custom-anthropic",
+  "instanceId": "siliconflow-claude",
+  "displayName": "SiliconFlow Claude",
   "authMode": "apiKey",
   "credentialSource": "env",
   "apiKeyEnv": "ANTHROPIC_API_KEY",
@@ -1107,6 +1430,7 @@ Before finalizing the schema in code, confirm:
 3. whether `headers` should be user-editable or controller-internal only
 4. whether `metadata` should remain in the stable schema or be limited to migration adapters
 5. whether secrets should resolve only from env + secure store, with plain `apiKey` writes fully blocked in normal UI flows
+6. whether OpenClaw runtime keys should preserve readable composite names or always normalize to a runtime-safe derived key
 
 ## Testing Plan
 
@@ -1125,6 +1449,10 @@ Add tests for:
 - direct vs proxy/custom endpoint behavior stays stable
 - oauth-backed providers still materialize correctly
 - `custom-anthropic` compiles with Anthropic-compatible API semantics rather than OpenAI-compatible semantics
+- multiple custom provider instances can coexist without overwriting each other
+- custom instance keys round-trip correctly through persistence, compilation, and UI state
+- protocol-aware validation picks the correct probe strategy for custom OpenAI vs custom Anthropic instances
+- persisted-key -> runtime-key mapping remains deterministic and collision-free
 
 ### Migration
 
@@ -1173,6 +1501,15 @@ Adding all new providers directly to the UI may overwhelm users.
 Mitigation:
 
 - separate registry support from default UI exposure
+
+### 5. Runtime key drift for custom instances
+
+If runtime keys are derived inconsistently, custom providers may appear duplicated, lose model refs, or fail cleanup.
+
+Mitigation:
+
+- define one persisted-key <-> runtime-key mapping strategy early
+- test round-trip mapping and stale cleanup explicitly
 
 ## What Not To Do
 
