@@ -128,6 +128,24 @@ https://github.com/nexu-io/nexu/pull/834
 - `--mode success`：纯正常回复
 - `--mode random`：随机错误
 
+### 自动化测试消息发送
+```bash
+# 通过 openclaw CLI 直接发消息到飞书（不需要手动操作飞书）
+OPENCLAW_CONFIG_PATH=.tmp/desktop/nexu-home/runtime/openclaw/state/openclaw.json \
+OPENCLAW_STATE_DIR=.tmp/desktop/nexu-home/runtime/openclaw/state \
+./openclaw-wrapper message send \
+  --target "oc_4e4588adb88ddd3f8093c834441bf64a" \
+  --channel feishu \
+  --message "测试消息" \
+  --json
+```
+
+### Compaction 反馈实现方案（确认可行）
+- `handleAutoCompactionStart`（subscriber handler）确认会被调用
+- 但它 emit 的 `onAgentEvent({ stream: "compaction" })` **不会传到 `agent-runner-execution.ts`**（不同执行上下文）
+- **可行方案**：在 `handleAutoCompactionStart` 里 `console.error("NEXU_EVENT compaction.started <payload>")`，controller 的 `emitRuntimeEventFromLine` 捕获，然后通过 `gatewayService.sendChannelMessage()` 发独立消息
+- 需要两层改动：patch `handleAutoCompactionStart` + controller 加 `compaction.started` 事件处理
+
 ### 切换模型 API
 ```bash
 curl -X PUT http://localhost:50800/api/internal/desktop/default-model \
