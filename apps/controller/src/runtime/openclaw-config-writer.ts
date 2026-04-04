@@ -81,6 +81,10 @@ async function syncWeixinAccountIndex(
   );
 }
 
+function resolveOpenclawStateDir(env: ControllerEnv): string {
+  return env.openclawStateDir ?? path.dirname(env.openclawConfigPath);
+}
+
 export class OpenClawConfigWriter {
   /** Last successfully written content — used to skip redundant writes. */
   private lastWrittenContent: string | null = null;
@@ -130,7 +134,7 @@ export class OpenClawConfigWriter {
     this.lastWrittenContent = content;
 
     // Sync weixin account index for openclaw-weixin plugin compatibility
-    await syncWeixinAccountIndex(this.env.openclawStateDir, config);
+    await syncWeixinAccountIndex(resolveOpenclawStateDir(this.env), config);
 
     const configStat = await stat(this.env.openclawConfigPath);
     logger.info(

@@ -493,7 +493,8 @@ export type RuntimeUnitLaunchStrategy =
   | "embedded"
   | "managed"
   | "delegated"
-  | "launchd";
+  | "launchd"
+  | "external";
 
 export type RuntimeUnitPhase =
   | "idle"
@@ -526,7 +527,9 @@ export type RuntimeReasonCode =
   | "launchd_stopped"
   | "launchd_start_requested"
   | "launchd_stop_requested"
-  | "launchd_log_line";
+  | "launchd_log_line"
+  | "external_available"
+  | "external_unavailable";
 
 export type RuntimeLogEntry = {
   id: string;
@@ -585,6 +588,7 @@ export type HostBootstrap = {
   posthogHost: string | null;
   isPackaged: boolean;
   needsSetupAnimation: boolean;
+  webviewPreloadUrl: string;
 };
 
 export type UpdateSource = "r2" | "github";

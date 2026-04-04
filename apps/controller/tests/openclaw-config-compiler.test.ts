@@ -177,6 +177,12 @@ describe("compileOpenClawConfig", () => {
       webhookPath: "/feishu/events/cli_a1b2c3",
       verificationToken: "verify-token",
     });
+    expect(result.channels.feishu).not.toMatchObject({
+      streaming: expect.anything(),
+      renderMode: expect.anything(),
+      requireMention: expect.anything(),
+      tools: expect.anything(),
+    });
     expect(result.plugins?.entries?.feishu?.enabled).toBe(true);
     expect(result.skills?.load?.extraDirs).toEqual([
       "/tmp/openclaw/skills",

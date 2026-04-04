@@ -53,6 +53,9 @@ OPENCLAW_STATE_DIR="$PWD/.openclaw" \
 
 ## 依赖管理
 
+- `install:full`：安装完整依赖，保留 peer / optional 依赖，作为对照基线。
+- `install:pruned`：先安装运行时最小依赖，再执行 pruning；在 Windows 上会额外省略 optional 依赖，避免已知的原生安装问题。
+
 ```bash
 # 安装完整依赖
 npm --prefix ./openclaw-runtime run install:full

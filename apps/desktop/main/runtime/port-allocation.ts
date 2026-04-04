@@ -1,5 +1,6 @@
 import { createServer } from "node:net";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
+import { platform } from "../platforms/platform-backends";
 
 type PortPurpose = "controller" | "web" | "openclaw";
 
@@ -132,13 +133,12 @@ async function probeIdlePort(options: {
     } catch (error) {
       server.close();
 
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "EADDRINUSE"
-      ) {
-        continue;
+      if (typeof error === "object" && error !== null && "code" in error) {
+        const errorCode = error.code;
+
+        if (platform.network.isPortProbeRetryableError(errorCode)) {
+          continue;
+        }
       }
 
       throw error;

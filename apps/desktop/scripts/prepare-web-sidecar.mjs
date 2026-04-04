@@ -14,6 +14,23 @@ const webSidecarSourceRoot = resolve(nexuRoot, "apps/desktop/sidecars/web");
 const sidecarRoot = getSidecarRoot("web");
 const sidecarDistRoot = resolve(sidecarRoot, "dist");
 
+async function runTimedStep(label, action) {
+  const startedAt = Date.now();
+  console.log(`[web-sidecar] step:start ${label}`);
+  try {
+    const result = await action();
+    console.log(
+      `[web-sidecar] step:done ${label} durationMs=${Date.now() - startedAt}`,
+    );
+    return result;
+  } catch (error) {
+    console.log(
+      `[web-sidecar] step:fail ${label} durationMs=${Date.now() - startedAt}`,
+    );
+    throw error;
+  }
+}
+
 async function ensureBuildArtifacts() {
   if (!(await pathExists(webDistRoot))) {
     throw new Error(
@@ -29,18 +46,20 @@ async function ensureBuildArtifacts() {
 }
 
 async function prepareWebSidecar() {
-  await ensureBuildArtifacts();
-  await resetDir(sidecarRoot);
-  await cp(webDistRoot, sidecarDistRoot, { recursive: true });
-  await cp(
-    resolve(webSidecarSourceRoot, "index.js"),
-    resolve(sidecarRoot, "index.js"),
-  );
+  await runTimedStep("prepare_web_sidecar", async () => {
+    await ensureBuildArtifacts();
+    await resetDir(sidecarRoot);
+    await cp(webDistRoot, sidecarDistRoot, { recursive: true });
+    await cp(
+      resolve(webSidecarSourceRoot, "index.js"),
+      resolve(sidecarRoot, "index.js"),
+    );
 
-  await writeFile(
-    resolve(sidecarRoot, "package.json"),
-    `${JSON.stringify({ name: "web-sidecar", private: true, type: "module" }, null, 2)}\n`,
-  );
+    await writeFile(
+      resolve(sidecarRoot, "package.json"),
+      `${JSON.stringify({ name: "web-sidecar", private: true, type: "module" }, null, 2)}\n`,
+    );
+  });
 }
 
 await prepareWebSidecar();

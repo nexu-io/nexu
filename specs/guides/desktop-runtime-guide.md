@@ -157,7 +157,7 @@ Use this snapshot to confirm that local controller/OpenClaw URLs resolve to dire
 
 ## Local State Map
 
-### Dev desktop (`pnpm start` / `pnpm restart`)
+### Dev desktop (`pnpm dev start` / `pnpm dev restart` / explicit per-service commands)
 
 - Electron `userData`: `<repo>/.tmp/desktop/electron`
 - Desktop logs: `<repo>/.tmp/desktop/electron/logs`
@@ -168,15 +168,16 @@ Use this snapshot to confirm that local controller/OpenClaw URLs resolve to dire
 - Runtime unit logs: `<repo>/.tmp/desktop/electron/logs/runtime-units`
 - Controller unit log: `<repo>/.tmp/desktop/electron/logs/runtime-units/controller.log`
 - Other managed unit logs: `<repo>/.tmp/desktop/electron/logs/runtime-units/<unit>.log`
-- Desktop wrapper log: `<repo>/.tmp/logs/desktop-dev.log`
-- Desktop startup timeline log: `<repo>/.tmp/logs/desktop-startup-timeline.log`
+- Desktop session log: `<repo>/.tmp/dev/logs/<run_id>/desktop.log`
+- Prepared sidecar cache root: `<repo>/.tmp/sidecars`
+- OpenClaw sidecar cache metadata: `<repo>/.tmp/sidecars/openclaw/prepare-cache.json`
 - OpenClaw runtime root: `<repo>/.tmp/desktop/electron/runtime/openclaw`
 - OpenClaw config: `<repo>/.tmp/desktop/electron/runtime/openclaw/config/openclaw.json`
 - OpenClaw state: `<repo>/.tmp/desktop/electron/runtime/openclaw/state`
 - OpenClaw native log: `/tmp/openclaw/openclaw-YYYY-MM-DD.log`
 - Desktop-scoped Nexu home: `<repo>/.tmp/desktop/electron/.nexu`
 - Controller `NEXU_HOME`: points to the desktop-scoped path above when launched by desktop dev
-- Repo-local reset command: `pnpm reset-state` or `./apps/desktop/dev.sh reset-state`
+- There is no repo-local desktop reset wrapper anymore; stop services explicitly and delete state paths manually when needed.
 
 ### Packaged desktop (DMG-installed app)
 
@@ -203,7 +204,7 @@ Use this snapshot to confirm that local controller/OpenClaw URLs resolve to dire
 
 ### How to use the logs
 
-- Start with the desktop wrapper log in dev when `pnpm start` fails before Electron is fully up: `<repo>/.tmp/logs/desktop-dev.log`
+- Start with `pnpm dev logs desktop` in dev when desktop fails before Electron is fully up.
 - Check `cold-start.log` for boot milestones and early main-process startup sequencing
 - Check `desktop-main.log` for main-process runtime behavior, auth recovery, renderer-side forwarded events, and desktop lifecycle diagnostics
 - Check `logs/runtime-units/*.log` for sidecar process logs, especially `controller.log`
@@ -221,6 +222,7 @@ Use this snapshot to confirm that local controller/OpenClaw URLs resolve to dire
 ### Full local wipe checklist
 
 - For a normal dev reset, run `pnpm reset-state`
+- For a lightweight manual wipe, stop each service explicitly, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` if you also want to discard controller-owned or legacy local state outside the desktop-scoped `userData`
 - For a full local wipe, run `pnpm stop`, remove `<repo>/.tmp/desktop/`, then remove `~/.nexu/` (includes extracted runtime sidecars and runner) and `~/Library/Application Support/@nexu/desktop/` if you also want to discard all packaged-app state
 - Use the full wipe when you want to forget bots, channels, model selections, generated OpenClaw state, extracted runtime, and any leftover controller state from earlier local runs
 
@@ -231,14 +233,23 @@ Use this snapshot to confirm that local controller/OpenClaw URLs resolve to dire
   - Use this for packaged-app-only flags such as `NEXU_DESKTOP_AUTO_UPDATE_ENABLED=false` when you want a local build to skip update checks.
   - Use `NEXU_DESKTOP_RELEASE_DIR=/absolute/output/path` when you want packaged artifacts written somewhere other than `apps/desktop/release`.
 
+- `Windows installer build fails with symlink permission errors`
+  - When EXE resource editing or signing is enabled, run local Windows installer builds from an Administrator shell.
+  - Non-admin shells can fail in the legacy `winCodeSign` / `rcedit` path with symlink permission errors.
+
 - `desktop won't cold start`
-  - Start with `pnpm logs` and `./apps/desktop/dev.sh devlog`.
+  - Start with `pnpm dev logs desktop`.
   - Then inspect `cold-start.log`, `desktop-main.log`, and `logs/runtime-units/*.log` under the desktop logs directory.
   - If the issue may be proxy-related, inspect `desktop-diagnostics.json` `proxy.source`, `proxy.env`, `proxy.bypass`, and `proxy.resolutions` before changing runtime code.
   - If the issue looks power-management related, inspect `desktop-diagnostics.json` `sleepGuard` plus `desktop-main.log` entries with `source=sleep-guard` to confirm the blocker type, power-source transitions, and whether a `suspend` was still observed.
   - Correlate by `desktop_boot_id` first, then `desktop_session_id` if auth/session recovery is involved.
-  - If `tmux session 'nexu-desktop' is not running` immediately after start, verify `pnpm -C apps/desktop exec electron --version` succeeds.
-  - If `pnpm exec electron` works but `pnpm run start:electron` fails to resolve `electron/cli.js`, prefer `pnpm exec electron .` inside `apps/desktop/package.json` and then rebuild from the standard `pnpm start` path.
+  - If `pnpm exec electron` works but `pnpm dev start desktop` still fails to boot, rebuild `@nexu/desktop` explicitly and inspect the current session `desktop.log`.
+
+- `pnpm dev start openclaw` fails before controller regenerates config
+  - This can happen when stale local state under `<repo>/.tmp/dev/openclaw/state/` is read first.
+  - Stop OpenClaw, then remove the stale `openclaw.json`, `openclaw-weixin/`, and `extensions/openclaw-weixin/` entries under that state directory.
+  - Retry after cleanup; if the problem persists, the broader fallback is removing `<repo>/.tmp/dev/openclaw/` entirely.
+  - This recovery restores startup, but it may not fix the underlying cause if stale state is recreated again.
 
 - `external requests fail only behind a corporate proxy`
   - Confirm the launching environment or packaged launchd manifests include the expected uppercase proxy env vars.

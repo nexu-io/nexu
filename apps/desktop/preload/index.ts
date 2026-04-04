@@ -66,6 +66,10 @@ const hostBridge: HostBridge = {
     posthogHost: runtimeConfig.posthogHost,
     isPackaged: !process.defaultApp,
     needsSetupAnimation: process.env.NEXU_NEEDS_SETUP_ANIMATION === "1",
+    webviewPreloadUrl: new URL(
+      "./webview-preload.js",
+      import.meta.url,
+    ).toString(),
   },
 
   invoke<TChannel extends HostInvokeChannel>(

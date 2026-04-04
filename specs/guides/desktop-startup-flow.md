@@ -1,6 +1,6 @@
 # Desktop Startup Flow
 
-This document describes the full startup sequence for Nexu Desktop. It applies to both local development (`pnpm start`) and the packaged app (Nexu.app) — they share the same launchd bootstrap code, differing only in path resolution, build steps, and state directories.
+This document describes the desktop startup sequence. Packaged app startup still uses the launchd/bootstrap path. Local development now uses explicit `pnpm dev start <service>` service orchestration and desktop attaches in external-runtime mode.
 
 ## Architecture Overview
 
@@ -27,13 +27,13 @@ This document describes the full startup sequence for Nexu Desktop. It applies t
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| **Launchd (dev)** | `pnpm start` | Build all → launchd services → Electron. Auto file watch for controller + web |
+| **Scripts Dev (dev)** | `pnpm dev start` | Lightweight full-stack startup (`openclaw` -> `controller` -> `web` -> `desktop`). Per-service commands remain available when needed. |
 | **Orchestrator** | `pnpm --filter @nexu/desktop dev` | Frontend development. Vite HMR, tmux orchestration |
-| **Packaged** | Open Nexu.app | Same as launchd mode. Default on macOS when packaged |
+| **Packaged** | Open Nexu.app | Packaged desktop-managed runtime |
 
 ## Directory Layout
 
-### Development (`pnpm start`)
+### Development (`pnpm dev start` / `pnpm dev start <service>`)
 
 All dev state is repo-scoped under `.tmp/`, fully isolated from the packaged app.
 
@@ -110,15 +110,17 @@ Dev and packaged modes use different launchd labels to prevent cross-attachment:
 
 ## Startup Sequence
 
-### Phase 1: Build (dev only)
+### Phase 1: Explicit service startup (dev only)
 
 ```
-pnpm start
-  └─ dev-launchd.sh start
-       ├─ full_cleanup()                    # Kill residual processes, bootout old services
-       ├─ pnpm build                        # Build shared → controller → web
-       ├─ pnpm --filter @nexu/desktop build # Build desktop shell (if dist missing)
-       └─ purge_plists()                    # Delete stale plist files
+pnpm dev start openclaw
+pnpm dev start controller
+pnpm dev start web
+pnpm dev start desktop
+  └─ scripts/dev desktop service
+       ├─ ensure desktop build artifacts
+       ├─ launch Electron directly
+       └─ attach desktop to external runtime targets
 ```
 
 ### Phase 2: Port Allocation + Bootstrap
@@ -258,21 +260,20 @@ UI indicators:
 
 ## File Watch (Auto Hot Reload)
 
-`pnpm start` automatically watches for file changes:
+The explicit `pnpm dev` flow does not provide an aggregate desktop wrapper watcher:
 
 | Change | Watcher | Effect | Latency |
 |--------|---------|--------|---------|
 | Controller (`apps/controller/src/`) | `tsc --watch` | `launchctl kickstart -k` restarts service | ~2-3s |
 | Web UI (`apps/web/src/`) | Polling (find + stat, 3s interval) | `pnpm --filter @nexu/web build` | ~5-8s |
-| Desktop Shell (`apps/desktop/src/`) | No auto-watch | Requires `pnpm restart` | ~20s |
+| Desktop Shell (`apps/desktop/src/`) | No auto-watch | Rebuild desktop, then `pnpm dev restart desktop` | ~20s |
 
 ## Exit Behavior
 
-### Dev Mode (`pnpm start`)
+### Dev Mode (`pnpm dev stop <service>`)
 
 - Close window / Dock quit → Electron exits normally
-- `dev-launchd.sh` trap on EXIT/INT/TERM → `stop_services` (bootout + kill)
-- All launchd services cleaned up automatically
+- Service cleanup is explicit; stop desktop/web/controller/openclaw through `pnpm dev stop <service>`
 
 ### Packaged Mode (Nexu.app)
 

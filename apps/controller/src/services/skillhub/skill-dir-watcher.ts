@@ -235,9 +235,12 @@ export class SkillDirWatcher {
       this.skillsDir,
       { recursive: true },
       (_event, filename) => {
-        if (filename?.endsWith("SKILL.md")) {
+        if (!filename || filename.endsWith("SKILL.md")) {
           this.scheduleSync();
+          return;
         }
+
+        this.scheduleSync();
       },
     );
 
