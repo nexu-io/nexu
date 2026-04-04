@@ -10,6 +10,7 @@ export type SkillDirWatcherLogFn = (
 ) => void;
 
 const defaultLog: SkillDirWatcherLogFn = () => {};
+const workspaceSkillPathPattern = /^agents\/[^/]+\/skills(?:\/|$)/;
 
 export class SkillDirWatcher {
   private readonly skillsDir: string;
@@ -263,7 +264,10 @@ export class SkillDirWatcher {
       this.workspaceWatcher = watch(
         this.openclawStateDir,
         { recursive: true },
-        () => {
+        (_eventType, fileName) => {
+          if (!this.shouldProcessWorkspaceEvent(fileName)) {
+            return;
+          }
           this.scheduleSync();
         },
       );
@@ -280,6 +284,17 @@ export class SkillDirWatcher {
         `Watching workspace skill directories under: ${this.openclawStateDir}`,
       );
     }
+  }
+
+  private shouldProcessWorkspaceEvent(
+    fileName: string | Buffer | null,
+  ): boolean {
+    if (fileName === null) {
+      return true;
+    }
+
+    const normalized = String(fileName).replace(/\\/g, "/");
+    return workspaceSkillPathPattern.test(normalized);
   }
 
   stop(): void {

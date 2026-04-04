@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildArtifactMatchSuffixes,
   getNodeSourceMapEntry,
+  normalizeRelativePath,
   pickArtifactSourceMap,
   resolveCompiledRepoPath,
   resolveNodeCompiledRepoPath,
@@ -29,6 +30,20 @@ describe("merge coverage helpers", () => {
   it("maps web-dist artifacts to apps/web/dist", () => {
     expect(resolveCompiledRepoPath("web-dist/assets/index-abc123.js")).toBe(
       "apps/web/dist/assets/index-abc123.js",
+    );
+  });
+
+  it("retains first-party paths under apps/desktop/shared", () => {
+    const sharedPath = join(
+      process.cwd(),
+      "apps",
+      "desktop",
+      "shared",
+      "runtime-config.ts",
+    );
+
+    expect(normalizeRelativePath(sharedPath, process.cwd())).toBe(
+      "apps/desktop/shared/runtime-config.ts",
     );
   });
 

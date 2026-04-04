@@ -247,7 +247,7 @@ function offsetsToLineCoverage(lineLengths, ranges) {
   return lineHits;
 }
 
-function normalizeRelativePath(filePath, repoRoot) {
+export function normalizeRelativePath(filePath, repoRoot) {
   const relativePath = toPosixPath(path.relative(repoRoot, filePath));
   if (relativePath.startsWith("..")) {
     return null;
@@ -259,7 +259,7 @@ function normalizeRelativePath(filePath, repoRoot) {
     return null;
   }
   if (
-    !/^(apps\/desktop\/(main|preload|src)\/|apps\/controller\/src\/|apps\/web\/src\/)/.test(
+    !/^(apps\/desktop\/(main|preload|src|shared)\/|apps\/controller\/src\/|apps\/web\/src\/)/.test(
       relativePath,
     )
   ) {
