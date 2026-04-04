@@ -220,7 +220,7 @@ describe("SkillDirWatcher workspace reconciliation", () => {
       expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
 
       removeWorkspaceSkill("bot-1", "live-tool");
-      writeWorkspaceFile("agents/bot-1/skills/.watch-trigger", "trigger");
+      writeWorkspaceFile("agents/bot-1/skills/watch-trigger.txt", "trigger");
 
       await waitUntil(() => db.getInstalledByAgent("bot-1").length === 0);
       watcher.stop();
