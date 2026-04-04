@@ -231,6 +231,7 @@ jobs:
         uses: codecov/codecov-action@v6
         with:
           use_oidc: true
+          skip_validation: true
           disable_search: true
           files: e2e/desktop/captures/coverage/lcov.info
           flags: desktop-e2e
