@@ -29,13 +29,19 @@ Related plan:
 
 ### 2. Finalize the API surface before removing legacy routes
 
-- [ ] Decide whether instance-oriented APIs are required
-- [ ] If yes, add:
-  - [ ] `POST /api/v1/model-providers/instances`
-  - [ ] `PUT /api/v1/model-providers/instances/{instanceKey}`
-  - [ ] `DELETE /api/v1/model-providers/instances/{instanceKey}`
-  - [ ] `POST /api/v1/model-providers/instances/{instanceKey}/validate`
-- [ ] Confirm long-term validation API shape for protocol-aware custom providers
+- [x] Decide whether instance-oriented APIs are required (`config.models.providers` stays the canonical CRUD surface; no duplicate instance CRUD helpers yet)
+- [x] Add the non-legacy validation surface needed before removing legacy routes:
+  - [x] `POST /api/v1/model-providers/{providerId}/validate`
+  - [x] `POST /api/v1/model-providers/instances/validate`
+- [x] Add the non-legacy OAuth aliases still required by the Models page:
+  - [x] `POST /api/v1/model-providers/{providerId}/oauth/start`
+  - [x] `GET /api/v1/model-providers/{providerId}/oauth/status`
+  - [x] `GET /api/v1/model-providers/{providerId}/oauth/provider-status`
+  - [x] `POST /api/v1/model-providers/{providerId}/oauth/disconnect`
+  - [x] `GET /api/v1/model-providers/minimax/oauth/status`
+  - [x] `POST /api/v1/model-providers/minimax/oauth/login`
+  - [x] `DELETE /api/v1/model-providers/minimax/oauth/login`
+- [x] Confirm long-term validation API shape for protocol-aware custom providers (instance-key-scoped validation while canonical writes stay config-document-based)
 
 ### 3. Finish persisted model-ref migration
 

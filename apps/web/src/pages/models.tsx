@@ -33,31 +33,32 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  deleteApiV1ProvidersMinimaxOauthLogin,
+  deleteApiV1ModelProvidersMinimaxOauthLogin,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
   getApiV1Me,
+  getApiV1ModelProvidersByProviderIdOauthProviderStatus,
+  getApiV1ModelProvidersByProviderIdOauthStatus,
   getApiV1ModelProvidersConfig,
+  getApiV1ModelProvidersMinimaxOauthStatus,
   getApiV1ModelProvidersRegistry,
   getApiV1Models,
-  getApiV1ProvidersByProviderIdOauthProviderStatus,
-  getApiV1ProvidersByProviderIdOauthStatus,
-  getApiV1ProvidersMinimaxOauthStatus,
   patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
   postApiInternalDesktopCloudRefresh,
-  postApiV1ProvidersByProviderIdOauthDisconnect,
-  postApiV1ProvidersByProviderIdOauthStart,
-  postApiV1ProvidersByProviderIdVerify,
-  postApiV1ProvidersMinimaxOauthLogin,
+  postApiV1ModelProvidersByProviderIdOauthDisconnect,
+  postApiV1ModelProvidersByProviderIdOauthStart,
+  postApiV1ModelProvidersByProviderIdValidate,
+  postApiV1ModelProvidersInstancesValidate,
+  postApiV1ModelProvidersMinimaxOauthLogin,
   putApiInternalDesktopDefaultModel,
   putApiV1ModelProvidersConfig,
 } from "../../lib/api/sdk.gen";
 import type {
+  PostApiV1ModelProvidersByProviderIdValidateData,
   PutApiV1ModelProvidersConfigData,
-  PutApiV1ProvidersByProviderIdData,
 } from "../../lib/api/types.gen";
 import { markSetupComplete } from "./welcome";
 
@@ -331,14 +332,20 @@ async function saveModelProviderConfig(
 }
 
 async function verifyApiKey(
+  providerKey: string,
   providerId: ByokProviderId,
   apiKey?: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
-  const { data, error } = await postApiV1ProvidersByProviderIdVerify({
-    path: { providerId },
-    body: { apiKey, baseUrl },
-  });
+  const customProvider = parseCustomProviderKey(providerKey);
+  const { data, error } = customProvider
+    ? await postApiV1ModelProvidersInstancesValidate({
+        body: { instanceKey: providerKey, apiKey, baseUrl },
+      })
+    : await postApiV1ModelProvidersByProviderIdValidate({
+        path: { providerId },
+        body: { apiKey, baseUrl },
+      });
   if (error || !data) throw new Error("Verify request failed");
   return data;
 }
@@ -372,7 +379,7 @@ function normalizeVerifiedModelIds(models: unknown[] | undefined): string[] {
 const OLLAMA_DUMMY_API_KEY = "ollama-local";
 
 type ConfigurableProviderId =
-  PutApiV1ProvidersByProviderIdData["path"]["providerId"];
+  PostApiV1ModelProvidersByProviderIdValidateData["path"]["providerId"];
 type ByokProviderId = ConfigurableProviderId;
 
 type ByokProviderEntry = ProviderRegistryEntryDto & {
@@ -1758,7 +1765,7 @@ function ByokProviderDetail({
       if (hostBridge) {
         return hostBridge.invoke("desktop:get-minimax-oauth-status", undefined);
       }
-      const { data } = await getApiV1ProvidersMinimaxOauthStatus();
+      const { data } = await getApiV1ModelProvidersMinimaxOauthStatus();
       return data;
     },
     refetchInterval: (query) => (query.state.data?.inProgress ? 2000 : false),
@@ -1786,7 +1793,7 @@ function ByokProviderDetail({
   const oauthProviderStatus = useQuery({
     queryKey: ["oauth-provider-status", providerId],
     queryFn: async () => {
-      const res = await getApiV1ProvidersByProviderIdOauthProviderStatus({
+      const res = await getApiV1ModelProvidersByProviderIdOauthProviderStatus({
         path: { providerId },
       });
       return res.data ?? { connected: false };
@@ -1798,7 +1805,7 @@ function ByokProviderDetail({
   const oauthFlowStatus = useQuery({
     queryKey: ["oauth-flow-status", providerId],
     queryFn: async () => {
-      const res = await getApiV1ProvidersByProviderIdOauthStatus({
+      const res = await getApiV1ModelProvidersByProviderIdOauthStatus({
         path: { providerId },
       });
       return res.data ?? { status: "idle" as const };
@@ -1828,7 +1835,7 @@ function ByokProviderDetail({
 
   const startOAuthMutation = useMutation({
     mutationFn: async () => {
-      const res = await postApiV1ProvidersByProviderIdOauthStart({
+      const res = await postApiV1ModelProvidersByProviderIdOauthStart({
         path: { providerId },
       });
       return res.data;
@@ -1845,7 +1852,7 @@ function ByokProviderDetail({
 
   const disconnectOAuthMutation = useMutation({
     mutationFn: async () => {
-      const res = await postApiV1ProvidersByProviderIdOauthDisconnect({
+      const res = await postApiV1ModelProvidersByProviderIdOauthDisconnect({
         path: { providerId },
       });
       return res.data;
@@ -1982,7 +1989,12 @@ function ByokProviderDetail({
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
     mutationFn: () =>
-      verifyApiKey(providerId, effectiveApiKey, baseUrl || undefined),
+      verifyApiKey(
+        providerKey,
+        providerId,
+        effectiveApiKey,
+        baseUrl || undefined,
+      ),
     onSuccess: (result) => {
       track("workspace_provider_check", {
         provider_name: providerId,
@@ -2004,6 +2016,7 @@ function ByokProviderDetail({
   const refreshModelsMutation = useMutation({
     mutationFn: async () => {
       const result = await verifyApiKey(
+        providerKey,
         providerId,
         effectiveApiKey,
         baseUrl || undefined,
@@ -2036,6 +2049,7 @@ function ByokProviderDetail({
       let models = displayModels;
       if (isOllama || effectiveApiKey || hasSavedApiKey) {
         const result = await verifyApiKey(
+          providerKey,
           providerId,
           effectiveApiKey,
           baseUrl || undefined,
@@ -2092,7 +2106,7 @@ function ByokProviderDetail({
           region: oauthRegion,
         });
       }
-      const { data, error } = await postApiV1ProvidersMinimaxOauthLogin({
+      const { data, error } = await postApiV1ModelProvidersMinimaxOauthLogin({
         body: { region: oauthRegion },
       });
       if (error || !data) {
@@ -2124,7 +2138,8 @@ function ByokProviderDetail({
       if (hostBridge) {
         return hostBridge.invoke("desktop:cancel-minimax-oauth", undefined);
       }
-      const { data, error } = await deleteApiV1ProvidersMinimaxOauthLogin();
+      const { data, error } =
+        await deleteApiV1ModelProvidersMinimaxOauthLogin();
       if (error || !data) {
         throw new Error("Failed to cancel MiniMax OAuth login");
       }

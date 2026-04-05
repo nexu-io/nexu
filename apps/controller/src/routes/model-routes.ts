@@ -13,6 +13,7 @@ import {
   providerResponseSchema,
   supportedByokProviderIds,
   upsertProviderBodySchema,
+  validateProviderInstanceBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
 } from "@nexu/shared";
@@ -142,6 +143,71 @@ export function registerModelRoutes(
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/api/v1/model-providers/{providerId}/validate",
+      tags: ["Model Providers"],
+      request: {
+        params: verifyProviderIdParamSchema,
+        body: {
+          content: { "application/json": { schema: verifyProviderBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: verifyProviderResponseSchema },
+          },
+          description: "Validate model provider credentials",
+        },
+      },
+    }),
+    async (c) => {
+      const { providerId } = c.req.valid("param");
+      return c.json(
+        await container.modelProviderService.verifyProvider(
+          providerId,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/model-providers/instances/validate",
+      tags: ["Model Providers"],
+      request: {
+        body: {
+          content: {
+            "application/json": { schema: validateProviderInstanceBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: verifyProviderResponseSchema },
+          },
+          description: "Validate model provider instance credentials",
+        },
+      },
+    }),
+    async (c) => {
+      const { instanceKey, ...input } = c.req.valid("json");
+      return c.json(
+        await container.modelProviderService.verifyProviderInstance(
+          instanceKey,
+          input,
+        ),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "get",
       path: "/api/v1/providers",
       tags: ["Providers"],
@@ -246,6 +312,74 @@ export function registerModelRoutes(
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/model-providers/minimax/oauth/status",
+      tags: ["Model Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: minimaxOauthStatusResponseSchema },
+          },
+          description: "MiniMax OAuth status",
+        },
+      },
+    }),
+    async (c) =>
+      c.json(await container.modelProviderService.getMiniMaxOauthStatus(), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/model-providers/minimax/oauth/login",
+      tags: ["Model Providers"],
+      request: {
+        body: {
+          content: {
+            "application/json": { schema: minimaxOauthStartBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: minimaxOauthStartResponseSchema },
+          },
+          description: "Start MiniMax OAuth login",
+        },
+      },
+    }),
+    async (c) => {
+      const body = c.req.valid("json");
+      const status = await container.modelProviderService.startMiniMaxOauth(
+        body.region,
+      );
+      return c.json({ ...status, started: true }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/api/v1/model-providers/minimax/oauth/login",
+      tags: ["Model Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: minimaxOauthCancelResponseSchema },
+          },
+          description: "Cancel MiniMax OAuth login",
+        },
+      },
+    }),
+    async (c) => {
+      const status = await container.modelProviderService.cancelMiniMaxOauth();
+      return c.json({ ...status, cancelled: true }, 200);
     },
   );
 

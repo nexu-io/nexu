@@ -157,7 +157,9 @@ describe("provider OAuth routes", () => {
     const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
     const app = createApp(container);
 
-    const response = await app.request("/api/v1/providers/openai/oauth/status");
+    const response = await app.request(
+      "/api/v1/model-providers/openai/oauth/status",
+    );
 
     expect(response.status).toBe(200);
     expect(container.modelProviderService.upsertProvider).toHaveBeenCalledWith(
@@ -189,7 +191,7 @@ describe("provider OAuth routes", () => {
     const app = createApp(container);
 
     const response = await app.request(
-      "/api/v1/providers/openai/oauth/disconnect",
+      "/api/v1/model-providers/openai/oauth/disconnect",
       { method: "POST" },
     );
 
@@ -217,7 +219,7 @@ describe("provider OAuth routes", () => {
     const app = createApp(container);
 
     const response = await app.request(
-      "/api/v1/providers/openai/oauth/disconnect",
+      "/api/v1/model-providers/openai/oauth/disconnect",
       { method: "POST" },
     );
 
@@ -241,7 +243,7 @@ describe("provider OAuth routes", () => {
     const app = createApp(container);
 
     const response = await app.request(
-      "/api/v1/providers/openai/oauth/disconnect",
+      "/api/v1/model-providers/openai/oauth/disconnect",
       { method: "POST" },
     );
 

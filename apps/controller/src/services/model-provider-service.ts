@@ -11,6 +11,7 @@ import {
   isCustomProviderTemplate,
   isSupportedByokProviderId,
   listProviderRegistryEntries,
+  parseCustomProviderKey,
   selectPreferredModel,
   type verifyProviderBodySchema,
   type verifyProviderResponseSchema,
@@ -609,6 +610,22 @@ export class ModelProviderService {
     providerId: string,
     input: VerifyProviderBody,
   ): Promise<VerifyProviderResponse> {
+    return this.verifyProviderKey(providerId, input);
+  }
+
+  async verifyProviderInstance(
+    instanceKey: string,
+    input: VerifyProviderBody,
+  ): Promise<VerifyProviderResponse> {
+    return this.verifyProviderKey(instanceKey, input);
+  }
+
+  private async verifyProviderKey(
+    providerKey: string,
+    input: VerifyProviderBody,
+  ): Promise<VerifyProviderResponse> {
+    const customProvider = parseCustomProviderKey(providerKey);
+    const providerId = customProvider?.templateId ?? providerKey;
     if (
       !isSupportedByokProviderId(providerId) &&
       !isCustomProviderTemplate(providerId)
@@ -616,7 +633,7 @@ export class ModelProviderService {
       return { valid: false, error: "Unsupported provider" };
     }
 
-    const storedProvider = await this.configStore.getProvider(providerId);
+    const storedProvider = await this.configStore.getProvider(providerKey);
     const runtimePolicy = getProviderRuntimePolicy(providerId);
     if (!runtimePolicy) {
       return { valid: false, error: "Unsupported provider" };
