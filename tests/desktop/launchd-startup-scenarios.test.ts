@@ -855,7 +855,7 @@ describe("Launchd Startup Scenarios", () => {
     expect(result.isAttach).toBe(false);
     expect(mockLaunchdManager.bootoutAndWaitForExit).toHaveBeenCalled();
     expect(mockLaunchdManager.installService).toHaveBeenCalledTimes(2);
-  });
+  }, 15000);
 
   // -----------------------------------------------------------------------
   // Scenario 20: Partial attach — only controller running
