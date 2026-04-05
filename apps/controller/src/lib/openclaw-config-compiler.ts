@@ -537,11 +537,11 @@ export function compileOpenClawConfig(
           },
         },
         // LLM call timeout. Default is 600s (10min) which causes the bot to
-        // appear unresponsive when the provider is down. 120s is enough for
-        // real LLM calls (including long reasoning chains) while giving users
-        // faster feedback on failures. Does NOT affect compaction timeout
-        // (which has its own 300s limit via EMBEDDED_COMPACTION_TIMEOUT_MS).
-        timeoutSeconds: 120,
+        // appear unresponsive when the provider is down. 300s (5min) leaves
+        // room for reasoning models (o1/o3 long thinking chains) while
+        // cutting max wait time in half. Aligns with compaction's own 300s
+        // safety timeout (EMBEDDED_COMPACTION_TIMEOUT_MS).
+        timeoutSeconds: 300,
         humanDelay: {
           mode: "off",
         },
