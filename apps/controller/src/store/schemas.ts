@@ -66,9 +66,14 @@ function buildCanonicalModelEntry(
 function buildCanonicalProviderBaseUrl(
   providerId: string,
   baseUrl: string | null,
+  oauthRegion: "global" | "cn" | null,
 ) {
   if (typeof baseUrl === "string" && baseUrl.trim().length > 0) {
     return baseUrl;
+  }
+
+  if (providerId === "minimax" && oauthRegion === "cn") {
+    return "https://api.minimaxi.com/anthropic";
   }
 
   return getDefaultProviderBaseUrls(providerId)[0] ?? null;
@@ -86,9 +91,12 @@ function migrateLegacyProviderToCanonicalConfig(
   const runtimePolicy = getProviderRuntimePolicy(
     customProvider?.templateId ?? providerKey,
   );
+  const hasApiKey =
+    typeof provider.apiKey === "string" && provider.apiKey.length > 0;
   const baseUrl = buildCanonicalProviderBaseUrl(
     provider.providerId,
     provider.baseUrl,
+    provider.oauthRegion,
   );
 
   if (baseUrl === null) {
@@ -117,12 +125,13 @@ function migrateLegacyProviderToCanonicalConfig(
     baseUrl,
     ...(provider.authMode === "oauth"
       ? { auth: "oauth" as const }
-      : provider.apiKey
+      : hasApiKey
         ? { auth: "api-key" as const }
         : {}),
     api: runtimePolicy?.apiKind,
-    ...(provider.authMode === "apiKey" && provider.apiKey
-      ? { apiKey: provider.apiKey }
+    ...((provider.authMode === "apiKey" || provider.authMode === undefined) &&
+    hasApiKey
+      ? { apiKey: provider.apiKey as string }
       : {}),
     ...(provider.oauthRegion ? { oauthRegion: provider.oauthRegion } : {}),
     ...(provider.oauthCredential?.provider

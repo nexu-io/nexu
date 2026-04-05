@@ -666,6 +666,137 @@ describe("compileOpenClawConfig", () => {
     );
   });
 
+  it("compiles canonical custom provider instances with deterministic runtime keys", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "custom-openai/team-gateway/gpt-4.1",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "custom-openai/team-gateway/gpt-4.1",
+        },
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            "custom-openai/team-gateway": {
+              providerTemplateId: "custom-openai",
+              instanceId: "team-gateway",
+              enabled: true,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: "custom-key",
+              baseUrl: "https://gateway.example.com/v1",
+              displayName: "Team Gateway",
+              models: [
+                {
+                  id: "gpt-4.1",
+                  name: "GPT-4.1",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(
+      result.models?.providers["custom-openai__team-gateway"],
+    ).toMatchObject({
+      baseUrl: "https://gateway.example.com/v1",
+      apiKey: "custom-key",
+      api: "openai-completions",
+    });
+    expect(
+      result.models?.providers["custom-openai__team-gateway"]?.models[0]?.id,
+    ).toBe("openai/gpt-4.1");
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "custom-openai__team-gateway/openai/gpt-4.1",
+    });
+  });
+
+  it("normalizes legacy byok model refs against canonical provider config", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "byok_openai/openai/gpt-4.1",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "byok_openai/openai/gpt-4.1",
+        },
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: "sk-test",
+              baseUrl: "https://api.openai.com/v1",
+              models: [
+                {
+                  id: "gpt-4.1",
+                  name: "GPT-4.1",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "openai/gpt-4.1",
+    });
+  });
+
   describe("agent skill assignment", () => {
     it("includes skills on agents when installedSlugs is provided", () => {
       const config = createConfig();
