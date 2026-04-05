@@ -154,7 +154,7 @@ describe("NexuConfigStore", () => {
     expect(result.provider.apiKey).toBeNull();
   });
 
-  it("dual-writes provider changes into canonical config.models.providers", async () => {
+  it("writes provider changes into canonical config.models.providers only", async () => {
     const store = new NexuConfigStore(env);
 
     await store.upsertProvider("openai", {
@@ -181,6 +181,8 @@ describe("NexuConfigStore", () => {
         api: "openai-completions",
       }),
     ]);
+    expect(config.providers).toEqual([]);
+    expect(config.schemaVersion).toBe(2);
   });
 
   it("migrates legacy config.providers into canonical config.models.providers on read", async () => {
@@ -234,6 +236,8 @@ describe("NexuConfigStore", () => {
     expect(config.models.providers.openai?.models).toEqual([
       expect.objectContaining({ id: "gpt-4o", name: "gpt-4o" }),
     ]);
+    expect(config.providers).toEqual([]);
+    expect(config.schemaVersion).toBe(2);
   });
 
   it("derives legacy provider compatibility state from canonical config.models.providers", async () => {
@@ -491,6 +495,8 @@ describe("NexuConfigStore", () => {
     ).toBe("gpt-4.1");
     expect(config.runtime.defaultModelId).toBe("google/gemini-2.5-flash");
     expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-pro");
+    expect(config.providers).toEqual([]);
+    expect(config.schemaVersion).toBe(2);
   });
 
   it("recovers from a broken primary config using backup-compatible data", async () => {
@@ -522,7 +528,7 @@ describe("NexuConfigStore", () => {
     const store = new NexuConfigStore(env);
     const config = await store.getConfig();
 
-    expect(config.schemaVersion).toBe(1);
+    expect(config.schemaVersion).toBe(2);
     expect(config.$schema).toBe("https://nexu.io/config.json");
   });
 

@@ -18,6 +18,7 @@ import {
 import { z } from "zod";
 
 const LEGACY_PROVIDER_MIGRATION_CREATED_AT = "1970-01-01T00:00:00.000Z";
+export const CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION = 2;
 
 type ProviderMetadataRecord = Record<string, unknown>;
 
@@ -431,6 +432,27 @@ function normalizeModelsConfigInput(
   );
 }
 
+function normalizeNexuConfigSchemaVersion(
+  schemaVersion: unknown,
+  input: Record<string, unknown>,
+): number {
+  const parsedSchemaVersion =
+    typeof schemaVersion === "number" ? schemaVersion : 1;
+
+  const hasCanonicalModels = input.models !== undefined;
+  const hasLegacyProviders =
+    Array.isArray(input.providers) && input.providers.length > 0;
+
+  if (!hasCanonicalModels && !hasLegacyProviders) {
+    return parsedSchemaVersion;
+  }
+
+  return Math.max(
+    parsedSchemaVersion,
+    CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+  );
+}
+
 export const controllerRuntimeConfigSchema = z
   .object({
     gateway: z
@@ -559,18 +581,15 @@ export const nexuConfigSchema = z.preprocess((input) => {
     typeof candidate.desktop === "object" && candidate.desktop !== null
       ? (candidate.desktop as Record<string, unknown>)
       : null;
-  const providers =
-    legacyProviders.length > 0 && candidate.models === undefined
-      ? legacyProviders
-      : deriveLegacyProvidersFromCanonicalModelsConfig(models);
-
   return {
     $schema:
       typeof candidate.$schema === "string"
         ? candidate.$schema
         : "https://nexu.io/config.json",
-    schemaVersion:
-      typeof candidate.schemaVersion === "number" ? candidate.schemaVersion : 1,
+    schemaVersion: normalizeNexuConfigSchemaVersion(
+      candidate.schemaVersion,
+      candidate,
+    ),
     app:
       typeof candidate.app === "object" && candidate.app !== null
         ? candidate.app
@@ -601,7 +620,7 @@ export const nexuConfigSchema = z.preprocess((input) => {
         }
       : {},
     models,
-    providers,
+    providers: [],
     integrations: Array.isArray(candidate.integrations)
       ? candidate.integrations
       : [],

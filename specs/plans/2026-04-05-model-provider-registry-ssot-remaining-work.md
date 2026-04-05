@@ -52,9 +52,9 @@ Related plan:
 
 ### 4. Cut over persistence to canonical-only writes
 
-- [ ] Stop writing legacy `config.providers`
-- [ ] Keep migration-read compatibility only for old configs
-- [ ] Add a migration/version marker for the canonical `config.models.providers` cutover
+- [x] Stop writing legacy `config.providers`
+- [x] Keep migration-read compatibility only for old configs
+- [x] Add a migration/version marker for the canonical `config.models.providers` cutover
 
 ### 5. Remove transitional legacy APIs and controller assumptions
 

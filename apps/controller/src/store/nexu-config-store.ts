@@ -28,6 +28,7 @@ import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import { LowDbStore } from "./lowdb-store.js";
 import {
+  CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
   type CloudProfileEntry,
   type CloudProfilesFile,
   type ControllerProvider,
@@ -297,7 +298,7 @@ export class NexuConfigStore {
       nexuConfigSchema,
       () => ({
         $schema: "https://nexu.io/config.json",
-        schemaVersion: 1,
+        schemaVersion: CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
         app: {},
         bots: [],
         runtime: {
@@ -1210,6 +1211,10 @@ export class NexuConfigStore {
 
       return {
         ...config,
+        schemaVersion: Math.max(
+          config.schemaVersion,
+          CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+        ),
         models: {
           ...config.models,
           providers: {
@@ -1289,6 +1294,10 @@ export class NexuConfigStore {
 
       return {
         ...config,
+        schemaVersion: Math.max(
+          config.schemaVersion,
+          CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+        ),
         models: {
           ...config.models,
           providers: {
@@ -1325,6 +1334,10 @@ export class NexuConfigStore {
 
       return {
         ...config,
+        schemaVersion: Math.max(
+          config.schemaVersion,
+          CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+        ),
         models: {
           ...config.models,
           providers: nextCanonicalProviders,
@@ -2182,8 +2195,12 @@ export class NexuConfigStore {
   ): Promise<PersistedModelsConfig> {
     await this.store.update((config) => ({
       ...config,
+      schemaVersion: Math.max(
+        config.schemaVersion,
+        CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+      ),
       models,
-      providers: deriveLegacyProvidersFromCanonicalModelsConfig(models),
+      providers: [],
     }));
 
     return (await this.getConfig()).models;
