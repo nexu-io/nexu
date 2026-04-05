@@ -513,6 +513,33 @@ export type PatchApiInternalDesktopPreferencesResponses = {
 
 export type PatchApiInternalDesktopPreferencesResponse = PatchApiInternalDesktopPreferencesResponses[keyof PatchApiInternalDesktopPreferencesResponses];
 
+export type GetApiAuthGetSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/get-session';
+};
+
+export type GetApiAuthGetSessionResponses = {
+    /**
+     * Desktop-local auth session
+     */
+    200: {
+        session: {
+            id: string;
+            expiresAt: string;
+        };
+        user: {
+            id: string;
+            email: string;
+            name: string;
+            image: string;
+        };
+    };
+};
+
+export type GetApiAuthGetSessionResponse = GetApiAuthGetSessionResponses[keyof GetApiAuthGetSessionResponses];
+
 export type GetApiInternalDesktopCloudStatusData = {
     body?: never;
     path?: never;
@@ -2155,6 +2182,265 @@ export type GetApiV1ModelsResponses = {
 };
 
 export type GetApiV1ModelsResponse = GetApiV1ModelsResponses[keyof GetApiV1ModelsResponses];
+
+export type GetApiV1ModelProvidersRegistryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/registry';
+};
+
+export type GetApiV1ModelProvidersRegistryResponses = {
+    /**
+     * Model provider registry
+     */
+    200: {
+        registry: Array<{
+            id: string;
+            canonicalOpenClawId: string;
+            aliases: Array<string>;
+            authModes: Array<'api-key' | 'aws-sdk' | 'oauth' | 'token'>;
+            apiKind: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+            defaultBaseUrls: Array<string>;
+            controllerConfigurable?: boolean;
+            modelsPageVisible?: boolean;
+            region?: 'global' | 'china' | 'local';
+            signupUrl?: string;
+            supportsCustomBaseUrl?: boolean;
+            supportsModelDiscovery?: boolean;
+            supportsProxyMode?: boolean;
+            managedByAuthProfiles?: boolean;
+            requiresOauthRegion?: boolean;
+            authHeader?: boolean;
+            defaultHeaders?: {
+                [key: string]: string;
+            };
+            experimental?: boolean;
+            hidden?: boolean;
+            displayName: string;
+            descriptionKey?: string;
+            apiDocsUrl?: string;
+            apiKeyPlaceholder?: string;
+            defaultProxyUrl?: string;
+            logo?: string;
+        }>;
+    };
+};
+
+export type GetApiV1ModelProvidersRegistryResponse = GetApiV1ModelProvidersRegistryResponses[keyof GetApiV1ModelProvidersRegistryResponses];
+
+export type GetApiV1ModelProvidersConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/config';
+};
+
+export type GetApiV1ModelProvidersConfigResponses = {
+    /**
+     * Model provider config document
+     */
+    200: {
+        config: {
+            mode?: 'merge' | 'replace';
+            providers?: {
+                [key: string]: {
+                    providerTemplateId?: string;
+                    instanceId?: string;
+                    enabled?: boolean;
+                    auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    apiKey?: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                    baseUrl: string;
+                    oauthRegion?: 'global' | 'cn';
+                    oauthProfileRef?: string;
+                    displayName?: string;
+                    headers?: {
+                        [key: string]: string | {
+                            source: 'env' | 'file' | 'exec';
+                            provider: string;
+                            id: string;
+                        };
+                    };
+                    models?: Array<{
+                        id: string;
+                        name: string;
+                        api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                        reasoning?: boolean;
+                        input?: Array<'text' | 'image'>;
+                        cost?: {
+                            input: number;
+                            output: number;
+                            cacheRead: number;
+                            cacheWrite: number;
+                        };
+                        contextWindow?: number;
+                        maxTokens?: number;
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        compat?: {
+                            [key: string]: unknown;
+                        };
+                    }>;
+                    metadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            bedrockDiscovery?: {
+                enabled?: boolean;
+                region?: string;
+                providerFilter?: Array<string>;
+                refreshInterval?: number;
+                defaultContextWindow?: number;
+                defaultMaxTokens?: number;
+            };
+        };
+    };
+};
+
+export type GetApiV1ModelProvidersConfigResponse = GetApiV1ModelProvidersConfigResponses[keyof GetApiV1ModelProvidersConfigResponses];
+
+export type PutApiV1ModelProvidersConfigData = {
+    body?: {
+        mode?: 'merge' | 'replace';
+        providers?: {
+            [key: string]: {
+                providerTemplateId?: string;
+                instanceId?: string;
+                enabled?: boolean;
+                auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                apiKey?: string | {
+                    source: 'env' | 'file' | 'exec';
+                    provider: string;
+                    id: string;
+                };
+                baseUrl: string;
+                oauthRegion?: 'global' | 'cn';
+                oauthProfileRef?: string;
+                displayName?: string;
+                headers?: {
+                    [key: string]: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                };
+                models?: Array<{
+                    id: string;
+                    name: string;
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    reasoning?: boolean;
+                    input?: Array<'text' | 'image'>;
+                    cost?: {
+                        input: number;
+                        output: number;
+                        cacheRead: number;
+                        cacheWrite: number;
+                    };
+                    contextWindow?: number;
+                    maxTokens?: number;
+                    headers?: {
+                        [key: string]: string;
+                    };
+                    compat?: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                metadata?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        bedrockDiscovery?: {
+            enabled?: boolean;
+            region?: string;
+            providerFilter?: Array<string>;
+            refreshInterval?: number;
+            defaultContextWindow?: number;
+            defaultMaxTokens?: number;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/config';
+};
+
+export type PutApiV1ModelProvidersConfigResponses = {
+    /**
+     * Updated model provider config document
+     */
+    200: {
+        config: {
+            mode?: 'merge' | 'replace';
+            providers?: {
+                [key: string]: {
+                    providerTemplateId?: string;
+                    instanceId?: string;
+                    enabled?: boolean;
+                    auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    apiKey?: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                    baseUrl: string;
+                    oauthRegion?: 'global' | 'cn';
+                    oauthProfileRef?: string;
+                    displayName?: string;
+                    headers?: {
+                        [key: string]: string | {
+                            source: 'env' | 'file' | 'exec';
+                            provider: string;
+                            id: string;
+                        };
+                    };
+                    models?: Array<{
+                        id: string;
+                        name: string;
+                        api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                        reasoning?: boolean;
+                        input?: Array<'text' | 'image'>;
+                        cost?: {
+                            input: number;
+                            output: number;
+                            cacheRead: number;
+                            cacheWrite: number;
+                        };
+                        contextWindow?: number;
+                        maxTokens?: number;
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        compat?: {
+                            [key: string]: unknown;
+                        };
+                    }>;
+                    metadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            bedrockDiscovery?: {
+                enabled?: boolean;
+                region?: string;
+                providerFilter?: Array<string>;
+                refreshInterval?: number;
+                defaultContextWindow?: number;
+                defaultMaxTokens?: number;
+            };
+        };
+    };
+};
+
+export type PutApiV1ModelProvidersConfigResponse = PutApiV1ModelProvidersConfigResponses[keyof PutApiV1ModelProvidersConfigResponses];
 
 export type GetApiV1ProvidersData = {
     body?: never;

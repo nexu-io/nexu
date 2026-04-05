@@ -9,6 +9,7 @@ import type {
   ConnectQqbotInput,
   ConnectSlackInput,
   ConnectWecomInput,
+  PersistedModelsConfig,
 } from "@nexu/shared";
 import {
   type cloudProfileSchema,
@@ -2173,6 +2174,23 @@ export class NexuConfigStore {
     }));
 
     return runtime;
+  }
+
+  async getModelProviderConfigDocument(): Promise<PersistedModelsConfig> {
+    const config = await this.getConfig();
+    return config.models;
+  }
+
+  async setModelProviderConfigDocument(
+    models: PersistedModelsConfig,
+  ): Promise<PersistedModelsConfig> {
+    await this.store.update((config) => ({
+      ...config,
+      models,
+      providers: deriveLegacyProvidersFromCanonicalModelsConfig(models),
+    }));
+
+    return models;
   }
 
   async syncManagedRuntimeGateway(input: {

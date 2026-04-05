@@ -4,6 +4,9 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   type Model,
+  type PersistedModelsConfig,
+  type ProviderRegistryEntryDto,
+  listProviderRegistryEntries,
   selectPreferredModel,
   type verifyProviderBodySchema,
   type verifyProviderResponseSchema,
@@ -451,6 +454,31 @@ export class ModelProviderService {
         isSupportedByokProviderId(provider.providerId),
       ),
     };
+  }
+
+  listProviderRegistry(): ProviderRegistryEntryDto[] {
+    return listProviderRegistryEntries().map((entry) => ({
+      ...entry,
+      aliases: [...entry.aliases],
+      authModes: [...entry.authModes],
+      defaultBaseUrls: [...entry.defaultBaseUrls],
+      ...(entry.defaultHeaders
+        ? { defaultHeaders: { ...entry.defaultHeaders } }
+        : {}),
+    }));
+  }
+
+  async getModelProviderConfigDocument(): Promise<PersistedModelsConfig> {
+    return this.configStore.getModelProviderConfigDocument();
+  }
+
+  async setModelProviderConfigDocument(
+    config: PersistedModelsConfig,
+  ): Promise<PersistedModelsConfig> {
+    const next = await this.configStore.setModelProviderConfigDocument(config);
+    await this.ensureValidDefaultModel();
+    await this.openclawSyncService.syncAll();
+    return next;
   }
 
   async refreshNexuOfficialModels(): Promise<{

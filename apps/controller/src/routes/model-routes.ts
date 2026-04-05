@@ -5,7 +5,10 @@ import {
   minimaxOauthStartResponseSchema,
   minimaxOauthStatusResponseSchema,
   modelListResponseSchema,
+  modelProviderConfigDocumentEnvelopeSchema,
+  persistedModelsConfigSchema,
   providerListResponseSchema,
+  providerRegistryResponseSchema,
   providerResponseSchema,
   upsertProviderBodySchema,
   verifyProviderBodySchema,
@@ -36,6 +39,95 @@ export function registerModelRoutes(
       },
     }),
     async (c) => c.json(await container.modelProviderService.listModels(), 200),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/model-providers/registry",
+      tags: ["Model Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: providerRegistryResponseSchema },
+          },
+          description: "Model provider registry",
+        },
+      },
+    }),
+    async (c) =>
+      c.json(
+        { registry: container.modelProviderService.listProviderRegistry() },
+        200,
+      ),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/model-providers/config",
+      tags: ["Model Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: modelProviderConfigDocumentEnvelopeSchema,
+            },
+          },
+          description: "Model provider config document",
+        },
+      },
+    }),
+    async (c) =>
+      c.json(
+        {
+          config:
+            await container.modelProviderService.getModelProviderConfigDocument(),
+        },
+        200,
+      ),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/api/v1/model-providers/config",
+      tags: ["Model Providers"],
+      request: {
+        body: {
+          content: {
+            "application/json": { schema: persistedModelsConfigSchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: modelProviderConfigDocumentEnvelopeSchema,
+            },
+          },
+          description: "Updated model provider config document",
+        },
+      },
+    }),
+    async (c) => {
+      const beforeInventory =
+        await container.modelProviderService.getInventoryStatus();
+      const config =
+        await container.modelProviderService.setModelProviderConfigDocument(
+          c.req.valid("json"),
+        );
+      const afterInventory =
+        await container.modelProviderService.getInventoryStatus();
+      if (
+        !beforeInventory.hasKnownInventory &&
+        afterInventory.hasKnownInventory
+      ) {
+        await container.desktopLocalService.restartRuntime();
+      }
+      return c.json({ config }, 200);
+    },
   );
 
   app.openapi(

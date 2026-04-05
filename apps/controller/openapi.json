@@ -1296,6 +1296,70 @@
         }
       }
     },
+    "/api/auth/get-session": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Desktop-local auth session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "expiresAt"
+                      ]
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "image": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "image"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "user"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/cloud-status": {
       "get": {
         "tags": [
@@ -5806,6 +5870,1053 @@
                   },
                   "required": [
                     "models"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-providers/registry": {
+      "get": {
+        "tags": [
+          "Model Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Model provider registry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "registry": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "canonicalOpenClawId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "aliases": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "authModes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "api-key",
+                                "aws-sdk",
+                                "oauth",
+                                "token"
+                              ]
+                            }
+                          },
+                          "apiKind": {
+                            "type": "string",
+                            "enum": [
+                              "openai-completions",
+                              "openai-responses",
+                              "openai-codex-responses",
+                              "anthropic-messages",
+                              "google-generative-ai",
+                              "github-copilot",
+                              "bedrock-converse-stream",
+                              "ollama"
+                            ]
+                          },
+                          "defaultBaseUrls": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "controllerConfigurable": {
+                            "type": "boolean"
+                          },
+                          "modelsPageVisible": {
+                            "type": "boolean"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "global",
+                              "china",
+                              "local"
+                            ]
+                          },
+                          "signupUrl": {
+                            "type": "string"
+                          },
+                          "supportsCustomBaseUrl": {
+                            "type": "boolean"
+                          },
+                          "supportsModelDiscovery": {
+                            "type": "boolean"
+                          },
+                          "supportsProxyMode": {
+                            "type": "boolean"
+                          },
+                          "managedByAuthProfiles": {
+                            "type": "boolean"
+                          },
+                          "requiresOauthRegion": {
+                            "type": "boolean"
+                          },
+                          "authHeader": {
+                            "type": "boolean"
+                          },
+                          "defaultHeaders": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "experimental": {
+                            "type": "boolean"
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "descriptionKey": {
+                            "type": "string"
+                          },
+                          "apiDocsUrl": {
+                            "type": "string"
+                          },
+                          "apiKeyPlaceholder": {
+                            "type": "string"
+                          },
+                          "defaultProxyUrl": {
+                            "type": "string"
+                          },
+                          "logo": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "canonicalOpenClawId",
+                          "aliases",
+                          "authModes",
+                          "apiKind",
+                          "defaultBaseUrls",
+                          "displayName"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "registry"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-providers/config": {
+      "get": {
+        "tags": [
+          "Model Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Model provider config document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "merge",
+                            "replace"
+                          ],
+                          "default": "merge"
+                        },
+                        "providers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "providerTemplateId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "instanceId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean",
+                                "default": true
+                              },
+                              "auth": {
+                                "type": "string",
+                                "enum": [
+                                  "api-key",
+                                  "aws-sdk",
+                                  "oauth",
+                                  "token"
+                                ]
+                              },
+                              "api": {
+                                "type": "string",
+                                "enum": [
+                                  "openai-completions",
+                                  "openai-responses",
+                                  "openai-codex-responses",
+                                  "anthropic-messages",
+                                  "google-generative-ai",
+                                  "github-copilot",
+                                  "bedrock-converse-stream",
+                                  "ollama"
+                                ]
+                              },
+                              "apiKey": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "source": {
+                                        "type": "string",
+                                        "enum": [
+                                          "env",
+                                          "file",
+                                          "exec"
+                                        ]
+                                      },
+                                      "provider": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "provider",
+                                      "id"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "oauthRegion": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "global",
+                                  "cn"
+                                ]
+                              },
+                              "oauthProfileRef": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "headers": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "source": {
+                                          "type": "string",
+                                          "enum": [
+                                            "env",
+                                            "file",
+                                            "exec"
+                                          ]
+                                        },
+                                        "provider": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "provider",
+                                        "id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "models": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "api": {
+                                      "type": "string",
+                                      "enum": [
+                                        "openai-completions",
+                                        "openai-responses",
+                                        "openai-codex-responses",
+                                        "anthropic-messages",
+                                        "google-generative-ai",
+                                        "github-copilot",
+                                        "bedrock-converse-stream",
+                                        "ollama"
+                                      ]
+                                    },
+                                    "reasoning": {
+                                      "type": "boolean",
+                                      "default": false
+                                    },
+                                    "input": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "text",
+                                          "image"
+                                        ]
+                                      },
+                                      "default": [
+                                        "text"
+                                      ]
+                                    },
+                                    "cost": {
+                                      "type": "object",
+                                      "properties": {
+                                        "input": {
+                                          "type": "number"
+                                        },
+                                        "output": {
+                                          "type": "number"
+                                        },
+                                        "cacheRead": {
+                                          "type": "number"
+                                        },
+                                        "cacheWrite": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "default": {
+                                        "input": 0,
+                                        "output": 0,
+                                        "cacheRead": 0,
+                                        "cacheWrite": 0
+                                      },
+                                      "required": [
+                                        "input",
+                                        "output",
+                                        "cacheRead",
+                                        "cacheWrite"
+                                      ]
+                                    },
+                                    "contextWindow": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "maxTokens": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "headers": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "compat": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                },
+                                "default": []
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "baseUrl"
+                            ]
+                          },
+                          "default": {}
+                        },
+                        "bedrockDiscovery": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "providerFilter": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "refreshInterval": {
+                              "type": "number"
+                            },
+                            "defaultContextWindow": {
+                              "type": "number"
+                            },
+                            "defaultMaxTokens": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "config"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Model Providers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "replace"
+                    ],
+                    "default": "merge"
+                  },
+                  "providers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "providerTemplateId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "instanceId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "auth": {
+                          "type": "string",
+                          "enum": [
+                            "api-key",
+                            "aws-sdk",
+                            "oauth",
+                            "token"
+                          ]
+                        },
+                        "api": {
+                          "type": "string",
+                          "enum": [
+                            "openai-completions",
+                            "openai-responses",
+                            "openai-codex-responses",
+                            "anthropic-messages",
+                            "google-generative-ai",
+                            "github-copilot",
+                            "bedrock-converse-stream",
+                            "ollama"
+                          ]
+                        },
+                        "apiKey": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "env",
+                                    "file",
+                                    "exec"
+                                  ]
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "provider",
+                                "id"
+                              ]
+                            }
+                          ]
+                        },
+                        "baseUrl": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthProfileRef": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "enum": [
+                                      "env",
+                                      "file",
+                                      "exec"
+                                    ]
+                                  },
+                                  "provider": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "provider",
+                                  "id"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "api": {
+                                "type": "string",
+                                "enum": [
+                                  "openai-completions",
+                                  "openai-responses",
+                                  "openai-codex-responses",
+                                  "anthropic-messages",
+                                  "google-generative-ai",
+                                  "github-copilot",
+                                  "bedrock-converse-stream",
+                                  "ollama"
+                                ]
+                              },
+                              "reasoning": {
+                                "type": "boolean",
+                                "default": false
+                              },
+                              "input": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "text",
+                                    "image"
+                                  ]
+                                },
+                                "default": [
+                                  "text"
+                                ]
+                              },
+                              "cost": {
+                                "type": "object",
+                                "properties": {
+                                  "input": {
+                                    "type": "number"
+                                  },
+                                  "output": {
+                                    "type": "number"
+                                  },
+                                  "cacheRead": {
+                                    "type": "number"
+                                  },
+                                  "cacheWrite": {
+                                    "type": "number"
+                                  }
+                                },
+                                "default": {
+                                  "input": 0,
+                                  "output": 0,
+                                  "cacheRead": 0,
+                                  "cacheWrite": 0
+                                },
+                                "required": [
+                                  "input",
+                                  "output",
+                                  "cacheRead",
+                                  "cacheWrite"
+                                ]
+                              },
+                              "contextWindow": {
+                                "type": "number",
+                                "default": 0
+                              },
+                              "maxTokens": {
+                                "type": "number",
+                                "default": 0
+                              },
+                              "headers": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "compat": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          },
+                          "default": []
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "baseUrl"
+                      ]
+                    },
+                    "default": {}
+                  },
+                  "bedrockDiscovery": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "region": {
+                        "type": "string"
+                      },
+                      "providerFilter": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "refreshInterval": {
+                        "type": "number"
+                      },
+                      "defaultContextWindow": {
+                        "type": "number"
+                      },
+                      "defaultMaxTokens": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated model provider config document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "merge",
+                            "replace"
+                          ],
+                          "default": "merge"
+                        },
+                        "providers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "providerTemplateId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "instanceId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean",
+                                "default": true
+                              },
+                              "auth": {
+                                "type": "string",
+                                "enum": [
+                                  "api-key",
+                                  "aws-sdk",
+                                  "oauth",
+                                  "token"
+                                ]
+                              },
+                              "api": {
+                                "type": "string",
+                                "enum": [
+                                  "openai-completions",
+                                  "openai-responses",
+                                  "openai-codex-responses",
+                                  "anthropic-messages",
+                                  "google-generative-ai",
+                                  "github-copilot",
+                                  "bedrock-converse-stream",
+                                  "ollama"
+                                ]
+                              },
+                              "apiKey": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "source": {
+                                        "type": "string",
+                                        "enum": [
+                                          "env",
+                                          "file",
+                                          "exec"
+                                        ]
+                                      },
+                                      "provider": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "provider",
+                                      "id"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "oauthRegion": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "global",
+                                  "cn"
+                                ]
+                              },
+                              "oauthProfileRef": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "headers": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "source": {
+                                          "type": "string",
+                                          "enum": [
+                                            "env",
+                                            "file",
+                                            "exec"
+                                          ]
+                                        },
+                                        "provider": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "provider",
+                                        "id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "models": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "api": {
+                                      "type": "string",
+                                      "enum": [
+                                        "openai-completions",
+                                        "openai-responses",
+                                        "openai-codex-responses",
+                                        "anthropic-messages",
+                                        "google-generative-ai",
+                                        "github-copilot",
+                                        "bedrock-converse-stream",
+                                        "ollama"
+                                      ]
+                                    },
+                                    "reasoning": {
+                                      "type": "boolean",
+                                      "default": false
+                                    },
+                                    "input": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "text",
+                                          "image"
+                                        ]
+                                      },
+                                      "default": [
+                                        "text"
+                                      ]
+                                    },
+                                    "cost": {
+                                      "type": "object",
+                                      "properties": {
+                                        "input": {
+                                          "type": "number"
+                                        },
+                                        "output": {
+                                          "type": "number"
+                                        },
+                                        "cacheRead": {
+                                          "type": "number"
+                                        },
+                                        "cacheWrite": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "default": {
+                                        "input": 0,
+                                        "output": 0,
+                                        "cacheRead": 0,
+                                        "cacheWrite": 0
+                                      },
+                                      "required": [
+                                        "input",
+                                        "output",
+                                        "cacheRead",
+                                        "cacheWrite"
+                                      ]
+                                    },
+                                    "contextWindow": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "maxTokens": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "headers": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "compat": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                },
+                                "default": []
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "baseUrl"
+                            ]
+                          },
+                          "default": {}
+                        },
+                        "bedrockDiscovery": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "providerFilter": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "refreshInterval": {
+                              "type": "number"
+                            },
+                            "defaultContextWindow": {
+                              "type": "number"
+                            },
+                            "defaultMaxTokens": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "config"
                   ]
                 }
               }
