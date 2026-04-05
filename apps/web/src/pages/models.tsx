@@ -6,8 +6,9 @@ import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
-  getProviderUiMetadata,
-  modelsPageProviderIds,
+  type ProviderRegistryEntryDto,
+  getProviderAliasCandidates,
+  normalizeProviderId,
   selectPreferredModel,
 } from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -29,14 +30,14 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  deleteApiV1ProvidersByProviderId,
   deleteApiV1ProvidersMinimaxOauthLogin,
   getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
   getApiV1Me,
+  getApiV1ModelProvidersConfig,
+  getApiV1ModelProvidersRegistry,
   getApiV1Models,
-  getApiV1Providers,
   getApiV1ProvidersByProviderIdOauthProviderStatus,
   getApiV1ProvidersByProviderIdOauthStatus,
   getApiV1ProvidersMinimaxOauthStatus,
@@ -49,9 +50,12 @@ import {
   postApiV1ProvidersByProviderIdVerify,
   postApiV1ProvidersMinimaxOauthLogin,
   putApiInternalDesktopDefaultModel,
-  putApiV1ProvidersByProviderId,
+  putApiV1ModelProvidersConfig,
 } from "../../lib/api/sdk.gen";
-import type { PutApiV1ProvidersByProviderIdData } from "../../lib/api/types.gen";
+import type {
+  PutApiV1ModelProvidersConfigData,
+  PutApiV1ProvidersByProviderIdData,
+} from "../../lib/api/types.gen";
 import { markSetupComplete } from "./welcome";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -71,19 +75,10 @@ interface ProviderConfig {
   models: ProviderModel[];
 }
 
-interface DbProvider {
-  id: string;
-  providerId: string;
-  displayName: string;
-  enabled: boolean;
-  baseUrl: string | null;
-  authMode?: "apiKey" | "oauth";
-  hasApiKey: boolean;
-  hasOauthCredential?: boolean;
-  oauthRegion?: "global" | "cn" | null;
-  oauthEmail?: string | null;
-  modelsJson: string;
-}
+type StoredModelsConfig = NonNullable<PutApiV1ModelProvidersConfigData["body"]>;
+type StoredProviderConfig = NonNullable<
+  StoredModelsConfig["providers"]
+>[string];
 
 type MiniMaxDesktopOauthStatus = {
   connected: boolean;
@@ -102,20 +97,20 @@ type MiniMaxDesktopOauthCancelResult = MiniMaxDesktopOauthStatus & {
 };
 
 function getDefaultMiniMaxAuthMode(
-  providerId: ByokProviderId,
-  dbProvider?: DbProvider,
+  provider: ProviderRegistryEntryDto,
+  providerConfig?: StoredProviderConfig,
 ): "apiKey" | "oauth" {
-  if (dbProvider?.authMode) {
-    return dbProvider.authMode;
+  if (providerConfig?.auth === "oauth") {
+    return "oauth";
   }
-  if (dbProvider?.hasApiKey) {
+  if (providerConfig?.apiKey) {
     return "apiKey";
   }
-  if (dbProvider?.hasOauthCredential) {
+  if (providerConfig?.oauthProfileRef) {
     return "oauth";
   }
 
-  return providerId === "minimax" ? "oauth" : "apiKey";
+  return provider.requiresOauthRegion ? "oauth" : "apiKey";
 }
 
 function setMiniMaxOauthErrorInCache(
@@ -249,17 +244,23 @@ function isSettingsTab(value: string | null): value is SettingsTab {
 
 // ── Provider metadata ─────────────────────────────────────────
 
-const NEXU_PROVIDER_META: ReturnType<typeof getProviderUiMetadata> = {
+const NEXU_PROVIDER_META = {
   displayName: "nexu Official",
   descriptionKey: "models.provider.nexu.description",
 };
 
-function getModelsPageProviderMeta(providerId: string) {
-  if (providerId === "nexu") {
-    return NEXU_PROVIDER_META;
+function getProviderMeta(provider: ProviderRegistryEntryDto | null) {
+  if (!provider) {
+    return null;
   }
 
-  return getProviderUiMetadata(providerId);
+  return {
+    displayName: provider.displayName,
+    descriptionKey: provider.descriptionKey,
+    apiDocsUrl: provider.apiDocsUrl,
+    apiKeyPlaceholder: provider.apiKeyPlaceholder,
+    defaultProxyUrl: provider.defaultProxyUrl,
+  };
 }
 
 // Well-known models per provider (shown when no verify result yet)
@@ -306,10 +307,6 @@ const DEFAULT_MODELS: Record<string, string[]> = {
   zai: ["glm-5", "glm-4.7", "glm-4.7-flash", "glm-4.7-flashx"],
 };
 
-const ZAI_CODING_PLAN_URLS: Record<string, string> = {
-  global: "https://api.z.ai/api/coding/paas/v4",
-  cn: "https://open.bigmodel.cn/api/coding/paas/v4",
-};
 const ZAI_CODING_PLAN_MODELS = [
   "glm-5",
   "glm-4.7",
@@ -325,21 +322,27 @@ function buildProviders(
     isDefault?: boolean;
     description?: string;
   }>,
+  registryEntries: ProviderRegistryEntryDto[],
 ): ProviderConfig[] {
+  const registryEntryMap = new Map(
+    registryEntries.map((entry) => [entry.id, entry] as const),
+  );
+
   // Group models by provider
   const grouped = new Map<string, ProviderModel[]>();
   for (const m of apiModels) {
-    const list = grouped.get(m.provider) ?? [];
+    const normalizedProviderId = normalizeProviderId(m.provider) ?? m.provider;
+    const list = grouped.get(normalizedProviderId) ?? [];
     list.push({
       id: m.id,
       name: m.name,
       description: m.description,
     });
-    grouped.set(m.provider, list);
+    grouped.set(normalizedProviderId, list);
   }
 
   return Array.from(grouped.entries()).map(([providerId, models]) => {
-    const meta = getModelsPageProviderMeta(providerId);
+    const meta = getProviderMeta(registryEntryMap.get(providerId) ?? null);
     return {
       id: providerId,
       name: meta?.displayName ?? providerId,
@@ -353,35 +356,29 @@ function buildProviders(
 
 // ── API helpers ───────────────────────────────────────────────
 
-async function fetchProviders(): Promise<DbProvider[]> {
-  const { data } = await getApiV1Providers();
-  return data?.providers ?? [];
+async function fetchProviderRegistry(): Promise<ProviderRegistryEntryDto[]> {
+  const { data } = await getApiV1ModelProvidersRegistry();
+  return data?.registry ?? [];
 }
 
-async function saveProvider(
-  providerId: ByokProviderId,
-  body: {
-    apiKey?: string;
-    baseUrl?: string | null;
-    enabled?: boolean;
-    displayName?: string;
-    authMode?: "apiKey" | "oauth";
-    modelsJson?: string;
-  },
-): Promise<DbProvider> {
-  const { data, error } = await putApiV1ProvidersByProviderId({
-    path: { providerId },
-    body: { ...body, baseUrl: body.baseUrl ?? undefined },
-  });
-  if (error || !data) throw new Error("Failed to save provider");
-  return data.provider as DbProvider;
+async function fetchModelProviderConfig(): Promise<StoredModelsConfig> {
+  const { data } = await getApiV1ModelProvidersConfig();
+  return (data?.config ?? {
+    mode: "merge",
+    providers: {},
+  }) as StoredModelsConfig;
 }
 
-async function deleteProvider(providerId: ByokProviderId): Promise<void> {
-  const { error } = await deleteApiV1ProvidersByProviderId({
-    path: { providerId },
+async function saveModelProviderConfig(
+  config: StoredModelsConfig,
+): Promise<StoredModelsConfig> {
+  const { data, error } = await putApiV1ModelProvidersConfig({
+    body: config,
   });
-  if (error) throw new Error("Failed to delete provider");
+  if (error || !data) {
+    throw new Error("Failed to save model provider config");
+  }
+  return data.config;
 }
 
 async function verifyApiKey(
@@ -404,10 +401,75 @@ const OLLAMA_DUMMY_API_KEY = "ollama-local";
 
 type ConfigurableProviderId =
   PutApiV1ProvidersByProviderIdData["path"]["providerId"];
-type ByokProviderId = Extract<
-  (typeof modelsPageProviderIds)[number],
-  ConfigurableProviderId
->;
+type ByokProviderId = ConfigurableProviderId;
+
+type ByokProviderEntry = ProviderRegistryEntryDto & {
+  id: ByokProviderId;
+};
+
+function getProviderDefaultBaseUrl(provider: ProviderRegistryEntryDto): string {
+  return provider.defaultProxyUrl ?? provider.defaultBaseUrls[0] ?? "";
+}
+
+function getProviderConfigMatch(
+  config: StoredModelsConfig | undefined,
+  providerId: string,
+): { key: string; config: StoredProviderConfig } | null {
+  const providers = config?.providers ?? {};
+  const candidateIds = new Set(getProviderAliasCandidates(providerId));
+
+  for (const [key, value] of Object.entries(providers)) {
+    if (candidateIds.has(key) || normalizeProviderId(key) === providerId) {
+      return { key, config: value as StoredProviderConfig };
+    }
+  }
+
+  return null;
+}
+
+function hasSavedProviderCredential(
+  providerConfig?: StoredProviderConfig,
+): boolean {
+  return Boolean(providerConfig?.apiKey || providerConfig?.oauthProfileRef);
+}
+
+function isStoredProviderConfigured(
+  providerConfig?: StoredProviderConfig,
+): boolean {
+  if (!providerConfig || providerConfig.enabled === false) {
+    return false;
+  }
+
+  return Boolean(
+    providerConfig.baseUrl ||
+      (providerConfig.models?.length ?? 0) > 0 ||
+      hasSavedProviderCredential(providerConfig),
+  );
+}
+
+function buildStoredModels(
+  provider: ProviderRegistryEntryDto,
+  modelIds: string[],
+): StoredProviderConfig["models"] {
+  return modelIds.map((modelId) => ({
+    id: modelId,
+    name: modelId,
+    api: provider.apiKind,
+  }));
+}
+
+function buildStoredModelsConfig(
+  currentConfig: StoredModelsConfig | undefined,
+  providers: NonNullable<StoredModelsConfig["providers"]>,
+): StoredModelsConfig {
+  return {
+    mode: currentConfig?.mode ?? "merge",
+    providers,
+    ...(currentConfig?.bedrockDiscovery
+      ? { bedrockDiscovery: currentConfig.bedrockDiscovery }
+      : {}),
+  };
+}
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -650,9 +712,14 @@ export function ModelsPage() {
     },
   });
 
-  const { data: dbProviders = [] } = useQuery({
-    queryKey: ["providers"],
-    queryFn: fetchProviders,
+  const { data: providerRegistry = [] } = useQuery({
+    queryKey: ["model-provider-registry"],
+    queryFn: fetchProviderRegistry,
+  });
+
+  const { data: providerConfigDoc } = useQuery({
+    queryKey: ["model-provider-config"],
+    queryFn: fetchModelProviderConfig,
   });
 
   // Current default model
@@ -666,6 +733,19 @@ export function ModelsPage() {
 
   const currentModelId = defaultModelData?.modelId ?? "";
   const models = modelsData?.models ?? [];
+  const visibleRegistryProviders = useMemo(
+    () =>
+      providerRegistry.filter(
+        (entry): entry is ByokProviderEntry =>
+          entry.modelsPageVisible === true &&
+          entry.controllerConfigurable === true,
+      ),
+    [providerRegistry],
+  );
+  const visibleRegistryProviderMap = useMemo(
+    () => new Map(visibleRegistryProviders.map((entry) => [entry.id, entry])),
+    [visibleRegistryProviders],
+  );
   const { data: desktopReadyData } = useQuery({
     queryKey: ["desktop-ready"],
     queryFn: async () => {
@@ -673,6 +753,64 @@ export function ModelsPage() {
       return data;
     },
   });
+  const saveProviderConfigMutation = useMutation({
+    mutationFn: saveModelProviderConfig,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["model-provider-config"] }),
+        queryClient.invalidateQueries({ queryKey: ["models"] }),
+        queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] }),
+      ]);
+    },
+  });
+
+  const upsertProviderConfig = useCallback(
+    async (
+      provider: ByokProviderEntry,
+      nextProviderConfig: StoredProviderConfig,
+    ) => {
+      if (!providerConfigDoc) {
+        throw new Error("Model provider config is still loading");
+      }
+
+      const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
+      const matchedProvider = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      );
+      currentProviders[matchedProvider?.key ?? provider.id] =
+        nextProviderConfig;
+
+      await saveProviderConfigMutation.mutateAsync(
+        buildStoredModelsConfig(providerConfigDoc, currentProviders),
+      );
+    },
+    [providerConfigDoc, saveProviderConfigMutation],
+  );
+
+  const removeProviderConfig = useCallback(
+    async (provider: ByokProviderEntry) => {
+      if (!providerConfigDoc) {
+        throw new Error("Model provider config is still loading");
+      }
+
+      const matchedProvider = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      );
+      if (!matchedProvider) {
+        return;
+      }
+
+      const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
+      delete currentProviders[matchedProvider.key];
+
+      await saveProviderConfigMutation.mutateAsync(
+        buildStoredModelsConfig(providerConfigDoc, currentProviders),
+      );
+    },
+    [providerConfigDoc, saveProviderConfigMutation],
+  );
 
   const userSwitchRef = useRef(false);
   const updateModel = useMutation({
@@ -713,17 +851,25 @@ export function ModelsPage() {
 
     if (newId && newId !== prev && !userSwitchRef.current) {
       const matched = models.find((m) => m.id === newId);
-      const providerMeta = getModelsPageProviderMeta(matched?.provider ?? "");
-      const providerName = providerMeta?.displayName ?? matched?.provider;
+      const matchedProviderId = normalizeProviderId(
+        matched?.provider ?? "",
+      ) as ByokProviderId | null;
+      const providerName =
+        (matchedProviderId
+          ? visibleRegistryProviderMap.get(matchedProviderId)?.displayName
+          : null) ?? matched?.provider;
       const label = providerName
         ? `${matched?.name ?? newId} (${providerName})`
         : (matched?.name ?? newId);
       toast.info(t("models.autoSwitched", { model: label }));
     }
     userSwitchRef.current = false;
-  }, [defaultModelData?.modelId, models, t]);
+  }, [defaultModelData?.modelId, models, t, visibleRegistryProviderMap]);
 
-  const providers = useMemo(() => buildProviders(models), [models]);
+  const providers = useMemo(
+    () => buildProviders(models, providerRegistry),
+    [models, providerRegistry],
+  );
 
   // Build sidebar items: Nexu first, then BYOK providers
   const sidebarItems = useMemo(() => {
@@ -733,6 +879,7 @@ export function ModelsPage() {
       modelCount: number;
       configured: boolean;
       managed: boolean;
+      registryEntry?: ByokProviderEntry;
     }> = [];
 
     // Nexu official — always shown
@@ -746,22 +893,24 @@ export function ModelsPage() {
     });
 
     // BYOK providers — always listed
-    for (const pid of modelsPageProviderIds) {
-      const meta = getModelsPageProviderMeta(pid);
-      const db = dbProviders.find((p) => p.providerId === pid);
-      const modProv = providers.find((p) => p.id === pid);
+    for (const provider of visibleRegistryProviders) {
+      const matchedProviderConfig = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      )?.config;
+      const modProv = providers.find((p) => p.id === provider.id);
       items.push({
-        id: pid,
-        name: meta?.displayName ?? pid,
+        id: provider.id,
+        name: provider.displayName,
         modelCount: modProv?.models.length ?? 0,
-        configured:
-          (db?.hasApiKey ?? false) || (db?.hasOauthCredential ?? false),
+        configured: isStoredProviderConfigured(matchedProviderConfig),
         managed: false,
+        registryEntry: provider,
       });
     }
 
     return items;
-  }, [providers, dbProviders]);
+  }, [providers, providerConfigDoc, visibleRegistryProviders]);
 
   const activeProvider =
     sidebarItems.find((p) => p.id === selectedProviderId) ??
@@ -928,9 +1077,7 @@ export function ModelsPage() {
                         providers.find((p) => p.id === activeProvider.id) ?? {
                           id: activeProvider.id,
                           name: activeProvider.name,
-                          description:
-                            getModelsPageProviderMeta(activeProvider.id)
-                              ?.descriptionKey ?? "",
+                          description: NEXU_PROVIDER_META.descriptionKey,
                           managed: true,
                           models: [],
                         }
@@ -939,12 +1086,25 @@ export function ModelsPage() {
                       onSelectModel={(modelId) => updateModel.mutate(modelId)}
                     />
                   )
+                ) : providerConfigDoc === undefined ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-[13px] text-text-muted">
+                      {t("models.loading")}
+                    </div>
+                  </div>
                 ) : (
                   <ByokProviderDetail
-                    providerId={activeProvider.id as ByokProviderId}
-                    dbProvider={dbProviders.find(
-                      (p) => p.providerId === activeProvider.id,
-                    )}
+                    provider={activeProvider.registryEntry as ByokProviderEntry}
+                    providerConfig={
+                      activeProvider.registryEntry
+                        ? getProviderConfigMatch(
+                            providerConfigDoc,
+                            activeProvider.registryEntry.id,
+                          )?.config
+                        : undefined
+                    }
+                    onSaveProviderConfig={upsertProviderConfig}
+                    onDeleteProviderConfig={removeProviderConfig}
                     queryClient={queryClient}
                     currentModelId={currentModelId}
                     onAutoSelectModel={handleAutoSelectModel}
@@ -1237,44 +1397,52 @@ function ManagedProviderDetail({
 // ── BYOK provider detail panel ────────────────────────────────
 
 function ByokProviderDetail({
-  providerId,
-  dbProvider,
+  provider,
+  providerConfig,
+  onSaveProviderConfig,
+  onDeleteProviderConfig,
   queryClient,
   currentModelId,
   onAutoSelectModel,
   onSelectModel,
 }: {
-  providerId: ByokProviderId;
-  dbProvider?: DbProvider;
+  provider: ByokProviderEntry;
+  providerConfig?: StoredProviderConfig;
+  onSaveProviderConfig: (
+    provider: ByokProviderEntry,
+    config: StoredProviderConfig,
+  ) => Promise<void>;
+  onDeleteProviderConfig: (provider: ByokProviderEntry) => Promise<void>;
   queryClient: ReturnType<typeof useQueryClient>;
   currentModelId: string;
   onAutoSelectModel: (modelId: string) => void;
   onSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
-  const meta = getModelsPageProviderMeta(providerId) ?? {
-    displayName: providerId,
+  const providerId = provider.id;
+  const meta = getProviderMeta(provider) ?? {
+    displayName: provider.displayName,
     descriptionKey: "",
     apiDocsUrl: undefined,
     apiKeyPlaceholder: "your-api-key",
-    defaultProxyUrl: "",
+    defaultProxyUrl: getProviderDefaultBaseUrl(provider),
   };
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(
-    dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
+    providerConfig?.baseUrl ?? getProviderDefaultBaseUrl(provider),
   );
   const [authMode, setAuthMode] = useState<"apiKey" | "oauth">(
-    getDefaultMiniMaxAuthMode(providerId, dbProvider),
+    getDefaultMiniMaxAuthMode(provider, providerConfig),
   );
   const [oauthRegion, setOauthRegion] = useState<"global" | "cn">(
-    dbProvider?.oauthRegion ?? "global",
+    providerConfig?.oauthRegion ?? "global",
   );
   const [dismissedMiniMaxOauthError, setDismissedMiniMaxOauthError] = useState<
     string | null
   >(null);
   const [isEditingApiKey, setIsEditingApiKey] = useState(
-    !dbProvider?.hasApiKey,
+    !providerConfig?.apiKey,
   );
   const isMiniMax = providerId === "minimax";
   const isOllama = providerId === "ollama";
@@ -1296,8 +1464,8 @@ function ByokProviderDetail({
 
   const hasMiniMaxOauthAccess =
     isMiniMax &&
-    (minimaxOauthStatus?.connected === true || dbProvider?.hasOauthCredential);
-  const hasSavedApiKey = Boolean(dbProvider?.hasApiKey);
+    (minimaxOauthStatus?.connected === true || providerConfig?.oauthProfileRef);
+  const hasSavedApiKey = Boolean(providerConfig?.apiKey);
   const hasSavedAccess = Boolean(hasSavedApiKey || hasMiniMaxOauthAccess);
 
   const visibleMiniMaxOauthError =
@@ -1345,8 +1513,9 @@ function ByokProviderDetail({
     if (flowDataStatus === "completed") {
       setOauthPending(false);
       queryClient.invalidateQueries({ queryKey: ["oauth-provider-status"] });
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["model-provider-config"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
       toast.success(t("models.byok.oauthSuccess"));
       markSetupComplete();
     } else if (flowDataStatus === "failed") {
@@ -1381,21 +1550,63 @@ function ByokProviderDetail({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["oauth-provider-status"] });
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["model-provider-config"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
     },
   });
 
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
   const canSubmitApiKeyConfig = Boolean(
-    isOllama || effectiveApiKey || hasSavedApiKey,
+    isOllama || effectiveApiKey || (!isEditingApiKey && hasSavedApiKey),
   );
   const canRefreshModels = Boolean(
     isOllama || effectiveApiKey || hasSavedApiKey,
   );
   const isProviderConfigured = Boolean(
     isOllama || hasSavedAccess || isOAuthConnected,
+  );
+  const storedModelIds = useMemo(
+    () => providerConfig?.models?.map((model) => model.id) ?? [],
+    [providerConfig?.models],
+  );
+  const persistedApiKey =
+    effectiveApiKey || (!isEditingApiKey ? providerConfig?.apiKey : undefined);
+
+  const buildApiKeyProviderConfig = useCallback(
+    (modelIds: string[]): StoredProviderConfig => ({
+      ...(providerConfig?.providerTemplateId
+        ? { providerTemplateId: providerConfig.providerTemplateId }
+        : {}),
+      ...(providerConfig?.instanceId
+        ? { instanceId: providerConfig.instanceId }
+        : {}),
+      enabled: true,
+      auth: "api-key",
+      api: provider.apiKind,
+      ...(persistedApiKey ? { apiKey: persistedApiKey } : {}),
+      baseUrl: baseUrl || getProviderDefaultBaseUrl(provider),
+      ...(isMiniMax ? { oauthRegion } : {}),
+      displayName: meta.displayName,
+      ...(providerConfig?.headers ? { headers: providerConfig.headers } : {}),
+      ...(providerConfig?.metadata
+        ? { metadata: providerConfig.metadata }
+        : {}),
+      models: buildStoredModels(provider, modelIds),
+    }),
+    [
+      baseUrl,
+      isMiniMax,
+      meta.displayName,
+      oauthRegion,
+      persistedApiKey,
+      provider,
+      providerConfig?.headers,
+      providerConfig?.instanceId,
+      providerConfig?.metadata,
+      providerConfig?.providerTemplateId,
+    ],
   );
 
   // ── Z.AI Coding Plan state ───────────────────────────
@@ -1404,19 +1615,33 @@ function ByokProviderDetail({
   const [codingPlanRegion, setCodingPlanRegion] = useState<"global" | "cn">(
     "global",
   );
+  const codingPlanBaseUrl: string =
+    codingPlanRegion === "cn"
+      ? "https://open.bigmodel.cn/api/coding/paas/v4"
+      : "https://api.z.ai/api/coding/paas/v4";
 
   const saveCodingPlanMutation = useMutation({
     mutationFn: () =>
-      saveProvider(providerId, {
-        apiKey: codingPlanKey,
-        baseUrl: ZAI_CODING_PLAN_URLS[codingPlanRegion],
-        displayName: "GLM",
+      onSaveProviderConfig(provider, {
+        ...(providerConfig?.providerTemplateId
+          ? { providerTemplateId: providerConfig.providerTemplateId }
+          : {}),
+        ...(providerConfig?.instanceId
+          ? { instanceId: providerConfig.instanceId }
+          : {}),
         enabled: true,
-        modelsJson: JSON.stringify(ZAI_CODING_PLAN_MODELS),
+        auth: "api-key",
+        api: provider.apiKind,
+        apiKey: codingPlanKey,
+        baseUrl: codingPlanBaseUrl,
+        ...(providerConfig?.headers ? { headers: providerConfig.headers } : {}),
+        ...(providerConfig?.metadata
+          ? { metadata: providerConfig.metadata }
+          : {}),
+        displayName: "GLM",
+        models: buildStoredModels(provider, ZAI_CODING_PLAN_MODELS),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
-      queryClient.invalidateQueries({ queryKey: ["models"] });
       setCodingPlanKey("");
       markSetupComplete();
       const preferred = selectPreferredModel(ZAI_CODING_PLAN_MODELS);
@@ -1429,15 +1654,15 @@ function ByokProviderDetail({
   // Reset form when provider changes
   useEffect(() => {
     setApiKey("");
-    setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
-    setAuthMode(getDefaultMiniMaxAuthMode(providerId, dbProvider));
-    setOauthRegion(dbProvider?.oauthRegion ?? "global");
-    setIsEditingApiKey(!dbProvider?.hasApiKey);
+    setBaseUrl(providerConfig?.baseUrl ?? getProviderDefaultBaseUrl(provider));
+    setAuthMode(getDefaultMiniMaxAuthMode(provider, providerConfig));
+    setOauthRegion(providerConfig?.oauthRegion ?? "global");
+    setIsEditingApiKey(!providerConfig?.apiKey);
     setVerifiedModels(null);
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
-  }, [dbProvider, meta.defaultProxyUrl, providerId]);
+  }, [provider, providerConfig]);
 
   useEffect(() => {
     if (!isMiniMax) {
@@ -1449,9 +1674,8 @@ function ByokProviderDetail({
       return;
     }
 
-    const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
-    setVerifiedModels(stored.length > 0 ? stored : null);
-  }, [authMode, dbProvider?.modelsJson, isMiniMax]);
+    setVerifiedModels(storedModelIds.length > 0 ? storedModelIds : null);
+  }, [authMode, isMiniMax, storedModelIds]);
 
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
@@ -1490,16 +1714,7 @@ function ByokProviderDetail({
       setVerifiedModels(models);
 
       if (hasSavedAccess || isOllama) {
-        await saveProvider(providerId, {
-          apiKey: effectiveApiKey || undefined,
-          baseUrl: baseUrl || null,
-          displayName: meta.displayName,
-          enabled: true,
-          authMode: "apiKey",
-          modelsJson: JSON.stringify(models),
-        });
-        await queryClient.invalidateQueries({ queryKey: ["providers"] });
-        await queryClient.invalidateQueries({ queryKey: ["models"] });
+        await onSaveProviderConfig(provider, buildApiKeyProviderConfig(models));
       }
 
       return models;
@@ -1528,14 +1743,7 @@ function ByokProviderDetail({
         }
       }
 
-      await saveProvider(providerId, {
-        apiKey: effectiveApiKey || undefined,
-        baseUrl: baseUrl || null,
-        displayName: meta.displayName,
-        enabled: true,
-        authMode: "apiKey",
-        modelsJson: JSON.stringify(models),
-      });
+      await onSaveProviderConfig(provider, buildApiKeyProviderConfig(models));
 
       return { models };
     },
@@ -1543,8 +1751,6 @@ function ByokProviderDetail({
       track("workspace_provider_save", {
         provider_name: providerId,
       });
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
-      queryClient.invalidateQueries({ queryKey: ["models"] });
       setApiKey("");
       setIsEditingApiKey(false);
       markSetupComplete();
@@ -1558,10 +1764,8 @@ function ByokProviderDetail({
 
   // ── Delete mutation ──────────────────────────────────
   const deleteMutation = useMutation({
-    mutationFn: () => deleteProvider(providerId),
+    mutationFn: () => onDeleteProviderConfig(provider),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
-      queryClient.invalidateQueries({ queryKey: ["models"] });
       if (isMiniMax) {
         queryClient.setQueryData(["minimax-oauth-status"], {
           connected: false,
@@ -1572,7 +1776,7 @@ function ByokProviderDetail({
         queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
       }
       setApiKey("");
-      setBaseUrl(meta.defaultProxyUrl ?? "");
+      setBaseUrl(getProviderDefaultBaseUrl(provider));
       setIsEditingApiKey(true);
       setVerifiedModels(null);
     },
@@ -1641,17 +1845,14 @@ function ByokProviderDetail({
     }
 
     const syncOauthModels = async () => {
-      const providers = await queryClient.fetchQuery({
-        queryKey: ["providers"],
-        queryFn: fetchProviders,
+      const config = await queryClient.fetchQuery({
+        queryKey: ["model-provider-config"],
+        queryFn: fetchModelProviderConfig,
       });
-      const minimaxProvider = providers.find(
-        (provider) => provider.providerId === "minimax",
-      );
-
-      const providerModels: string[] = JSON.parse(
-        minimaxProvider?.modelsJson ?? "[]",
-      );
+      const providerModels =
+        getProviderConfigMatch(config, "minimax")?.config.models?.map(
+          (model) => model.id,
+        ) ?? [];
       if (providerModels.length > 0) {
         setVerifiedModels(providerModels);
       }
@@ -1666,10 +1867,9 @@ function ByokProviderDetail({
   // Model list to show: verified > DB stored > defaults
   const displayModels = useMemo(() => {
     if (verifiedModels && verifiedModels.length > 0) return verifiedModels;
-    const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
-    if (stored.length > 0) return stored;
+    if (storedModelIds.length > 0) return storedModelIds;
     return DEFAULT_MODELS[providerId] ?? [];
-  }, [verifiedModels, dbProvider, providerId]);
+  }, [providerId, storedModelIds, verifiedModels]);
 
   const getScopedByokModelId = useCallback(
     (modelId: string) =>
@@ -1846,10 +2046,10 @@ function ByokProviderDetail({
                   oauthRegion === "cn" ? "api.minimaxi.com" : "api.minimax.io",
               })}
             </div>
-            {minimaxOauthStatus?.connected || dbProvider?.hasOauthCredential ? (
+            {minimaxOauthStatus?.connected ||
+            providerConfig?.oauthProfileRef ? (
               <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-700">
                 {t("models.byok.minimax.connected")}
-                {dbProvider?.oauthEmail ? ` · ${dbProvider.oauthEmail}` : ""}
               </div>
             ) : null}
             {visibleMiniMaxOauthError ? (
@@ -2017,7 +2217,7 @@ function ByokProviderDetail({
               >
                 {t("models.byok.apiKey")}
               </label>
-              {dbProvider?.hasApiKey && !isEditingApiKey ? (
+              {hasSavedApiKey && !isEditingApiKey ? (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-brand-primary)]/25 bg-[var(--color-brand-subtle)] px-3 py-2.5">
                   <div className="min-w-0">
                     <div className="text-[12px] font-medium text-text-primary">
@@ -2165,7 +2365,7 @@ function ByokProviderDetail({
               {saveMutation.isPending && (
                 <Loader2 size={13} className="animate-spin" />
               )}
-              {dbProvider?.hasApiKey
+              {hasSavedApiKey
                 ? t("models.byok.updateConfig")
                 : t("models.byok.saveAndEnable")}
             </button>
