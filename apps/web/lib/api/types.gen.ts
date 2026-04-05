@@ -2629,7 +2629,7 @@ export type PostApiV1ProvidersByProviderIdVerifyData = {
         baseUrl?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai' | 'custom-openai' | 'custom-anthropic';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}/verify';

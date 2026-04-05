@@ -1,5 +1,6 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  customProviderTemplateIds,
   minimaxOauthCancelResponseSchema,
   minimaxOauthStartBodySchema,
   minimaxOauthStartResponseSchema,
@@ -10,16 +11,25 @@ import {
   providerListResponseSchema,
   providerRegistryResponseSchema,
   providerResponseSchema,
+  supportedByokProviderIds,
   upsertProviderBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
-import { supportedByokProviderIds } from "../lib/byok-providers.js";
 import type { ControllerBindings } from "../types.js";
 
-const providerIdParamSchema = z.object({
+const transitionalProviderIdParamSchema = z.object({
   providerId: z.enum(supportedByokProviderIds),
+});
+
+const verifiableProviderIds = [
+  ...supportedByokProviderIds,
+  ...customProviderTemplateIds,
+] as const;
+
+const verifyProviderIdParamSchema = z.object({
+  providerId: z.enum(verifiableProviderIds),
 });
 
 export function registerModelRoutes(
@@ -154,7 +164,7 @@ export function registerModelRoutes(
       path: "/api/v1/providers/{providerId}",
       tags: ["Providers"],
       request: {
-        params: providerIdParamSchema,
+        params: transitionalProviderIdParamSchema,
         body: {
           content: { "application/json": { schema: upsertProviderBodySchema } },
         },
@@ -212,7 +222,7 @@ export function registerModelRoutes(
       method: "delete",
       path: "/api/v1/providers/{providerId}",
       tags: ["Providers"],
-      request: { params: providerIdParamSchema },
+      request: { params: transitionalProviderIdParamSchema },
       responses: {
         200: {
           content: {
@@ -313,7 +323,7 @@ export function registerModelRoutes(
       path: "/api/v1/providers/{providerId}/verify",
       tags: ["Providers"],
       request: {
-        params: providerIdParamSchema,
+        params: verifyProviderIdParamSchema,
         body: {
           content: { "application/json": { schema: verifyProviderBodySchema } },
         },

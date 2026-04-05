@@ -61,6 +61,10 @@ function createConfig(overrides: Partial<NexuConfig> = {}): NexuConfig {
       },
       defaultModelId: "anthropic/claude-sonnet-4",
     },
+    models: {
+      mode: "merge",
+      providers: {},
+    },
     providers: [
       {
         id: "provider-1",

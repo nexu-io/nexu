@@ -9,7 +9,6 @@ import {
   parseCustomProviderKey,
 } from "@nexu/shared";
 import type { NexuConfig } from "../store/schemas.js";
-import { migrateLegacyProvidersToCanonicalModelsConfig } from "../store/schemas.js";
 import { normalizeProviderBaseUrl } from "./provider-base-url.js";
 
 type ProviderMetadataRecord = Record<string, unknown>;
@@ -46,11 +45,7 @@ function getMetadataRecord(value: unknown): ProviderMetadataRecord | undefined {
 }
 
 function getCanonicalModelsConfig(config: NexuConfig): PersistedModelsConfig {
-  if (config.models) {
-    return config.models;
-  }
-
-  return migrateLegacyProvidersToCanonicalModelsConfig(config.providers ?? []);
+  return config.models;
 }
 
 function getProviderSecretValue(

@@ -16,7 +16,6 @@ import {
   type connectIntegrationResponseSchema,
   type connectIntegrationSchema,
   type integrationResponseSchema,
-  type providerResponseSchema,
   type refreshIntegrationSchema,
   type updateAuthSourceSchema,
   type updateUserProfileSchema,
@@ -43,7 +42,6 @@ import {
 
 const DEFAULT_MANAGED_CHANNEL_ACCOUNT_ID = "default";
 
-type ProviderResponse = z.infer<typeof providerResponseSchema>;
 type UpsertProviderBody = z.infer<typeof upsertProviderBodySchema>;
 type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
 type StoredProviderResponse = z.infer<typeof storedProviderResponseSchema>;
@@ -279,6 +277,10 @@ function serializeProvider(
     apiKey: provider.apiKey,
     models: provider.models,
   };
+}
+
+function listCanonicalProviders(config: NexuConfig): ControllerProvider[] {
+  return deriveLegacyProvidersFromCanonicalModelsConfig(config.models);
 }
 
 export class NexuConfigStore {
@@ -1134,9 +1136,11 @@ export class NexuConfigStore {
     return disconnectedChannel !== null;
   }
 
-  async listProviders(): Promise<ProviderResponse[]> {
+  async listProviders(): Promise<StoredProviderResponse[]> {
     const config = await this.getConfig();
-    return config.providers.map((provider) => serializeProvider(provider));
+    return listCanonicalProviders(config).map((provider) =>
+      serializeProvider(provider),
+    );
   }
 
   async getProvider(
@@ -1144,7 +1148,9 @@ export class NexuConfigStore {
   ): Promise<StoredProviderResponse | null> {
     const config = await this.getConfig();
     const provider =
-      config.providers.find((item) => item.providerId === providerId) ?? null;
+      listCanonicalProviders(config).find(
+        (item) => item.providerId === providerId,
+      ) ?? null;
     return provider ? serializeProvider(provider) : null;
   }
 
@@ -1157,7 +1163,7 @@ export class NexuConfigStore {
     let created = false;
 
     await this.store.update((config) => {
-      const existing = config.providers.find(
+      const existing = listCanonicalProviders(config).find(
         (item) => item.providerId === providerId,
       );
       const nextProvider: ControllerProvider = existing
@@ -1212,11 +1218,7 @@ export class NexuConfigStore {
               .providers,
           },
         },
-        providers: existing
-          ? config.providers.map((item) =>
-              item.providerId === providerId ? nextProvider : item,
-            )
-          : [...config.providers, nextProvider],
+        providers: [],
       };
     });
 
@@ -1251,7 +1253,7 @@ export class NexuConfigStore {
     let result: ControllerProvider | null = null;
 
     await this.store.update((config) => {
-      const existing = config.providers.find(
+      const existing = listCanonicalProviders(config).find(
         (item) => item.providerId === providerId,
       );
       const nextProvider: ControllerProvider = existing
@@ -1295,11 +1297,7 @@ export class NexuConfigStore {
               .providers,
           },
         },
-        providers: existing
-          ? config.providers.map((item) =>
-              item.providerId === providerId ? nextProvider : item,
-            )
-          : [...config.providers, nextProvider],
+        providers: [],
       };
     });
 
@@ -1314,14 +1312,11 @@ export class NexuConfigStore {
     let deleted = false;
 
     await this.store.update((config) => {
-      const nextProviders = config.providers.filter((provider) => {
+      for (const provider of listCanonicalProviders(config)) {
         if (provider.providerId === providerId) {
           deleted = true;
-          return false;
         }
-
-        return true;
-      });
+      }
 
       const nextCanonicalProviders = {
         ...config.models.providers,
@@ -1334,13 +1329,7 @@ export class NexuConfigStore {
           ...config.models,
           providers: nextCanonicalProviders,
         },
-        providers:
-          nextProviders.length > 0
-            ? nextProviders
-            : deriveLegacyProvidersFromCanonicalModelsConfig({
-                ...config.models,
-                providers: nextCanonicalProviders,
-              }),
+        providers: [],
       };
     });
 

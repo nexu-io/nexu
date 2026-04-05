@@ -7,8 +7,11 @@ import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
   type ProviderRegistryEntryDto,
+  buildCustomProviderKey,
+  customProviderTemplateIds,
   getProviderAliasCandidates,
   normalizeProviderId,
+  parseCustomProviderKey,
   selectPreferredModel,
 } from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -74,6 +77,17 @@ interface ProviderConfig {
   apiDocsUrl?: string;
   models: ProviderModel[];
 }
+
+type SidebarItem = {
+  id: string;
+  name: string;
+  modelCount: number;
+  configured: boolean;
+  managed: boolean;
+  kind: "managed" | "builtin-byok" | "custom-byok" | "add-custom";
+  providerKey?: string;
+  registryEntry?: ByokProviderEntry;
+};
 
 type StoredModelsConfig = NonNullable<PutApiV1ModelProvidersConfigData["body"]>;
 type StoredProviderConfig = NonNullable<
@@ -242,71 +256,6 @@ function isSettingsTab(value: string | null): value is SettingsTab {
   return value === "general" || value === "providers";
 }
 
-// ── Provider metadata ─────────────────────────────────────────
-
-const NEXU_PROVIDER_META = {
-  displayName: "nexu Official",
-  descriptionKey: "models.provider.nexu.description",
-};
-
-function getProviderMeta(provider: ProviderRegistryEntryDto | null) {
-  if (!provider) {
-    return null;
-  }
-
-  return {
-    displayName: provider.displayName,
-    descriptionKey: provider.descriptionKey,
-    apiDocsUrl: provider.apiDocsUrl,
-    apiKeyPlaceholder: provider.apiKeyPlaceholder,
-    defaultProxyUrl: provider.defaultProxyUrl,
-  };
-}
-
-// Well-known models per provider (shown when no verify result yet)
-const DEFAULT_MODELS: Record<string, string[]> = {
-  anthropic: [
-    "claude-opus-4-1-20250805",
-    "claude-opus-4-20250514",
-    "claude-sonnet-4-20250514",
-    "claude-3-5-haiku-20241022",
-  ],
-  openai: ["gpt-5.4", "gpt-5.1", "gpt-5-mini", "o4-mini"],
-  google: [
-    "gemini-3-pro",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-  ],
-  ollama: [],
-  siliconflow: [
-    "deepseek-ai/DeepSeek-R1",
-    "deepseek-ai/DeepSeek-V3",
-    "Qwen/Qwen3-14B",
-    "moonshotai/Kimi-K2-Instruct",
-  ],
-  ppio: [
-    "deepseek/deepseek-v3-turbo",
-    "deepseek/deepseek-v3/community",
-    "deepseek/deepseek-r1-0528",
-    "deepseek/deepseek-r1/community",
-  ],
-  openrouter: ["auto", "openrouter/hunter-alpha", "openrouter/healer-alpha"],
-  minimax: [
-    "MiniMax-M2.7",
-    "MiniMax-M2.7-highspeed",
-    "MiniMax-M2.5",
-    "MiniMax-M2.5-highspeed",
-    "MiniMax-M2.1",
-    "MiniMax-M2.1-highspeed",
-    "MiniMax-M2",
-  ],
-  kimi: ["kimi-k2.5"],
-  glm: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flash"],
-  moonshot: ["kimi-k2.5"],
-  zai: ["glm-5", "glm-4.7", "glm-4.7-flash", "glm-4.7-flashx"],
-};
-
 const ZAI_CODING_PLAN_MODELS = [
   "glm-5",
   "glm-4.7",
@@ -342,7 +291,7 @@ function buildProviders(
   }
 
   return Array.from(grouped.entries()).map(([providerId, models]) => {
-    const meta = getProviderMeta(registryEntryMap.get(providerId) ?? null);
+    const meta = registryEntryMap.get(providerId) ?? null;
     return {
       id: providerId,
       name: meta?.displayName ?? providerId,
@@ -392,6 +341,29 @@ async function verifyApiKey(
   });
   if (error || !data) throw new Error("Verify request failed");
   return data;
+}
+
+function normalizeVerifiedModelIds(models: unknown[] | undefined): string[] {
+  if (!models) {
+    return [];
+  }
+
+  return models
+    .map((model) => {
+      if (typeof model === "string") {
+        return model;
+      }
+      if (
+        model &&
+        typeof model === "object" &&
+        "id" in model &&
+        typeof model.id === "string"
+      ) {
+        return model.id;
+      }
+      return null;
+    })
+    .filter((modelId): modelId is string => Boolean(modelId));
 }
 
 // ── BYOK provider sidebar entries ─────────────────────────────
@@ -676,6 +648,149 @@ function _GeneralSettings() {
 
 // _CurrentModelSelector removed — model switching now lives inline in each provider's model list
 
+function AddCustomProviderDetail({
+  customTemplates,
+  onCreate,
+}: {
+  customTemplates: ByokProviderEntry[];
+  onCreate: (input: {
+    template: ByokProviderEntry;
+    instanceId: string;
+    displayName: string;
+    baseUrl: string;
+  }) => Promise<void>;
+}) {
+  const [templateId, setTemplateId] = useState<string>(
+    customTemplates[0]?.id ?? "custom-openai",
+  );
+  const [instanceId, setInstanceId] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+
+  const template = useMemo(
+    () => customTemplates.find((item) => item.id === templateId) ?? null,
+    [customTemplates, templateId],
+  );
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!template) {
+        throw new Error("Custom provider template not found");
+      }
+
+      await onCreate({
+        template,
+        instanceId: instanceId.trim(),
+        displayName:
+          displayName.trim() ||
+          `${template.displayName} / ${instanceId.trim()}`,
+        baseUrl: baseUrl.trim(),
+      });
+    },
+    onSuccess: () => {
+      setInstanceId("");
+      setDisplayName("");
+      setBaseUrl("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to add custom provider");
+    },
+  });
+
+  const canCreate = Boolean(template && instanceId.trim() && baseUrl.trim());
+
+  return (
+    <div className="max-w-lg space-y-4">
+      <div className="text-[14px] font-semibold text-text-primary">
+        Add custom provider
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label
+            htmlFor="custom-provider-template"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            Template
+          </label>
+          <select
+            id="custom-provider-template"
+            value={templateId}
+            onChange={(event) => setTemplateId(event.target.value)}
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          >
+            {customTemplates.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label
+            htmlFor="custom-provider-instance-id"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            Instance id
+          </label>
+          <input
+            id="custom-provider-instance-id"
+            type="text"
+            value={instanceId}
+            onChange={(event) => setInstanceId(event.target.value)}
+            placeholder="e.g. team-gateway"
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="custom-provider-display-name"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            Display name
+          </label>
+          <input
+            id="custom-provider-display-name"
+            type="text"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder={template?.displayName ?? "Custom provider"}
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="custom-provider-base-url"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            Base URL
+          </label>
+          <input
+            id="custom-provider-base-url"
+            type="text"
+            value={baseUrl}
+            onChange={(event) => setBaseUrl(event.target.value)}
+            placeholder="https://api.example.com/v1"
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          />
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={!canCreate || createMutation.isPending}
+        onClick={() => createMutation.mutate()}
+        className={cn(
+          "rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+          canCreate && !createMutation.isPending
+            ? "bg-accent text-accent-fg hover:bg-accent/90"
+            : "bg-surface-2 text-text-muted cursor-not-allowed",
+        )}
+      >
+        {createMutation.isPending ? "Adding..." : "Add provider"}
+      </button>
+    </div>
+  );
+}
+
 export function ModelsPage() {
   const { t } = useTranslation();
   const { stars: starNexu } = useGitHubStars();
@@ -764,22 +879,14 @@ export function ModelsPage() {
     },
   });
 
-  const upsertProviderConfig = useCallback(
-    async (
-      provider: ByokProviderEntry,
-      nextProviderConfig: StoredProviderConfig,
-    ) => {
+  const upsertProviderConfigByKey = useCallback(
+    async (providerKey: string, nextProviderConfig: StoredProviderConfig) => {
       if (!providerConfigDoc) {
         throw new Error("Model provider config is still loading");
       }
 
       const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
-      const matchedProvider = getProviderConfigMatch(
-        providerConfigDoc,
-        provider.id,
-      );
-      currentProviders[matchedProvider?.key ?? provider.id] =
-        nextProviderConfig;
+      currentProviders[providerKey] = nextProviderConfig;
 
       await saveProviderConfigMutation.mutateAsync(
         buildStoredModelsConfig(providerConfigDoc, currentProviders),
@@ -788,12 +895,41 @@ export function ModelsPage() {
     [providerConfigDoc, saveProviderConfigMutation],
   );
 
-  const removeProviderConfig = useCallback(
-    async (provider: ByokProviderEntry) => {
+  const removeProviderConfigByKey = useCallback(
+    async (providerKey: string) => {
       if (!providerConfigDoc) {
         throw new Error("Model provider config is still loading");
       }
 
+      const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
+      delete currentProviders[providerKey];
+
+      await saveProviderConfigMutation.mutateAsync(
+        buildStoredModelsConfig(providerConfigDoc, currentProviders),
+      );
+    },
+    [providerConfigDoc, saveProviderConfigMutation],
+  );
+
+  const upsertBuiltinProviderConfig = useCallback(
+    async (
+      provider: ByokProviderEntry,
+      nextProviderConfig: StoredProviderConfig,
+    ) => {
+      const matchedProvider = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      );
+      await upsertProviderConfigByKey(
+        matchedProvider?.key ?? provider.id,
+        nextProviderConfig,
+      );
+    },
+    [providerConfigDoc, upsertProviderConfigByKey],
+  );
+
+  const removeBuiltinProviderConfig = useCallback(
+    async (provider: ByokProviderEntry) => {
       const matchedProvider = getProviderConfigMatch(
         providerConfigDoc,
         provider.id,
@@ -801,15 +937,9 @@ export function ModelsPage() {
       if (!matchedProvider) {
         return;
       }
-
-      const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
-      delete currentProviders[matchedProvider.key];
-
-      await saveProviderConfigMutation.mutateAsync(
-        buildStoredModelsConfig(providerConfigDoc, currentProviders),
-      );
+      await removeProviderConfigByKey(matchedProvider.key);
     },
-    [providerConfigDoc, saveProviderConfigMutation],
+    [providerConfigDoc, removeProviderConfigByKey],
   );
 
   const userSwitchRef = useRef(false);
@@ -871,16 +1001,48 @@ export function ModelsPage() {
     [models, providerRegistry],
   );
 
-  // Build sidebar items: Nexu first, then BYOK providers
+  const customTemplateRegistryMap = useMemo(() => {
+    const map = new Map<string, ByokProviderEntry>();
+    for (const templateId of customProviderTemplateIds) {
+      const template = providerRegistry.find(
+        (entry): entry is ByokProviderEntry => entry.id === templateId,
+      );
+      if (template) {
+        map.set(template.id, template);
+      }
+    }
+    return map;
+  }, [providerRegistry]);
+
+  const customProviderInstances = useMemo(() => {
+    const entries = providerConfigDoc?.providers
+      ? Object.entries(providerConfigDoc.providers)
+      : [];
+    return entries
+      .map(([key, config]) => {
+        const parsed = parseCustomProviderKey(key);
+        if (!parsed) {
+          return null;
+        }
+
+        const template = customTemplateRegistryMap.get(parsed.templateId);
+        if (!template) {
+          return null;
+        }
+
+        return {
+          key,
+          instanceId: parsed.instanceId,
+          template,
+          config: config as StoredProviderConfig,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  }, [customTemplateRegistryMap, providerConfigDoc?.providers]);
+
+  // Build sidebar items: Nexu first, then built-in BYOK, then custom BYOK
   const sidebarItems = useMemo(() => {
-    const items: Array<{
-      id: string;
-      name: string;
-      modelCount: number;
-      configured: boolean;
-      managed: boolean;
-      registryEntry?: ByokProviderEntry;
-    }> = [];
+    const items: SidebarItem[] = [];
 
     // Nexu official — always shown
     const nexuProvider = providers.find((p) => p.id === "nexu");
@@ -890,9 +1052,10 @@ export function ModelsPage() {
       modelCount: nexuProvider?.models.length ?? 0,
       configured: (nexuProvider?.models.length ?? 0) > 0,
       managed: true,
+      kind: "managed",
     });
 
-    // BYOK providers — always listed
+    // Built-in BYOK providers — always listed
     for (const provider of visibleRegistryProviders) {
       const matchedProviderConfig = getProviderConfigMatch(
         providerConfigDoc,
@@ -905,12 +1068,46 @@ export function ModelsPage() {
         modelCount: modProv?.models.length ?? 0,
         configured: isStoredProviderConfigured(matchedProviderConfig),
         managed: false,
+        kind: "builtin-byok",
         registryEntry: provider,
       });
     }
 
+    for (const customInstance of customProviderInstances) {
+      const modelCount = models.filter((model) =>
+        model.id.startsWith(`${customInstance.key}/`),
+      ).length;
+      items.push({
+        id: customInstance.key,
+        name:
+          customInstance.config.displayName?.trim() ||
+          `${customInstance.template.displayName} / ${customInstance.instanceId}`,
+        modelCount,
+        configured: isStoredProviderConfigured(customInstance.config),
+        managed: false,
+        kind: "custom-byok",
+        providerKey: customInstance.key,
+        registryEntry: customInstance.template,
+      });
+    }
+
+    items.push({
+      id: "__add-custom-provider__",
+      name: "+ Add custom provider",
+      modelCount: 0,
+      configured: false,
+      managed: false,
+      kind: "add-custom",
+    });
+
     return items;
-  }, [providers, providerConfigDoc, visibleRegistryProviders]);
+  }, [
+    customProviderInstances,
+    models,
+    providerConfigDoc,
+    providers,
+    visibleRegistryProviders,
+  ]);
 
   const activeProvider =
     sidebarItems.find((p) => p.id === selectedProviderId) ??
@@ -1001,41 +1198,98 @@ export function ModelsPage() {
             className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
             style={{ minHeight: 520 }}
           >
-            {/* Left: Provider list with Enabled / Providers grouping */}
-            {/* Left: Provider list — flat, no enabled/disabled split */}
+            {/* Left: Provider list */}
             <div className="w-56 shrink-0 bg-surface-0 overflow-y-auto">
-              <div className="p-2 space-y-0.5">
-                {sidebarItems.map((item) => {
-                  const isActive = activeProvider?.id === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedProviderId(item.id);
-                        clearSetupParam();
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                        isActive ? "bg-surface-3" : "hover:bg-surface-2",
-                      )}
-                    >
-                      <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
-                        <ProviderLogo provider={item.id} size={14} />
-                      </span>
-                      <span
+              <div className="p-2 space-y-2">
+                <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                  Providers
+                </div>
+                {sidebarItems
+                  .filter((item) => item.kind !== "custom-byok")
+                  .map((item) => {
+                    const isAddCustom = item.kind === "add-custom";
+                    const providerLogoId = item.registryEntry?.id ?? item.id;
+                    const isActive = activeProvider?.id === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedProviderId(item.id);
+                          clearSetupParam();
+                        }}
                         className={cn(
-                          "flex-1 text-[12px] truncate",
-                          isActive
-                            ? "font-semibold text-text-primary"
-                            : "font-medium text-text-primary",
+                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                          isActive ? "bg-surface-3" : "hover:bg-surface-2",
                         )}
                       >
-                        {item.name}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
+                          {isAddCustom ? (
+                            <span className="text-[14px] text-text-secondary">
+                              +
+                            </span>
+                          ) : (
+                            <ProviderLogo provider={providerLogoId} size={14} />
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "flex-1 text-[12px] truncate",
+                            isActive
+                              ? "font-semibold text-text-primary"
+                              : "font-medium text-text-primary",
+                          )}
+                        >
+                          {item.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                <div className="pt-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                  Custom providers
+                </div>
+                {sidebarItems
+                  .filter((item) => item.kind === "custom-byok")
+                  .map((item) => {
+                    const isActive = activeProvider?.id === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedProviderId(item.id);
+                          clearSetupParam();
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                          isActive ? "bg-surface-3" : "hover:bg-surface-2",
+                        )}
+                      >
+                        <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
+                          <ProviderLogo
+                            provider={item.registryEntry?.id ?? item.id}
+                            size={14}
+                          />
+                        </span>
+                        <span
+                          className={cn(
+                            "flex-1 text-[12px] truncate",
+                            isActive
+                              ? "font-semibold text-text-primary"
+                              : "font-medium text-text-primary",
+                          )}
+                        >
+                          {item.name}
+                        </span>
+                        {item.modelCount > 0 && (
+                          <span className="text-[10px] text-text-muted">
+                            {item.modelCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
 
@@ -1077,7 +1331,7 @@ export function ModelsPage() {
                         providers.find((p) => p.id === activeProvider.id) ?? {
                           id: activeProvider.id,
                           name: activeProvider.name,
-                          description: NEXU_PROVIDER_META.descriptionKey,
+                          description: "models.provider.nexu.description",
                           managed: true,
                           models: [],
                         }
@@ -1092,19 +1346,65 @@ export function ModelsPage() {
                       {t("models.loading")}
                     </div>
                   </div>
+                ) : activeProvider.kind === "add-custom" ? (
+                  <AddCustomProviderDetail
+                    customTemplates={Array.from(
+                      customTemplateRegistryMap.values(),
+                    )}
+                    onCreate={async (input) => {
+                      const providerKey = buildCustomProviderKey(
+                        input.template
+                          .id as (typeof customProviderTemplateIds)[number],
+                        input.instanceId,
+                      );
+                      await upsertProviderConfigByKey(providerKey, {
+                        providerTemplateId: input.template.id,
+                        instanceId: input.instanceId,
+                        enabled: true,
+                        api: input.template.apiKind,
+                        baseUrl: input.baseUrl,
+                        displayName: input.displayName,
+                        models: [],
+                      });
+                      setSelectedProviderId(providerKey);
+                    }}
+                  />
                 ) : (
                   <ByokProviderDetail
                     provider={activeProvider.registryEntry as ByokProviderEntry}
+                    providerKey={
+                      activeProvider.providerKey ??
+                      (activeProvider.registryEntry as ByokProviderEntry).id
+                    }
                     providerConfig={
                       activeProvider.registryEntry
-                        ? getProviderConfigMatch(
-                            providerConfigDoc,
-                            activeProvider.registryEntry.id,
-                          )?.config
+                        ? activeProvider.providerKey
+                          ? providerConfigDoc.providers?.[
+                              activeProvider.providerKey
+                            ]
+                          : getProviderConfigMatch(
+                              providerConfigDoc,
+                              activeProvider.registryEntry.id,
+                            )?.config
                         : undefined
                     }
-                    onSaveProviderConfig={upsertProviderConfig}
-                    onDeleteProviderConfig={removeProviderConfig}
+                    onSaveProviderConfig={
+                      activeProvider.providerKey
+                        ? (_, config) =>
+                            upsertProviderConfigByKey(
+                              activeProvider.providerKey ?? "",
+                              config,
+                            )
+                        : upsertBuiltinProviderConfig
+                    }
+                    onDeleteProviderConfig={
+                      activeProvider.providerKey
+                        ? () =>
+                            removeProviderConfigByKey(
+                              activeProvider.providerKey ?? "",
+                            )
+                        : removeBuiltinProviderConfig
+                    }
                     queryClient={queryClient}
                     currentModelId={currentModelId}
                     onAutoSelectModel={handleAutoSelectModel}
@@ -1398,6 +1698,7 @@ function ManagedProviderDetail({
 
 function ByokProviderDetail({
   provider,
+  providerKey,
   providerConfig,
   onSaveProviderConfig,
   onDeleteProviderConfig,
@@ -1407,6 +1708,7 @@ function ByokProviderDetail({
   onSelectModel,
 }: {
   provider: ByokProviderEntry;
+  providerKey: string;
   providerConfig?: StoredProviderConfig;
   onSaveProviderConfig: (
     provider: ByokProviderEntry,
@@ -1420,11 +1722,11 @@ function ByokProviderDetail({
 }) {
   const { t } = useTranslation();
   const providerId = provider.id;
-  const meta = getProviderMeta(provider) ?? {
+  const meta = {
     displayName: provider.displayName,
-    descriptionKey: "",
-    apiDocsUrl: undefined,
-    apiKeyPlaceholder: "your-api-key",
+    descriptionKey: provider.descriptionKey,
+    apiDocsUrl: provider.apiDocsUrl,
+    apiKeyPlaceholder: provider.apiKeyPlaceholder ?? "your-api-key",
     defaultProxyUrl: getProviderDefaultBaseUrl(provider),
   };
 
@@ -1686,8 +1988,9 @@ function ByokProviderDetail({
         provider_name: providerId,
         success: result.valid,
       });
-      if (result.valid && result.models) {
-        setVerifiedModels(result.models);
+      const modelIds = normalizeVerifiedModelIds(result.models);
+      if (result.valid) {
+        setVerifiedModels(modelIds);
       }
     },
     onError: () => {
@@ -1710,7 +2013,7 @@ function ByokProviderDetail({
         throw new Error(result.error ?? t("models.byok.keyInvalidUnknown"));
       }
 
-      const models = result.models ?? [];
+      const models = normalizeVerifiedModelIds(result.models);
       setVerifiedModels(models);
 
       if (hasSavedAccess || isOllama) {
@@ -1738,8 +2041,8 @@ function ByokProviderDetail({
           baseUrl || undefined,
         );
         if (result.valid && result.models) {
-          models = result.models;
-          setVerifiedModels(result.models);
+          models = normalizeVerifiedModelIds(result.models);
+          setVerifiedModels(models);
         }
       }
 
@@ -1868,15 +2171,15 @@ function ByokProviderDetail({
   const displayModels = useMemo(() => {
     if (verifiedModels && verifiedModels.length > 0) return verifiedModels;
     if (storedModelIds.length > 0) return storedModelIds;
-    return DEFAULT_MODELS[providerId] ?? [];
-  }, [providerId, storedModelIds, verifiedModels]);
+    return [];
+  }, [storedModelIds, verifiedModels]);
 
   const getScopedByokModelId = useCallback(
     (modelId: string) =>
-      modelId.startsWith(`${providerId}/`)
+      modelId.startsWith(`${providerKey}/`)
         ? modelId
-        : `${providerId}/${modelId}`,
-    [providerId],
+        : `${providerKey}/${modelId}`,
+    [providerKey],
   );
 
   return (

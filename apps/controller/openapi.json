@@ -7477,7 +7477,9 @@
                 "kimi",
                 "glm",
                 "moonshot",
-                "zai"
+                "zai",
+                "custom-openai",
+                "custom-anthropic"
               ]
             },
             "required": true,

@@ -6,6 +6,10 @@ import {
   type Model,
   type PersistedModelsConfig,
   type ProviderRegistryEntryDto,
+  getDefaultProviderBaseUrls,
+  getProviderRuntimePolicy,
+  isCustomProviderTemplate,
+  isSupportedByokProviderId,
   listProviderRegistryEntries,
   selectPreferredModel,
   type verifyProviderBodySchema,
@@ -13,7 +17,6 @@ import {
 } from "@nexu/shared";
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
-import { isSupportedByokProviderId } from "../lib/byok-providers.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
@@ -91,7 +94,6 @@ const MINI_MAX_OAUTH_REQUEST_TIMEOUT_MS = 15000;
 const MINI_MAX_OAUTH_TOKEN_REQUEST_TIMEOUT_MS = 15000;
 const OPENCLAW_COMMAND_TIMEOUT_MS = 30000;
 const NEXU_OFFICIAL_PROVIDER_ID = "nexu";
-const OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434";
 const OLLAMA_DUMMY_API_KEY = "ollama-local";
 
 function durationSecondsToMs(valueInSeconds: number): number {
@@ -145,20 +147,15 @@ function hasSameCloudModels(
   );
 }
 
-const PROVIDER_BASE_URLS: Record<string, string> = {
-  anthropic: "https://api.anthropic.com/v1",
-  openai: "https://api.openai.com/v1",
-  google: "https://generativelanguage.googleapis.com/v1beta/openai",
-  ollama: OLLAMA_DEFAULT_BASE_URL,
-  siliconflow: "https://api.siliconflow.cn/v1",
-  ppio: "https://api.ppinfra.com/v3/openai",
-  openrouter: "https://openrouter.ai/api/v1",
-  minimax: MINI_MAX_API_BASE_URL_GLOBAL,
-  kimi: "https://api.moonshot.cn/v1",
-  glm: "https://open.bigmodel.cn/api/paas/v4",
-  moonshot: "https://api.moonshot.cn/v1",
-  zai: "https://open.bigmodel.cn/api/paas/v4",
-};
+function toProviderInventoryInput(
+  providers: Awaited<ReturnType<NexuConfigStore["listProviders"]>>,
+): Array<{ providerId: string; apiKey: string | null; models: string[] }> {
+  return providers.map((provider) => ({
+    providerId: provider.providerId,
+    apiKey: provider.apiKey ?? null,
+    models: provider.models ?? [],
+  }));
+}
 
 function buildProviderUrl(
   baseUrl: string | null | undefined,
@@ -372,11 +369,12 @@ export class ModelProviderService {
   async listModels() {
     await this.refreshMiniMaxOauthModelsIfNeeded();
 
-    const config = await this.configStore.getConfig();
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
-    const providers = config.providers.filter(
-      (provider) =>
-        provider.enabled && isSupportedByokProviderId(provider.providerId),
+    const providers = toProviderInventoryInput(
+      (await this.configStore.listProviders()).filter(
+        (provider) =>
+          provider.enabled && isSupportedByokProviderId(provider.providerId),
+      ),
     );
     const { cloudModels, byokModels } = await this.getAvailableModels(
       providers,
@@ -547,13 +545,12 @@ export class ModelProviderService {
   async getInventoryStatus(): Promise<ModelInventoryStatus> {
     const desktopCloud =
       await this.configStore.getDesktopCloudInventoryStatus();
-    const config = await this.configStore.getConfig();
-    const hasByokInventory = config.providers
-      .filter(
+    const hasByokInventory = toProviderInventoryInput(
+      (await this.configStore.listProviders()).filter(
         (provider) =>
           provider.enabled && isSupportedByokProviderId(provider.providerId),
-      )
-      .some((provider) => provider.models.length > 0);
+      ),
+    ).some((provider) => provider.models.length > 0);
 
     return {
       hasKnownInventory: desktopCloud.hasCloudInventory || hasByokInventory,
@@ -612,21 +609,31 @@ export class ModelProviderService {
     providerId: string,
     input: VerifyProviderBody,
   ): Promise<VerifyProviderResponse> {
-    if (!isSupportedByokProviderId(providerId)) {
+    if (
+      !isSupportedByokProviderId(providerId) &&
+      !isCustomProviderTemplate(providerId)
+    ) {
       return { valid: false, error: "Unsupported provider" };
     }
 
     const storedProvider = await this.configStore.getProvider(providerId);
+    const runtimePolicy = getProviderRuntimePolicy(providerId);
+    if (!runtimePolicy) {
+      return { valid: false, error: "Unsupported provider" };
+    }
+
     const apiKey =
       input.apiKey !== undefined
         ? input.apiKey.trim()
         : storedProvider?.apiKey || "";
+    const defaultBaseUrl =
+      providerId === "minimax" && storedProvider?.oauthRegion === "cn"
+        ? MINI_MAX_API_BASE_URL_CN
+        : (getDefaultProviderBaseUrls(providerId)[0] ?? null);
+    const resolvedBaseUrl =
+      input.baseUrl ?? storedProvider?.baseUrl ?? defaultBaseUrl;
 
-    const verifyUrl =
-      buildProviderUrl(
-        input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
-        "/models",
-      ) ?? "";
+    const verifyUrl = buildProviderUrl(resolvedBaseUrl, "/models") ?? "";
     if (verifyUrl.length === 0) {
       return { valid: false, error: "Unknown provider and no baseUrl given" };
     }
@@ -639,10 +646,7 @@ export class ModelProviderService {
         }
 
         const response = await proxyFetch(
-          buildProviderUrl(
-            input.baseUrl ?? PROVIDER_BASE_URLS[providerId] ?? null,
-            "/api/tags",
-          ) ?? verifyUrl,
+          buildProviderUrl(resolvedBaseUrl, "/api/tags") ?? verifyUrl,
           {
             headers: Object.keys(headers).length > 0 ? headers : undefined,
             timeoutMs: 10000,
@@ -670,7 +674,7 @@ export class ModelProviderService {
       }
 
       const headers: Record<string, string> =
-        providerId === "anthropic"
+        runtimePolicy.apiKind === "anthropic-messages"
           ? {
               "x-api-key": apiKey,
               "anthropic-version": "2023-06-01",
@@ -816,9 +820,11 @@ export class ModelProviderService {
     const currentId = config.runtime.defaultModelId;
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
     const inventory = await this.getInventoryStatus();
-    const providers = config.providers.filter(
-      (provider) =>
-        provider.enabled && isSupportedByokProviderId(provider.providerId),
+    const providers = toProviderInventoryInput(
+      (await this.configStore.listProviders()).filter(
+        (provider) =>
+          provider.enabled && isSupportedByokProviderId(provider.providerId),
+      ),
     );
 
     if (!inventory.hasKnownInventory) {
