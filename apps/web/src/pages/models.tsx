@@ -5,7 +5,11 @@ import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import { selectPreferredModel } from "@nexu/shared";
+import {
+  getProviderUiMetadata,
+  modelsPageProviderIds,
+  selectPreferredModel,
+} from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -245,106 +249,18 @@ function isSettingsTab(value: string | null): value is SettingsTab {
 
 // ── Provider metadata ─────────────────────────────────────────
 
-const PROVIDER_META: Record<
-  string,
-  {
-    name: string;
-    descriptionKey: string;
-    apiDocsUrl?: string;
-    apiKeyPlaceholder?: string;
-    defaultProxyUrl?: string;
-  }
-> = {
-  nexu: {
-    name: "nexu Official",
-    descriptionKey: "models.provider.nexu.description",
-  },
-  anthropic: {
-    name: "Anthropic",
-    descriptionKey: "models.provider.anthropic.description",
-    apiDocsUrl: "https://console.anthropic.com/settings/keys",
-    apiKeyPlaceholder: "sk-ant-api03-...",
-    defaultProxyUrl: "https://api.anthropic.com",
-  },
-  openai: {
-    name: "OpenAI",
-    descriptionKey: "models.provider.openai.description",
-    apiDocsUrl: "https://platform.openai.com/api-keys",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.openai.com/v1",
-  },
-  google: {
-    name: "Google AI",
-    descriptionKey: "models.provider.google.description",
-    apiDocsUrl: "https://aistudio.google.com/app/apikey",
-    apiKeyPlaceholder: "AIza...",
-    defaultProxyUrl: "https://generativelanguage.googleapis.com/v1beta",
-  },
-  ollama: {
-    name: "Ollama",
-    descriptionKey: "models.provider.ollama.description",
-    apiDocsUrl: "https://ollama.com/download",
-    apiKeyPlaceholder: "ollama-local",
-    defaultProxyUrl: "http://127.0.0.1:11434",
-  },
-  siliconflow: {
-    name: "SiliconFlow",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://cloud.siliconflow.cn/account/ak",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.siliconflow.cn/v1",
-  },
-  ppio: {
-    name: "PPIO",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://www.ppinfra.com/",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.ppinfra.com/v3/openai",
-  },
-  openrouter: {
-    name: "OpenRouter",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://openrouter.ai/settings/keys",
-    apiKeyPlaceholder: "sk-or-...",
-    defaultProxyUrl: "https://openrouter.ai/api/v1",
-  },
-  minimax: {
-    name: "MiniMax",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl:
-      "https://platform.minimaxi.com/user-center/basic-information/interface-key",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.minimax.io/anthropic",
-  },
-  kimi: {
-    name: "Kimi",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://platform.moonshot.cn/console/api-keys",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.moonshot.cn/v1",
-  },
-  glm: {
-    name: "GLM",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
-    apiKeyPlaceholder: "eyJ...",
-    defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
-  },
-  moonshot: {
-    name: "Kimi",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://platform.moonshot.cn/console/api-keys",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.moonshot.cn/v1",
-  },
-  zai: {
-    name: "GLM",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
-    apiKeyPlaceholder: "eyJ...",
-    defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
-  },
+const NEXU_PROVIDER_META: ReturnType<typeof getProviderUiMetadata> = {
+  displayName: "nexu Official",
+  descriptionKey: "models.provider.nexu.description",
 };
+
+function getModelsPageProviderMeta(providerId: string) {
+  if (providerId === "nexu") {
+    return NEXU_PROVIDER_META;
+  }
+
+  return getProviderUiMetadata(providerId);
+}
 
 // Well-known models per provider (shown when no verify result yet)
 const DEFAULT_MODELS: Record<string, string[]> = {
@@ -423,16 +339,13 @@ function buildProviders(
   }
 
   return Array.from(grouped.entries()).map(([providerId, models]) => {
-    const meta = PROVIDER_META[providerId] ?? {
-      name: providerId,
-      descriptionKey: "",
-    };
+    const meta = getModelsPageProviderMeta(providerId);
     return {
       id: providerId,
-      name: meta.name,
-      description: meta.descriptionKey,
+      name: meta?.displayName ?? providerId,
+      description: meta?.descriptionKey ?? "",
       managed: providerId === "nexu",
-      apiDocsUrl: meta.apiDocsUrl,
+      apiDocsUrl: meta?.apiDocsUrl,
       models,
     };
   });
@@ -487,25 +400,12 @@ async function verifyApiKey(
 // ── BYOK provider sidebar entries ─────────────────────────────
 // Always show these four as configurable, even if no key set yet
 
-const BYOK_PROVIDER_IDS = [
-  "anthropic",
-  "openai",
-  "google",
-  "ollama",
-  "siliconflow",
-  "ppio",
-  "openrouter",
-  "minimax",
-  "kimi",
-  "glm",
-] as const;
-
 const OLLAMA_DUMMY_API_KEY = "ollama-local";
 
 type ConfigurableProviderId =
   PutApiV1ProvidersByProviderIdData["path"]["providerId"];
 type ByokProviderId = Extract<
-  (typeof BYOK_PROVIDER_IDS)[number],
+  (typeof modelsPageProviderIds)[number],
   ConfigurableProviderId
 >;
 
@@ -813,8 +713,8 @@ export function ModelsPage() {
 
     if (newId && newId !== prev && !userSwitchRef.current) {
       const matched = models.find((m) => m.id === newId);
-      const providerName =
-        PROVIDER_META[matched?.provider ?? ""]?.name ?? matched?.provider;
+      const providerMeta = getModelsPageProviderMeta(matched?.provider ?? "");
+      const providerName = providerMeta?.displayName ?? matched?.provider;
       const label = providerName
         ? `${matched?.name ?? newId} (${providerName})`
         : (matched?.name ?? newId);
@@ -846,13 +746,13 @@ export function ModelsPage() {
     });
 
     // BYOK providers — always listed
-    for (const pid of BYOK_PROVIDER_IDS) {
-      const meta = PROVIDER_META[pid] ?? { name: pid, description: "" };
+    for (const pid of modelsPageProviderIds) {
+      const meta = getModelsPageProviderMeta(pid);
       const db = dbProviders.find((p) => p.providerId === pid);
       const modProv = providers.find((p) => p.id === pid);
       items.push({
         id: pid,
-        name: meta.name,
+        name: meta?.displayName ?? pid,
         modelCount: modProv?.models.length ?? 0,
         configured:
           (db?.hasApiKey ?? false) || (db?.hasOauthCredential ?? false),
@@ -1029,8 +929,8 @@ export function ModelsPage() {
                           id: activeProvider.id,
                           name: activeProvider.name,
                           description:
-                            PROVIDER_META[activeProvider.id]?.descriptionKey ??
-                            "",
+                            getModelsPageProviderMeta(activeProvider.id)
+                              ?.descriptionKey ?? "",
                           managed: true,
                           models: [],
                         }
@@ -1352,8 +1252,8 @@ function ByokProviderDetail({
   onSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
-  const meta = PROVIDER_META[providerId] ?? {
-    name: providerId,
+  const meta = getModelsPageProviderMeta(providerId) ?? {
+    displayName: providerId,
     descriptionKey: "",
     apiDocsUrl: undefined,
     apiKeyPlaceholder: "your-api-key",
@@ -1593,7 +1493,7 @@ function ByokProviderDetail({
         await saveProvider(providerId, {
           apiKey: effectiveApiKey || undefined,
           baseUrl: baseUrl || null,
-          displayName: meta.name,
+          displayName: meta.displayName,
           enabled: true,
           authMode: "apiKey",
           modelsJson: JSON.stringify(models),
@@ -1631,7 +1531,7 @@ function ByokProviderDetail({
       await saveProvider(providerId, {
         apiKey: effectiveApiKey || undefined,
         baseUrl: baseUrl || null,
-        displayName: meta.name,
+        displayName: meta.displayName,
         enabled: true,
         authMode: "apiKey",
         modelsJson: JSON.stringify(models),
@@ -1790,7 +1690,7 @@ function ByokProviderDetail({
           <div>
             <div className="flex items-center gap-2">
               <div className="text-[14px] font-semibold text-text-primary">
-                {meta.name}
+                {meta.displayName}
               </div>
               {meta.apiDocsUrl && (
                 <a
@@ -1805,7 +1705,7 @@ function ByokProviderDetail({
               )}
             </div>
             <div className="text-[11px] text-text-tertiary">
-              {t(meta.descriptionKey)}
+              {meta.descriptionKey ? t(meta.descriptionKey) : ""}
             </div>
           </div>
         </div>
