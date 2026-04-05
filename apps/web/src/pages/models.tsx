@@ -1919,7 +1919,7 @@ function ByokProviderDetail({
   );
 
   // ── Z.AI Coding Plan state ───────────────────────────
-  const isZaiProvider = providerId === "glm";
+  const isZaiProvider = providerId === "zai";
   const [codingPlanKey, setCodingPlanKey] = useState("");
   const [codingPlanRegion, setCodingPlanRegion] = useState<"global" | "cn">(
     "global",

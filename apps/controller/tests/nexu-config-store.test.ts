@@ -181,7 +181,7 @@ describe("NexuConfigStore", () => {
         api: "openai-completions",
       }),
     ]);
-    expect(config.providers).toEqual([]);
+    expect(config).not.toHaveProperty("providers");
     expect(config.schemaVersion).toBe(2);
   });
 
@@ -236,7 +236,7 @@ describe("NexuConfigStore", () => {
     expect(config.models.providers.openai?.models).toEqual([
       expect.objectContaining({ id: "gpt-4o", name: "gpt-4o" }),
     ]);
-    expect(config.providers).toEqual([]);
+    expect(config).not.toHaveProperty("providers");
     expect(config.schemaVersion).toBe(2);
   });
 
@@ -495,7 +495,7 @@ describe("NexuConfigStore", () => {
     ).toBe("gpt-4.1");
     expect(config.runtime.defaultModelId).toBe("google/gemini-2.5-flash");
     expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-pro");
-    expect(config.providers).toEqual([]);
+    expect(config).not.toHaveProperty("providers");
     expect(config.schemaVersion).toBe(2);
   });
 

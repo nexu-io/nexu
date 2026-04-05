@@ -731,15 +731,23 @@ export class ModelProviderService {
   async getMiniMaxOauthStatus(): Promise<MiniMaxOauthStatus> {
     await this.refreshMiniMaxOauthModelsIfNeeded();
 
+    const modelProviderConfig =
+      await this.configStore.getModelProviderConfigDocument();
+    const canonicalProvider = modelProviderConfig.providers.minimax;
     const provider = await this.configStore.getProvider("minimax");
     const connected =
-      provider?.authMode === "oauth" && provider.hasOauthCredential === true;
+      canonicalProvider?.auth === "oauth" &&
+      (typeof canonicalProvider.oauthProfileRef === "string" ||
+        provider?.hasOauthCredential === true);
     const inProgress = connected ? false : this.miniMaxOauthState.inProgress;
 
     this.miniMaxOauthState = {
       connected,
       inProgress,
-      region: provider?.oauthRegion ?? this.miniMaxOauthState.region,
+      region:
+        canonicalProvider?.oauthRegion ??
+        provider?.oauthRegion ??
+        this.miniMaxOauthState.region,
       error: this.miniMaxOauthState.error,
     };
 

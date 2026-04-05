@@ -548,7 +548,7 @@ const nexuConfigObjectSchema = z.object({
   bots: z.array(botResponseSchema).default([]),
   runtime: controllerRuntimeConfigSchema,
   models: persistedModelsConfigSchema.default({ mode: "merge", providers: {} }),
-  providers: z.array(controllerProviderSchema).default([]),
+  providers: z.array(controllerProviderSchema).optional(),
   integrations: z.array(integrationResponseSchema).default([]),
   channels: z.array(channelResponseSchema).default([]),
   templates: z.record(z.string(), controllerTemplateSchema).default({}),
@@ -620,7 +620,6 @@ export const nexuConfigSchema = z.preprocess((input) => {
         }
       : {},
     models,
-    providers: [],
     integrations: Array.isArray(candidate.integrations)
       ? candidate.integrations
       : [],

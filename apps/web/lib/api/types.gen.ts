@@ -2448,7 +2448,7 @@ export type PostApiV1ModelProvidersByProviderIdValidateData = {
         baseUrl?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai' | 'custom-openai' | 'custom-anthropic';
+        providerId: 'anthropic' | 'google' | 'openai' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'ollama' | 'zai' | 'minimax' | 'custom-openai' | 'custom-anthropic';
     };
     query?: never;
     url: '/api/v1/model-providers/{providerId}/validate';
@@ -2490,119 +2490,6 @@ export type PostApiV1ModelProvidersInstancesValidateResponses = {
 };
 
 export type PostApiV1ModelProvidersInstancesValidateResponse = PostApiV1ModelProvidersInstancesValidateResponses[keyof PostApiV1ModelProvidersInstancesValidateResponses];
-
-export type GetApiV1ProvidersData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/providers';
-};
-
-export type GetApiV1ProvidersResponses = {
-    /**
-     * Provider list
-     */
-    200: {
-        providers: Array<{
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        }>;
-    };
-};
-
-export type GetApiV1ProvidersResponse = GetApiV1ProvidersResponses[keyof GetApiV1ProvidersResponses];
-
-export type DeleteApiV1ProvidersByProviderIdData = {
-    body?: never;
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}';
-};
-
-export type DeleteApiV1ProvidersByProviderIdResponses = {
-    /**
-     * Deleted provider
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteApiV1ProvidersByProviderIdResponse = DeleteApiV1ProvidersByProviderIdResponses[keyof DeleteApiV1ProvidersByProviderIdResponses];
-
-export type PutApiV1ProvidersByProviderIdData = {
-    body?: {
-        apiKey?: string;
-        baseUrl?: string;
-        enabled?: boolean;
-        displayName?: string;
-        authMode?: 'apiKey' | 'oauth';
-        modelsJson?: string;
-    };
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}';
-};
-
-export type PutApiV1ProvidersByProviderIdResponses = {
-    /**
-     * Updated provider
-     */
-    200: {
-        provider: {
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        };
-    };
-    /**
-     * Created provider
-     */
-    201: {
-        provider: {
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        };
-    };
-};
-
-export type PutApiV1ProvidersByProviderIdResponse = PutApiV1ProvidersByProviderIdResponses[keyof PutApiV1ProvidersByProviderIdResponses];
 
 export type GetApiV1ModelProvidersMinimaxOauthStatusData = {
     body?: never;
@@ -2672,99 +2559,6 @@ export type PostApiV1ModelProvidersMinimaxOauthLoginResponses = {
 
 export type PostApiV1ModelProvidersMinimaxOauthLoginResponse = PostApiV1ModelProvidersMinimaxOauthLoginResponses[keyof PostApiV1ModelProvidersMinimaxOauthLoginResponses];
 
-export type GetApiV1ProvidersMinimaxOauthStatusData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/providers/minimax/oauth/status';
-};
-
-export type GetApiV1ProvidersMinimaxOauthStatusResponses = {
-    /**
-     * MiniMax OAuth status
-     */
-    200: {
-        connected: boolean;
-        inProgress: boolean;
-        region?: 'global' | 'cn';
-        error?: string;
-    };
-};
-
-export type GetApiV1ProvidersMinimaxOauthStatusResponse = GetApiV1ProvidersMinimaxOauthStatusResponses[keyof GetApiV1ProvidersMinimaxOauthStatusResponses];
-
-export type DeleteApiV1ProvidersMinimaxOauthLoginData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/providers/minimax/oauth/login';
-};
-
-export type DeleteApiV1ProvidersMinimaxOauthLoginResponses = {
-    /**
-     * Cancel MiniMax OAuth login
-     */
-    200: {
-        connected: boolean;
-        inProgress: boolean;
-        region?: 'global' | 'cn';
-        error?: string;
-        cancelled: boolean;
-    };
-};
-
-export type DeleteApiV1ProvidersMinimaxOauthLoginResponse = DeleteApiV1ProvidersMinimaxOauthLoginResponses[keyof DeleteApiV1ProvidersMinimaxOauthLoginResponses];
-
-export type PostApiV1ProvidersMinimaxOauthLoginData = {
-    body?: {
-        region: 'global' | 'cn';
-    };
-    path?: never;
-    query?: never;
-    url: '/api/v1/providers/minimax/oauth/login';
-};
-
-export type PostApiV1ProvidersMinimaxOauthLoginResponses = {
-    /**
-     * Start MiniMax OAuth login
-     */
-    200: {
-        connected: boolean;
-        inProgress: boolean;
-        region?: 'global' | 'cn';
-        error?: string;
-        started: boolean;
-        browserUrl?: string;
-    };
-};
-
-export type PostApiV1ProvidersMinimaxOauthLoginResponse = PostApiV1ProvidersMinimaxOauthLoginResponses[keyof PostApiV1ProvidersMinimaxOauthLoginResponses];
-
-export type PostApiV1ProvidersByProviderIdVerifyData = {
-    body?: {
-        apiKey?: string;
-        baseUrl?: string;
-    };
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai' | 'custom-openai' | 'custom-anthropic';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}/verify';
-};
-
-export type PostApiV1ProvidersByProviderIdVerifyResponses = {
-    /**
-     * Verify provider
-     */
-    200: {
-        valid: boolean;
-        models?: Array<string>;
-        error?: string;
-    };
-};
-
-export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
-
 export type PostApiV1ModelProvidersByProviderIdOauthStartData = {
     body?: never;
     path: {
@@ -2785,27 +2579,6 @@ export type PostApiV1ModelProvidersByProviderIdOauthStartResponses = {
 };
 
 export type PostApiV1ModelProvidersByProviderIdOauthStartResponse = PostApiV1ModelProvidersByProviderIdOauthStartResponses[keyof PostApiV1ModelProvidersByProviderIdOauthStartResponses];
-
-export type PostApiV1ProvidersByProviderIdOauthStartData = {
-    body?: never;
-    path: {
-        providerId: string;
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/start';
-};
-
-export type PostApiV1ProvidersByProviderIdOauthStartResponses = {
-    /**
-     * OAuth flow started
-     */
-    200: {
-        browserUrl?: string;
-        error?: string;
-    };
-};
-
-export type PostApiV1ProvidersByProviderIdOauthStartResponse = PostApiV1ProvidersByProviderIdOauthStartResponses[keyof PostApiV1ProvidersByProviderIdOauthStartResponses];
 
 export type GetApiV1ModelProvidersByProviderIdOauthStatusData = {
     body?: never;
@@ -2828,28 +2601,6 @@ export type GetApiV1ModelProvidersByProviderIdOauthStatusResponses = {
 };
 
 export type GetApiV1ModelProvidersByProviderIdOauthStatusResponse = GetApiV1ModelProvidersByProviderIdOauthStatusResponses[keyof GetApiV1ModelProvidersByProviderIdOauthStatusResponses];
-
-export type GetApiV1ProvidersByProviderIdOauthStatusData = {
-    body?: never;
-    path: {
-        providerId: string;
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/status';
-};
-
-export type GetApiV1ProvidersByProviderIdOauthStatusResponses = {
-    /**
-     * Current OAuth flow status
-     */
-    200: {
-        status: 'idle' | 'pending' | 'completed' | 'failed';
-        error?: string;
-        models?: Array<string>;
-    };
-};
-
-export type GetApiV1ProvidersByProviderIdOauthStatusResponse = GetApiV1ProvidersByProviderIdOauthStatusResponses[keyof GetApiV1ProvidersByProviderIdOauthStatusResponses];
 
 export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusData = {
     body?: never;
@@ -2874,29 +2625,6 @@ export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses = {
 
 export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponse = GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses[keyof GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses];
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusData = {
-    body?: never;
-    path: {
-        providerId: string;
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/provider-status';
-};
-
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponses = {
-    /**
-     * OAuth provider connection status
-     */
-    200: {
-        connected: boolean;
-        provider?: string;
-        expiresAt?: number;
-        remainingMs?: number;
-    };
-};
-
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponse = GetApiV1ProvidersByProviderIdOauthProviderStatusResponses[keyof GetApiV1ProvidersByProviderIdOauthProviderStatusResponses];
-
 export type PostApiV1ModelProvidersByProviderIdOauthDisconnectData = {
     body?: never;
     path: {
@@ -2916,26 +2644,6 @@ export type PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses = {
 };
 
 export type PostApiV1ModelProvidersByProviderIdOauthDisconnectResponse = PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses[keyof PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses];
-
-export type PostApiV1ProvidersByProviderIdOauthDisconnectData = {
-    body?: never;
-    path: {
-        providerId: string;
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/disconnect';
-};
-
-export type PostApiV1ProvidersByProviderIdOauthDisconnectResponses = {
-    /**
-     * OAuth provider disconnected
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type PostApiV1ProvidersByProviderIdOauthDisconnectResponse = PostApiV1ProvidersByProviderIdOauthDisconnectResponses[keyof PostApiV1ProvidersByProviderIdOauthDisconnectResponses];
 
 export type GetApiV1IntegrationsData = {
     body?: never;
