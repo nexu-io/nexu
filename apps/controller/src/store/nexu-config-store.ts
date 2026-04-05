@@ -1846,6 +1846,7 @@ export class NexuConfigStore {
     }
 
     await this.store.update((currentConfig) => {
+      const currentProfile = readLocalProfile(currentConfig);
       const sessions = readDesktopCloudSessions(currentConfig);
       const nextSession = sessions[nextProfile.name];
 
@@ -1853,6 +1854,12 @@ export class NexuConfigStore {
         ...currentConfig,
         desktop: {
           ...currentConfig.desktop,
+          localProfile: {
+            ...currentProfile,
+            authSource: nextSession?.connected
+              ? currentProfile.authSource
+              : "desktop-local",
+          },
           activeCloudProfileName: nextProfile.name,
           cloud: nextSession
             ? {
@@ -2179,7 +2186,7 @@ export class NexuConfigStore {
       providers: deriveLegacyProvidersFromCanonicalModelsConfig(models),
     }));
 
-    return models;
+    return (await this.getConfig()).models;
   }
 
   async syncManagedRuntimeGateway(input: {

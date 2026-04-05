@@ -5,7 +5,9 @@ import {
   botResponseSchema,
   buildCustomProviderKey,
   channelResponseSchema,
+  getCustomProviderProtocolFamily,
   getDefaultProviderBaseUrls,
+  getProviderAliasCandidates,
   getProviderRuntimePolicy,
   integrationResponseSchema,
   normalizeProviderId,
@@ -35,6 +37,202 @@ function normalizeProviderStorageKey(providerId: string): string | null {
   }
 
   return normalizeProviderId(providerId);
+}
+
+function encodeCustomProviderRuntimeKey(
+  templateId: string,
+  instanceId: string,
+): string {
+  return `${templateId}__${encodeURIComponent(instanceId)}`;
+}
+
+function getProviderRuntimeNamespace(providerKey: string): string | null {
+  const customProvider = parseCustomProviderKey(providerKey);
+  const providerId = customProvider?.templateId ?? providerKey;
+  const runtimePolicy = getProviderRuntimePolicy(providerId);
+  if (!runtimePolicy) {
+    return null;
+  }
+
+  return customProvider
+    ? (getCustomProviderProtocolFamily(customProvider.templateId) ??
+        runtimePolicy.canonicalOpenClawId)
+    : runtimePolicy.canonicalOpenClawId;
+}
+
+function stripRuntimeModelNamespace(
+  modelId: string,
+  namespace: string,
+): string {
+  return modelId.startsWith(`${namespace}/`)
+    ? modelId.slice(namespace.length + 1)
+    : modelId;
+}
+
+function matchPersistedModelRef(
+  modelsConfig: PersistedModelsConfig,
+  rawModelId: string,
+): { persistedKey: string; modelId: string } | null {
+  const prefixes = Object.entries(modelsConfig.providers).flatMap(
+    ([persistedKey]): Array<{
+      persistedKey: string;
+      prefix: string;
+      runtimeNamespace: string;
+    }> => {
+      const customProvider = parseCustomProviderKey(persistedKey);
+      const providerId = customProvider?.templateId ?? persistedKey;
+      const runtimePolicy = getProviderRuntimePolicy(providerId);
+      const runtimeNamespace = getProviderRuntimeNamespace(persistedKey);
+      if (!runtimePolicy || !runtimeNamespace) {
+        return [];
+      }
+
+      const candidatePrefixes = customProvider
+        ? [
+            persistedKey,
+            encodeCustomProviderRuntimeKey(
+              customProvider.templateId,
+              customProvider.instanceId,
+            ),
+          ]
+        : [
+            persistedKey,
+            ...getProviderAliasCandidates(providerId),
+            `byok_${runtimePolicy.canonicalOpenClawId}`,
+          ];
+
+      return Array.from(new Set(candidatePrefixes)).map((prefix) => ({
+        persistedKey,
+        prefix,
+        runtimeNamespace,
+      }));
+    },
+  );
+
+  prefixes.sort((left, right) => right.prefix.length - left.prefix.length);
+
+  for (const { persistedKey, prefix, runtimeNamespace } of prefixes) {
+    if (!rawModelId.startsWith(`${prefix}/`)) {
+      continue;
+    }
+
+    const remainder = rawModelId.slice(prefix.length + 1);
+    return {
+      persistedKey,
+      modelId: stripRuntimeModelNamespace(remainder, runtimeNamespace),
+    };
+  }
+
+  return null;
+}
+
+function normalizePersistedModelRef(
+  rawModelId: string,
+  modelsConfig: PersistedModelsConfig,
+): string {
+  const modelId = rawModelId.trim();
+  if (modelId.length === 0) {
+    return modelId;
+  }
+
+  if (
+    modelId.startsWith("link/") ||
+    modelId.startsWith("litellm/") ||
+    modelId.startsWith("debug/")
+  ) {
+    return modelId;
+  }
+
+  const matched = matchPersistedModelRef(modelsConfig, modelId);
+  if (matched) {
+    return `${matched.persistedKey}/${matched.modelId}`;
+  }
+
+  if (modelId.startsWith("byok_")) {
+    const slashIndex = modelId.indexOf("/");
+    if (slashIndex > 0 && slashIndex < modelId.length - 1) {
+      return normalizePersistedModelRef(
+        modelId.slice(slashIndex + 1),
+        modelsConfig,
+      );
+    }
+  }
+
+  const slashIndex = modelId.indexOf("/");
+  if (slashIndex <= 0 || slashIndex === modelId.length - 1) {
+    return modelId;
+  }
+
+  const providerPrefix = modelId.slice(0, slashIndex);
+  const remainder = modelId.slice(slashIndex + 1);
+  const normalizedProviderPrefix = normalizeProviderStorageKey(providerPrefix);
+  if (!normalizedProviderPrefix) {
+    return modelId;
+  }
+
+  return `${normalizedProviderPrefix}/${remainder}`;
+}
+
+function normalizeProviderModelId(
+  providerKey: string,
+  rawModelId: string,
+  modelsConfig: PersistedModelsConfig,
+): string {
+  const normalizedRef = normalizePersistedModelRef(rawModelId, modelsConfig);
+  if (normalizedRef.startsWith(`${providerKey}/`)) {
+    return normalizedRef.slice(providerKey.length + 1);
+  }
+
+  const runtimeNamespace = getProviderRuntimeNamespace(providerKey);
+  if (runtimeNamespace) {
+    return stripRuntimeModelNamespace(normalizedRef, runtimeNamespace);
+  }
+
+  return normalizedRef;
+}
+
+function normalizeCanonicalModelsConfig(
+  modelsConfig: PersistedModelsConfig,
+): PersistedModelsConfig {
+  const normalizedProviders = Object.fromEntries(
+    Object.entries(modelsConfig.providers).flatMap(
+      ([providerKey, provider]) => {
+        const normalizedProviderKey = normalizeProviderStorageKey(providerKey);
+        if (!normalizedProviderKey) {
+          return [];
+        }
+
+        return [[normalizedProviderKey, provider]];
+      },
+    ),
+  );
+
+  const normalizedConfig: PersistedModelsConfig = {
+    ...modelsConfig,
+    providers: normalizedProviders,
+  };
+
+  return {
+    ...normalizedConfig,
+    providers: Object.fromEntries(
+      Object.entries(normalizedConfig.providers).map(
+        ([providerKey, provider]) => [
+          providerKey,
+          {
+            ...provider,
+            models: provider.models.map((model) => ({
+              ...model,
+              id: normalizeProviderModelId(
+                providerKey,
+                model.id,
+                normalizedConfig,
+              ),
+            })),
+          },
+        ],
+      ),
+    ),
+  };
 }
 
 function buildCanonicalModelEntry(
@@ -225,10 +423,12 @@ function normalizeModelsConfigInput(
 ): PersistedModelsConfig {
   const parsedModels = persistedModelsConfigSchema.safeParse(candidateModels);
   if (parsedModels.success) {
-    return parsedModels.data;
+    return normalizeCanonicalModelsConfig(parsedModels.data);
   }
 
-  return migrateLegacyProvidersToCanonicalModelsConfig(legacyProviders);
+  return normalizeCanonicalModelsConfig(
+    migrateLegacyProvidersToCanonicalModelsConfig(legacyProviders),
+  );
 }
 
 export const controllerRuntimeConfigSchema = z
@@ -351,6 +551,14 @@ export const nexuConfigSchema = z.preprocess((input) => {
     ? candidate.providers
     : [];
   const models = normalizeModelsConfigInput(candidate.models, legacyProviders);
+  const runtimeCandidate =
+    typeof candidate.runtime === "object" && candidate.runtime !== null
+      ? (candidate.runtime as Record<string, unknown>)
+      : null;
+  const desktopCandidate =
+    typeof candidate.desktop === "object" && candidate.desktop !== null
+      ? (candidate.desktop as Record<string, unknown>)
+      : null;
   const providers =
     legacyProviders.length > 0 && candidate.models === undefined
       ? legacyProviders
@@ -367,11 +575,31 @@ export const nexuConfigSchema = z.preprocess((input) => {
       typeof candidate.app === "object" && candidate.app !== null
         ? candidate.app
         : {},
-    bots: Array.isArray(candidate.bots) ? candidate.bots : [],
-    runtime:
-      typeof candidate.runtime === "object" && candidate.runtime !== null
-        ? candidate.runtime
-        : {},
+    bots: Array.isArray(candidate.bots)
+      ? candidate.bots.map((bot) =>
+          typeof bot === "object" &&
+          bot !== null &&
+          typeof bot.modelId === "string"
+            ? {
+                ...bot,
+                modelId: normalizePersistedModelRef(bot.modelId, models),
+              }
+            : bot,
+        )
+      : [],
+    runtime: runtimeCandidate
+      ? {
+          ...runtimeCandidate,
+          ...(typeof runtimeCandidate.defaultModelId === "string"
+            ? {
+                defaultModelId: normalizePersistedModelRef(
+                  runtimeCandidate.defaultModelId,
+                  models,
+                ),
+              }
+            : {}),
+        }
+      : {},
     models,
     providers,
     integrations: Array.isArray(candidate.integrations)
@@ -382,10 +610,19 @@ export const nexuConfigSchema = z.preprocess((input) => {
       typeof candidate.templates === "object" && candidate.templates !== null
         ? candidate.templates
         : {},
-    desktop:
-      typeof candidate.desktop === "object" && candidate.desktop !== null
-        ? candidate.desktop
-        : {},
+    desktop: desktopCandidate
+      ? {
+          ...desktopCandidate,
+          ...(typeof desktopCandidate.selectedModelId === "string"
+            ? {
+                selectedModelId: normalizePersistedModelRef(
+                  desktopCandidate.selectedModelId,
+                  models,
+                ),
+              }
+            : {}),
+        }
+      : {},
     secrets:
       typeof candidate.secrets === "object" && candidate.secrets !== null
         ? candidate.secrets

@@ -16,8 +16,6 @@ describe("NexuConfigStore", () => {
       port: 3010,
       host: "127.0.0.1",
       webUrl: "http://localhost:5173",
-      nexuCloudUrl: "https://nexu.io",
-      nexuLinkUrl: "https://link.nexu.io",
       nexuHomeDir: path.join(rootDir, ".nexu"),
       nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
       artifactsIndexPath: path.join(
@@ -34,13 +32,11 @@ describe("NexuConfigStore", () => {
       openclawStateDir: path.join(rootDir, ".openclaw"),
       openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
       openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
+      userSkillsDir: path.join(rootDir, ".agents", "skills"),
+      openclawBuiltinExtensionsDir: null,
       openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
+      bundledRuntimePluginsDir: path.join(rootDir, "bundled-runtime-plugins"),
       runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
-      openclawCuratedSkillsDir: path.join(
-        rootDir,
-        ".openclaw",
-        "bundled-skills",
-      ),
       openclawRuntimeModelStatePath: path.join(
         rootDir,
         ".openclaw",
@@ -48,6 +44,7 @@ describe("NexuConfigStore", () => {
       ),
       skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
       skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+      analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
       staticSkillsDir: undefined,
       platformTemplatesDir: undefined,
       openclawWorkspaceTemplatesDir: path.join(
@@ -55,7 +52,11 @@ describe("NexuConfigStore", () => {
         ".openclaw",
         "workspace-templates",
       ),
+      openclawOwnershipMode: "external",
+      openclawBaseUrl: "http://127.0.0.1:18789",
       openclawBin: "openclaw",
+      openclawLogDir: path.join(rootDir, ".nexu", "logs", "openclaw"),
+      openclawLaunchdLabel: null,
       litellmBaseUrl: null,
       litellmApiKey: null,
       openclawGatewayPort: 18789,
@@ -65,6 +66,7 @@ describe("NexuConfigStore", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
+      amplitudeApiKey: undefined,
     };
   });
 
@@ -298,6 +300,197 @@ describe("NexuConfigStore", () => {
       hasApiKey: true,
       modelsJson: JSON.stringify(["gpt-4o-mini"]),
     });
+  });
+
+  it("normalizes persisted saved model refs on read", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [
+            {
+              id: "bot-1",
+              name: "Assistant",
+              slug: "assistant",
+              poolId: null,
+              status: "active",
+              modelId: "custom-openai__team%20gateway/openai/gpt-4.1",
+              systemPrompt: null,
+              createdAt: "2026-04-05T00:00:00.000Z",
+              updatedAt: "2026-04-05T00:00:00.000Z",
+            },
+          ],
+          runtime: {
+            defaultModelId: "byok_openai/openai/gpt-4.1",
+          },
+          models: {
+            mode: "merge",
+            providers: {
+              openai: {
+                enabled: true,
+                displayName: "OpenAI",
+                baseUrl: "https://api.openai.com/v1",
+                auth: "api-key",
+                api: "openai-completions",
+                apiKey: "sk-test",
+                models: [
+                  {
+                    id: "openai/gpt-4.1",
+                    name: "gpt-4.1",
+                    api: "openai-completions",
+                    reasoning: false,
+                    input: ["text"],
+                    cost: {
+                      input: 0,
+                      output: 0,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    contextWindow: 128000,
+                    maxTokens: 16384,
+                  },
+                ],
+              },
+              "custom-openai/team gateway": {
+                providerTemplateId: "custom-openai",
+                instanceId: "team gateway",
+                enabled: true,
+                displayName: "Team Gateway",
+                baseUrl: "https://gateway.example.com/v1",
+                auth: "api-key",
+                api: "openai-completions",
+                apiKey: "sk-custom",
+                models: [
+                  {
+                    id: "openai/gpt-4.1",
+                    name: "gpt-4.1",
+                    api: "openai-completions",
+                    reasoning: false,
+                    input: ["text"],
+                    cost: {
+                      input: 0,
+                      output: 0,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    contextWindow: 128000,
+                    maxTokens: 16384,
+                  },
+                ],
+              },
+            },
+          },
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {
+            selectedModelId: "google/gemini-2.5-flash",
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const config = await store.getConfig();
+
+    expect(config.runtime.defaultModelId).toBe("openai/gpt-4.1");
+    expect(config.bots[0]?.modelId).toBe("custom-openai/team gateway/gpt-4.1");
+    expect(config.desktop.selectedModelId).toBe("google/gemini-2.5-flash");
+    expect(config.models.providers.openai?.models[0]?.id).toBe("gpt-4.1");
+    expect(
+      config.models.providers["custom-openai/team gateway"]?.models[0]?.id,
+    ).toBe("gpt-4.1");
+  });
+
+  it("rewrites saved model refs to canonical form on save", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.setModelProviderConfigDocument({
+      mode: "merge",
+      providers: {
+        google: {
+          enabled: true,
+          displayName: "Gemini",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+          auth: "api-key",
+          api: "openai-completions",
+          apiKey: "gemini-key",
+          models: [
+            {
+              id: "google/gemini-2.5-flash",
+              name: "gemini-2.5-flash",
+              api: "openai-completions",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 128000,
+              maxTokens: 16384,
+            },
+          ],
+        },
+        "custom-openai/team gateway": {
+          providerTemplateId: "custom-openai",
+          instanceId: "team gateway",
+          enabled: true,
+          displayName: "Team Gateway",
+          baseUrl: "https://gateway.example.com/v1",
+          auth: "api-key",
+          api: "openai-completions",
+          apiKey: "sk-custom",
+          models: [
+            {
+              id: "custom-openai/team gateway/gpt-4.1",
+              name: "gpt-4.1",
+              api: "openai-completions",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 128000,
+              maxTokens: 16384,
+            },
+          ],
+        },
+      },
+    });
+    await store.setDefaultModel("google/gemini-2.5-flash");
+    const bot = await store.createBot({
+      name: "Assistant",
+      slug: "assistant",
+      modelId: "custom-openai__team%20gateway/openai/gpt-4.1",
+    });
+    await store.updateBot(bot.id, {
+      modelId: "byok_gemini/gemini/gemini-2.5-pro",
+    });
+
+    const config = await store.getConfig();
+
+    expect(config.models.providers.google?.models[0]?.id).toBe(
+      "gemini-2.5-flash",
+    );
+    expect(
+      config.models.providers["custom-openai/team gateway"]?.models[0]?.id,
+    ).toBe("gpt-4.1");
+    expect(config.runtime.defaultModelId).toBe("google/gemini-2.5-flash");
+    expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-pro");
   });
 
   it("recovers from a broken primary config using backup-compatible data", async () => {

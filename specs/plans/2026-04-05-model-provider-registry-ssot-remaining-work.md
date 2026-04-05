@@ -45,10 +45,10 @@ Related plan:
 
 ### 3. Finish persisted model-ref migration
 
-- [ ] Rewrite legacy provider-prefixed refs to canonical form on save
-- [ ] Remove product-facing dependence on `byok_*` refs
-- [ ] Verify custom-instance runtime refs stay deterministic across restarts
-- [ ] Audit all persisted model-ref locations that still need rewrite coverage
+- [x] Rewrite legacy provider-prefixed refs to canonical form on save
+- [x] Remove product-facing dependence on `byok_*` refs
+- [x] Verify custom-instance runtime refs stay deterministic across restarts
+- [x] Audit all persisted model-ref locations that still need rewrite coverage
 
 ### 4. Cut over persistence to canonical-only writes
 
