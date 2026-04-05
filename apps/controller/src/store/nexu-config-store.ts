@@ -34,6 +34,8 @@ import {
   type ControllerRuntimeConfig,
   type NexuConfig,
   cloudProfilesFileSchema,
+  deriveLegacyProvidersFromCanonicalModelsConfig,
+  migrateLegacyProvidersToCanonicalModelsConfig,
   nexuConfigSchema,
   type storedProviderResponseSchema,
 } from "./schemas.js";
@@ -302,6 +304,10 @@ export class NexuConfigStore {
             authMode: env.openclawGatewayToken ? "token" : "none",
           },
           defaultModelId: env.defaultModelId,
+        },
+        models: {
+          mode: "merge",
+          providers: {},
         },
         providers: [],
         integrations: [],
@@ -1197,6 +1203,14 @@ export class NexuConfigStore {
 
       return {
         ...config,
+        models: {
+          ...config.models,
+          providers: {
+            ...config.models.providers,
+            ...migrateLegacyProvidersToCanonicalModelsConfig([nextProvider])
+              .providers,
+          },
+        },
         providers: existing
           ? config.providers.map((item) =>
               item.providerId === providerId ? nextProvider : item,
@@ -1272,6 +1286,14 @@ export class NexuConfigStore {
 
       return {
         ...config,
+        models: {
+          ...config.models,
+          providers: {
+            ...config.models.providers,
+            ...migrateLegacyProvidersToCanonicalModelsConfig([nextProvider])
+              .providers,
+          },
+        },
         providers: existing
           ? config.providers.map((item) =>
               item.providerId === providerId ? nextProvider : item,
@@ -1290,17 +1312,36 @@ export class NexuConfigStore {
   async deleteProvider(providerId: string): Promise<boolean> {
     let deleted = false;
 
-    await this.store.update((config) => ({
-      ...config,
-      providers: config.providers.filter((provider) => {
+    await this.store.update((config) => {
+      const nextProviders = config.providers.filter((provider) => {
         if (provider.providerId === providerId) {
           deleted = true;
           return false;
         }
 
         return true;
-      }),
-    }));
+      });
+
+      const nextCanonicalProviders = {
+        ...config.models.providers,
+      };
+      delete nextCanonicalProviders[providerId];
+
+      return {
+        ...config,
+        models: {
+          ...config.models,
+          providers: nextCanonicalProviders,
+        },
+        providers:
+          nextProviders.length > 0
+            ? nextProviders
+            : deriveLegacyProvidersFromCanonicalModelsConfig({
+                ...config.models,
+                providers: nextCanonicalProviders,
+              }),
+      };
+    });
 
     return deleted;
   }

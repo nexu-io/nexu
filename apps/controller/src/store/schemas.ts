@@ -1,10 +1,226 @@
 import {
+  type ModelProviderConfig,
+  type ModelProviderModelEntry,
+  type PersistedModelsConfig,
   botResponseSchema,
+  buildCustomProviderKey,
   channelResponseSchema,
+  getDefaultProviderBaseUrls,
+  getProviderRuntimePolicy,
   integrationResponseSchema,
+  normalizeProviderId,
+  parseCustomProviderKey,
+  persistedModelsConfigSchema,
   providerResponseSchema,
 } from "@nexu/shared";
 import { z } from "zod";
+
+const LEGACY_PROVIDER_MIGRATION_CREATED_AT = "1970-01-01T00:00:00.000Z";
+
+type ProviderMetadataRecord = Record<string, unknown>;
+
+function getMetadataRecord(value: unknown): ProviderMetadataRecord | undefined {
+  return typeof value === "object" && value !== null
+    ? (value as ProviderMetadataRecord)
+    : undefined;
+}
+
+function normalizeProviderStorageKey(providerId: string): string | null {
+  const customProvider = parseCustomProviderKey(providerId);
+  if (customProvider) {
+    return buildCustomProviderKey(
+      customProvider.templateId,
+      customProvider.instanceId,
+    );
+  }
+
+  return normalizeProviderId(providerId);
+}
+
+function buildCanonicalModelEntry(
+  providerKey: string,
+  modelId: string,
+): ModelProviderModelEntry {
+  const customProvider = parseCustomProviderKey(providerKey);
+  const providerPolicy = getProviderRuntimePolicy(
+    customProvider?.templateId ?? providerKey,
+  );
+
+  return {
+    id: modelId,
+    name: modelId,
+    api: providerPolicy?.apiKind,
+    reasoning: false,
+    input: ["text"],
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+    contextWindow: 0,
+    maxTokens: 0,
+  };
+}
+
+function buildCanonicalProviderBaseUrl(
+  providerId: string,
+  baseUrl: string | null,
+) {
+  if (typeof baseUrl === "string" && baseUrl.trim().length > 0) {
+    return baseUrl;
+  }
+
+  return getDefaultProviderBaseUrls(providerId)[0] ?? null;
+}
+
+function migrateLegacyProviderToCanonicalConfig(
+  provider: ControllerProvider,
+): [string, ModelProviderConfig] | null {
+  const providerKey = normalizeProviderStorageKey(provider.providerId);
+  if (!providerKey) {
+    return null;
+  }
+
+  const customProvider = parseCustomProviderKey(providerKey);
+  const runtimePolicy = getProviderRuntimePolicy(
+    customProvider?.templateId ?? providerKey,
+  );
+  const baseUrl = buildCanonicalProviderBaseUrl(
+    provider.providerId,
+    provider.baseUrl,
+  );
+
+  if (baseUrl === null) {
+    return null;
+  }
+
+  const metadata: ProviderMetadataRecord = {
+    legacyId: provider.id,
+    legacyCreatedAt: provider.createdAt,
+    legacyUpdatedAt: provider.updatedAt,
+  };
+
+  if (provider.oauthCredential) {
+    metadata.legacyOauthCredential = provider.oauthCredential;
+  }
+
+  const nextProvider: ModelProviderConfig = {
+    ...(customProvider
+      ? {
+          providerTemplateId: customProvider.templateId,
+          instanceId: customProvider.instanceId,
+        }
+      : {}),
+    enabled: provider.enabled,
+    displayName: provider.displayName ?? undefined,
+    baseUrl,
+    ...(provider.authMode === "oauth"
+      ? { auth: "oauth" as const }
+      : provider.apiKey
+        ? { auth: "api-key" as const }
+        : {}),
+    api: runtimePolicy?.apiKind,
+    ...(provider.authMode === "apiKey" && provider.apiKey
+      ? { apiKey: provider.apiKey }
+      : {}),
+    ...(provider.oauthRegion ? { oauthRegion: provider.oauthRegion } : {}),
+    ...(provider.oauthCredential?.provider
+      ? { oauthProfileRef: provider.oauthCredential.provider }
+      : {}),
+    models: provider.models.map((modelId) =>
+      buildCanonicalModelEntry(providerKey, modelId),
+    ),
+    metadata,
+  };
+
+  return [providerKey, nextProvider];
+}
+
+export function migrateLegacyProvidersToCanonicalModelsConfig(
+  providers: ReadonlyArray<ControllerProvider>,
+): PersistedModelsConfig {
+  const nextProviders: Record<string, ModelProviderConfig> = {};
+
+  for (const provider of providers) {
+    const migrated = migrateLegacyProviderToCanonicalConfig(provider);
+    if (!migrated) {
+      continue;
+    }
+
+    const [providerKey, nextProvider] = migrated;
+    nextProviders[providerKey] = nextProvider;
+  }
+
+  return {
+    mode: "merge",
+    providers: nextProviders,
+  };
+}
+
+function migrateCanonicalProviderToLegacyProvider(
+  providerKey: string,
+  provider: ModelProviderConfig,
+): ControllerProvider | null {
+  const metadata = getMetadataRecord(provider.metadata);
+  const providerId = providerKey;
+  const legacyId =
+    typeof metadata?.legacyId === "string" && metadata.legacyId.length > 0
+      ? metadata.legacyId
+      : providerId;
+  const createdAt =
+    typeof metadata?.legacyCreatedAt === "string" &&
+    metadata.legacyCreatedAt.length > 0
+      ? metadata.legacyCreatedAt
+      : LEGACY_PROVIDER_MIGRATION_CREATED_AT;
+  const updatedAt =
+    typeof metadata?.legacyUpdatedAt === "string" &&
+    metadata.legacyUpdatedAt.length > 0
+      ? metadata.legacyUpdatedAt
+      : createdAt;
+  const oauthCredential =
+    typeof metadata?.legacyOauthCredential === "object" &&
+    metadata.legacyOauthCredential !== null
+      ? (metadata.legacyOauthCredential as ControllerProvider["oauthCredential"])
+      : null;
+
+  return {
+    id: legacyId,
+    providerId,
+    displayName: provider.displayName ?? null,
+    enabled: provider.enabled,
+    baseUrl: provider.baseUrl,
+    authMode: provider.auth === "oauth" ? "oauth" : "apiKey",
+    apiKey: typeof provider.apiKey === "string" ? provider.apiKey : null,
+    oauthRegion: provider.oauthRegion ?? null,
+    oauthCredential,
+    models: provider.models.map((model) => model.id),
+    createdAt,
+    updatedAt,
+  };
+}
+
+export function deriveLegacyProvidersFromCanonicalModelsConfig(
+  modelsConfig: PersistedModelsConfig,
+): ControllerProvider[] {
+  return Object.entries(modelsConfig.providers)
+    .map(([providerKey, provider]) =>
+      migrateCanonicalProviderToLegacyProvider(providerKey, provider),
+    )
+    .filter((provider): provider is ControllerProvider => provider !== null);
+}
+
+function normalizeModelsConfigInput(
+  candidateModels: unknown,
+  legacyProviders: ReadonlyArray<ControllerProvider>,
+): PersistedModelsConfig {
+  const parsedModels = persistedModelsConfigSchema.safeParse(candidateModels);
+  if (parsedModels.success) {
+    return parsedModels.data;
+  }
+
+  return migrateLegacyProvidersToCanonicalModelsConfig(legacyProviders);
+}
 
 export const controllerRuntimeConfigSchema = z
   .object({
@@ -100,6 +316,7 @@ const nexuConfigObjectSchema = z.object({
   app: z.record(z.unknown()).default({}),
   bots: z.array(botResponseSchema).default([]),
   runtime: controllerRuntimeConfigSchema,
+  models: persistedModelsConfigSchema.default({ mode: "merge", providers: {} }),
   providers: z.array(controllerProviderSchema).default([]),
   integrations: z.array(integrationResponseSchema).default([]),
   channels: z.array(channelResponseSchema).default([]),
@@ -121,6 +338,15 @@ export const nexuConfigSchema = z.preprocess((input) => {
   }
 
   const candidate = input as Record<string, unknown>;
+  const legacyProviders = Array.isArray(candidate.providers)
+    ? candidate.providers
+    : [];
+  const models = normalizeModelsConfigInput(candidate.models, legacyProviders);
+  const providers =
+    legacyProviders.length > 0 && candidate.models === undefined
+      ? legacyProviders
+      : deriveLegacyProvidersFromCanonicalModelsConfig(models);
+
   return {
     $schema:
       typeof candidate.$schema === "string"
@@ -137,7 +363,8 @@ export const nexuConfigSchema = z.preprocess((input) => {
       typeof candidate.runtime === "object" && candidate.runtime !== null
         ? candidate.runtime
         : {},
-    providers: Array.isArray(candidate.providers) ? candidate.providers : [],
+    models,
+    providers,
     integrations: Array.isArray(candidate.integrations)
       ? candidate.integrations
       : [],

@@ -152,6 +152,154 @@ describe("NexuConfigStore", () => {
     expect(result.provider.apiKey).toBeNull();
   });
 
+  it("dual-writes provider changes into canonical config.models.providers", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.upsertProvider("openai", {
+      apiKey: "sk-test",
+      displayName: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      modelsJson: JSON.stringify(["gpt-5.4"]),
+    });
+
+    const config = await store.getConfig();
+
+    expect(config.models.providers.openai).toMatchObject({
+      enabled: true,
+      displayName: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "api-key",
+      api: "openai-completions",
+      apiKey: "sk-test",
+    });
+    expect(config.models.providers.openai?.models).toEqual([
+      expect.objectContaining({
+        id: "gpt-5.4",
+        name: "gpt-5.4",
+        api: "openai-completions",
+      }),
+    ]);
+  });
+
+  it("migrates legacy config.providers into canonical config.models.providers on read", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [],
+          runtime: {},
+          providers: [
+            {
+              id: "provider-openai",
+              providerId: "openai",
+              displayName: "OpenAI",
+              enabled: true,
+              baseUrl: "https://api.openai.com/v1",
+              authMode: "apiKey",
+              apiKey: "sk-test",
+              oauthRegion: null,
+              oauthCredential: null,
+              models: ["gpt-4o"],
+              createdAt: "2026-04-04T00:00:00.000Z",
+              updatedAt: "2026-04-04T00:00:00.000Z",
+            },
+          ],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {},
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const config = await store.getConfig();
+
+    expect(config.models.providers.openai).toMatchObject({
+      displayName: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "api-key",
+      apiKey: "sk-test",
+    });
+    expect(config.models.providers.openai?.models).toEqual([
+      expect.objectContaining({ id: "gpt-4o", name: "gpt-4o" }),
+    ]);
+  });
+
+  it("derives legacy provider compatibility state from canonical config.models.providers", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [],
+          runtime: {},
+          models: {
+            mode: "merge",
+            providers: {
+              openai: {
+                enabled: true,
+                displayName: "OpenAI",
+                baseUrl: "https://api.openai.com/v1",
+                auth: "api-key",
+                api: "openai-completions",
+                apiKey: "sk-test",
+                models: [
+                  {
+                    id: "gpt-4o-mini",
+                    name: "gpt-4o-mini",
+                    api: "openai-completions",
+                    reasoning: false,
+                    input: ["text"],
+                    cost: {
+                      input: 0,
+                      output: 0,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    contextWindow: 128000,
+                    maxTokens: 16384,
+                  },
+                ],
+              },
+            },
+          },
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {},
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const providers = await store.listProviders();
+
+    expect(providers).toHaveLength(1);
+    expect(providers[0]).toMatchObject({
+      providerId: "openai",
+      displayName: "OpenAI",
+      hasApiKey: true,
+      modelsJson: JSON.stringify(["gpt-4o-mini"]),
+    });
+  });
+
   it("recovers from a broken primary config using backup-compatible data", async () => {
     const brokenConfigPath = env.nexuConfigPath;
     const backupPath = `${brokenConfigPath}.bak`;
