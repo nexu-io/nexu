@@ -151,62 +151,6 @@ export async function createContainer(): Promise<ControllerContainer> {
     }
   };
 
-  // Send compaction status message to channel when compaction starts
-  openclawProcess.onRuntimeEvent((event) => {
-    if (event.event !== "compaction.started") return;
-    const payload = event.payload as
-      | {
-          sessionKey?: string;
-          channel?: string;
-        }
-      | undefined;
-    if (!payload?.sessionKey) return;
-
-    // Parse target from sessionKey: agent:<id>:direct:<userId>
-    const parts = (payload.sessionKey as string).split(":");
-    const to = parts.length >= 4 ? parts.slice(3).join(":") : undefined;
-    if (!to) return;
-
-    // Resolve channel: prefer payload.channel, then infer from config
-    const resolveChannel = async (): Promise<string | undefined> => {
-      if (typeof payload.channel === "string" && payload.channel)
-        return payload.channel;
-      // Infer from first connected channel in config
-      try {
-        const cfg = await configStore.getConfig();
-        return cfg.channels.find((ch) => ch.status === "connected")
-          ?.channelType;
-      } catch {
-        return undefined;
-      }
-    };
-
-    void (async () => {
-      const channel = await resolveChannel();
-      if (!channel) return;
-      const l = await configStore
-        .getDesktopLocale()
-        .catch(() => "zh-CN" as const);
-      const message =
-        l === "en"
-          ? "⏳ Compacting conversation history, estimated ~30s..."
-          : "⏳ 正在整理对话记录，预计30秒内完成...";
-      await gatewayService
-        .sendChannelMessage({
-          to,
-          message,
-          channel,
-          sessionKey: payload.sessionKey,
-        })
-        .catch((err) => {
-          logger.warn(
-            { error: err instanceof Error ? err.message : String(err) },
-            "compaction_status_send_failed",
-          );
-        });
-    })();
-  });
-
   return {
     env,
     gatewayClient,
