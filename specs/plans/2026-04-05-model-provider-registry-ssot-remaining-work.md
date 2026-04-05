@@ -1,0 +1,72 @@
+# Model Provider Registry + OpenClaw SSoT Remaining Work
+
+Date: 2026-04-05
+
+Related plan:
+
+- `specs/plans/2026-04-04-model-provider-registry-ssot-plan.md`
+
+## Strict implementation sequence
+
+### 1. Expand registry + alias coverage first
+
+- [x] Add missing registry entries:
+  - [x] `mistral`
+  - [x] `xai`
+  - [x] `together`
+  - [x] `huggingface`
+  - [x] `qwen`
+  - [x] `volcengine`
+  - [x] `qianfan`
+  - [x] `vllm`
+  - [x] `byteplus`
+  - [x] `venice`
+  - [x] `github-copilot`
+  - [x] `xiaomi`
+  - [x] `chutes`
+- [x] Add/verify alias normalization for the new entries
+- [x] Decide which of those providers should be visible in the Models UI vs hidden
+
+### 2. Finalize the API surface before removing legacy routes
+
+- [ ] Decide whether instance-oriented APIs are required
+- [ ] If yes, add:
+  - [ ] `POST /api/v1/model-providers/instances`
+  - [ ] `PUT /api/v1/model-providers/instances/{instanceKey}`
+  - [ ] `DELETE /api/v1/model-providers/instances/{instanceKey}`
+  - [ ] `POST /api/v1/model-providers/instances/{instanceKey}/validate`
+- [ ] Confirm long-term validation API shape for protocol-aware custom providers
+
+### 3. Finish persisted model-ref migration
+
+- [ ] Rewrite legacy provider-prefixed refs to canonical form on save
+- [ ] Remove product-facing dependence on `byok_*` refs
+- [ ] Verify custom-instance runtime refs stay deterministic across restarts
+- [ ] Audit all persisted model-ref locations that still need rewrite coverage
+
+### 4. Cut over persistence to canonical-only writes
+
+- [ ] Stop writing legacy `config.providers`
+- [ ] Keep migration-read compatibility only for old configs
+- [ ] Add a migration/version marker for the canonical `config.models.providers` cutover
+
+### 5. Remove transitional legacy APIs and controller assumptions
+
+- [ ] Remove legacy `/api/v1/providers/*` CRUD routes after consumers move off them
+- [ ] Remove remaining legacy provider assumptions from controller services/store
+
+### 6. Final cleanup
+
+- [ ] Verify web flows use registry + canonical config only
+- [ ] Verify controller sync/compiler paths no longer depend on legacy provider semantics
+- [ ] Delete any leftover compatibility-only code once the migration window closes
+
+## Done when
+
+- [ ] `config.models.providers` is the only canonical persisted provider config
+- [ ] legacy `config.providers` is read-only for migration or deleted
+- [ ] legacy provider CRUD APIs are removed
+- [ ] registry contains the agreed provider inventory + alias coverage
+- [ ] web flows use registry + canonical config only
+- [ ] saved model refs are canonicalized
+- [ ] custom provider keys/runtime refs are stable and deterministic
