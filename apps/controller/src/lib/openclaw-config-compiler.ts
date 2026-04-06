@@ -425,11 +425,19 @@ function compilePlugins(
     ),
   ];
 
+  const platformPluginIds = [
+    "nexu-runtime-model",
+    "nexu-credit-guard",
+    "nexu-platform-bootstrap",
+  ];
+
   return {
     load: {
       paths: [env.openclawExtensionsDir],
     },
-    ...(connectedPluginIds.length > 0 ? { allow: connectedPluginIds } : {}),
+    ...(connectedPluginIds.length > 0
+      ? { allow: [...connectedPluginIds, ...platformPluginIds] }
+      : {}),
     entries: {
       feishu: {
         enabled: true,
@@ -460,6 +468,12 @@ function compilePlugins(
         : {}),
       "nexu-runtime-model": {
         enabled: true,
+      },
+      "nexu-credit-guard": {
+        enabled: true,
+        config: {
+          contactUrl: "https://nexu.app/contact",
+        },
       },
       ...(hasMiniMaxOauth
         ? {
