@@ -50,8 +50,16 @@ function getCanonicalModelsConfig(config: NexuConfig): PersistedModelsConfig {
 
 function getProviderSecretValue(
   secret: ProviderSecretInput | undefined,
-): string | null {
-  return typeof secret === "string" && secret.length > 0 ? secret : null;
+): ProviderSecretInput | null {
+  if (typeof secret === "string") {
+    return secret.length > 0 ? secret : null;
+  }
+
+  if (typeof secret === "object" && secret !== null) {
+    return secret;
+  }
+
+  return null;
 }
 
 function getProviderHeaderValues(
@@ -235,7 +243,7 @@ export function listModelProviderRuntimeDescriptorsFromProviders(
 
 export function resolveModelProviderApiKey(
   descriptor: ModelProviderRuntimeDescriptor,
-): string | null {
+): ProviderSecretInput | null {
   if (descriptor.provider.auth === "oauth") {
     return descriptor.legacyOauthCredential?.access ?? null;
   }

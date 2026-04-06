@@ -87,8 +87,10 @@ export function registerProviderOAuthRoutes(
               200,
             );
           }
+          const { apiKey: _previousApiKey, ...existingProviderWithoutApiKey } =
+            existingProvider ?? {};
           const nextProvider = {
-            ...existingProvider,
+            ...existingProviderWithoutApiKey,
             enabled: true,
             displayName: existingProvider?.displayName ?? "OpenAI",
             baseUrl,

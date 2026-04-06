@@ -191,8 +191,16 @@ describe("provider OAuth routes", () => {
         openai: {
           auth: "oauth",
           oauthProfileRef: "openai-codex",
-          apiKey: "existing-api-key",
           models: [{ id: "gpt-5.4" }],
+        },
+      },
+    });
+    await expect(
+      container.modelProviderService.getModelProviderConfigDocument(),
+    ).resolves.not.toMatchObject({
+      providers: {
+        openai: {
+          apiKey: expect.anything(),
         },
       },
     });

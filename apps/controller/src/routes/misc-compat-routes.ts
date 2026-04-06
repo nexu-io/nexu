@@ -333,6 +333,16 @@ export function registerMiscCompatRoutes(
         });
       }
 
+      if (typeof provider.apiKey !== "string") {
+        return c.json(
+          {
+            error:
+              "OpenAI-compatible proxy requires a string API key for this provider",
+          },
+          400,
+        );
+      }
+
       const response = await proxyFetch(
         buildOpenAiCompatUrl(provider.baseUrl),
         {

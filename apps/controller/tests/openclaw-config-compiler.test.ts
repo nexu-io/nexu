@@ -748,6 +748,55 @@ describe("compileOpenClawConfig", () => {
     });
   });
 
+  it("preserves secret-ref provider API keys in compiled models config", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: {
+                source: "env",
+                provider: "nexu",
+                id: "openai-api-key",
+              },
+              baseUrl: "https://api.openai.com/v1",
+              models: [
+                {
+                  id: "gpt-4.1",
+                  name: "GPT-4.1",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.openai?.apiKey).toEqual({
+      source: "env",
+      provider: "nexu",
+      id: "openai-api-key",
+    });
+    expect(result.models?.providers.openai?.models[0]?.id).toBe("gpt-4.1");
+  });
+
   it("normalizes legacy byok model refs against canonical provider config", () => {
     const now = new Date().toISOString();
     const result = compileOpenClawConfig(
