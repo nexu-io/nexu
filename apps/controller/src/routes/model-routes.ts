@@ -1,6 +1,7 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
-  customProviderTemplateIds,
+  isCustomProviderTemplate,
+  isSupportedByokProviderId,
   minimaxOauthCancelResponseSchema,
   minimaxOauthStartBodySchema,
   minimaxOauthStartResponseSchema,
@@ -16,32 +17,17 @@ import {
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
 
-const verifiableProviderIds = [
-  "anthropic",
-  "google",
-  "openai",
-  "openrouter",
-  "mistral",
-  "xai",
-  "together",
-  "huggingface",
-  "qwen",
-  "volcengine",
-  "qianfan",
-  "vllm",
-  "byteplus",
-  "venice",
-  "github-copilot",
-  "xiaomi",
-  "chutes",
-  "ollama",
-  "zai",
-  "minimax",
-  ...customProviderTemplateIds,
-] as const;
-
 const verifyProviderIdParamSchema = z.object({
-  providerId: z.enum(verifiableProviderIds),
+  providerId: z
+    .string()
+    .refine(
+      (providerId) =>
+        isSupportedByokProviderId(providerId) ||
+        isCustomProviderTemplate(providerId),
+      {
+        message: "Unsupported provider",
+      },
+    ),
 });
 
 export function registerModelRoutes(

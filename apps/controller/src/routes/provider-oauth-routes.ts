@@ -93,6 +93,7 @@ export function registerProviderOAuthRoutes(
             displayName: existingProvider?.displayName ?? "OpenAI",
             baseUrl,
             auth: "oauth" as const,
+            oauthProfileRef: completed.profile.provider,
             models,
           };
 

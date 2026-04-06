@@ -190,6 +190,7 @@ describe("provider OAuth routes", () => {
       providers: {
         openai: {
           auth: "oauth",
+          oauthProfileRef: "openai-codex",
           apiKey: "existing-api-key",
           models: [{ id: "gpt-5.4" }],
         },
