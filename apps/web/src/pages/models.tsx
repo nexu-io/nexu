@@ -211,7 +211,7 @@ export function isModelSelected(
 }
 
 function normalizeByokModelSelectionKey(
-  providerId: string,
+  providerKey: string,
   modelId: string,
 ): string {
   const normalizedModelId = modelId.trim().toLowerCase();
@@ -219,20 +219,20 @@ function normalizeByokModelSelectionKey(
     return normalizedModelId;
   }
 
-  const normalizedProviderId = providerId.trim().toLowerCase();
-  return normalizedModelId.startsWith(`${normalizedProviderId}/`)
+  const normalizedProviderKey = providerKey.trim().toLowerCase();
+  return normalizedModelId.startsWith(`${normalizedProviderKey}/`)
     ? normalizedModelId
-    : `${normalizedProviderId}/${normalizedModelId}`;
+    : `${normalizedProviderKey}/${normalizedModelId}`;
 }
 
 function isByokModelSelected(
-  providerId: string,
+  providerKey: string,
   modelId: string,
   currentModelId: string,
 ): boolean {
   return (
-    normalizeByokModelSelectionKey(providerId, modelId) ===
-    normalizeByokModelSelectionKey(providerId, currentModelId)
+    normalizeByokModelSelectionKey(providerKey, modelId) ===
+    normalizeByokModelSelectionKey(providerKey, currentModelId)
   );
 }
 
@@ -2764,7 +2764,7 @@ function ByokProviderDetail({
           {displayModels.map((modelId) => {
             const scopedModelId = getScopedByokModelId(modelId);
             const isSelected = isByokModelSelected(
-              providerId,
+              providerKey,
               modelId,
               currentModelId,
             );

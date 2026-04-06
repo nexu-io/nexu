@@ -180,7 +180,11 @@ function toProviderInventoryInput(
         oauthProfileRef: provider.oauthProfileRef ?? null,
       };
     })
-    .filter((provider) => isSupportedByokProviderId(provider.providerId));
+    .filter(
+      (provider) =>
+        isSupportedByokProviderId(provider.providerId) ||
+        isCustomProviderTemplate(provider.providerId),
+    );
 }
 
 function buildProviderUrl(
@@ -436,9 +440,9 @@ export class ModelProviderService {
       .filter((provider) => !expiredOAuthProviderIds.has(provider.providerId))
       .flatMap((provider) =>
         provider.models.map((modelId) => ({
-          id: `${provider.providerId}/${modelId}`,
+          id: `${provider.providerKey}/${modelId}`,
           name: modelId,
-          provider: provider.providerId,
+          provider: provider.providerKey,
         })),
       );
 
