@@ -1897,7 +1897,10 @@ function ByokProviderDetail({
       ...(persistedApiKey ? { apiKey: persistedApiKey } : {}),
       baseUrl: baseUrl || getProviderDefaultBaseUrl(provider),
       ...(isMiniMax ? { oauthRegion } : {}),
-      displayName: meta.displayName,
+      displayName:
+        providerConfig?.providerTemplateId && providerConfig.displayName?.trim()
+          ? providerConfig.displayName
+          : meta.displayName,
       ...(providerConfig?.headers ? { headers: providerConfig.headers } : {}),
       ...(providerConfig?.metadata
         ? { metadata: providerConfig.metadata }
@@ -1912,9 +1915,10 @@ function ByokProviderDetail({
       persistedApiKey,
       provider,
       providerConfig?.headers,
+      providerConfig?.displayName,
       providerConfig?.instanceId,
-      providerConfig?.metadata,
       providerConfig?.providerTemplateId,
+      providerConfig?.metadata,
     ],
   );
 

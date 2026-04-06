@@ -703,6 +703,9 @@ describe("compileOpenClawConfig", () => {
               apiKey: "custom-key",
               baseUrl: "https://gateway.example.com/v1",
               displayName: "Team Gateway",
+              headers: {
+                "x-team-id": "team-gateway",
+              },
               models: [
                 {
                   id: "gpt-4.1",
@@ -733,6 +736,9 @@ describe("compileOpenClawConfig", () => {
       baseUrl: "https://gateway.example.com/v1",
       apiKey: "custom-key",
       api: "openai-completions",
+      headers: {
+        "x-team-id": "team-gateway",
+      },
     });
     expect(
       result.models?.providers["custom-openai__team-gateway"]?.models[0]?.id,

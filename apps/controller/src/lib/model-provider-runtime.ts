@@ -54,6 +54,22 @@ function getProviderSecretValue(
   return typeof secret === "string" && secret.length > 0 ? secret : null;
 }
 
+function getProviderHeaderValues(
+  headers: ModelProviderConfig["headers"],
+): Record<string, string> | undefined {
+  if (!headers) {
+    return undefined;
+  }
+
+  const resolvedEntries = Object.entries(headers).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+
+  return resolvedEntries.length > 0
+    ? Object.fromEntries(resolvedEntries)
+    : undefined;
+}
+
 function resolveDefaultBaseUrls(
   providerId: string,
   oauthRegion: "global" | "cn" | null | undefined,
@@ -170,6 +186,14 @@ export function listModelProviderRuntimeDescriptorsFromProviders(
           .access === "string"
           ? (metadata.legacyOauthCredential as ModelProviderRuntimeDescriptor["legacyOauthCredential"])
           : null;
+      const providerHeaderValues = getProviderHeaderValues(provider.headers);
+      const defaultHeaders =
+        providerHeaderValues || runtimePolicy.defaultHeaders
+          ? {
+              ...(runtimePolicy.defaultHeaders ?? {}),
+              ...(providerHeaderValues ?? {}),
+            }
+          : undefined;
 
       return [
         {
@@ -202,9 +226,7 @@ export function listModelProviderRuntimeDescriptorsFromProviders(
           isCustomProvider: customProvider !== null,
           apiKind: provider.api ?? runtimePolicy.apiKind,
           authHeader: runtimePolicy.authHeader,
-          defaultHeaders: provider.headers
-            ? undefined
-            : runtimePolicy.defaultHeaders,
+          defaultHeaders,
         },
       ];
     },
