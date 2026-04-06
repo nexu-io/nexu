@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+const providerSecretRefSchema = z.object({
+  source: z.enum(["env", "file", "exec"]),
+  provider: z.string().min(1),
+  id: z.string().min(1),
+});
+
 const gatewayAuthSchema = z.object({
   mode: z.enum(["none", "token"]),
   token: z.string().optional(),
@@ -433,7 +439,7 @@ const modelEntrySchema = z.object({
 const modelProviderSchema = z
   .object({
     baseUrl: z.string(),
-    apiKey: z.string(),
+    apiKey: z.union([z.string(), providerSecretRefSchema]),
     api: z.string(),
     models: z.array(modelEntrySchema),
   })

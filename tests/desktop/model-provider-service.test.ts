@@ -310,4 +310,52 @@ describe("ModelProviderService", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("verifies custom provider instances with stored api key and anthropic headers", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+    const instanceKey = "custom-anthropic/my-instance";
+
+    await service.upsertProvider(instanceKey, {
+      baseUrl: "https://custom-anthropic.example",
+      apiKey: "stored-anthropic-key",
+      enabled: true,
+      displayName: "My Custom Anthropic",
+      modelsJson: JSON.stringify([]),
+    });
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe("https://custom-anthropic.example/models");
+      expect(init?.headers).toEqual({
+        "x-api-key": "stored-anthropic-key",
+        "anthropic-version": "2023-06-01",
+      });
+
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "claude-3-7-sonnet" }, { id: "claude-sonnet-4" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProviderInstance(instanceKey, {});
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["claude-3-7-sonnet", "claude-sonnet-4"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

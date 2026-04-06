@@ -129,4 +129,70 @@ describe("OpenClawAuthProfilesWriter", () => {
       key: "anthropic-key",
     });
   });
+
+  it("writes canonical model-provider credentials into auth-profiles", async () => {
+    const env = createEnv(tempDir);
+    const writer = new OpenClawAuthProfilesWriter(
+      new OpenClawAuthProfilesStore(env),
+    );
+
+    await writer.writeForAgents(
+      {
+        agents: {
+          list: [
+            {
+              id: "bot_1",
+              name: "Bot One",
+              workspace: resolve(env.openclawStateDir, "agents", "bot_1"),
+            },
+          ],
+        },
+      } as never,
+      {
+        "custom-openai/team-gateway": {
+          providerTemplateId: "custom-openai",
+          instanceId: "team-gateway",
+          enabled: true,
+          auth: "api-key",
+          api: "openai-completions",
+          apiKey: "canonical-custom-key",
+          baseUrl: "https://gateway.example.com/v1",
+          models: [
+            {
+              id: "gpt-4.1",
+              name: "GPT-4.1",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    );
+
+    const authProfilesPath = resolve(
+      env.openclawStateDir,
+      "agents",
+      "bot_1",
+      "agent",
+      "auth-profiles.json",
+    );
+    const parsed = JSON.parse(readFileSync(authProfilesPath, "utf8")) as {
+      version: number;
+      profiles: Record<string, { type: string; provider: string; key: string }>;
+    };
+
+    expect(parsed.profiles["custom-openai/team-gateway:default"]).toEqual({
+      type: "api_key",
+      provider: "custom-openai/team-gateway",
+      key: "canonical-custom-key",
+    });
+  });
 });
