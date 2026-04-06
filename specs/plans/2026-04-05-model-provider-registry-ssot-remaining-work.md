@@ -58,21 +58,21 @@ Related plan:
 
 ### 5. Remove transitional legacy APIs and controller assumptions
 
-- [ ] Remove legacy `/api/v1/providers/*` CRUD routes after consumers move off them
-- [ ] Remove remaining legacy provider assumptions from controller services/store
+- [x] Remove legacy `/api/v1/providers/*` CRUD routes after consumers move off them
+- [x] Remove remaining legacy provider assumptions from controller services/store
 
 ### 6. Final cleanup
 
-- [ ] Verify web flows use registry + canonical config only
-- [ ] Verify controller sync/compiler paths no longer depend on legacy provider semantics
-- [ ] Delete any leftover compatibility-only code once the migration window closes
+- [x] Verify web flows use registry + canonical config only
+- [x] Verify controller sync/compiler paths no longer depend on legacy provider semantics
+- [x] Delete any leftover compatibility-only code once the migration window closes
 
 ## Done when
 
-- [ ] `config.models.providers` is the only canonical persisted provider config
-- [ ] legacy `config.providers` is read-only for migration or deleted
-- [ ] legacy provider CRUD APIs are removed
+- [x] `config.models.providers` is the only canonical persisted provider config
+- [x] legacy `config.providers` is read-only for migration or deleted
+- [x] legacy provider CRUD APIs are removed
 - [ ] registry contains the agreed provider inventory + alias coverage
-- [ ] web flows use registry + canonical config only
-- [ ] saved model refs are canonicalized
-- [ ] custom provider keys/runtime refs are stable and deterministic
+- [x] web flows use registry + canonical config only
+- [x] saved model refs are canonicalized
+- [x] custom provider keys/runtime refs are stable and deterministic

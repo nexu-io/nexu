@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   type Model,
+  type ModelProviderConfig,
   type PersistedModelsConfig,
   type ProviderRegistryEntryDto,
   getDefaultProviderBaseUrls,
@@ -148,14 +149,38 @@ function hasSameCloudModels(
   );
 }
 
+type ProviderInventoryInput = {
+  providerKey: string;
+  providerId: string;
+  enabled: boolean;
+  apiKey: string | null;
+  models: string[];
+  baseUrl: string | null;
+  oauthRegion: "global" | "cn" | null;
+  auth: ModelProviderConfig["auth"] | undefined;
+  oauthProfileRef: string | null;
+};
+
 function toProviderInventoryInput(
-  providers: Awaited<ReturnType<NexuConfigStore["listProviders"]>>,
-): Array<{ providerId: string; apiKey: string | null; models: string[] }> {
-  return providers.map((provider) => ({
-    providerId: provider.providerId,
-    apiKey: provider.apiKey ?? null,
-    models: provider.models ?? [],
-  }));
+  providers: PersistedModelsConfig["providers"],
+): ProviderInventoryInput[] {
+  return Object.entries(providers)
+    .map(([providerKey, provider]) => {
+      const customProvider = parseCustomProviderKey(providerKey);
+      const providerId = customProvider?.templateId ?? providerKey;
+      return {
+        providerKey,
+        providerId,
+        enabled: provider.enabled,
+        apiKey: typeof provider.apiKey === "string" ? provider.apiKey : null,
+        models: provider.models.map((model) => model.id),
+        baseUrl: provider.baseUrl ?? null,
+        oauthRegion: provider.oauthRegion ?? null,
+        auth: provider.auth,
+        oauthProfileRef: provider.oauthProfileRef ?? null,
+      };
+    })
+    .filter((provider) => isSupportedByokProviderId(provider.providerId));
 }
 
 function buildProviderUrl(
@@ -372,11 +397,8 @@ export class ModelProviderService {
 
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
     const providers = toProviderInventoryInput(
-      (await this.configStore.listProviders()).filter(
-        (provider) =>
-          provider.enabled && isSupportedByokProviderId(provider.providerId),
-      ),
-    );
+      (await this.configStore.getModelProviderConfigDocument()).providers,
+    ).filter((provider) => provider.enabled);
     const { cloudModels, byokModels } = await this.getAvailableModels(
       providers,
       desktopCloud,
@@ -389,9 +411,11 @@ export class ModelProviderService {
 
   private async getAvailableModels(
     providers: ReadonlyArray<{
+      providerKey: string;
       providerId: string;
       apiKey: string | null;
       models: string[];
+      auth: ModelProviderConfig["auth"] | undefined;
     }>,
     desktopCloud: {
       models?: Array<{ id: string; name?: string | null }> | null;
@@ -425,13 +449,21 @@ export class ModelProviderService {
    * Returns provider IDs that use OAuth (no API key) and whose token is expired.
    */
   private async getExpiredOAuthProviderIds(
-    providers: ReadonlyArray<{ providerId: string; apiKey: string | null }>,
+    providers: ReadonlyArray<{
+      providerId: string;
+      apiKey: string | null;
+      auth: ModelProviderConfig["auth"] | undefined;
+    }>,
   ): Promise<Set<string>> {
     if (!this.openclawAuthService) return new Set();
 
     const expired = new Set<string>();
     for (const provider of providers) {
-      if (provider.apiKey || !OAUTH_PROVIDER_IDS.has(provider.providerId)) {
+      if (
+        provider.apiKey ||
+        provider.auth !== "oauth" ||
+        !OAUTH_PROVIDER_IDS.has(provider.providerId)
+      ) {
         continue;
       }
       const status = await this.openclawAuthService.getProviderOAuthStatus(
@@ -447,11 +479,11 @@ export class ModelProviderService {
   async listProviders() {
     await this.refreshMiniMaxOauthModelsIfNeeded();
 
-    const providers = await this.configStore.listProviders();
+    const providers = toProviderInventoryInput(
+      (await this.configStore.getModelProviderConfigDocument()).providers,
+    );
     return {
-      providers: providers.filter((provider) =>
-        isSupportedByokProviderId(provider.providerId),
-      ),
+      providers,
     };
   }
 
@@ -547,11 +579,8 @@ export class ModelProviderService {
     const desktopCloud =
       await this.configStore.getDesktopCloudInventoryStatus();
     const hasByokInventory = toProviderInventoryInput(
-      (await this.configStore.listProviders()).filter(
-        (provider) =>
-          provider.enabled && isSupportedByokProviderId(provider.providerId),
-      ),
-    ).some((provider) => provider.models.length > 0);
+      (await this.configStore.getModelProviderConfigDocument()).providers,
+    ).some((provider) => provider.enabled && provider.models.length > 0);
 
     return {
       hasKnownInventory: desktopCloud.hasCloudInventory || hasByokInventory,
@@ -734,20 +763,16 @@ export class ModelProviderService {
     const modelProviderConfig =
       await this.configStore.getModelProviderConfigDocument();
     const canonicalProvider = modelProviderConfig.providers.minimax;
-    const provider = await this.configStore.getProvider("minimax");
     const connected =
       canonicalProvider?.auth === "oauth" &&
       (typeof canonicalProvider.oauthProfileRef === "string" ||
-        provider?.hasOauthCredential === true);
+        typeof canonicalProvider.metadata === "object");
     const inProgress = connected ? false : this.miniMaxOauthState.inProgress;
 
     this.miniMaxOauthState = {
       connected,
       inProgress,
-      region:
-        canonicalProvider?.oauthRegion ??
-        provider?.oauthRegion ??
-        this.miniMaxOauthState.region,
+      region: canonicalProvider?.oauthRegion ?? this.miniMaxOauthState.region,
       error: this.miniMaxOauthState.error,
     };
 
@@ -846,11 +871,8 @@ export class ModelProviderService {
     const desktopCloud = await this.configStore.getDesktopCloudStatus();
     const inventory = await this.getInventoryStatus();
     const providers = toProviderInventoryInput(
-      (await this.configStore.listProviders()).filter(
-        (provider) =>
-          provider.enabled && isSupportedByokProviderId(provider.providerId),
-      ),
-    );
+      (await this.configStore.getModelProviderConfigDocument()).providers,
+    ).filter((provider) => provider.enabled);
 
     if (!inventory.hasKnownInventory) {
       return "unknown";
@@ -872,15 +894,16 @@ export class ModelProviderService {
   }
 
   private async refreshMiniMaxOauthModelsIfNeeded(): Promise<void> {
-    const provider = await this.configStore.getProvider("minimax");
+    const provider = (await this.configStore.getModelProviderConfigDocument())
+      .providers.minimax;
     if (
-      provider?.authMode !== "oauth" ||
-      provider.hasOauthCredential !== true
+      provider?.auth !== "oauth" ||
+      typeof provider.oauthProfileRef !== "string"
     ) {
       return;
     }
 
-    const currentModels = provider.models ?? [];
+    const currentModels = provider.models.map((model) => model.id);
 
     if (hasSameModels(currentModels, MINI_MAX_OAUTH_MODELS)) {
       return;

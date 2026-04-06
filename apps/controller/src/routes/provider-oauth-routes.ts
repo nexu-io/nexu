@@ -1,5 +1,7 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  getDefaultProviderBaseUrls,
+  getProviderRuntimePolicy,
   oauthProviderStatusResponseSchema,
   oauthStartResponseSchema,
   oauthStatusResponseSchema,
@@ -72,13 +74,51 @@ export function registerProviderOAuthRoutes(
               ? completed.models
               : OPENAI_CODEX_KNOWN_MODELS;
 
-          await container.modelProviderService.upsertProvider(providerId, {
-            displayName: "OpenAI",
+          const existingConfig =
+            await container.modelProviderService.getModelProviderConfigDocument();
+          const runtimePolicy = getProviderRuntimePolicy(providerId);
+          const existingProvider = existingConfig.providers[providerId];
+          const baseUrl =
+            existingProvider?.baseUrl ??
+            getDefaultProviderBaseUrls(providerId)[0];
+          if (!baseUrl) {
+            return c.json(
+              { ...flowStatus, error: "Unknown provider base URL" },
+              200,
+            );
+          }
+          const nextProvider = {
+            ...existingProvider,
             enabled: true,
-            apiKey: null,
-            modelsJson: JSON.stringify(models),
-          });
-          await container.openclawSyncService.syncAll();
+            displayName: existingProvider?.displayName ?? "OpenAI",
+            baseUrl,
+            auth: "oauth" as const,
+            models,
+          };
+
+          existingConfig.providers[providerId] = {
+            ...nextProvider,
+            ...(runtimePolicy?.apiKind ? { api: runtimePolicy.apiKind } : {}),
+            models: models.map((modelId) => ({
+              id: modelId,
+              name: modelId,
+              reasoning: false,
+              input: ["text"] as Array<"text" | "image">,
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+              ...(runtimePolicy?.apiKind ? { api: runtimePolicy.apiKind } : {}),
+            })),
+          };
+
+          await container.modelProviderService.setModelProviderConfigDocument(
+            existingConfig,
+          );
           return c.json({ ...flowStatus, models }, 200);
         }
       }
@@ -141,11 +181,15 @@ export function registerProviderOAuthRoutes(
       const ok =
         await container.openclawAuthService.disconnectOAuth(providerId);
       if (ok && wasConnected) {
-        // Remove the provider's stored model list so models don't linger
-        // in the model selector after OAuth is revoked.
-        await container.modelProviderService.deleteProvider(providerId);
+        const existingConfig =
+          await container.modelProviderService.getModelProviderConfigDocument();
+        if (existingConfig.providers[providerId]) {
+          delete existingConfig.providers[providerId];
+          await container.modelProviderService.setModelProviderConfigDocument(
+            existingConfig,
+          );
+        }
         await container.modelProviderService.ensureValidDefaultModel();
-        await container.openclawSyncService.syncAll();
       }
       return c.json({ ok }, 200);
     },
