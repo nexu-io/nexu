@@ -252,12 +252,74 @@ export function registerDesktopRoutes(
     }),
     async (c) => {
       const body = c.req.valid("json");
-      return c.json(
-        {
-          locale: await container.configStore.setDesktopLocale(body.locale),
-        },
-        200,
-      );
+      const locale = await container.configStore.setDesktopLocale(body.locale);
+      await container.openclawSyncService.syncAll();
+      return c.json({ locale }, 200);
     },
   );
+
+  // Compaction notification endpoint — called by OpenClaw patch
+  // (handleAutoCompactionStart in compact-*.js / dispatch-*.js) via
+  // HTTP POST when Pi auto-compaction starts.
+  //
+  // Why HTTP instead of stderr NEXU_EVENT:
+  //   In launchd mode, controller doesn't spawn OpenClaw (launchd does),
+  //   so controller can't read OpenClaw's stderr. HTTP works regardless
+  //   of process management mode.
+  //
+  // Why not onAgentEvent:
+  //   handleAutoCompactionStart's subscriber-emitted compaction events
+  //   don't reach agent-runner-execution's onAgentEvent (different
+  //   execution contexts). Verified via debug logging 2026-04-04.
+  //
+  // Session key format: agent:<agentId>:direct:<userId>
+  // Channel is resolved from payload or first connected channel in config.
+  // Target (to) is the user ID parsed from session key — works for feishu
+  // DMs (ou_xxx), verified via openclaw message send 2026-04-04.
+  app.post("/api/internal/compaction-notify", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const sessionKey = body.sessionKey as string | undefined;
+    if (!sessionKey) return c.json({ ok: false }, 400);
+
+    const parts = sessionKey.split(":");
+    const to = parts.length >= 4 ? parts.slice(3).join(":") : undefined;
+    if (!to) return c.json({ ok: false, reason: "no target" }, 400);
+
+    // Resolve channel: prefer explicit value from OpenClaw context,
+    // fall back to first connected channel in Nexu config.
+    // ctx.params.messageChannel is often null in compaction context,
+    // so the fallback is the common path.
+    let channel = typeof body.channel === "string" ? body.channel : undefined;
+    if (!channel) {
+      const cfg = await container.configStore.getConfig();
+      channel = cfg.channels.find(
+        (ch) => ch.status === "connected",
+      )?.channelType;
+    }
+    if (!channel) return c.json({ ok: false, reason: "no channel" }, 400);
+
+    const locale = await container.configStore.getDesktopLocale();
+    const message =
+      locale === "en"
+        ? "⏳ Compacting conversation history, estimated ~30s..."
+        : "⏳ 正在整理对话记录，预计30秒内完成...";
+
+    try {
+      await container.gatewayService.sendChannelMessage({
+        to,
+        message,
+        channel,
+        sessionKey,
+      });
+      return c.json({ ok: true });
+    } catch (err) {
+      return c.json(
+        {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        500,
+      );
+    }
+  });
 }
