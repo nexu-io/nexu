@@ -16,10 +16,7 @@ import { SurfaceFrame } from "./surface-frame";
 import { UpdateBanner } from "./update-banner";
 
 function getWebviewPreloadUrl(): string {
-  return new URL(
-    "../dist-electron/preload/webview-preload.js",
-    document.location.href,
-  ).href;
+  return window.nexuHost.bootstrap.webviewPreloadUrl;
 }
 
 export function DesktopShell() {
