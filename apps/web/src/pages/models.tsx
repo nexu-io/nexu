@@ -90,6 +90,15 @@ type SidebarItem = {
   registryEntry?: ByokProviderEntry;
 };
 
+const ADD_CUSTOM_PROVIDER_ITEM: SidebarItem = {
+  id: "__add-custom-provider__",
+  name: "Add custom provider",
+  modelCount: 0,
+  configured: false,
+  managed: false,
+  kind: "add-custom",
+};
+
 type StoredModelsConfig = NonNullable<PutApiV1ModelProvidersConfigData["body"]>;
 type StoredProviderConfig = NonNullable<
   StoredModelsConfig["providers"]
@@ -1098,15 +1107,6 @@ export function ModelsPage() {
       });
     }
 
-    items.push({
-      id: "__add-custom-provider__",
-      name: "+ Add custom provider",
-      modelCount: 0,
-      configured: false,
-      managed: false,
-      kind: "add-custom",
-    });
-
     return items;
   }, [
     customProviderInstances,
@@ -1118,6 +1118,9 @@ export function ModelsPage() {
 
   const activeProvider =
     sidebarItems.find((p) => p.id === selectedProviderId) ??
+    (selectedProviderId === ADD_CUSTOM_PROVIDER_ITEM.id
+      ? ADD_CUSTOM_PROVIDER_ITEM
+      : null) ??
     sidebarItems[0] ??
     null;
 
@@ -1203,19 +1206,16 @@ export function ModelsPage() {
           {/* Provider sidebar + detail */}
           <div
             className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
-            style={{ minHeight: 520 }}
+            style={{ minHeight: 500 }}
           >
             {/* Left: Provider list */}
-            <div className="w-56 shrink-0 bg-surface-0 overflow-y-auto">
-              <div className="p-2 space-y-2">
-                <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+            <div className="w-56 shrink-0 bg-surface-0 flex flex-col border-r border-border-subtle">
+              <div className="flex-1 overflow-y-auto p-2">
+                <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
                   Providers
                 </div>
-                {sidebarItems
-                  .filter((item) => item.kind !== "custom-byok")
-                  .map((item) => {
-                    const isAddCustom = item.kind === "add-custom";
-                    const providerLogoId = item.registryEntry?.id ?? item.id;
+                <div className="space-y-1">
+                  {sidebarItems.map((item) => {
                     const isActive = activeProvider?.id === item.id;
                     return (
                       <button
@@ -1226,50 +1226,7 @@ export function ModelsPage() {
                           clearSetupParam();
                         }}
                         className={cn(
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                          isActive ? "bg-surface-3" : "hover:bg-surface-2",
-                        )}
-                      >
-                        <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
-                          {isAddCustom ? (
-                            <span className="text-[14px] text-text-secondary">
-                              +
-                            </span>
-                          ) : (
-                            <ProviderLogo provider={providerLogoId} size={14} />
-                          )}
-                        </span>
-                        <span
-                          className={cn(
-                            "flex-1 text-[12px] truncate",
-                            isActive
-                              ? "font-semibold text-text-primary"
-                              : "font-medium text-text-primary",
-                          )}
-                        >
-                          {item.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-
-                <div className="pt-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                  Custom providers
-                </div>
-                {sidebarItems
-                  .filter((item) => item.kind === "custom-byok")
-                  .map((item) => {
-                    const isActive = activeProvider?.id === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedProviderId(item.id);
-                          clearSetupParam();
-                        }}
-                        className={cn(
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
+                          "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors",
                           isActive ? "bg-surface-3" : "hover:bg-surface-2",
                         )}
                       >
@@ -1289,14 +1246,34 @@ export function ModelsPage() {
                         >
                           {item.name}
                         </span>
-                        {item.modelCount > 0 && (
+                        {item.modelCount > 0 ? (
                           <span className="text-[10px] text-text-muted">
                             {item.modelCount}
                           </span>
-                        )}
+                        ) : null}
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="border-t border-border-subtle p-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProviderId(ADD_CUSTOM_PROVIDER_ITEM.id);
+                    clearSetupParam();
+                  }}
+                  className={cn(
+                    "w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                    activeProvider?.id === ADD_CUSTOM_PROVIDER_ITEM.id
+                      ? "border-accent/30 bg-accent/10 text-accent"
+                      : "border-border bg-surface-0 text-text-secondary hover:bg-surface-2 hover:text-text-primary",
+                  )}
+                >
+                  <span className="text-[14px] leading-none">+</span>
+                  Add custom provider
+                </button>
               </div>
             </div>
 

@@ -1,4 +1,4 @@
-import { ModelIcon, ProviderIcon } from "@lobehub/icons";
+import { BaiduCloud, ModelIcon, ProviderIcon } from "@lobehub/icons";
 import type { CSSProperties } from "react";
 
 const PROVIDER_ICON_ALIASES: Record<string, string> = {
@@ -71,6 +71,16 @@ export function ProviderLogo({
   provider: string;
   size?: number;
 }) {
+  const normalizedProvider = provider.trim().toLowerCase();
+
+  if (normalizedProvider === "nexu") {
+    return <FallbackProviderMark provider={provider} size={size} />;
+  }
+
+  if (normalizedProvider === "qianfan" || normalizedProvider === "baidu") {
+    return <BaiduCloud.Color size={size} style={{ flex: "none" }} />;
+  }
+
   const iconProvider = normalizeProviderIconKey(provider);
 
   if (iconProvider) {

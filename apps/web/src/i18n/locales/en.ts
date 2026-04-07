@@ -311,6 +311,24 @@ const en = {
   "models.provider.google.description": "Gemini series AI models",
   "models.provider.ollama.description":
     "Use local Ollama models running on your machine",
+  "models.provider.siliconflow.description":
+    "SiliconFlow provides hosted foundation models through an OpenAI-compatible API.",
+  "models.provider.ppio.description":
+    "PPIO offers a managed OpenAI-compatible endpoint for running popular models.",
+  "models.provider.qwen.description":
+    "Alibaba Cloud DashScope provides Qwen and other models through a compatible API.",
+  "models.provider.volcengine.description":
+    "Volcengine Ark gives access to Doubao, DeepSeek, and other hosted models.",
+  "models.provider.qianfan.description":
+    "Baidu Qianfan provides ERNIE and other hosted models through a compatible API.",
+  "models.provider.xiaomi.description":
+    "Xiaomi offers its large-model platform through an OpenAI-compatible endpoint.",
+  "models.provider.minimax.description":
+    "MiniMax provides chat and reasoning models through its hosted API platform.",
+  "models.provider.kimi.description":
+    "Moonshot AI provides Kimi models through an OpenAI-compatible API.",
+  "models.provider.glm.description":
+    "Zhipu provides GLM models through the BigModel compatible API.",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
   "models.managed.connected": "Log out",

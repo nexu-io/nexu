@@ -298,6 +298,24 @@ const zhCN = {
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
   "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
+  "models.provider.siliconflow.description":
+    "SiliconFlow 通过兼容 OpenAI 的接口提供托管基础模型服务。",
+  "models.provider.ppio.description":
+    "PPIO 提供托管的 OpenAI 兼容接口，可接入热门模型。",
+  "models.provider.qwen.description":
+    "阿里云百炼通过兼容接口提供千问等模型服务。",
+  "models.provider.volcengine.description":
+    "火山引擎方舟可接入豆包、DeepSeek 等托管模型。",
+  "models.provider.qianfan.description":
+    "百度智能云千帆通过兼容接口提供文心等托管模型。",
+  "models.provider.xiaomi.description":
+    "小米通过兼容 OpenAI 的接口提供大模型平台能力。",
+  "models.provider.minimax.description":
+    "MiniMax 通过托管 API 平台提供对话与推理模型。",
+  "models.provider.kimi.description":
+    "月之暗面通过 OpenAI 兼容接口提供 Kimi 模型。",
+  "models.provider.glm.description":
+    "智谱通过 BigModel 兼容接口提供 GLM 模型。",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
   "models.managed.connected": "退出登录",
