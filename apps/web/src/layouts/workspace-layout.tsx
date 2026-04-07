@@ -1025,22 +1025,6 @@ function WorkspaceLayoutInner() {
                       <div className="space-y-2 border-t border-border/60 pt-2.5">
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-1 text-[11px] text-text-muted">
-                            {t("layout.sidebar.balancePopup.recharged")}
-                            <span
-                              title={t(
-                                "layout.sidebar.balancePopup.rechargedTooltip",
-                              )}
-                              className="cursor-default"
-                            >
-                              <Info size={10} className="text-text-muted/60" />
-                            </span>
-                          </span>
-                          <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {rewardsStatus.cloudBalance.totalRecharged}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
                             {t("layout.sidebar.balancePopup.earned")}
                             <span
                               title={t(
@@ -1053,14 +1037,6 @@ function WorkspaceLayoutInner() {
                           </span>
                           <span className="tabular-nums text-[11px] font-medium text-text-secondary">
                             {rewardsStatus.progress.earnedCredits}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-text-muted">
-                            {t("layout.sidebar.balancePopup.consumed")}
-                          </span>
-                          <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {rewardsStatus.cloudBalance.totalConsumed}
                           </span>
                         </div>
                       </div>

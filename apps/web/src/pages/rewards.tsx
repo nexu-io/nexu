@@ -660,24 +660,6 @@ export function RewardsPage() {
               );
             })}
         </div>
-
-        {status.tasks.some(
-          (task) => task.id === "daily_checkin" && task.claimCount > 0,
-        ) ? (
-          <div className="mt-5 border-t border-border/50 pt-4 text-[11px] text-text-muted">
-            {t("rewards.checkinTotal").replace(
-              "${n}",
-              formatRewardAmount(
-                status.tasks
-                  .filter((task) => task.id === "daily_checkin")
-                  .reduce(
-                    (sum, task) => sum + task.claimCount * task.reward,
-                    0,
-                  ),
-              ),
-            )}
-          </div>
-        ) : null}
       </div>
 
       {confirmTask ? (

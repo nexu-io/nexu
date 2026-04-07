@@ -165,7 +165,7 @@ const en = {
     "Total credits added from your subscription plan",
   "layout.sidebar.balancePopup.earned": "Reward credits (cumulative)",
   "layout.sidebar.balancePopup.earnedTooltip":
-    "Total bonus credits earned from rewards and promotions",
+    "Earned from signup rewards, completed tasks, and activities. Consumption order: plan credits → credit packs → reward credits.",
   "layout.sidebar.balancePopup.consumed": "Consumed",
   "layout.sidebar.balancePopup.viewDetail": "View details",
   "layout.mobile.settings": "Settings",
@@ -299,7 +299,6 @@ const en = {
   "rewards.earnedLabel": "Earned",
   "rewards.totalCredits": "Reward credits {{n}}",
   "rewards.taskProgress": "Weekly tasks {{a}} / {{b}}",
-  "rewards.checkinTotal": "Daily check-ins claimed: ${n} credits",
   "rewards.group.daily": "Daily",
   "rewards.group.opensource": "Open Source",
   "rewards.group.social": "Social & messaging",

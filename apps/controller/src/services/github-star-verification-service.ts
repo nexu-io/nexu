@@ -82,11 +82,13 @@ export class GithubStarVerificationService {
     if (!response.ok) {
       const remaining = response.headers.get("x-ratelimit-remaining");
       const reset = response.headers.get("x-ratelimit-reset");
+      const authed = token ? "yes" : "no";
+      const suffix =
+        remaining !== null
+          ? ` (remaining=${remaining} reset=${reset} authed=${authed})`
+          : ` (authed=${authed})`;
       throw new Error(
-        `Failed to fetch GitHub stars: ${response.status}` +
-          (remaining !== null
-            ? ` (remaining=${remaining} reset=${reset} authed=${token ? "yes" : "no"})`
-            : ` (authed=${token ? "yes" : "no"})`),
+        `Failed to fetch GitHub stars: ${response.status}${suffix}`,
       );
     }
 
