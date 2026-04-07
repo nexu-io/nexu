@@ -194,9 +194,15 @@ start_services() {
 
   (
     cd "$REPO_ROOT/apps/controller"
+    initial_compile_complete=0
     pnpm exec tsc --watch --preserveWatchOutput 2>&1 | while IFS= read -r line; do
       echo "[controller:tsc] $line"
       if echo "$line" | grep -q "Found 0 errors"; then
+        if [ $initial_compile_complete -eq 0 ]; then
+          initial_compile_complete=1
+          echo "[controller] Initial watch compile complete; skipping restart."
+          continue
+        fi
         echo "[controller] Restarting service..."
         launchctl kickstart -k "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null && echo "[controller] Restarted." || true
       fi
