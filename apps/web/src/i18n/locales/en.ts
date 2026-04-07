@@ -315,7 +315,8 @@ const en = {
   "models.provider.volcengine.name": "Volcengine Ark",
   "models.provider.qianfan.name": "Baidu Qianfan",
   "models.provider.xiaomi.name": "Xiaomi MiMo",
-  "models.provider.glm.name": "GLM",
+  "models.provider.glm.name": "Zhipu",
+  "models.provider.siliconflow.name": "SiliconFlow",
   "models.provider.siliconflow.description":
     "SiliconFlow provides hosted foundation models through an OpenAI-compatible API.",
   "models.provider.ppio.description":

@@ -1661,7 +1661,7 @@ function ManagedProviderDetail({
                 >
                   <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
                     <ModelLogo
-                      model={model.name}
+                      model={model.id}
                       provider={provider.id}
                       size={14}
                     />
@@ -1941,7 +1941,7 @@ function ByokProviderDetail({
         ...(providerConfig?.metadata
           ? { metadata: providerConfig.metadata }
           : {}),
-        displayName: "GLM",
+        displayName: "Zhipu",
         models: buildStoredModels(provider, ZAI_CODING_PLAN_MODELS),
       }),
     onSuccess: () => {

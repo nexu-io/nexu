@@ -300,11 +300,12 @@ const zhCN = {
   "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
   "models.provider.qwen.name": "千问",
   "models.provider.volcengine.name": "火山引擎",
-  "models.provider.qianfan.name": "千帆",
+  "models.provider.qianfan.name": "百度千帆",
   "models.provider.xiaomi.name": "小米 MiMo",
-  "models.provider.glm.name": "智谱 GLM",
+  "models.provider.glm.name": "智谱",
+  "models.provider.siliconflow.name": "硅基流动",
   "models.provider.siliconflow.description":
-    "SiliconFlow 通过兼容 OpenAI 的接口提供托管基础模型服务。",
+    "硅基流动通过兼容 OpenAI 的接口提供托管基础模型服务。",
   "models.provider.ppio.description":
     "PPIO 提供托管的 OpenAI 兼容接口，可接入热门模型。",
   "models.provider.qwen.description":
