@@ -1847,6 +1847,7 @@ function ByokProviderDetail({
   );
   const isMiniMax = providerId === "minimax";
   const isOllama = providerId === "ollama";
+  const isAwsSdkProvider = provider.authModes.includes("aws-sdk");
   const hostBridge = getModelsHostInvokeBridge();
   const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey.trim();
 
@@ -1866,8 +1867,12 @@ function ByokProviderDetail({
   const hasMiniMaxOauthAccess =
     isMiniMax &&
     (minimaxOauthStatus?.connected === true || providerConfig?.oauthProfileRef);
+  const hasSavedAwsSdkAccess =
+    isAwsSdkProvider && providerConfig?.auth === "aws-sdk";
   const hasSavedApiKey = Boolean(providerConfig?.apiKey);
-  const hasSavedAccess = Boolean(hasSavedApiKey || hasMiniMaxOauthAccess);
+  const hasSavedAccess = Boolean(
+    hasSavedApiKey || hasMiniMaxOauthAccess || hasSavedAwsSdkAccess,
+  );
 
   const visibleMiniMaxOauthError =
     minimaxOauthStatus?.error &&
@@ -1960,10 +1965,13 @@ function ByokProviderDetail({
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
   const canSubmitApiKeyConfig = Boolean(
-    isOllama || effectiveApiKey || (!isEditingApiKey && hasSavedApiKey),
+    isOllama ||
+      isAwsSdkProvider ||
+      effectiveApiKey ||
+      (!isEditingApiKey && hasSavedApiKey),
   );
   const canRefreshModels = Boolean(
-    isOllama || effectiveApiKey || hasSavedApiKey,
+    isOllama || isAwsSdkProvider || effectiveApiKey || hasSavedApiKey,
   );
   const isProviderConfigured = Boolean(
     isOllama || hasSavedAccess || isOAuthConnected,
@@ -1975,7 +1983,7 @@ function ByokProviderDetail({
   const persistedApiKey =
     effectiveApiKey || (!isEditingApiKey ? providerConfig?.apiKey : undefined);
 
-  const buildApiKeyProviderConfig = useCallback(
+  const buildProviderConfig = useCallback(
     (modelIds: string[]): StoredProviderConfig => ({
       ...(providerConfig?.providerTemplateId
         ? { providerTemplateId: providerConfig.providerTemplateId }
@@ -1984,9 +1992,11 @@ function ByokProviderDetail({
         ? { instanceId: providerConfig.instanceId }
         : {}),
       enabled: true,
-      auth: "api-key",
+      auth: isAwsSdkProvider ? "aws-sdk" : "api-key",
       api: provider.apiKind,
-      ...(persistedApiKey ? { apiKey: persistedApiKey } : {}),
+      ...(!isAwsSdkProvider && persistedApiKey
+        ? { apiKey: persistedApiKey }
+        : {}),
       baseUrl: baseUrl || getProviderDefaultBaseUrl(provider),
       ...(isMiniMax ? { oauthRegion } : {}),
       displayName:
@@ -2009,6 +2019,7 @@ function ByokProviderDetail({
       providerConfig?.headers,
       providerConfig?.displayName,
       providerConfig?.instanceId,
+      isAwsSdkProvider,
       providerConfig?.providerTemplateId,
       providerConfig?.metadata,
     ],
@@ -2126,7 +2137,7 @@ function ByokProviderDetail({
       setVerifiedModels(models);
 
       if (hasSavedAccess || isOllama) {
-        await onSaveProviderConfig(provider, buildApiKeyProviderConfig(models));
+        await onSaveProviderConfig(provider, buildProviderConfig(models));
       }
 
       return models;
@@ -2143,7 +2154,7 @@ function ByokProviderDetail({
   const saveMutation = useMutation({
     mutationFn: async () => {
       let models = displayModels;
-      if (isOllama || effectiveApiKey || hasSavedApiKey) {
+      if (isOllama || isAwsSdkProvider || effectiveApiKey || hasSavedApiKey) {
         const result = await verifyApiKey(
           providerKey,
           providerId,
@@ -2156,7 +2167,7 @@ function ByokProviderDetail({
         }
       }
 
-      await onSaveProviderConfig(provider, buildApiKeyProviderConfig(models));
+      await onSaveProviderConfig(provider, buildProviderConfig(models));
 
       return { models };
     },
@@ -2628,7 +2639,7 @@ function ByokProviderDetail({
 
       {!isOAuthConnected && (!isMiniMax || authMode === "apiKey") && (
         <div className="space-y-4 mb-6">
-          {!isOllama && (
+          {!isOllama && !isAwsSdkProvider && (
             <div>
               <label
                 htmlFor={`apikey-${providerId}`}
@@ -2709,6 +2720,16 @@ function ByokProviderDetail({
                       })}
                 </div>
               )}
+            </div>
+          )}
+          {isAwsSdkProvider && (
+            <div className="rounded-lg border border-border bg-surface-0 px-3 py-2.5">
+              <div className="text-[12px] font-medium text-text-primary">
+                {t("models.byok.awsSdkAuth")}
+              </div>
+              <div className="mt-1 text-[10px] text-text-muted">
+                {t("models.byok.awsSdkAuthHint")}
+              </div>
             </div>
           )}
           <div>
@@ -2794,7 +2815,9 @@ function ByokProviderDetail({
               )}
               {hasSavedApiKey
                 ? t("models.byok.updateConfig")
-                : t("models.byok.saveAndEnable")}
+                : hasSavedAccess
+                  ? t("models.byok.updateConfig")
+                  : t("models.byok.saveAndEnable")}
             </button>
           )}
 

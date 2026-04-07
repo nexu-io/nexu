@@ -322,6 +322,14 @@ const zhCN = {
     "月之暗面通过 OpenAI 兼容接口提供 Kimi 模型。",
   "models.provider.glm.description":
     "智谱通过 BigModel 兼容接口提供 GLM 模型。",
+  "models.provider.nvidia.description":
+    "NVIDIA NIM 通过兼容 OpenAI 的接口提供托管模型服务。",
+  "models.provider.stepfun.description":
+    "StepFun 通过兼容 OpenAI 的接口提供托管模型服务。",
+  "models.provider.amazonBedrock.description":
+    "AWS Bedrock 使用你的 AWS 凭证链与区域配置进行鉴权。",
+  "models.provider.deepseek.description":
+    "DeepSeek 通过兼容 OpenAI 的接口提供托管模型服务。",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
   "models.managed.connected": "退出登录",
@@ -378,6 +386,9 @@ const zhCN = {
   "models.byok.oauthFailed": "ChatGPT 登录失败",
   "models.byok.oauthOrApiKey": "或手动输入 API Key",
   "models.byok.oauthDescription": "使用你的 ChatGPT Plus/Pro 订阅",
+  "models.byok.awsSdkAuth": "鉴权方式：AWS 凭证链",
+  "models.byok.awsSdkAuthHint":
+    "这里无需填写 API Key。请在运行环境中配置 AWS 凭证与区域。",
   "models.byok.minimax.authModeOauth": "OAuth 登录",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",

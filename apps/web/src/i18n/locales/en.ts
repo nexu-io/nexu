@@ -335,6 +335,14 @@ const en = {
     "Moonshot AI provides Kimi models through an OpenAI-compatible API.",
   "models.provider.glm.description":
     "Zhipu provides GLM models through the BigModel compatible API.",
+  "models.provider.nvidia.description":
+    "NVIDIA NIM provides hosted models through an OpenAI-compatible API.",
+  "models.provider.stepfun.description":
+    "StepFun provides hosted models through an OpenAI-compatible API.",
+  "models.provider.amazonBedrock.description":
+    "AWS Bedrock uses your AWS credentials and region configuration.",
+  "models.provider.deepseek.description":
+    "DeepSeek provides hosted models through an OpenAI-compatible API.",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
   "models.managed.connected": "Log out",
@@ -394,6 +402,9 @@ const en = {
   "models.byok.oauthFailed": "ChatGPT login failed",
   "models.byok.oauthOrApiKey": "Or enter an API key manually",
   "models.byok.oauthDescription": "Use your ChatGPT Plus/Pro subscription",
+  "models.byok.awsSdkAuth": "Authentication uses your AWS credential chain",
+  "models.byok.awsSdkAuthHint":
+    "No API key is required here. Configure AWS credentials and region in your runtime environment.",
   "models.byok.minimax.authModeOauth": "OAuth Login",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
