@@ -4,6 +4,23 @@ import type {
   ProviderUiMetadata,
 } from "./provider-types.js";
 
+const bundledProviderModelsById = {
+  xiaomi: [
+    {
+      id: "mimo-v2-flash",
+      name: "Xiaomi MiMo V2 Flash",
+    },
+    {
+      id: "mimo-v2-pro",
+      name: "Xiaomi MiMo V2 Pro",
+    },
+    {
+      id: "mimo-v2-omni",
+      name: "Xiaomi MiMo V2 Omni",
+    },
+  ],
+} as const;
+
 const providerRegistryEntries = [
   {
     id: "anthropic",
@@ -214,7 +231,8 @@ const providerRegistryEntries = [
     aliases: ["qwen-portal"],
     controllerConfigurable: true,
     modelsPageVisible: true,
-    displayName: "千问",
+    displayName: "Qwen",
+    displayNameKey: "models.provider.qwen.name",
     descriptionKey: "models.provider.qwen.description",
     apiDocsUrl:
       "https://help.aliyun.com/zh/model-studio/developer-reference/compatibility-of-openai-with-dashscope",
@@ -233,7 +251,8 @@ const providerRegistryEntries = [
     aliases: ["bytedance", "doubao"],
     controllerConfigurable: true,
     modelsPageVisible: true,
-    displayName: "火山引擎",
+    displayName: "Volcengine Ark",
+    displayNameKey: "models.provider.volcengine.name",
     descriptionKey: "models.provider.volcengine.description",
     apiDocsUrl: "https://www.volcengine.com/docs/82379/1330626",
     apiKeyPlaceholder: "...",
@@ -251,7 +270,8 @@ const providerRegistryEntries = [
     aliases: ["baidu"],
     controllerConfigurable: true,
     modelsPageVisible: true,
-    displayName: "千帆",
+    displayName: "Baidu Qianfan",
+    displayNameKey: "models.provider.qianfan.name",
     descriptionKey: "models.provider.qianfan.description",
     apiDocsUrl: "https://cloud.baidu.com/doc/qianfan-api/index.html",
     apiKeyPlaceholder: "...",
@@ -341,14 +361,16 @@ const providerRegistryEntries = [
     canonicalOpenClawId: "xiaomi",
     aliases: [],
     controllerConfigurable: true,
-    modelsPageVisible: false,
-    displayName: "小米",
+    modelsPageVisible: true,
+    displayName: "Xiaomi MiMo",
+    displayNameKey: "models.provider.xiaomi.name",
     descriptionKey: "models.provider.xiaomi.description",
-    apiDocsUrl: "https://docs.api.xiaomi.com/en/cloud-ml/api/index.html",
+    apiDocsUrl: "https://platform.xiaomimimo.com/#/console/api-keys",
     apiKeyPlaceholder: "...",
+    defaultProxyUrl: "https://api.xiaomimimo.com/v1",
     authModes: ["api-key"],
     apiKind: "openai-completions",
-    defaultBaseUrls: [],
+    defaultBaseUrls: ["https://api.xiaomimimo.com/v1"],
     supportsCustomBaseUrl: true,
     supportsModelDiscovery: true,
     supportsProxyMode: true,
@@ -418,7 +440,8 @@ const providerRegistryEntries = [
     aliases: [],
     controllerConfigurable: true,
     modelsPageVisible: true,
-    displayName: "智谱 GLM",
+    displayName: "GLM",
+    displayNameKey: "models.provider.glm.name",
     descriptionKey: "models.provider.glm.description",
     apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
     apiKeyPlaceholder: "eyJ...",
@@ -619,6 +642,7 @@ export function getProviderUiMetadata(
 
   return {
     displayName: entry.displayName,
+    displayNameKey: entry.displayNameKey,
     descriptionKey: entry.descriptionKey,
     apiDocsUrl: entry.apiDocsUrl,
     apiKeyPlaceholder: entry.apiKeyPlaceholder,
@@ -656,6 +680,25 @@ export function getProviderRuntimePolicy(providerId: string): {
     supportsModelDiscovery: entry.supportsModelDiscovery,
     supportsProxyMode: entry.supportsProxyMode,
   };
+}
+
+export function getBundledProviderModels(
+  providerId: string,
+): Array<{ id: string; name: string }> {
+  const normalizedProviderId = normalizeProviderId(providerId);
+  if (!normalizedProviderId) {
+    return [];
+  }
+
+  return (
+    bundledProviderModelsById[
+      normalizedProviderId as keyof typeof bundledProviderModelsById
+    ] ?? []
+  ).map((model) => ({ ...model }));
+}
+
+export function getBundledProviderModelIds(providerId: string): string[] {
+  return getBundledProviderModels(providerId).map((model) => model.id);
 }
 
 export function getCustomProviderProtocolFamily(

@@ -2218,6 +2218,7 @@ export type GetApiV1ModelProvidersRegistryResponses = {
             experimental?: boolean;
             hidden?: boolean;
             displayName: string;
+            displayNameKey?: string;
             descriptionKey?: string;
             apiDocsUrl?: string;
             apiKeyPlaceholder?: string;
@@ -2442,31 +2443,6 @@ export type PutApiV1ModelProvidersConfigResponses = {
 
 export type PutApiV1ModelProvidersConfigResponse = PutApiV1ModelProvidersConfigResponses[keyof PutApiV1ModelProvidersConfigResponses];
 
-export type PostApiV1ModelProvidersByProviderIdValidateData = {
-    body?: {
-        apiKey?: string;
-        baseUrl?: string;
-    };
-    path: {
-        providerId: 'anthropic' | 'google' | 'openai' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'ollama' | 'zai' | 'minimax' | 'custom-openai' | 'custom-anthropic';
-    };
-    query?: never;
-    url: '/api/v1/model-providers/{providerId}/validate';
-};
-
-export type PostApiV1ModelProvidersByProviderIdValidateResponses = {
-    /**
-     * Validate model provider credentials
-     */
-    200: {
-        valid: boolean;
-        models?: Array<string>;
-        error?: string;
-    };
-};
-
-export type PostApiV1ModelProvidersByProviderIdValidateResponse = PostApiV1ModelProvidersByProviderIdValidateResponses[keyof PostApiV1ModelProvidersByProviderIdValidateResponses];
-
 export type PostApiV1ModelProvidersInstancesValidateData = {
     body?: {
         apiKey?: string;
@@ -2490,6 +2466,31 @@ export type PostApiV1ModelProvidersInstancesValidateResponses = {
 };
 
 export type PostApiV1ModelProvidersInstancesValidateResponse = PostApiV1ModelProvidersInstancesValidateResponses[keyof PostApiV1ModelProvidersInstancesValidateResponses];
+
+export type PostApiV1ModelProvidersByProviderIdValidateData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/model-providers/{providerId}/validate';
+};
+
+export type PostApiV1ModelProvidersByProviderIdValidateResponses = {
+    /**
+     * Validate model provider credentials
+     */
+    200: {
+        valid: boolean;
+        models?: Array<string>;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersByProviderIdValidateResponse = PostApiV1ModelProvidersByProviderIdValidateResponses[keyof PostApiV1ModelProvidersByProviderIdValidateResponses];
 
 export type GetApiV1ModelProvidersMinimaxOauthStatusData = {
     body?: never;

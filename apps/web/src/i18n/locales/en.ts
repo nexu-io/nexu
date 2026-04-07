@@ -311,6 +311,11 @@ const en = {
   "models.provider.google.description": "Gemini series AI models",
   "models.provider.ollama.description":
     "Use local Ollama models running on your machine",
+  "models.provider.qwen.name": "Qwen",
+  "models.provider.volcengine.name": "Volcengine Ark",
+  "models.provider.qianfan.name": "Baidu Qianfan",
+  "models.provider.xiaomi.name": "Xiaomi MiMo",
+  "models.provider.glm.name": "GLM",
   "models.provider.siliconflow.description":
     "SiliconFlow provides hosted foundation models through an OpenAI-compatible API.",
   "models.provider.ppio.description":
@@ -322,7 +327,7 @@ const en = {
   "models.provider.qianfan.description":
     "Baidu Qianfan provides ERNIE and other hosted models through a compatible API.",
   "models.provider.xiaomi.description":
-    "Xiaomi offers its large-model platform through an OpenAI-compatible endpoint.",
+    "Xiaomi MiMo provides Flash, Pro, and Omni models through a compatible API.",
   "models.provider.minimax.description":
     "MiniMax provides chat and reasoning models through its hosted API platform.",
   "models.provider.kimi.description":

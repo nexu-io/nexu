@@ -36,6 +36,7 @@ export type CustomProviderProtocolFamily = "openai" | "anthropic";
 
 export type ProviderUiMetadata = {
   displayName: string;
+  displayNameKey?: string;
   descriptionKey?: string;
   apiDocsUrl?: string;
   apiKeyPlaceholder?: string;

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -8,29 +9,75 @@ const execFileAsync = promisify(execFile);
 
 const scriptFilePath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptFilePath), "../..");
+const runtimePortsPath = path.join(
+  repoRoot,
+  ".tmp",
+  "launchd",
+  "runtime-ports.json",
+);
+
+function readRuntimeProbeDefaults() {
+  if (!existsSync(runtimePortsPath)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(runtimePortsPath, "utf8"));
+    const controllerPort =
+      typeof parsed.controllerPort === "number" ? parsed.controllerPort : null;
+    const nexuHome =
+      typeof parsed.nexuHome === "string" && parsed.nexuHome.length > 0
+        ? parsed.nexuHome
+        : null;
+    const openclawStateDir =
+      typeof parsed.openclawStateDir === "string" &&
+      parsed.openclawStateDir.length > 0
+        ? parsed.openclawStateDir
+        : null;
+
+    return {
+      controllerUrl:
+        controllerPort !== null ? `http://127.0.0.1:${controllerPort}` : null,
+      configPath:
+        nexuHome !== null
+          ? path.join(nexuHome, "runtime", "openclaw", "state", "openclaw.json")
+          : null,
+      stateDir: openclawStateDir,
+    };
+  } catch {
+    return null;
+  }
+}
+
+const runtimeProbeDefaults = readRuntimeProbeDefaults();
 
 const defaultOptions = {
-  configPath: path.join(
-    repoRoot,
-    ".tmp",
-    "desktop",
-    "nexu-home",
-    "runtime",
-    "openclaw",
-    "state",
-    "openclaw.json",
-  ),
-  stateDir: path.join(
-    repoRoot,
-    ".tmp",
-    "desktop",
-    "electron",
-    "user-data",
-    "runtime",
-    "openclaw",
-    "state",
-  ),
-  controllerUrl: "http://127.0.0.1:50800",
+  configPath:
+    runtimeProbeDefaults?.configPath ??
+    path.join(
+      repoRoot,
+      ".tmp",
+      "desktop",
+      "nexu-home",
+      "runtime",
+      "openclaw",
+      "state",
+      "openclaw.json",
+    ),
+  stateDir:
+    runtimeProbeDefaults?.stateDir ??
+    path.join(
+      repoRoot,
+      ".tmp",
+      "desktop",
+      "electron",
+      "user-data",
+      "runtime",
+      "openclaw",
+      "state",
+    ),
+  controllerUrl:
+    runtimeProbeDefaults?.controllerUrl ?? "http://127.0.0.1:50800",
   sessionId: "local-probe",
   provider: null,
   model: null,
@@ -215,6 +262,43 @@ function extractAssistantText(payload) {
     .trim();
 }
 
+function parseJsonFromStdout(stdout) {
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    const trimmed = stdout.trim();
+    const lastJsonStart = Math.max(
+      trimmed.lastIndexOf("\n{"),
+      trimmed.lastIndexOf("\n["),
+    );
+    const firstJsonStart = (() => {
+      const objectStart = trimmed.indexOf("{");
+      const arrayStart = trimmed.indexOf("[");
+      if (objectStart === -1) return arrayStart;
+      if (arrayStart === -1) return objectStart;
+      return Math.min(objectStart, arrayStart);
+    })();
+    const candidate =
+      lastJsonStart >= 0
+        ? trimmed.slice(lastJsonStart + 1)
+        : trimmed.startsWith("{") || trimmed.startsWith("[")
+          ? trimmed
+          : firstJsonStart >= 0
+            ? trimmed.slice(firstJsonStart)
+            : "";
+
+    if (candidate) {
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // fall through to original error
+      }
+    }
+
+    throw error;
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
@@ -279,7 +363,7 @@ async function main() {
       maxBuffer: 1024 * 1024 * 10,
     });
 
-    const payload = JSON.parse(stdout);
+    const payload = parseJsonFromStdout(stdout);
     const assistantText = extractAssistantText(payload);
 
     if (!assistantText) {

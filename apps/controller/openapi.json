@@ -5992,6 +5992,9 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "displayNameKey": {
+                            "type": "string"
+                          },
                           "descriptionKey": {
                             "type": "string"
                           },
@@ -6925,93 +6928,6 @@
         }
       }
     },
-    "/api/v1/model-providers/{providerId}/validate": {
-      "post": {
-        "tags": [
-          "Model Providers"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "anthropic",
-                "google",
-                "openai",
-                "openrouter",
-                "mistral",
-                "xai",
-                "together",
-                "huggingface",
-                "qwen",
-                "volcengine",
-                "qianfan",
-                "vllm",
-                "byteplus",
-                "venice",
-                "github-copilot",
-                "xiaomi",
-                "chutes",
-                "ollama",
-                "zai",
-                "minimax",
-                "custom-openai",
-                "custom-anthropic"
-              ]
-            },
-            "required": true,
-            "name": "providerId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "apiKey": {
-                    "type": "string"
-                  },
-                  "baseUrl": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Validate model provider credentials",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "valid": {
-                      "type": "boolean"
-                    },
-                    "models": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "valid"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/model-providers/instances/validate": {
       "post": {
         "tags": [
@@ -7044,6 +6960,69 @@
         "responses": {
           "200": {
             "description": "Validate model provider instance credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-providers/{providerId}/validate": {
+      "post": {
+        "tags": [
+          "Model Providers"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "providerId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "baseUrl": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validate model provider credentials",
             "content": {
               "application/json": {
                 "schema": {

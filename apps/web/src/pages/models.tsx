@@ -137,6 +137,15 @@ function getDefaultMiniMaxAuthMode(
   return provider.requiresOauthRegion ? "oauth" : "apiKey";
 }
 
+function getProviderDisplayName(
+  provider: Pick<ProviderRegistryEntryDto, "displayName" | "displayNameKey">,
+  t: (key: string) => string,
+): string {
+  return provider.displayNameKey
+    ? t(provider.displayNameKey)
+    : provider.displayName;
+}
+
 function setMiniMaxOauthErrorInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   error: Error,
@@ -1080,7 +1089,7 @@ export function ModelsPage() {
       const modProv = providers.find((p) => p.id === provider.id);
       items.push({
         id: provider.id,
-        name: provider.displayName,
+        name: getProviderDisplayName(provider, t),
         modelCount: modProv?.models.length ?? 0,
         configured: isStoredProviderConfigured(matchedProviderConfig),
         managed: false,
@@ -1113,6 +1122,7 @@ export function ModelsPage() {
     models,
     providerConfigDoc,
     providers,
+    t,
     visibleRegistryProviders,
   ]);
 
@@ -1710,13 +1720,12 @@ function ByokProviderDetail({
 }) {
   const { t } = useTranslation();
   const providerId = provider.id;
-  const meta = {
-    displayName: provider.displayName,
-    descriptionKey: provider.descriptionKey,
-    apiDocsUrl: provider.apiDocsUrl,
-    apiKeyPlaceholder: provider.apiKeyPlaceholder ?? "your-api-key",
-    defaultProxyUrl: getProviderDefaultBaseUrl(provider),
-  };
+  const providerDisplayName = getProviderDisplayName(provider, t);
+  const providerDescriptionKey = provider.descriptionKey;
+  const providerApiDocsUrl = provider.apiDocsUrl;
+  const providerApiKeyPlaceholder =
+    provider.apiKeyPlaceholder ?? "your-api-key";
+  const providerDefaultProxyUrl = getProviderDefaultBaseUrl(provider);
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(
@@ -1881,7 +1890,7 @@ function ByokProviderDetail({
       displayName:
         providerConfig?.providerTemplateId && providerConfig.displayName?.trim()
           ? providerConfig.displayName
-          : meta.displayName,
+          : providerDisplayName,
       ...(providerConfig?.headers ? { headers: providerConfig.headers } : {}),
       ...(providerConfig?.metadata
         ? { metadata: providerConfig.metadata }
@@ -1891,10 +1900,10 @@ function ByokProviderDetail({
     [
       baseUrl,
       isMiniMax,
-      meta.displayName,
       oauthRegion,
       persistedApiKey,
       provider,
+      providerDisplayName,
       providerConfig?.headers,
       providerConfig?.displayName,
       providerConfig?.instanceId,
@@ -2198,11 +2207,11 @@ function ByokProviderDetail({
           <div>
             <div className="flex items-center gap-2">
               <div className="text-[14px] font-semibold text-text-primary">
-                {meta.displayName}
+                {providerDisplayName}
               </div>
-              {meta.apiDocsUrl && (
+              {providerApiDocsUrl && (
                 <a
-                  href={meta.apiDocsUrl}
+                  href={providerApiDocsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-link text-[11px]"
@@ -2213,7 +2222,7 @@ function ByokProviderDetail({
               )}
             </div>
             <div className="text-[11px] text-text-tertiary">
-              {meta.descriptionKey ? t(meta.descriptionKey) : ""}
+              {providerDescriptionKey ? t(providerDescriptionKey) : ""}
             </div>
           </div>
         </div>
@@ -2553,7 +2562,7 @@ function ByokProviderDetail({
                       resetProviderActionState();
                       setApiKey(e.target.value);
                     }}
-                    placeholder={meta.apiKeyPlaceholder}
+                    placeholder={providerApiKeyPlaceholder}
                     className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
                   />
                   <button
@@ -2635,7 +2644,9 @@ function ByokProviderDetail({
                 resetProviderActionState();
                 setBaseUrl(e.target.value);
               }}
-              placeholder={meta.defaultProxyUrl || "https://api.example.com/v1"}
+              placeholder={
+                providerDefaultProxyUrl || "https://api.example.com/v1"
+              }
               className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
             />
             {isOllama && verifyMutation.isSuccess && (

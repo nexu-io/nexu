@@ -358,4 +358,68 @@ describe("ModelProviderService", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("uses bundled Xiaomi MiMo models when discovery endpoint is unavailable", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("https://api.xiaomimimo.com/v1/models");
+
+      return new Response("not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("xiaomi", {
+        apiKey: "xiaomi-test-key",
+        baseUrl: "https://api.xiaomimimo.com/v1",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-omni"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("lists bundled Xiaomi MiMo models for enabled providers with empty stored inventory", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+
+    await service.upsertProvider("xiaomi", {
+      baseUrl: "https://api.xiaomimimo.com/v1",
+      apiKey: "xiaomi-test-key",
+      enabled: true,
+      displayName: "Xiaomi MiMo",
+      modelsJson: JSON.stringify([]),
+    });
+
+    const { models } = await service.listModels();
+
+    expect(models.filter((model) => model.provider === "xiaomi")).toEqual([
+      {
+        id: "xiaomi/mimo-v2-flash",
+        name: "mimo-v2-flash",
+        provider: "xiaomi",
+      },
+      {
+        id: "xiaomi/mimo-v2-pro",
+        name: "mimo-v2-pro",
+        provider: "xiaomi",
+      },
+      {
+        id: "xiaomi/mimo-v2-omni",
+        name: "mimo-v2-omni",
+        provider: "xiaomi",
+      },
+    ]);
+  });
 });

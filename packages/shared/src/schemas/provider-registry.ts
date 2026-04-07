@@ -26,6 +26,7 @@ export const providerRegistryEntrySchema = z.object({
   experimental: z.boolean().optional(),
   hidden: z.boolean().optional(),
   displayName: z.string().min(1),
+  displayNameKey: z.string().optional(),
   descriptionKey: z.string().optional(),
   apiDocsUrl: z.string().optional(),
   apiKeyPlaceholder: z.string().optional(),

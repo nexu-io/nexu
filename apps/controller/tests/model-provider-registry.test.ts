@@ -80,6 +80,7 @@ describe("model provider registry", () => {
       "qwen",
       "volcengine",
       "qianfan",
+      "xiaomi",
     ]) {
       expect(entryMap.get(providerId)?.modelsPageVisible).toBe(true);
       expect(entryMap.get(providerId)?.controllerConfigurable).toBe(true);
@@ -89,7 +90,6 @@ describe("model provider registry", () => {
       "byteplus",
       "venice",
       "github-copilot",
-      "xiaomi",
       "chutes",
     ]) {
       expect(entryMap.get(providerId)?.modelsPageVisible).toBe(false);

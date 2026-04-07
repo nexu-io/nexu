@@ -7,6 +7,7 @@ import {
   type ModelProviderConfig,
   type PersistedModelsConfig,
   type ProviderRegistryEntryDto,
+  getBundledProviderModelIds,
   getDefaultProviderBaseUrls,
   getProviderRuntimePolicy,
   isCustomProviderTemplate,
@@ -161,6 +162,13 @@ type ProviderInventoryInput = {
   oauthProfileRef: string | null;
 };
 
+function resolveInventoryModelIds(
+  providerId: string,
+  models: string[],
+): string[] {
+  return models.length > 0 ? models : getBundledProviderModelIds(providerId);
+}
+
 function toProviderInventoryInput(
   providers: PersistedModelsConfig["providers"],
 ): ProviderInventoryInput[] {
@@ -173,7 +181,10 @@ function toProviderInventoryInput(
         providerId,
         enabled: provider.enabled,
         apiKey: typeof provider.apiKey === "string" ? provider.apiKey : null,
-        models: provider.models.map((model) => model.id),
+        models: resolveInventoryModelIds(
+          providerId,
+          provider.models.map((model) => model.id),
+        ),
         baseUrl: provider.baseUrl ?? null,
         oauthRegion: provider.oauthRegion ?? null,
         auth: provider.auth,
@@ -739,12 +750,28 @@ export class ModelProviderService {
         if (providerId === "minimax" && response.status === 404) {
           return { valid: true, models: MINI_MAX_API_MODELS };
         }
+        if (providerId === "xiaomi" && response.status === 404) {
+          return {
+            valid: true,
+            models: getBundledProviderModelIds(providerId),
+          };
+        }
         return { valid: false, error: `HTTP ${response.status}` };
       }
 
       const payload = (await response.json()) as {
         data?: Array<{ id: string }>;
       };
+      if (providerId === "xiaomi") {
+        return {
+          valid: true,
+          models:
+            Array.isArray(payload.data) && payload.data.length > 0
+              ? payload.data.map((item) => item.id)
+              : getBundledProviderModelIds(providerId),
+        };
+      }
+
       return {
         valid: true,
         models: Array.isArray(payload.data)

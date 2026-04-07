@@ -2,6 +2,7 @@ import {
   type ModelProviderConfig,
   type PersistedModelsConfig,
   type ProviderSecretInput,
+  getBundledProviderModels,
   getCustomProviderProtocolFamily,
   getDefaultProviderBaseUrls,
   getProviderAliasCandidates,
@@ -165,6 +166,25 @@ export function listModelProviderRuntimeDescriptorsFromProviders(
         return [];
       }
 
+      const resolvedModels =
+        provider.models.length > 0
+          ? provider.models
+          : getBundledProviderModels(providerId).map((model) => ({
+              id: model.id,
+              name: model.name,
+              reasoning: false,
+              input: ["text"] as Array<"text" | "image">,
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+              ...(runtimePolicy.apiKind ? { api: runtimePolicy.apiKind } : {}),
+            }));
+
       const usesProxyRuntimeKey = customProvider
         ? false
         : isProviderProxied({
@@ -213,6 +233,7 @@ export function listModelProviderRuntimeDescriptorsFromProviders(
           provider: {
             ...provider,
             baseUrl: resolvedBaseUrl,
+            models: resolvedModels,
           },
           aliasCandidates: customProvider
             ? [persistedKey]

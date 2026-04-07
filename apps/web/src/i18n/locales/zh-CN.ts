@@ -298,6 +298,11 @@ const zhCN = {
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
   "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
+  "models.provider.qwen.name": "千问",
+  "models.provider.volcengine.name": "火山引擎",
+  "models.provider.qianfan.name": "千帆",
+  "models.provider.xiaomi.name": "小米 MiMo",
+  "models.provider.glm.name": "智谱 GLM",
   "models.provider.siliconflow.description":
     "SiliconFlow 通过兼容 OpenAI 的接口提供托管基础模型服务。",
   "models.provider.ppio.description":
@@ -309,7 +314,7 @@ const zhCN = {
   "models.provider.qianfan.description":
     "百度智能云千帆通过兼容接口提供文心等托管模型。",
   "models.provider.xiaomi.description":
-    "小米通过兼容 OpenAI 的接口提供大模型平台能力。",
+    "小米 MiMo 通过兼容接口提供 Flash、Pro 和 Omni 模型。",
   "models.provider.minimax.description":
     "MiniMax 通过托管 API 平台提供对话与推理模型。",
   "models.provider.kimi.description":

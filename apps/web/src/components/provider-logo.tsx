@@ -1,8 +1,9 @@
-import { BaiduCloud, ModelIcon, ProviderIcon } from "@lobehub/icons";
+import { ModelIcon, ProviderIcon } from "@lobehub/icons";
 import type { CSSProperties } from "react";
 
 const PROVIDER_ICON_ALIASES: Record<string, string> = {
   anthropic: "anthropic",
+  baidu: "baidu",
   glm: "zhipu",
   google: "google",
   kimi: "moonshot",
@@ -12,8 +13,15 @@ const PROVIDER_ICON_ALIASES: Record<string, string> = {
   openai: "openai",
   openrouter: "openrouter",
   ppio: "ppio",
+  qianfan: "baidu",
+  qwen: "alibaba",
   siliconflow: "siliconcloud",
-  zai: "zai",
+  together: "together",
+  togetherai: "together",
+  volcengine: "volcengine",
+  xai: "xai",
+  xiaomi: "xiaomimimo",
+  zai: "zhipu",
 };
 
 function normalizeProviderIconKey(provider: string): string | null {
@@ -28,6 +36,20 @@ function normalizeProviderIconKey(provider: string): string | null {
 
 function fallbackStyle(size: number): CSSProperties {
   return { width: size, height: size };
+}
+
+function getDisplayModelId(model: string): string {
+  const normalized = model.trim();
+
+  if (!normalized) {
+    return normalized;
+  }
+
+  if (!normalized.includes("/")) {
+    return normalized;
+  }
+
+  return normalized.slice(normalized.lastIndexOf("/") + 1);
 }
 
 function FallbackProviderMark({
@@ -64,6 +86,17 @@ function FallbackProviderMark({
   );
 }
 
+function FallbackModelMark({ model, size }: { model: string; size: number }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded text-[9px] font-bold bg-surface-3 text-text-muted"
+      style={fallbackStyle(size)}
+    >
+      {(model[0] ?? "?").toUpperCase()}
+    </span>
+  );
+}
+
 export function ProviderLogo({
   provider,
   size = 16,
@@ -77,24 +110,20 @@ export function ProviderLogo({
     return <FallbackProviderMark provider={provider} size={size} />;
   }
 
-  if (normalizedProvider === "qianfan" || normalizedProvider === "baidu") {
-    return <BaiduCloud.Color size={size} style={{ flex: "none" }} />;
-  }
-
   const iconProvider = normalizeProviderIconKey(provider);
 
-  if (iconProvider) {
-    return (
-      <ProviderIcon
-        provider={iconProvider}
-        size={size}
-        type="color"
-        style={{ flex: "none" }}
-      />
-    );
+  if (!iconProvider) {
+    return <FallbackProviderMark provider={provider} size={size} />;
   }
 
-  return <FallbackProviderMark provider={provider} size={size} />;
+  return (
+    <ProviderIcon
+      provider={iconProvider}
+      type="color"
+      size={size}
+      style={{ flex: "none" }}
+    />
+  );
 }
 
 export function ModelLogo({
@@ -106,20 +135,22 @@ export function ModelLogo({
   provider?: string;
   size?: number;
 }) {
-  if (model.trim().length > 0) {
-    return <ModelIcon model={model} size={size} style={{ flex: "none" }} />;
-  }
+  const displayModelId = getDisplayModelId(model);
 
-  if (provider) {
-    return <ProviderLogo provider={provider} size={size} />;
+  if (!displayModelId) {
+    return provider ? (
+      <ProviderLogo provider={provider} size={size} />
+    ) : (
+      <FallbackModelMark model={model} size={size} />
+    );
   }
 
   return (
-    <span
-      className="flex items-center justify-center rounded text-[9px] font-bold bg-surface-3 text-text-muted"
-      style={fallbackStyle(size)}
-    >
-      {(model[0] ?? "?").toUpperCase()}
-    </span>
+    <ModelIcon
+      model={displayModelId}
+      type="color"
+      size={size}
+      style={{ flex: "none" }}
+    />
   );
 }
