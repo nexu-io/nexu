@@ -141,38 +141,6 @@ export function registerModelRoutes(
   app.openapi(
     createRoute({
       method: "post",
-      path: "/api/v1/model-providers/{providerId}/validate",
-      tags: ["Model Providers"],
-      request: {
-        params: verifyProviderIdParamSchema,
-        body: {
-          content: { "application/json": { schema: verifyProviderBodySchema } },
-        },
-      },
-      responses: {
-        200: {
-          content: {
-            "application/json": { schema: verifyProviderResponseSchema },
-          },
-          description: "Validate model provider credentials",
-        },
-      },
-    }),
-    async (c) => {
-      const { providerId } = c.req.valid("param");
-      return c.json(
-        await container.modelProviderService.verifyProvider(
-          providerId,
-          c.req.valid("json"),
-        ),
-        200,
-      );
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
       path: "/api/v1/model-providers/instances/validate",
       tags: ["Model Providers"],
       request: {
@@ -197,6 +165,38 @@ export function registerModelRoutes(
         await container.modelProviderService.verifyProviderInstance(
           instanceKey,
           input,
+        ),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/model-providers/{providerId}/validate",
+      tags: ["Model Providers"],
+      request: {
+        params: verifyProviderIdParamSchema,
+        body: {
+          content: { "application/json": { schema: verifyProviderBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: verifyProviderResponseSchema },
+          },
+          description: "Validate model provider credentials",
+        },
+      },
+    }),
+    async (c) => {
+      const { providerId } = c.req.valid("param");
+      return c.json(
+        await container.modelProviderService.verifyProvider(
+          providerId,
+          c.req.valid("json"),
         ),
         200,
       );

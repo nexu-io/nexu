@@ -1378,6 +1378,10 @@ export function ModelsPage() {
                   />
                 ) : (
                   <ByokProviderDetail
+                    key={
+                      activeProvider.providerKey ??
+                      (activeProvider.registryEntry as ByokProviderEntry).id
+                    }
                     provider={activeProvider.registryEntry as ByokProviderEntry}
                     providerKey={
                       activeProvider.providerKey ??
@@ -2083,6 +2087,11 @@ function ByokProviderDetail({
     },
   });
 
+  const resetProviderActionState = useCallback(() => {
+    verifyMutation.reset();
+    saveMutation.reset();
+  }, [saveMutation, verifyMutation]);
+
   // ── Delete mutation ──────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: () => onDeleteProviderConfig(provider),
@@ -2563,7 +2572,10 @@ function ByokProviderDetail({
                     id={`apikey-${providerId}`}
                     type="password"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      resetProviderActionState();
+                      setApiKey(e.target.value);
+                    }}
                     placeholder={meta.apiKeyPlaceholder}
                     className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
                   />
@@ -2642,7 +2654,10 @@ function ByokProviderDetail({
               id={`baseurl-${providerId}`}
               type="text"
               value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
+              onChange={(e) => {
+                resetProviderActionState();
+                setBaseUrl(e.target.value);
+              }}
               placeholder={meta.defaultProxyUrl || "https://api.example.com/v1"}
               className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
             />
