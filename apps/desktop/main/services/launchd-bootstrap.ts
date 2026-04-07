@@ -1786,6 +1786,34 @@ function readBundleExecutableName(appContentsPath: string): string {
   }
 }
 
+function readBundleInfoValue(
+  appContentsPath: string,
+  key: string,
+): string | null {
+  try {
+    const plistPath = path.join(appContentsPath, "Info.plist");
+    const raw = readFileSync(plistPath, "utf8");
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = raw.match(
+      new RegExp(`<key>${escapedKey}</key>\\s*<string>([^<]+)</string>`),
+    );
+    return match?.[1]?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildRuntimeExtractionStamp(
+  appContentsPath: string,
+  appVersion: string,
+): string {
+  const bundleVersion = readBundleInfoValue(appContentsPath, "CFBundleVersion");
+  return JSON.stringify({
+    appVersion,
+    bundleVersion,
+  });
+}
+
 /**
  * Ensure a standalone Electron-as-Node runner exists outside the .app bundle.
  *
@@ -1810,6 +1838,10 @@ export async function ensureExternalNodeRunner(
   appVersion: string,
 ): Promise<string> {
   const binaryName = readBundleExecutableName(appContentsPath);
+  const extractionStamp = buildRuntimeExtractionStamp(
+    appContentsPath,
+    appVersion,
+  );
   const runnerRoot = path.join(nexuHome, "runtime", "nexu-runner.app");
   const stagingRoot = `${runnerRoot}.staging`;
   const binaryPath = path.join(runnerRoot, "Contents", "MacOS", binaryName);
@@ -1833,7 +1865,7 @@ export async function ensureExternalNodeRunner(
     if (
       existsSync(stampPath) &&
       existsSync(binaryPath) &&
-      readFileSync(stampPath, "utf8").trim() === appVersion
+      readFileSync(stampPath, "utf8").trim() === extractionStamp
     ) {
       return binaryPath;
     }
@@ -1842,7 +1874,7 @@ export async function ensureExternalNodeRunner(
   }
 
   console.log(
-    `Extracting external node runner for v${appVersion} to ${runnerRoot}`,
+    `Extracting external node runner for runtime ${extractionStamp} to ${runnerRoot}`,
   );
 
   // Atomic extraction: build in staging directory, then rename into place.
@@ -1883,7 +1915,7 @@ export async function ensureExternalNodeRunner(
   // Write version stamp AFTER the swap so it is only visible when the
   // runner bundle is fully in place.  The stamp file is a sibling of the
   // .app bundle, not inside it, to preserve the code signature.
-  writeFileSync(stampPath, appVersion, "utf8");
+  writeFileSync(stampPath, extractionStamp, "utf8");
 
   console.log(`External node runner ready at ${binaryPath}`);
   return binaryPath;
@@ -1908,6 +1940,10 @@ async function ensureExternalControllerSidecar(
   nexuHome: string,
   appVersion: string,
 ): Promise<{ controllerRoot: string; entryPath: string }> {
+  const extractionStamp = buildRuntimeExtractionStamp(
+    appContentsPath,
+    appVersion,
+  );
   const controllerRoot = path.join(nexuHome, "runtime", "controller-sidecar");
   const stagingRoot = `${controllerRoot}.staging`;
   const entryPath = path.join(controllerRoot, "dist", "index.js");
@@ -1924,7 +1960,7 @@ async function ensureExternalControllerSidecar(
     if (
       existsSync(stampPath) &&
       existsSync(entryPath) &&
-      readFileSync(stampPath, "utf8").trim() === appVersion
+      readFileSync(stampPath, "utf8").trim() === extractionStamp
     ) {
       return { controllerRoot, entryPath };
     }
@@ -1933,7 +1969,7 @@ async function ensureExternalControllerSidecar(
   }
 
   console.log(
-    `Extracting controller sidecar for v${appVersion} to ${controllerRoot}`,
+    `Extracting controller sidecar for runtime ${extractionStamp} to ${controllerRoot}`,
   );
 
   const srcControllerDir = path.join(
@@ -1965,7 +2001,7 @@ async function ensureExternalControllerSidecar(
 
   // Write version stamp inside staging directory
   const stagingStampPath = path.join(stagingRoot, ".version-stamp");
-  writeFileSync(stagingStampPath, appVersion, "utf8");
+  writeFileSync(stagingStampPath, extractionStamp, "utf8");
 
   // Atomic swap: remove old directory, then rename staging into place.
   // mv (rename) is atomic on the same filesystem (POSIX guarantee).
