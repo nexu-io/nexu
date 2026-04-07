@@ -46,7 +46,13 @@ function loadState() {
     cachedState = parsed;
     return parsed;
   } catch {
-    return cachedState ?? { locale: "zh-CN" };
+    // Default to "en" when the state file is missing or unreadable so we
+    // stay aligned with the controller's own default locale (also "en"
+    // when desktop.locale is unset). Returning "zh-CN" here would mean
+    // English users get Chinese error replacements during the brief
+    // window before the controller writes the state file for the first
+    // time.
+    return cachedState ?? { locale: "en" };
   }
 }
 
@@ -197,9 +203,17 @@ function matchErrorCodeFromContent(content) {
 
 const DEFAULT_CONTACT_URL = "https://nexu.app/contact";
 
-/** Per-session error code cache. Keyed by sessionId (ephemeral). */
-const sessionErrorCache = new Map();
-const CACHE_TTL_MS = 30_000;
+/**
+ * Cache of recent LLM error codes, keyed by `channelId` (the only correlation
+ * field shared between `llm_output` and `message_sending` contexts in the
+ * OpenClaw plugin API). This is intentionally narrow to reduce the chance of
+ * applying an error code from one conversation to a different conversation's
+ * outgoing reply. The TTL is short for the same reason: an llm_output and the
+ * follow-up error reply should be milliseconds apart in the normal path, so a
+ * 5s window is more than enough while keeping the cross-talk window small.
+ */
+const channelErrorCache = new Map();
+const CACHE_TTL_MS = 5_000;
 
 const plugin = {
   id: "nexu-credit-guard",
@@ -212,15 +226,15 @@ const plugin = {
     // Phase 1: capture the raw error code from the LLM response
     api.on("llm_output", async (event, ctx) => {
       const code = extractErrorCode(event.lastAssistant);
-      if (!code || !ctx.sessionId) return;
+      if (!code || !ctx.channelId) return;
 
-      sessionErrorCache.set(ctx.sessionId, { code, ts: Date.now() });
+      channelErrorCache.set(ctx.channelId, { code, ts: Date.now() });
 
       // Evict stale entries periodically
-      if (sessionErrorCache.size > 500) {
+      if (channelErrorCache.size > 500) {
         const now = Date.now();
-        for (const [key, val] of sessionErrorCache) {
-          if (now - val.ts > CACHE_TTL_MS) sessionErrorCache.delete(key);
+        for (const [key, val] of channelErrorCache) {
+          if (now - val.ts > CACHE_TTL_MS) channelErrorCache.delete(key);
         }
       }
     });
@@ -228,7 +242,7 @@ const plugin = {
     // Phase 2: replace the outgoing error message
     api.on(
       "message_sending",
-      async (event) => {
+      async (event, ctx) => {
         // Only intercept messages that look like errors
         if (
           !event.content.startsWith("⚠️") &&
@@ -242,17 +256,20 @@ const plugin = {
           return;
         }
 
-        // Try cached error code first (from llm_output), then pattern-match
+        // Try cached error code first (from llm_output), then pattern-match.
+        // Cache lookup is keyed by channelId (the only correlation field
+        // shared between llm_output and message_sending contexts), so we
+        // never apply a cross-channel error code, and within a channel we
+        // only consume entries that are within the short TTL window.
         let errorCode = null;
-
-        // Check cache by scanning recent entries (message_sending ctx has
-        // conversationId, not sessionId, so we check by recency)
-        const now = Date.now();
-        for (const [key, val] of sessionErrorCache) {
-          if (now - val.ts < CACHE_TTL_MS) {
-            errorCode = val.code;
-            sessionErrorCache.delete(key);
-            break;
+        if (ctx?.channelId) {
+          const entry = channelErrorCache.get(ctx.channelId);
+          if (entry && Date.now() - entry.ts < CACHE_TTL_MS) {
+            errorCode = entry.code;
+            channelErrorCache.delete(ctx.channelId);
+          } else if (entry) {
+            // Stale — discard so it can't pollute a future unrelated reply.
+            channelErrorCache.delete(ctx.channelId);
           }
         }
 
@@ -266,7 +283,7 @@ const plugin = {
         if (!messages) return;
 
         const state = loadState();
-        const locale = state?.locale || "zh-CN";
+        const locale = state?.locale || "en";
         const localised = t(locale, messages[0], messages[1], contactUrl);
 
         api.logger.info(
