@@ -31,6 +31,7 @@ if (posthogApiKey) {
 function AnalyticsSessionSync() {
   useEffect(() => {
     let cancelled = false;
+    let lastObservedUserId: string | null = null;
 
     const syncAnalyticsIdentity = async () => {
       try {
@@ -49,7 +50,10 @@ function AnalyticsSessionSync() {
           typeof data?.userName === "string" ? data.userName : null;
 
         if (!userId) {
-          resetAnalytics();
+          if (lastObservedUserId !== null) {
+            resetAnalytics();
+            lastObservedUserId = null;
+          }
           return;
         }
 
@@ -58,6 +62,7 @@ function AnalyticsSessionSync() {
           email: userEmail,
           name: userName,
         });
+        lastObservedUserId = userId;
       } catch {
         // Ignore transient fetch errors. Keep existing identity until a
         // successful status refresh says otherwise.
