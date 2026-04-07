@@ -35,7 +35,22 @@ When the user's message is about **nexu itself** — for example:
 - channels, integrations, architecture, or product capabilities
 - exact questions such as `nexu是谁`, `谁是nexu`, `nexu是什么`,
   `nexu最近有什么更新`, `nexu最近的更新版本是什么`, `nexu支持什么版本`,
-  `nexu支持什么渠道`, `如何连接 Discord/Feishu/Slack`
+  `nexu支持什么渠道`, `如何连接 Discord/Feishu/Slack`,
+  `怎么连接telegram`, `怎么连接whatsapp`, `怎么连接微信`
+
+Also treat **channel setup questions in the current nexu conversation** as nexu
+product questions even if the user does not explicitly repeat the word `nexu`.
+Examples:
+
+- `怎么连接telegram`
+- `怎么连接whatsapp`
+- `怎么连接微信`
+- `如何连接 Discord`
+- `飞书怎么接`
+
+If the user is asking how to connect a supported IM/channel and they do not name
+another product, assume they mean connecting that channel to nexu and route to
+the `who-is-nexu` skill first.
 
 you must treat that as a **skill-first retrieval task**.
 

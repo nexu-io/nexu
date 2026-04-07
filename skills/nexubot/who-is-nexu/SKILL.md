@@ -26,8 +26,11 @@ bash {baseDir}/scripts/run-collector.sh --lang zh --query "<user question>"
 4. Read the JSON output and build the reply from these sections:
    - `briefing.question`
    - `briefing.topic`
+   - `briefing.focus`
    - `briefing.relevantPoints`
    - `briefing.recentUpdate`
+   - `briefing.referenceLinks`
+   - `briefing.sourceGapNote`
    - `briefing.cta`
    - `briefing.sourceCoverage`
    - `sources.docs`
@@ -44,23 +47,37 @@ bash {baseDir}/scripts/run-collector.sh --lang zh --query "<user question>"
 - Then answer in this order:
   1) Direct answer to the user's question
   2) 2-4 supporting points from `briefing.relevantPoints`
-  3) If useful, 1 recent update from `briefing.recentUpdate`
-  4) If sources are partial, say that briefly
-  5) End with the exact one-line CTA from `briefing.cta` when the answer is substantive
+  3) If useful, add 1 short recent update from `briefing.recentUpdate` as a secondary section after the main answer
+  4) Add a short `参考链接：` / `References:` section with 2-3 links from `briefing.referenceLinks`
+  5) If sources are partial, say that briefly
+  6) End with the exact one-line CTA from `briefing.cta` when the answer is substantive
 - If the question is specifically `nexu是谁` / `what is nexu`, answer identity first.
 - If the question is about updates/version/changelog, prioritize release/blog content.
 - If the question is about channels/features/how it works, prioritize docs content.
+- If `briefing.focus` is present, only keep content and links related to that specific channel or source.
+- If `briefing.focus` is a specific channel and `briefing.referenceLinks` contains a channel-specific docs page, show that docs link first instead of describing the docs homepage as if it were a channel guide.
+- If `briefing.focus` is present and `briefing.relevantPoints` is empty or very sparse, say clearly that the checked docs/blog/release do not provide a more explicit channel-specific guide.
+- If `briefing.focus` is a specific channel but there is no channel-specific docs page, say that clearly and keep the answer limited to what the official docs/blog/release explicitly state.
+- The user's main question must be answered in the first paragraph or first 2 lines.
+- The recent update section is optional supporting context, not the headline.
 
 ## Hard rules
 
 - Do not answer nexu-related questions from memory before running the script.
+- When the user asks about a specific channel such as 微信 / Discord / Slack / 飞书, do not pad the answer with unrelated channels.
+- Do not fall back to generic multi-channel descriptions when the user asked about one specific channel.
+- Do not let `recentUpdate` appear before the direct answer to the user's question.
+- Do not let a version update section become longer or more prominent than the main answer unless the user explicitly asked about updates.
 - Do not invent version numbers, dates, channels, or features.
+- Do not turn a short release note into a detailed channel setup tutorial unless the docs explicitly provide those steps.
 - Prefer the newest release in `sources.releases.latest` when mentioning "latest".
 - If one source fails, continue with the remaining sources and briefly note the gap.
 - Do not dump raw JSON to the user.
 - Do not switch into generic self-introduction, onboarding, or capability-menu mode.
 - Do not use phrases like "我是你的 nexu agent" / "我能为你做什么" / "给我起个名字" / "你的时区是".
 - If the sources do not directly answer the question, say what you found and what is still unclear.
+- Always include the source links section for normal informational answers when `briefing.referenceLinks` is available.
+- Keep the links clean and scannable. Prefer one link per line or a short flat list.
 - Do not send "thinking", "checking", or "organizing" placeholder messages before the final answer for nexu product questions.
 - Keep the CTA to one short line. Do not let it dominate the answer.
 - Do not add the CTA if the user is reporting a bug, asking for support on a broken flow, or the answer is mostly an apology / uncertainty.

@@ -2,6 +2,32 @@
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_RELEASE_LIMIT = 3;
+const CHANNEL_DOC_LINKS = {
+  wechat: {
+    label: "微信接入 Docs",
+    url: "https://docs.nexu.io/zh/guide/channels/wechat",
+  },
+  feishu: {
+    label: "飞书接入 Docs",
+    url: "https://docs.nexu.io/zh/guide/channels/feishu",
+  },
+  slack: {
+    label: "Slack 接入 Docs",
+    url: "https://docs.nexu.io/zh/guide/channels/slack",
+  },
+  discord: {
+    label: "Discord 接入 Docs",
+    url: "https://docs.nexu.io/zh/guide/channels/discord",
+  },
+  telegram: {
+    label: "Telegram 接入 Docs",
+    url: "https://docs.nexu.io/zh/guide/channels/telegram",
+  },
+  whatsapp: {
+    label: "WhatsApp 接入 Docs",
+    url: "https://docs.nexu.io/zh/guide/channels/whatsapp",
+  },
+};
 
 function parseArgs(argv) {
   const args = { lang: "zh", limit: DEFAULT_RELEASE_LIMIT, query: "" };
@@ -132,7 +158,7 @@ function detectTopic(query) {
   if (/(更新|版本|release|changelog|最近|latest|新版本|发布)/i.test(text)) {
     return "updates";
   }
-  if (/(渠道|飞书|slack|discord|telegram|whatsapp|wechat|接入|im|channel)/i.test(text)) {
+  if (/(渠道|飞书|企业微信|微信|slack|discord|telegram|whatsapp|wechat|wecom|接入|im|channel)/i.test(text)) {
     return "channels";
   }
   if (/(功能|能力|能做什么|可以做什么|支持什么|feature|capability|skill)/i.test(text)) {
@@ -142,6 +168,63 @@ function detectTopic(query) {
     return "architecture";
   }
   return "general";
+}
+
+function detectFocus(query) {
+  const text = normalizeText(query);
+  if (!text) return null;
+
+  const focusDefs = [
+    { key: "wechat", patterns: [/微信/i, /wechat/i] },
+    { key: "wecom", patterns: [/企业微信/i, /wecom/i] },
+    { key: "feishu", patterns: [/飞书/i, /feishu/i, /lark/i] },
+    { key: "discord", patterns: [/discord/i] },
+    { key: "slack", patterns: [/slack/i] },
+    { key: "telegram", patterns: [/telegram/i] },
+    { key: "whatsapp", patterns: [/whatsapp/i] },
+    { key: "docs", patterns: [/\bdocs?\b/i, /文档/i, /guide/i, /教程/i] },
+    { key: "blog", patterns: [/\bblog\b/i, /博客/i] },
+    { key: "releases", patterns: [/release/i, /changelog/i, /更新日志/i, /发行说明/i] },
+  ];
+
+  return focusDefs.find((focus) =>
+    focus.patterns.some((pattern) => pattern.test(text)),
+  ) ?? null;
+}
+
+function matchesFocus(text, focusKey) {
+  const value = normalizeText(text);
+  const focusPatterns = {
+    wechat: /(微信|wechat)/i,
+    wecom: /(企业微信|wecom)/i,
+    feishu: /(飞书|feishu|lark)/i,
+    discord: /(discord)/i,
+    slack: /(slack)/i,
+    telegram: /(telegram)/i,
+    whatsapp: /(whatsapp)/i,
+    docs: /(\bdocs?\b|文档|guide|教程)/i,
+    blog: /(\bblog\b|博客)/i,
+    releases: /(release|changelog|更新日志|发行说明)/i,
+  };
+
+  return focusPatterns[focusKey]?.test(value) ?? false;
+}
+
+function getFocusDocLink(focus) {
+  if (!focus?.key) return null;
+  return CHANNEL_DOC_LINKS[focus.key] ?? null;
+}
+
+function isChannelFocus(focus) {
+  return [
+    "wechat",
+    "wecom",
+    "feishu",
+    "discord",
+    "slack",
+    "telegram",
+    "whatsapp",
+  ].includes(focus?.key ?? "");
 }
 
 function scoreLine(line, keywords, topic) {
@@ -291,6 +374,156 @@ function extractReleaseHighlights(body, limit = 3) {
   return uniqueNonEmpty(lines).slice(0, limit);
 }
 
+function buildReferenceLinks(result, topic, focus) {
+  const links = [];
+  const docs = result.sources.docs;
+  const blog = result.sources.blog;
+  const releases = result.sources.releases?.recent ?? [];
+  const latestRelease = result.sources.releases?.latest;
+  const focusDocLink = getFocusDocLink(focus);
+  const docsHasFocus =
+    docs?.summary?.some((line) => matchesFocus(line, focus?.key)) ?? false;
+  const matchingBlog = blog?.recentPosts?.find((post) =>
+    matchesFocus(post.title ?? "", focus?.key),
+  );
+  const matchingRelease = releases.find((release) =>
+    (release.highlights ?? []).some((line) => matchesFocus(line, focus?.key)),
+  );
+
+  if (focusDocLink?.url) {
+    links.push(focusDocLink);
+  } else if (docs?.url) {
+    links.push({
+      label: "Docs",
+      url: docs.url,
+    });
+  }
+
+  if (blog?.url) {
+    links.push({
+      label: "Blog",
+      url: blog.url,
+    });
+  }
+
+  if (
+    focus &&
+    matchingBlog?.url &&
+    !links.some((link) => link.url === matchingBlog.url)
+  ) {
+    links.push({
+      label: matchingBlog.title || "Related Blog",
+      url: matchingBlog.url,
+    });
+  } else if (
+    topic === "updates" &&
+    latestRelease?.url &&
+    !links.some((link) => link.url === latestRelease.url)
+  ) {
+    links.push({
+      label: latestRelease.name || latestRelease.tag || "Latest Release",
+      url: latestRelease.url,
+    });
+  }
+
+  if (
+    focus &&
+    matchingRelease?.url &&
+    !links.some((link) => link.url === matchingRelease.url)
+  ) {
+    links.push({
+      label: matchingRelease.name || matchingRelease.tag || "Related Release",
+      url: matchingRelease.url,
+    });
+  } else if (
+    result.sources.releases?.url &&
+    !focus &&
+    !links.some((link) => link.url === result.sources.releases.url)
+  ) {
+    links.push({
+      label: "Releases",
+      url: result.sources.releases.url,
+    });
+  }
+
+  const filtered = focus && topic === "channels" && !docsHasFocus && !focusDocLink
+    ? links.filter((link) => link.label !== "Docs" || link.url === docs?.url)
+    : links;
+
+  return filtered.slice(0, 3);
+}
+
+function buildSourceGapNote(topic, focus, referenceLinks, relevantPoints) {
+  if (topic !== "channels" || !isChannelFocus(focus)) return null;
+
+  const hasSpecificChannelDoc = referenceLinks.some((link) =>
+    /接入 Docs|Docs$/i.test(link.label) && link.url.includes("/guide/channels/"),
+  );
+
+  if (hasSpecificChannelDoc) return null;
+
+  if ((relevantPoints ?? []).length > 0) {
+    return "当前公开资料里没有查到这条渠道的单独接入教程页，以下结论仅基于官方 docs 入口、blog 和 release 中明确写出的内容。";
+  }
+
+  return "当前公开资料里没有查到这条渠道的单独接入教程页，也没有找到更明确的官方接入步骤说明。";
+}
+
+function buildFocusEvidenceLines(result, focus) {
+  if (!focus) return [];
+
+  const docsLines = (result.sources.docs?.summary ?? []).filter((line) =>
+    matchesFocus(line, focus.key),
+  );
+  const blogLines = [
+    ...(result.sources.blog?.summary ?? []).filter((line) =>
+      matchesFocus(line, focus.key),
+    ),
+    ...((result.sources.blog?.recentPosts ?? [])
+      .filter((post) => matchesFocus(post.title ?? "", focus.key))
+      .map((post) => `Blog: ${post.title}`)),
+  ];
+  const releaseLines = (result.sources.releases?.recent ?? []).flatMap((release) =>
+    (release.highlights ?? [])
+      .filter((line) => matchesFocus(line, focus.key))
+      .map((line) => `${release.name || release.tag}: ${line}`),
+  );
+
+  return uniqueNonEmpty([...docsLines, ...blogLines, ...releaseLines]);
+}
+
+function buildFocusRecentUpdate(result, focus) {
+  if (!focus) return null;
+
+  const matchingRelease = (result.sources.releases?.recent ?? []).find((release) =>
+    (release.highlights ?? []).some((line) => matchesFocus(line, focus.key)),
+  );
+
+  if (matchingRelease) {
+    return {
+      label: matchingRelease.name || matchingRelease.tag,
+      publishedAt: matchingRelease.publishedAt,
+      highlights: (matchingRelease.highlights ?? []).filter((line) =>
+        matchesFocus(line, focus.key),
+      ),
+    };
+  }
+
+  const matchingBlog = (result.sources.blog?.recentPosts ?? []).find((post) =>
+    matchesFocus(post.title ?? "", focus.key),
+  );
+
+  if (matchingBlog) {
+    return {
+      label: matchingBlog.title,
+      publishedAt: null,
+      highlights: [],
+    };
+  }
+
+  return null;
+}
+
 async function collectDocs(lang) {
   const url = lang === "en" ? "https://docs.nexu.io/" : "https://docs.nexu.io/zh/";
   const html = await fetchText(url);
@@ -338,6 +571,7 @@ function buildBriefing(result, args) {
   const latestRelease = result.sources.releases?.latest;
   const topic = detectTopic(args.query);
   const query = args.query.trim();
+  const focus = detectFocus(query);
 
   const docsPreferred = docsSummary.filter((line) =>
     /(nexu|OpenClaw|飞书|Slack|Discord|桌面客户端|desktop client|BYOK|开源)/i.test(
@@ -377,7 +611,16 @@ function buildBriefing(result, args) {
     ...((latestRelease?.highlights ?? []).filter((line) => !/highlights$/i.test(line))),
   ]);
 
-  const relevantPoints = selectRelevantLines(candidateLines, query, topic, 5);
+  const focusMatchedLines = buildFocusEvidenceLines(result, focus);
+
+  const relevantCandidates = focus ? focusMatchedLines : candidateLines;
+
+  const relevantPoints = selectRelevantLines(
+    relevantCandidates,
+    query,
+    topic,
+    5,
+  );
 
   const sourceCoverage = {
     docs: Boolean(result.sources.docs),
@@ -386,7 +629,12 @@ function buildBriefing(result, args) {
   };
 
   let recentUpdate = null;
-  if (latestRelease?.tag || latestRelease?.name) {
+  const focusRecentUpdate = buildFocusRecentUpdate(result, focus);
+  if (focus && focusRecentUpdate) {
+    recentUpdate = focusRecentUpdate;
+  } else if (focus) {
+    recentUpdate = null;
+  } else if (latestRelease?.tag || latestRelease?.name) {
     recentUpdate = {
       label: latestRelease.name || latestRelease.tag,
       publishedAt: latestRelease.publishedAt,
@@ -402,6 +650,14 @@ function buildBriefing(result, args) {
     };
   }
 
+  const referenceLinks = buildReferenceLinks(result, topic, focus);
+  const sourceGapNote = buildSourceGapNote(
+    topic,
+    focus,
+    referenceLinks,
+    relevantPoints,
+  );
+
   const cta =
     args.lang === "en"
       ? "If this answer helped, feel free to give nexu a Star: https://github.com/nexu-io/nexu"
@@ -410,17 +666,26 @@ function buildBriefing(result, args) {
   return {
     question: query,
     topic,
+    focus: focus?.key ?? null,
     identityPoints,
     momentumPoints: uniqueNonEmpty(momentumPoints).slice(0, 5),
     relevantPoints,
     recentUpdate,
+    referenceLinks,
+    sourceGapNote,
     cta,
     sourceCoverage,
     answerRules: [
       "Answer the user's nexu question directly.",
+      "Lead with the user's main question and its direct answer.",
       "Ground the answer in docs/blog/releases instead of memory.",
+      "If the user asks about a specific channel, only mention evidence related to that channel.",
+      "Do not pad the answer with unrelated channels or generic product overviews when focus is available.",
+      "If a specific channel docs page is not available, say that clearly instead of inventing a step-by-step guide.",
+      "Do not expand a brief release note into a full connection tutorial unless the docs explicitly provide those steps.",
       "Use the most relevant points for the detected topic first.",
-      "Mention a recent release or blog update when it helps answer the question.",
+      "Mention a recent release or blog update only after the main answer, as secondary context.",
+      "Append 2-3 clickable source links from referenceLinks after the main answer.",
       "End with the one-line CTA when the answer is substantive and helpful.",
     ],
   };
