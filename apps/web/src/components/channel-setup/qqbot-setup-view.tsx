@@ -8,10 +8,7 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import {
-  postApiV1ChannelsQqbotConnect,
-  postApiV1ChannelsQqbotTest,
-} from "../../../lib/api/sdk.gen";
+import { postApiV1ChannelsQqbotConnect } from "../../../lib/api/sdk.gen";
 
 const QQBOT_LOGIN_URL = "https://q.qq.com/qqbot/openclaw/login.html";
 
@@ -30,7 +27,6 @@ export function QqbotSetupView({
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [testing, setTesting] = useState(false);
 
   const getTrimmedCredentials = () => {
     const trimmedAppId = appId.trim();
@@ -74,31 +70,6 @@ export function QqbotSetupView({
       setAppSecret("");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleTestConnectivity = async () => {
-    const { appId: trimmedAppId, appSecret: trimmedAppSecret } =
-      getTrimmedCredentials();
-    if (!trimmedAppId || !trimmedAppSecret) {
-      toast.error(t("qqbotSetup.credentialsRequired"));
-      return;
-    }
-
-    setTesting(true);
-    try {
-      const { data, error } = await postApiV1ChannelsQqbotTest({
-        body: { appId: trimmedAppId, appSecret: trimmedAppSecret },
-      });
-
-      if (error || !data?.success) {
-        toast.error(error?.message ?? t("qqbotSetup.testFailed"));
-        return;
-      }
-
-      toast.success(data.message || t("qqbotSetup.testSuccess"));
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -194,22 +165,8 @@ export function QqbotSetupView({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={handleTestConnectivity}
-            disabled={disabled || submitting || testing}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-2.5 text-[13px] font-medium text-text-primary transition-all hover:bg-surface-2 disabled:opacity-60"
-          >
-            {testing ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <KeyRound size={14} />
-            )}
-            {t("qqbotSetup.testConnectivity")}
-          </button>
-
-          <button
-            type="button"
             onClick={handleConnect}
-            disabled={disabled || submitting || testing}
+            disabled={disabled || submitting}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-fg transition-all hover:bg-accent-hover disabled:opacity-60"
           >
             {submitting ? (

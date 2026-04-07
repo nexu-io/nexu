@@ -3,10 +3,7 @@ import { ExternalLink, KeyRound, Loader2, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import {
-  postApiV1ChannelsDingtalkConnect,
-  postApiV1ChannelsDingtalkTest,
-} from "../../../lib/api/sdk.gen";
+import { postApiV1ChannelsDingtalkConnect } from "../../../lib/api/sdk.gen";
 
 const DINGTALK_OPEN_PLATFORM_URL =
   "https://open-dev.dingtalk.com/?spm=ding_open_doc.document.0.0.4eb96384sA4J3a";
@@ -26,7 +23,6 @@ export function DingtalkSetupView({
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [testing, setTesting] = useState(false);
 
   const getTrimmedCredentials = () => ({
     clientId: clientId.trim(),
@@ -69,34 +65,6 @@ export function DingtalkSetupView({
       setClientSecret("");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleTestConnectivity = async () => {
-    const { clientId: trimmedClientId, clientSecret: trimmedClientSecret } =
-      getTrimmedCredentials();
-    if (!trimmedClientId || !trimmedClientSecret) {
-      toast.error(t("dingtalkSetup.credentialsRequired"));
-      return;
-    }
-
-    setTesting(true);
-    try {
-      const { data, error } = await postApiV1ChannelsDingtalkTest({
-        body: {
-          clientId: trimmedClientId,
-          clientSecret: trimmedClientSecret,
-        },
-      });
-
-      if (error || !data?.success) {
-        toast.error(error?.message ?? t("dingtalkSetup.testFailed"));
-        return;
-      }
-
-      toast.success(data.message || t("dingtalkSetup.testSuccess"));
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -192,22 +160,8 @@ export function DingtalkSetupView({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={handleTestConnectivity}
-            disabled={disabled || submitting || testing}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-2.5 text-[13px] font-medium text-text-primary transition-all hover:bg-surface-2 disabled:opacity-60"
-          >
-            {testing ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <KeyRound size={14} />
-            )}
-            {t("dingtalkSetup.testConnectivity")}
-          </button>
-
-          <button
-            type="button"
             onClick={handleConnect}
-            disabled={disabled || submitting || testing}
+            disabled={disabled || submitting}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-fg transition-all hover:bg-accent-hover disabled:opacity-60"
           >
             {submitting ? (

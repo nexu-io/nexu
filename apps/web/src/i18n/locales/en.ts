@@ -801,7 +801,6 @@ const en = {
   "qqbotSetup.appSecretLabel": "App Secret",
   "qqbotSetup.appSecretPlaceholder": "Your app secret",
   "qqbotSetup.credentialsRequired": "QQ App ID and App Secret are required",
-  "qqbotSetup.testConnectivity": "Test Connectivity",
   "qqbotSetup.testSuccess": "QQ credentials are valid",
   "qqbotSetup.testFailed": "Failed to verify QQ credentials",
   "qqbotSetup.connect": "Connect QQ",
@@ -825,7 +824,6 @@ const en = {
   "dingtalkSetup.clientSecretPlaceholder": "Your client secret",
   "dingtalkSetup.credentialsRequired":
     "DingTalk Client ID and Client Secret are required",
-  "dingtalkSetup.testConnectivity": "Test Connectivity",
   "dingtalkSetup.testSuccess": "DingTalk credentials are valid",
   "dingtalkSetup.testFailed": "Failed to verify DingTalk credentials",
   "dingtalkSetup.connect": "Connect DingTalk",
@@ -837,7 +835,8 @@ const en = {
   "wecomSetup.desc":
     "Enter your WeCom bot credentials to enable replies through the bundled OpenClaw plugin.",
   "wecomSetup.quickSetup": "Quick setup",
-  "wecomSetup.step1": "Open WeCom Developer Center.",
+  "wecomSetup.step1LinkLabel": "Open WeCom Developer Center",
+  "wecomSetup.step1Suffix": ".",
   "wecomSetup.step2": "Create or open your bot application.",
   "wecomSetup.step3": "Copy the Bot ID and Secret.",
   "wecomSetup.step4": "Paste the credentials below and verify the connection.",
@@ -846,7 +845,6 @@ const en = {
   "wecomSetup.secretLabel": "Secret",
   "wecomSetup.secretPlaceholder": "Your bot secret",
   "wecomSetup.credentialsRequired": "WeCom Bot ID and Secret are required",
-  "wecomSetup.testConnectivity": "Test Connectivity",
   "wecomSetup.testSuccess": "WeCom credentials look valid",
   "wecomSetup.testFailed": "Failed to verify WeCom credentials",
   "wecomSetup.connect": "Connect WeCom",
