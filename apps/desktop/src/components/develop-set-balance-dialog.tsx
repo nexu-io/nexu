@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { notifyDesktopRewardsUpdated } from "../lib/host-api";
 
 type DesktopRewardsStatus = {
   cloudBalance?: {
@@ -151,6 +152,7 @@ export function DevelopSetBalanceDialog({
     try {
       const nextBalance = await setCurrentBalance(webBaseUrl, parsedBalance);
       setBalance(String(nextBalance));
+      await notifyDesktopRewardsUpdated().catch(() => undefined);
       onClose();
     } catch (error: unknown) {
       setErrorMessage(

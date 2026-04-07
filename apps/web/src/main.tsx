@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+} from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -6,6 +10,7 @@ import { Toaster } from "sonner";
 import { getApiInternalDesktopCloudStatus } from "../lib/api/sdk.gen";
 import webPackageJson from "../package.json";
 import { App } from "./app";
+import { DESKTOP_REWARDS_QUERY_KEY } from "./hooks/use-desktop-rewards";
 import "./lib/api";
 import { LocaleProvider } from "./hooks/use-locale";
 import {
@@ -83,6 +88,36 @@ function AnalyticsSessionSync() {
   return null;
 }
 
+function DesktopRewardsSync() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const candidate = (window as Window & { nexuHost?: unknown }).nexuHost;
+    if (!candidate || typeof candidate !== "object") {
+      return;
+    }
+
+    const onDesktopCommand = Reflect.get(candidate, "onDesktopCommand");
+    if (typeof onDesktopCommand !== "function") {
+      return;
+    }
+
+    return onDesktopCommand.call(candidate, (command: { type?: string }) => {
+      if (command.type === "desktop:rewards-updated") {
+        void queryClient.invalidateQueries({
+          queryKey: DESKTOP_REWARDS_QUERY_KEY,
+        });
+      }
+    }) as (() => void) | undefined;
+  }, [queryClient]);
+
+  return null;
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -102,6 +137,7 @@ ReactDOM.createRoot(root).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AnalyticsSessionSync />
+          <DesktopRewardsSync />
           <App />
           <Toaster position="top-right" />
         </BrowserRouter>

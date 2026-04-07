@@ -1159,6 +1159,12 @@ function DesktopShell() {
       if (command.type === "setup:complete") {
         return;
       }
+      if (
+        command.type !== "develop:focus-surface" &&
+        command.type !== "develop:show-shell"
+      ) {
+        return;
+      }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);

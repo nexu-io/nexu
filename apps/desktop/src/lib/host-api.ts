@@ -103,6 +103,10 @@ export async function getDesktopCloudStatus() {
   return getHostBridge().invoke("desktop:get-cloud-status", undefined);
 }
 
+export async function notifyDesktopRewardsUpdated(): Promise<void> {
+  await getHostBridge().invoke("desktop:rewards-updated", undefined);
+}
+
 export async function createCloudProfile(profile: {
   name: string;
   cloudUrl: string;

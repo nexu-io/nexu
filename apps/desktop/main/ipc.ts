@@ -1,5 +1,12 @@
 import * as Sentry from "@sentry/electron/main";
-import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
+import {
+  BrowserWindow,
+  app,
+  crashReporter,
+  ipcMain,
+  shell,
+  webContents,
+} from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -416,6 +423,22 @@ export function registerIpcHandlers(
               method: "DELETE",
             },
           );
+        }
+
+        case "desktop:rewards-updated": {
+          for (const contents of webContents.getAllWebContents()) {
+            if (!contents.isDestroyed()) {
+              contents.send("host:desktop-command", {
+                type: "desktop:rewards-updated",
+              });
+            }
+          }
+
+          const result: HostInvokeResultMap["desktop:rewards-updated"] = {
+            ok: true,
+          };
+
+          return result;
         }
 
         case "shell:open-external": {
