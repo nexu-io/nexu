@@ -116,17 +116,19 @@ async function ensureExistingRuntimeInstall() {
   ]);
 }
 
+// Only honor an explicitly provided electron dist override (used by e2e
+// coverage tooling). When unset, return null so electron-builder falls back
+// to its default electron resolution. Pointing electron-builder directly at
+// the pnpm-stored Electron.app caused codesign to fail with "bundle format is
+// ambiguous" because the framework symlink layout did not survive the copy
+// from the pnpm content-addressable store (regression from #698).
 async function resolveElectronDistPath() {
-  if (process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH) {
-    return process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH;
+  const override = process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH;
+  if (!override) {
+    return null;
   }
-
-  const electronPackageJsonPath = require.resolve("electron/package.json", {
-    paths: [electronRoot, repoRoot],
-  });
-  const electronDistPath = resolve(dirname(electronPackageJsonPath), "dist");
-  await ensureExistingPath(electronDistPath, "electron dist");
-  return electronDistPath;
+  await ensureExistingPath(override, "electron dist override");
+  return override;
 }
 
 async function timedStep(stepName, fn, timings) {
@@ -805,7 +807,9 @@ async function main() {
         "--publish",
         "never",
         `--config.electronVersion=${electronVersion}`,
-        `--config.electronDist=${electronDistPath}`,
+        ...(electronDistPath
+          ? [`--config.electronDist=${electronDistPath}`]
+          : []),
         `--config.buildVersion=${buildVersion}`,
         `--config.directories.output=${releaseRoot}`,
         ...(isFastCiMode
