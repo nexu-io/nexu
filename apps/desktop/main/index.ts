@@ -7,6 +7,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  dialog,
   globalShortcut,
   nativeTheme,
   powerMonitor,
@@ -382,6 +383,27 @@ function triggerUpdateCheck(): void {
   });
 }
 
+function showAboutDialog(): void {
+  const version = app.getVersion();
+  const detailLines = [
+    `Version ${version}`,
+    `Electron ${process.versions.electron}`,
+    `Chromium ${process.versions.chrome}`,
+    `Node ${process.versions.node}`,
+  ];
+  const options = {
+    type: "info" as const,
+    title: "About Nexu",
+    message: "Nexu",
+    detail: detailLines.join("\n"),
+    buttons: ["OK"],
+    noLink: true,
+  };
+  void (mainWindow
+    ? dialog.showMessageBox(mainWindow, options)
+    : dialog.showMessageBox(options));
+}
+
 function installApplicationMenu(): void {
   const developMenu: MenuItemConstructorOptions = {
     label: "Develop",
@@ -413,20 +435,42 @@ function installApplicationMenu(): void {
     ],
   };
 
+  const helpSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: "Export Diagnostics…",
+      click: () => {
+        void exportDiagnostics({
+          orchestrator,
+          runtimeConfig,
+          source: "help-menu",
+        }).catch(() => undefined);
+      },
+    },
+  ];
+
+  // On macOS About/Check-for-Updates live in the application menu by
+  // platform convention. On Windows/Linux there is no app menu, so surface
+  // them in Help instead (issue nexu-io/nexu#784).
+  if (process.platform !== "darwin") {
+    helpSubmenu.push(
+      { type: "separator" },
+      {
+        id: "check-for-updates",
+        label: "Check for Updates…",
+        enabled: app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
+        click: () => triggerUpdateCheck(),
+      },
+      {
+        id: "about-nexu",
+        label: `About Nexu (v${app.getVersion()})`,
+        click: () => showAboutDialog(),
+      },
+    );
+  }
+
   const helpMenu: MenuItemConstructorOptions = {
     role: "help",
-    submenu: [
-      {
-        label: "Export Diagnostics…",
-        click: () => {
-          void exportDiagnostics({
-            orchestrator,
-            runtimeConfig,
-            source: "help-menu",
-          }).catch(() => undefined);
-        },
-      },
-    ],
+    submenu: helpSubmenu,
   };
 
   const template: MenuItemConstructorOptions[] = [
