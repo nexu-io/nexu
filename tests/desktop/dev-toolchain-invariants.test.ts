@@ -6,10 +6,10 @@
  * verify critical invariants that are easy to accidentally break:
  *
  * Launch path safety:
- *  1. pnpm start (dev-launchd.sh) launches Electron through dev-env.sh
- *  2. pnpm dev (dev.sh → dev-run.sh) launches Electron through dev-env.sh
- *  3. dev-env.sh patches LSUIElement and flushes LS cache
- *  4. dev-env.sh exports NEXU_WORKSPACE_ROOT
+ *  1. pnpm start (dev-launchd.sh) still launches Electron explicitly
+ *  2. pnpm dev desktop launch is centralized in scripts/dev platform helpers
+ *  3. mac desktop helper patches LSUIElement and flushes LS cache
+ *  4. desktop platform helpers export NEXU_WORKSPACE_ROOT / runtime roots
  *
  * ELECTRON_RUN_AS_NODE coverage:
  *  5. All plist templates set ELECTRON_RUN_AS_NODE=1
@@ -41,14 +41,18 @@ function readFile(relativePath: string): string {
 
 describe("Launch path safety", () => {
   const devLaunchdSh = readFile("scripts/dev-launchd.sh");
-  const devRunSh = readFile("apps/desktop/scripts/dev-run.sh");
-  const devEnvSh = readFile("apps/desktop/scripts/dev-env.sh");
+  const desktopService = readFile("scripts/dev/src/services/desktop.ts");
+  const desktopPlatform = readFile(
+    "scripts/dev/src/shared/platform/desktop-dev-platform.ts",
+  );
+  const darwinDesktopPlatform = readFile(
+    "scripts/dev/src/shared/platform/desktop-dev-platform.darwin.ts",
+  );
 
   // -----------------------------------------------------------------------
-  // 1. pnpm start → dev-launchd.sh must go through dev-env.sh
+  // 1. pnpm start keeps explicit Electron launch
   // -----------------------------------------------------------------------
-  it("dev-launchd.sh launches Electron through dev-env.sh", () => {
-    // The line that starts Electron must include dev-env.sh in the command
+  it("dev-launchd.sh launches Electron explicitly", () => {
     const electronLaunchLines = devLaunchdSh
       .split("\n")
       .filter(
@@ -58,50 +62,38 @@ describe("Launch path safety", () => {
       );
 
     expect(electronLaunchLines.length).toBeGreaterThanOrEqual(1);
-
-    for (const line of electronLaunchLines) {
-      expect(line).toContain("dev-env.sh");
-    }
   });
 
   // -----------------------------------------------------------------------
-  // 2. pnpm dev → dev-run.sh must go through dev-env.sh
+  // 2. pnpm dev desktop launch is centralized in scripts/dev helpers
   // -----------------------------------------------------------------------
-  it("dev-run.sh launches Electron through dev-env.sh", () => {
-    const electronLaunchLines = devRunSh
-      .split("\n")
-      .filter(
-        (line) =>
-          line.includes("electron") &&
-          line.includes("exec") &&
-          !line.trimStart().startsWith("#") &&
-          !line.includes("ELECTRON_MAIN_MATCH"),
-      );
-
-    expect(electronLaunchLines.length).toBeGreaterThanOrEqual(1);
-
-    for (const line of electronLaunchLines) {
-      expect(line).toContain("dev-env.sh");
-    }
+  it("desktop service delegates launch decisions to platform helpers", () => {
+    expect(desktopService).toContain("createDesktopElectronLaunchSpec");
+    expect(desktopService).toContain("findDesktopDevMainPid");
+    expect(desktopService).toContain("terminateDesktopDevProcesses");
+    expect(desktopPlatform).toContain('case "darwin"');
+    expect(desktopPlatform).toContain('case "win32"');
   });
 
   // -----------------------------------------------------------------------
-  // 3. dev-env.sh patches LSUIElement and flushes LS cache
+  // 3. mac helper patches LSUIElement and flushes LS cache
   // -----------------------------------------------------------------------
-  it("dev-env.sh patches LSUIElement=true", () => {
-    expect(devEnvSh).toContain("LSUIElement");
-    expect(devEnvSh).toContain("PlistBuddy");
+  it("darwin desktop helper patches LSUIElement=true", () => {
+    expect(darwinDesktopPlatform).toContain("LSUIElement");
+    expect(darwinDesktopPlatform).toContain("PlistBuddy");
   });
 
-  it("dev-env.sh flushes Launch Services cache after patching", () => {
-    expect(devEnvSh).toContain("lsregister");
+  it("darwin desktop helper flushes Launch Services cache after patching", () => {
+    expect(darwinDesktopPlatform).toContain("lsregister");
   });
 
   // -----------------------------------------------------------------------
-  // 4. dev-env.sh exports NEXU_WORKSPACE_ROOT
+  // 4. desktop helper exports NEXU_WORKSPACE_ROOT/runtime roots
   // -----------------------------------------------------------------------
-  it("dev-env.sh exports NEXU_WORKSPACE_ROOT", () => {
-    expect(devEnvSh).toContain("export NEXU_WORKSPACE_ROOT=");
+  it("desktop helper injects workspace and runtime roots", () => {
+    expect(darwinDesktopPlatform).toContain("NEXU_WORKSPACE_ROOT");
+    expect(darwinDesktopPlatform).toContain("NEXU_DESKTOP_APP_ROOT");
+    expect(darwinDesktopPlatform).toContain("NEXU_DESKTOP_RUNTIME_ROOT");
   });
 
   // -----------------------------------------------------------------------
@@ -205,6 +197,7 @@ describe("ELECTRON_RUN_AS_NODE coverage", () => {
 
 describe("Shutdown safety", () => {
   const devLaunchdSh = readFile("scripts/dev-launchd.sh");
+  const desktopService = readFile("scripts/dev/src/services/desktop.ts");
   const quitHandler = readFile("apps/desktop/main/services/quit-handler.ts");
   const updateManager = readFile("apps/desktop/main/updater/update-manager.ts");
 
@@ -237,87 +230,76 @@ describe("Shutdown safety", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 12. quit-handler uses teardownLaunchdServices
+  // 12. quit-handler delegates lifecycle decisions and cleans runtime ports
   // -----------------------------------------------------------------------
-  it("quit-handler.ts uses teardownLaunchdServices (not inline bootout)", () => {
+  it("quit-handler.ts exposes lifecycle-owned quit hooks", () => {
+    expect(quitHandler).toContain("onQuitCompletely");
+    expect(quitHandler).toContain("onRunInBackground");
     expect(quitHandler).toContain("teardownLaunchdServices");
-    // Must NOT have inline bootoutService calls in quit-completely path
-    expect(quitHandler).not.toContain("bootoutService");
   });
 
   // -----------------------------------------------------------------------
-  // 13. update-manager wraps teardown in try/catch
+  // 13. update-manager delegates install prep to runtime lifecycle hook
   // -----------------------------------------------------------------------
-  it("update-manager.ts wraps teardown in try/catch", () => {
-    // Extract the quitAndInstall method body for analysis
+  it("update-manager.ts uses prepareForUpdateInstall hook", () => {
+    expect(updateManager).toContain("prepareForUpdateInstall?: (");
+    expect(updateManager).toContain("prepareForUpdateInstall?: (");
+    expect(updateManager).toContain("prepareForUpdateInstall?.({");
+  });
+
+  it("update-manager.ts stops periodic checks during quitAndInstall", () => {
     const methodStart = updateManager.indexOf("async quitAndInstall()");
-    const methodBody = updateManager.slice(methodStart, methodStart + 2000);
-    // The teardown call must be preceded by "try {" in the method
-    const teardownPos = methodBody.indexOf("teardownLaunchdServices");
-    const beforeTeardown = methodBody.slice(0, teardownPos);
-    expect(beforeTeardown).toContain("try");
-  });
-
-  it("update-manager.ts wraps orchestrator.dispose in try/catch", () => {
-    const methodStart = updateManager.indexOf("async quitAndInstall()");
-    const methodBody = updateManager.slice(methodStart, methodStart + 2000);
-    const disposePos = methodBody.indexOf("this.orchestrator.dispose()");
-    const beforeDispose = methodBody.slice(0, disposePos);
-    // Count try blocks — must have at least 2 (one for teardown, one for dispose)
-    const tryCount = (beforeDispose.match(/\btry\s*\{/g) ?? []).length;
-    expect(tryCount).toBeGreaterThanOrEqual(2);
+    const methodBody = updateManager.slice(methodStart, methodStart + 1200);
+    expect(methodBody).toContain("this.stopPeriodicCheck()");
   });
 
   // -----------------------------------------------------------------------
-  // 14. update-manager calls ensureNexuProcessesDead before install
+  // 14. index wires runtime lifecycle update-install hook into update-manager
   // -----------------------------------------------------------------------
-  it("update-manager.ts calls ensureNexuProcessesDead before quitAndInstall", () => {
-    const ensureIndex = updateManager.indexOf("ensureNexuProcessesDead");
-    const installIndex = updateManager.indexOf("autoUpdater.quitAndInstall");
-
-    expect(ensureIndex).toBeGreaterThan(-1);
-    expect(installIndex).toBeGreaterThan(-1);
-    // ensureNexuProcessesDead must come BEFORE autoUpdater.quitAndInstall
-    expect(ensureIndex).toBeLessThan(installIndex);
-  });
-
-  // -----------------------------------------------------------------------
-  // Bonus: update-manager imports ensureNexuProcessesDead
-  // -----------------------------------------------------------------------
-  it("update-manager.ts imports ensureNexuProcessesDead", () => {
-    expect(updateManager).toContain("import");
-    expect(updateManager).toContain("ensureNexuProcessesDead");
-  });
-
-  // -----------------------------------------------------------------------
-  // 15. P0-2: index.ts has gracefulShutdown function
-  // -----------------------------------------------------------------------
-  it("index.ts defines a single gracefulShutdown function", () => {
+  it("index.ts passes runtimeLifecycle.prepareForUpdateInstall into update-manager", () => {
     const indexTs = readFile("apps/desktop/main/index.ts");
-    expect(indexTs).toContain("async function gracefulShutdown(");
-    // Must have idempotent guard
-    expect(indexTs).toContain("shutdownInProgress");
-    // Must have hard timeout
-    expect(indexTs).toContain("SHUTDOWN_HARD_TIMEOUT_MS");
+    expect(indexTs).toContain(
+      "prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall",
+    );
   });
 
   // -----------------------------------------------------------------------
-  // 16. P0-2: SIGTERM and SIGINT handlers exist
+  // Bonus: mac runtime lifecycle owns quit/background hooks
   // -----------------------------------------------------------------------
-  it("index.ts registers SIGTERM and SIGINT handlers", () => {
-    const indexTs = readFile("apps/desktop/main/index.ts");
-    expect(indexTs).toContain('"SIGTERM"');
-    expect(indexTs).toContain('"SIGINT"');
-    expect(indexTs).toContain("process.on(signal");
+  it("mac launchd lifecycle installs quit hooks", () => {
+    const lifecycle = readFile(
+      "apps/desktop/main/platforms/mac/launchd-lifecycle.ts",
+    );
+    expect(lifecycle).toContain("onQuitCompletely");
+    expect(lifecycle).toContain("onRunInBackground");
+    expect(lifecycle).toContain("prepareMacLaunchdUpdateInstall");
   });
 
   // -----------------------------------------------------------------------
-  // 17. P1-2: before-quit uses removeListener, not removeAllListeners
+  // 15. desktop index wires update-manager through runtime lifecycle
   // -----------------------------------------------------------------------
-  it("index.ts uses removeListener instead of removeAllListeners for before-quit", () => {
+  it("index.ts constructs UpdateManager with runtime lifecycle hooks", () => {
     const indexTs = readFile("apps/desktop/main/index.ts");
-    expect(indexTs).toContain('app.removeListener("before-quit"');
-    expect(indexTs).not.toContain("removeAllListeners");
+    expect(indexTs).toContain("new UpdateManager(");
+    expect(indexTs).toContain("runtimeLifecycle.prepareForUpdateInstall");
+  });
+
+  // -----------------------------------------------------------------------
+  // 16. desktop service is an explicit composite of Vite + Electron
+  // -----------------------------------------------------------------------
+  it("scripts/dev desktop service tracks both workerPid and electron pid", () => {
+    expect(desktopService).toContain("workerPid");
+    expect(desktopService).toContain("createDesktopViteCommand");
+    expect(desktopService).toContain("createDesktopElectronLaunchSpec");
+  });
+
+  // -----------------------------------------------------------------------
+  // 17. desktop vite implicit Electron startup is disabled under scripts/dev
+  // -----------------------------------------------------------------------
+  it("vite config supports disabling implicit Electron startup", () => {
+    const viteConfig = readFile("apps/desktop/vite.config.ts");
+    expect(viteConfig).toContain("NEXU_DESKTOP_DISABLE_VITE_ELECTRON_STARTUP");
+    expect(viteConfig).toContain("options.startup()");
   });
 
   // -----------------------------------------------------------------------

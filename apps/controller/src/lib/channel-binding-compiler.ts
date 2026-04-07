@@ -278,17 +278,15 @@ export function compileChannelsConfig(params: {
       ? {
           feishu: {
             enabled: true,
+            // Card Kit streaming: replies stream in real-time via feishu
+            // interactive cards. Without these, replies arrive as plain text
+            // after the full LLM response completes (no streaming UX).
             streaming: true,
             renderMode: "card",
+            dmPolicy: "open",
+            groupPolicy: "open",
             requireMention: true,
-            tools: {
-              doc: true,
-              chat: true,
-              wiki: true,
-              drive: true,
-              perm: true,
-              scopes: true,
-            },
+            allowFrom: ["*"],
             accounts: feishuAccounts,
           },
         }

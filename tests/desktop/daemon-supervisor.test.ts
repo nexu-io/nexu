@@ -31,6 +31,7 @@ interface MockChildProcess extends EventEmitter {
 const mockSpawn = vi.fn();
 vi.mock("node:child_process", () => ({
   spawn: mockSpawn,
+  execFile: vi.fn(),
   execFileSync: vi.fn(() => ""),
 }));
 

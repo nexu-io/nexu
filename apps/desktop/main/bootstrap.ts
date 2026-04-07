@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { app } from "electron";
 import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
+import { resolveRuntimePlatform } from "./platforms/platform-resolver";
 
 function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   if (stream.destroyed || !stream.writable) {
@@ -37,7 +38,34 @@ function loadDesktopDevEnv(): void {
       continue;
     }
 
-    process.loadEnvFile(envPath);
+    const source = readFileSync(envPath, "utf8");
+    for (const rawLine of source.split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex <= 0) {
+        continue;
+      }
+
+      const key = line.slice(0, separatorIndex).trim();
+      if (!key || process.env[key] !== undefined) {
+        continue;
+      }
+
+      const rawValue = line.slice(separatorIndex + 1).trim();
+      if (
+        (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+        (rawValue.startsWith("'") && rawValue.endsWith("'"))
+      ) {
+        process.env[key] = rawValue.slice(1, -1);
+        continue;
+      }
+
+      process.env[key] = rawValue;
+    }
   }
 }
 
@@ -52,7 +80,9 @@ function configureLocalDevPaths(): void {
   const userDataPath = resolve(electronRoot, "user-data");
   const sessionDataPath = resolve(electronRoot, "session-data");
   const logsPath = resolve(userDataPath, "logs");
-  const nexuHomePath = getDesktopNexuHomeDir(userDataPath);
+  const nexuHomePath = process.env.NEXU_HOME
+    ? resolve(process.env.NEXU_HOME)
+    : getDesktopNexuHomeDir(userDataPath);
 
   mkdirSync(userDataPath, { recursive: true });
   mkdirSync(sessionDataPath, { recursive: true });
@@ -83,23 +113,53 @@ function configurePackagedPaths(): void {
 
   const appDataPath = app.getPath("appData");
   const overrideUserDataPath = process.env.NEXU_DESKTOP_USER_DATA_ROOT;
+  const defaultUserDataPath = app.getPath("userData");
+  const runtimePlatform = resolveRuntimePlatform();
+  const legacyWindowsUserDataPath = join(appDataPath, "@nexu", "desktop");
+  const standardWindowsUserDataPath = join(appDataPath, "nexu-desktop");
   const userDataPath = overrideUserDataPath
     ? resolve(overrideUserDataPath)
-    : join(appDataPath, "@nexu", "desktop");
-  const sessionDataPath = join(userDataPath, "session");
-  const logsPath = join(userDataPath, "logs");
+    : runtimePlatform === "win"
+      ? standardWindowsUserDataPath
+      : join(appDataPath, "@nexu", "desktop");
+  let effectiveUserDataPath = userDataPath;
 
-  mkdirSync(userDataPath, { recursive: true });
+  if (
+    runtimePlatform === "win" &&
+    !overrideUserDataPath &&
+    userDataPath !== legacyWindowsUserDataPath &&
+    !existsSync(userDataPath) &&
+    existsSync(legacyWindowsUserDataPath)
+  ) {
+    try {
+      renameSync(legacyWindowsUserDataPath, userDataPath);
+    } catch (error) {
+      effectiveUserDataPath = legacyWindowsUserDataPath;
+      safeWrite(
+        process.stdout,
+        `[desktop:paths] legacy userData migration failed; reusing legacy path error=${error instanceof Error ? error.message : String(error)} from=${legacyWindowsUserDataPath} to=${userDataPath}\n`,
+      );
+    }
+  }
+
+  const sessionDataPath = join(effectiveUserDataPath, "session");
+  const logsPath = join(effectiveUserDataPath, "logs");
+  const nexuHomePath = getDesktopNexuHomeDir(effectiveUserDataPath);
+
+  mkdirSync(effectiveUserDataPath, { recursive: true });
   mkdirSync(sessionDataPath, { recursive: true });
   mkdirSync(logsPath, { recursive: true });
+  mkdirSync(nexuHomePath, { recursive: true });
 
-  app.setPath("userData", userDataPath);
+  process.env.NEXU_HOME = nexuHomePath;
+
+  app.setPath("userData", effectiveUserDataPath);
   app.setPath("sessionData", sessionDataPath);
   app.setAppLogsPath(logsPath);
 
   safeWrite(
     process.stdout,
-    `[desktop:paths] appData=${appDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} userData=${userDataPath} sessionData=${sessionDataPath} logs=${logsPath}\n`,
+    `[desktop:paths] appData=${appDataPath} defaultUserData=${defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
   );
 }
 

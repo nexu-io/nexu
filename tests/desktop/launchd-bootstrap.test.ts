@@ -7,6 +7,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -148,6 +152,8 @@ function makeBootstrapEnv(
   };
 }
 
+const originalPlatform = process.platform;
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -163,27 +169,84 @@ describe("isLaunchdBootstrapEnabled", () => {
 
   it("returns true when NEXU_USE_LAUNCHD=1", async () => {
     process.env.NEXU_USE_LAUNCHD = "1";
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
-    expect(isLaunchdBootstrapEnabled()).toBe(true);
+    expect(shouldUseMacLaunchdRuntime()).toBe(true);
   });
 
   it("returns false when NEXU_USE_LAUNCHD=0", async () => {
     process.env.NEXU_USE_LAUNCHD = "0";
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 
   it("returns false in CI", async () => {
     process.env.CI = "true";
     process.env.NEXU_USE_LAUNCHD = undefined;
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
+  });
+
+  it("returns true for packaged macOS by default", async () => {
+    Object.defineProperty(process, "execPath", {
+      value: "/Applications/Nexu.app/Contents/MacOS/Nexu",
+      configurable: true,
+    });
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+    Reflect.deleteProperty(process.env, "NEXU_USE_LAUNCHD");
+    Reflect.deleteProperty(process.env, "CI");
+
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
+    );
+
+    expect(shouldUseMacLaunchdRuntime()).toBe(true);
+  });
+
+  it("returns false for packaged non-macOS app", async () => {
+    Object.defineProperty(process, "execPath", {
+      value: "C:\\Program Files\\Nexu\\Nexu.exe",
+      configurable: true,
+    });
+    Object.defineProperty(process, "platform", {
+      value: "win32",
+      configurable: true,
+    });
+    Reflect.deleteProperty(process.env, "NEXU_USE_LAUNCHD");
+    Reflect.deleteProperty(process.env, "CI");
+
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
+    );
+
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
+  });
+
+  it("returns false for dev mode (execPath contains node_modules)", async () => {
+    Object.defineProperty(process, "execPath", {
+      value: "/repo/node_modules/.bin/node",
+      configurable: true,
+    });
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+    Reflect.deleteProperty(process.env, "NEXU_USE_LAUNCHD");
+    Reflect.deleteProperty(process.env, "CI");
+
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
+    );
+
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 });
 
@@ -193,7 +256,7 @@ describe("getDefaultPlistDir", () => {
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
     const dir = getDefaultPlistDir(true);
-    expect(dir).toContain(".tmp/launchd");
+    expect(normalizePath(dir)).toContain(".tmp/launchd");
   });
 
   it("returns ~/Library/LaunchAgents for prod", async () => {
@@ -201,7 +264,7 @@ describe("getDefaultPlistDir", () => {
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
     const dir = getDefaultPlistDir(false);
-    expect(dir).toBe("/Users/testuser/Library/LaunchAgents");
+    expect(normalizePath(dir)).toBe("/Users/testuser/Library/LaunchAgents");
   });
 });
 
@@ -210,31 +273,46 @@ describe("getLogDir", () => {
     const { getLogDir } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
-    expect(getLogDir("/custom/home")).toBe("/custom/home/logs");
+    expect(normalizePath(getLogDir("/custom/home"))).toBe("/custom/home/logs");
   });
 
   it("returns ~/.nexu/logs when nexuHome is not provided", async () => {
     const { getLogDir } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
-    expect(getLogDir()).toBe("/Users/testuser/.nexu/logs");
+    expect(normalizePath(getLogDir())).toBe("/Users/testuser/.nexu/logs");
   });
 });
 
 describe("resolveLaunchdPaths", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
+  });
+
   it("resolves dev paths from workspace root", async () => {
     const { resolveLaunchdPaths } = await import(
       "../../apps/desktop/main/services/launchd-bootstrap"
     );
     const paths = await resolveLaunchdPaths(false, "/ignored");
 
-    expect(paths.controllerEntryPath).toContain(
+    expect(normalizePath(paths.controllerEntryPath)).toContain(
       "apps/controller/dist/index.js",
     );
-    expect(paths.openclawPath).toContain(
+    expect(normalizePath(paths.openclawPath)).toContain(
       "openclaw-runtime/node_modules/openclaw/openclaw.mjs",
     );
-    expect(paths.controllerCwd).toContain("apps/controller");
+    expect(normalizePath(paths.controllerCwd)).toContain("apps/controller");
   });
 
   it("resolves packaged paths to external locations outside .app", async () => {
@@ -244,19 +322,27 @@ describe("resolveLaunchdPaths", () => {
     const paths = await resolveLaunchdPaths(true, "/Resources", "1.0.0");
 
     // Node runner should be outside .app (in ~/.nexu/runtime/nexu-runner.app/)
-    expect(paths.nodePath).toContain(".nexu/runtime/nexu-runner.app");
-    expect(paths.nodePath).not.toContain("/Resources");
+    expect(normalizePath(paths.nodePath)).toContain(
+      ".nexu/runtime/nexu-runner.app",
+    );
+    expect(normalizePath(paths.nodePath)).not.toContain("/Resources");
     // Controller should be outside .app (in ~/.nexu/runtime/controller-sidecar/)
-    expect(paths.controllerEntryPath).toContain(
+    expect(normalizePath(paths.controllerEntryPath)).toContain(
       ".nexu/runtime/controller-sidecar/dist/index.js",
     );
-    expect(paths.controllerCwd).toContain(".nexu/runtime/controller-sidecar");
+    expect(normalizePath(paths.controllerCwd)).toContain(
+      ".nexu/runtime/controller-sidecar",
+    );
   });
 });
 
 describe("bootstrapWithLaunchd", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+    });
 
     // Default: no services running, not installed
     mockLaunchdManager.getServiceStatus.mockResolvedValue({
@@ -277,6 +363,10 @@ describe("bootstrapWithLaunchd", () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", {
+      value: originalPlatform,
+      configurable: true,
+    });
     vi.unstubAllGlobals();
   });
 
@@ -387,7 +477,7 @@ describe("bootstrapWithLaunchd", () => {
   });
 });
 
-describe("isLaunchdBootstrapEnabled edge cases", () => {
+describe("shouldUseMacLaunchdRuntime edge cases", () => {
   const originalEnv = { ...process.env };
   const originalPlatform = process.platform;
   const originalExecPath = process.execPath;
@@ -406,10 +496,10 @@ describe("isLaunchdBootstrapEnabled edge cases", () => {
       value: "/Applications/Nexu.app/Contents/MacOS/Nexu",
     });
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
-    expect(isLaunchdBootstrapEnabled()).toBe(true);
+    expect(shouldUseMacLaunchdRuntime()).toBe(true);
   });
 
   it("returns false when not on macOS even if packaged", async () => {
@@ -420,10 +510,10 @@ describe("isLaunchdBootstrapEnabled edge cases", () => {
       value: "/Applications/Nexu.app/Contents/MacOS/Nexu",
     });
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 
   it("returns false when execPath contains node_modules (dev mode)", async () => {
@@ -435,9 +525,9 @@ describe("isLaunchdBootstrapEnabled edge cases", () => {
         "/repo/node_modules/.pnpm/electron/dist/Electron.app/Contents/MacOS/Electron",
     });
 
-    const { isLaunchdBootstrapEnabled } = await import(
-      "../../apps/desktop/main/services/launchd-bootstrap"
+    const { shouldUseMacLaunchdRuntime } = await import(
+      "../../apps/desktop/main/platforms/mac/runtime"
     );
-    expect(isLaunchdBootstrapEnabled()).toBe(false);
+    expect(shouldUseMacLaunchdRuntime()).toBe(false);
   });
 });

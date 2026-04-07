@@ -297,6 +297,8 @@ export class OpenClawSyncService {
     );
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
     await this.runtimeModelWriter.write(runtimeModelRef);
+    // Write locale state for the credit-guard patch in OpenClaw runtime.
+    // Match the controller's own locale default: unset → "en" (not "zh-CN").
     const locale =
       (config.desktop as Record<string, unknown>).locale === "zh-CN"
         ? "zh-CN"

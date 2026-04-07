@@ -20,6 +20,7 @@ import type {
   RuntimeUnitSnapshot,
   RuntimeUnitState,
 } from "../../shared/host";
+import { platform } from "../platforms/platform-backends";
 import type {
   LaunchdManager,
   ServiceStatus,
@@ -83,6 +84,7 @@ export class RuntimeOrchestrator {
           manifest.launchStrategy === "embedded"
             ? "running"
             : manifest.launchStrategy === "delegated" ||
+                manifest.launchStrategy === "external" ||
                 manifest.launchStrategy === "launchd"
               ? "stopped"
               : "idle",
@@ -126,6 +128,7 @@ export class RuntimeOrchestrator {
   }
 
   getRuntimeState(): RuntimeState {
+    this.refreshExternalUnits();
     this.refreshDelegatedUnits();
     this.refreshLaunchdUnits();
 
@@ -500,6 +503,7 @@ export class RuntimeOrchestrator {
       if (this.children.has(id)) {
         setRecordPhase(record, "running");
         record.autoRestartAttempts = 0;
+        record.lastError = null;
         this.logStateChange(record, {
           kind: "lifecycle",
           actionId,
@@ -637,9 +641,11 @@ export class RuntimeOrchestrator {
           ? [record.manifest.command, ...record.manifest.args].join(" ")
           : record.manifest.launchStrategy === "launchd"
             ? `launchd service: ${record.manifest.launchdLabel ?? "unknown"}`
-            : record.manifest.launchStrategy === "delegated"
-              ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
-              : null,
+            : record.manifest.launchStrategy === "external"
+              ? `external port: ${record.manifest.port ?? "unknown"}`
+              : record.manifest.launchStrategy === "delegated"
+                ? `delegated process match: ${record.manifest.delegatedProcessMatch ?? "unknown"}`
+                : null,
       binaryPath: record.manifest.binaryPath ?? null,
       logFilePath: record.logFilePath,
       logTail: record.logTail,
@@ -942,6 +948,78 @@ export class RuntimeOrchestrator {
       }
 
       this.refreshDelegatedUnit(record);
+    }
+  }
+
+  private refreshExternalUnits(): void {
+    for (const record of this.units.values()) {
+      if (record.manifest.launchStrategy !== "external") {
+        continue;
+      }
+
+      this.refreshExternalUnit(record);
+    }
+  }
+
+  private refreshExternalUnit(record: RuntimeUnitRecord): void {
+    const port = record.manifest.port;
+    const previousPhase = record.phase;
+    const previousPid = record.pid;
+    const previousError = record.lastError;
+
+    if (port === null) {
+      setRecordPhase(record, "failed");
+      record.lastError = "Missing external runtime port.";
+      markProbeFailure(record);
+
+      if (
+        previousPhase !== record.phase ||
+        previousError !== record.lastError
+      ) {
+        const actionId = beginAction(record, "probe");
+        this.logStateChange(record, {
+          kind: "probe",
+          actionId,
+          reasonCode: "external_unavailable",
+          message: `external runtime ${record.manifest.id} is misconfigured: ${record.lastError}`,
+        });
+      }
+      return;
+    }
+
+    const pid = platform.process.getListeningPidByPort(port);
+
+    if (pid !== null) {
+      setRecordPhase(record, "running");
+      record.pid = pid;
+      record.startedAt ??= this.startedAt;
+      record.exitedAt = null;
+      record.exitCode = null;
+      record.lastError = null;
+      markProbeSuccess(record);
+    } else {
+      setRecordPhase(record, "stopped");
+      record.pid = null;
+      record.lastError = null;
+      markProbeFailure(record);
+    }
+
+    if (
+      previousPhase !== record.phase ||
+      previousPid !== record.pid ||
+      previousError !== record.lastError
+    ) {
+      const actionId = beginAction(record, "probe");
+      this.logStateChange(record, {
+        kind: "probe",
+        actionId,
+        reasonCode:
+          pid !== null ? "external_available" : "external_unavailable",
+        message:
+          pid !== null
+            ? `external runtime ${record.manifest.id} detected on port ${port} (pid=${pid})`
+            : `external runtime ${record.manifest.id} unavailable on port ${port}`,
+      });
     }
   }
 

@@ -64,6 +64,10 @@ const hostBridge: HostBridge = {
     sentryDsn: runtimeConfig.sentryDsn,
     isPackaged: !process.defaultApp,
     needsSetupAnimation: process.env.NEXU_NEEDS_SETUP_ANIMATION === "1",
+    webviewPreloadUrl: new URL(
+      "./webview-preload.js",
+      import.meta.url,
+    ).toString(),
   },
 
   invoke<TChannel extends HostInvokeChannel>(

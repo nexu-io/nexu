@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 vi.mock("node:os", () => ({
   homedir: vi.fn(() => "/Users/testuser"),
 }));
@@ -117,16 +121,16 @@ describe("generatePlist", () => {
     const controllerPlist = generatePlist("controller", mockEnv);
     const openclawPlist = generatePlist("openclaw", mockEnv);
 
-    expect(controllerPlist).toContain(
+    expect(normalizePath(controllerPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/controller.log</string>",
     );
-    expect(controllerPlist).toContain(
+    expect(normalizePath(controllerPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/controller.error.log</string>",
     );
-    expect(openclawPlist).toContain(
+    expect(normalizePath(openclawPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.log</string>",
     );
-    expect(openclawPlist).toContain(
+    expect(normalizePath(openclawPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
     );
   });
@@ -217,7 +221,7 @@ describe("generatePlist", () => {
     );
     const plist = generatePlist("openclaw", mockEnv);
 
-    expect(plist).toContain(
+    expect(normalizePath(plist)).toContain(
       "<key>WorkingDirectory</key>\n    <string>/app</string>",
     );
   });
@@ -228,7 +232,7 @@ describe("generatePlist", () => {
     );
     const plist = generatePlist("openclaw", mockEnv);
 
-    expect(plist).toContain(
+    expect(normalizePath(plist)).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
     );
   });
@@ -262,7 +266,7 @@ describe("generatePlist", () => {
     );
     const plist = generatePlist("controller", mockEnv);
 
-    expect(plist).toContain(
+    expect(normalizePath(plist)).toContain(
       "<key>WorkingDirectory</key>\n    <string>/app/controller</string>",
     );
   });

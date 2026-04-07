@@ -28,6 +28,9 @@ const sidecarPluginsRoot = resolve(sidecarRoot, "plugins");
 const sidecarNodeModules = resolve(sidecarRoot, "node_modules");
 const controllerNodeModules = resolve(controllerRoot, "node_modules");
 const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
+const diagnosticsEnabled =
+  process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS === "1" ||
+  process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS?.toLowerCase() === "true";
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(3)}s`;
@@ -61,6 +64,7 @@ async function ensureBuildArtifacts() {
 
 async function prepareControllerSidecar() {
   const startedAt = performance.now();
+  let copiedPackages = 0;
   await ensureBuildArtifacts();
   await resetDir(sidecarRoot);
 
@@ -98,9 +102,17 @@ async function prepareControllerSidecar() {
     await copyRuntimeDependencyClosure({
       packageRoot: controllerRoot,
       targetNodeModules: sidecarNodeModules,
+      onPackageCopied: (copiedPackageCount) => {
+        copiedPackages = copiedPackageCount;
+        if (diagnosticsEnabled && copiedPackageCount % 25 === 0) {
+          console.log(
+            `[controller-sidecar][progress] copied=${copiedPackageCount}`,
+          );
+        }
+      },
     });
     console.log(
-      `[controller-sidecar][timing] prepareControllerSidecar duration=${formatDurationMs(
+      `[controller-sidecar][timing] prepareControllerSidecar copied=${copiedPackages} duration=${formatDurationMs(
         performance.now() - startedAt,
       )}`,
     );

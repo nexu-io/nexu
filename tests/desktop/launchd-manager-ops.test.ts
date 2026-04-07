@@ -4,6 +4,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 // ---------------------------------------------------------------------------
 // Mock child_process.execFile
 // ---------------------------------------------------------------------------
@@ -206,7 +210,7 @@ describe("LaunchdManager", () => {
       await mgr.installService("io.nexu.controller", "<plist>test</plist>");
 
       expect(fs.writeFile).toHaveBeenCalledWith(
-        "/tmp/test/io.nexu.controller.plist",
+        expect.stringMatching(/io\.nexu\.controller\.plist$/),
         "<plist>test</plist>",
         "utf8",
       );
@@ -357,7 +361,10 @@ describe("LaunchdManager", () => {
 
       await mgr.uninstallService("io.nexu.controller");
 
-      expect(fs.unlink).toHaveBeenCalledWith(
+      const unlinkPath = (fs.unlink as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[0];
+      expect(typeof unlinkPath).toBe("string");
+      expect(normalizePath(String(unlinkPath))).toBe(
         "/tmp/test/io.nexu.controller.plist",
       );
     });

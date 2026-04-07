@@ -7,6 +7,8 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "download": "bash scripts/download-nightly.sh",
+    "coverage:merge": "node scripts/merge-coverage.mjs",
+    "coverage:report": "node scripts/report-coverage.mjs",
     "test": "bash scripts/run-e2e.sh full",
     "test:smoke": "bash scripts/run-e2e.sh smoke",
     "test:login": "bash scripts/run-e2e.sh login",

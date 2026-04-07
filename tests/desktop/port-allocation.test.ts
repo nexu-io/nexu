@@ -1,10 +1,9 @@
 import { createServer } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
-import { allocateDesktopRuntimePorts } from "#desktop/main/runtime/port-allocation";
-import type { PortAllocationError } from "#desktop/main/runtime/port-allocation";
-import type { DesktopRuntimeConfig } from "#desktop/shared/runtime-config";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { DesktopRuntimeConfig } from "../../apps/desktop/shared/runtime-config";
 
 const servers: Array<import("node:net").Server> = [];
+const originalPlatform = process.platform;
 
 function createRuntimeConfig(input?: {
   controllerPort?: number;
@@ -16,6 +15,7 @@ function createRuntimeConfig(input?: {
   const openclawPort = input?.openclawPort ?? 61_020;
 
   return {
+    runtimeMode: "internal",
     buildInfo: {
       version: "0.0.0",
       source: "local-dev",
@@ -25,6 +25,7 @@ function createRuntimeConfig(input?: {
     },
     updates: {
       autoUpdateEnabled: true,
+      channel: "stable",
     },
     ports: {
       controller: controllerPort,
@@ -34,8 +35,6 @@ function createRuntimeConfig(input?: {
       controllerBase: `http://127.0.0.1:${controllerPort}`,
       web: `http://127.0.0.1:${webPort}`,
       openclawBase: `http://127.0.0.1:${openclawPort}`,
-      nexuCloud: "https://nexu.io",
-      nexuLink: null,
       updateFeed: null,
     },
     tokens: {
@@ -79,10 +78,26 @@ afterEach(async () => {
         }),
     ),
   );
+
+  Object.defineProperty(process, "platform", {
+    value: originalPlatform,
+    configurable: true,
+  });
 });
 
 describe("desktop port allocation", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    Object.defineProperty(process, "platform", {
+      value: "win32",
+      configurable: true,
+    });
+  });
+
   it("probes the next idle port when preferred ports are occupied", async () => {
+    const { allocateDesktopRuntimePorts } = await import(
+      "../../apps/desktop/main/runtime/port-allocation"
+    );
     const runtimeConfig = createRuntimeConfig();
     await listenOnPort(runtimeConfig.ports.controller);
     await listenOnPort(runtimeConfig.ports.web);
@@ -121,6 +136,9 @@ describe("desktop port allocation", () => {
   });
 
   it("throws a classified error when explicit ports conflict inside the bundle", async () => {
+    const { allocateDesktopRuntimePorts } = await import(
+      "../../apps/desktop/main/runtime/port-allocation"
+    );
     const runtimeConfig = createRuntimeConfig({
       controllerPort: 62_000,
       webPort: 62_000,
@@ -134,7 +152,7 @@ describe("desktop port allocation", () => {
         },
         runtimeConfig,
       ),
-    ).rejects.toMatchObject<Partial<PortAllocationError>>({
+    ).rejects.toMatchObject({
       name: "PortAllocationError",
       code: "runtime_port_conflict",
       purpose: "bundle",

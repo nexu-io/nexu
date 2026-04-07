@@ -11,6 +11,7 @@ import {
 import { createRequire } from "node:module";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as platformFilesystem from "../platforms/filesystem-compat.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 export const electronRoot = resolve(scriptDir, "../..");
@@ -56,11 +57,9 @@ export async function linkOrCopyDirectory(
   const excludeNames = new Set(options.excludeNames ?? []);
 
   if (shouldCopyRuntimeDependencies()) {
-    await cp(sourcePath, targetPath, {
-      recursive: true,
-      dereference: true,
-      filter: (source) => {
-        const name = basename(source);
+    await copyDirectoryTree(sourcePath, targetPath, {
+      filter: ({ sourcePath: candidateSourcePath }) => {
+        const name = basename(candidateSourcePath);
         return name !== ".bin" && !excludeNames.has(name);
       },
     });
@@ -68,11 +67,31 @@ export async function linkOrCopyDirectory(
   }
 
   if (excludeNames.size === 0) {
-    await symlink(
-      sourcePath,
-      targetPath,
-      process.platform === "win32" ? "junction" : "dir",
-    );
+    try {
+      await symlink(
+        sourcePath,
+        targetPath,
+        platformFilesystem.resolveDirectoryLinkKind({
+          env: process.env,
+          platform: process.platform,
+        }),
+      );
+    } catch (error) {
+      if (
+        !platformFilesystem.shouldRetryLinkFailureWithCopy({
+          env: process.env,
+          platform: process.platform,
+        })
+      ) {
+        throw error;
+      }
+
+      await cp(sourcePath, targetPath, {
+        recursive: true,
+        dereference: true,
+        filter: (source) => basename(source) !== ".bin",
+      });
+    }
     return;
   }
 
@@ -87,16 +106,77 @@ export async function linkOrCopyDirectory(
     const sourceEntryPath = resolve(sourcePath, entry);
     const sourceEntryStats = await lstat(sourceEntryPath);
 
-    await symlink(
-      sourceEntryPath,
-      resolve(targetPath, entry),
-      process.platform === "win32"
-        ? sourceEntryStats.isDirectory()
-          ? "junction"
-          : "file"
-        : undefined,
-    );
+    const targetEntryPath = resolve(targetPath, entry);
+
+    try {
+      await symlink(
+        sourceEntryPath,
+        targetEntryPath,
+        platformFilesystem.resolveEntryLinkKind({
+          env: process.env,
+          platform: process.platform,
+          isDirectory: sourceEntryStats.isDirectory(),
+        }),
+      );
+    } catch (error) {
+      if (
+        !platformFilesystem.shouldRetryLinkFailureWithCopy({
+          env: process.env,
+          platform: process.platform,
+        })
+      ) {
+        throw error;
+      }
+
+      await cp(sourceEntryPath, targetEntryPath, {
+        recursive: sourceEntryStats.isDirectory(),
+        dereference: true,
+      });
+    }
   }
+}
+
+export async function copyDirectoryTree(sourcePath, targetPath, options = {}) {
+  const sourceStats = await lstat(sourcePath);
+  const relativePath = options.baseSourcePath
+    ? relative(options.baseSourcePath, sourcePath)
+    : "";
+
+  if (
+    options.filter &&
+    !options.filter({
+      sourcePath,
+      targetPath,
+      relativePath,
+      sourceStats,
+    })
+  ) {
+    return;
+  }
+
+  if (sourceStats.isSymbolicLink()) {
+    return;
+  }
+
+  if (sourceStats.isDirectory()) {
+    await mkdir(targetPath, { recursive: true });
+    const entries = await readdir(sourcePath);
+
+    for (const entry of entries) {
+      await copyDirectoryTree(
+        resolve(sourcePath, entry),
+        resolve(targetPath, entry),
+        {
+          ...options,
+          baseSourcePath: options.baseSourcePath ?? sourcePath,
+        },
+      );
+    }
+    return;
+  }
+
+  await mkdir(dirname(targetPath), { recursive: true });
+  await cp(sourcePath, targetPath, { force: true });
 }
 
 export async function removePathIfExists(path) {
@@ -153,6 +233,7 @@ export async function copyRuntimeDependencyClosure({
   packageRoot,
   targetNodeModules,
   dependencyNames,
+  onPackageCopied,
 }) {
   const closureStartedAt = performance.now();
   let copiedPackageCount = 0;
@@ -187,22 +268,23 @@ export async function copyRuntimeDependencyClosure({
     }
     seen.add(seenKey);
     copiedPackageCount += 1;
+    onPackageCopied?.(copiedPackageCount);
 
     await mkdir(dirname(targetPackageRoot), { recursive: true });
     await rm(targetPackageRoot, { recursive: true, force: true });
-    await cp(sourcePackageRoot, targetPackageRoot, {
-      recursive: true,
-      dereference: true,
-      filter: (source) => {
-        if (basename(source) === ".bin") {
+    await copyDirectoryTree(sourcePackageRoot, targetPackageRoot, {
+      filter: ({
+        sourcePath: candidateSourcePath,
+        relativePath: candidateRelativePath,
+      }) => {
+        if (basename(candidateSourcePath) === ".bin") {
           return false;
         }
 
-        const relativePath = relative(sourcePackageRoot, source);
         return (
-          relativePath === "" ||
-          (!relativePath.startsWith("node_modules/") &&
-            relativePath !== "node_modules")
+          candidateRelativePath === "" ||
+          (!candidateRelativePath.startsWith("node_modules/") &&
+            candidateRelativePath !== "node_modules")
         );
       },
     });

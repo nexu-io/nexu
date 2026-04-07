@@ -159,7 +159,7 @@ unzip -l <nexu-repo-root>/.tmp/diagnostics/nexu-diagnostics-<timestamp>.zip
 ## Environment Differences (local dev vs packaged build)
 
 - Both runtime modes collect via Electron `userData`-relative paths (avoiding hardcoded legacy paths).
-- Local `pnpm restart`: `userData` is at `<repo>/.tmp/desktop/electron`.
+- Local `pnpm dev start desktop` / `pnpm dev restart desktop`: `userData` is at `<repo>/.tmp/desktop/electron`.
 - Packaged build: `userData` is at `~/Library/Application Support/@nexu/desktop` (or overridden by `NEXU_DESKTOP_USER_DATA_ROOT`).
 
 ## Redaction Check (recommended)

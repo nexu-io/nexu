@@ -226,6 +226,20 @@ function findWorkspaceRoot(startDir: string): string | null {
   return null;
 }
 
+function resolveOpenclawEntryFromBin(binPath: string): string | null {
+  const resolvedBinPath = path.resolve(binPath.trim());
+  if (resolvedBinPath.endsWith(".mjs") && existsSync(resolvedBinPath)) {
+    return resolvedBinPath;
+  }
+
+  const entry = path.resolve(
+    path.dirname(resolvedBinPath),
+    "..",
+    "node_modules/openclaw/openclaw.mjs",
+  );
+  return existsSync(entry) ? entry : null;
+}
+
 function getOpenClawCommandSpec(env: ControllerEnv): {
   command: string;
   argsPrefix: string[];
@@ -244,6 +258,15 @@ function getOpenClawCommandSpec(env: ControllerEnv): {
     : null;
   const electronExec = process.env.OPENCLAW_ELECTRON_EXECUTABLE;
   if (electronExec) {
+    const openclawEntryFromBin = resolveOpenclawEntryFromBin(env.openclawBin);
+    if (openclawEntryFromBin) {
+      return {
+        command: electronExec,
+        argsPrefix: [openclawEntryFromBin],
+        extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
+      };
+    }
+
     if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
       return {
         command: electronExec,
@@ -252,12 +275,12 @@ function getOpenClawCommandSpec(env: ControllerEnv): {
       };
     }
 
-    const binDir = path.dirname(path.resolve(env.openclawBin));
-    const entry = path.resolve(
-      binDir,
-      "..",
-      "node_modules/openclaw/openclaw.mjs",
-    );
+    const entry = resolveOpenclawEntryFromBin(env.openclawBin);
+    if (!entry) {
+      throw new Error(
+        "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
+      );
+    }
     return {
       command: electronExec,
       argsPrefix: [entry],
@@ -1066,6 +1089,14 @@ export class ModelProviderService {
   }
 
   private async restartRuntime(): Promise<void> {
+    if (!this.openclawProcess.managesProcess()) {
+      logger.info(
+        {},
+        "model_provider_runtime_restart_skipped_external_openclaw",
+      );
+      return;
+    }
+
     await this.openclawProcess.stop();
     this.openclawProcess.enableAutoRestart();
     this.openclawProcess.start();

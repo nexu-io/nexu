@@ -7,6 +7,15 @@ import renderer from "vite-plugin-electron-renderer";
 
 const nexuWebRoot = resolve(__dirname, "../web");
 const nexuWebSrc = resolve(nexuWebRoot, "src");
+const desktopDevHost = process.env.NEXU_DESKTOP_DEV_HOST ?? "127.0.0.1";
+const desktopDevPort = Number.parseInt(
+  process.env.NEXU_DESKTOP_DEV_PORT ?? "5180",
+  10,
+);
+const desktopDevApiOrigin =
+  process.env.NEXU_DESKTOP_DEV_API_ORIGIN ?? "http://127.0.0.1:3010";
+const disableImplicitElectronStartup =
+  process.env.NEXU_DESKTOP_DISABLE_VITE_ELECTRON_STARTUP === "1";
 
 export default defineConfig({
   base: "./",
@@ -17,6 +26,10 @@ export default defineConfig({
       {
         entry: "main/bootstrap.ts",
         onstart(options) {
+          if (disableImplicitElectronStartup) {
+            return;
+          }
+
           options.startup();
         },
         vite: {
@@ -76,14 +89,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5180,
+    host: desktopDevHost,
+    port: desktopDevPort,
+    strictPort: true,
     fs: {
       allow: [resolve(__dirname, "../..")],
     },
     proxy: {
-      "/v1": "http://127.0.0.1:50800",
-      "/api": "http://127.0.0.1:50800",
-      "/openapi.json": "http://127.0.0.1:50800",
+      "/v1": desktopDevApiOrigin,
+      "/api": desktopDevApiOrigin,
+      "/openapi.json": desktopDevApiOrigin,
     },
   },
   build: {

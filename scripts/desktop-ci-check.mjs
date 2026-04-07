@@ -10,6 +10,21 @@ const maxHealthAttemptsByMode = {
 };
 const probeTimeoutMs = 5_000;
 const requiredDiagnosticsUnitIds = ["controller", "openclaw"];
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
+function createCommandSpec(command, args) {
+  if (
+    process.platform === "win32" &&
+    (command === "pnpm" || command === "pnpm.cmd")
+  ) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
+    };
+  }
+
+  return { command, args };
+}
 
 function parseArgs(argv) {
   const [mode, ...rest] = argv;
@@ -44,7 +59,62 @@ function compactPaths(paths) {
   return [...new Set(paths.filter(Boolean))];
 }
 
+function readNumberEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function getPortConfig(mode) {
+  return {
+    controllerPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_CONTROLLER_PORT" : "NEXU_CONTROLLER_PORT",
+      50800,
+    ),
+    webPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_WEB_PORT" : "NEXU_WEB_PORT",
+      50810,
+    ),
+    openclawPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_OPENCLAW_PORT" : "NEXU_OPENCLAW_PORT",
+      18789,
+    ),
+  };
+}
+
+function getReadinessUrls(mode, portConfig) {
+  const controllerUrl =
+    process.env[
+      mode === "dev" ? "NEXU_DEV_CONTROLLER_URL" : "NEXU_CONTROLLER_URL"
+    ] ?? `http://127.0.0.1:${portConfig.controllerPort}`;
+  const webUrl =
+    process.env[mode === "dev" ? "NEXU_DEV_WEB_URL" : "NEXU_WEB_URL"] ??
+    `http://127.0.0.1:${portConfig.webPort}`;
+  const openclawBaseUrl =
+    process.env[
+      mode === "dev" ? "NEXU_DEV_OPENCLAW_BASE_URL" : "NEXU_OPENCLAW_BASE_URL"
+    ] ?? `http://127.0.0.1:${portConfig.openclawPort}`;
+
+  return {
+    api: `${controllerUrl}/api/internal/desktop/ready`,
+    web: `${webUrl}/api/internal/desktop/ready`,
+    webSurface: `${webUrl}/workspace`,
+    openclawHealth: `${openclawBaseUrl}/health`,
+  };
+}
+
+function isBrowserControlRequired() {
+  const value = process.env.NEXU_DESKTOP_CHECK_REQUIRE_BROWSER_CONTROL;
+
+  if (value === undefined) {
+    return true;
+  }
+
+  return value === "1" || value.toLowerCase() === "true";
+}
+
 function createCheckContext(mode) {
+  const portConfig = getPortConfig(mode);
+
   if (mode === "dev") {
     const desktopRoot = resolve(repoRoot, ".tmp/desktop/electron");
     const desktopUserDataRoot = resolve(desktopRoot, "user-data");
@@ -53,19 +123,15 @@ function createCheckContext(mode) {
 
     return {
       mode,
-      statusCommand: ["pnpm", ["status"]],
+      statusCommand: [pnpmCommand, ["dev", "status"]],
       ports: [
-        { unit: "controller", port: 50800 },
-        { unit: "web", port: 50810 },
+        { unit: "controller", port: portConfig.controllerPort },
+        { unit: "web", port: portConfig.webPort },
       ],
-      readinessUrls: {
-        api: "http://127.0.0.1:50800/api/internal/desktop/ready",
-        web: "http://127.0.0.1:50810/api/internal/desktop/ready",
-        webSurface: "http://127.0.0.1:50810/workspace",
-        openclawHealth: "http://127.0.0.1:18789/health",
-      },
+      readinessUrls: getReadinessUrls(mode, portConfig),
       processChecks: {
-        tmuxSessionName: "nexu-desktop",
+        lockFile: resolve(repoRoot, ".tmp/dev/desktop.pid"),
+        pidKey: "pid",
       },
       diagnosticsFiles: [resolve(desktopLogsDir, "desktop-diagnostics.json")],
       logs: {
@@ -82,9 +148,10 @@ function createCheckContext(mode) {
         ]),
       },
       capturePaths: [
-        { source: resolve(repoRoot, ".tmp/logs"), target: "repo-logs" },
+        { source: resolve(repoRoot, ".tmp/dev/logs"), target: "repo-logs" },
         { source: desktopLogsDir, target: "electron-logs" },
       ],
+      portConfig,
     };
   }
 
@@ -101,15 +168,10 @@ function createCheckContext(mode) {
     mode,
     statusCommand: null,
     ports: [
-      { unit: "controller", port: 50800 },
-      { unit: "web", port: 50810 },
+      { unit: "controller", port: portConfig.controllerPort },
+      { unit: "web", port: portConfig.webPort },
     ],
-    readinessUrls: {
-      api: "http://127.0.0.1:50800/api/internal/desktop/ready",
-      web: "http://127.0.0.1:50810/api/internal/desktop/ready",
-      webSurface: "http://127.0.0.1:50810/workspace",
-      openclawHealth: "http://127.0.0.1:18789/health",
-    },
+    readinessUrls: getReadinessUrls(mode, portConfig),
     processChecks: {
       pidFile: process.env.NEXU_DESKTOP_PACKAGED_PID_PATH ?? null,
     },
@@ -179,12 +241,14 @@ function createCheckContext(mode) {
           ]
         : []),
     ],
+    portConfig,
   };
 }
 
 async function runCommand(command, args) {
   await new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, {
+    const commandSpec = createCommandSpec(command, args);
+    const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: repoRoot,
       env: process.env,
       stdio: "inherit",
@@ -271,6 +335,37 @@ async function readFirstExistingJson(paths) {
 }
 
 async function isPortListening(port) {
+  if (process.platform === "win32") {
+    return new Promise((resolvePromise, rejectPromise) => {
+      const child = spawn("netstat", ["-ano", "-p", "tcp"], {
+        cwd: repoRoot,
+        env: process.env,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+
+      const chunks = [];
+      child.stdout.on("data", (chunk) => chunks.push(chunk));
+      child.on("error", rejectPromise);
+      child.on("exit", (code) => {
+        if (code !== 0) {
+          resolvePromise(false);
+          return;
+        }
+
+        const output = Buffer.concat(chunks).toString("utf8");
+        const lines = output.split(/\r?\n/u);
+        const listening = lines.some((line) => {
+          const normalized = line.trim().replace(/\s+/gu, " ");
+          return (
+            normalized.includes(`:${String(port)} `) &&
+            normalized.includes(" LISTENING ")
+          );
+        });
+        resolvePromise(listening);
+      });
+    });
+  }
+
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn("lsof", [`-iTCP:${String(port)}`, "-sTCP:LISTEN"], {
       cwd: repoRoot,
@@ -279,19 +374,6 @@ async function isPortListening(port) {
     });
 
     child.on("error", rejectPromise);
-    child.on("exit", (code) => resolvePromise(code === 0));
-  });
-}
-
-async function isTmuxSessionRunning(sessionName) {
-  return new Promise((resolvePromise) => {
-    const child = spawn("tmux", ["has-session", "-t", sessionName], {
-      cwd: repoRoot,
-      env: process.env,
-      stdio: "ignore",
-    });
-
-    child.on("error", () => resolvePromise(false));
     child.on("exit", (code) => resolvePromise(code === 0));
   });
 }
@@ -326,6 +408,32 @@ async function readPidIfAlive(pidFile) {
     : { alive: false, pid, detail: `pid ${pid} is not running` };
 }
 
+async function readStatePidIfAlive(stateFile) {
+  if (!stateFile || !(await fileExists(stateFile))) {
+    return { alive: false, pid: null, detail: "state file is missing" };
+  }
+
+  let parsedState;
+  try {
+    parsedState = JSON.parse(await readFile(stateFile, "utf8"));
+  } catch {
+    return { alive: false, pid: null, detail: "state file is invalid JSON" };
+  }
+
+  const pid = parsedState?.electronPid;
+  if (!Number.isInteger(pid)) {
+    return {
+      alive: false,
+      pid: null,
+      detail: "state file does not contain a valid electronPid",
+    };
+  }
+
+  return isPidAlive(pid)
+    ? { alive: true, pid, detail: `pid ${pid} is running` }
+    : { alive: false, pid, detail: `pid ${pid} is not running` };
+}
+
 async function fetchText(url) {
   try {
     const response = await fetch(url, {
@@ -343,24 +451,64 @@ async function fetchText(url) {
 }
 
 async function collectAppProcessResults(context) {
+  if (context.processChecks.lockFile) {
+    return {
+      mainProcess: await readJsonPidIfAlive(
+        context.processChecks.lockFile,
+        context.processChecks.pidKey ?? "pid",
+      ),
+      auxiliaryProcess: null,
+    };
+  }
+
   if (context.processChecks.pidFile) {
     return {
       mainProcess: await readPidIfAlive(context.processChecks.pidFile),
-      tmuxSession: null,
+      auxiliaryProcess: null,
+    };
+  }
+
+  if (context.processChecks.stateFile) {
+    return {
+      mainProcess: await readStatePidIfAlive(context.processChecks.stateFile),
+      auxiliaryProcess: null,
     };
   }
 
   return {
     mainProcess: {
-      alive: true,
+      alive: false,
       pid: null,
-      detail: "dev app liveness is tracked via tmux session",
+      detail: "no desktop process check configured",
     },
-    tmuxSession: {
-      alive: await isTmuxSessionRunning(context.processChecks.tmuxSessionName),
-      detail: `tmux session ${context.processChecks.tmuxSessionName}`,
-    },
+    auxiliaryProcess: null,
   };
+}
+
+async function readJsonPidIfAlive(filePath, pidKey) {
+  if (!filePath || !(await fileExists(filePath))) {
+    return { alive: false, pid: null, detail: "pid file is missing" };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return { alive: false, pid: null, detail: "pid file is invalid JSON" };
+  }
+
+  const pid = parsed?.[pidKey];
+  if (!Number.isInteger(pid)) {
+    return {
+      alive: false,
+      pid: null,
+      detail: `pid file does not contain a valid ${pidKey}`,
+    };
+  }
+
+  return isPidAlive(pid)
+    ? { alive: true, pid, detail: `pid ${pid} is running` }
+    : { alive: false, pid, detail: `pid ${pid} is not running` };
 }
 
 function buildMissingCheckSummary(missingChecks) {
@@ -481,7 +629,7 @@ function probesPassed(results, diagnostics) {
     results.webReady.body.includes('"ready":true') &&
     results.webSurface.body.includes('<div id="root"></div>') &&
     results.openclawHealth.ok &&
-    results.browserControlListening &&
+    (!isBrowserControlRequired() || results.browserControlListening) &&
     results.appProcessResults.mainProcess.alive &&
     (results.appProcessResults.tmuxSession?.alive ?? true) &&
     diagnosticsChecksPassed(diagnostics)
@@ -943,7 +1091,7 @@ async function verifyRuntime(context) {
     addMissing("web", "root document did not contain app mount node");
   }
 
-  if (!probeResults.browserControlListening) {
+  if (isBrowserControlRequired() && !probeResults.browserControlListening) {
     addMissing("openclaw", "browser control port 18791 is not listening");
   }
 
@@ -952,10 +1100,6 @@ async function verifyRuntime(context) {
       context.mode === "dev" ? "desktop-shell" : "packaged-app",
       probeResults.appProcessResults.mainProcess.detail,
     );
-  }
-
-  if (probeResults.appProcessResults.tmuxSession?.alive === false) {
-    addMissing("desktop-shell", "tmux session nexu-desktop is not running");
   }
 
   if (!probeResults.openclawHealth.ok) {
