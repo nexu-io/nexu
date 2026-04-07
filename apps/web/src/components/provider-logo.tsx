@@ -1,23 +1,27 @@
-import { ModelIcon, ProviderIcon } from "@lobehub/icons";
 import type { CSSProperties } from "react";
+import { useMemo, useState } from "react";
 
 const PROVIDER_ICON_ALIASES: Record<string, string> = {
   anthropic: "anthropic",
   baidu: "baidu",
+  baiducloud: "baiducloud",
   glm: "zhipu",
   google: "google",
+  huggingface: "huggingface",
   kimi: "moonshot",
   minimax: "minimax",
+  mistral: "mistral",
   moonshot: "moonshot",
   ollama: "ollama",
   openai: "openai",
   openrouter: "openrouter",
   ppio: "ppio",
-  qianfan: "baidu",
-  qwen: "alibaba",
+  qianfan: "baiducloud",
+  qwen: "alibabacloud",
   siliconflow: "siliconcloud",
   together: "together",
   togetherai: "together",
+  vllm: "vllm",
   volcengine: "volcengine",
   xai: "xai",
   xiaomi: "xiaomimimo",
@@ -36,6 +40,38 @@ function normalizeProviderIconKey(provider: string): string | null {
 
 function fallbackStyle(size: number): CSSProperties {
   return { width: size, height: size };
+}
+
+const LOCAL_PROVIDER_ICON_KEYS = new Set([
+  "anthropic",
+  "baidu",
+  "baiducloud",
+  "zhipu",
+  "google",
+  "huggingface",
+  "moonshot",
+  "minimax",
+  "mistral",
+  "ollama",
+  "openai",
+  "openrouter",
+  "ppio",
+  "alibaba",
+  "alibabacloud",
+  "siliconcloud",
+  "together",
+  "vllm",
+  "volcengine",
+  "xai",
+  "xiaomimimo",
+]);
+
+function getProviderIconSrc(provider: string): string | null {
+  if (!LOCAL_PROVIDER_ICON_KEYS.has(provider)) {
+    return null;
+  }
+
+  return `/model-provider-icons/${provider}.svg`;
 }
 
 function getDisplayModelId(model: string): string {
@@ -117,11 +153,39 @@ export function ProviderLogo({
   }
 
   return (
-    <ProviderIcon
-      provider={iconProvider}
-      type="color"
+    <ProviderLogoImage
+      provider={provider}
+      iconProvider={iconProvider}
       size={size}
+    />
+  );
+}
+
+function ProviderLogoImage({
+  provider,
+  iconProvider,
+  size,
+}: {
+  provider: string;
+  iconProvider: string;
+  size: number;
+}) {
+  const src = useMemo(() => getProviderIconSrc(iconProvider), [iconProvider]);
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return <FallbackProviderMark provider={provider} size={size} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={iconProvider}
+      width={size}
+      height={size}
+      className="shrink-0"
       style={{ flex: "none" }}
+      onError={() => setFailed(true)}
     />
   );
 }
@@ -145,12 +209,9 @@ export function ModelLogo({
     );
   }
 
-  return (
-    <ModelIcon
-      model={displayModelId}
-      type="color"
-      size={size}
-      style={{ flex: "none" }}
-    />
-  );
+  if (provider) {
+    return <ProviderLogo provider={provider} size={size} />;
+  }
+
+  return <FallbackModelMark model={displayModelId} size={size} />;
 }
