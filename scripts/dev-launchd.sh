@@ -227,7 +227,7 @@ start_services() {
   echo "Starting Electron desktop (launchd mode)..."
   echo ""
   cd "$REPO_ROOT"
-  NEXU_USE_LAUNCHD=1 NEXU_HOME="$DEV_NEXU_HOME" \
+  NEXU_USE_LAUNCHD=1 NEXU_HOME="$DEV_NEXU_HOME" NEXU_WORKSPACE_ROOT="$REPO_ROOT" \
     pnpm exec electron apps/desktop
 }
 

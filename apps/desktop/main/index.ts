@@ -64,6 +64,7 @@ import {
   getLegacyNexuHomeStateDir,
   migrateOpenclawState,
 } from "./services/state-migration";
+import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -327,6 +328,7 @@ async function gracefulShutdown(reason: string): Promise<void> {
     sleepGuard?.dispose(reason);
     await diagnosticsReporter?.flushNow().catch(() => undefined);
     flushRuntimeLoggers();
+    flushV8CoverageIfEnabled();
 
     if (launchdResult) {
       await teardownLaunchdServices({
@@ -694,6 +696,9 @@ async function runLaunchdColdStart(): Promise<void> {
     posthogHost:
       process.env.POSTHOG_HOST ?? runtimeConfig.posthogHost ?? undefined,
     log: (message: string) => logColdStart(message),
+    nodeV8Coverage: process.env.NODE_V8_COVERAGE,
+    desktopE2ECoverage: process.env.NEXU_DESKTOP_E2E_COVERAGE,
+    desktopE2ECoverageRunId: process.env.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
     buildSource:
@@ -1176,6 +1181,7 @@ app.whenReady().then(async () => {
           sleepGuard?.dispose("launchd-quit");
           await diagnosticsReporter?.flushNow().catch(() => undefined);
           flushRuntimeLoggers();
+          flushV8CoverageIfEnabled();
         },
       };
       installLaunchdQuitHandler(quitOpts);

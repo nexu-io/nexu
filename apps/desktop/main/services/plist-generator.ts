@@ -59,6 +59,33 @@ export interface PlistEnv {
   posthogApiKey?: string;
   /** PostHog host for controller analytics */
   posthogHost?: string;
+  /** Optional Node V8 coverage output directory */
+  nodeV8Coverage?: string;
+  /** Optional desktop E2E coverage mode switch */
+  desktopE2ECoverage?: string;
+  /** Optional desktop E2E coverage run identifier */
+  desktopE2ECoverageRunId?: string;
+}
+
+function renderCoverageEnvEntries(env: PlistEnv): string {
+  const optionalCoverageEntries = [
+    ["NODE_V8_COVERAGE", env.nodeV8Coverage],
+    ["NEXU_DESKTOP_E2E_COVERAGE", env.desktopE2ECoverage],
+    ["NEXU_DESKTOP_E2E_COVERAGE_RUN_ID", env.desktopE2ECoverageRunId],
+  ] as const;
+
+  return optionalCoverageEntries
+    .flatMap(([key, value]) => {
+      if (!value) {
+        return [];
+      }
+
+      return [
+        `\n        <key>${key}</key>`,
+        `\n        <string>${escapeXml(value)}</string>`,
+      ];
+    })
+    .join("");
 }
 
 function renderProxyEnvEntries(proxyEnv: Record<string, string>): string {
@@ -162,7 +189,7 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>TMPDIR</key>
         <string>${escapeXml(env.openclawTmpDir)}</string>${renderProxyEnvEntries(
           env.proxyEnv,
-        )}${
+        )}${renderCoverageEnvEntries(env)}${
           env.nexuHome
             ? `
         <key>NEXU_HOME</key>
@@ -278,7 +305,7 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <key>HOME</key>
         <string>${escapeXml(os.homedir())}</string>${renderProxyEnvEntries(
           env.proxyEnv,
-        )}${
+        )}${renderCoverageEnvEntries(env)}${
           env.systemPath
             ? `
         <key>PATH</key>

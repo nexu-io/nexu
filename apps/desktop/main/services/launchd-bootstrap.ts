@@ -91,6 +91,12 @@ export interface LaunchdBootstrapEnv {
   posthogApiKey?: string;
   /** PostHog host for controller analytics */
   posthogHost?: string;
+  /** Optional Node V8 coverage output directory */
+  nodeV8Coverage?: string;
+  /** Optional desktop E2E coverage mode switch */
+  desktopE2ECoverage?: string;
+  /** Optional desktop E2E coverage run identifier */
+  desktopE2ECoverageRunId?: string;
   /** Optional structured logger for packaged mode (console.log is lost in packaged builds) */
   log?: (message: string) => void;
   /** Optional override for controller startup validation timeout (tests only). */
@@ -612,6 +618,9 @@ export async function bootstrapWithLaunchd(
     proxyEnv: env.proxyEnv,
     posthogApiKey: env.posthogApiKey,
     posthogHost: env.posthogHost,
+    nodeV8Coverage: env.nodeV8Coverage,
+    desktopE2ECoverage: env.desktopE2ECoverage,
+    desktopE2ECoverageRunId: env.desktopE2ECoverageRunId,
   };
   await cleanupStalePlists(launchd, plistDir, labels, cleanupPlistEnv);
 

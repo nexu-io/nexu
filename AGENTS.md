@@ -231,6 +231,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Architecture & data flows | `ARCHITECTURE.md` |
 | System design | `specs/designs/openclaw-multi-tenant.md` |
 | OpenClaw internals | `specs/designs/openclaw-architecture-internals.md` |
+| OpenClaw error handling & compaction | `specs/references/openclaw-error-handling-internals.md` |
 | Engineering principles | `specs/design-docs/core-beliefs.md` |
 | Config schema & pitfalls | `specs/references/openclaw-config-schema.md` |
 | API coding patterns | `specs/references/api-patterns.md` |

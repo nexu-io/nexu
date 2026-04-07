@@ -424,12 +424,17 @@ function compilePlugins(
         .filter((pluginId): pluginId is string => pluginId !== null),
     ),
   ];
+  const platformPluginIds = [
+    "nexu-runtime-model",
+    "nexu-platform-bootstrap",
+    ...(hasMiniMaxOauth ? ["minimax-portal-auth"] : []),
+  ];
 
   return {
     load: {
       paths: [env.openclawExtensionsDir],
     },
-    ...(connectedPluginIds.length > 0 ? { allow: connectedPluginIds } : {}),
+    allow: [...connectedPluginIds, ...platformPluginIds],
     entries: {
       feishu: {
         enabled: true,
@@ -516,8 +521,14 @@ export function compileOpenClawConfig(
       defaults: {
         model: { primary: defaultModelId },
         compaction: {
+          // "safeguard" mode: Pi framework auto-compacts when prompt
+          // approaches context window. The safeguard extension (compaction-
+          // safeguard.ts) handles LLM summarization with quality guards.
           mode: "safeguard",
-          maxHistoryShare: 0.5,
+          // Max fraction of context window for retained history after
+          // compaction. 0.3 = 70% reserved for system prompt + response.
+          // Tested: 0.5 was too tight for models with large system prompts.
+          maxHistoryShare: 0.3,
           keepRecentTokens: 20000,
           recentTurnsPreserve: 5,
           qualityGuard: { enabled: true },
@@ -525,6 +536,12 @@ export function compileOpenClawConfig(
             enabled: true,
           },
         },
+        // LLM call timeout. Default is 600s (10min) which causes the bot to
+        // appear unresponsive when the provider is down. 300s (5min) leaves
+        // room for reasoning models (o1/o3 long thinking chains) while
+        // cutting max wait time in half. Aligns with compaction's own 300s
+        // safety timeout (EMBEDDED_COMPACTION_TIMEOUT_MS).
+        timeoutSeconds: 300,
         humanDelay: {
           mode: "off",
         },
