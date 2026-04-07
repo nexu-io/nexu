@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { selectPreferredModel } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
@@ -308,36 +306,10 @@ export class OpenClawSyncService {
     // even after the allowlist changes, because OpenClaw's config-reload
     // treats agents/skills changes as kind "none" (no hot-reload action).
     if (configPushed) {
-      await this.touchAnySkillMarker();
+      await this.watchTrigger.nudgeSkillsWatcher("config-pushed");
     }
 
     logger.info({ seq, configPushed }, "doSync: complete");
     return { configPushed };
-  }
-
-  /**
-   * Touch one SKILL.md to trigger OpenClaw's skills chokidar watcher.
-   * Best-effort: silently ignored if no skills exist on disk yet.
-   */
-  private async touchAnySkillMarker(): Promise<void> {
-    try {
-      const entries = await import("node:fs/promises").then((fs) =>
-        fs.readdir(this.env.openclawSkillsDir, { withFileTypes: true }),
-      );
-      const first = entries.find(
-        (e) =>
-          e.isDirectory() &&
-          existsSync(resolve(this.env.openclawSkillsDir, e.name, "SKILL.md")),
-      );
-      if (first) {
-        await this.watchTrigger.touchSkill(first.name);
-        logger.info(
-          { slug: first.name },
-          "doSync: touched SKILL.md to bump snapshot version",
-        );
-      }
-    } catch {
-      // best-effort
-    }
   }
 }
