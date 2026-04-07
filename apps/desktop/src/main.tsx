@@ -50,6 +50,7 @@ import {
   triggerMainProcessCrash,
   triggerRendererProcessCrash,
 } from "./lib/host-api";
+import { getDesktopOpenClawUrl } from "./lib/openclaw-surface";
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
@@ -1093,6 +1094,7 @@ function DesktopShell() {
   const webSurfaceVersion = 0;
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
+  const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
   const update = useAutoUpdate();
 
   // Setup animation phases:
@@ -1124,6 +1126,24 @@ function DesktopShell() {
         setSetupPhase((prev) => (prev === "looping" ? "fading" : prev));
       })
       .catch(() => null);
+
+    void getRuntimeState()
+      .then(setRuntimeState)
+      .catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onRuntimeEvent((event) => {
+      setRuntimeState((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return applyRuntimeEvent(current, event);
+      });
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -1210,12 +1230,10 @@ function DesktopShell() {
     runtimeConfig && controllerReady
       ? new URL("/workspace", runtimeConfig.urls.web).toString()
       : null;
-  const desktopOpenClawUrl = runtimeConfig
-    ? new URL(
-        `/#token=${runtimeConfig.tokens.gateway}`,
-        runtimeConfig.urls.openclawBase,
-      ).toString()
-    : null;
+  const desktopOpenClawUrl = getDesktopOpenClawUrl({
+    runtimeConfig,
+    runtimeState,
+  });
   return (
     <div
       className={
