@@ -1,5 +1,5 @@
 ---
-name: LibTV Video
+name: libtv-video
 description: Seedance 2.0 video generation via LibTV Gateway - AI text-to-video, image-to-video, video continuation, style transfer using Seedance 2.0 model. Also supports Kling 3.0, Wan 2.6, Midjourney. Trigger phrases: "seedance", "generate video", "make a video", "libtv", "liblib".
 homepage: https://www.liblib.tv/
 metadata:
