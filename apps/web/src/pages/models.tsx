@@ -85,24 +85,24 @@ type SidebarItem = {
   modelCount: number;
   configured: boolean;
   managed: boolean;
-  kind: "managed" | "builtin-byok" | "custom-byok" | "add-custom";
+  kind: "managed" | "builtin-byok" | "custom-byok" | "custom-draft";
   providerKey?: string;
   registryEntry?: ByokProviderEntry;
-};
-
-const ADD_CUSTOM_PROVIDER_ITEM: SidebarItem = {
-  id: "__add-custom-provider__",
-  name: "Add custom provider",
-  modelCount: 0,
-  configured: false,
-  managed: false,
-  kind: "add-custom",
+  draftId?: string;
 };
 
 type StoredModelsConfig = NonNullable<PutApiV1ModelProvidersConfigData["body"]>;
 type StoredProviderConfig = NonNullable<
   StoredModelsConfig["providers"]
 >[string];
+type CustomProviderTemplateId = (typeof customProviderTemplateIds)[number];
+type CustomProviderDraft = {
+  id: string;
+  templateId: CustomProviderTemplateId;
+  instanceId: string;
+  displayName: string;
+  baseUrl: string;
+};
 
 type MiniMaxDesktopOauthStatus = {
   connected: boolean;
@@ -468,6 +468,28 @@ function buildStoredModelsConfig(
   };
 }
 
+function getCustomProviderTemplateLabel(
+  templateId: CustomProviderTemplateId,
+  t: (key: string) => string,
+): string {
+  switch (templateId) {
+    case "custom-anthropic":
+      return t("models.customProvider.compatibilityAnthropic");
+    case "custom-openai":
+      return t("models.customProvider.compatibilityOpenai");
+  }
+}
+
+function createCustomProviderDraft(id: string): CustomProviderDraft {
+  return {
+    id,
+    templateId: "custom-openai",
+    instanceId: "",
+    displayName: "",
+    baseUrl: "",
+  };
+}
+
 // ── Component ──────────────────────────────────────────────────
 
 function _GeneralSettings() {
@@ -674,27 +696,28 @@ function _GeneralSettings() {
 // _CurrentModelSelector removed — model switching now lives inline in each provider's model list
 
 function AddCustomProviderDetail({
+  draft,
   customTemplates,
+  onChange,
   onCreate,
+  onRemove,
 }: {
+  draft: CustomProviderDraft;
   customTemplates: ByokProviderEntry[];
+  onChange: (draft: CustomProviderDraft) => void;
   onCreate: (input: {
     template: ByokProviderEntry;
     instanceId: string;
     displayName: string;
     baseUrl: string;
   }) => Promise<void>;
+  onRemove: () => void;
 }) {
-  const [templateId, setTemplateId] = useState<string>(
-    customTemplates[0]?.id ?? "custom-openai",
-  );
-  const [instanceId, setInstanceId] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
+  const { t } = useTranslation();
 
   const template = useMemo(
-    () => customTemplates.find((item) => item.id === templateId) ?? null,
-    [customTemplates, templateId],
+    () => customTemplates.find((item) => item.id === draft.templateId) ?? null,
+    [customTemplates, draft.templateId],
   );
 
   const createMutation = useMutation({
@@ -705,29 +728,26 @@ function AddCustomProviderDetail({
 
       await onCreate({
         template,
-        instanceId: instanceId.trim(),
+        instanceId: draft.instanceId.trim(),
         displayName:
-          displayName.trim() ||
-          `${template.displayName} / ${instanceId.trim()}`,
-        baseUrl: baseUrl.trim(),
+          draft.displayName.trim() ||
+          `${getCustomProviderTemplateLabel(draft.templateId, t)} / ${draft.instanceId.trim()}`,
+        baseUrl: draft.baseUrl.trim(),
       });
     },
-    onSuccess: () => {
-      setInstanceId("");
-      setDisplayName("");
-      setBaseUrl("");
-    },
     onError: (error) => {
-      toast.error(error.message || "Failed to add custom provider");
+      toast.error(error.message || t("models.customProvider.createFailed"));
     },
   });
 
-  const canCreate = Boolean(template && instanceId.trim() && baseUrl.trim());
+  const canCreate = Boolean(
+    template && draft.instanceId.trim() && draft.baseUrl.trim(),
+  );
 
   return (
     <div className="max-w-lg space-y-4">
       <div className="text-[14px] font-semibold text-text-primary">
-        Add custom provider
+        {t("models.customProvider.title")}
       </div>
       <div className="space-y-3">
         <div>
@@ -735,17 +755,25 @@ function AddCustomProviderDetail({
             htmlFor="custom-provider-template"
             className="mb-1.5 block text-[12px] font-medium text-text-secondary"
           >
-            Template
+            {t("models.customProvider.compatibility")}
           </label>
           <select
             id="custom-provider-template"
-            value={templateId}
-            onChange={(event) => setTemplateId(event.target.value)}
+            value={draft.templateId}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                templateId: event.target.value as CustomProviderTemplateId,
+              })
+            }
             className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
           >
             {customTemplates.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.displayName}
+                {getCustomProviderTemplateLabel(
+                  item.id as CustomProviderTemplateId,
+                  t,
+                )}
               </option>
             ))}
           </select>
@@ -755,14 +783,16 @@ function AddCustomProviderDetail({
             htmlFor="custom-provider-instance-id"
             className="mb-1.5 block text-[12px] font-medium text-text-secondary"
           >
-            Instance id
+            {t("models.customProvider.instanceId")}
           </label>
           <input
             id="custom-provider-instance-id"
             type="text"
-            value={instanceId}
-            onChange={(event) => setInstanceId(event.target.value)}
-            placeholder="e.g. team-gateway"
+            value={draft.instanceId}
+            onChange={(event) =>
+              onChange({ ...draft, instanceId: event.target.value })
+            }
+            placeholder={t("models.customProvider.instanceIdPlaceholder")}
             className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
           />
         </div>
@@ -771,14 +801,16 @@ function AddCustomProviderDetail({
             htmlFor="custom-provider-display-name"
             className="mb-1.5 block text-[12px] font-medium text-text-secondary"
           >
-            Display name
+            {t("models.customProvider.displayName")}
           </label>
           <input
             id="custom-provider-display-name"
             type="text"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            placeholder={template?.displayName ?? "Custom provider"}
+            value={draft.displayName}
+            onChange={(event) =>
+              onChange({ ...draft, displayName: event.target.value })
+            }
+            placeholder={t("models.customProvider.displayNamePlaceholder")}
             className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
           />
         </div>
@@ -787,31 +819,44 @@ function AddCustomProviderDetail({
             htmlFor="custom-provider-base-url"
             className="mb-1.5 block text-[12px] font-medium text-text-secondary"
           >
-            Base URL
+            {t("models.customProvider.baseUrl")}
           </label>
           <input
             id="custom-provider-base-url"
             type="text"
-            value={baseUrl}
-            onChange={(event) => setBaseUrl(event.target.value)}
-            placeholder="https://api.example.com/v1"
+            value={draft.baseUrl}
+            onChange={(event) =>
+              onChange({ ...draft, baseUrl: event.target.value })
+            }
+            placeholder={t("models.customProvider.baseUrlPlaceholder")}
             className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
           />
         </div>
       </div>
-      <button
-        type="button"
-        disabled={!canCreate || createMutation.isPending}
-        onClick={() => createMutation.mutate()}
-        className={cn(
-          "rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
-          canCreate && !createMutation.isPending
-            ? "bg-accent text-accent-fg hover:bg-accent/90"
-            : "bg-surface-2 text-text-muted cursor-not-allowed",
-        )}
-      >
-        {createMutation.isPending ? "Adding..." : "Add provider"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canCreate || createMutation.isPending}
+          onClick={() => createMutation.mutate()}
+          className={cn(
+            "rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+            canCreate && !createMutation.isPending
+              ? "bg-accent text-accent-fg hover:bg-accent/90"
+              : "bg-surface-2 text-text-muted cursor-not-allowed",
+          )}
+        >
+          {createMutation.isPending
+            ? t("models.customProvider.creating")
+            : t("models.customProvider.create")}
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-lg px-4 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
+        >
+          {t("models.customProvider.removeDraft")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -837,6 +882,9 @@ export function ModelsPage() {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     providerParam ?? (isSetupMode ? "anthropic" : null),
   );
+  const [customProviderDrafts, setCustomProviderDrafts] = useState<
+    CustomProviderDraft[]
+  >([]);
 
   const queryClient = useQueryClient();
 
@@ -1065,6 +1113,13 @@ export function ModelsPage() {
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   }, [customTemplateRegistryMap, providerConfigDoc?.providers]);
 
+  const removeCustomProviderDraft = useCallback((draftId: string) => {
+    setCustomProviderDrafts((previous) =>
+      previous.filter((draft) => draft.id !== draftId),
+    );
+    setSelectedProviderId((current) => (current === draftId ? null : current));
+  }, []);
+
   // Build sidebar items: Nexu first, then built-in BYOK, then custom BYOK
   const sidebarItems = useMemo(() => {
     const items: SidebarItem[] = [];
@@ -1116,9 +1171,32 @@ export function ModelsPage() {
       });
     }
 
+    for (const draft of customProviderDrafts) {
+      const template = customTemplateRegistryMap.get(draft.templateId);
+      if (!template) {
+        continue;
+      }
+
+      items.push({
+        id: draft.id,
+        name:
+          draft.displayName.trim() ||
+          draft.instanceId.trim() ||
+          t("models.customProvider.newProvider"),
+        modelCount: 0,
+        configured: false,
+        managed: false,
+        kind: "custom-draft",
+        draftId: draft.id,
+        registryEntry: template,
+      });
+    }
+
     return items;
   }, [
+    customProviderDrafts,
     customProviderInstances,
+    customTemplateRegistryMap,
     models,
     providerConfigDoc,
     providers,
@@ -1128,11 +1206,18 @@ export function ModelsPage() {
 
   const activeProvider =
     sidebarItems.find((p) => p.id === selectedProviderId) ??
-    (selectedProviderId === ADD_CUSTOM_PROVIDER_ITEM.id
-      ? ADD_CUSTOM_PROVIDER_ITEM
-      : null) ??
     sidebarItems[0] ??
     null;
+
+  const activeCustomProviderDraft = useMemo(
+    () =>
+      activeProvider?.kind === "custom-draft"
+        ? (customProviderDrafts.find(
+            (draft) => draft.id === activeProvider.draftId,
+          ) ?? null)
+        : null,
+    [activeProvider, customProviderDrafts],
+  );
 
   // Clear setup param once user interacts
   const clearSetupParam = useCallback(() => {
@@ -1145,6 +1230,14 @@ export function ModelsPage() {
       setSearchParams(next, { replace: true });
     }
   }, [isSetupMode, searchParams, setSearchParams]);
+
+  const handleAddCustomProvider = useCallback(() => {
+    const draftId = `__custom-provider-draft__${Date.now()}`;
+    const nextDraft = createCustomProviderDraft(draftId);
+    setCustomProviderDrafts((previous) => [...previous, nextDraft]);
+    setSelectedProviderId(draftId);
+    clearSetupParam();
+  }, [clearSetupParam]);
 
   const _changeSettingsTab = useCallback(
     (tab: SettingsTab) => {
@@ -1270,19 +1363,14 @@ export function ModelsPage() {
               <div className="border-t border-border-subtle p-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedProviderId(ADD_CUSTOM_PROVIDER_ITEM.id);
-                    clearSetupParam();
-                  }}
+                  onClick={handleAddCustomProvider}
                   className={cn(
                     "w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
-                    activeProvider?.id === ADD_CUSTOM_PROVIDER_ITEM.id
-                      ? "border-accent/30 bg-accent/10 text-accent"
-                      : "border-border bg-surface-0 text-text-secondary hover:bg-surface-2 hover:text-text-primary",
+                    "border-border bg-surface-0 text-text-secondary hover:bg-surface-2 hover:text-text-primary",
                   )}
                 >
                   <span className="text-[14px] leading-none">+</span>
-                  Add custom provider
+                  {t("models.customProvider.addButton")}
                 </button>
               </div>
             </div>
@@ -1340,29 +1428,43 @@ export function ModelsPage() {
                       {t("models.loading")}
                     </div>
                   </div>
-                ) : activeProvider.kind === "add-custom" ? (
-                  <AddCustomProviderDetail
-                    customTemplates={Array.from(
-                      customTemplateRegistryMap.values(),
-                    )}
-                    onCreate={async (input) => {
-                      const providerKey = buildCustomProviderKey(
-                        input.template
-                          .id as (typeof customProviderTemplateIds)[number],
-                        input.instanceId,
-                      );
-                      await upsertProviderConfigByKey(providerKey, {
-                        providerTemplateId: input.template.id,
-                        instanceId: input.instanceId,
-                        enabled: true,
-                        api: input.template.apiKind,
-                        baseUrl: input.baseUrl,
-                        displayName: input.displayName,
-                        models: [],
-                      });
-                      setSelectedProviderId(providerKey);
-                    }}
-                  />
+                ) : activeProvider.kind === "custom-draft" ? (
+                  activeCustomProviderDraft ? (
+                    <AddCustomProviderDetail
+                      draft={activeCustomProviderDraft}
+                      customTemplates={Array.from(
+                        customTemplateRegistryMap.values(),
+                      )}
+                      onChange={(draft) => {
+                        setCustomProviderDrafts((previous) =>
+                          previous.map((item) =>
+                            item.id === draft.id ? draft : item,
+                          ),
+                        );
+                      }}
+                      onCreate={async (input) => {
+                        const providerKey = buildCustomProviderKey(
+                          input.template
+                            .id as (typeof customProviderTemplateIds)[number],
+                          input.instanceId,
+                        );
+                        await upsertProviderConfigByKey(providerKey, {
+                          providerTemplateId: input.template.id,
+                          instanceId: input.instanceId,
+                          enabled: true,
+                          api: input.template.apiKind,
+                          baseUrl: input.baseUrl,
+                          displayName: input.displayName,
+                          models: [],
+                        });
+                        removeCustomProviderDraft(activeCustomProviderDraft.id);
+                        setSelectedProviderId(providerKey);
+                      }}
+                      onRemove={() => {
+                        removeCustomProviderDraft(activeCustomProviderDraft.id);
+                      }}
+                    />
+                  ) : null
                 ) : (
                   <ByokProviderDetail
                     key={

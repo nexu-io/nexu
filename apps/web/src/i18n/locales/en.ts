@@ -412,6 +412,22 @@ const en = {
   "models.byok.zaiCodingPlanDesc":
     "Free models with your Z.AI Coding Plan subscription",
   "models.byok.zaiOrGeneralApi": "Or use General API key",
+  "models.customProvider.addButton": "Add custom provider",
+  "models.customProvider.title": "New custom provider",
+  "models.customProvider.newProvider": "New custom provider",
+  "models.customProvider.compatibility": "Compatibility",
+  "models.customProvider.compatibilityOpenai": "OpenAI-compatible",
+  "models.customProvider.compatibilityAnthropic": "Anthropic-compatible",
+  "models.customProvider.instanceId": "Instance id",
+  "models.customProvider.instanceIdPlaceholder": "e.g. team-gateway",
+  "models.customProvider.displayName": "Display name",
+  "models.customProvider.displayNamePlaceholder": "Custom provider",
+  "models.customProvider.baseUrl": "Base URL",
+  "models.customProvider.baseUrlPlaceholder": "https://api.example.com/v1",
+  "models.customProvider.create": "Create provider",
+  "models.customProvider.creating": "Creating...",
+  "models.customProvider.createFailed": "Failed to create custom provider",
+  "models.customProvider.removeDraft": "Remove draft",
 
   // ── Channels Page ──
   "channels.pageTitle": "Channels",
