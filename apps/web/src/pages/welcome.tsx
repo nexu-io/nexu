@@ -21,6 +21,7 @@ import { LanguageSwitcher } from "../components/language-switcher";
 import { ProviderLogo } from "../components/provider-logo";
 import { useLocale } from "../hooks/use-locale";
 import { usePageTitle } from "../hooks/use-page-title";
+import { authClient } from "../lib/auth-client";
 import { track } from "../lib/tracking";
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
@@ -104,11 +105,8 @@ export function WelcomePage() {
   const { t } = useLocale();
   usePageTitle(t("welcome.pageTitle"));
   const navigate = useNavigate();
-
-  // If already set up, skip welcome
-  if (isSetupComplete()) {
-    return <Navigate to="/workspace" replace />;
-  }
+  const { data: session, isPending: authPending } = authClient.useSession();
+  const setupComplete = isSetupComplete();
 
   const [mode, setMode] = useState<Mode>("choose");
 
@@ -123,6 +121,14 @@ export function WelcomePage() {
     connected: false,
     polling: false,
   });
+
+  if (setupComplete && authPending) {
+    return <div className="min-h-screen bg-[#0b0b0d]" />;
+  }
+
+  if (setupComplete && session?.user) {
+    return <Navigate to="/workspace" replace />;
+  }
 
   useEffect(() => {
     let cancelled = false;
