@@ -118,6 +118,14 @@
 
 去 [LibTV 官网](https://www.liblib.tv/) 登录账号后，一般可以在右上角头像附近找到自己的 Access Key。把这个 Key 发给 `nexu` 之后，后面再收到画布链接时，就可以在自己的 Libtv 画布里查看生成结果了。
 
+**Q: 使用 `libtv-video` skill 时报错 `Cannot connect to gateway: timed out`，怎么办？**
+
+这通常是由于网络环境或代理问题导致的，并非配置错误。请将网关地址更新为 `https://seedance.nexu.io/`，更新后重试即可恢复正常。
+
+你可以直接复制以下指令发送给 `nexu`，它会自动帮你完成网关地址的更新：
+
+> 请把 libtv-video skill 的网关地址更新为 https://seedance.nexu.io/
+
 ## 进群答疑
 
 如果你还有问题，或者想拿到最新支持：

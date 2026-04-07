@@ -139,10 +139,25 @@ const watcher = chokidar.watch(controllerSourceDirectoryPath, {
   ignoreInitial: true,
 });
 
-watcher.on("all", async () => {
-  try {
-    await restartWorker();
-  } catch {}
+let restartPending = false;
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
+
+watcher.on("all", () => {
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+  }
+  restartTimer = setTimeout(async () => {
+    restartTimer = null;
+    if (restartPending) return;
+    restartPending = true;
+    try {
+      await restartWorker();
+    } catch (error) {
+      console.error("[controller] restart failed:", error);
+    } finally {
+      restartPending = false;
+    }
+  }, 500);
 });
 
 process.on("SIGINT", async () => {

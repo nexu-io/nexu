@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -105,8 +106,20 @@ jobs:
           NEXU_SKIP_RUNTIME_POSTINSTALL: "1"
         run: pnpm install --frozen-lockfile
 
-      - name: Test
-        run: pnpm test
+      - name: Test with coverage
+        run: pnpm test:coverage
+
+      - name: Upload unit coverage to Codecov
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: true
+          disable_search: true
+          files: coverage/lcov.info
+          flags: unit
+          name: unit-${{ github.run_id }}-${{ github.run_attempt }}
+          fail_ci_if_error: false
+          verbose: true
 
   # ── openclaw-runtime lockfile sync ─────────────────────────────────────────
   openclaw-runtime-lockfile:
