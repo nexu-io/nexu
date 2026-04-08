@@ -187,7 +187,7 @@ export class OpenClawAuthService {
     try {
       const profileKey = "openai-codex:default";
       const filePaths =
-        await this.authProfilesStore.listAgentAuthProfilesPaths();
+        await this.authProfilesStore.listExistingAuthProfilesPaths();
       for (const filePath of filePaths) {
         const profiles = await this.authProfilesStore.readAuthProfiles(
           filePath,
@@ -249,7 +249,7 @@ export class OpenClawAuthService {
 
     try {
       const filePaths =
-        await this.authProfilesStore.listAgentAuthProfilesPaths();
+        await this.authProfilesStore.listExistingAuthProfilesPaths();
       if (filePaths.length === 0) return false;
       const profileKey = "openai-codex:default";
       await Promise.all(
@@ -488,10 +488,8 @@ export class OpenClawAuthService {
     key: string,
     profile: OAuthProfile,
   ): Promise<void> {
-    const filePaths = await this.authProfilesStore.listAgentAuthProfilesPaths();
-    if (filePaths.length === 0) {
-      throw new Error("No agent directory found for auth profiles");
-    }
+    const filePaths =
+      await this.authProfilesStore.listWritableAuthProfilesPaths();
 
     await Promise.all(
       filePaths.map(async (filePath) => {

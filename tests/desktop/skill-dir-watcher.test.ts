@@ -39,6 +39,7 @@ async function waitUntil(
 describe("SkillDirWatcher", () => {
   let tempDir: string;
   let skillsDir: string;
+  let userSkillsDir: string;
   let dbPath: string;
   let db: SkillDb;
   let watcher: SkillDirWatcher;
@@ -47,6 +48,8 @@ describe("SkillDirWatcher", () => {
     tempDir = makeTempDir();
     skillsDir = resolve(tempDir, "skills");
     mkdirSync(skillsDir, { recursive: true });
+    userSkillsDir = resolve(tempDir, "user-skills");
+    mkdirSync(userSkillsDir, { recursive: true });
     dbPath = resolve(tempDir, "skill-ledger.json");
     db = await SkillDb.create(dbPath);
   });
@@ -82,6 +85,22 @@ describe("SkillDirWatcher", () => {
 
       expect(db.isInstalled("github", "managed")).toBe(true);
       expect(db.getAllInstalled()).toHaveLength(1);
+    });
+
+    it("records untracked user-directory skills as user", () => {
+      writeSkill(userSkillsDir, "obsidian");
+      writeSkill(userSkillsDir, "playwright-skill");
+
+      watcher = new SkillDirWatcher({
+        skillsDir,
+        userSkillsDir,
+        skillDb: db,
+      });
+      watcher.syncNow();
+
+      expect(db.isInstalled("obsidian", "user")).toBe(true);
+      expect(db.isInstalled("playwright-skill", "user")).toBe(true);
+      expect(db.getAllInstalled()).toHaveLength(2);
     });
 
     it("marks missing skills as uninstalled", () => {
@@ -190,6 +209,28 @@ describe("SkillDirWatcher", () => {
       await waitUntil(() => !db.isInstalled("doomed-skill", "managed"));
 
       expect(db.isInstalled("doomed-skill", "managed")).toBe(false);
+    });
+
+    it("detects user skill install and triggers onChange after debounce", async () => {
+      let changeCount = 0;
+
+      watcher = new SkillDirWatcher({
+        skillsDir,
+        userSkillsDir,
+        skillDb: db,
+        debounceMs: 50,
+        onChange: () => {
+          changeCount += 1;
+        },
+      });
+      watcher.start();
+
+      writeSkill(userSkillsDir, "obsidian");
+
+      await waitUntil(() => db.isInstalled("obsidian", "user"));
+
+      expect(db.isInstalled("obsidian", "user")).toBe(true);
+      expect(changeCount).toBeGreaterThan(0);
     });
   });
 });

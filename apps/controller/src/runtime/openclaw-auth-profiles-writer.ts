@@ -140,6 +140,19 @@ export class OpenClawAuthProfilesWriter {
       string,
       AuthProfileRecord
     >;
+    const sharedProfiles =
+      (
+        await this.authProfilesStore.readAuthProfiles(
+          this.authProfilesStore.sharedAuthProfilesPath(),
+          { missingOk: true },
+        )
+      )?.profiles ?? {};
+    const sharedNonApiProfiles = Object.fromEntries(
+      Object.entries(sharedProfiles).filter(
+        ([, profile]) => !isApiKeyProfile(profile),
+      ),
+    );
+
     await Promise.all(
       (config.agents?.list ?? []).map(async (agent) => {
         if (
@@ -156,7 +169,9 @@ export class OpenClawAuthProfilesWriter {
         await this.authProfilesStore.updateAuthProfiles(
           authProfilesPath,
           async (existing) => {
-            const preservedProfiles: Record<string, unknown> = {};
+            const preservedProfiles: Record<string, unknown> = {
+              ...sharedNonApiProfiles,
+            };
             for (const [key, profile] of Object.entries(existing.profiles)) {
               if (!isApiKeyProfile(profile)) {
                 preservedProfiles[key] = profile;

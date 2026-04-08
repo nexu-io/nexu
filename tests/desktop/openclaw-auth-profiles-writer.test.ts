@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -127,6 +127,73 @@ describe("OpenClawAuthProfilesWriter", () => {
       type: "api_key",
       provider: "anthropic",
       key: "anthropic-key",
+    });
+  });
+
+  it("seeds each agent auth-profiles store from shared non-api_key profiles", async () => {
+    const env = createEnv(tempDir);
+    mkdirSync(env.openclawStateDir, { recursive: true });
+    writeFileSync(
+      resolve(env.openclawStateDir, "auth-profiles.json"),
+      `${JSON.stringify(
+        {
+          version: 1,
+          profiles: {
+            "openai-codex:default": {
+              type: "oauth",
+              provider: "openai-codex",
+              access: "oauth-access",
+              refresh: "oauth-refresh",
+              expires: Date.now() + 60_000,
+              email: "user@example.com",
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const writer = new OpenClawAuthProfilesWriter(
+      new OpenClawAuthProfilesStore(env),
+    );
+
+    await writer.writeForAgents({
+      agents: {
+        list: [
+          {
+            id: "bot_1",
+            name: "Bot One",
+            workspace: resolve(env.openclawStateDir, "agents", "bot_1"),
+          },
+        ],
+      },
+      models: {
+        mode: "merge",
+        providers: {},
+      },
+    } as never);
+
+    const authProfilesPath = resolve(
+      env.openclawStateDir,
+      "agents",
+      "bot_1",
+      "agent",
+      "auth-profiles.json",
+    );
+    const parsed = JSON.parse(readFileSync(authProfilesPath, "utf8")) as {
+      version: number;
+      profiles: Record<
+        string,
+        { type: string; provider: string; access?: string }
+      >;
+    };
+
+    expect(parsed.profiles["openai-codex:default"]).toMatchObject({
+      type: "oauth",
+      provider: "openai-codex",
+      access: "oauth-access",
     });
   });
 });

@@ -92,6 +92,31 @@ export class OpenClawAuthProfilesStore {
     }
   }
 
+  sharedAuthProfilesPath(): string {
+    return path.join(this.env.openclawStateDir, "auth-profiles.json");
+  }
+
+  async listWritableAuthProfilesPaths(): Promise<string[]> {
+    return [
+      this.sharedAuthProfilesPath(),
+      ...(await this.listAgentAuthProfilesPaths()),
+    ];
+  }
+
+  async listExistingAuthProfilesPaths(): Promise<string[]> {
+    const candidates = await this.listWritableAuthProfilesPaths();
+    const existingPaths: string[] = [];
+
+    for (const filePath of candidates) {
+      const data = await this.readAuthProfiles(filePath, { missingOk: true });
+      if (data) {
+        existingPaths.push(filePath);
+      }
+    }
+
+    return existingPaths;
+  }
+
   authProfilesPathForWorkspace(workspace: string): string {
     return path.join(workspace, "agent", "auth-profiles.json");
   }

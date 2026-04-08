@@ -33,6 +33,7 @@ import {
   startWebDevProcess,
   stopWebDevProcess,
 } from "./services/web.js";
+import { isAlreadyRunningStartError } from "./shared/default-start.js";
 import { getScriptsDevLogger } from "./shared/logger.js";
 import { defaultLogTailLineCount } from "./shared/logs.js";
 import { createDevSessionId } from "./shared/trace.js";
@@ -75,10 +76,25 @@ function readTargetOrThrow(target: string | undefined): DevTarget {
 }
 
 async function startDefaultStack(): Promise<void> {
-  await runDefaultStartStage("openclaw", createDevSessionId());
-  await runDefaultStartStage("controller", createDevSessionId());
-  await runDefaultStartStage("web", createDevSessionId());
-  await runDefaultStartStage("desktop", createDevSessionId());
+  const logger = getCliLogger();
+
+  for (const target of ["openclaw", "controller", "web", "desktop"] as const) {
+    const sessionId = createDevSessionId();
+
+    try {
+      await runDefaultStartStage(target, sessionId);
+    } catch (error) {
+      if (isAlreadyRunningStartError(target, error)) {
+        logger.info("service already running; skipping startup stage", {
+          target,
+          sessionId,
+        });
+        continue;
+      }
+
+      throw error;
+    }
+  }
 }
 
 async function stopDefaultStack(): Promise<void> {
