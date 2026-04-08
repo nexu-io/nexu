@@ -37,6 +37,10 @@ const booleanSchema = z
   .enum(["true", "false", "1", "0"])
   .transform((value) => value === "true" || value === "1");
 
+function booleanWithDefault(defaultValue: boolean) {
+  return booleanSchema.optional().transform((value) => value ?? defaultValue);
+}
+
 const openclawOwnershipModeSchema = z.enum(["external", "internal"]);
 
 function parseUrlPort(value: string): number | null {
@@ -93,8 +97,8 @@ const envSchema = z.object({
   OPENCLAW_LAUNCHD_LABEL: z.string().optional(),
   LITELLM_BASE_URL: z.string().optional(),
   LITELLM_API_KEY: z.string().optional(),
-  RUNTIME_MANAGE_OPENCLAW_PROCESS: booleanSchema.default("false"),
-  RUNTIME_GATEWAY_PROBE_ENABLED: booleanSchema.default("true"),
+  RUNTIME_MANAGE_OPENCLAW_PROCESS: booleanWithDefault(false),
+  RUNTIME_GATEWAY_PROBE_ENABLED: booleanWithDefault(true),
   RUNTIME_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   RUNTIME_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   DEFAULT_MODEL_ID: z.string().default("link/gemini-3-flash-preview"),
@@ -103,8 +107,6 @@ const envSchema = z.object({
   VITE_POSTHOG_API_KEY: z.string().optional(),
   POSTHOG_HOST: z.string().optional(),
   VITE_POSTHOG_HOST: z.string().optional(),
-  AMPLITUDE_API_KEY: z.string().optional(),
-  VITE_AMPLITUDE_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -202,8 +204,6 @@ export const env = {
   posthogApiKey:
     parsed.POSTHOG_API_KEY?.trim() || parsed.VITE_POSTHOG_API_KEY?.trim(),
   posthogHost: parsed.POSTHOG_HOST?.trim() || parsed.VITE_POSTHOG_HOST?.trim(),
-  amplitudeApiKey:
-    parsed.AMPLITUDE_API_KEY?.trim() || parsed.VITE_AMPLITUDE_API_KEY?.trim(),
 };
 
 export type ControllerEnv = typeof env;

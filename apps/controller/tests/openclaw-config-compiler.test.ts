@@ -62,54 +62,7 @@ function createConfig(overrides: Partial<NexuConfig> = {}): NexuConfig {
     },
     models: {
       mode: "merge",
-      providers: {
-        openai: {
-          enabled: true,
-          auth: "api-key",
-          api: "openai-completions",
-          apiKey: "sk-test",
-          baseUrl: "https://api.openai.com/v1",
-          models: [
-            {
-              id: "gpt-4o",
-              name: "GPT-4o",
-              reasoning: false,
-              input: ["text"],
-              cost: {
-                input: 0,
-                output: 0,
-                cacheRead: 0,
-                cacheWrite: 0,
-              },
-              contextWindow: 0,
-              maxTokens: 0,
-            },
-          ],
-        },
-        anthropic: {
-          enabled: true,
-          auth: "api-key",
-          api: "anthropic-messages",
-          apiKey: "proxy-key",
-          baseUrl: "https://proxy.example.com/v1",
-          models: [
-            {
-              id: "claude-sonnet-4",
-              name: "Claude Sonnet 4",
-              reasoning: false,
-              input: ["text"],
-              cost: {
-                input: 0,
-                output: 0,
-                cacheRead: 0,
-                cacheWrite: 0,
-              },
-              contextWindow: 0,
-              maxTokens: 0,
-            },
-          ],
-        },
-      },
+      providers: {},
     },
     providers: [
       {
@@ -336,10 +289,6 @@ describe("compileOpenClawConfig", () => {
     const result = compileOpenClawConfig(
       createConfig({
         providers: [],
-        models: {
-          mode: "merge",
-          providers: {},
-        },
         desktop: {},
         bots: [
           {
@@ -413,7 +362,7 @@ describe("compileOpenClawConfig", () => {
       agentId: "bot-1",
       match: {
         channel: "dingtalk-connector",
-        accountId: "__default__",
+        accountId: "default",
       },
     });
     expect(result.plugins?.allow).toContain("dingtalk-connector");
@@ -437,34 +386,13 @@ describe("compileOpenClawConfig", () => {
           },
           defaultModelId: "openai/gpt-5.4",
         },
-        models: {
-          mode: "merge",
-          providers: {
-            openai: {
-              enabled: true,
-              auth: "api-key",
-              api: "openai-completions",
-              apiKey: undefined,
-              baseUrl: "https://api.openai.com/v1",
-              models: [
-                {
-                  id: "gpt-5.4",
-                  name: "GPT-5.4",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
-            },
+        providers: [
+          {
+            ...createConfig().providers[0],
+            apiKey: null,
+            models: ["gpt-5.4"],
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),
@@ -495,34 +423,22 @@ describe("compileOpenClawConfig", () => {
           },
           defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
         },
-        models: {
-          mode: "merge",
-          providers: {
-            siliconflow: {
-              enabled: true,
-              auth: "api-key",
-              api: "openai-completions",
-              apiKey: "sk-test",
-              baseUrl: "https://api.siliconflow.cn/v1",
-              models: [
-                {
-                  id: "Pro/MiniMaxAI/MiniMax-M2.5",
-                  name: "MiniMax M2.5",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
-            },
+        providers: [
+          {
+            id: "provider-siliconflow",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: null,
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),
@@ -556,34 +472,22 @@ describe("compileOpenClawConfig", () => {
           },
           defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
         },
-        models: {
-          mode: "merge",
-          providers: {
-            siliconflow: {
-              enabled: true,
-              auth: "api-key",
-              api: "openai-completions",
-              apiKey: "sk-test",
-              baseUrl: "https://api.siliconflow.cn/v1",
-              models: [
-                {
-                  id: "Pro/MiniMaxAI/MiniMax-M2.5",
-                  name: "MiniMax M2.5",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
-            },
+        providers: [
+          {
+            id: "provider-siliconflow-cn",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: "https://api.siliconflow.cn/v1",
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),
@@ -618,41 +522,29 @@ describe("compileOpenClawConfig", () => {
           },
           defaultModelId: "siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
         },
-        models: {
-          mode: "merge",
-          providers: {
-            siliconflow: {
-              enabled: true,
-              auth: "api-key",
-              api: "openai-completions",
-              apiKey: "sk-test",
-              baseUrl: "https://api.siliconflow.com/v1",
-              models: [
-                {
-                  id: "Pro/MiniMaxAI/MiniMax-M2.5",
-                  name: "MiniMax M2.5",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
-            },
+        providers: [
+          {
+            id: "provider-siliconflow-legacy",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: "https://api.siliconflow.com/v1",
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),
     );
 
     expect(result.models?.providers.siliconflow?.baseUrl).toBe(
-      "https://api.siliconflow.cn/v1",
+      "https://api.siliconflow.com/v1",
     );
     expect(result.models?.providers.byok_siliconflow).toBeUndefined();
     expect(result.models?.providers.siliconflow?.models[0]?.id).toBe(
@@ -681,34 +573,22 @@ describe("compileOpenClawConfig", () => {
           defaultModelId:
             "byok_siliconflow/siliconflow/Pro/MiniMaxAI/MiniMax-M2.5",
         },
-        models: {
-          mode: "merge",
-          providers: {
-            siliconflow: {
-              enabled: true,
-              auth: "api-key",
-              api: "openai-completions",
-              apiKey: "sk-test",
-              baseUrl: "https://models.example.com/v1",
-              models: [
-                {
-                  id: "Pro/MiniMaxAI/MiniMax-M2.5",
-                  name: "MiniMax M2.5",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
-            },
+        providers: [
+          {
+            id: "provider-siliconflow-proxy",
+            providerId: "siliconflow",
+            displayName: "SiliconFlow Proxy",
+            enabled: true,
+            authMode: "apiKey",
+            baseUrl: "https://models.example.com/v1",
+            apiKey: "sk-test",
+            oauthRegion: null,
+            oauthCredential: null,
+            models: ["Pro/MiniMaxAI/MiniMax-M2.5"],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),
@@ -730,17 +610,14 @@ describe("compileOpenClawConfig", () => {
     const result = compileOpenClawConfig(
       createConfig({
         providers: [
-          ...(createConfig().providers ?? []),
+          ...createConfig().providers,
           {
+            ...createConfig().providers[0],
             id: "provider-3",
             providerId: "custom",
             displayName: "Custom",
-            enabled: true,
-            authMode: "apiKey",
             baseUrl: "https://models.example.com/v1",
             apiKey: "custom-key",
-            oauthRegion: null,
-            oauthCredential: null,
             models: ["anthropic/claude-sonnet-4"],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -759,38 +636,30 @@ describe("compileOpenClawConfig", () => {
   });
 
   it("uses the CN MiniMax endpoint for CN OAuth providers", () => {
+    const now = new Date().toISOString();
     const result = compileOpenClawConfig(
       createConfig({
-        models: {
-          mode: "merge",
-          providers: {
-            minimax: {
-              enabled: true,
-              auth: "oauth",
-              api: "anthropic-messages",
-              apiKey: undefined,
-              baseUrl: "https://api.minimaxi.com/anthropic",
-              oauthRegion: "cn",
-              oauthProfileRef: "minimax-portal",
-              models: [
-                {
-                  id: "MiniMax-M2.7",
-                  name: "MiniMax M2.7",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
+        providers: [
+          {
+            id: "provider-minimax-cn",
+            providerId: "minimax",
+            displayName: "MiniMax",
+            enabled: true,
+            baseUrl: null,
+            authMode: "oauth",
+            apiKey: null,
+            oauthRegion: "cn",
+            oauthCredential: {
+              provider: "minimax-portal",
+              access: "access-token",
+              refresh: "refresh-token",
+              expires: Date.now() + 60_000,
             },
+            models: ["MiniMax-M2.7"],
+            createdAt: now,
+            updatedAt: now,
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),
@@ -1166,34 +1035,13 @@ describe("compileOpenClawConfig", () => {
           },
           defaultModelId: "openai/gpt-5.4",
         },
-        models: {
-          mode: "merge",
-          providers: {
-            openai: {
-              enabled: true,
-              auth: "api-key",
-              api: "openai-completions",
-              apiKey: undefined,
-              baseUrl: "https://api.openai.com/v1",
-              models: [
-                {
-                  id: "gpt-5.4",
-                  name: "GPT-5.4",
-                  reasoning: false,
-                  input: ["text"],
-                  cost: {
-                    input: 0,
-                    output: 0,
-                    cacheRead: 0,
-                    cacheWrite: 0,
-                  },
-                  contextWindow: 0,
-                  maxTokens: 0,
-                },
-              ],
-            },
+        providers: [
+          {
+            ...createConfig().providers[0],
+            apiKey: null,
+            models: ["gpt-5.4"],
           },
-        },
+        ],
         desktop: {},
       }),
       createEnv(),

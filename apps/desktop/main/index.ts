@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/electron/main";
@@ -132,36 +131,18 @@ const needsSetupExtraction = checkOpenclawExtractionNeeded(
   app.isPackaged,
 );
 
-logStartupCheckpoint(
-  `runtime path snapshot packaged=${app.isPackaged} electronRoot=${electronRoot} userData=${app.getPath("userData")} resourcesRuntime=${resolve(electronRoot, "runtime")} resourcesRuntimeExists=${existsSync(resolve(electronRoot, "runtime"))} packagedControllerExists=${existsSync(resolve(electronRoot, "runtime", "controller", "dist", "index.js"))} packagedWebExists=${existsSync(resolve(electronRoot, "runtime", "web", "index.js"))} packagedOpenclawRootExists=${existsSync(resolve(electronRoot, "runtime", "openclaw"))}`,
-);
-
 // Set env var BEFORE window creation so the preload can read it for bootstrap data.
 if (needsSetupExtraction) {
   process.env.NEXU_NEEDS_SETUP_ANIMATION = "1";
 }
 
-logStartupCheckpoint("manifest generation begin");
 const runtimeUnitManifests = createRuntimeUnitManifests(
   electronRoot,
   app.getPath("userData"),
   app.isPackaged,
   runtimeConfig,
 );
-logStartupCheckpoint(
-  `manifest generation done count=${runtimeUnitManifests.length} ids=${runtimeUnitManifests
-    .map((manifest) => `${manifest.id}:${manifest.launchStrategy}`)
-    .join(",")}`,
-);
-
-logStartupCheckpoint("runtime assembly begin");
 const orchestrator = new RuntimeOrchestrator(runtimeUnitManifests);
-logStartupCheckpoint(
-  `runtime assembly done registered=${orchestrator
-    .getRuntimeState()
-    .units.map((unit) => `${unit.id}:${unit.launchStrategy}:${unit.phase}`)
-    .join(",")}`,
-);
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
@@ -538,28 +519,6 @@ function logColdStart(message: string): void {
   });
 }
 
-function logStartupCheckpoint(message: string): void {
-  writeDesktopMainLog({
-    source: "startup-checkpoint",
-    stream: "system",
-    kind: "lifecycle",
-    message,
-    logFilePath: getDesktopLogFilePath("desktop-main.log"),
-    windowId: null,
-  });
-}
-
-function logStartupCheckpointError(message: string): void {
-  writeDesktopMainLog({
-    source: "startup-checkpoint",
-    stream: "stderr",
-    kind: "lifecycle",
-    message,
-    logFilePath: getDesktopLogFilePath("desktop-main.log"),
-    windowId: null,
-  });
-}
-
 function logLaunchTimeline(message: string): void {
   const launchId = process.env.NEXU_DESKTOP_LAUNCH_ID ?? "unknown";
   writeDesktopMainLog({
@@ -644,56 +603,15 @@ async function waitForControllerReadiness(): Promise<void> {
 async function runDesktopColdStart(): Promise<void> {
   diagnosticsReporter?.markColdStartRunning("starting controller");
   logColdStart("starting controller");
-  logStartupCheckpoint(
-    `controller start begin registered=${orchestrator
-      .getRuntimeState()
-      .units.map((unit) => unit.id)
-      .join(",")}`,
-  );
-  const controllerStartStartedAt = Date.now();
-  try {
-    await orchestrator.startOne("controller");
-    logStartupCheckpoint(
-      `controller start success durationMs=${Date.now() - controllerStartStartedAt}`,
-    );
-  } catch (error) {
-    logStartupCheckpointError(
-      `controller start fail durationMs=${Date.now() - controllerStartStartedAt} error=${error instanceof Error ? error.message : String(error)}`,
-    );
-    throw error;
-  }
+  await orchestrator.startOne("controller");
 
   diagnosticsReporter?.markColdStartRunning("waiting for controller readiness");
   logColdStart("waiting for controller readiness");
-  logStartupCheckpoint("controller readiness wait begin");
-  const controllerReadyStartedAt = Date.now();
-  try {
-    await waitForControllerReadiness();
-    logStartupCheckpoint(
-      `controller readiness wait success durationMs=${Date.now() - controllerReadyStartedAt}`,
-    );
-  } catch (error) {
-    logStartupCheckpointError(
-      `controller readiness wait fail durationMs=${Date.now() - controllerReadyStartedAt} error=${error instanceof Error ? error.message : String(error)}`,
-    );
-    throw error;
-  }
+  await waitForControllerReadiness();
 
   diagnosticsReporter?.markColdStartRunning("starting web");
   logColdStart("starting web");
-  logStartupCheckpoint("web start begin");
-  const webStartStartedAt = Date.now();
-  try {
-    await orchestrator.startOne("web");
-    logStartupCheckpoint(
-      `web start success durationMs=${Date.now() - webStartStartedAt}`,
-    );
-  } catch (error) {
-    logStartupCheckpointError(
-      `web start fail durationMs=${Date.now() - webStartStartedAt} error=${error instanceof Error ? error.message : String(error)}`,
-    );
-    throw error;
-  }
+  await orchestrator.startOne("web");
 
   const sessionId = rotateDesktopLogSession();
   logColdStart(`cold start session ready sessionId=${sessionId}`);

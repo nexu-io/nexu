@@ -7,7 +7,6 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
-import { resolveOpenClawEntryPath } from "../lib/openclaw-runtime-bridge.js";
 
 const MAX_CONSECUTIVE_RESTARTS = 10;
 const BASE_RESTART_DELAY_MS = 3000;
@@ -36,6 +35,20 @@ function findWorkspaceRoot(startDir: string): string | null {
   }
 
   return null;
+}
+
+function resolveOpenclawEntryFromBin(binPath: string): string | null {
+  const resolvedBinPath = path.resolve(binPath.trim());
+  if (resolvedBinPath.endsWith(".mjs") && existsSync(resolvedBinPath)) {
+    return resolvedBinPath;
+  }
+
+  const entry = path.resolve(
+    path.dirname(resolvedBinPath),
+    "..",
+    "node_modules/openclaw/openclaw.mjs",
+  );
+  return existsSync(entry) ? entry : null;
 }
 
 export interface OpenClawRuntimeEvent {
@@ -123,54 +136,48 @@ export class OpenClawProcessManager {
     let extraEnv: Record<string, string> = {};
 
     if (electronExec) {
-      const entry = resolveOpenClawEntryPath({
-        openclawBin: this.env.openclawBin,
-        workspaceRoot:
+      const openclawEntryFromBin = resolveOpenclawEntryFromBin(
+        this.env.openclawBin,
+      );
+      if (openclawEntryFromBin) {
+        cmd = electronExec;
+        args = [openclawEntryFromBin, "gateway", "run"];
+        extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+      } else {
+        const workspaceRoot =
           process.env.NEXU_WORKSPACE_ROOT?.trim() ||
-          findWorkspaceRoot(process.cwd()),
-      });
-      if (!entry) {
-        throw new Error(
-          "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
-        );
+          findWorkspaceRoot(process.cwd());
+        const runtimeEntryPath = workspaceRoot
+          ? path.join(
+              workspaceRoot,
+              "openclaw-runtime",
+              "node_modules",
+              "openclaw",
+              "openclaw.mjs",
+            )
+          : null;
+
+        if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
+          cmd = electronExec;
+          args = [runtimeEntryPath, "gateway", "run"];
+          extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+        } else {
+          // Resolve the openclaw entry point relative to the bin script
+          const entry = resolveOpenclawEntryFromBin(this.env.openclawBin);
+          if (!entry) {
+            throw new Error(
+              "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
+            );
+          }
+          cmd = electronExec;
+          args = [entry, "gateway", "run"];
+          extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
+        }
       }
-      logger.info(
-        {
-          openclawBin: this.env.openclawBin,
-          entry,
-          electronExec,
-        },
-        "controller resolved openclaw entry via repo-root openclaw runtime bridge",
-      );
-      cmd = electronExec;
-      args = [entry, "gateway", "run"];
-      extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
     } else {
-      logger.info(
-        {
-          openclawBin: this.env.openclawBin,
-          electronExec: null,
-        },
-        "controller using direct openclaw binary path",
-      );
       cmd = this.env.openclawBin;
       args = ["gateway", "run"];
     }
-
-    logger.info(
-      {
-        mode: electronExec ? "electron-entry" : "direct-bin",
-        cmd,
-        args,
-        cwd: path.resolve(this.env.openclawStateDir),
-        openclawBin: this.env.openclawBin,
-        openclawBinExists: existsSync(this.env.openclawBin),
-        electronExec,
-        electronExecExists: electronExec ? existsSync(electronExec) : null,
-        platform: process.platform,
-      },
-      "openclaw spawn contract",
-    );
 
     const child = spawn(cmd, args, {
       cwd: path.resolve(this.env.openclawStateDir),
@@ -232,13 +239,7 @@ export class OpenClawProcessManager {
 
     child.once("error", (error) => {
       logger.error(
-        {
-          error: error.message,
-          code: "code" in error ? error.code : undefined,
-          path: "path" in error ? error.path : undefined,
-          syscall: "syscall" in error ? error.syscall : undefined,
-          spawnargs: "spawnargs" in error ? error.spawnargs : undefined,
-        },
+        { error: error.message },
         "failed to spawn openclaw process",
       );
       this.child = null;

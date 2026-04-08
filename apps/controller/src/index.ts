@@ -9,7 +9,6 @@ async function main(): Promise<void> {
   const container = await createContainer();
   const stopBackgroundLoops = await bootstrapController(container);
   const app = createApp(container);
-
   const server = serve(
     {
       fetch: app.fetch,

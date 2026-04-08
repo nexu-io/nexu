@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
 import type { ControllerEnv } from "../src/app/env.js";
-import { CreditGuardStateWriter } from "../src/runtime/credit-guard-state-writer.js";
 import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
@@ -18,7 +17,6 @@ import { SessionsRuntime } from "../src/runtime/sessions-runtime.js";
 import { createRuntimeState } from "../src/runtime/state.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { AgentService } from "../src/services/agent-service.js";
-import { AnalyticsService } from "../src/services/analytics-service.js";
 import { ArtifactService } from "../src/services/artifact-service.js";
 import { ChannelFallbackService } from "../src/services/channel-fallback-service.js";
 import { ChannelService } from "../src/services/channel-service.js";
@@ -46,6 +44,8 @@ async function createTestContainer(
     port: 3010,
     host: "127.0.0.1",
     webUrl: "http://localhost:5173",
+    nexuCloudUrl: "https://nexu.io",
+    nexuLinkUrl: "https://link.nexu.io",
     nexuHomeDir: path.join(rootDir, ".nexu"),
     nexuConfigPath: path.join(rootDir, ".nexu", "config.json"),
     artifactsIndexPath: path.join(rootDir, ".nexu", "artifacts", "index.json"),
@@ -57,24 +57,16 @@ async function createTestContainer(
     openclawStateDir: path.join(rootDir, ".openclaw"),
     openclawConfigPath: path.join(rootDir, ".openclaw", "openclaw.json"),
     openclawSkillsDir: path.join(rootDir, ".openclaw", "skills"),
-    userSkillsDir: path.join(rootDir, ".agents", "skills"),
-    openclawBuiltinExtensionsDir: null,
     openclawExtensionsDir: path.join(rootDir, ".openclaw", "extensions"),
-    bundledRuntimePluginsDir: path.join(rootDir, ".dist-runtime", "plugins"),
     runtimePluginTemplatesDir: path.join(rootDir, "runtime-plugins"),
+    openclawCuratedSkillsDir: path.join(rootDir, ".openclaw", "bundled-skills"),
     openclawRuntimeModelStatePath: path.join(
       rootDir,
       ".openclaw",
       "nexu-runtime-model.json",
     ),
-    creditGuardStatePath: path.join(
-      rootDir,
-      ".openclaw",
-      "nexu-credit-guard-state.json",
-    ),
     skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
     skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
-    analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
     staticSkillsDir: undefined,
     platformTemplatesDir: undefined,
     openclawWorkspaceTemplatesDir: path.join(
@@ -82,11 +74,7 @@ async function createTestContainer(
       ".openclaw",
       "workspace-templates",
     ),
-    openclawOwnershipMode: "external",
-    openclawBaseUrl: "http://127.0.0.1:18789",
     openclawBin: "openclaw",
-    openclawLogDir: path.join(rootDir, ".nexu", "logs", "openclaw"),
-    openclawLaunchdLabel: null,
     litellmBaseUrl: null,
     litellmApiKey: null,
     openclawGatewayPort: 18789,
@@ -96,9 +84,6 @@ async function createTestContainer(
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
-    posthogApiKey: undefined,
-    posthogHost: undefined,
-    amplitudeApiKey: undefined,
   };
 
   const configStore = new NexuConfigStore(env);
@@ -109,7 +94,6 @@ async function createTestContainer(
   const authProfilesWriter = new OpenClawAuthProfilesWriter(authProfilesStore);
   const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
   const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
-  const creditGuardStateWriter = new CreditGuardStateWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
   const sessionsRuntime = new SessionsRuntime(env);
@@ -118,10 +102,12 @@ async function createTestContainer(
   const runtimeState = createRuntimeState();
   const wsClient = {
     isConnected: () => false,
-    request: vi.fn(async () => ({})),
     stop: vi.fn(),
   } as unknown as ControllerContainer["wsClient"];
-  const gatewayService = new OpenClawGatewayService(wsClient, runtimeState);
+  const gatewayService = new OpenClawGatewayService({
+    isConnected: () => false,
+    request: vi.fn(),
+  } as never);
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -131,16 +117,13 @@ async function createTestContainer(
     authProfilesStore,
     runtimePluginWriter,
     runtimeModelWriter,
-    creditGuardStateWriter,
     templateWriter,
     watchTrigger,
     gatewayService,
   );
   const modelProviderService = new ModelProviderService(
     configStore,
-    env,
-    openclawSyncService,
-    openclawProcess,
+    env.nodeEnv,
   );
   const runtimeModelStateService = new RuntimeModelStateService(env);
   const channelFallbackService = new ChannelFallbackService(
@@ -199,7 +182,6 @@ async function createTestContainer(
       modelProviderService,
       openclawProcess,
     ),
-    analyticsService: new AnalyticsService(env, configStore, sessionsRuntime),
     artifactService: new ArtifactService(artifactsStore),
     templateService: new TemplateService(configStore, openclawSyncService),
     skillhubService,

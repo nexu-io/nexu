@@ -15,11 +15,6 @@ import net, { createConnection } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import {
-  resolvePackagedOpenClawLaunchLayout,
-  resolveRepoLocalOpenClawInstallLayout,
-  resolveRepoLocalOpenClawLaunchLayout,
-} from "../shared/openclaw-runtime-bridge";
 
 const execFileAsync = promisify(execFile);
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
@@ -1319,8 +1314,6 @@ function escapeRegexLiteral(value: string): string {
 function getNexuProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
   const nexuHome = path.join(os.homedir(), ".nexu");
-  const repoLocalOpenClawLaunchLayout =
-    resolveRepoLocalOpenClawLaunchLayout(repoRoot);
   const patterns = new Set<string>([
     escapeRegexLiteral(
       path.join(nexuHome, "runtime", "controller-sidecar", "dist", "index.js"),
@@ -1329,7 +1322,15 @@ function getNexuProcessPatterns(): string[] {
     escapeRegexLiteral(
       path.join(repoRoot, "apps", "controller", "dist", "index.js"),
     ),
-    escapeRegexLiteral(repoLocalOpenClawLaunchLayout.openclawPath),
+    escapeRegexLiteral(
+      path.join(
+        repoRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
+    ),
     ...getNexuOpenclawProcessPatterns(),
   ]);
 
@@ -1352,15 +1353,21 @@ function getNexuProcessPatterns(): string[] {
 
 function getNexuOpenclawProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
-  const repoLocalOpenClawLaunchLayout =
-    resolveRepoLocalOpenClawLaunchLayout(repoRoot);
-  const repoLocalOpenClawInstallLayout =
-    resolveRepoLocalOpenClawInstallLayout(repoRoot);
   const patterns = new Set<string>([
     "\\.nexu/(runtime/)?openclaw-sidecar",
     "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway",
-    escapeRegexLiteral(repoLocalOpenClawLaunchLayout.openclawPath),
-    escapeRegexLiteral(repoLocalOpenClawInstallLayout.runtimeGatewayBinPath),
+    escapeRegexLiteral(
+      path.join(
+        repoRoot,
+        "openclaw-runtime",
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
+    ),
+    escapeRegexLiteral(
+      path.join(repoRoot, "openclaw-runtime", "bin", "openclaw-gateway"),
+    ),
   ]);
 
   if (process.resourcesPath) {
@@ -1779,6 +1786,87 @@ function readBundleExecutableName(appContentsPath: string): string {
   }
 }
 
+function readBundleInfoValue(
+  appContentsPath: string,
+  key: string,
+): string | null {
+  try {
+    const plistPath = path.join(appContentsPath, "Info.plist");
+    const raw = readFileSync(plistPath, "utf8");
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = raw.match(
+      new RegExp(`<key>${escapedKey}</key>\\s*<string>([^<]+)</string>`),
+    );
+    return match?.[1]?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildRuntimeExtractionStamp(
+  appContentsPath: string,
+  appVersion: string,
+): string {
+  const bundleVersion = readBundleInfoValue(appContentsPath, "CFBundleVersion");
+  return JSON.stringify({
+    appVersion,
+    bundleVersion,
+  });
+}
+
+function readRuntimeExtractionStamp(stampPath: string): string | null {
+  try {
+    return readFileSync(stampPath, "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function shouldReplaceExtractedRuntime(opts: {
+  entryPath: string;
+  stampPath: string;
+  expectedStamp: string;
+}): boolean {
+  const { entryPath, stampPath, expectedStamp } = opts;
+  const hasExistingRuntime = existsSync(entryPath) || existsSync(stampPath);
+
+  if (!hasExistingRuntime) {
+    return false;
+  }
+
+  return readRuntimeExtractionStamp(stampPath) !== expectedStamp;
+}
+
+async function cleanupForPackagedRuntimeReplacement(
+  log: (message: string) => void,
+) {
+  const launchd = new LaunchdManager({ log });
+  const labels = {
+    controller: SERVICE_LABELS.controller(false),
+    openclaw: SERVICE_LABELS.openclaw(false),
+  };
+  const plistDir = getDefaultPlistDir(false);
+
+  log(
+    "packaged runtime identity changed; tearing down launchd services before runtime replacement",
+  );
+  await teardownLaunchdServices({
+    launchd,
+    labels,
+    plistDir,
+  });
+
+  const { clean, remainingPids } = await ensureNexuProcessesDead({
+    timeoutMs: 5_000,
+    intervalMs: 200,
+  });
+  if (!clean) {
+    log(
+      `packaged runtime replacement proceeding with surviving pids=${remainingPids.join(",")}`,
+    );
+  }
+}
+
 /**
  * Ensure a standalone Electron-as-Node runner exists outside the .app bundle.
  *
@@ -1803,6 +1891,10 @@ export async function ensureExternalNodeRunner(
   appVersion: string,
 ): Promise<string> {
   const binaryName = readBundleExecutableName(appContentsPath);
+  const extractionStamp = buildRuntimeExtractionStamp(
+    appContentsPath,
+    appVersion,
+  );
   const runnerRoot = path.join(nexuHome, "runtime", "nexu-runner.app");
   const stagingRoot = `${runnerRoot}.staging`;
   const binaryPath = path.join(runnerRoot, "Contents", "MacOS", binaryName);
@@ -1826,7 +1918,7 @@ export async function ensureExternalNodeRunner(
     if (
       existsSync(stampPath) &&
       existsSync(binaryPath) &&
-      readFileSync(stampPath, "utf8").trim() === appVersion
+      readFileSync(stampPath, "utf8").trim() === extractionStamp
     ) {
       return binaryPath;
     }
@@ -1835,7 +1927,7 @@ export async function ensureExternalNodeRunner(
   }
 
   console.log(
-    `Extracting external node runner for v${appVersion} to ${runnerRoot}`,
+    `Extracting external node runner for runtime ${extractionStamp} to ${runnerRoot}`,
   );
 
   // Atomic extraction: build in staging directory, then rename into place.
@@ -1876,7 +1968,7 @@ export async function ensureExternalNodeRunner(
   // Write version stamp AFTER the swap so it is only visible when the
   // runner bundle is fully in place.  The stamp file is a sibling of the
   // .app bundle, not inside it, to preserve the code signature.
-  writeFileSync(stampPath, appVersion, "utf8");
+  writeFileSync(stampPath, extractionStamp, "utf8");
 
   console.log(`External node runner ready at ${binaryPath}`);
   return binaryPath;
@@ -1901,6 +1993,10 @@ async function ensureExternalControllerSidecar(
   nexuHome: string,
   appVersion: string,
 ): Promise<{ controllerRoot: string; entryPath: string }> {
+  const extractionStamp = buildRuntimeExtractionStamp(
+    appContentsPath,
+    appVersion,
+  );
   const controllerRoot = path.join(nexuHome, "runtime", "controller-sidecar");
   const stagingRoot = `${controllerRoot}.staging`;
   const entryPath = path.join(controllerRoot, "dist", "index.js");
@@ -1917,7 +2013,7 @@ async function ensureExternalControllerSidecar(
     if (
       existsSync(stampPath) &&
       existsSync(entryPath) &&
-      readFileSync(stampPath, "utf8").trim() === appVersion
+      readFileSync(stampPath, "utf8").trim() === extractionStamp
     ) {
       return { controllerRoot, entryPath };
     }
@@ -1926,7 +2022,7 @@ async function ensureExternalControllerSidecar(
   }
 
   console.log(
-    `Extracting controller sidecar for v${appVersion} to ${controllerRoot}`,
+    `Extracting controller sidecar for runtime ${extractionStamp} to ${controllerRoot}`,
   );
 
   const srcControllerDir = path.join(
@@ -1958,7 +2054,7 @@ async function ensureExternalControllerSidecar(
 
   // Write version stamp inside staging directory
   const stagingStampPath = path.join(stagingRoot, ".version-stamp");
-  writeFileSync(stagingStampPath, appVersion, "utf8");
+  writeFileSync(stagingStampPath, extractionStamp, "utf8");
 
   // Atomic swap: remove old directory, then rename staging into place.
   // mv (rename) is atomic on the same filesystem (POSIX guarantee).
@@ -1993,12 +2089,67 @@ export async function resolveLaunchdPaths(
     const runtimeDir = path.join(resourcesPath, "runtime");
     const nexuHome = path.join(os.homedir(), ".nexu");
     const version = appVersion ?? "unknown";
+    const log = console.log;
 
     // Extract runner + controller sidecar outside .app so launchd services
     // don't lock the bundle. If extraction fails (disk full, permissions,
     // etc.), fall back to in-bundle paths — the app will work but Finder
     // will report "app is in use" during reinstall.
     const appContentsPath = path.dirname(resourcesPath); // .app/Contents
+    const extractionStamp = buildRuntimeExtractionStamp(
+      appContentsPath,
+      version,
+    );
+    const runnerBinaryName = readBundleExecutableName(appContentsPath);
+    const runnerBinaryPath = path.join(
+      nexuHome,
+      "runtime",
+      "nexu-runner.app",
+      "Contents",
+      "MacOS",
+      runnerBinaryName,
+    );
+    const runnerStampPath = path.join(
+      nexuHome,
+      "runtime",
+      ".nexu-runner-version",
+    );
+    const controllerEntryPathExternal = path.join(
+      nexuHome,
+      "runtime",
+      "controller-sidecar",
+      "dist",
+      "index.js",
+    );
+    const controllerStampPath = path.join(
+      nexuHome,
+      "runtime",
+      "controller-sidecar",
+      ".version-stamp",
+    );
+    const shouldReplaceRuntime =
+      shouldReplaceExtractedRuntime({
+        entryPath: runnerBinaryPath,
+        stampPath: runnerStampPath,
+        expectedStamp: extractionStamp,
+      }) ||
+      shouldReplaceExtractedRuntime({
+        entryPath: controllerEntryPathExternal,
+        stampPath: controllerStampPath,
+        expectedStamp: extractionStamp,
+      });
+
+    if (shouldReplaceRuntime) {
+      try {
+        await cleanupForPackagedRuntimeReplacement(log);
+      } catch (err) {
+        console.warn(
+          "Packaged runtime cleanup before replacement failed, continuing with extraction attempt.",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
     let nodePath = process.execPath;
     let controllerEntryPath = path.join(
       runtimeDir,
@@ -2036,25 +2187,32 @@ export async function resolveLaunchdPaths(
       runtimeDir,
       nexuHome,
     );
-    const openclawLayout =
-      resolvePackagedOpenClawLaunchLayout(openclawSidecarRoot);
 
     return {
       nodePath,
       controllerEntryPath,
-      openclawPath: openclawLayout.openclawPath,
+      openclawPath: path.join(
+        openclawSidecarRoot,
+        "node_modules",
+        "openclaw",
+        "openclaw.mjs",
+      ),
       // Use nexuHome as cwd instead of .app paths so launchd services
       // don't hold directory file-descriptors inside the bundle.
       controllerCwd: controllerRoot,
-      openclawCwd: openclawLayout.openclawCwd,
-      openclawBinPath: openclawLayout.openclawBinPath,
-      openclawExtensionsDir: openclawLayout.openclawExtensionsDir,
+      openclawCwd: openclawSidecarRoot,
+      openclawBinPath: path.join(openclawSidecarRoot, "bin", "openclaw"),
+      openclawExtensionsDir: path.join(
+        openclawSidecarRoot,
+        "node_modules",
+        "openclaw",
+        "extensions",
+      ),
     };
   }
 
   // Development: use local paths
   const repoRoot = getWorkspaceRoot();
-  const openclawLayout = resolveRepoLocalOpenClawLaunchLayout(repoRoot);
   return {
     nodePath: process.execPath,
     controllerEntryPath: path.join(
@@ -2064,10 +2222,31 @@ export async function resolveLaunchdPaths(
       "dist",
       "index.js",
     ),
-    openclawPath: openclawLayout.openclawPath,
+    openclawPath: path.join(
+      repoRoot,
+      "openclaw-runtime",
+      "node_modules",
+      "openclaw",
+      "openclaw.mjs",
+    ),
     controllerCwd: path.join(repoRoot, "apps", "controller"),
-    openclawCwd: openclawLayout.openclawCwd,
-    openclawBinPath: openclawLayout.openclawBinPath,
-    openclawExtensionsDir: openclawLayout.openclawExtensionsDir,
+    openclawCwd: repoRoot,
+    openclawBinPath: path.join(
+      repoRoot,
+      ".tmp",
+      "sidecars",
+      "openclaw",
+      "bin",
+      "openclaw",
+    ),
+    openclawExtensionsDir: path.join(
+      repoRoot,
+      ".tmp",
+      "sidecars",
+      "openclaw",
+      "node_modules",
+      "openclaw",
+      "extensions",
+    ),
   };
 }

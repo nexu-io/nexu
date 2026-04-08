@@ -77,12 +77,10 @@ const NEXU_OFFICIAL_MODEL_REFRESH_INTERVAL_MS = 60 * 1000;
 export async function createContainer(): Promise<ControllerContainer> {
   const configStore = new NexuConfigStore(env);
   await configStore.reconcileConfiguredDesktopCloudState();
-  if (env.manageOpenclawProcess) {
-    await configStore.syncManagedRuntimeGateway({
-      port: env.openclawGatewayPort,
-      authMode: env.openclawGatewayToken ? "token" : "none",
-    });
-  }
+  await configStore.syncManagedRuntimeGateway({
+    port: env.openclawGatewayPort,
+    authMode: env.openclawGatewayToken ? "token" : "none",
+  });
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);

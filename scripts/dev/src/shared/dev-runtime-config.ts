@@ -2,11 +2,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { devTmpPath, repoRootPath } from "@nexu/dev-utils";
-import {
-  getPreparedDevOpenclawManifestPath,
-  resolveOpenClawRepoLocalLayout,
-  resolvePreparedDevOpenclawLayout,
-} from "./openclaw-runtime-bridge.js";
 
 import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
 
@@ -130,22 +125,19 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     mergedEnv.NEXU_DEV_OPENCLAW_LOG_DIR,
     join(devTmpPath, "openclaw", "logs"),
   );
-  const preparedDevRuntimeLayout = existsSync(
-    getPreparedDevOpenclawManifestPath(),
-  )
-    ? resolvePreparedDevOpenclawLayout()
-    : null;
-  const repoLocalLayout = resolveOpenClawRepoLocalLayout();
   const openclawEntryPath = resolvePath(
     mergedEnv.NEXU_DEV_OPENCLAW_ENTRY_PATH,
-    preparedDevRuntimeLayout?.entryPath ?? repoLocalLayout.openclawEntryPath,
+    join(
+      repoRootPath,
+      "openclaw-runtime",
+      "node_modules",
+      "openclaw",
+      "openclaw.mjs",
+    ),
   );
   const openclawBuiltinExtensionsDir = resolvePath(
     mergedEnv.OPENCLAW_EXTENSIONS_DIR,
-    preparedDevRuntimeLayout
-      ? preparedDevRuntimeLayout.builtinExtensionsDir
-      : resolveOpenClawRepoLocalLayout({ openclawEntryPath })
-          .openclawBuiltinExtensionsDir,
+    join(dirname(openclawEntryPath), "extensions"),
   );
 
   cachedConfig = {

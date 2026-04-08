@@ -408,6 +408,8 @@ const en = {
   "rewards.action.open": "Open",
   "reward.daily_checkin.name": "Daily check-in",
   "reward.daily_checkin.desc": "Once per day",
+  "reward.daily_checkin.autoGrantedDesc":
+    "Daily reward is granted automatically. No manual claim needed.",
   "reward.github_star.name": "Star us",
   "reward.github_star.desc": "One-time reward",
   "reward.x_share.name": "Share on X",

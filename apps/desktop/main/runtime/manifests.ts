@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   statSync,
   writeFileSync,
@@ -14,13 +15,6 @@ import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import { resolveRuntimeManifestsRoots } from "../platforms/shared/runtime-roots";
 import { createAsyncArchiveSidecarMaterializer } from "../platforms/shared/sidecar-materializer";
 import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/openclaw-runtime-locator";
-import {
-  isPackagedOpenclawExtractionNeeded,
-  resolvePackagedOpenclawArchivePath,
-  resolvePackagedOpenclawExtractedSidecarRoot,
-  resolvePackagedOpenclawSidecarRoot,
-} from "../shared/openclaw-runtime-bridge";
-import { writeDesktopMainLog } from "./runtime-logger";
 import type { RuntimeUnitManifest } from "./types";
 
 function ensureDir(path: string): string {
@@ -171,26 +165,65 @@ function buildOpenclawNodePath(
   return buildNode22Path();
 }
 
-function getDesktopLogFilePath(userDataPath: string, name: string): string {
-  return path.resolve(userDataPath, "logs", name);
+function resolvePackagedOpenclawArchivePath(
+  packagedSidecarRoot: string,
+): string | undefined {
+  const archiveMetadataPath = path.resolve(packagedSidecarRoot, "archive.json");
+  const archivePath = existsSync(archiveMetadataPath)
+    ? path.resolve(
+        packagedSidecarRoot,
+        JSON.parse(readFileSync(archiveMetadataPath, "utf8")).path,
+      )
+    : path.resolve(packagedSidecarRoot, "payload.tar.gz");
+
+  return existsSync(archivePath) ? archivePath : undefined;
 }
 
-function logManifestLifecycle(
-  userDataPath: string,
-  message: string,
-  stream: "system" | "stderr" = "system",
-): void {
-  writeDesktopMainLog({
-    source: "runtime-manifests",
-    stream,
-    kind: "lifecycle",
-    message,
-    logFilePath: getDesktopLogFilePath(userDataPath, "desktop-main.log"),
-  });
+function resolvePackagedOpenclawExtractedSidecarRoot(
+  runtimeRoot: string,
+): string {
+  const extractedRoot = path.resolve(runtimeRoot, "openclaw-sidecar");
+  mkdirSync(extractedRoot, { recursive: true });
+  return extractedRoot;
 }
 
-function formatPathSnapshotEntry(label: string, targetPath: string): string {
-  return `${label}=${existsSync(targetPath) ? "present" : "missing"}:${targetPath}`;
+function resolvePackagedOpenclawSidecarRoot(
+  runtimeSidecarBaseRoot: string,
+  runtimeRoot: string,
+): string {
+  const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
+  const archivePath = resolvePackagedOpenclawArchivePath(packagedSidecarRoot);
+
+  if (!archivePath) {
+    return packagedSidecarRoot;
+  }
+
+  return resolvePackagedOpenclawExtractedSidecarRoot(runtimeRoot);
+}
+
+function isPackagedOpenclawExtractionNeeded(input: {
+  extractedSidecarRoot: string;
+  archivePath: string;
+  archiveEntryPath: string;
+  stampFileName?: string;
+}): boolean {
+  const stampPath = path.resolve(
+    input.extractedSidecarRoot,
+    input.stampFileName ?? ".archive-stamp",
+  );
+  const extractedOpenclawEntry = path.resolve(
+    input.extractedSidecarRoot,
+    input.archiveEntryPath,
+  );
+
+  if (!existsSync(stampPath) || !existsSync(extractedOpenclawEntry)) {
+    return true;
+  }
+
+  const archiveStat = statSync(input.archivePath);
+  const archiveStamp = `${archiveStat.size}:${archiveStat.mtimeMs}`;
+
+  return readFileSync(stampPath, "utf8") !== archiveStamp;
 }
 
 export function buildSkillNodePath(
@@ -299,11 +332,6 @@ export function createRuntimeUnitManifests(
   isPackaged: boolean,
   runtimeConfig: DesktopRuntimeConfig,
 ): RuntimeUnitManifest[] {
-  const startedAt = Date.now();
-  logManifestLifecycle(
-    userDataPath,
-    `manifest generation start packaged=${isPackaged} electronRoot=${electronRoot} userData=${userDataPath}`,
-  );
   const {
     runtimeSidecarBaseRoot,
     runtimeRoot,
@@ -326,7 +354,6 @@ export function createRuntimeUnitManifests(
     ? path.resolve(runtimeSidecarBaseRoot, "web")
     : path.resolve(repoRoot, "apps", "desktop", "sidecars", "web");
   const webEntryPath = path.resolve(webRoot, "index.js");
-  const webDistRoot = path.resolve(webRoot, "dist");
   const packagedOpenclawRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const packagedOpenclawArchive =
     resolvePackagedOpenclawArchivePath(packagedOpenclawRoot);
@@ -371,25 +398,6 @@ export function createRuntimeUnitManifests(
   ensureDir(openclawConfigDir);
   ensureDir(openclawStateDir);
   ensureDir(openclawTempDir);
-
-  const pathSnapshot = [
-    formatPathSnapshotEntry("runtimeSidecarBaseRoot", runtimeSidecarBaseRoot),
-    formatPathSnapshotEntry("controllerRoot", controllerRoot),
-    formatPathSnapshotEntry("controllerEntry", controllerEntryPath),
-    formatPathSnapshotEntry("webRoot", webRoot),
-    formatPathSnapshotEntry("webEntry", webEntryPath),
-    formatPathSnapshotEntry("webDistRoot", webDistRoot),
-    formatPathSnapshotEntry("packagedOpenclawRoot", packagedOpenclawRoot),
-    packagedOpenclawArchive
-      ? formatPathSnapshotEntry(
-          "packagedOpenclawArchive",
-          packagedOpenclawArchive,
-        )
-      : "packagedOpenclawArchive=missing:<none>",
-    formatPathSnapshotEntry("extractedOpenclawRoot", extractedOpenclawRoot),
-    formatPathSnapshotEntry("effectiveOpenclawBin", effectiveOpenclawBinPath),
-  ].join(" ");
-  logManifestLifecycle(userDataPath, `manifest paths ${pathSnapshot}`);
 
   const controllerManifest: RuntimeUnitManifest = {
     id: "controller",
@@ -486,12 +494,5 @@ export function createRuntimeUnitManifests(
     },
   };
 
-  const manifests = [controllerManifest, webManifest, openclawManifest];
-  logManifestLifecycle(
-    userDataPath,
-    `manifest generation done count=${manifests.length} ids=${manifests
-      .map((manifest) => `${manifest.id}:${manifest.launchStrategy}`)
-      .join(",")} durationMs=${Date.now() - startedAt}`,
-  );
-  return manifests;
+  return [controllerManifest, webManifest, openclawManifest];
 }

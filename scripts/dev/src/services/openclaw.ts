@@ -1,9 +1,12 @@
+import { join } from "node:path";
+
 import {
   createNodeOptions,
   ensureDirectory,
   ensureParentDirectory,
   getListeningPortPid,
   isProcessRunning,
+  prepareOpenclawRuntimeStage,
   readDevLock,
   removeDevLock,
   repoRootPath,
@@ -20,7 +23,6 @@ import {
 } from "../shared/dev-runtime-config.js";
 import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
-import { prepareRepoLocalDevOpenclawRuntime } from "../shared/openclaw-runtime-bridge.js";
 import {
   getOpenclawDevLogPath,
   getOpenclawRuntimeStageRootPath,
@@ -56,15 +58,6 @@ function createOpenclawCommand(sessionId: string): {
   args: string[];
 } {
   const { cliPath } = resolveTsxPaths();
-  const logger = getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
-  });
-
-  logger.info("selected tsx supervisor entrypoint for openclaw dev startup", {
-    command: process.execPath,
-    args: [cliPath, openclawSupervisorPath],
-  });
 
   return {
     command: process.execPath,
@@ -125,49 +118,6 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
   }
 
   throw new Error(`openclaw gateway did not open port ${port}`);
-}
-
-async function waitForOpenclawPortProcessLaunch(
-  supervisorPid: number,
-): Promise<void> {
-  const logger = getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
-  });
-  const port = getScriptsDevRuntimeConfig().openclawPort;
-  const attempts = 30;
-  const delayMs = 250;
-  const waitStartedAt = Date.now();
-
-  for (let index = 0; index < attempts; index += 1) {
-    if (await getOpenclawHealthStatus()) {
-      return;
-    }
-
-    if (!isProcessRunning(supervisorPid)) {
-      throw new Error("openclaw supervisor exited before health check passed");
-    }
-
-    if ((index + 1) % 4 === 0) {
-      logger.info("waiting for openclaw health endpoint", {
-        supervisorPid,
-        port,
-        elapsedMs: Date.now() - waitStartedAt,
-      });
-    }
-
-    if (index < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-
-  if (!isProcessRunning(supervisorPid)) {
-    throw new Error("openclaw supervisor exited before health check passed");
-  }
-
-  throw new Error(
-    `openclaw health endpoint did not become ready at ${getScriptsDevRuntimeConfig().openclawBaseUrl}/health`,
-  );
 }
 
 async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
@@ -258,19 +208,26 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     component: "openclaw-service",
     service: "openclaw",
   });
-  const preparedRuntime = await prepareRepoLocalDevOpenclawRuntime({
+  const stage = await prepareOpenclawRuntimeStage({
+    sourceOpenclawRoot: join(
+      repoRootPath,
+      "openclaw-runtime",
+      "node_modules",
+      "openclaw",
+    ),
+    patchRoot: join(repoRootPath, "openclaw-runtime-patches"),
+    targetStageRoot: getOpenclawRuntimeStageRootPath(),
     log: (message) => logger.info(message),
   });
 
   logger.info("using patched staged openclaw runtime", {
-    stagedOpenclawRoot: preparedRuntime.stagedOpenclawRoot,
-    fingerprint: preparedRuntime.fingerprint,
-    reused: preparedRuntime.reused,
-    patchedFileCount: preparedRuntime.patchedFileCount,
-    manifestPath: preparedRuntime.manifestPath,
+    stagedOpenclawRoot: stage.stagedOpenclawRoot,
+    fingerprint: stage.fingerprint,
+    reused: stage.reused,
+    patchedFileCount: stage.patchedFileCount,
   });
 
-  return preparedRuntime.entryPath;
+  return join(stage.stagedOpenclawRoot, "openclaw.mjs");
 }
 
 export async function startOpenclawDevProcess(options: {
@@ -311,13 +268,6 @@ export async function startOpenclawDevProcess(options: {
   const openclawEntryPath = await prepareOpenclawEntryPath();
 
   logOpenclawTiming("filesystem-ready", startedAt);
-  logger.info(
-    "prepared openclaw runtime entry path from repo-root openclaw runtime bridge",
-    {
-      openclawEntryPath,
-      runtimeStageRoot: getOpenclawRuntimeStageRootPath(),
-    },
-  );
 
   const processHandle = await spawnHiddenProcess({
     command: commandSpec.command,
@@ -358,9 +308,11 @@ export async function startOpenclawDevProcess(options: {
 
   try {
     listenerPid = await waitForOpenclawPortPid(supervisorPid);
-  } catch {
-    await waitForOpenclawPortProcessLaunch(supervisorPid);
-    listenerPid = await waitForOpenclawPortPid(supervisorPid);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `${message}. Inspect ${logFilePath} for OpenClaw startup details.`,
+    );
   }
 
   logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);

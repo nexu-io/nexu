@@ -4,6 +4,4 @@ set -euo pipefail
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-openclaw_path="$(node -e 'const path = require("node:path"); const { resolveRepoLocalOpenClawLaunchLayout } = require(path.resolve(process.argv[1], "openclaw-runtime", "api", "launch-layout.cjs")); process.stdout.write(resolveRepoLocalOpenClawLaunchLayout(process.argv[1]).openclawPath);' "$script_dir")"
-
-exec node "$openclaw_path" "$@"
+exec node "$script_dir/openclaw-runtime/node_modules/openclaw/openclaw.mjs" "$@"

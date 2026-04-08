@@ -613,10 +613,7 @@ export class RuntimeOrchestrator {
     const record = this.units.get(id);
 
     if (!record) {
-      const availableIds = Array.from(this.units.keys()).sort();
-      throw new Error(
-        `Unknown daemon: ${id}; available=${availableIds.join(",") || "<none>"}; manifestCount=${availableIds.length}`,
-      );
+      throw new Error(`Unknown daemon: ${id}`);
     }
 
     return record;
