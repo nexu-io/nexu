@@ -1,4 +1,7 @@
-import { isSupportedByokProviderId } from "@nexu/shared";
+import {
+  isSupportedByokProviderId,
+  parseCustomProviderKey,
+} from "@nexu/shared";
 import { logger } from "../lib/logger.js";
 import { isManagedCloudModelId } from "../lib/managed-models.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
@@ -10,6 +13,7 @@ export interface QuotaFallbackResult {
 }
 
 export interface ByokProviderInfo {
+  providerKey: string;
   providerId: string;
   modelId: string;
 }
@@ -39,11 +43,16 @@ export class QuotaFallbackService {
   // Returns the first enabled BYOK provider that has an API key and at least one model.
   async getAvailableByokProvider(): Promise<ByokProviderInfo | null> {
     const config = await this.configStore.getConfig();
-    for (const provider of config.providers ?? []) {
+    for (const [providerKey, provider] of Object.entries(
+      config.models.providers ?? {},
+    )) {
+      const customProvider = parseCustomProviderKey(providerKey);
+      const providerId = customProvider?.templateId ?? providerKey;
+
       if (!provider.enabled) {
         continue;
       }
-      if (!isSupportedByokProviderId(provider.providerId)) {
+      if (!isSupportedByokProviderId(providerId)) {
         continue;
       }
       // OAuth providers (no apiKey) are excluded from auto-fallback.
@@ -55,8 +64,9 @@ export class QuotaFallbackService {
         continue;
       }
       return {
-        providerId: provider.providerId,
-        modelId: `${provider.providerId}/${firstModel}`,
+        providerKey,
+        providerId,
+        modelId: `${providerKey}/${firstModel.id}`,
       };
     }
     return null;

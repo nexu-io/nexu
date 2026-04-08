@@ -71,4 +71,41 @@ describe("QuotaFallbackService", () => {
     expect(setDefaultModel).toHaveBeenCalledWith("gemini-3.1-pro-preview");
     expect(syncAll).toHaveBeenCalledTimes(1);
   });
+
+  it("reads fallback providers from canonical models config", async () => {
+    const service = new QuotaFallbackService(
+      {
+        getConfig: vi.fn().mockResolvedValue({
+          runtime: {
+            defaultModelId: "nexu-managed/model",
+          },
+          desktop: {
+            cloud: {
+              models: [],
+            },
+          },
+          models: {
+            providers: {
+              openai: {
+                enabled: true,
+                apiKey: "sk-test",
+                baseUrl: "https://api.openai.com/v1",
+                models: [{ id: "gpt-4.1" }],
+              },
+            },
+          },
+          providers: [],
+        }),
+      } as never,
+      {
+        syncAll: vi.fn(),
+      } as never,
+    );
+
+    await expect(service.getAvailableByokProvider()).resolves.toEqual({
+      providerKey: "openai",
+      providerId: "openai",
+      modelId: "openai/gpt-4.1",
+    });
+  });
 });
