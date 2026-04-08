@@ -4,7 +4,10 @@ import { PlatformIcon } from "@/components/platform-icons";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
-import { useDesktopBudgetGuard } from "@/hooks/use-desktop-budget-guard";
+import {
+  getBudgetBannerRouteVariant,
+  useDesktopBudgetGuard,
+} from "@/hooks/use-desktop-budget-guard";
 import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
@@ -603,6 +606,9 @@ function WorkspaceLayoutInner() {
       pathname: location.pathname,
       cloudConnected,
     });
+  const budgetBannerRouteVariant = getBudgetBannerRouteVariant(
+    location.pathname,
+  );
 
   const showEmptyState =
     sessions.length === 0 &&
@@ -1546,10 +1552,9 @@ function WorkspaceLayoutInner() {
           </div>
 
           <main className="flex-1 overflow-y-auto min-h-0">
-            {shouldShowPrompt &&
-            budgetStatus !== "healthy" &&
-            location.pathname !== "/workspace" &&
-            location.pathname !== "/workspace/home" ? (
+            {budgetBannerRouteVariant === "global" &&
+            shouldShowPrompt &&
+            budgetStatus !== "healthy" ? (
               <div className="mx-auto max-w-4xl px-4 pb-0 pt-4 sm:px-6 md:px-8">
                 <BudgetWarningBanner
                   status={budgetStatus}

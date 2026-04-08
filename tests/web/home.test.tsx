@@ -94,7 +94,26 @@ function renderHomePage({
   );
 }
 
-function renderRewardsPage(): string {
+function renderRewardsPage(rewardsStatus?: {
+  viewer: {
+    cloudConnected: boolean;
+    activeModelId: string | null;
+    activeModelProviderId: string | null;
+    usingManagedModel: boolean;
+  };
+  progress: {
+    claimedCount: number;
+    totalCount: number;
+    earnedCredits: number;
+    availableCredits?: number;
+  };
+  tasks?: Array<Record<string, unknown>>;
+  cloudBalance?: {
+    totalBalance: number;
+    totalRecharged: number;
+    totalConsumed: number;
+  } | null;
+}): string {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -104,25 +123,28 @@ function renderRewardsPage(): string {
   });
 
   queryClient.setQueryData(["desktop-rewards"], {
-    viewer: {
+    viewer: rewardsStatus?.viewer ?? {
       cloudConnected: false,
       activeModelId: null,
       activeModelProviderId: null,
       usingManagedModel: false,
     },
-    progress: {
+    progress: rewardsStatus?.progress ?? {
       claimedCount: 2,
       totalCount: rewardTasks.length,
       earnedCredits: 5,
       availableCredits: rewardTasks.reduce((sum, task) => sum + task.reward, 0),
     },
-    tasks: rewardTasks.map((task) => ({
-      ...task,
-      isClaimed: task.id === "daily_checkin" || task.id === "github_star",
-      lastClaimedAt: null,
-      claimCount:
-        task.id === "daily_checkin" || task.id === "github_star" ? 1 : 0,
-    })),
+    tasks:
+      rewardsStatus?.tasks ??
+      rewardTasks.map((task) => ({
+        ...task,
+        isClaimed: task.id === "daily_checkin" || task.id === "github_star",
+        lastClaimedAt: null,
+        claimCount:
+          task.id === "daily_checkin" || task.id === "github_star" ? 1 : 0,
+      })),
+    cloudBalance: rewardsStatus?.cloudBalance ?? null,
   });
 
   return renderToStaticMarkup(
@@ -355,9 +377,76 @@ describe("RewardsPage", () => {
     expect(markup).not.toContain("rewards.badge");
     expect(markup).not.toContain("rewards.refresh");
   });
+
+  it("keeps the switch-back hint when using BYOK with a positive balance", () => {
+    const markup = renderRewardsPage({
+      viewer: {
+        cloudConnected: true,
+        activeModelId: "openai/gpt-4.1",
+        activeModelProviderId: "openai",
+        usingManagedModel: false,
+      },
+      progress: {
+        claimedCount: 2,
+        totalCount: rewardTasks.length,
+        earnedCredits: 5,
+        availableCredits: rewardTasks.reduce(
+          (sum, task) => sum + task.reward,
+          0,
+        ),
+      },
+      cloudBalance: {
+        totalBalance: 120,
+        totalRecharged: 500,
+        totalConsumed: 380,
+      },
+    });
+
+    expect(markup).toContain("rewards.modelHintTitle");
+    expect(markup).toContain("rewards.modelHintBody");
+    expect(markup).toContain("rewards.modelHintCta");
+  });
+
+  it("does not show the switch-back hint when using BYOK with zero balance", () => {
+    const markup = renderRewardsPage({
+      viewer: {
+        cloudConnected: true,
+        activeModelId: "openai/gpt-4.1",
+        activeModelProviderId: "openai",
+        usingManagedModel: false,
+      },
+      progress: {
+        claimedCount: 2,
+        totalCount: rewardTasks.length,
+        earnedCredits: 5,
+        availableCredits: rewardTasks.reduce(
+          (sum, task) => sum + task.reward,
+          0,
+        ),
+      },
+      cloudBalance: {
+        totalBalance: 0,
+        totalRecharged: 500,
+        totalConsumed: 500,
+      },
+    });
+
+    expect(markup).not.toContain("rewards.modelHintTitle");
+    expect(markup).not.toContain("rewards.modelHintBody");
+    expect(markup).not.toContain("rewards.modelHintCta");
+  });
 });
 
 describe("Rewards locale parity", () => {
+  it("uses 可用积分 instead of 套餐额度 in budget banner headlines", () => {
+    expect(zhCN["budget.banner.warningHeadline"]).toBe(
+      "可用积分即将耗尽，可采取以下方式避免任务中断",
+    );
+    expect(zhCN["budget.banner.depletedHeadline"]).toBe(
+      "可用积分已用尽（明天重置），可采取以下方式继续使用",
+    );
+  });
+
   it("keeps the source Chinese rewards copy for the header and task labels", () => {
     expect(zhCN["rewards.title"]).toBe("分享 nexu，获取额外积分");
     expect(zhCN["rewards.desc"]).toBe(

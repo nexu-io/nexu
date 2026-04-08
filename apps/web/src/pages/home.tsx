@@ -22,7 +22,10 @@ import {
   SeedancePromoBanner,
   SeedancePromoModal,
 } from "@/components/seedance-promo";
-import { useDesktopBudgetGuard } from "@/hooks/use-desktop-budget-guard";
+import {
+  getBudgetBannerRouteVariant,
+  useDesktopBudgetGuard,
+} from "@/hooks/use-desktop-budget-guard";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
@@ -625,6 +628,8 @@ export function HomePage() {
       pathname: "/workspace/home",
       cloudConnected: rewardsStatus.viewer.cloudConnected,
     });
+  const budgetBannerRouteVariant =
+    getBudgetBannerRouteVariant("/workspace/home");
 
   const dismissSeedancePromo = useCallback(() => {
     setShowSeedancePromo(false);
@@ -779,7 +784,9 @@ export function HomePage() {
             </div>
           </div>
 
-          {shouldShowPrompt && budgetStatus !== "healthy" ? (
+          {budgetBannerRouteVariant === "inline" &&
+          shouldShowPrompt &&
+          budgetStatus !== "healthy" ? (
             <BudgetWarningBanner
               status={budgetStatus}
               dismissible={bannerDismissible}
@@ -1021,7 +1028,9 @@ export function HomePage() {
           </div>
         </div>
 
-        {shouldShowPrompt && budgetStatus !== "healthy" ? (
+        {budgetBannerRouteVariant === "inline" &&
+        shouldShowPrompt &&
+        budgetStatus !== "healthy" ? (
           <BudgetWarningBanner
             status={budgetStatus}
             dismissible={bannerDismissible}
