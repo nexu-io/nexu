@@ -330,7 +330,7 @@ export function RewardsPage() {
     }
 
     if (rewardTaskRequiresGithubStarSession(task.id)) {
-      // Trust-based GitHub star reward: open the browser, wait 5 seconds for
+      // Trust-based GitHub star reward: open the browser, wait 10 seconds for
       // the user to click star, then auto-grant. The cloud `/rewards/claim`
       // endpoint enforces per-account de-dup via `alreadyClaimed`, so users
       // can't double-claim by clicking repeatedly.
@@ -346,7 +346,7 @@ export function RewardsPage() {
         await openExternalUrl(task.actionUrl);
       }
       const toastId = toast.loading(t("rewards.githubVerifying"));
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
       try {
         const result = await claimTask({
           taskId: task.id,
