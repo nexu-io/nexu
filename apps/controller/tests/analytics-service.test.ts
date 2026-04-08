@@ -17,7 +17,11 @@ type AnalyticsServiceInternals = {
     eventProperties: Record<string, unknown>,
     timestampMs: number,
   ) => Promise<void>;
-  resolveAnalyticsDistinctId: () => Promise<string | null>;
+  resolveAnalyticsDistinctId: () => Promise<
+    | { status: "ready"; distinctId: string }
+    | { status: "missing" }
+    | { status: "error" }
+  >;
 };
 
 function createEnv(overrides: Partial<ControllerEnv> = {}): ControllerEnv {
@@ -171,9 +175,10 @@ describe("AnalyticsService transport", () => {
     );
 
     const internals = service as unknown as AnalyticsServiceInternals;
-    await expect(internals.resolveAnalyticsDistinctId()).resolves.toBe(
-      "cloud-user-123",
-    );
+    await expect(internals.resolveAnalyticsDistinctId()).resolves.toEqual({
+      status: "ready",
+      distinctId: "cloud-user-123",
+    });
   });
 
   it("skips analytics distinct id for desktop-local-user", async () => {
@@ -188,7 +193,28 @@ describe("AnalyticsService transport", () => {
     );
 
     const internals = service as unknown as AnalyticsServiceInternals;
-    await expect(internals.resolveAnalyticsDistinctId()).resolves.toBeNull();
+    await expect(internals.resolveAnalyticsDistinctId()).resolves.toEqual({
+      status: "missing",
+    });
+  });
+
+  it("returns an error state when cloud identity lookup throws", async () => {
+    const service = new AnalyticsService(
+      createEnv(),
+      {
+        getDesktopCloudStatus: async () => {
+          throw new Error("temporary read failure");
+        },
+      } as never,
+      {
+        listSessions: async () => [],
+      } as never,
+    );
+
+    const internals = service as unknown as AnalyticsServiceInternals;
+    await expect(internals.resolveAnalyticsDistinctId()).resolves.toEqual({
+      status: "error",
+    });
   });
 
   it("does not poll sessions when no real cloud user id is available", async () => {
@@ -274,5 +300,76 @@ describe("AnalyticsService transport", () => {
 
     expect(listSessions).toHaveBeenCalledTimes(2);
     expect(sendAnalyticsEvent).not.toHaveBeenCalled();
+  });
+
+  it("preserves unsent analytics when cloud identity lookup throws", async () => {
+    const tempDir = mkdtempSync(
+      path.join(tmpdir(), "analytics-service-error-"),
+    );
+    const transcriptPath = path.join(tempDir, "session.jsonl");
+    writeFileSync(
+      transcriptPath,
+      `${[
+        JSON.stringify({
+          type: "model_change",
+          provider: "openai",
+        }),
+        JSON.stringify({
+          id: "message-1",
+          type: "message",
+          timestamp: "2026-04-08T00:00:00.000Z",
+          message: {
+            role: "user",
+          },
+        }),
+        JSON.stringify({
+          id: "assistant-1",
+          type: "message",
+          timestamp: "2026-04-08T00:00:01.000Z",
+          message: {
+            role: "assistant",
+            provider: "openai",
+            content: [],
+          },
+        }),
+      ].join("\n")}
+`,
+      "utf8",
+    );
+
+    const listSessions = vi.fn().mockResolvedValue([
+      {
+        id: "session-1",
+        channelType: "slack",
+        metadata: {
+          path: transcriptPath,
+        },
+      },
+    ]);
+    const getDesktopCloudStatus = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("temporary read failure"))
+      .mockResolvedValueOnce({ userId: "cloud-user-123" });
+    vi.mocked(proxyFetch).mockResolvedValue(
+      new Response(null, { status: 200 }),
+    );
+
+    const service = new AnalyticsService(
+      createEnv({
+        analyticsStatePath: path.join(tempDir, "analytics-state.json"),
+      }),
+      {
+        getDesktopCloudStatus,
+      } as never,
+      {
+        listSessions,
+      } as never,
+    );
+
+    await service.poll();
+    await service.poll();
+
+    expect(listSessions).toHaveBeenCalledTimes(1);
+    expect(proxyFetch).toHaveBeenCalledTimes(2);
   });
 });

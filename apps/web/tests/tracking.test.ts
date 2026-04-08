@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { identifyMock, resetMock, registerMock, initMock } = vi.hoisted(() => ({
+const {
+  captureMock,
+  identifyMock,
+  initMock,
+  registerMock,
+  resetMock,
+  setPersonPropertiesMock,
+} = vi.hoisted(() => ({
+  captureMock: vi.fn(),
   identifyMock: vi.fn(),
-  resetMock: vi.fn(),
-  registerMock: vi.fn(),
   initMock: vi.fn(),
+  registerMock: vi.fn(),
+  resetMock: vi.fn(),
+  setPersonPropertiesMock: vi.fn(),
 }));
 
 vi.mock("posthog-js", () => ({
@@ -13,15 +22,17 @@ vi.mock("posthog-js", () => ({
     identify: identifyMock,
     reset: resetMock,
     register: registerMock,
-    capture: vi.fn(),
-    setPersonProperties: vi.fn(),
+    capture: captureMock,
+    setPersonProperties: setPersonPropertiesMock,
   },
 }));
 
 import {
+  identify,
   identifyAuthenticatedUser,
   initializeAnalytics,
   resetAnalytics,
+  track,
 } from "../src/lib/tracking";
 
 describe("tracking identity", () => {
@@ -82,5 +93,42 @@ describe("tracking identity", () => {
     resetAnalytics();
 
     expect(resetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sets person properties for non-identity profile updates", () => {
+    initializeAnalytics({
+      apiKey: "phc_test",
+      environment: "test",
+    });
+
+    identify({
+      channels_connected: 1,
+      slack_connected: true,
+    });
+
+    expect(setPersonPropertiesMock).toHaveBeenCalledWith({
+      channels_connected: 1,
+      slack_connected: true,
+    });
+  });
+
+  it("captures normalized analytics event properties", () => {
+    initializeAnalytics({
+      apiKey: "phc_test",
+      environment: "test",
+    });
+
+    track("workspace_view", {
+      nested: {
+        ok: true,
+      },
+      unsupported: () => "skip-me",
+    });
+
+    expect(captureMock).toHaveBeenCalledWith("workspace_view", {
+      nested: {
+        ok: true,
+      },
+    });
   });
 });

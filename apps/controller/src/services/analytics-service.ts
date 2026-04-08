@@ -65,6 +65,11 @@ type ResolvedSkillInfo = {
   source: string | null;
 };
 
+type AnalyticsDistinctIdResolution =
+  | { status: "ready"; distinctId: string }
+  | { status: "missing" }
+  | { status: "error" };
+
 const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
 const EMPTY_ANALYTICS_STATE: AnalyticsState = {
@@ -170,7 +175,11 @@ export class AnalyticsService {
     }
 
     const analyticsDistinctId = await this.resolveAnalyticsDistinctId();
-    const shouldSendAnalytics = analyticsDistinctId !== null;
+    if (analyticsDistinctId.status === "error") {
+      return;
+    }
+
+    const shouldSendAnalytics = analyticsDistinctId.status === "ready";
 
     await this.ensureStateLoaded();
     const sessions = await this.sessionsRuntime.listSessions();
@@ -218,7 +227,7 @@ export class AnalyticsService {
 
         if (shouldSendAnalytics) {
           await this.sendAnalyticsEvent(
-            analyticsDistinctId,
+            analyticsDistinctId.distinctId,
             "user_message_sent",
             {
               channel: userMessage.channel,
@@ -242,7 +251,7 @@ export class AnalyticsService {
 
         if (shouldSendAnalytics) {
           await this.sendAnalyticsEvent(
-            analyticsDistinctId,
+            analyticsDistinctId.distinctId,
             "skill_use",
             {
               skill_name: skillUse.skillName,
@@ -261,7 +270,7 @@ export class AnalyticsService {
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
       if (shouldSendAnalytics) {
         await this.sendAnalyticsEvent(
-          analyticsDistinctId,
+          analyticsDistinctId.distinctId,
           "nexu_first_conversation_start",
           {
             channel: firstSessionCandidate.channel,
@@ -608,7 +617,7 @@ export class AnalyticsService {
     return `${host.replace(/\/+$/, "")}/i/v0/e/`;
   }
 
-  private async resolveAnalyticsDistinctId(): Promise<string | null> {
+  private async resolveAnalyticsDistinctId(): Promise<AnalyticsDistinctIdResolution> {
     try {
       const cloudStatus = await this.configStore.getDesktopCloudStatus();
       const userId =
@@ -616,12 +625,12 @@ export class AnalyticsService {
           ? cloudStatus.userId.trim()
           : "";
       if (!userId || userId === "desktop-local-user") {
-        return null;
+        return { status: "missing" };
       }
 
-      return userId;
+      return { status: "ready", distinctId: userId };
     } catch {
-      return null;
+      return { status: "error" };
     }
   }
 

@@ -46,4 +46,24 @@ describe("getAnalyticsAppMetadata", () => {
       appVersion: "0.0.1",
     });
   });
+
+  it("falls back to web package metadata during SSR", () => {
+    vi.unstubAllGlobals();
+
+    expect(getAnalyticsAppMetadata()).toEqual({
+      appName: "nexu-web",
+      appVersion: "0.0.1",
+    });
+  });
+
+  it("falls back when nexuHost is not an object", () => {
+    vi.stubGlobal("window", {
+      nexuHost: "invalid-host-shape",
+    });
+
+    expect(getAnalyticsAppMetadata()).toEqual({
+      appName: "nexu-web",
+      appVersion: "0.0.1",
+    });
+  });
 });

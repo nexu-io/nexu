@@ -51,6 +51,7 @@ import {
   triggerRendererProcessCrash,
 } from "./lib/host-api";
 import { getDesktopOpenClawUrl } from "./lib/openclaw-surface";
+import { syncDesktopPostHogIdentity } from "./lib/posthog-identity";
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
@@ -82,16 +83,6 @@ let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
 let currentPosthogUserId: string | null = null;
 let currentPosthogIdentifyKey: string | null = null;
-
-function buildPostHogPersonPropertiesKey(input: {
-  email?: string | null;
-  name?: string | null;
-}): string {
-  return JSON.stringify([
-    ["email", input.email ?? null],
-    ["name", input.name ?? null],
-  ]);
-}
 
 function sendRendererStartupProbe(
   stage: string,
@@ -178,47 +169,18 @@ function syncPostHogIdentity(input: {
     return;
   }
 
-  const userId =
-    typeof input.userId === "string" && input.userId.trim().length > 0
-      ? input.userId
-      : null;
+  const nextState = syncDesktopPostHogIdentity(
+    posthog,
+    posthogSuperProperties,
+    {
+      currentUserId: currentPosthogUserId,
+      currentIdentifyKey: currentPosthogIdentifyKey,
+    },
+    input,
+  );
 
-  if (!userId) {
-    if (currentPosthogUserId === null) {
-      return;
-    }
-
-    posthog.reset();
-    posthog.register(posthogSuperProperties);
-    currentPosthogUserId = null;
-    currentPosthogIdentifyKey = null;
-    return;
-  }
-
-  const nextIdentifyKey = JSON.stringify([
-    userId,
-    buildPostHogPersonPropertiesKey({
-      email: input.userEmail ?? null,
-      name: input.userName ?? null,
-    }),
-  ]);
-
-  if (currentPosthogIdentifyKey === nextIdentifyKey) {
-    return;
-  }
-
-  if (currentPosthogUserId && currentPosthogUserId !== userId) {
-    posthog.reset();
-    posthog.register(posthogSuperProperties);
-    currentPosthogIdentifyKey = null;
-  }
-
-  posthog.identify(userId, {
-    email: input.userEmail ?? null,
-    name: input.userName ?? null,
-  });
-  currentPosthogUserId = userId;
-  currentPosthogIdentifyKey = nextIdentifyKey;
+  currentPosthogUserId = nextState.currentUserId;
+  currentPosthogIdentifyKey = nextState.currentIdentifyKey;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
