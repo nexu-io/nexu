@@ -57,6 +57,14 @@ function buildRuntimeExtractionStamp(
   return JSON.stringify({
     appVersion,
     bundleVersion,
+    // Including process.arch forces a re-clone when the user reinstalls a
+    // different architecture (e.g. x64 → arm64) of the same Nexu version.
+    // Without this, the cached nexu-runner.app and controller-sidecar from
+    // the old install are reused even though their native binaries no longer
+    // match the running Electron, leading to silent native-binding load
+    // failures and a fully broken openclaw startup. Reproduced manually on
+    // 2026-04-08 when reinstalling x64 → arm64 of the same nightly version.
+    arch: process.arch,
   });
 }
 

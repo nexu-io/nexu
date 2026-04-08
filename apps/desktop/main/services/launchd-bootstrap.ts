@@ -1811,6 +1811,10 @@ function buildRuntimeExtractionStamp(
   return JSON.stringify({
     appVersion,
     bundleVersion,
+    // Including process.arch forces a re-clone when the user reinstalls a
+    // different architecture (e.g. x64 → arm64) of the same Nexu version.
+    // Mirrored in platforms/mac/launchd-paths.ts; both copies must agree.
+    arch: process.arch,
   });
 }
 
