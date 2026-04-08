@@ -799,19 +799,19 @@ describe("NexuConfigStore", () => {
 
     try {
       const status = await store.setDesktopRewardBalance(4200);
-      expect(fetchCalls).toBe(3);
+      expect(fetchCalls).toBe(2);
       expect(JSON.parse(capturedBody ?? "{}")).toEqual({
         targetBalance: 4200,
         idempotencyKey: expect.stringContaining("desktop-set-balance-"),
       });
       expect(status.cloudBalance?.totalBalance).toBe(4200);
-      expect(status.cloudBalance?.giftBalance).toBe(84);
+      expect(status.cloudBalance?.giftBalance).toBe(0);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it("getDesktopRewardsStatus preserves cloud balance when cloud returns unknown task ids", async () => {
+  it("getDesktopRewardsStatus returns rewards status without waiting on credits summary", async () => {
     await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
     await writeFile(
       path.join(rootDir, ".nexu", "config.json"),
@@ -879,71 +879,47 @@ describe("NexuConfigStore", () => {
       "fetch",
       vi.fn(async () => {
         fetchCalls += 1;
-        if (fetchCalls === 1) {
-          return new Response(
-            JSON.stringify({
-              tasks: [
-                {
-                  id: "daily_checkin",
-                  displayName: "Daily Check-in",
-                  groupId: "daily",
-                  rewardPoints: 100,
-                  repeatMode: "daily",
-                  shareMode: "link",
-                  icon: "calendar",
-                  url: null,
-                  isClaimed: true,
-                  claimCount: 1,
-                  lastClaimedAt: "2026-04-08T00:00:00.000Z",
-                },
-                {
-                  id: "xiaohongshu",
-                  displayName: "Share on Xiaohongshu",
-                  groupId: "social",
-                  rewardPoints: 200,
-                  repeatMode: "weekly",
-                  shareMode: "image",
-                  icon: "xiaohongshu",
-                  url: null,
-                  isClaimed: false,
-                  claimCount: 0,
-                  lastClaimedAt: null,
-                },
-              ],
-              progress: {
-                claimedCount: 1,
-                totalCount: 2,
-                earnedCredits: 0,
-              },
-              cloudBalance: {
-                totalBalance: 1,
-                giftBalance: 99,
-                totalRecharged: 1210,
-                totalConsumed: 1209,
-                syncedAt: "2026-04-07T09:36:51.342Z",
-                updatedAt: "2026-04-07T09:36:51.342Z",
-              },
-            }),
-            { status: 200 },
-          );
-        }
-
         return new Response(
           JSON.stringify({
-            appUserId: "user-1",
-            balance: {
+            tasks: [
+              {
+                id: "daily_checkin",
+                displayName: "Daily Check-in",
+                groupId: "daily",
+                rewardPoints: 100,
+                repeatMode: "daily",
+                shareMode: "link",
+                icon: "calendar",
+                url: null,
+                isClaimed: true,
+                claimCount: 1,
+                lastClaimedAt: "2026-04-08T00:00:00.000Z",
+              },
+              {
+                id: "xiaohongshu",
+                displayName: "Share on Xiaohongshu",
+                groupId: "social",
+                rewardPoints: 200,
+                repeatMode: "weekly",
+                shareMode: "image",
+                icon: "xiaohongshu",
+                url: null,
+                isClaimed: false,
+                claimCount: 0,
+                lastClaimedAt: null,
+              },
+            ],
+            progress: {
+              claimedCount: 1,
+              totalCount: 2,
+              earnedCredits: 0,
+            },
+            cloudBalance: {
               totalBalance: 1,
-              giftBalance: 9,
               totalRecharged: 1210,
               totalConsumed: 1209,
               syncedAt: "2026-04-07T09:36:51.342Z",
               updatedAt: "2026-04-07T09:36:51.342Z",
-            },
-            usageSummary: {
-              totalEntries: 0,
-              totalDueCredits: 0,
-              totalChargedCredits: 0,
-              totalCostUsd: "0.00",
             },
           }),
           { status: 200 },
@@ -953,9 +929,9 @@ describe("NexuConfigStore", () => {
 
     try {
       const status = await store.getDesktopRewardsStatus();
-      expect(fetchCalls).toBe(2);
+      expect(fetchCalls).toBe(1);
       expect(status.cloudBalance?.totalBalance).toBe(1);
-      expect(status.cloudBalance?.giftBalance).toBe(9);
+      expect(status.cloudBalance?.giftBalance).toBe(0);
       expect(status.tasks).toHaveLength(1);
       expect(status.tasks[0]?.id).toBe("daily_checkin");
       expect(status.progress.claimedCount).toBe(1);
@@ -1197,7 +1173,7 @@ describe("NexuConfigStore", () => {
     }
   });
 
-  it("claimDesktopReward uses status from claim response without extra fetch", async () => {
+  it("claimDesktopReward returns claim status without waiting on credits summary", async () => {
     await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
 
     const mockTask = {
@@ -1223,24 +1199,6 @@ describe("NexuConfigStore", () => {
         cloudBalance: null,
       },
     };
-    const creditsSummaryResponse = {
-      appUserId: "user-1",
-      balance: {
-        totalBalance: 0,
-        giftBalance: 100,
-        totalRecharged: 0,
-        totalConsumed: 0,
-        syncedAt: "2026-04-01T00:00:00.000Z",
-        updatedAt: "2026-04-01T00:00:00.000Z",
-      },
-      usageSummary: {
-        totalEntries: 1,
-        totalDueCredits: 100,
-        totalChargedCredits: 100,
-        totalCostUsd: "0.00",
-      },
-    };
-
     await writeFile(
       path.join(rootDir, ".nexu", "config.json"),
       JSON.stringify(
@@ -1274,12 +1232,8 @@ describe("NexuConfigStore", () => {
       "fetch",
       vi.fn(async (_input, init) => {
         fetchCallCount += 1;
-        if (fetchCallCount === 1) {
-          claimBody = init?.body ?? null;
-          return new Response(JSON.stringify(claimResponse), { status: 200 });
-        }
-
-        return new Response(JSON.stringify(creditsSummaryResponse), {
+        claimBody = init?.body ?? null;
+        return new Response(JSON.stringify(claimResponse), {
           status: 200,
         });
       }),
@@ -1294,9 +1248,8 @@ describe("NexuConfigStore", () => {
       expect(result.status.tasks).toHaveLength(1);
       expect(result.status.tasks[0]?.isClaimed).toBe(true);
       expect(result.status.progress.claimedCount).toBe(1);
-      expect(result.status.cloudBalance?.giftBalance).toBe(100);
-      // Two fetch calls total: claim + credits summary
-      expect(fetchCallCount).toBe(2);
+      expect(result.status.cloudBalance).toBeNull();
+      expect(fetchCallCount).toBe(1);
       expect(claimBody).toBe(
         JSON.stringify({
           taskId: "daily_checkin",

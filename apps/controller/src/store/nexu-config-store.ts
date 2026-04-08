@@ -1720,7 +1720,6 @@ export class NexuConfigStore {
       cloud.models ?? [],
     );
     let creditsBalance: CreditSummaryResponse["balance"] | null = null;
-
     if (cloud.connected && cloud.apiKey) {
       const { activeProfile } =
         await this.readConfiguredDesktopCloudProfile(config);
@@ -1729,35 +1728,29 @@ export class NexuConfigStore {
         cloudUrl,
         apiKey: cloud.apiKey,
       });
-      const [cloudResult, creditsSummaryResult] = await Promise.all([
-        service.getRewardsStatus(),
-        service.getCreditsSummary(),
-      ]);
-      creditsBalance = creditsSummaryResult.ok
-        ? creditsSummaryResult.data.balance
-        : null;
+      const cloudResult = await service.getRewardsStatus();
 
       if (cloudResult.ok) {
-        const cloudStatus = cloudResult.data;
-        const creditsSummary = creditsSummaryResult.ok
-          ? creditsSummaryResult.data
-          : null;
-
-        if (!creditsSummaryResult.ok) {
-          logger.warn(
-            { reason: creditsSummaryResult.reason },
-            "desktop_credits_summary_cloud_fallback",
-          );
-        }
-
         return convertCloudStatusToDesktop(
-          cloudStatus,
+          cloudResult.data,
           {
             cloudConnected: true,
             activeModelId,
             activeManagedModel,
           },
-          creditsSummary,
+          null,
+        );
+      }
+
+      const creditsSummaryResult = await service.getCreditsSummary();
+      creditsBalance = creditsSummaryResult.ok
+        ? creditsSummaryResult.data.balance
+        : null;
+
+      if (!creditsSummaryResult.ok) {
+        logger.warn(
+          { reason: creditsSummaryResult.reason },
+          "desktop_credits_summary_cloud_fallback",
         );
       }
 
@@ -1842,13 +1835,6 @@ export class NexuConfigStore {
       activeModelId2,
       cloud2.models ?? [],
     );
-    const creditsSummaryResult = await service.getCreditsSummary();
-    if (!creditsSummaryResult.ok) {
-      logger.warn(
-        { reason: creditsSummaryResult.reason },
-        "desktop_credits_summary_cloud_fallback",
-      );
-    }
 
     return {
       ok: claimData.ok,
@@ -1860,7 +1846,7 @@ export class NexuConfigStore {
           activeModelId: activeModelId2,
           activeManagedModel: activeManagedModel2,
         },
-        creditsSummaryResult.ok ? creditsSummaryResult.data : null,
+        null,
       ),
     };
   }
