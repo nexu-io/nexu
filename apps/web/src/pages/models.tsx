@@ -2104,7 +2104,7 @@ function ByokProviderDetail({
       verifyApiKey(
         providerKey,
         providerId,
-        effectiveApiKey,
+        persistedApiKey,
         baseUrl || undefined,
       ),
     onSuccess: (result) => {
@@ -2130,7 +2130,7 @@ function ByokProviderDetail({
       const result = await verifyApiKey(
         providerKey,
         providerId,
-        effectiveApiKey,
+        persistedApiKey,
         baseUrl || undefined,
       );
 
@@ -2163,7 +2163,7 @@ function ByokProviderDetail({
         const result = await verifyApiKey(
           providerKey,
           providerId,
-          effectiveApiKey,
+          persistedApiKey,
           baseUrl || undefined,
         );
         if (result.valid && result.models) {
