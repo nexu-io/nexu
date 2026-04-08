@@ -10,7 +10,7 @@ export type SkillDirWatcherLogFn = (
 ) => void;
 
 const defaultLog: SkillDirWatcherLogFn = () => {};
-const workspaceSkillPathPattern = /^agents\/[^/]+\/skills(?:\/|$)/;
+const workspaceSkillPathPattern = /(?:^|\/)agents\/[^/]+\/skills(?:\/|$)/;
 
 export class SkillDirWatcher {
   private readonly skillsDir: string;
@@ -299,7 +299,7 @@ export class SkillDirWatcher {
       return false;
     }
 
-    const normalized = String(fileName).replace(/\\/g, "/");
+    const normalized = this.normalizeWorkspaceWatchPath(String(fileName));
     return workspaceSkillPathPattern.test(normalized);
   }
 
@@ -337,7 +337,7 @@ export class SkillDirWatcher {
   }
 
   private ensureWorkspaceSkillWatcherForPath(relativePath: string): void {
-    const normalized = relativePath.replace(/\\/g, "/");
+    const normalized = this.normalizeWorkspaceWatchPath(relativePath);
     const match = normalized.match(/^agents\/([^/]+)\//);
     if (!match) {
       return;
@@ -349,6 +349,16 @@ export class SkillDirWatcher {
     }
 
     this.ensureWorkspaceSkillWatcher(botId);
+  }
+
+  private normalizeWorkspaceWatchPath(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, "/");
+    const agentsIndex = normalized.indexOf("agents/");
+    if (agentsIndex < 0) {
+      return normalized;
+    }
+
+    return normalized.slice(agentsIndex);
   }
 
   private ensureWorkspaceSkillWatcher(botId: string): void {

@@ -19,6 +19,7 @@ type InternalSkillSource = "curated" | "managed" | "custom";
 
 type AnalyticsState = {
   sessionStartSent: boolean;
+  firstConversationDistinctId: string | null;
   sentUserMessageIds: string[];
   sentSkillUseIds: string[];
 };
@@ -74,6 +75,7 @@ const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
 const EMPTY_ANALYTICS_STATE: AnalyticsState = {
   sessionStartSent: false,
+  firstConversationDistinctId: null,
   sentUserMessageIds: [],
   sentSkillUseIds: [],
 };
@@ -180,11 +182,25 @@ export class AnalyticsService {
     }
 
     const shouldSendAnalytics = analyticsDistinctId.status === "ready";
+    const currentDistinctId =
+      analyticsDistinctId.status === "ready"
+        ? analyticsDistinctId.distinctId
+        : null;
+    let stateChanged = false;
 
     await this.ensureStateLoaded();
+    if (
+      currentDistinctId &&
+      this.state.sessionStartSent &&
+      this.state.firstConversationDistinctId !== currentDistinctId
+    ) {
+      this.state.sessionStartSent = false;
+      this.state.firstConversationDistinctId = null;
+      stateChanged = true;
+    }
+
     const sessions = await this.sessionsRuntime.listSessions();
     const skillLedger = await this.readSkillLedgerSources();
-    let stateChanged = false;
     let firstSessionCandidate: UserMessageCandidate | null = null;
 
     for (const session of sessions) {
@@ -278,6 +294,7 @@ export class AnalyticsService {
           },
           firstSessionCandidate.timestampMs,
         );
+        this.state.firstConversationDistinctId = analyticsDistinctId.distinctId;
       }
       this.state.sessionStartSent = true;
       stateChanged = true;
@@ -298,6 +315,10 @@ export class AnalyticsService {
       const parsed = JSON.parse(raw) as Partial<AnalyticsState>;
       this.state = {
         sessionStartSent: parsed.sessionStartSent === true,
+        firstConversationDistinctId:
+          typeof parsed.firstConversationDistinctId === "string"
+            ? parsed.firstConversationDistinctId
+            : null,
         sentUserMessageIds: Array.isArray(parsed.sentUserMessageIds)
           ? parsed.sentUserMessageIds.filter(
               (value): value is string => typeof value === "string",

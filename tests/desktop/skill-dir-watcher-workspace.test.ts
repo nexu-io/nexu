@@ -270,7 +270,6 @@ describe("SkillDirWatcher workspace reconciliation", () => {
         debounceMs: 50,
       });
 
-      const syncSpy = vi.spyOn(watcher as never, "syncNow");
       watcher.start();
 
       writeWorkspaceFile(
@@ -278,10 +277,10 @@ describe("SkillDirWatcher workspace reconciliation", () => {
         "touch to trigger watcher",
       );
 
-      await waitUntil(() => syncSpy.mock.calls.length > 0);
-      expect(syncSpy).toHaveBeenCalled();
-      expect(db.getInstalledByAgent("bot-1").map((s) => s.slug)).toContain(
-        "agent-tool",
+      await waitUntil(() =>
+        db
+          .getInstalledByAgent("bot-1")
+          .some((skill) => skill.slug === "agent-tool"),
       );
       watcher.stop();
     },
