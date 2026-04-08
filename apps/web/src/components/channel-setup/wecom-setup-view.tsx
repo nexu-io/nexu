@@ -3,10 +3,7 @@ import { BriefcaseBusiness, KeyRound, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import {
-  postApiV1ChannelsWecomConnect,
-  postApiV1ChannelsWecomTest,
-} from "../../../lib/api/sdk.gen";
+import { postApiV1ChannelsWecomConnect } from "../../../lib/api/sdk.gen";
 
 export interface WecomSetupViewProps {
   onConnected: () => void;
@@ -23,7 +20,6 @@ export function WecomSetupView({
   const [botId, setBotId] = useState("");
   const [secret, setSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [testing, setTesting] = useState(false);
 
   const getTrimmedCredentials = () => {
     const trimmedBotId = botId.trim();
@@ -70,30 +66,8 @@ export function WecomSetupView({
     }
   };
 
-  const handleTestConnectivity = async () => {
-    const { botId: trimmedBotId, secret: trimmedSecret } =
-      getTrimmedCredentials();
-    if (!trimmedBotId || !trimmedSecret) {
-      toast.error(t("wecomSetup.credentialsRequired"));
-      return;
-    }
-
-    setTesting(true);
-    try {
-      const { data, error } = await postApiV1ChannelsWecomTest({
-        body: { botId: trimmedBotId, secret: trimmedSecret },
-      });
-
-      if (error || !data?.success) {
-        toast.error(error?.message ?? t("wecomSetup.testFailed"));
-        return;
-      }
-
-      toast.success(data.message || t("wecomSetup.testSuccess"));
-    } finally {
-      setTesting(false);
-    }
-  };
+  const wecomDeveloperCenterUrl =
+    "https://work.weixin.qq.com/wework_admin/frame#/aiHelper/list?from=manage_tools";
 
   return (
     <div className="p-5 rounded-xl border bg-surface-1 border-border">
@@ -117,7 +91,17 @@ export function WecomSetupView({
             {t("wecomSetup.quickSetup")}
           </div>
           <ol className="space-y-1 text-[12px] text-text-muted list-decimal pl-4">
-            <li>{t("wecomSetup.step1")}</li>
+            <li>
+              <a
+                href={wecomDeveloperCenterUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline underline-offset-2 hover:text-accent-hover"
+              >
+                {t("wecomSetup.step1LinkLabel")}
+              </a>
+              {t("wecomSetup.step1Suffix")}
+            </li>
             <li>{t("wecomSetup.step2")}</li>
             <li>{t("wecomSetup.step3")}</li>
             <li>{t("wecomSetup.step4")}</li>
@@ -177,22 +161,8 @@ export function WecomSetupView({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={handleTestConnectivity}
-            disabled={disabled || submitting || testing}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-2.5 text-[13px] font-medium text-text-primary transition-all hover:bg-surface-2 disabled:opacity-60"
-          >
-            {testing ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <KeyRound size={14} />
-            )}
-            {t("wecomSetup.testConnectivity")}
-          </button>
-
-          <button
-            type="button"
             onClick={handleConnect}
-            disabled={disabled || submitting || testing}
+            disabled={disabled || submitting}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-medium text-accent-fg transition-all hover:bg-accent-hover disabled:opacity-60"
           >
             {submitting ? (

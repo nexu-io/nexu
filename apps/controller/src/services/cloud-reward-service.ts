@@ -86,7 +86,6 @@ export type GithubStarPrepareData = z.infer<
 export type GithubStarVerifyData = z.infer<
   typeof githubStarVerifyResponseSchema
 >;
-
 export type CloudRewardErrorReason =
   | "auth_failed"
   | "network_error"
@@ -310,7 +309,6 @@ export function createCloudRewardService(
         return { ok: false, reason: "network_error" };
       }
     },
-
     async setRewardBalance(balance) {
       try {
         const res = await fetchWithAuth("/api/v1/test/credits/set-balance", {

@@ -1159,6 +1159,12 @@ function DesktopShell() {
       if (command.type === "setup:complete") {
         return;
       }
+      if (
+        command.type !== "develop:focus-surface" &&
+        command.type !== "develop:show-shell"
+      ) {
+        return;
+      }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
@@ -1244,7 +1250,6 @@ function DesktopShell() {
     >
       <DevelopSetBalanceDialog
         open={showSetBalanceDialog}
-        webBaseUrl={runtimeConfig?.urls.web ?? null}
         onClose={() => setShowSetBalanceDialog(false)}
       />
       <div className="window-drag-bar" />
@@ -1345,22 +1350,19 @@ function DesktopShell() {
               version={webSurfaceVersion}
               preload={getWebviewPreloadUrl()}
             />
-          ) : (
+          ) : controllerSurfaceState === "failed" ||
+            controllerSurfaceState === "recovering" ? (
             <section className="runtime-empty-state">
               <span className="runtime-eyebrow">Workspace</span>
               <h2>
                 {controllerSurfaceState === "recovering"
                   ? "Restarting controller..."
-                  : controllerSurfaceState === "failed"
-                    ? "Controller unavailable"
-                    : "Starting controller..."}
+                  : "Controller unavailable"}
               </h2>
               <p>
                 {controllerSurfaceState === "recovering"
                   ? "The local controller stopped cleanly, so desktop is starting it again before mounting the workspace."
-                  : controllerSurfaceState === "failed"
-                    ? "Workspace startup timed out because the local controller did not come back. Retry it here or switch to the control plane."
-                    : "Desktop is waiting for the local controller to report ready before loading the workspace surface."}
+                  : "Workspace startup timed out because the local controller did not come back. Retry it here or switch to the control plane."}
               </p>
               <div className="runtime-actions">
                 <button
@@ -1380,6 +1382,20 @@ function DesktopShell() {
                 </button>
               </div>
             </section>
+          ) : (
+            // Normal polling state: show the brand NexuLoader instead of a
+            // text card with a "Retry controller" button. SurfaceFrame with
+            // src={null} renders its built-in NexuLoader overlay, which is
+            // the same loader used once the webview mounts — producing a
+            // seamless visual transition once the controller is ready.
+            // See issue #876.
+            <SurfaceFrame
+              description="Authenticated workspace surface served by the repo-local web sidecar."
+              src={null}
+              title="nexu Web"
+              version={webSurfaceVersion}
+              preload={getWebviewPreloadUrl()}
+            />
           )}
         </div>
         <div

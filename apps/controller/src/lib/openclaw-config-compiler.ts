@@ -426,6 +426,7 @@ function compilePlugins(
   ];
   const platformPluginIds = [
     "nexu-runtime-model",
+    "nexu-credit-guard",
     "nexu-platform-bootstrap",
     ...(hasMiniMaxOauth ? ["minimax-portal-auth"] : []),
   ];
@@ -465,6 +466,12 @@ function compilePlugins(
         : {}),
       "nexu-runtime-model": {
         enabled: true,
+      },
+      "nexu-credit-guard": {
+        enabled: true,
+        config: {
+          contactUrl: "https://nexu.app/contact",
+        },
       },
       ...(hasMiniMaxOauth
         ? {

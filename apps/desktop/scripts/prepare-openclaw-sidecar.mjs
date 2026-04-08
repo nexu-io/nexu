@@ -41,7 +41,7 @@ const buildCacheRoot = resolve(
   process.env.NEXU_DEV_CACHE_DIR ?? resolve(repoRoot, ".cache", "nexu-dev"),
 );
 const openclawSidecarCacheRoot = resolve(buildCacheRoot, "openclaw-sidecar");
-const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-03-30-openclaw-sidecar-cache-v2";
+const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-04-08-openclaw-sidecar-signing-v3";
 const OPENCLAW_SIDECAR_ARCHIVE_FORMAT =
   resolveBuildTargetPlatform({
     env: process.env,
@@ -670,17 +670,6 @@ async function writeOpenclawSidecarCacheEntry(fingerprint) {
   );
 }
 
-const nativeBinaryNamePattern = /\.(?:node|dylib|so|dll)$/u;
-const nativeBinaryBasenames = new Set(["spawn-helper"]);
-
-function isNativeBinaryCandidate(filePath) {
-  const baseName = basename(filePath);
-  return (
-    nativeBinaryNamePattern.test(baseName) ||
-    nativeBinaryBasenames.has(baseName)
-  );
-}
-
 async function resolve7ZipCommand() {
   const candidates =
     process.platform === "win32" ? ["7z.exe", "7z"] : ["7zz", "7z"];
@@ -856,8 +845,15 @@ async function signOpenclawNativeBinaries() {
   const startedAt = Date.now();
   const identity = await ensureCodesignIdentity();
   const files = await collectFiles(sidecarRoot);
-  const candidateFiles = files.filter(isNativeBinaryCandidate);
-  let machOCount = 0;
+  const candidateFiles = files.filter((filePath) => {
+    const baseName = basename(filePath);
+    return (
+      baseName.endsWith(".node") ||
+      baseName.endsWith(".dylib") ||
+      baseName === "spawn-helper"
+    );
+  });
+  let signedCount = 0;
 
   console.log(
     `[openclaw-sidecar] scanning ${candidateFiles.length} native-binary candidates out of ${files.length} files`,
@@ -866,13 +862,6 @@ async function signOpenclawNativeBinaries() {
   for (const filePath of candidateFiles) {
     const { stdout } = await runAndCapture("file", ["-b", filePath]);
     const description = stdout.trim();
-    const isMachO = description.includes("Mach-O");
-
-    if (!isMachO) {
-      continue;
-    }
-
-    machOCount += 1;
 
     const isExecutable =
       description.includes("executable") || description.includes("bundle");
@@ -886,11 +875,15 @@ async function signOpenclawNativeBinaries() {
       ...(isExecutable ? ["--options", "runtime"] : []),
       filePath,
     ];
+    console.log(
+      `[openclaw-sidecar] codesigning native binary: ${relative(sidecarRoot, filePath)} (${description})`,
+    );
     await run("codesign", args);
+    signedCount += 1;
   }
 
   console.log(
-    `[openclaw-sidecar] signed ${machOCount} native binaries in ${formatDurationMs(
+    `[openclaw-sidecar] signed ${signedCount} native binaries in ${formatDurationMs(
       Date.now() - startedAt,
     )}`,
   );

@@ -21,6 +21,7 @@ import {
   type integrationResponseSchema,
   type providerResponseSchema,
   type refreshIntegrationSchema,
+  rewardGroupSchema,
   rewardTaskIdSchema,
   type updateAuthSourceSchema,
   type updateUserProfileSchema,
@@ -323,13 +324,14 @@ function convertCloudStatusToDesktop(
     progress: cloudStatus.progress,
     tasks: cloudStatus.tasks.flatMap((task) => {
       const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
-      if (!parsedTaskId.success) {
+      const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
+      if (!parsedTaskId.success || !parsedGroupId.success) {
         return [];
       }
 
       return {
         id: parsedTaskId.data as RewardTaskId,
-        group: task.groupId as "daily" | "opensource" | "social",
+        group: parsedGroupId.data,
         icon: task.icon ?? "gift",
         reward: task.rewardPoints,
         shareMode: task.shareMode as "link" | "tweet" | "image",
@@ -1506,7 +1508,6 @@ export class NexuConfigStore {
       apiKey: cloud.apiKey,
     });
   }
-
   async getDesktopRewardsStatus(): Promise<DesktopRewardsStatus> {
     const config = await this.getConfig();
     const cloud = readDesktopCloud(config);
@@ -1989,11 +1990,18 @@ export class NexuConfigStore {
     if (!existingProfiles.some((item) => item.name === previousName)) {
       throw new Error(`Unknown cloud profile: ${previousName}`);
     }
+    const nextName = profile.name.trim();
+    if (
+      nextName !== previousName &&
+      existingProfiles.some((item) => item.name === nextName)
+    ) {
+      throw new Error(`Cloud profile already exists: ${nextName}`);
+    }
 
     const nextProfiles = existingProfiles.map((item) =>
       item.name === previousName
         ? {
-            name: profile.name.trim(),
+            name: nextName,
             cloudUrl: profile.cloudUrl.trim(),
             linkUrl: profile.linkUrl.trim(),
           }
@@ -2017,12 +2025,12 @@ export class NexuConfigStore {
           ...config.desktop,
           activeCloudProfileName:
             readDesktopActiveCloudProfileName(config) === previousName
-              ? profile.name.trim()
+              ? nextName
               : readDesktopActiveCloudProfileName(config),
           cloudSessions: previousSession
             ? {
                 ...restSessions,
-                [profile.name.trim()]: previousSession,
+                [nextName]: previousSession,
               }
             : restSessions,
         },

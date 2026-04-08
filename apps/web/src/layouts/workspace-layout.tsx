@@ -580,6 +580,8 @@ function WorkspaceLayoutInner() {
     cloudConnected &&
     !rewardsStatus.cloudBalance &&
     (rewardsStatusLoading || !rewardsStatusResolved);
+  const canOpenBalancePopup =
+    cloudConnected || rewardsStatus.cloudBalance !== null;
   const rewardBalanceValue = rewardsStatus.cloudBalance
     ? `${rewardsStatus.cloudBalance.totalBalance} ${t("layout.sidebar.balanceUnit")}`
     : cloudConnected
@@ -587,6 +589,9 @@ function WorkspaceLayoutInner() {
         ? t("layout.sidebar.balancePlaceholder")
         : `0 ${t("layout.sidebar.balanceUnit")}`
       : t("layout.sidebar.balancePlaceholder");
+  const rewardBalancePopupValue = rewardsStatus.cloudBalance
+    ? String(rewardsStatus.cloudBalance.totalBalance)
+    : rewardBalanceValue;
   const shouldShowRewardsBanner =
     cloudConnected &&
     rewardsStatus.progress.totalCount > 0 &&
@@ -993,7 +998,7 @@ function WorkspaceLayoutInner() {
                   data-sidebar-rewards-balance="true"
                   className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5 text-left"
                   onClick={() => {
-                    if (rewardsStatus.cloudBalance) {
+                    if (canOpenBalancePopup) {
                       setShowBalancePopup((prev) => !prev);
                     } else {
                       track("workspace_rewards_click");
@@ -1015,7 +1020,7 @@ function WorkspaceLayoutInner() {
                     </span>
                   </div>
                 </button>
-                {rewardsStatus.cloudBalance && showBalancePopup ? (
+                {canOpenBalancePopup && showBalancePopup ? (
                   <div
                     data-sidebar-rewards-balance-popup="true"
                     className="absolute bottom-full left-0 right-0 z-30 pb-2"
@@ -1026,7 +1031,7 @@ function WorkspaceLayoutInner() {
                           ✦ {t("layout.sidebar.balancePopup.total")}
                         </span>
                         <span className="tabular-nums text-[14px] font-bold text-text-primary">
-                          {rewardsStatus.cloudBalance.totalBalance}
+                          {rewardBalancePopupValue}
                         </span>
                       </div>
                       <div className="space-y-2 border-t border-border/60 pt-2.5">

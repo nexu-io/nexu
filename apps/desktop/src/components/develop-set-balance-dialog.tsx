@@ -1,4 +1,9 @@
 import { useEffect, useId, useState } from "react";
+import {
+  getDesktopRewardsStatus,
+  notifyDesktopRewardsUpdated,
+  setDesktopRewardBalance,
+} from "../lib/host-api";
 
 type DesktopRewardsStatus = {
   cloudBalance?: {
@@ -6,64 +11,25 @@ type DesktopRewardsStatus = {
   } | null;
 };
 
-type ErrorResponse = {
-  message?: string;
-};
-
 type DevelopSetBalanceDialogProps = {
   open: boolean;
-  webBaseUrl: string | null;
   onClose: () => void;
 };
 
-export async function fetchCurrentBalance(webBaseUrl: string): Promise<number> {
-  const response = await fetch(
-    new URL("/api/internal/desktop/rewards", webBaseUrl),
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to load the current test balance.");
-  }
-
-  const payload = (await response.json()) as DesktopRewardsStatus;
+export async function fetchCurrentBalance(): Promise<number> {
+  const payload = (await getDesktopRewardsStatus()) as DesktopRewardsStatus;
   return payload.cloudBalance?.totalBalance ?? 0;
 }
 
-export async function setCurrentBalance(
-  webBaseUrl: string,
-  balance: number,
-): Promise<number> {
-  const response = await fetch(
-    new URL("/api/internal/desktop/rewards/set-balance", webBaseUrl),
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ balance }),
-    },
-  );
-
-  if (!response.ok) {
-    let message = "Failed to update the test balance.";
-
-    try {
-      const payload = (await response.json()) as ErrorResponse;
-      if (typeof payload.message === "string" && payload.message.length > 0) {
-        message = payload.message;
-      }
-    } catch {}
-
-    throw new Error(message);
-  }
-
-  const payload = (await response.json()) as DesktopRewardsStatus;
+export async function setCurrentBalance(balance: number): Promise<number> {
+  const payload = (await setDesktopRewardBalance(
+    balance,
+  )) as DesktopRewardsStatus;
   return payload.cloudBalance?.totalBalance ?? balance;
 }
 
 export function DevelopSetBalanceDialog({
   open,
-  webBaseUrl,
   onClose,
 }: DevelopSetBalanceDialogProps) {
   const titleId = useId();
@@ -75,7 +41,7 @@ export function DevelopSetBalanceDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !webBaseUrl) {
+    if (!open) {
       return;
     }
 
@@ -83,7 +49,7 @@ export function DevelopSetBalanceDialog({
     setLoading(true);
     setErrorMessage(null);
 
-    void fetchCurrentBalance(webBaseUrl)
+    void fetchCurrentBalance()
       .then((currentBalance) => {
         if (!isActive) {
           return;
@@ -112,7 +78,7 @@ export function DevelopSetBalanceDialog({
     return () => {
       isActive = false;
     };
-  }, [open, webBaseUrl]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -134,11 +100,6 @@ export function DevelopSetBalanceDialog({
   }
 
   const handleConfirm = async () => {
-    if (!webBaseUrl) {
-      setErrorMessage("Desktop runtime is not ready yet.");
-      return;
-    }
-
     const parsedBalance = Number(balance.trim());
     if (!Number.isInteger(parsedBalance) || parsedBalance < 0) {
       setErrorMessage("Enter a non-negative whole number.");
@@ -149,8 +110,9 @@ export function DevelopSetBalanceDialog({
     setErrorMessage(null);
 
     try {
-      const nextBalance = await setCurrentBalance(webBaseUrl, parsedBalance);
+      const nextBalance = await setCurrentBalance(parsedBalance);
       setBalance(String(nextBalance));
+      await notifyDesktopRewardsUpdated().catch(() => undefined);
       onClose();
     } catch (error: unknown) {
       setErrorMessage(

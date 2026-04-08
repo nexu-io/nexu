@@ -47,6 +47,12 @@ export function DesktopShell() {
       if (command.type === "setup:complete") {
         return;
       }
+      if (
+        command.type !== "develop:focus-surface" &&
+        command.type !== "develop:show-shell"
+      ) {
+        return;
+      }
 
       setActiveSurface(command.surface);
       setChromeMode(command.chromeMode);
@@ -63,7 +69,6 @@ export function DesktopShell() {
     >
       <DevelopSetBalanceDialog
         open={showSetBalanceDialog}
-        webBaseUrl={runtimeConfig?.urls.web ?? null}
         onClose={() => setShowSetBalanceDialog(false)}
       />
       <div className="window-drag-bar" />
