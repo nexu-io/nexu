@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rewardTasks } from "../../packages/shared/dist/index.js";
+import { rewardTasks } from "../../packages/shared/src/schemas/rewards";
 
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
 const REDDIT_LINK =

@@ -11,6 +11,7 @@ import type {
   ConnectWecomInput,
   DesktopRewardClaimProof,
   DesktopRewardsStatus,
+  RewardTask,
   RewardTaskId,
 } from "@nexu/shared";
 import {
@@ -23,6 +24,7 @@ import {
   type refreshIntegrationSchema,
   rewardGroupSchema,
   rewardTaskIdSchema,
+  rewardTasks,
   type updateAuthSourceSchema,
   type updateUserProfileSchema,
   type upsertProviderBodySchema,
@@ -93,6 +95,10 @@ const defaultCloudProfile: CloudProfileEntry = {
   cloudUrl: "https://nexu.io",
   linkUrl: "https://link.nexu.io",
 };
+
+const rewardTaskTemplateById = new Map<RewardTaskId, RewardTask>(
+  rewardTasks.map((task) => [task.id, task]),
+);
 
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
@@ -327,7 +333,8 @@ function convertCloudStatusToDesktop(
       shareMode: task.shareMode as "link" | "tweet" | "image",
       repeatMode: task.repeatMode as "once" | "daily" | "weekly",
       requiresScreenshot: task.shareMode === "image",
-      actionUrl: task.url,
+      actionUrl:
+        rewardTaskTemplateById.get(parsedTaskId.data)?.actionUrl ?? null,
       isClaimed: task.isClaimed,
       lastClaimedAt: task.lastClaimedAt,
       claimCount: task.claimCount,
