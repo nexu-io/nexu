@@ -141,7 +141,7 @@ const providerRegistryEntries = [
     modelsPageVisible: true,
     displayName: "NVIDIA",
     descriptionKey: "models.provider.nvidia.description",
-    apiDocsUrl: "https://docs.openclaw.ai/providers/nvidia",
+    apiDocsUrl: "https://build.nvidia.com/settings/api-keys",
     apiKeyPlaceholder: "nvapi-...",
     defaultProxyUrl: "https://integrate.api.nvidia.com/v1",
     authModes: ["api-key"],
