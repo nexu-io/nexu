@@ -85,6 +85,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@nexu/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@sentry/electron':
         specifier: ^7.10.0
         version: 7.10.0
