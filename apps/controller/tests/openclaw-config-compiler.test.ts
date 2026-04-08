@@ -677,7 +677,7 @@ describe("compileOpenClawConfig", () => {
         bots: [
           {
             ...createConfig().bots[0],
-            modelId: "custom-openai/team-gateway/gpt-4.1",
+            modelId: "custom-openai/team-gateway/anthropic/claude-haiku-4.5",
             createdAt: now,
             updatedAt: now,
           },
@@ -688,7 +688,8 @@ describe("compileOpenClawConfig", () => {
             bind: "loopback",
             authMode: "token",
           },
-          defaultModelId: "custom-openai/team-gateway/gpt-4.1",
+          defaultModelId:
+            "custom-openai/team-gateway/anthropic/claude-haiku-4.5",
         },
         providers: [],
         models: {
@@ -708,8 +709,8 @@ describe("compileOpenClawConfig", () => {
               },
               models: [
                 {
-                  id: "gpt-4.1",
-                  name: "GPT-4.1",
+                  id: "anthropic/claude-haiku-4.5",
+                  name: "Claude Haiku 4.5",
                   reasoning: false,
                   input: ["text"],
                   cost: {
@@ -742,9 +743,9 @@ describe("compileOpenClawConfig", () => {
     });
     expect(
       result.models?.providers["custom-openai__team-gateway"]?.models[0]?.id,
-    ).toBe("openai/gpt-4.1");
+    ).toBe("anthropic/claude-haiku-4.5");
     expect(result.agents.defaults?.model).toEqual({
-      primary: "custom-openai__team-gateway/openai/gpt-4.1",
+      primary: "custom-openai__team-gateway/anthropic/claude-haiku-4.5",
     });
   });
 

@@ -5,7 +5,6 @@ import {
   botResponseSchema,
   buildCustomProviderKey,
   channelResponseSchema,
-  getCustomProviderProtocolFamily,
   getDefaultProviderBaseUrls,
   getProviderAliasCandidates,
   getProviderRuntimePolicy,
@@ -49,16 +48,16 @@ function encodeCustomProviderRuntimeKey(
 
 function getProviderRuntimeNamespace(providerKey: string): string | null {
   const customProvider = parseCustomProviderKey(providerKey);
-  const providerId = customProvider?.templateId ?? providerKey;
-  const runtimePolicy = getProviderRuntimePolicy(providerId);
+  if (customProvider) {
+    return null;
+  }
+
+  const runtimePolicy = getProviderRuntimePolicy(providerKey);
   if (!runtimePolicy) {
     return null;
   }
 
-  return customProvider
-    ? (getCustomProviderProtocolFamily(customProvider.templateId) ??
-        runtimePolicy.canonicalOpenClawId)
-    : runtimePolicy.canonicalOpenClawId;
+  return runtimePolicy.canonicalOpenClawId;
 }
 
 function stripRuntimeModelNamespace(
@@ -78,13 +77,13 @@ function matchPersistedModelRef(
     ([persistedKey]): Array<{
       persistedKey: string;
       prefix: string;
-      runtimeNamespace: string;
+      runtimeNamespace: string | null;
     }> => {
       const customProvider = parseCustomProviderKey(persistedKey);
       const providerId = customProvider?.templateId ?? persistedKey;
       const runtimePolicy = getProviderRuntimePolicy(providerId);
       const runtimeNamespace = getProviderRuntimeNamespace(persistedKey);
-      if (!runtimePolicy || !runtimeNamespace) {
+      if (!runtimePolicy) {
         return [];
       }
 
@@ -120,7 +119,9 @@ function matchPersistedModelRef(
     const remainder = rawModelId.slice(prefix.length + 1);
     return {
       persistedKey,
-      modelId: stripRuntimeModelNamespace(remainder, runtimeNamespace),
+      modelId: runtimeNamespace
+        ? stripRuntimeModelNamespace(remainder, runtimeNamespace)
+        : remainder,
     };
   }
 

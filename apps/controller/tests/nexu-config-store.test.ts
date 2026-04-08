@@ -410,12 +410,14 @@ describe("NexuConfigStore", () => {
     const config = await store.getConfig();
 
     expect(config.runtime.defaultModelId).toBe("openai/gpt-4.1");
-    expect(config.bots[0]?.modelId).toBe("custom-openai/team gateway/gpt-4.1");
+    expect(config.bots[0]?.modelId).toBe(
+      "custom-openai/team gateway/openai/gpt-4.1",
+    );
     expect(config.desktop.selectedModelId).toBe("google/gemini-2.5-flash");
     expect(config.models.providers.openai?.models[0]?.id).toBe("gpt-4.1");
     expect(
       config.models.providers["custom-openai/team gateway"]?.models[0]?.id,
-    ).toBe("gpt-4.1");
+    ).toBe("openai/gpt-4.1");
   });
 
   it("rewrites saved model refs to canonical form on save", async () => {
@@ -500,6 +502,57 @@ describe("NexuConfigStore", () => {
     expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-pro");
     expect(config).not.toHaveProperty("providers");
     expect(config.schemaVersion).toBe(2);
+  });
+
+  it("preserves slash-qualified model ids for custom anthropic providers", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.setModelProviderConfigDocument({
+      mode: "merge",
+      providers: {
+        "custom-anthropic/team gateway": {
+          providerTemplateId: "custom-anthropic",
+          instanceId: "team gateway",
+          enabled: true,
+          displayName: "Team Gateway",
+          baseUrl: "https://gateway.example.com/v1",
+          auth: "api-key",
+          api: "anthropic-messages",
+          apiKey: "sk-custom",
+          models: [
+            {
+              id: "anthropic/claude-haiku-4.5",
+              name: "claude-haiku-4.5",
+              api: "anthropic-messages",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 128000,
+              maxTokens: 16384,
+            },
+          ],
+        },
+      },
+    });
+    const bot = await store.createBot({
+      name: "Assistant",
+      slug: "assistant",
+      modelId: "custom-anthropic__team%20gateway/anthropic/claude-haiku-4.5",
+    });
+
+    const config = await store.getConfig();
+
+    expect(
+      config.models.providers["custom-anthropic/team gateway"]?.models[0]?.id,
+    ).toBe("anthropic/claude-haiku-4.5");
+    expect(config.bots.find((item) => item.id === bot.id)?.modelId).toBe(
+      "custom-anthropic/team gateway/anthropic/claude-haiku-4.5",
+    );
   });
 
   it("recovers from a broken primary config using backup-compatible data", async () => {

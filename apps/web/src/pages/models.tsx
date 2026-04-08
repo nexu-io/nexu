@@ -1987,6 +1987,8 @@ function ByokProviderDetail({
   );
   const persistedApiKey =
     effectiveApiKey || (!isEditingApiKey ? providerConfig?.apiKey : undefined);
+  const validationApiKey =
+    typeof persistedApiKey === "string" ? persistedApiKey : undefined;
 
   const buildProviderConfig = useCallback(
     (modelIds: string[]): StoredProviderConfig => ({
@@ -2104,7 +2106,7 @@ function ByokProviderDetail({
       verifyApiKey(
         providerKey,
         providerId,
-        persistedApiKey,
+        validationApiKey,
         baseUrl || undefined,
       ),
     onSuccess: (result) => {
@@ -2130,7 +2132,7 @@ function ByokProviderDetail({
       const result = await verifyApiKey(
         providerKey,
         providerId,
-        persistedApiKey,
+        validationApiKey,
         baseUrl || undefined,
       );
 
@@ -2163,7 +2165,7 @@ function ByokProviderDetail({
         const result = await verifyApiKey(
           providerKey,
           providerId,
-          persistedApiKey,
+          validationApiKey,
           baseUrl || undefined,
         );
         if (result.valid && result.models) {

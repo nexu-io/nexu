@@ -285,6 +285,10 @@ export function buildProviderRuntimeModelId(
   descriptor: ModelProviderRuntimeDescriptor,
   modelId: string,
 ): string {
+  if (descriptor.isCustomProvider) {
+    return modelId;
+  }
+
   const normalizedModelId = stripCanonicalModelPrefix(
     descriptor.runtimeModelNamespace,
     modelId,
@@ -333,10 +337,12 @@ export function findProviderDescriptorForModelRef(
     const remainder = rawModelId.slice(prefix.length + 1);
     return {
       descriptor,
-      modelId: stripCanonicalModelPrefix(
-        descriptor.runtimeModelNamespace,
-        remainder,
-      ),
+      modelId: descriptor.isCustomProvider
+        ? remainder
+        : stripCanonicalModelPrefix(
+            descriptor.runtimeModelNamespace,
+            remainder,
+          ),
     };
   }
 
