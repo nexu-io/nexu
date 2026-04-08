@@ -806,6 +806,11 @@ async function ensureBuildConfig() {
   const config = {
     NEXU_CLOUD_URL: merged.NEXU_CLOUD_URL ?? "https://nexu.io",
     NEXU_LINK_URL: merged.NEXU_LINK_URL ?? null,
+    ...(merged.NEXU_DESKTOP_UPDATE_CHANNEL
+      ? {
+          NEXU_DESKTOP_UPDATE_CHANNEL: merged.NEXU_DESKTOP_UPDATE_CHANNEL,
+        }
+      : {}),
     NEXU_DESKTOP_APP_VERSION:
       merged.NEXU_DESKTOP_APP_VERSION ??
       (typeof desktopPackage.version === "string"
