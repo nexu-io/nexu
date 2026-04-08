@@ -38,6 +38,24 @@ const mockRewardStatusResponse = {
   },
 };
 
+const mockCreditsSummaryResponse = {
+  appUserId: "user-1",
+  balance: {
+    totalBalance: 500,
+    giftBalance: 125,
+    totalRecharged: 600,
+    totalConsumed: 100,
+    syncedAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
+  },
+  usageSummary: {
+    totalEntries: 1,
+    totalDueCredits: 100,
+    totalChargedCredits: 100,
+    totalCostUsd: "0.00",
+  },
+};
+
 const mockClaimResponse = {
   ok: true,
   alreadyClaimed: false,
@@ -262,6 +280,53 @@ describe("createCloudRewardService", () => {
       await service.getRewardsStatus();
 
       expect(capturedHeaders.authorization).toBe("Bearer my-secret-key");
+    });
+  });
+
+  describe("getCreditsSummary", () => {
+    it("returns ok:true with parsed summary on success", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify(mockCreditsSummaryResponse), {
+              status: 200,
+            }),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditsSummary();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      expect(result.data.balance.totalBalance).toBe(500);
+      expect(result.data.balance.giftBalance).toBe(125);
+    });
+
+    it("returns ok:false reason:parse_error when summary body does not match schema", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify({ unexpected: "shape" }), {
+              status: 200,
+            }),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditsSummary();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("unreachable");
+      expect(result.reason).toBe("parse_error");
     });
   });
 

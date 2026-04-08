@@ -2,7 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkspaceLayout } from "../src/layouts/workspace-layout";
+import {
+  WorkspaceLayout,
+  getWorkspaceGiftBalance,
+} from "../src/layouts/workspace-layout";
 
 vi.mock("@/lib/api", () => ({}));
 
@@ -110,6 +113,7 @@ function renderWorkspaceLayout(
     };
     cloudBalance: {
       totalBalance: number;
+      giftBalance?: number;
       totalRecharged: number;
       totalConsumed: number;
     } | null;
@@ -196,6 +200,13 @@ describe("WorkspaceLayout", () => {
     installBrowserStubs();
   });
 
+  it("uses the credits summary balance as the gift balance source", () => {
+    expect(getWorkspaceGiftBalance({ cloudBalance: null })).toBe(0);
+    expect(getWorkspaceGiftBalance({ cloudBalance: { giftBalance: 42 } })).toBe(
+      42,
+    );
+  });
+
   it("renders structured sidebar session rows for the workspace shell", () => {
     const markup = renderWorkspaceLayout();
 
@@ -236,6 +247,7 @@ describe("WorkspaceLayout", () => {
         },
         cloudBalance: {
           totalBalance: 200,
+          giftBalance: 42,
           totalRecharged: 900,
           totalConsumed: 700,
         },
@@ -418,7 +430,7 @@ describe("WorkspaceLayout", () => {
     expect(markup).not.toContain('data-budget-banner-status="warning"');
   });
 
-  it("renders the logged-in rewards card with a separate balance entry", () => {
+  it("renders the logged-in rewards card with the credit balance entry", () => {
     const markup = renderWorkspaceLayout(
       "/workspace/sessions/sess-1",
       {
@@ -435,6 +447,7 @@ describe("WorkspaceLayout", () => {
         },
         cloudBalance: {
           totalBalance: 200,
+          giftBalance: 42,
           totalRecharged: 900,
           totalConsumed: 700,
         },
@@ -448,42 +461,10 @@ describe("WorkspaceLayout", () => {
     expect(markup).toContain("layout.sidebar.rewardsTitle");
     expect(markup).toContain("4/10");
     expect(markup).toContain('data-sidebar-rewards-balance="true"');
-    expect(markup).toContain('data-sidebar-rewards-balance-popup="true"');
-    expect(markup).toContain('data-sidebar-rewards-balance-detail="true"');
-    expect(markup).toContain('href="https://nexu.net/bill"');
     expect(markup).toContain("layout.sidebar.balanceLabel");
     expect(markup).toContain("200 layout.sidebar.balanceUnit");
+    expect(markup).toContain("42");
     expect(markup).not.toContain("layout.sidebar.loginTitle");
-  });
-
-  it("routes the balance detail CTA to the test billing page for the test cloud profile", () => {
-    const markup = renderWorkspaceLayout(
-      "/workspace/sessions/sess-1",
-      {
-        viewer: {
-          cloudConnected: true,
-          activeModelId: "link/gemini",
-          activeModelProviderId: "link",
-          usingManagedModel: true,
-        },
-        progress: {
-          claimedCount: 4,
-          totalCount: 10,
-          earnedCredits: 700,
-        },
-        cloudBalance: {
-          totalBalance: 200,
-          totalRecharged: 900,
-          totalConsumed: 700,
-        },
-      },
-      {
-        connected: true,
-        cloudUrl: "https://nexu.powerformer.net",
-      },
-    );
-
-    expect(markup).toContain('href="https://nexu.powerformer.net/bill"');
   });
 
   it("renders zero balance when connected but cloud balance is null", () => {

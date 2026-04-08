@@ -210,6 +210,16 @@ function resolveCloudUsageUrl(cloudUrl?: string | null): string {
   }
 }
 
+type RewardsBalanceSource = {
+  cloudBalance: { giftBalance: number } | null;
+};
+
+export function getWorkspaceGiftBalance(
+  rewardsStatus: RewardsBalanceSource,
+): number {
+  return rewardsStatus.cloudBalance?.giftBalance ?? 0;
+}
+
 const GitHubIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
     <title>GitHub</title>
@@ -595,6 +605,7 @@ function WorkspaceLayoutInner() {
   const rewardBalancePopupValue = rewardsStatus.cloudBalance
     ? String(rewardsStatus.cloudBalance.totalBalance)
     : rewardBalanceValue;
+  const rewardGiftBalanceValue = getWorkspaceGiftBalance(rewardsStatus);
   const shouldShowRewardsBanner =
     cloudConnected &&
     rewardsStatus.progress.totalCount > 0 &&
@@ -1059,7 +1070,7 @@ function WorkspaceLayoutInner() {
                             </span>
                           </span>
                           <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {rewardsStatus.progress.earnedCredits}
+                            {rewardGiftBalanceValue}
                           </span>
                         </div>
                       </div>

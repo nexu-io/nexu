@@ -163,9 +163,9 @@ const zhCN = {
   "layout.sidebar.balancePopup.recharged": "套餐积分（累计）",
   "layout.sidebar.balancePopup.rechargedTooltip":
     "从订阅套餐中累计获得的积分总量",
-  "layout.sidebar.balancePopup.earned": "赠送积分",
+  "layout.sidebar.balancePopup.earned": "赠送积分余额",
   "layout.sidebar.balancePopup.earnedTooltip":
-    "来自注册奖励、完成任务等活动。消耗顺序：套餐积分 → 积分包 → 赠送积分。",
+    "来自奖励和活动赠送的积分。消耗顺序：套餐积分 → 积分包 → 赠送积分。",
   "layout.sidebar.balancePopup.consumed": "累计消耗",
   "layout.sidebar.balancePopup.viewDetail": "查看使用情况",
   "layout.empty.title": "暂无对话",
