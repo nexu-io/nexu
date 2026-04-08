@@ -339,6 +339,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Windows packaging tools
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+
       - name: Show desktop toolchain versions
         shell: pwsh
         run: pnpm exec electron --version
