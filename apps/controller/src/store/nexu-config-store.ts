@@ -1624,6 +1624,7 @@ export class NexuConfigStore {
       await this.setDesktopCloudState({
         connected: false,
         polling: false,
+        userId: null,
         userName: null,
         userEmail: null,
         connectedAt: null,
