@@ -53,10 +53,18 @@ full_cleanup() {
 
   sleep 1
 
-  # 3. Kill any remaining orphan processes (including global openclaw)
+  # 3. Kill any remaining orphan processes (including current scripts/dev
+  #    supervisors and older direct launch patterns)
+  pkill -9 -f -- "--nexu-dev-service=openclaw" 2>/dev/null || true
+  pkill -9 -f -- "--nexu-dev-service=controller" 2>/dev/null || true
   pkill -9 -f "openclaw.mjs gateway" 2>/dev/null || true
   pkill -9 -f "controller/dist/index.js" 2>/dev/null || true
-  # Also stop global openclaw gateway if it's occupying our port
+
+  # Also stop any process still occupying our service ports.
+  if lsof -i ":$CONTROLLER_PORT" -P -n &>/dev/null; then
+    echo "  Port $CONTROLLER_PORT occupied — killing occupying process..."
+    lsof -ti ":$CONTROLLER_PORT" | xargs kill -9 2>/dev/null || true
+  fi
   if lsof -i ":$OPENCLAW_PORT" -P -n &>/dev/null; then
     echo "  Port $OPENCLAW_PORT occupied — killing occupying process..."
     lsof -ti ":$OPENCLAW_PORT" | xargs kill -9 2>/dev/null || true
@@ -134,8 +142,12 @@ stop_services() {
   done
 
   # Force-kill any remaining orphan processes
+  pkill -9 -f -- "--nexu-dev-service=openclaw" 2>/dev/null || true
+  pkill -9 -f -- "--nexu-dev-service=controller" 2>/dev/null || true
   pkill -9 -f "openclaw.mjs gateway" 2>/dev/null || true
   pkill -9 -f "controller/dist/index.js" 2>/dev/null || true
+  lsof -ti ":$CONTROLLER_PORT" | xargs kill -9 2>/dev/null || true
+  lsof -ti ":$OPENCLAW_PORT" | xargs kill -9 2>/dev/null || true
   pkill -9 -f "chrome_crashpad_handler" 2>/dev/null || true
 
   # Kill tsc --watch and web watcher background processes.
@@ -194,9 +206,15 @@ start_services() {
 
   (
     cd "$REPO_ROOT/apps/controller"
+    initial_compile_complete=0
     pnpm exec tsc --watch --preserveWatchOutput 2>&1 | while IFS= read -r line; do
       echo "[controller:tsc] $line"
       if echo "$line" | grep -q "Found 0 errors"; then
+        if [ $initial_compile_complete -eq 0 ]; then
+          initial_compile_complete=1
+          echo "[controller] Initial watch compile complete; skipping restart."
+          continue
+        fi
         echo "[controller] Restarting service..."
         launchctl kickstart -k "$DOMAIN/$CONTROLLER_LABEL" 2>/dev/null && echo "[controller] Restarted." || true
       fi

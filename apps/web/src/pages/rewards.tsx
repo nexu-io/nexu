@@ -53,6 +53,19 @@ const REWARD_GROUPS: Array<{
   { key: "social", labelKey: "rewards.group.social" },
 ];
 
+function getRewardsModelHintState(input: {
+  loading: boolean;
+  cloudConnected: boolean;
+  usingManagedModel: boolean;
+  cloudBalance: { totalBalance: number } | null;
+}): "switch-back" | "none" {
+  if (input.loading) return "none";
+  if (!input.cloudConnected) return "none";
+  if (input.usingManagedModel) return "none";
+  if ((input.cloudBalance?.totalBalance ?? 0) <= 0) return "none";
+  return "switch-back";
+}
+
 function RewardConfirmModal({
   task,
   phase,
@@ -266,6 +279,12 @@ export function RewardsPage() {
       tasks: status.tasks.filter((task) => task.group === group.key),
     })).filter((group) => group.tasks.length > 0);
   }, [status.tasks]);
+  const modelHintState = getRewardsModelHintState({
+    loading,
+    cloudConnected: status.viewer.cloudConnected,
+    usingManagedModel: status.viewer.usingManagedModel,
+    cloudBalance: status.cloudBalance,
+  });
 
   const handleTaskAction = async (task: RewardTaskStatus) => {
     if (task.isClaimed) {
@@ -377,9 +396,7 @@ export function RewardsPage() {
           </div>
         ) : null}
 
-        {!loading &&
-        status.viewer.cloudConnected &&
-        !status.viewer.usingManagedModel ? (
+        {modelHintState === "switch-back" ? (
           <div className="mb-6 rounded-[18px] border border-border bg-surface-0 px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>

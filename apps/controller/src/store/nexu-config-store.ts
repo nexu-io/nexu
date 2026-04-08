@@ -11,6 +11,9 @@ import type {
   ConnectWecomInput,
   DesktopRewardClaimProof,
   DesktopRewardsStatus,
+  ModelProviderConfig,
+  PersistedModelsConfig,
+  RewardTask,
   RewardTaskId,
 } from "@nexu/shared";
 import {
@@ -18,11 +21,14 @@ import {
   type cloudProfileSchema,
   type connectIntegrationResponseSchema,
   type connectIntegrationSchema,
+  getDefaultProviderBaseUrls,
+  getProviderRuntimePolicy,
   type integrationResponseSchema,
-  type providerResponseSchema,
+  parseCustomProviderKey,
   type refreshIntegrationSchema,
   rewardGroupSchema,
   rewardTaskIdSchema,
+  rewardTasks,
   type updateAuthSourceSchema,
   type updateUserProfileSchema,
   type upsertProviderBodySchema,
@@ -40,9 +46,9 @@ import {
 } from "../services/cloud-reward-service.js";
 import { LowDbStore } from "./lowdb-store.js";
 import {
+  CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
   type CloudProfileEntry,
   type CloudProfilesFile,
-  type ControllerProvider,
   type ControllerRuntimeConfig,
   type NexuConfig,
   cloudProfilesFileSchema,
@@ -52,7 +58,6 @@ import {
 
 const DEFAULT_MANAGED_CHANNEL_ACCOUNT_ID = "default";
 
-type ProviderResponse = z.infer<typeof providerResponseSchema>;
 type UpsertProviderBody = z.infer<typeof upsertProviderBodySchema>;
 type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
 type StoredProviderResponse = z.infer<typeof storedProviderResponseSchema>;
@@ -94,6 +99,10 @@ const defaultCloudProfile: CloudProfileEntry = {
   cloudUrl: "https://nexu.io",
   linkUrl: "https://link.nexu.io",
 };
+
+const rewardTaskTemplateById = new Map<RewardTaskId, RewardTask>(
+  rewardTasks.map((task) => [task.id, task]),
+);
 
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
@@ -282,25 +291,198 @@ function parseModelsJson(modelsJson: string | undefined): string[] {
   }
 }
 
-function serializeProvider(
-  provider: ControllerProvider,
-): StoredProviderResponse {
+function getProviderMetadata(
+  provider: ModelProviderConfig | undefined,
+): Record<string, unknown> | null {
+  if (!provider) {
+    return null;
+  }
+  return typeof provider.metadata === "object" && provider.metadata !== null
+    ? provider.metadata
+    : null;
+}
+
+function getLegacyProviderField(
+  provider: ModelProviderConfig,
+  key: string,
+): string | null {
+  const metadata = getProviderMetadata(provider);
+  const value = metadata?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function getLegacyOauthCredential(provider: ModelProviderConfig): {
+  provider: string;
+  access: string;
+  refresh?: string;
+  expires?: number;
+  email?: string;
+} | null {
+  const metadata = getProviderMetadata(provider);
+  const value = metadata?.legacyOauthCredential;
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const credential = value as Record<string, unknown>;
+  if (
+    typeof credential.provider !== "string" ||
+    typeof credential.access !== "string"
+  ) {
+    return null;
+  }
+
   return {
-    id: provider.id,
-    providerId: provider.providerId,
-    displayName: provider.displayName,
+    provider: credential.provider,
+    access: credential.access,
+    ...(typeof credential.refresh === "string"
+      ? { refresh: credential.refresh }
+      : {}),
+    ...(typeof credential.expires === "number"
+      ? { expires: credential.expires }
+      : {}),
+    ...(typeof credential.email === "string"
+      ? { email: credential.email }
+      : {}),
+  };
+}
+
+function serializeProvider(
+  providerId: string,
+  provider: ModelProviderConfig,
+): StoredProviderResponse {
+  const oauthCredential = getLegacyOauthCredential(provider);
+  const modelIds = provider.models.map((model) => model.id);
+  return {
+    id: getLegacyProviderField(provider, "legacyId") ?? providerId,
+    providerId,
+    displayName: provider.displayName ?? null,
     enabled: provider.enabled,
-    baseUrl: provider.baseUrl,
-    authMode: provider.authMode,
-    hasApiKey: provider.apiKey !== null,
-    hasOauthCredential: provider.oauthCredential !== null,
-    oauthRegion: provider.oauthRegion,
-    oauthEmail: provider.oauthCredential?.email ?? null,
-    modelsJson: JSON.stringify(provider.models),
-    createdAt: provider.createdAt,
-    updatedAt: provider.updatedAt,
-    apiKey: provider.apiKey,
-    models: provider.models,
+    baseUrl: provider.baseUrl ?? null,
+    authMode: provider.auth === "oauth" ? "oauth" : "apiKey",
+    hasApiKey:
+      typeof provider.apiKey === "string" && provider.apiKey.length > 0,
+    hasOauthCredential: oauthCredential !== null,
+    oauthRegion: provider.oauthRegion ?? null,
+    oauthEmail: oauthCredential?.email ?? null,
+    modelsJson: JSON.stringify(modelIds),
+    createdAt: getLegacyProviderField(provider, "legacyCreatedAt") ?? undefined,
+    updatedAt: getLegacyProviderField(provider, "legacyUpdatedAt") ?? undefined,
+    apiKey: typeof provider.apiKey === "string" ? provider.apiKey : null,
+    models: modelIds,
+  };
+}
+
+function listCanonicalProviders(config: NexuConfig): StoredProviderResponse[] {
+  return Object.entries(config.models.providers).map(([providerId, provider]) =>
+    serializeProvider(providerId, provider),
+  );
+}
+
+function buildProviderBaseUrl(
+  providerId: string,
+  baseUrl: string | null | undefined,
+  oauthRegion: "global" | "cn" | null | undefined,
+): string {
+  if (typeof baseUrl === "string" && baseUrl.trim().length > 0) {
+    return baseUrl;
+  }
+  if (providerId === "minimax" && oauthRegion === "cn") {
+    return "https://api.minimaxi.com/anthropic";
+  }
+  return (
+    getDefaultProviderBaseUrls(providerId)[0] ?? "https://api.openai.com/v1"
+  );
+}
+
+function buildProviderConfig(
+  providerKey: string,
+  input: UpsertProviderBody,
+  currentTime: string,
+  existing?: ModelProviderConfig,
+): ModelProviderConfig {
+  const customProvider = parseCustomProviderKey(providerKey);
+  const providerId = customProvider?.templateId ?? providerKey;
+  const runtimePolicy = getProviderRuntimePolicy(providerId);
+  const existingMetadata = getProviderMetadata(existing) ?? {};
+  const authMode =
+    input.authMode ?? (existing?.auth === "oauth" ? "oauth" : "apiKey");
+  const nextModels =
+    input.modelsJson === undefined
+      ? (existing?.models ?? [])
+      : parseModelsJson(input.modelsJson).map((modelId) => ({
+          id: modelId,
+          name: modelId,
+          reasoning: false,
+          input: ["text"] as Array<"text" | "image">,
+          cost: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+          },
+          contextWindow: 0,
+          maxTokens: 0,
+          ...(runtimePolicy?.apiKind ? { api: runtimePolicy.apiKind } : {}),
+        }));
+  const nextOauthRegion =
+    authMode === "apiKey" ? null : (existing?.oauthRegion ?? null);
+  const nextMetadata: Record<string, unknown> = {
+    ...existingMetadata,
+    legacyId:
+      (typeof existingMetadata.legacyId === "string" &&
+        existingMetadata.legacyId) ||
+      crypto.randomUUID(),
+    legacyCreatedAt:
+      (typeof existingMetadata.legacyCreatedAt === "string" &&
+        existingMetadata.legacyCreatedAt) ||
+      currentTime,
+    legacyUpdatedAt: currentTime,
+  };
+
+  return {
+    ...(customProvider
+      ? {
+          providerTemplateId: customProvider.templateId,
+          instanceId: customProvider.instanceId,
+        }
+      : {}),
+    enabled: input.enabled ?? existing?.enabled ?? true,
+    ...((input.displayName ?? existing?.displayName)
+      ? { displayName: input.displayName ?? existing?.displayName }
+      : {}),
+    baseUrl: buildProviderBaseUrl(
+      providerId,
+      input.baseUrl === undefined ? existing?.baseUrl : input.baseUrl,
+      nextOauthRegion,
+    ),
+    ...(authMode === "oauth"
+      ? {
+          auth: "oauth" as const,
+          ...(existing?.oauthProfileRef
+            ? { oauthProfileRef: existing.oauthProfileRef }
+            : {}),
+        }
+      : { auth: "api-key" as const }),
+    ...(runtimePolicy?.apiKind ? { api: runtimePolicy.apiKind } : {}),
+    ...(authMode === "apiKey"
+      ? {
+          apiKey:
+            input.apiKey === undefined
+              ? existing?.apiKey
+              : (input.apiKey ?? undefined),
+        }
+      : {}),
+    ...(nextOauthRegion ? { oauthRegion: nextOauthRegion } : {}),
+    models: nextModels,
+    metadata:
+      authMode === "apiKey"
+        ? Object.fromEntries(
+            Object.entries(nextMetadata).filter(
+              ([key]) => key !== "legacyOauthCredential",
+            ),
+          )
+        : nextMetadata,
   };
 }
 
@@ -329,7 +511,8 @@ function convertCloudStatusToDesktop(
       shareMode: task.shareMode as "link" | "tweet" | "image",
       repeatMode: task.repeatMode as "once" | "daily" | "weekly",
       requiresScreenshot: task.shareMode === "image",
-      actionUrl: task.url,
+      actionUrl:
+        rewardTaskTemplateById.get(parsedTaskId.data)?.actionUrl ?? null,
       isClaimed: task.isClaimed,
       lastClaimedAt: task.lastClaimedAt,
       claimCount: task.claimCount,
@@ -380,7 +563,7 @@ export class NexuConfigStore {
       nexuConfigSchema,
       () => ({
         $schema: "https://nexu.io/config.json",
-        schemaVersion: 1,
+        schemaVersion: CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
         app: {},
         bots: [],
         runtime: {
@@ -391,7 +574,10 @@ export class NexuConfigStore {
           },
           defaultModelId: env.defaultModelId,
         },
-        providers: [],
+        models: {
+          mode: "merge",
+          providers: {},
+        },
         integrations: [],
         channels: [],
         templates: {},
@@ -1246,9 +1432,9 @@ export class NexuConfigStore {
     return disconnectedChannel !== null;
   }
 
-  async listProviders(): Promise<ProviderResponse[]> {
+  async listProviders(): Promise<StoredProviderResponse[]> {
     const config = await this.getConfig();
-    return config.providers.map((provider) => serializeProvider(provider));
+    return listCanonicalProviders(config);
   }
 
   async getProvider(
@@ -1256,8 +1442,10 @@ export class NexuConfigStore {
   ): Promise<StoredProviderResponse | null> {
     const config = await this.getConfig();
     const provider =
-      config.providers.find((item) => item.providerId === providerId) ?? null;
-    return provider ? serializeProvider(provider) : null;
+      listCanonicalProviders(config).find(
+        (item) => item.providerId === providerId,
+      ) ?? null;
+    return provider;
   }
 
   async upsertProvider(
@@ -1265,62 +1453,34 @@ export class NexuConfigStore {
     input: UpsertProviderBody,
   ): Promise<{ provider: StoredProviderResponse; created: boolean }> {
     const currentTime = now();
-    let result: ControllerProvider | null = null;
+    let result: ModelProviderConfig | null = null;
     let created = false;
 
     await this.store.update((config) => {
-      const existing = config.providers.find(
-        (item) => item.providerId === providerId,
+      const existing = config.models.providers[providerId];
+      const nextProvider = buildProviderConfig(
+        providerId,
+        input,
+        currentTime,
+        existing,
       );
-      const nextProvider: ControllerProvider = existing
-        ? {
-            ...existing,
-            displayName: input.displayName ?? existing.displayName,
-            enabled: input.enabled ?? existing.enabled,
-            authMode: input.authMode ?? existing.authMode,
-            baseUrl:
-              input.baseUrl === undefined ? existing.baseUrl : input.baseUrl,
-            apiKey: input.apiKey === undefined ? existing.apiKey : input.apiKey,
-            oauthRegion:
-              input.authMode === "apiKey" ? null : existing.oauthRegion,
-            oauthCredential:
-              input.authMode === "apiKey" ? null : existing.oauthCredential,
-            models:
-              input.modelsJson === undefined
-                ? existing.models
-                : parseModelsJson(input.modelsJson),
-            updatedAt: currentTime,
-          }
-        : {
-            id: crypto.randomUUID(),
-            providerId,
-            displayName: input.displayName ?? providerId,
-            enabled: input.enabled ?? true,
-            baseUrl: input.baseUrl ?? null,
-            authMode: input.authMode ?? "apiKey",
-            apiKey: input.apiKey ?? null,
-            oauthRegion: null,
-            oauthCredential: null,
-            models: parseModelsJson(input.modelsJson),
-            createdAt: currentTime,
-            updatedAt: currentTime,
-          };
-
-      if (nextProvider.authMode === "apiKey") {
-        nextProvider.oauthRegion = null;
-        nextProvider.oauthCredential = null;
-      }
 
       created = existing === undefined;
       result = nextProvider;
 
       return {
         ...config,
-        providers: existing
-          ? config.providers.map((item) =>
-              item.providerId === providerId ? nextProvider : item,
-            )
-          : [...config.providers, nextProvider],
+        schemaVersion: Math.max(
+          config.schemaVersion,
+          CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+        ),
+        models: {
+          ...config.models,
+          providers: {
+            ...config.models.providers,
+            [providerId]: nextProvider,
+          },
+        },
       };
     });
 
@@ -1329,7 +1489,7 @@ export class NexuConfigStore {
     }
 
     return {
-      provider: serializeProvider(result),
+      provider: serializeProvider(providerId, result),
       created,
     };
   }
@@ -1352,50 +1512,69 @@ export class NexuConfigStore {
     },
   ): Promise<StoredProviderResponse> {
     const currentTime = now();
-    let result: ControllerProvider | null = null;
+    let result: ModelProviderConfig | null = null;
 
     await this.store.update((config) => {
-      const existing = config.providers.find(
-        (item) => item.providerId === providerId,
-      );
-      const nextProvider: ControllerProvider = existing
-        ? {
-            ...existing,
-            displayName: input.displayName ?? existing.displayName,
-            enabled: input.enabled ?? true,
-            baseUrl:
-              input.baseUrl === undefined ? existing.baseUrl : input.baseUrl,
-            authMode: "oauth",
-            apiKey: null,
-            oauthRegion: input.oauthRegion,
-            oauthCredential: input.oauthCredential,
-            models: [...input.models],
-            updatedAt: currentTime,
-          }
-        : {
-            id: crypto.randomUUID(),
-            providerId,
-            displayName: input.displayName ?? providerId,
-            enabled: input.enabled ?? true,
-            baseUrl: input.baseUrl ?? null,
-            authMode: "oauth",
-            apiKey: null,
-            oauthRegion: input.oauthRegion,
-            oauthCredential: input.oauthCredential,
-            models: [...input.models],
-            createdAt: currentTime,
-            updatedAt: currentTime,
-          };
+      const existing = config.models.providers[providerId];
+      const existingMetadata = getProviderMetadata(existing) ?? {};
+      const nextProvider: ModelProviderConfig = {
+        ...(existing?.providerTemplateId
+          ? {
+              providerTemplateId: existing.providerTemplateId,
+              instanceId: existing.instanceId,
+            }
+          : {}),
+        enabled: input.enabled ?? existing?.enabled ?? true,
+        displayName: input.displayName ?? existing?.displayName ?? providerId,
+        baseUrl: buildProviderBaseUrl(
+          providerId,
+          input.baseUrl === undefined ? existing?.baseUrl : input.baseUrl,
+          input.oauthRegion,
+        ),
+        auth: "oauth",
+        ...(existing?.api ? { api: existing.api } : {}),
+        oauthRegion: input.oauthRegion,
+        oauthProfileRef: input.oauthCredential.provider,
+        models: input.models.map((modelId) => ({
+          id: modelId,
+          name: modelId,
+          reasoning: false,
+          input: ["text"] as Array<"text" | "image">,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 0,
+          maxTokens: 0,
+          ...(existing?.api ? { api: existing.api } : {}),
+        })),
+        metadata: {
+          ...existingMetadata,
+          legacyId:
+            (typeof existingMetadata.legacyId === "string" &&
+              existingMetadata.legacyId) ||
+            crypto.randomUUID(),
+          legacyCreatedAt:
+            (typeof existingMetadata.legacyCreatedAt === "string" &&
+              existingMetadata.legacyCreatedAt) ||
+            currentTime,
+          legacyUpdatedAt: currentTime,
+          legacyOauthCredential: input.oauthCredential,
+        },
+      };
 
       result = nextProvider;
 
       return {
         ...config,
-        providers: existing
-          ? config.providers.map((item) =>
-              item.providerId === providerId ? nextProvider : item,
-            )
-          : [...config.providers, nextProvider],
+        schemaVersion: Math.max(
+          config.schemaVersion,
+          CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+        ),
+        models: {
+          ...config.models,
+          providers: {
+            ...config.models.providers,
+            [providerId]: nextProvider,
+          },
+        },
       };
     });
 
@@ -1403,23 +1582,36 @@ export class NexuConfigStore {
       throw new Error(`Failed to set oauth provider ${providerId}`);
     }
 
-    return serializeProvider(result);
+    return serializeProvider(providerId, result);
   }
 
   async deleteProvider(providerId: string): Promise<boolean> {
     let deleted = false;
 
-    await this.store.update((config) => ({
-      ...config,
-      providers: config.providers.filter((provider) => {
+    await this.store.update((config) => {
+      for (const provider of listCanonicalProviders(config)) {
         if (provider.providerId === providerId) {
           deleted = true;
-          return false;
         }
+      }
 
-        return true;
-      }),
-    }));
+      const nextCanonicalProviders = {
+        ...config.models.providers,
+      };
+      delete nextCanonicalProviders[providerId];
+
+      return {
+        ...config,
+        schemaVersion: Math.max(
+          config.schemaVersion,
+          CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+        ),
+        models: {
+          ...config.models,
+          providers: nextCanonicalProviders,
+        },
+      };
+    });
 
     return deleted;
   }
@@ -2192,9 +2384,9 @@ export class NexuConfigStore {
     this.abortDesktopCloudPolling();
 
     await this.store.update((currentConfig) => {
+      const currentProfile = readLocalProfile(currentConfig);
       const sessions = readDesktopCloudSessions(currentConfig);
       const nextSession = sessions[nextProfile.name];
-      const currentProfile = readLocalProfile(currentConfig);
 
       return {
         ...currentConfig,
@@ -2202,7 +2394,9 @@ export class NexuConfigStore {
           ...currentConfig.desktop,
           localProfile: {
             ...currentProfile,
-            authSource: "desktop-local",
+            authSource: nextSession?.connected
+              ? currentProfile.authSource
+              : "desktop-local",
           },
           activeCloudProfileName: nextProfile.name,
           cloud: nextSession
@@ -2519,6 +2713,26 @@ export class NexuConfigStore {
     }));
 
     return runtime;
+  }
+
+  async getModelProviderConfigDocument(): Promise<PersistedModelsConfig> {
+    const config = await this.getConfig();
+    return config.models;
+  }
+
+  async setModelProviderConfigDocument(
+    models: PersistedModelsConfig,
+  ): Promise<PersistedModelsConfig> {
+    await this.store.update((config) => ({
+      ...config,
+      schemaVersion: Math.max(
+        config.schemaVersion,
+        CANONICAL_MODELS_PROVIDERS_CUTOVER_SCHEMA_VERSION,
+      ),
+      models,
+    }));
+
+    return (await this.getConfig()).models;
   }
 
   async syncManagedRuntimeGateway(input: {

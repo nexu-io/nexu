@@ -6763,91 +6763,153 @@
         }
       }
     },
-    "/api/v1/providers": {
+    "/api/v1/model-providers/registry": {
       "get": {
         "tags": [
-          "Providers"
+          "Model Providers"
         ],
         "responses": {
           "200": {
-            "description": "Provider list",
+            "description": "Model provider registry",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "providers": {
+                    "registry": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
                           "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "canonicalOpenClawId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "aliases": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "authModes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "api-key",
+                                "aws-sdk",
+                                "oauth",
+                                "token"
+                              ]
+                            }
+                          },
+                          "apiKind": {
+                            "type": "string",
+                            "enum": [
+                              "openai-completions",
+                              "openai-responses",
+                              "openai-codex-responses",
+                              "anthropic-messages",
+                              "google-generative-ai",
+                              "github-copilot",
+                              "bedrock-converse-stream",
+                              "ollama"
+                            ]
+                          },
+                          "defaultBaseUrls": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "controllerConfigurable": {
+                            "type": "boolean"
+                          },
+                          "modelsPageVisible": {
+                            "type": "boolean"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "global",
+                              "china",
+                              "local"
+                            ]
+                          },
+                          "signupUrl": {
                             "type": "string"
                           },
-                          "providerId": {
-                            "type": "string"
+                          "supportsCustomBaseUrl": {
+                            "type": "boolean"
+                          },
+                          "supportsModelDiscovery": {
+                            "type": "boolean"
+                          },
+                          "supportsProxyMode": {
+                            "type": "boolean"
+                          },
+                          "managedByAuthProfiles": {
+                            "type": "boolean"
+                          },
+                          "requiresOauthRegion": {
+                            "type": "boolean"
+                          },
+                          "authHeader": {
+                            "type": "boolean"
+                          },
+                          "defaultHeaders": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "experimental": {
+                            "type": "boolean"
+                          },
+                          "hidden": {
+                            "type": "boolean"
                           },
                           "displayName": {
                             "type": "string",
-                            "nullable": true
+                            "minLength": 1
                           },
-                          "enabled": {
-                            "type": "boolean"
-                          },
-                          "baseUrl": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "authMode": {
-                            "type": "string",
-                            "enum": [
-                              "apiKey",
-                              "oauth"
-                            ]
-                          },
-                          "hasApiKey": {
-                            "type": "boolean"
-                          },
-                          "hasOauthCredential": {
-                            "type": "boolean"
-                          },
-                          "oauthRegion": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "global",
-                              "cn"
-                            ]
-                          },
-                          "oauthEmail": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "modelsJson": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "createdAt": {
+                          "displayNameKey": {
                             "type": "string"
                           },
-                          "updatedAt": {
+                          "descriptionKey": {
+                            "type": "string"
+                          },
+                          "apiDocsUrl": {
+                            "type": "string"
+                          },
+                          "apiKeyPlaceholder": {
+                            "type": "string"
+                          },
+                          "defaultProxyUrl": {
+                            "type": "string"
+                          },
+                          "logo": {
                             "type": "string"
                           }
                         },
                         "required": [
                           "id",
-                          "providerId",
-                          "displayName",
-                          "enabled",
-                          "baseUrl",
-                          "hasApiKey",
-                          "modelsJson"
+                          "canonicalOpenClawId",
+                          "aliases",
+                          "authModes",
+                          "apiKind",
+                          "defaultBaseUrls",
+                          "displayName"
                         ]
                       }
                     }
                   },
                   "required": [
-                    "providers"
+                    "registry"
                   ]
                 }
               }
@@ -6856,29 +6918,970 @@
         }
       }
     },
-    "/api/v1/providers/{providerId}": {
+    "/api/v1/model-providers/config": {
+      "get": {
+        "tags": [
+          "Model Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Model provider config document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "merge",
+                            "replace"
+                          ],
+                          "default": "merge"
+                        },
+                        "providers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "providerTemplateId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "instanceId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean",
+                                "default": true
+                              },
+                              "auth": {
+                                "type": "string",
+                                "enum": [
+                                  "api-key",
+                                  "aws-sdk",
+                                  "oauth",
+                                  "token"
+                                ]
+                              },
+                              "api": {
+                                "type": "string",
+                                "enum": [
+                                  "openai-completions",
+                                  "openai-responses",
+                                  "openai-codex-responses",
+                                  "anthropic-messages",
+                                  "google-generative-ai",
+                                  "github-copilot",
+                                  "bedrock-converse-stream",
+                                  "ollama"
+                                ]
+                              },
+                              "apiKey": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "source": {
+                                        "type": "string",
+                                        "enum": [
+                                          "env",
+                                          "file",
+                                          "exec"
+                                        ]
+                                      },
+                                      "provider": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "provider",
+                                      "id"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "oauthRegion": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "global",
+                                  "cn"
+                                ]
+                              },
+                              "oauthProfileRef": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "headers": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "source": {
+                                          "type": "string",
+                                          "enum": [
+                                            "env",
+                                            "file",
+                                            "exec"
+                                          ]
+                                        },
+                                        "provider": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "provider",
+                                        "id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "models": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "api": {
+                                      "type": "string",
+                                      "enum": [
+                                        "openai-completions",
+                                        "openai-responses",
+                                        "openai-codex-responses",
+                                        "anthropic-messages",
+                                        "google-generative-ai",
+                                        "github-copilot",
+                                        "bedrock-converse-stream",
+                                        "ollama"
+                                      ]
+                                    },
+                                    "reasoning": {
+                                      "type": "boolean",
+                                      "default": false
+                                    },
+                                    "input": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "text",
+                                          "image"
+                                        ]
+                                      },
+                                      "default": [
+                                        "text"
+                                      ]
+                                    },
+                                    "cost": {
+                                      "type": "object",
+                                      "properties": {
+                                        "input": {
+                                          "type": "number"
+                                        },
+                                        "output": {
+                                          "type": "number"
+                                        },
+                                        "cacheRead": {
+                                          "type": "number"
+                                        },
+                                        "cacheWrite": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "default": {
+                                        "input": 0,
+                                        "output": 0,
+                                        "cacheRead": 0,
+                                        "cacheWrite": 0
+                                      },
+                                      "required": [
+                                        "input",
+                                        "output",
+                                        "cacheRead",
+                                        "cacheWrite"
+                                      ]
+                                    },
+                                    "contextWindow": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "maxTokens": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "headers": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "compat": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                },
+                                "default": []
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "baseUrl"
+                            ]
+                          },
+                          "default": {}
+                        },
+                        "bedrockDiscovery": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "providerFilter": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "refreshInterval": {
+                              "type": "number"
+                            },
+                            "defaultContextWindow": {
+                              "type": "number"
+                            },
+                            "defaultMaxTokens": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "config"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
-          "Providers"
+          "Model Providers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "replace"
+                    ],
+                    "default": "merge"
+                  },
+                  "providers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "providerTemplateId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "instanceId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "auth": {
+                          "type": "string",
+                          "enum": [
+                            "api-key",
+                            "aws-sdk",
+                            "oauth",
+                            "token"
+                          ]
+                        },
+                        "api": {
+                          "type": "string",
+                          "enum": [
+                            "openai-completions",
+                            "openai-responses",
+                            "openai-codex-responses",
+                            "anthropic-messages",
+                            "google-generative-ai",
+                            "github-copilot",
+                            "bedrock-converse-stream",
+                            "ollama"
+                          ]
+                        },
+                        "apiKey": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "env",
+                                    "file",
+                                    "exec"
+                                  ]
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "provider",
+                                "id"
+                              ]
+                            }
+                          ]
+                        },
+                        "baseUrl": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "oauthRegion": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "global",
+                            "cn"
+                          ]
+                        },
+                        "oauthProfileRef": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "enum": [
+                                      "env",
+                                      "file",
+                                      "exec"
+                                    ]
+                                  },
+                                  "provider": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "provider",
+                                  "id"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "api": {
+                                "type": "string",
+                                "enum": [
+                                  "openai-completions",
+                                  "openai-responses",
+                                  "openai-codex-responses",
+                                  "anthropic-messages",
+                                  "google-generative-ai",
+                                  "github-copilot",
+                                  "bedrock-converse-stream",
+                                  "ollama"
+                                ]
+                              },
+                              "reasoning": {
+                                "type": "boolean",
+                                "default": false
+                              },
+                              "input": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "text",
+                                    "image"
+                                  ]
+                                },
+                                "default": [
+                                  "text"
+                                ]
+                              },
+                              "cost": {
+                                "type": "object",
+                                "properties": {
+                                  "input": {
+                                    "type": "number"
+                                  },
+                                  "output": {
+                                    "type": "number"
+                                  },
+                                  "cacheRead": {
+                                    "type": "number"
+                                  },
+                                  "cacheWrite": {
+                                    "type": "number"
+                                  }
+                                },
+                                "default": {
+                                  "input": 0,
+                                  "output": 0,
+                                  "cacheRead": 0,
+                                  "cacheWrite": 0
+                                },
+                                "required": [
+                                  "input",
+                                  "output",
+                                  "cacheRead",
+                                  "cacheWrite"
+                                ]
+                              },
+                              "contextWindow": {
+                                "type": "number",
+                                "default": 0
+                              },
+                              "maxTokens": {
+                                "type": "number",
+                                "default": 0
+                              },
+                              "headers": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
+                              },
+                              "compat": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          },
+                          "default": []
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "baseUrl"
+                      ]
+                    },
+                    "default": {}
+                  },
+                  "bedrockDiscovery": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "region": {
+                        "type": "string"
+                      },
+                      "providerFilter": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "refreshInterval": {
+                        "type": "number"
+                      },
+                      "defaultContextWindow": {
+                        "type": "number"
+                      },
+                      "defaultMaxTokens": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated model provider config document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "merge",
+                            "replace"
+                          ],
+                          "default": "merge"
+                        },
+                        "providers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "providerTemplateId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "instanceId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean",
+                                "default": true
+                              },
+                              "auth": {
+                                "type": "string",
+                                "enum": [
+                                  "api-key",
+                                  "aws-sdk",
+                                  "oauth",
+                                  "token"
+                                ]
+                              },
+                              "api": {
+                                "type": "string",
+                                "enum": [
+                                  "openai-completions",
+                                  "openai-responses",
+                                  "openai-codex-responses",
+                                  "anthropic-messages",
+                                  "google-generative-ai",
+                                  "github-copilot",
+                                  "bedrock-converse-stream",
+                                  "ollama"
+                                ]
+                              },
+                              "apiKey": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "source": {
+                                        "type": "string",
+                                        "enum": [
+                                          "env",
+                                          "file",
+                                          "exec"
+                                        ]
+                                      },
+                                      "provider": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "source",
+                                      "provider",
+                                      "id"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "baseUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "oauthRegion": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "global",
+                                  "cn"
+                                ]
+                              },
+                              "oauthProfileRef": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "headers": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "source": {
+                                          "type": "string",
+                                          "enum": [
+                                            "env",
+                                            "file",
+                                            "exec"
+                                          ]
+                                        },
+                                        "provider": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "source",
+                                        "provider",
+                                        "id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "models": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "api": {
+                                      "type": "string",
+                                      "enum": [
+                                        "openai-completions",
+                                        "openai-responses",
+                                        "openai-codex-responses",
+                                        "anthropic-messages",
+                                        "google-generative-ai",
+                                        "github-copilot",
+                                        "bedrock-converse-stream",
+                                        "ollama"
+                                      ]
+                                    },
+                                    "reasoning": {
+                                      "type": "boolean",
+                                      "default": false
+                                    },
+                                    "input": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "text",
+                                          "image"
+                                        ]
+                                      },
+                                      "default": [
+                                        "text"
+                                      ]
+                                    },
+                                    "cost": {
+                                      "type": "object",
+                                      "properties": {
+                                        "input": {
+                                          "type": "number"
+                                        },
+                                        "output": {
+                                          "type": "number"
+                                        },
+                                        "cacheRead": {
+                                          "type": "number"
+                                        },
+                                        "cacheWrite": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "default": {
+                                        "input": 0,
+                                        "output": 0,
+                                        "cacheRead": 0,
+                                        "cacheWrite": 0
+                                      },
+                                      "required": [
+                                        "input",
+                                        "output",
+                                        "cacheRead",
+                                        "cacheWrite"
+                                      ]
+                                    },
+                                    "contextWindow": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "maxTokens": {
+                                      "type": "number",
+                                      "default": 0
+                                    },
+                                    "headers": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "compat": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "nullable": true
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                },
+                                "default": []
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "nullable": true
+                                }
+                              }
+                            },
+                            "required": [
+                              "baseUrl"
+                            ]
+                          },
+                          "default": {}
+                        },
+                        "bedrockDiscovery": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "providerFilter": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "refreshInterval": {
+                              "type": "number"
+                            },
+                            "defaultContextWindow": {
+                              "type": "number"
+                            },
+                            "defaultMaxTokens": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "config"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-providers/instances/validate": {
+      "post": {
+        "tags": [
+          "Model Providers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "baseUrl": {
+                    "type": "string"
+                  },
+                  "instanceKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "instanceKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validate model provider instance credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-providers/{providerId}/validate": {
+      "post": {
+        "tags": [
+          "Model Providers"
         ],
         "parameters": [
           {
             "schema": {
-              "type": "string",
-              "enum": [
-                "anthropic",
-                "openai",
-                "google",
-                "ollama",
-                "siliconflow",
-                "ppio",
-                "openrouter",
-                "minimax",
-                "kimi",
-                "glm",
-                "moonshot",
-                "zai"
-              ]
+              "type": "string"
             },
             "required": true,
             "name": "providerId",
@@ -6892,27 +7895,9 @@
                 "type": "object",
                 "properties": {
                   "apiKey": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "baseUrl": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "displayName": {
                     "type": "string"
                   },
-                  "authMode": {
-                    "type": "string",
-                    "enum": [
-                      "apiKey",
-                      "oauth"
-                    ]
-                  },
-                  "modelsJson": {
+                  "baseUrl": {
                     "type": "string"
                   }
                 }
@@ -6922,211 +7907,27 @@
         },
         "responses": {
           "200": {
-            "description": "Updated provider",
+            "description": "Validate model provider credentials",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "provider": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "providerId": {
-                          "type": "string"
-                        },
-                        "displayName": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "enabled": {
-                          "type": "boolean"
-                        },
-                        "baseUrl": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "authMode": {
-                          "type": "string",
-                          "enum": [
-                            "apiKey",
-                            "oauth"
-                          ]
-                        },
-                        "hasApiKey": {
-                          "type": "boolean"
-                        },
-                        "hasOauthCredential": {
-                          "type": "boolean"
-                        },
-                        "oauthRegion": {
-                          "type": "string",
-                          "nullable": true,
-                          "enum": [
-                            "global",
-                            "cn"
-                          ]
-                        },
-                        "oauthEmail": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "modelsJson": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "createdAt": {
-                          "type": "string"
-                        },
-                        "updatedAt": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "providerId",
-                        "displayName",
-                        "enabled",
-                        "baseUrl",
-                        "hasApiKey",
-                        "modelsJson"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "provider"
-                  ]
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Created provider",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "provider": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "providerId": {
-                          "type": "string"
-                        },
-                        "displayName": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "enabled": {
-                          "type": "boolean"
-                        },
-                        "baseUrl": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "authMode": {
-                          "type": "string",
-                          "enum": [
-                            "apiKey",
-                            "oauth"
-                          ]
-                        },
-                        "hasApiKey": {
-                          "type": "boolean"
-                        },
-                        "hasOauthCredential": {
-                          "type": "boolean"
-                        },
-                        "oauthRegion": {
-                          "type": "string",
-                          "nullable": true,
-                          "enum": [
-                            "global",
-                            "cn"
-                          ]
-                        },
-                        "oauthEmail": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "modelsJson": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "createdAt": {
-                          "type": "string"
-                        },
-                        "updatedAt": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "providerId",
-                        "displayName",
-                        "enabled",
-                        "baseUrl",
-                        "hasApiKey",
-                        "modelsJson"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "provider"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Providers"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "anthropic",
-                "openai",
-                "google",
-                "ollama",
-                "siliconflow",
-                "ppio",
-                "openrouter",
-                "minimax",
-                "kimi",
-                "glm",
-                "moonshot",
-                "zai"
-              ]
-            },
-            "required": true,
-            "name": "providerId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted provider",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
+                    "valid": {
                       "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "ok"
+                    "valid"
                   ]
                 }
               }
@@ -7135,10 +7936,10 @@
         }
       }
     },
-    "/api/v1/providers/minimax/oauth/status": {
+    "/api/v1/model-providers/minimax/oauth/status": {
       "get": {
         "tags": [
-          "Providers"
+          "Model Providers"
         ],
         "responses": {
           "200": {
@@ -7178,10 +7979,10 @@
         }
       }
     },
-    "/api/v1/providers/minimax/oauth/login": {
+    "/api/v1/model-providers/minimax/oauth/login": {
       "post": {
         "tags": [
-          "Providers"
+          "Model Providers"
         ],
         "requestBody": {
           "content": {
@@ -7250,7 +8051,7 @@
       },
       "delete": {
         "tags": [
-          "Providers"
+          "Model Providers"
         ],
         "responses": {
           "200": {
@@ -7310,7 +8111,24 @@
                 "ollama",
                 "siliconflow",
                 "ppio",
+                "nvidia",
+                "stepfun",
+                "amazon-bedrock",
+                "deepseek",
                 "openrouter",
+                "mistral",
+                "xai",
+                "together",
+                "huggingface",
+                "qwen",
+                "volcengine",
+                "qianfan",
+                "vllm",
+                "byteplus",
+                "venice",
+                "github-copilot",
+                "xiaomi",
+                "chutes",
                 "minimax",
                 "kimi",
                 "glm",
@@ -7449,10 +8267,10 @@
         }
       }
     },
-    "/api/v1/providers/{providerId}/oauth/start": {
+    "/api/v1/model-providers/{providerId}/oauth/start": {
       "post": {
         "tags": [
-          "Provider OAuth"
+          "Model Providers"
         ],
         "parameters": [
           {
@@ -7486,10 +8304,10 @@
         }
       }
     },
-    "/api/v1/providers/{providerId}/oauth/status": {
+    "/api/v1/model-providers/{providerId}/oauth/status": {
       "get": {
         "tags": [
-          "Provider OAuth"
+          "Model Providers"
         ],
         "parameters": [
           {
@@ -7538,10 +8356,10 @@
         }
       }
     },
-    "/api/v1/providers/{providerId}/oauth/provider-status": {
+    "/api/v1/model-providers/{providerId}/oauth/provider-status": {
       "get": {
         "tags": [
-          "Provider OAuth"
+          "Model Providers"
         ],
         "parameters": [
           {
@@ -7584,10 +8402,10 @@
         }
       }
     },
-    "/api/v1/providers/{providerId}/oauth/disconnect": {
+    "/api/v1/model-providers/{providerId}/oauth/disconnect": {
       "post": {
         "tags": [
-          "Provider OAuth"
+          "Model Providers"
         ],
         "parameters": [
           {

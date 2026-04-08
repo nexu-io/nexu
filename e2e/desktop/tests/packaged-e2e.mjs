@@ -662,7 +662,7 @@ async function runModelSwitchScenario({ page, userDataDir, captureDir }) {
   try {
     log("Verifying provider");
     const verifyRes = await fetch(
-      `${controllerBase}/api/v1/providers/openai/verify`,
+      `${controllerBase}/api/v1/model-providers/openai/validate`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -676,19 +676,31 @@ async function runModelSwitchScenario({ page, userDataDir, captureDir }) {
     log("Provider verified");
 
     log("Upserting provider");
-    const upsertRes = await fetch(`${controllerBase}/api/v1/providers/openai`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({
-        apiKey: "sk-e2e",
-        baseUrl: provider.baseUrl,
-        enabled: true,
-        displayName: "OpenAI E2E",
-        authMode: "apiKey",
-        modelsJson: JSON.stringify(["test-a", "test-b"]),
-      }),
-    });
+    const upsertRes = await fetch(
+      `${controllerBase}/api/v1/model-providers/config`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              displayName: "OpenAI E2E",
+              baseUrl: provider.baseUrl,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: "sk-e2e",
+              models: [
+                { id: "test-a", name: "test-a", api: "openai-completions" },
+                { id: "test-b", name: "test-b", api: "openai-completions" },
+              ],
+            },
+          },
+        }),
+      },
+    );
     assert(upsertRes.ok, `upsert failed: ${upsertRes.status}`);
     log("Provider upserted");
 

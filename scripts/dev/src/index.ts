@@ -125,6 +125,23 @@ async function startTarget(
   }
 
   if (target === "controller") {
+    const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
+
+    if (openclawSnapshot.status !== "running") {
+      getCliLogger().info(
+        "openclaw is not running; starting openclaw for controller",
+        {
+          target,
+          openclawStatus: openclawSnapshot.status,
+        },
+      );
+
+      const openclawFact = await startOpenclawDevProcess({
+        sessionId: createDevSessionId(),
+      });
+      getCliLogger().info("openclaw started", openclawFact);
+    }
+
     const controllerFact = await startControllerDevProcess({ sessionId });
     getCliLogger().info("controller started", controllerFact);
     return;
@@ -184,6 +201,23 @@ async function restartTarget(
   }
 
   if (target === "controller") {
+    const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
+
+    if (openclawSnapshot.status !== "running") {
+      getCliLogger().info(
+        "openclaw is not running; starting openclaw for controller restart",
+        {
+          target,
+          openclawStatus: openclawSnapshot.status,
+        },
+      );
+
+      const openclawFact = await startOpenclawDevProcess({
+        sessionId: createDevSessionId(),
+      });
+      getCliLogger().info("openclaw started", openclawFact);
+    }
+
     const controllerFact = await restartControllerDevProcess({ sessionId });
     getCliLogger().info("controller restarted", controllerFact);
     return;

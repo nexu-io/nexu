@@ -15,15 +15,15 @@ const PROVIDER_LABELS: Record<string, string> = {
   nexu: "nexu Official",
   anthropic: "Anthropic",
   openai: "OpenAI",
-  google: "Google AI",
+  google: "Google AI Studio",
   siliconflow: "SiliconFlow",
   ppio: "PPIO",
   openrouter: "OpenRouter",
   minimax: "MiniMax",
-  kimi: "Kimi",
-  glm: "GLM",
-  moonshot: "Kimi",
-  zai: "GLM",
+  kimi: "Moonshot",
+  glm: "Zhipu",
+  moonshot: "Moonshot",
+  zai: "Zhipu",
 };
 
 function getGroupKey(model: ModelPickerItem): string {
@@ -232,7 +232,7 @@ export function ModelPickerDropdown({
         >
           {currentGroupKey ? (
             <ModelLogo
-              model={currentModelLabel}
+              model={currentModelId}
               provider={currentGroupKey}
               size={14}
             />
@@ -408,7 +408,7 @@ export function ModelPickerDropdown({
                               )}
                               <span className="w-[14px] h-[14px] shrink-0 flex items-center justify-center">
                                 <ModelLogo
-                                  model={model.name}
+                                  model={model.id}
                                   provider={provider.id}
                                   size={13}
                                 />

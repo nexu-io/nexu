@@ -484,6 +484,38 @@ const en = {
   "models.provider.google.description": "Gemini series AI models",
   "models.provider.ollama.description":
     "Use local Ollama models running on your machine",
+  "models.provider.qwen.name": "Qwen",
+  "models.provider.volcengine.name": "Volcengine Ark",
+  "models.provider.qianfan.name": "Baidu Qianfan",
+  "models.provider.xiaomi.name": "Xiaomi MiMo",
+  "models.provider.glm.name": "Zhipu",
+  "models.provider.siliconflow.name": "SiliconFlow",
+  "models.provider.siliconflow.description":
+    "SiliconFlow provides hosted foundation models through an OpenAI-compatible API.",
+  "models.provider.ppio.description":
+    "PPIO offers a managed OpenAI-compatible endpoint for running popular models.",
+  "models.provider.qwen.description":
+    "Alibaba Cloud DashScope provides Qwen and other models through a compatible API.",
+  "models.provider.volcengine.description":
+    "Volcengine Ark gives access to Doubao, DeepSeek, and other hosted models.",
+  "models.provider.qianfan.description":
+    "Baidu Qianfan provides ERNIE and other hosted models through a compatible API.",
+  "models.provider.xiaomi.description":
+    "Xiaomi MiMo provides Flash, Pro, and Omni models through a compatible API.",
+  "models.provider.minimax.description":
+    "MiniMax provides chat and reasoning models through its hosted API platform.",
+  "models.provider.kimi.description":
+    "Moonshot AI provides Kimi models through an OpenAI-compatible API.",
+  "models.provider.glm.description":
+    "Zhipu provides GLM models through the BigModel compatible API.",
+  "models.provider.nvidia.description":
+    "NVIDIA NIM provides hosted models through an OpenAI-compatible API.",
+  "models.provider.stepfun.description":
+    "StepFun provides hosted models through an OpenAI-compatible API.",
+  "models.provider.amazonBedrock.description":
+    "AWS Bedrock uses your AWS credentials and region configuration.",
+  "models.provider.deepseek.description":
+    "DeepSeek provides hosted models through an OpenAI-compatible API.",
   "models.provider.openaiCompatible.description":
     "OpenAI-compatible API provider",
   "models.managed.connected": "Log out",
@@ -543,6 +575,9 @@ const en = {
   "models.byok.oauthFailed": "ChatGPT login failed",
   "models.byok.oauthOrApiKey": "Or enter an API key manually",
   "models.byok.oauthDescription": "Use your ChatGPT Plus/Pro subscription",
+  "models.byok.awsSdkAuth": "Authentication uses your AWS credential chain",
+  "models.byok.awsSdkAuthHint":
+    "No API key is required here. Configure AWS credentials and region in your runtime environment.",
   "models.byok.minimax.authModeOauth": "OAuth Login",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
@@ -561,6 +596,22 @@ const en = {
   "models.byok.zaiCodingPlanDesc":
     "Free models with your Z.AI Coding Plan subscription",
   "models.byok.zaiOrGeneralApi": "Or use General API key",
+  "models.customProvider.addButton": "Add custom provider",
+  "models.customProvider.title": "New custom provider",
+  "models.customProvider.newProvider": "New custom provider",
+  "models.customProvider.compatibility": "Compatibility",
+  "models.customProvider.compatibilityOpenai": "OpenAI-compatible",
+  "models.customProvider.compatibilityAnthropic": "Anthropic-compatible",
+  "models.customProvider.instanceId": "Instance id",
+  "models.customProvider.instanceIdPlaceholder": "e.g. team-gateway",
+  "models.customProvider.displayName": "Display name",
+  "models.customProvider.displayNamePlaceholder": "Custom provider",
+  "models.customProvider.baseUrl": "Base URL",
+  "models.customProvider.baseUrlPlaceholder": "https://api.example.com/v1",
+  "models.customProvider.create": "Create provider",
+  "models.customProvider.creating": "Creating...",
+  "models.customProvider.createFailed": "Failed to create custom provider",
+  "models.customProvider.removeDraft": "Remove draft",
 
   // ── Channels Page ──
   "channels.pageTitle": "Channels",

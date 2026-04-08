@@ -364,9 +364,9 @@ const zhCN = {
   "budget.banner.warningTitle": "云端额度即将耗尽",
   "budget.banner.depletedTitle": "云端额度已用尽",
   "budget.banner.warningHeadline":
-    "套餐额度即将耗尽，可采取以下方式避免任务中断",
+    "可用积分即将耗尽，可采取以下方式避免任务中断",
   "budget.banner.depletedHeadline":
-    "套餐额度已用尽（明天重置），可采取以下方式继续使用",
+    "可用积分已用尽（明天重置），可采取以下方式继续使用",
   "budget.banner.description":
     "完成任务赚取更多积分，或使用自带 API Key (BYOK) 继续使用。",
   "budget.banner.warningDescription":
@@ -459,6 +459,38 @@ const zhCN = {
   "models.provider.openai.description": "GPT 系列 AI 模型",
   "models.provider.google.description": "Gemini 系列 AI 模型",
   "models.provider.ollama.description": "使用你机器上本地运行的 Ollama 模型",
+  "models.provider.qwen.name": "千问",
+  "models.provider.volcengine.name": "火山引擎",
+  "models.provider.qianfan.name": "百度千帆",
+  "models.provider.xiaomi.name": "小米 MiMo",
+  "models.provider.glm.name": "智谱",
+  "models.provider.siliconflow.name": "硅基流动",
+  "models.provider.siliconflow.description":
+    "硅基流动通过兼容 OpenAI 的接口提供托管基础模型服务。",
+  "models.provider.ppio.description":
+    "PPIO 提供托管的 OpenAI 兼容接口，可接入热门模型。",
+  "models.provider.qwen.description":
+    "阿里云百炼通过兼容接口提供千问等模型服务。",
+  "models.provider.volcengine.description":
+    "火山引擎方舟可接入豆包、DeepSeek 等托管模型。",
+  "models.provider.qianfan.description":
+    "百度智能云千帆通过兼容接口提供文心等托管模型。",
+  "models.provider.xiaomi.description":
+    "小米 MiMo 通过兼容接口提供 Flash、Pro 和 Omni 模型。",
+  "models.provider.minimax.description":
+    "MiniMax 通过托管 API 平台提供对话与推理模型。",
+  "models.provider.kimi.description":
+    "月之暗面通过 OpenAI 兼容接口提供 Kimi 模型。",
+  "models.provider.glm.description":
+    "智谱通过 BigModel 兼容接口提供 GLM 模型。",
+  "models.provider.nvidia.description":
+    "NVIDIA NIM 通过兼容 OpenAI 的接口提供托管模型服务。",
+  "models.provider.stepfun.description":
+    "StepFun 通过兼容 OpenAI 的接口提供托管模型服务。",
+  "models.provider.amazonBedrock.description":
+    "AWS Bedrock 使用你的 AWS 凭证链与区域配置进行鉴权。",
+  "models.provider.deepseek.description":
+    "DeepSeek 通过兼容 OpenAI 的接口提供托管模型服务。",
   "models.provider.openaiCompatible.description":
     "兼容 OpenAI 协议的模型服务商",
   "models.managed.connected": "退出登录",
@@ -515,6 +547,9 @@ const zhCN = {
   "models.byok.oauthFailed": "ChatGPT 登录失败",
   "models.byok.oauthOrApiKey": "或手动输入 API Key",
   "models.byok.oauthDescription": "使用你的 ChatGPT Plus/Pro 订阅",
+  "models.byok.awsSdkAuth": "鉴权方式：AWS 凭证链",
+  "models.byok.awsSdkAuthHint":
+    "这里无需填写 API Key。请在运行环境中配置 AWS 凭证与区域。",
   "models.byok.minimax.authModeOauth": "OAuth 登录",
   "models.byok.minimax.authModeApiKey": "API Key",
   "models.byok.minimax.oauthTitle": "MiniMax Coding Plan OAuth",
@@ -532,6 +567,22 @@ const zhCN = {
   "models.byok.zaiCodingPlan": "智谱 Coding Plan",
   "models.byok.zaiCodingPlanDesc": "使用你的智谱 Coding Plan 订阅（免费模型）",
   "models.byok.zaiOrGeneralApi": "或使用通用 API Key",
+  "models.customProvider.addButton": "添加自定义服务商",
+  "models.customProvider.title": "新建自定义服务商",
+  "models.customProvider.newProvider": "新的自定义服务商",
+  "models.customProvider.compatibility": "兼容协议",
+  "models.customProvider.compatibilityOpenai": "兼容 OpenAI",
+  "models.customProvider.compatibilityAnthropic": "兼容 Anthropic",
+  "models.customProvider.instanceId": "实例 ID",
+  "models.customProvider.instanceIdPlaceholder": "例如：team-gateway",
+  "models.customProvider.displayName": "显示名称",
+  "models.customProvider.displayNamePlaceholder": "自定义服务商",
+  "models.customProvider.baseUrl": "Base URL",
+  "models.customProvider.baseUrlPlaceholder": "https://api.example.com/v1",
+  "models.customProvider.create": "创建服务商",
+  "models.customProvider.creating": "创建中...",
+  "models.customProvider.createFailed": "创建自定义服务商失败",
+  "models.customProvider.removeDraft": "移除草稿",
 
   // ── Channels Page ──
   "channels.pageTitle": "渠道",

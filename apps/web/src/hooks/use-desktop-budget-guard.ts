@@ -10,6 +10,7 @@ import {
 } from "./use-desktop-rewards";
 
 export type BudgetBannerStatus = "healthy" | "warning" | "depleted";
+export type BudgetBannerRouteVariant = "inline" | "global" | "hidden";
 
 const budgetBannerDismissStorageKey = "nexu_budget_banner_dismissed_v2";
 
@@ -54,6 +55,23 @@ export function getBudgetBannerStatus(input: {
   return "healthy";
 }
 
+export function getBudgetBannerRouteVariant(
+  pathname: string,
+): BudgetBannerRouteVariant {
+  if (pathname === "/workspace" || pathname === "/workspace/home") {
+    return "inline";
+  }
+
+  if (
+    pathname === "/workspace/sessions" ||
+    pathname.startsWith("/workspace/sessions/")
+  ) {
+    return "global";
+  }
+
+  return "hidden";
+}
+
 export function useDesktopBudgetGuard(input: {
   pathname: string;
   cloudConnected: boolean;
@@ -84,13 +102,8 @@ export function useDesktopBudgetGuard(input: {
     ],
   );
 
-  const isRemediationPage =
-    input.pathname.includes("/workspace/rewards") ||
-    input.pathname.includes("/workspace/settings") ||
-    input.pathname.includes("/workspace/models");
   const bannerDismissible = budgetStatus === "warning";
   const shouldShowPrompt =
-    !isRemediationPage &&
     budgetStatus !== "healthy" &&
     (!bannerDismissible || dismissedStatus !== budgetStatus);
 

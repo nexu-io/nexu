@@ -2427,127 +2427,323 @@ export type GetApiV1ModelsResponses = {
 
 export type GetApiV1ModelsResponse = GetApiV1ModelsResponses[keyof GetApiV1ModelsResponses];
 
-export type GetApiV1ProvidersData = {
+export type GetApiV1ModelProvidersRegistryData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/providers';
+    url: '/api/v1/model-providers/registry';
 };
 
-export type GetApiV1ProvidersResponses = {
+export type GetApiV1ModelProvidersRegistryResponses = {
     /**
-     * Provider list
+     * Model provider registry
      */
     200: {
-        providers: Array<{
+        registry: Array<{
             id: string;
-            providerId: string;
+            canonicalOpenClawId: string;
+            aliases: Array<string>;
+            authModes: Array<'api-key' | 'aws-sdk' | 'oauth' | 'token'>;
+            apiKind: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+            defaultBaseUrls: Array<string>;
+            controllerConfigurable?: boolean;
+            modelsPageVisible?: boolean;
+            region?: 'global' | 'china' | 'local';
+            signupUrl?: string;
+            supportsCustomBaseUrl?: boolean;
+            supportsModelDiscovery?: boolean;
+            supportsProxyMode?: boolean;
+            managedByAuthProfiles?: boolean;
+            requiresOauthRegion?: boolean;
+            authHeader?: boolean;
+            defaultHeaders?: {
+                [key: string]: string;
+            };
+            experimental?: boolean;
+            hidden?: boolean;
             displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
+            displayNameKey?: string;
+            descriptionKey?: string;
+            apiDocsUrl?: string;
+            apiKeyPlaceholder?: string;
+            defaultProxyUrl?: string;
+            logo?: string;
         }>;
     };
 };
 
-export type GetApiV1ProvidersResponse = GetApiV1ProvidersResponses[keyof GetApiV1ProvidersResponses];
+export type GetApiV1ModelProvidersRegistryResponse = GetApiV1ModelProvidersRegistryResponses[keyof GetApiV1ModelProvidersRegistryResponses];
 
-export type DeleteApiV1ProvidersByProviderIdData = {
-    body?: never;
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}';
-};
-
-export type DeleteApiV1ProvidersByProviderIdResponses = {
-    /**
-     * Deleted provider
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteApiV1ProvidersByProviderIdResponse = DeleteApiV1ProvidersByProviderIdResponses[keyof DeleteApiV1ProvidersByProviderIdResponses];
-
-export type PutApiV1ProvidersByProviderIdData = {
-    body?: {
-        apiKey?: string;
-        baseUrl?: string;
-        enabled?: boolean;
-        displayName?: string;
-        authMode?: 'apiKey' | 'oauth';
-        modelsJson?: string;
-    };
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}';
-};
-
-export type PutApiV1ProvidersByProviderIdResponses = {
-    /**
-     * Updated provider
-     */
-    200: {
-        provider: {
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        };
-    };
-    /**
-     * Created provider
-     */
-    201: {
-        provider: {
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        };
-    };
-};
-
-export type PutApiV1ProvidersByProviderIdResponse = PutApiV1ProvidersByProviderIdResponses[keyof PutApiV1ProvidersByProviderIdResponses];
-
-export type GetApiV1ProvidersMinimaxOauthStatusData = {
+export type GetApiV1ModelProvidersConfigData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/providers/minimax/oauth/status';
+    url: '/api/v1/model-providers/config';
 };
 
-export type GetApiV1ProvidersMinimaxOauthStatusResponses = {
+export type GetApiV1ModelProvidersConfigResponses = {
+    /**
+     * Model provider config document
+     */
+    200: {
+        config: {
+            mode?: 'merge' | 'replace';
+            providers?: {
+                [key: string]: {
+                    providerTemplateId?: string;
+                    instanceId?: string;
+                    enabled?: boolean;
+                    auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    apiKey?: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                    baseUrl: string;
+                    oauthRegion?: 'global' | 'cn';
+                    oauthProfileRef?: string;
+                    displayName?: string;
+                    headers?: {
+                        [key: string]: string | {
+                            source: 'env' | 'file' | 'exec';
+                            provider: string;
+                            id: string;
+                        };
+                    };
+                    models?: Array<{
+                        id: string;
+                        name: string;
+                        api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                        reasoning?: boolean;
+                        input?: Array<'text' | 'image'>;
+                        cost?: {
+                            input: number;
+                            output: number;
+                            cacheRead: number;
+                            cacheWrite: number;
+                        };
+                        contextWindow?: number;
+                        maxTokens?: number;
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        compat?: {
+                            [key: string]: unknown;
+                        };
+                    }>;
+                    metadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            bedrockDiscovery?: {
+                enabled?: boolean;
+                region?: string;
+                providerFilter?: Array<string>;
+                refreshInterval?: number;
+                defaultContextWindow?: number;
+                defaultMaxTokens?: number;
+            };
+        };
+    };
+};
+
+export type GetApiV1ModelProvidersConfigResponse = GetApiV1ModelProvidersConfigResponses[keyof GetApiV1ModelProvidersConfigResponses];
+
+export type PutApiV1ModelProvidersConfigData = {
+    body?: {
+        mode?: 'merge' | 'replace';
+        providers?: {
+            [key: string]: {
+                providerTemplateId?: string;
+                instanceId?: string;
+                enabled?: boolean;
+                auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                apiKey?: string | {
+                    source: 'env' | 'file' | 'exec';
+                    provider: string;
+                    id: string;
+                };
+                baseUrl: string;
+                oauthRegion?: 'global' | 'cn';
+                oauthProfileRef?: string;
+                displayName?: string;
+                headers?: {
+                    [key: string]: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                };
+                models?: Array<{
+                    id: string;
+                    name: string;
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    reasoning?: boolean;
+                    input?: Array<'text' | 'image'>;
+                    cost?: {
+                        input: number;
+                        output: number;
+                        cacheRead: number;
+                        cacheWrite: number;
+                    };
+                    contextWindow?: number;
+                    maxTokens?: number;
+                    headers?: {
+                        [key: string]: string;
+                    };
+                    compat?: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                metadata?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        bedrockDiscovery?: {
+            enabled?: boolean;
+            region?: string;
+            providerFilter?: Array<string>;
+            refreshInterval?: number;
+            defaultContextWindow?: number;
+            defaultMaxTokens?: number;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/config';
+};
+
+export type PutApiV1ModelProvidersConfigResponses = {
+    /**
+     * Updated model provider config document
+     */
+    200: {
+        config: {
+            mode?: 'merge' | 'replace';
+            providers?: {
+                [key: string]: {
+                    providerTemplateId?: string;
+                    instanceId?: string;
+                    enabled?: boolean;
+                    auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    apiKey?: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                    baseUrl: string;
+                    oauthRegion?: 'global' | 'cn';
+                    oauthProfileRef?: string;
+                    displayName?: string;
+                    headers?: {
+                        [key: string]: string | {
+                            source: 'env' | 'file' | 'exec';
+                            provider: string;
+                            id: string;
+                        };
+                    };
+                    models?: Array<{
+                        id: string;
+                        name: string;
+                        api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                        reasoning?: boolean;
+                        input?: Array<'text' | 'image'>;
+                        cost?: {
+                            input: number;
+                            output: number;
+                            cacheRead: number;
+                            cacheWrite: number;
+                        };
+                        contextWindow?: number;
+                        maxTokens?: number;
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        compat?: {
+                            [key: string]: unknown;
+                        };
+                    }>;
+                    metadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            bedrockDiscovery?: {
+                enabled?: boolean;
+                region?: string;
+                providerFilter?: Array<string>;
+                refreshInterval?: number;
+                defaultContextWindow?: number;
+                defaultMaxTokens?: number;
+            };
+        };
+    };
+};
+
+export type PutApiV1ModelProvidersConfigResponse = PutApiV1ModelProvidersConfigResponses[keyof PutApiV1ModelProvidersConfigResponses];
+
+export type PostApiV1ModelProvidersInstancesValidateData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+        instanceKey: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/instances/validate';
+};
+
+export type PostApiV1ModelProvidersInstancesValidateResponses = {
+    /**
+     * Validate model provider instance credentials
+     */
+    200: {
+        valid: boolean;
+        models?: Array<string>;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersInstancesValidateResponse = PostApiV1ModelProvidersInstancesValidateResponses[keyof PostApiV1ModelProvidersInstancesValidateResponses];
+
+export type PostApiV1ModelProvidersByProviderIdValidateData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/model-providers/{providerId}/validate';
+};
+
+export type PostApiV1ModelProvidersByProviderIdValidateResponses = {
+    /**
+     * Validate model provider credentials
+     */
+    200: {
+        valid: boolean;
+        models?: Array<string>;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersByProviderIdValidateResponse = PostApiV1ModelProvidersByProviderIdValidateResponses[keyof PostApiV1ModelProvidersByProviderIdValidateResponses];
+
+export type GetApiV1ModelProvidersMinimaxOauthStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/minimax/oauth/status';
+};
+
+export type GetApiV1ModelProvidersMinimaxOauthStatusResponses = {
     /**
      * MiniMax OAuth status
      */
@@ -2559,16 +2755,16 @@ export type GetApiV1ProvidersMinimaxOauthStatusResponses = {
     };
 };
 
-export type GetApiV1ProvidersMinimaxOauthStatusResponse = GetApiV1ProvidersMinimaxOauthStatusResponses[keyof GetApiV1ProvidersMinimaxOauthStatusResponses];
+export type GetApiV1ModelProvidersMinimaxOauthStatusResponse = GetApiV1ModelProvidersMinimaxOauthStatusResponses[keyof GetApiV1ModelProvidersMinimaxOauthStatusResponses];
 
-export type DeleteApiV1ProvidersMinimaxOauthLoginData = {
+export type DeleteApiV1ModelProvidersMinimaxOauthLoginData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/providers/minimax/oauth/login';
+    url: '/api/v1/model-providers/minimax/oauth/login';
 };
 
-export type DeleteApiV1ProvidersMinimaxOauthLoginResponses = {
+export type DeleteApiV1ModelProvidersMinimaxOauthLoginResponses = {
     /**
      * Cancel MiniMax OAuth login
      */
@@ -2581,18 +2777,18 @@ export type DeleteApiV1ProvidersMinimaxOauthLoginResponses = {
     };
 };
 
-export type DeleteApiV1ProvidersMinimaxOauthLoginResponse = DeleteApiV1ProvidersMinimaxOauthLoginResponses[keyof DeleteApiV1ProvidersMinimaxOauthLoginResponses];
+export type DeleteApiV1ModelProvidersMinimaxOauthLoginResponse = DeleteApiV1ModelProvidersMinimaxOauthLoginResponses[keyof DeleteApiV1ModelProvidersMinimaxOauthLoginResponses];
 
-export type PostApiV1ProvidersMinimaxOauthLoginData = {
+export type PostApiV1ModelProvidersMinimaxOauthLoginData = {
     body?: {
         region: 'global' | 'cn';
     };
     path?: never;
     query?: never;
-    url: '/api/v1/providers/minimax/oauth/login';
+    url: '/api/v1/model-providers/minimax/oauth/login';
 };
 
-export type PostApiV1ProvidersMinimaxOauthLoginResponses = {
+export type PostApiV1ModelProvidersMinimaxOauthLoginResponses = {
     /**
      * Start MiniMax OAuth login
      */
@@ -2606,7 +2802,7 @@ export type PostApiV1ProvidersMinimaxOauthLoginResponses = {
     };
 };
 
-export type PostApiV1ProvidersMinimaxOauthLoginResponse = PostApiV1ProvidersMinimaxOauthLoginResponses[keyof PostApiV1ProvidersMinimaxOauthLoginResponses];
+export type PostApiV1ModelProvidersMinimaxOauthLoginResponse = PostApiV1ModelProvidersMinimaxOauthLoginResponses[keyof PostApiV1ModelProvidersMinimaxOauthLoginResponses];
 
 export type PostApiV1ProvidersByProviderIdVerifyData = {
     body?: {
@@ -2614,7 +2810,7 @@ export type PostApiV1ProvidersByProviderIdVerifyData = {
         baseUrl?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'nvidia' | 'stepfun' | 'amazon-bedrock' | 'deepseek' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}/verify';
@@ -2673,16 +2869,16 @@ export type PostApiV1QuotaRestoreManagedResponses = {
 
 export type PostApiV1QuotaRestoreManagedResponse = PostApiV1QuotaRestoreManagedResponses[keyof PostApiV1QuotaRestoreManagedResponses];
 
-export type PostApiV1ProvidersByProviderIdOauthStartData = {
+export type PostApiV1ModelProvidersByProviderIdOauthStartData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/start';
+    url: '/api/v1/model-providers/{providerId}/oauth/start';
 };
 
-export type PostApiV1ProvidersByProviderIdOauthStartResponses = {
+export type PostApiV1ModelProvidersByProviderIdOauthStartResponses = {
     /**
      * OAuth flow started
      */
@@ -2692,18 +2888,18 @@ export type PostApiV1ProvidersByProviderIdOauthStartResponses = {
     };
 };
 
-export type PostApiV1ProvidersByProviderIdOauthStartResponse = PostApiV1ProvidersByProviderIdOauthStartResponses[keyof PostApiV1ProvidersByProviderIdOauthStartResponses];
+export type PostApiV1ModelProvidersByProviderIdOauthStartResponse = PostApiV1ModelProvidersByProviderIdOauthStartResponses[keyof PostApiV1ModelProvidersByProviderIdOauthStartResponses];
 
-export type GetApiV1ProvidersByProviderIdOauthStatusData = {
+export type GetApiV1ModelProvidersByProviderIdOauthStatusData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/status';
+    url: '/api/v1/model-providers/{providerId}/oauth/status';
 };
 
-export type GetApiV1ProvidersByProviderIdOauthStatusResponses = {
+export type GetApiV1ModelProvidersByProviderIdOauthStatusResponses = {
     /**
      * Current OAuth flow status
      */
@@ -2714,18 +2910,18 @@ export type GetApiV1ProvidersByProviderIdOauthStatusResponses = {
     };
 };
 
-export type GetApiV1ProvidersByProviderIdOauthStatusResponse = GetApiV1ProvidersByProviderIdOauthStatusResponses[keyof GetApiV1ProvidersByProviderIdOauthStatusResponses];
+export type GetApiV1ModelProvidersByProviderIdOauthStatusResponse = GetApiV1ModelProvidersByProviderIdOauthStatusResponses[keyof GetApiV1ModelProvidersByProviderIdOauthStatusResponses];
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusData = {
+export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/provider-status';
+    url: '/api/v1/model-providers/{providerId}/oauth/provider-status';
 };
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponses = {
+export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses = {
     /**
      * OAuth provider connection status
      */
@@ -2737,18 +2933,18 @@ export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponses = {
     };
 };
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponse = GetApiV1ProvidersByProviderIdOauthProviderStatusResponses[keyof GetApiV1ProvidersByProviderIdOauthProviderStatusResponses];
+export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponse = GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses[keyof GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses];
 
-export type PostApiV1ProvidersByProviderIdOauthDisconnectData = {
+export type PostApiV1ModelProvidersByProviderIdOauthDisconnectData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/disconnect';
+    url: '/api/v1/model-providers/{providerId}/oauth/disconnect';
 };
 
-export type PostApiV1ProvidersByProviderIdOauthDisconnectResponses = {
+export type PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses = {
     /**
      * OAuth provider disconnected
      */
@@ -2757,7 +2953,7 @@ export type PostApiV1ProvidersByProviderIdOauthDisconnectResponses = {
     };
 };
 
-export type PostApiV1ProvidersByProviderIdOauthDisconnectResponse = PostApiV1ProvidersByProviderIdOauthDisconnectResponses[keyof PostApiV1ProvidersByProviderIdOauthDisconnectResponses];
+export type PostApiV1ModelProvidersByProviderIdOauthDisconnectResponse = PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses[keyof PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses];
 
 export type GetApiV1IntegrationsData = {
     body?: never;

@@ -58,13 +58,13 @@ function FadeIn({
 const PROVIDER_OPTIONS = [
   { id: "anthropic", name: "Anthropic", placeholder: "sk-ant-..." },
   { id: "openai", name: "OpenAI", placeholder: "sk-..." },
-  { id: "google", name: "Google AI", placeholder: "AIza..." },
+  { id: "google", name: "Google AI Studio", placeholder: "AIza..." },
   { id: "siliconflow", name: "SiliconFlow", placeholder: "sk-..." },
   { id: "ppio", name: "PPIO", placeholder: "sk-..." },
   { id: "openrouter", name: "OpenRouter", placeholder: "sk-or-..." },
   { id: "minimax", name: "MiniMax", placeholder: "sk-..." },
-  { id: "kimi", name: "Kimi", placeholder: "sk-..." },
-  { id: "glm", name: "GLM", placeholder: "eyJ..." },
+  { id: "kimi", name: "Moonshot", placeholder: "sk-..." },
+  { id: "glm", name: "Zhipu", placeholder: "eyJ..." },
 ] as const;
 
 type Mode = "choose" | "byok";

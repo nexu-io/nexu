@@ -60,6 +60,10 @@ function createConfig(overrides: Partial<NexuConfig> = {}): NexuConfig {
       },
       defaultModelId: "anthropic/claude-sonnet-4",
     },
+    models: {
+      mode: "merge",
+      providers: {},
+    },
     providers: [
       {
         id: "provider-1",
@@ -664,6 +668,193 @@ describe("compileOpenClawConfig", () => {
     expect(result.models?.providers.minimax?.baseUrl).toBe(
       "https://api.minimaxi.com/anthropic",
     );
+  });
+
+  it("compiles canonical custom provider instances with deterministic runtime keys", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "custom-openai/team-gateway/anthropic/claude-haiku-4.5",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId:
+            "custom-openai/team-gateway/anthropic/claude-haiku-4.5",
+        },
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            "custom-openai/team-gateway": {
+              providerTemplateId: "custom-openai",
+              instanceId: "team-gateway",
+              enabled: true,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: "custom-key",
+              baseUrl: "https://gateway.example.com/v1",
+              displayName: "Team Gateway",
+              headers: {
+                "x-team-id": "team-gateway",
+              },
+              models: [
+                {
+                  id: "anthropic/claude-haiku-4.5",
+                  name: "Claude Haiku 4.5",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(
+      result.models?.providers["custom-openai__team-gateway"],
+    ).toMatchObject({
+      baseUrl: "https://gateway.example.com/v1",
+      apiKey: "custom-key",
+      api: "openai-completions",
+      headers: {
+        "x-team-id": "team-gateway",
+      },
+    });
+    expect(
+      result.models?.providers["custom-openai__team-gateway"]?.models[0]?.id,
+    ).toBe("anthropic/claude-haiku-4.5");
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "custom-openai__team-gateway/anthropic/claude-haiku-4.5",
+    });
+  });
+
+  it("preserves secret-ref provider API keys in compiled models config", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: {
+                source: "env",
+                provider: "nexu",
+                id: "openai-api-key",
+              },
+              baseUrl: "https://api.openai.com/v1",
+              models: [
+                {
+                  id: "gpt-4.1",
+                  name: "GPT-4.1",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.openai?.apiKey).toEqual({
+      source: "env",
+      provider: "nexu",
+      id: "openai-api-key",
+    });
+    expect(result.models?.providers.openai?.models[0]?.id).toBe("gpt-4.1");
+  });
+
+  it("normalizes legacy byok model refs against canonical provider config", () => {
+    const now = new Date().toISOString();
+    const result = compileOpenClawConfig(
+      createConfig({
+        bots: [
+          {
+            ...createConfig().bots[0],
+            modelId: "byok_openai/openai/gpt-4.1",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        runtime: {
+          gateway: {
+            port: 18789,
+            bind: "loopback",
+            authMode: "token",
+          },
+          defaultModelId: "byok_openai/openai/gpt-4.1",
+        },
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              auth: "api-key",
+              api: "openai-completions",
+              apiKey: "sk-test",
+              baseUrl: "https://api.openai.com/v1",
+              models: [
+                {
+                  id: "gpt-4.1",
+                  name: "GPT-4.1",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.agents.defaults?.model).toEqual({
+      primary: "openai/gpt-4.1",
+    });
   });
 
   describe("agent skill assignment", () => {

@@ -395,7 +395,7 @@ export function registerIpcHandlers(
           return fetchControllerJson<
             HostInvokeResultMap["desktop:get-minimax-oauth-status"]
           >(
-            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/status`,
+            `${runtimeConfig.urls.controllerBase}/api/v1/model-providers/minimax/oauth/status`,
           );
         }
 
@@ -405,7 +405,7 @@ export function registerIpcHandlers(
           return fetchControllerJson<
             HostInvokeResultMap["desktop:start-minimax-oauth"]
           >(
-            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/login`,
+            `${runtimeConfig.urls.controllerBase}/api/v1/model-providers/minimax/oauth/login`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -418,7 +418,7 @@ export function registerIpcHandlers(
           return fetchControllerJson<
             HostInvokeResultMap["desktop:cancel-minimax-oauth"]
           >(
-            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/login`,
+            `${runtimeConfig.urls.controllerBase}/api/v1/model-providers/minimax/oauth/login`,
             {
               method: "DELETE",
             },

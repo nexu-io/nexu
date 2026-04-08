@@ -103,25 +103,28 @@ function installBrowserStubs(localStorage: Storage) {
   });
 }
 
-function renderWorkspaceLayout(rewardsStatus: {
-  viewer: {
-    cloudConnected: boolean;
-    activeModelId: string | null;
-    activeModelProviderId: string | null;
-    usingManagedModel: boolean;
-  };
-  progress: {
-    claimedCount: number;
-    totalCount: number;
-    earnedCredits: number;
-    availableCredits: number;
-  };
-  cloudBalance: {
-    totalBalance: number;
-    totalRecharged: number;
-    totalConsumed: number;
-  } | null;
-}) {
+function renderWorkspaceLayout(
+  rewardsStatus: {
+    viewer: {
+      cloudConnected: boolean;
+      activeModelId: string | null;
+      activeModelProviderId: string | null;
+      usingManagedModel: boolean;
+    };
+    progress: {
+      claimedCount: number;
+      totalCount: number;
+      earnedCredits: number;
+      availableCredits: number;
+    };
+    cloudBalance: {
+      totalBalance: number;
+      totalRecharged: number;
+      totalConsumed: number;
+    } | null;
+  },
+  initialEntry = "/workspace/sessions/sess-1",
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -167,12 +170,23 @@ function renderWorkspaceLayout(rewardsStatus: {
 
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/workspace/sessions/sess-1"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route element={<WorkspaceLayout />}>
+            <Route path="/workspace" element={<div>Home body</div>} />
+            <Route path="/workspace/home" element={<div>Home body</div>} />
             <Route
               path="/workspace/sessions/:id"
               element={<div>Session body</div>}
+            />
+            <Route
+              path="/workspace/rewards"
+              element={<div>Rewards body</div>}
+            />
+            <Route path="/workspace/skills" element={<div>Skills body</div>} />
+            <Route
+              path="/workspace/skills/:slug"
+              element={<div>Skill detail body</div>}
             />
           </Route>
         </Routes>
@@ -221,6 +235,76 @@ describe("budget banner dismissal persistence", () => {
     });
 
     expect(markup).toContain('data-budget-banner-status="warning"');
+  });
+
+  it("does not render the global warning banner on the skills page", () => {
+    const sessionStorage = new StorageMock();
+    const localStorage = new StorageMock();
+
+    vi.stubGlobal("sessionStorage", sessionStorage);
+    installBrowserStubs(localStorage);
+    localStorage.setItem("nexu_setup_complete", "1");
+
+    const markup = renderWorkspaceLayout(
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 6,
+          totalCount: rewardTasks.length,
+          earnedCredits: 1200,
+          availableCredits: 0,
+        },
+        cloudBalance: {
+          totalBalance: 5,
+          totalRecharged: 1200,
+          totalConsumed: 0,
+        },
+      },
+      "/workspace/skills",
+    );
+
+    expect(markup).toContain("Skills body");
+    expect(markup).not.toContain('data-budget-banner-status="warning"');
+  });
+
+  it("does not render the global warning banner on skill detail pages", () => {
+    const sessionStorage = new StorageMock();
+    const localStorage = new StorageMock();
+
+    vi.stubGlobal("sessionStorage", sessionStorage);
+    installBrowserStubs(localStorage);
+    localStorage.setItem("nexu_setup_complete", "1");
+
+    const markup = renderWorkspaceLayout(
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 6,
+          totalCount: rewardTasks.length,
+          earnedCredits: 1200,
+          availableCredits: 0,
+        },
+        cloudBalance: {
+          totalBalance: 5,
+          totalRecharged: 1200,
+          totalConsumed: 0,
+        },
+      },
+      "/workspace/skills/sample-skill",
+    );
+
+    expect(markup).toContain("Skill detail body");
+    expect(markup).not.toContain('data-budget-banner-status="warning"');
   });
 
   it("does not let a stale v1 session dismissal hide the depleted banner", () => {

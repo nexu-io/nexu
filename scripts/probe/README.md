@@ -4,6 +4,42 @@ This directory contains local developer probe scripts for checking high-signal r
 
 This is a local developer probe, not a CI-safe browser test.
 
+## Model Call Probe
+
+The model call probe sends one prompt directly through the repo-local OpenClaw runtime (no Slack/Feishu path).
+
+### Basic usage
+
+```bash
+pnpm probe:model
+```
+
+### Override options
+
+```bash
+pnpm probe:model -- \
+  --session-id local-probe \
+  --message "hello from probe" \
+  --timeout-sec 60
+```
+
+### Test a specific provider/model
+
+```bash
+pnpm probe:model -- \
+  --provider custom-openai/litellm \
+  --model anthropic/claude-3.5-haiku \
+  --message "Reply with exactly: PROVIDER_TEST_OK"
+```
+
+The probe prints the selected provider + model before sending the prompt.
+If you pass `--provider` / `--model`, it temporarily switches the desktop default model for the probe run, then restores the original default model afterward.
+
+Defaults assume the standard repo-local desktop dev paths:
+
+- config: `.tmp/desktop/nexu-home/runtime/openclaw/state/openclaw.json`
+- state: `.tmp/desktop/electron/user-data/runtime/openclaw/state`
+
 ## Prepare
 
 Install Chrome Canary, instead of using Chrome.

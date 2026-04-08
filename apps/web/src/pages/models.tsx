@@ -9,7 +9,15 @@ import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import { selectPreferredModel } from "@nexu/shared";
+import {
+  type ProviderRegistryEntryDto,
+  buildCustomProviderKey,
+  customProviderTemplateIds,
+  getProviderAliasCandidates,
+  normalizeProviderId,
+  parseCustomProviderKey,
+  selectPreferredModel,
+} from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -29,28 +37,32 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  deleteApiV1ProvidersByProviderId,
-  deleteApiV1ProvidersMinimaxOauthLogin,
+  deleteApiV1ModelProvidersMinimaxOauthLogin,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
   getApiV1Me,
+  getApiV1ModelProvidersByProviderIdOauthProviderStatus,
+  getApiV1ModelProvidersByProviderIdOauthStatus,
+  getApiV1ModelProvidersConfig,
+  getApiV1ModelProvidersMinimaxOauthStatus,
+  getApiV1ModelProvidersRegistry,
   getApiV1Models,
-  getApiV1Providers,
-  getApiV1ProvidersByProviderIdOauthProviderStatus,
-  getApiV1ProvidersByProviderIdOauthStatus,
-  getApiV1ProvidersMinimaxOauthStatus,
   patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
   postApiInternalDesktopCloudRefresh,
-  postApiV1ProvidersByProviderIdOauthDisconnect,
-  postApiV1ProvidersByProviderIdOauthStart,
-  postApiV1ProvidersByProviderIdVerify,
-  postApiV1ProvidersMinimaxOauthLogin,
+  postApiV1ModelProvidersByProviderIdOauthDisconnect,
+  postApiV1ModelProvidersByProviderIdOauthStart,
+  postApiV1ModelProvidersByProviderIdValidate,
+  postApiV1ModelProvidersInstancesValidate,
+  postApiV1ModelProvidersMinimaxOauthLogin,
   putApiInternalDesktopDefaultModel,
-  putApiV1ProvidersByProviderId,
+  putApiV1ModelProvidersConfig,
 } from "../../lib/api/sdk.gen";
-import type { PutApiV1ProvidersByProviderIdData } from "../../lib/api/types.gen";
+import type {
+  PostApiV1ModelProvidersByProviderIdValidateData,
+  PutApiV1ModelProvidersConfigData,
+} from "../../lib/api/types.gen";
 import { markSetupComplete } from "./welcome";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -70,19 +82,30 @@ interface ProviderConfig {
   models: ProviderModel[];
 }
 
-interface DbProvider {
+type SidebarItem = {
   id: string;
-  providerId: string;
+  name: string;
+  modelCount: number;
+  configured: boolean;
+  managed: boolean;
+  kind: "managed" | "builtin-byok" | "custom-byok" | "custom-draft";
+  providerKey?: string;
+  registryEntry?: ByokProviderEntry;
+  draftId?: string;
+};
+
+type StoredModelsConfig = NonNullable<PutApiV1ModelProvidersConfigData["body"]>;
+type StoredProviderConfig = NonNullable<
+  StoredModelsConfig["providers"]
+>[string];
+type CustomProviderTemplateId = (typeof customProviderTemplateIds)[number];
+type CustomProviderDraft = {
+  id: string;
+  templateId: CustomProviderTemplateId;
+  instanceId: string;
   displayName: string;
-  enabled: boolean;
-  baseUrl: string | null;
-  authMode?: "apiKey" | "oauth";
-  hasApiKey: boolean;
-  hasOauthCredential?: boolean;
-  oauthRegion?: "global" | "cn" | null;
-  oauthEmail?: string | null;
-  modelsJson: string;
-}
+  baseUrl: string;
+};
 
 type MiniMaxDesktopOauthStatus = {
   connected: boolean;
@@ -101,20 +124,29 @@ type MiniMaxDesktopOauthCancelResult = MiniMaxDesktopOauthStatus & {
 };
 
 function getDefaultMiniMaxAuthMode(
-  providerId: ByokProviderId,
-  dbProvider?: DbProvider,
+  provider: ProviderRegistryEntryDto,
+  providerConfig?: StoredProviderConfig,
 ): "apiKey" | "oauth" {
-  if (dbProvider?.authMode) {
-    return dbProvider.authMode;
+  if (providerConfig?.auth === "oauth") {
+    return "oauth";
   }
-  if (dbProvider?.hasApiKey) {
+  if (providerConfig?.apiKey) {
     return "apiKey";
   }
-  if (dbProvider?.hasOauthCredential) {
+  if (providerConfig?.oauthProfileRef) {
     return "oauth";
   }
 
-  return providerId === "minimax" ? "oauth" : "apiKey";
+  return provider.requiresOauthRegion ? "oauth" : "apiKey";
+}
+
+function getProviderDisplayName(
+  provider: Pick<ProviderRegistryEntryDto, "displayName" | "displayNameKey">,
+  t: (key: string) => string,
+): string {
+  return provider.displayNameKey
+    ? t(provider.displayNameKey)
+    : provider.displayName;
 }
 
 function setMiniMaxOauthErrorInCache(
@@ -200,7 +232,7 @@ export function isModelSelected(
 }
 
 function normalizeByokModelSelectionKey(
-  providerId: string,
+  providerKey: string,
   modelId: string,
 ): string {
   const normalizedModelId = modelId.trim().toLowerCase();
@@ -208,20 +240,20 @@ function normalizeByokModelSelectionKey(
     return normalizedModelId;
   }
 
-  const normalizedProviderId = providerId.trim().toLowerCase();
-  return normalizedModelId.startsWith(`${normalizedProviderId}/`)
+  const normalizedProviderKey = providerKey.trim().toLowerCase();
+  return normalizedModelId.startsWith(`${normalizedProviderKey}/`)
     ? normalizedModelId
-    : `${normalizedProviderId}/${normalizedModelId}`;
+    : `${normalizedProviderKey}/${normalizedModelId}`;
 }
 
 function isByokModelSelected(
-  providerId: string,
+  providerKey: string,
   modelId: string,
   currentModelId: string,
 ): boolean {
   return (
-    normalizeByokModelSelectionKey(providerId, modelId) ===
-    normalizeByokModelSelectionKey(providerId, currentModelId)
+    normalizeByokModelSelectionKey(providerKey, modelId) ===
+    normalizeByokModelSelectionKey(providerKey, currentModelId)
   );
 }
 
@@ -246,157 +278,6 @@ function isSettingsTab(value: string | null): value is SettingsTab {
   return value === "general" || value === "providers";
 }
 
-// ── Provider metadata ─────────────────────────────────────────
-
-const PROVIDER_META: Record<
-  string,
-  {
-    name: string;
-    descriptionKey: string;
-    apiDocsUrl?: string;
-    apiKeyPlaceholder?: string;
-    defaultProxyUrl?: string;
-  }
-> = {
-  nexu: {
-    name: "nexu Official",
-    descriptionKey: "models.provider.nexu.description",
-  },
-  anthropic: {
-    name: "Anthropic",
-    descriptionKey: "models.provider.anthropic.description",
-    apiDocsUrl: "https://console.anthropic.com/settings/keys",
-    apiKeyPlaceholder: "sk-ant-api03-...",
-    defaultProxyUrl: "https://api.anthropic.com",
-  },
-  openai: {
-    name: "OpenAI",
-    descriptionKey: "models.provider.openai.description",
-    apiDocsUrl: "https://platform.openai.com/api-keys",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.openai.com/v1",
-  },
-  google: {
-    name: "Google AI",
-    descriptionKey: "models.provider.google.description",
-    apiDocsUrl: "https://aistudio.google.com/app/apikey",
-    apiKeyPlaceholder: "AIza...",
-    defaultProxyUrl: "https://generativelanguage.googleapis.com/v1beta",
-  },
-  ollama: {
-    name: "Ollama",
-    descriptionKey: "models.provider.ollama.description",
-    apiDocsUrl: "https://ollama.com/download",
-    apiKeyPlaceholder: "ollama-local",
-    defaultProxyUrl: "http://127.0.0.1:11434",
-  },
-  siliconflow: {
-    name: "SiliconFlow",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://cloud.siliconflow.cn/account/ak",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.siliconflow.cn/v1",
-  },
-  ppio: {
-    name: "PPIO",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://www.ppinfra.com/",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.ppinfra.com/v3/openai",
-  },
-  openrouter: {
-    name: "OpenRouter",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://openrouter.ai/settings/keys",
-    apiKeyPlaceholder: "sk-or-...",
-    defaultProxyUrl: "https://openrouter.ai/api/v1",
-  },
-  minimax: {
-    name: "MiniMax",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl:
-      "https://platform.minimaxi.com/user-center/basic-information/interface-key",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.minimax.io/anthropic",
-  },
-  kimi: {
-    name: "Kimi",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://platform.moonshot.cn/console/api-keys",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.moonshot.cn/v1",
-  },
-  glm: {
-    name: "GLM",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
-    apiKeyPlaceholder: "eyJ...",
-    defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
-  },
-  moonshot: {
-    name: "Kimi",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://platform.moonshot.cn/console/api-keys",
-    apiKeyPlaceholder: "sk-...",
-    defaultProxyUrl: "https://api.moonshot.cn/v1",
-  },
-  zai: {
-    name: "GLM",
-    descriptionKey: "models.provider.openaiCompatible.description",
-    apiDocsUrl: "https://open.bigmodel.cn/usercenter/apikeys",
-    apiKeyPlaceholder: "eyJ...",
-    defaultProxyUrl: "https://open.bigmodel.cn/api/paas/v4",
-  },
-};
-
-// Well-known models per provider (shown when no verify result yet)
-const DEFAULT_MODELS: Record<string, string[]> = {
-  anthropic: [
-    "claude-opus-4-1-20250805",
-    "claude-opus-4-20250514",
-    "claude-sonnet-4-20250514",
-    "claude-3-5-haiku-20241022",
-  ],
-  openai: ["gpt-5.4", "gpt-5.1", "gpt-5-mini", "o4-mini"],
-  google: [
-    "gemini-3-pro",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-  ],
-  ollama: [],
-  siliconflow: [
-    "deepseek-ai/DeepSeek-R1",
-    "deepseek-ai/DeepSeek-V3",
-    "Qwen/Qwen3-14B",
-    "moonshotai/Kimi-K2-Instruct",
-  ],
-  ppio: [
-    "deepseek/deepseek-v3-turbo",
-    "deepseek/deepseek-v3/community",
-    "deepseek/deepseek-r1-0528",
-    "deepseek/deepseek-r1/community",
-  ],
-  openrouter: ["auto", "openrouter/hunter-alpha", "openrouter/healer-alpha"],
-  minimax: [
-    "MiniMax-M2.7",
-    "MiniMax-M2.7-highspeed",
-    "MiniMax-M2.5",
-    "MiniMax-M2.5-highspeed",
-    "MiniMax-M2.1",
-    "MiniMax-M2.1-highspeed",
-    "MiniMax-M2",
-  ],
-  kimi: ["kimi-k2.5"],
-  glm: ["glm-5", "glm-5-turbo", "glm-4.7", "glm-4.7-flash"],
-  moonshot: ["kimi-k2.5"],
-  zai: ["glm-5", "glm-4.7", "glm-4.7-flash", "glm-4.7-flashx"],
-};
-
-const ZAI_CODING_PLAN_URLS: Record<string, string> = {
-  global: "https://api.z.ai/api/coding/paas/v4",
-  cn: "https://open.bigmodel.cn/api/coding/paas/v4",
-};
 const ZAI_CODING_PLAN_MODELS = [
   "glm-5",
   "glm-4.7",
@@ -412,30 +293,33 @@ function buildProviders(
     isDefault?: boolean;
     description?: string;
   }>,
+  registryEntries: ProviderRegistryEntryDto[],
 ): ProviderConfig[] {
+  const registryEntryMap = new Map(
+    registryEntries.map((entry) => [entry.id, entry] as const),
+  );
+
   // Group models by provider
   const grouped = new Map<string, ProviderModel[]>();
   for (const m of apiModels) {
-    const list = grouped.get(m.provider) ?? [];
+    const normalizedProviderId = normalizeProviderId(m.provider) ?? m.provider;
+    const list = grouped.get(normalizedProviderId) ?? [];
     list.push({
       id: m.id,
       name: m.name,
       description: m.description,
     });
-    grouped.set(m.provider, list);
+    grouped.set(normalizedProviderId, list);
   }
 
   return Array.from(grouped.entries()).map(([providerId, models]) => {
-    const meta = PROVIDER_META[providerId] ?? {
-      name: providerId,
-      descriptionKey: "",
-    };
+    const meta = registryEntryMap.get(providerId) ?? null;
     return {
       id: providerId,
-      name: meta.name,
-      description: meta.descriptionKey,
+      name: meta?.displayName ?? providerId,
+      description: meta?.descriptionKey ?? "",
       managed: providerId === "nexu",
-      apiDocsUrl: meta.apiDocsUrl,
+      apiDocsUrl: meta?.apiDocsUrl,
       models,
     };
   });
@@ -443,74 +327,171 @@ function buildProviders(
 
 // ── API helpers ───────────────────────────────────────────────
 
-async function fetchProviders(): Promise<DbProvider[]> {
-  const { data } = await getApiV1Providers();
-  return data?.providers ?? [];
+async function fetchProviderRegistry(): Promise<ProviderRegistryEntryDto[]> {
+  const { data } = await getApiV1ModelProvidersRegistry();
+  return data?.registry ?? [];
 }
 
-async function saveProvider(
-  providerId: ByokProviderId,
-  body: {
-    apiKey?: string;
-    baseUrl?: string | null;
-    enabled?: boolean;
-    displayName?: string;
-    authMode?: "apiKey" | "oauth";
-    modelsJson?: string;
-  },
-): Promise<DbProvider> {
-  const { data, error } = await putApiV1ProvidersByProviderId({
-    path: { providerId },
-    body: { ...body, baseUrl: body.baseUrl ?? undefined },
-  });
-  if (error || !data) throw new Error("Failed to save provider");
-  return data.provider as DbProvider;
+async function fetchModelProviderConfig(): Promise<StoredModelsConfig> {
+  const { data } = await getApiV1ModelProvidersConfig();
+  return (data?.config ?? {
+    mode: "merge",
+    providers: {},
+  }) as StoredModelsConfig;
 }
 
-async function deleteProvider(providerId: ByokProviderId): Promise<void> {
-  const { error } = await deleteApiV1ProvidersByProviderId({
-    path: { providerId },
+async function saveModelProviderConfig(
+  config: StoredModelsConfig,
+): Promise<StoredModelsConfig> {
+  const { data, error } = await putApiV1ModelProvidersConfig({
+    body: config,
   });
-  if (error) throw new Error("Failed to delete provider");
+  if (error || !data) {
+    throw new Error("Failed to save model provider config");
+  }
+  return data.config;
 }
 
 async function verifyApiKey(
+  providerKey: string,
   providerId: ByokProviderId,
   apiKey?: string,
   baseUrl?: string,
 ): Promise<{ valid: boolean; models?: string[]; error?: string }> {
-  const { data, error } = await postApiV1ProvidersByProviderIdVerify({
-    path: { providerId },
-    body: { apiKey, baseUrl },
-  });
+  const customProvider = parseCustomProviderKey(providerKey);
+  const { data, error } = customProvider
+    ? await postApiV1ModelProvidersInstancesValidate({
+        body: { instanceKey: providerKey, apiKey, baseUrl },
+      })
+    : await postApiV1ModelProvidersByProviderIdValidate({
+        path: { providerId },
+        body: { apiKey, baseUrl },
+      });
   if (error || !data) throw new Error("Verify request failed");
   return data;
+}
+
+function normalizeVerifiedModelIds(models: unknown[] | undefined): string[] {
+  if (!models) {
+    return [];
+  }
+
+  return models
+    .map((model) => {
+      if (typeof model === "string") {
+        return model;
+      }
+      if (
+        model &&
+        typeof model === "object" &&
+        "id" in model &&
+        typeof model.id === "string"
+      ) {
+        return model.id;
+      }
+      return null;
+    })
+    .filter((modelId): modelId is string => Boolean(modelId));
 }
 
 // ── BYOK provider sidebar entries ─────────────────────────────
 // Always show these four as configurable, even if no key set yet
 
-const BYOK_PROVIDER_IDS = [
-  "anthropic",
-  "openai",
-  "google",
-  "ollama",
-  "siliconflow",
-  "ppio",
-  "openrouter",
-  "minimax",
-  "kimi",
-  "glm",
-] as const;
-
 const OLLAMA_DUMMY_API_KEY = "ollama-local";
 
 type ConfigurableProviderId =
-  PutApiV1ProvidersByProviderIdData["path"]["providerId"];
-type ByokProviderId = Extract<
-  (typeof BYOK_PROVIDER_IDS)[number],
-  ConfigurableProviderId
->;
+  PostApiV1ModelProvidersByProviderIdValidateData["path"]["providerId"];
+type ByokProviderId = ConfigurableProviderId;
+
+type ByokProviderEntry = ProviderRegistryEntryDto & {
+  id: ByokProviderId;
+};
+
+function getProviderDefaultBaseUrl(provider: ProviderRegistryEntryDto): string {
+  return provider.defaultProxyUrl ?? provider.defaultBaseUrls[0] ?? "";
+}
+
+function getProviderConfigMatch(
+  config: StoredModelsConfig | undefined,
+  providerId: string,
+): { key: string; config: StoredProviderConfig } | null {
+  const providers = config?.providers ?? {};
+  const candidateIds = new Set(getProviderAliasCandidates(providerId));
+
+  for (const [key, value] of Object.entries(providers)) {
+    if (candidateIds.has(key) || normalizeProviderId(key) === providerId) {
+      return { key, config: value as StoredProviderConfig };
+    }
+  }
+
+  return null;
+}
+
+function hasSavedProviderCredential(
+  providerConfig?: StoredProviderConfig,
+): boolean {
+  return Boolean(providerConfig?.apiKey || providerConfig?.oauthProfileRef);
+}
+
+function isStoredProviderConfigured(
+  providerConfig?: StoredProviderConfig,
+): boolean {
+  if (!providerConfig || providerConfig.enabled === false) {
+    return false;
+  }
+
+  return Boolean(
+    providerConfig.baseUrl ||
+      (providerConfig.models?.length ?? 0) > 0 ||
+      hasSavedProviderCredential(providerConfig),
+  );
+}
+
+function buildStoredModels(
+  provider: ProviderRegistryEntryDto,
+  modelIds: string[],
+): StoredProviderConfig["models"] {
+  return modelIds.map((modelId) => ({
+    id: modelId,
+    name: modelId,
+    api: provider.apiKind,
+  }));
+}
+
+function buildStoredModelsConfig(
+  currentConfig: StoredModelsConfig | undefined,
+  providers: NonNullable<StoredModelsConfig["providers"]>,
+): StoredModelsConfig {
+  return {
+    mode: currentConfig?.mode ?? "merge",
+    providers,
+    ...(currentConfig?.bedrockDiscovery
+      ? { bedrockDiscovery: currentConfig.bedrockDiscovery }
+      : {}),
+  };
+}
+
+function getCustomProviderTemplateLabel(
+  templateId: CustomProviderTemplateId,
+  t: (key: string) => string,
+): string {
+  switch (templateId) {
+    case "custom-anthropic":
+      return t("models.customProvider.compatibilityAnthropic");
+    case "custom-openai":
+      return t("models.customProvider.compatibilityOpenai");
+  }
+}
+
+function createCustomProviderDraft(id: string): CustomProviderDraft {
+  return {
+    id,
+    templateId: "custom-openai",
+    instanceId: "",
+    displayName: "",
+    baseUrl: "",
+  };
+}
 
 // ── Component ──────────────────────────────────────────────────
 
@@ -717,6 +698,172 @@ function _GeneralSettings() {
 
 // _CurrentModelSelector removed — model switching now lives inline in each provider's model list
 
+function AddCustomProviderDetail({
+  draft,
+  customTemplates,
+  onChange,
+  onCreate,
+  onRemove,
+}: {
+  draft: CustomProviderDraft;
+  customTemplates: ByokProviderEntry[];
+  onChange: (draft: CustomProviderDraft) => void;
+  onCreate: (input: {
+    template: ByokProviderEntry;
+    instanceId: string;
+    displayName: string;
+    baseUrl: string;
+  }) => Promise<void>;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const template = useMemo(
+    () => customTemplates.find((item) => item.id === draft.templateId) ?? null,
+    [customTemplates, draft.templateId],
+  );
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!template) {
+        throw new Error("Custom provider template not found");
+      }
+
+      await onCreate({
+        template,
+        instanceId: draft.instanceId.trim(),
+        displayName:
+          draft.displayName.trim() ||
+          `${getCustomProviderTemplateLabel(draft.templateId, t)} / ${draft.instanceId.trim()}`,
+        baseUrl: draft.baseUrl.trim(),
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message || t("models.customProvider.createFailed"));
+    },
+  });
+
+  const canCreate = Boolean(
+    template && draft.instanceId.trim() && draft.baseUrl.trim(),
+  );
+
+  return (
+    <div className="max-w-lg space-y-4">
+      <div className="text-[14px] font-semibold text-text-primary">
+        {t("models.customProvider.title")}
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label
+            htmlFor="custom-provider-template"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            {t("models.customProvider.compatibility")}
+          </label>
+          <select
+            id="custom-provider-template"
+            value={draft.templateId}
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                templateId: event.target.value as CustomProviderTemplateId,
+              })
+            }
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          >
+            {customTemplates.map((item) => (
+              <option key={item.id} value={item.id}>
+                {getCustomProviderTemplateLabel(
+                  item.id as CustomProviderTemplateId,
+                  t,
+                )}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label
+            htmlFor="custom-provider-instance-id"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            {t("models.customProvider.instanceId")}
+          </label>
+          <input
+            id="custom-provider-instance-id"
+            type="text"
+            value={draft.instanceId}
+            onChange={(event) =>
+              onChange({ ...draft, instanceId: event.target.value })
+            }
+            placeholder={t("models.customProvider.instanceIdPlaceholder")}
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="custom-provider-display-name"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            {t("models.customProvider.displayName")}
+          </label>
+          <input
+            id="custom-provider-display-name"
+            type="text"
+            value={draft.displayName}
+            onChange={(event) =>
+              onChange({ ...draft, displayName: event.target.value })
+            }
+            placeholder={t("models.customProvider.displayNamePlaceholder")}
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="custom-provider-base-url"
+            className="mb-1.5 block text-[12px] font-medium text-text-secondary"
+          >
+            {t("models.customProvider.baseUrl")}
+          </label>
+          <input
+            id="custom-provider-base-url"
+            type="text"
+            value={draft.baseUrl}
+            onChange={(event) =>
+              onChange({ ...draft, baseUrl: event.target.value })
+            }
+            placeholder={t("models.customProvider.baseUrlPlaceholder")}
+            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canCreate || createMutation.isPending}
+          onClick={() => createMutation.mutate()}
+          className={cn(
+            "rounded-lg px-4 py-2 text-[12px] font-medium transition-colors",
+            canCreate && !createMutation.isPending
+              ? "bg-accent text-accent-fg hover:bg-accent/90"
+              : "bg-surface-2 text-text-muted cursor-not-allowed",
+          )}
+        >
+          {createMutation.isPending
+            ? t("models.customProvider.creating")
+            : t("models.customProvider.create")}
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-lg px-4 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
+        >
+          {t("models.customProvider.removeDraft")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ModelsPage() {
   const { t } = useTranslation();
   const { stars: starNexu } = useGitHubStars();
@@ -738,6 +885,9 @@ export function ModelsPage() {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     providerParam ?? (isSetupMode ? "anthropic" : null),
   );
+  const [customProviderDrafts, setCustomProviderDrafts] = useState<
+    CustomProviderDraft[]
+  >([]);
 
   const queryClient = useQueryClient();
 
@@ -753,9 +903,14 @@ export function ModelsPage() {
     },
   });
 
-  const { data: dbProviders = [] } = useQuery({
-    queryKey: ["providers"],
-    queryFn: fetchProviders,
+  const { data: providerRegistry = [] } = useQuery({
+    queryKey: ["model-provider-registry"],
+    queryFn: fetchProviderRegistry,
+  });
+
+  const { data: providerConfigDoc } = useQuery({
+    queryKey: ["model-provider-config"],
+    queryFn: fetchModelProviderConfig,
   });
 
   // Current default model
@@ -769,6 +924,19 @@ export function ModelsPage() {
 
   const currentModelId = defaultModelData?.modelId ?? "";
   const models = modelsData?.models ?? [];
+  const visibleRegistryProviders = useMemo(
+    () =>
+      providerRegistry.filter(
+        (entry): entry is ByokProviderEntry =>
+          entry.modelsPageVisible === true &&
+          entry.controllerConfigurable === true,
+      ),
+    [providerRegistry],
+  );
+  const visibleRegistryProviderMap = useMemo(
+    () => new Map(visibleRegistryProviders.map((entry) => [entry.id, entry])),
+    [visibleRegistryProviders],
+  );
   const { data: desktopReadyData } = useQuery({
     queryKey: ["desktop-ready"],
     queryFn: async () => {
@@ -776,6 +944,79 @@ export function ModelsPage() {
       return data;
     },
   });
+  const saveProviderConfigMutation = useMutation({
+    mutationFn: saveModelProviderConfig,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["model-provider-config"] }),
+        queryClient.invalidateQueries({ queryKey: ["models"] }),
+        queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] }),
+      ]);
+    },
+  });
+
+  const upsertProviderConfigByKey = useCallback(
+    async (providerKey: string, nextProviderConfig: StoredProviderConfig) => {
+      if (!providerConfigDoc) {
+        throw new Error("Model provider config is still loading");
+      }
+
+      const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
+      currentProviders[providerKey] = nextProviderConfig;
+
+      await saveProviderConfigMutation.mutateAsync(
+        buildStoredModelsConfig(providerConfigDoc, currentProviders),
+      );
+    },
+    [providerConfigDoc, saveProviderConfigMutation],
+  );
+
+  const removeProviderConfigByKey = useCallback(
+    async (providerKey: string) => {
+      if (!providerConfigDoc) {
+        throw new Error("Model provider config is still loading");
+      }
+
+      const currentProviders = { ...(providerConfigDoc?.providers ?? {}) };
+      delete currentProviders[providerKey];
+
+      await saveProviderConfigMutation.mutateAsync(
+        buildStoredModelsConfig(providerConfigDoc, currentProviders),
+      );
+    },
+    [providerConfigDoc, saveProviderConfigMutation],
+  );
+
+  const upsertBuiltinProviderConfig = useCallback(
+    async (
+      provider: ByokProviderEntry,
+      nextProviderConfig: StoredProviderConfig,
+    ) => {
+      const matchedProvider = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      );
+      await upsertProviderConfigByKey(
+        matchedProvider?.key ?? provider.id,
+        nextProviderConfig,
+      );
+    },
+    [providerConfigDoc, upsertProviderConfigByKey],
+  );
+
+  const removeBuiltinProviderConfig = useCallback(
+    async (provider: ByokProviderEntry) => {
+      const matchedProvider = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      );
+      if (!matchedProvider) {
+        return;
+      }
+      await removeProviderConfigByKey(matchedProvider.key);
+    },
+    [providerConfigDoc, removeProviderConfigByKey],
+  );
 
   const userSwitchRef = useRef(false);
   const updateModel = useMutation({
@@ -816,27 +1057,75 @@ export function ModelsPage() {
 
     if (newId && newId !== prev && !userSwitchRef.current) {
       const matched = models.find((m) => m.id === newId);
+      const matchedProviderId = normalizeProviderId(
+        matched?.provider ?? "",
+      ) as ByokProviderId | null;
       const providerName =
-        PROVIDER_META[matched?.provider ?? ""]?.name ?? matched?.provider;
+        (matchedProviderId
+          ? visibleRegistryProviderMap.get(matchedProviderId)?.displayName
+          : null) ?? matched?.provider;
       const label = providerName
         ? `${matched?.name ?? newId} (${providerName})`
         : (matched?.name ?? newId);
       toast.info(t("models.autoSwitched", { model: label }));
     }
     userSwitchRef.current = false;
-  }, [defaultModelData?.modelId, models, t]);
+  }, [defaultModelData?.modelId, models, t, visibleRegistryProviderMap]);
 
-  const providers = useMemo(() => buildProviders(models), [models]);
+  const providers = useMemo(
+    () => buildProviders(models, providerRegistry),
+    [models, providerRegistry],
+  );
 
-  // Build sidebar items: Nexu first, then BYOK providers
+  const customTemplateRegistryMap = useMemo(() => {
+    const map = new Map<string, ByokProviderEntry>();
+    for (const templateId of customProviderTemplateIds) {
+      const template = providerRegistry.find(
+        (entry): entry is ByokProviderEntry => entry.id === templateId,
+      );
+      if (template) {
+        map.set(template.id, template);
+      }
+    }
+    return map;
+  }, [providerRegistry]);
+
+  const customProviderInstances = useMemo(() => {
+    const entries = providerConfigDoc?.providers
+      ? Object.entries(providerConfigDoc.providers)
+      : [];
+    return entries
+      .map(([key, config]) => {
+        const parsed = parseCustomProviderKey(key);
+        if (!parsed) {
+          return null;
+        }
+
+        const template = customTemplateRegistryMap.get(parsed.templateId);
+        if (!template) {
+          return null;
+        }
+
+        return {
+          key,
+          instanceId: parsed.instanceId,
+          template,
+          config: config as StoredProviderConfig,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+  }, [customTemplateRegistryMap, providerConfigDoc?.providers]);
+
+  const removeCustomProviderDraft = useCallback((draftId: string) => {
+    setCustomProviderDrafts((previous) =>
+      previous.filter((draft) => draft.id !== draftId),
+    );
+    setSelectedProviderId((current) => (current === draftId ? null : current));
+  }, []);
+
+  // Build sidebar items: Nexu first, then built-in BYOK, then custom BYOK
   const sidebarItems = useMemo(() => {
-    const items: Array<{
-      id: string;
-      name: string;
-      modelCount: number;
-      configured: boolean;
-      managed: boolean;
-    }> = [];
+    const items: SidebarItem[] = [];
 
     // Nexu official — always shown
     const nexuProvider = providers.find((p) => p.id === "nexu");
@@ -846,30 +1135,103 @@ export function ModelsPage() {
       modelCount: nexuProvider?.models.length ?? 0,
       configured: (nexuProvider?.models.length ?? 0) > 0,
       managed: true,
+      kind: "managed",
     });
 
-    // BYOK providers — always listed
-    for (const pid of BYOK_PROVIDER_IDS) {
-      const meta = PROVIDER_META[pid] ?? { name: pid, description: "" };
-      const db = dbProviders.find((p) => p.providerId === pid);
-      const modProv = providers.find((p) => p.id === pid);
+    // Built-in BYOK providers — always listed
+    for (const provider of visibleRegistryProviders) {
+      const matchedProviderConfig = getProviderConfigMatch(
+        providerConfigDoc,
+        provider.id,
+      )?.config;
+      const modProv = providers.find((p) => p.id === provider.id);
       items.push({
-        id: pid,
-        name: meta.name,
+        id: provider.id,
+        name: getProviderDisplayName(provider, t),
         modelCount: modProv?.models.length ?? 0,
-        configured:
-          (db?.hasApiKey ?? false) || (db?.hasOauthCredential ?? false),
+        configured: isStoredProviderConfigured(matchedProviderConfig),
         managed: false,
+        kind: "builtin-byok",
+        registryEntry: provider,
+      });
+    }
+
+    for (const customInstance of customProviderInstances) {
+      const modelCount = models.filter((model) =>
+        model.id.startsWith(`${customInstance.key}/`),
+      ).length;
+      items.push({
+        id: customInstance.key,
+        name:
+          customInstance.config.displayName?.trim() ||
+          `${customInstance.template.displayName} / ${customInstance.instanceId}`,
+        modelCount,
+        configured: isStoredProviderConfigured(customInstance.config),
+        managed: false,
+        kind: "custom-byok",
+        providerKey: customInstance.key,
+        registryEntry: customInstance.template,
+      });
+    }
+
+    for (const draft of customProviderDrafts) {
+      const template = customTemplateRegistryMap.get(draft.templateId);
+      if (!template) {
+        continue;
+      }
+
+      items.push({
+        id: draft.id,
+        name:
+          draft.displayName.trim() ||
+          draft.instanceId.trim() ||
+          t("models.customProvider.newProvider"),
+        modelCount: 0,
+        configured: false,
+        managed: false,
+        kind: "custom-draft",
+        draftId: draft.id,
+        registryEntry: template,
       });
     }
 
     return items;
-  }, [providers, dbProviders]);
+  }, [
+    customProviderDrafts,
+    customProviderInstances,
+    customTemplateRegistryMap,
+    models,
+    providerConfigDoc,
+    providers,
+    t,
+    visibleRegistryProviders,
+  ]);
 
   const activeProvider =
     sidebarItems.find((p) => p.id === selectedProviderId) ??
     sidebarItems[0] ??
     null;
+
+  const activeCustomProviderDraft = useMemo(
+    () =>
+      activeProvider?.kind === "custom-draft"
+        ? (customProviderDrafts.find(
+            (draft) => draft.id === activeProvider.draftId,
+          ) ?? null)
+        : null,
+    [activeProvider, customProviderDrafts],
+  );
+
+  const activeBuiltinProviderMatch = useMemo(
+    () =>
+      activeProvider?.kind === "builtin-byok" && activeProvider.registryEntry
+        ? getProviderConfigMatch(
+            providerConfigDoc,
+            activeProvider.registryEntry.id,
+          )
+        : null,
+    [activeProvider, providerConfigDoc],
+  );
 
   // Clear setup param once user interacts
   const clearSetupParam = useCallback(() => {
@@ -882,6 +1244,14 @@ export function ModelsPage() {
       setSearchParams(next, { replace: true });
     }
   }, [isSetupMode, searchParams, setSearchParams]);
+
+  const handleAddCustomProvider = useCallback(() => {
+    const draftId = `__custom-provider-draft__${Date.now()}`;
+    const nextDraft = createCustomProviderDraft(draftId);
+    setCustomProviderDrafts((previous) => [...previous, nextDraft]);
+    setSelectedProviderId(draftId);
+    clearSetupParam();
+  }, [clearSetupParam]);
 
   const _changeSettingsTab = useCallback(
     (tab: SettingsTab) => {
@@ -953,43 +1323,69 @@ export function ModelsPage() {
           {/* Provider sidebar + detail */}
           <div
             className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
-            style={{ minHeight: 520 }}
+            style={{ minHeight: 500 }}
           >
-            {/* Left: Provider list with Enabled / Providers grouping */}
-            {/* Left: Provider list — flat, no enabled/disabled split */}
-            <div className="w-56 shrink-0 bg-surface-0 overflow-y-auto">
-              <div className="p-2 space-y-0.5">
-                {sidebarItems.map((item) => {
-                  const isActive = activeProvider?.id === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedProviderId(item.id);
-                        clearSetupParam();
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors",
-                        isActive ? "bg-surface-3" : "hover:bg-surface-2",
-                      )}
-                    >
-                      <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
-                        <ProviderLogo provider={item.id} size={14} />
-                      </span>
-                      <span
+            {/* Left: Provider list */}
+            <div className="w-56 shrink-0 bg-surface-0 flex flex-col border-r border-border-subtle">
+              <div className="flex-1 overflow-y-auto p-2">
+                <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                  Providers
+                </div>
+                <div className="space-y-1">
+                  {sidebarItems.map((item) => {
+                    const isActive = activeProvider?.id === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedProviderId(item.id);
+                          clearSetupParam();
+                        }}
                         className={cn(
-                          "flex-1 text-[12px] truncate",
-                          isActive
-                            ? "font-semibold text-text-primary"
-                            : "font-medium text-text-primary",
+                          "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors",
+                          isActive ? "bg-surface-3" : "hover:bg-surface-2",
                         )}
                       >
-                        {item.name}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
+                          <ProviderLogo
+                            provider={item.registryEntry?.id ?? item.id}
+                            size={14}
+                          />
+                        </span>
+                        <span
+                          className={cn(
+                            "flex-1 text-[12px] truncate",
+                            isActive
+                              ? "font-semibold text-text-primary"
+                              : "font-medium text-text-primary",
+                          )}
+                        >
+                          {item.name}
+                        </span>
+                        {item.modelCount > 0 ? (
+                          <span className="text-[10px] text-text-muted">
+                            {item.modelCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border-t border-border-subtle p-3">
+                <button
+                  type="button"
+                  onClick={handleAddCustomProvider}
+                  className={cn(
+                    "w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                    "border-border bg-surface-0 text-text-secondary hover:bg-surface-2 hover:text-text-primary",
+                  )}
+                >
+                  <span className="text-[14px] leading-none">+</span>
+                  {t("models.customProvider.addButton")}
+                </button>
               </div>
             </div>
 
@@ -1031,9 +1427,7 @@ export function ModelsPage() {
                         providers.find((p) => p.id === activeProvider.id) ?? {
                           id: activeProvider.id,
                           name: activeProvider.name,
-                          description:
-                            PROVIDER_META[activeProvider.id]?.descriptionKey ??
-                            "",
+                          description: "models.provider.nexu.description",
                           managed: true,
                           models: [],
                         }
@@ -1042,12 +1436,88 @@ export function ModelsPage() {
                       onSelectModel={(modelId) => updateModel.mutate(modelId)}
                     />
                   )
+                ) : providerConfigDoc === undefined ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-[13px] text-text-muted">
+                      {t("models.loading")}
+                    </div>
+                  </div>
+                ) : activeProvider.kind === "custom-draft" ? (
+                  activeCustomProviderDraft ? (
+                    <AddCustomProviderDetail
+                      draft={activeCustomProviderDraft}
+                      customTemplates={Array.from(
+                        customTemplateRegistryMap.values(),
+                      )}
+                      onChange={(draft) => {
+                        setCustomProviderDrafts((previous) =>
+                          previous.map((item) =>
+                            item.id === draft.id ? draft : item,
+                          ),
+                        );
+                      }}
+                      onCreate={async (input) => {
+                        const providerKey = buildCustomProviderKey(
+                          input.template
+                            .id as (typeof customProviderTemplateIds)[number],
+                          input.instanceId,
+                        );
+                        await upsertProviderConfigByKey(providerKey, {
+                          providerTemplateId: input.template.id,
+                          instanceId: input.instanceId,
+                          enabled: true,
+                          api: input.template.apiKind,
+                          baseUrl: input.baseUrl,
+                          displayName: input.displayName,
+                          models: [],
+                        });
+                        removeCustomProviderDraft(activeCustomProviderDraft.id);
+                        setSelectedProviderId(providerKey);
+                      }}
+                      onRemove={() => {
+                        removeCustomProviderDraft(activeCustomProviderDraft.id);
+                      }}
+                    />
+                  ) : null
                 ) : (
                   <ByokProviderDetail
-                    providerId={activeProvider.id as ByokProviderId}
-                    dbProvider={dbProviders.find(
-                      (p) => p.providerId === activeProvider.id,
-                    )}
+                    key={
+                      activeProvider.providerKey ??
+                      activeBuiltinProviderMatch?.key ??
+                      (activeProvider.registryEntry as ByokProviderEntry).id
+                    }
+                    provider={activeProvider.registryEntry as ByokProviderEntry}
+                    providerKey={
+                      activeProvider.providerKey ??
+                      activeBuiltinProviderMatch?.key ??
+                      (activeProvider.registryEntry as ByokProviderEntry).id
+                    }
+                    providerConfig={
+                      activeProvider.registryEntry
+                        ? activeProvider.providerKey
+                          ? providerConfigDoc.providers?.[
+                              activeProvider.providerKey
+                            ]
+                          : activeBuiltinProviderMatch?.config
+                        : undefined
+                    }
+                    onSaveProviderConfig={
+                      activeProvider.providerKey
+                        ? (_, config) =>
+                            upsertProviderConfigByKey(
+                              activeProvider.providerKey ?? "",
+                              config,
+                            )
+                        : upsertBuiltinProviderConfig
+                    }
+                    onDeleteProviderConfig={
+                      activeProvider.providerKey
+                        ? () =>
+                            removeProviderConfigByKey(
+                              activeProvider.providerKey ?? "",
+                            )
+                        : removeBuiltinProviderConfig
+                    }
                     queryClient={queryClient}
                     currentModelId={currentModelId}
                     onAutoSelectModel={handleAutoSelectModel}
@@ -1308,7 +1778,7 @@ function ManagedProviderDetail({
                 >
                   <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-white border border-border-subtle">
                     <ModelLogo
-                      model={model.name}
+                      model={model.id}
                       provider={provider.id}
                       size={14}
                     />
@@ -1342,47 +1812,57 @@ function ManagedProviderDetail({
 // ── BYOK provider detail panel ────────────────────────────────
 
 function ByokProviderDetail({
-  providerId,
-  dbProvider,
+  provider,
+  providerKey,
+  providerConfig,
+  onSaveProviderConfig,
+  onDeleteProviderConfig,
   queryClient,
   currentModelId,
   onAutoSelectModel,
   onSelectModel,
 }: {
-  providerId: ByokProviderId;
-  dbProvider?: DbProvider;
+  provider: ByokProviderEntry;
+  providerKey: string;
+  providerConfig?: StoredProviderConfig;
+  onSaveProviderConfig: (
+    provider: ByokProviderEntry,
+    config: StoredProviderConfig,
+  ) => Promise<void>;
+  onDeleteProviderConfig: (provider: ByokProviderEntry) => Promise<void>;
   queryClient: ReturnType<typeof useQueryClient>;
   currentModelId: string;
   onAutoSelectModel: (modelId: string) => void;
   onSelectModel: (modelId: string) => void;
 }) {
   const { t } = useTranslation();
-  const meta = PROVIDER_META[providerId] ?? {
-    name: providerId,
-    descriptionKey: "",
-    apiDocsUrl: undefined,
-    apiKeyPlaceholder: "your-api-key",
-    defaultProxyUrl: "",
-  };
+  const providerId = provider.id;
+  const providerDisplayName = getProviderDisplayName(provider, t);
+  const providerDescriptionKey = provider.descriptionKey;
+  const providerApiDocsUrl = provider.apiDocsUrl;
+  const providerApiKeyPlaceholder =
+    provider.apiKeyPlaceholder ?? "your-api-key";
+  const providerDefaultProxyUrl = getProviderDefaultBaseUrl(provider);
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(
-    dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "",
+    providerConfig?.baseUrl ?? getProviderDefaultBaseUrl(provider),
   );
   const [authMode, setAuthMode] = useState<"apiKey" | "oauth">(
-    getDefaultMiniMaxAuthMode(providerId, dbProvider),
+    getDefaultMiniMaxAuthMode(provider, providerConfig),
   );
   const [oauthRegion, setOauthRegion] = useState<"global" | "cn">(
-    dbProvider?.oauthRegion ?? "global",
+    providerConfig?.oauthRegion ?? "global",
   );
   const [dismissedMiniMaxOauthError, setDismissedMiniMaxOauthError] = useState<
     string | null
   >(null);
   const [isEditingApiKey, setIsEditingApiKey] = useState(
-    !dbProvider?.hasApiKey,
+    !providerConfig?.apiKey,
   );
   const isMiniMax = providerId === "minimax";
   const isOllama = providerId === "ollama";
+  const isAwsSdkProvider = provider.authModes.includes("aws-sdk");
   const hostBridge = getModelsHostInvokeBridge();
   const effectiveApiKey = isOllama ? OLLAMA_DUMMY_API_KEY : apiKey.trim();
 
@@ -1393,7 +1873,7 @@ function ByokProviderDetail({
       if (hostBridge) {
         return hostBridge.invoke("desktop:get-minimax-oauth-status", undefined);
       }
-      const { data } = await getApiV1ProvidersMinimaxOauthStatus();
+      const { data } = await getApiV1ModelProvidersMinimaxOauthStatus();
       return data;
     },
     refetchInterval: (query) => (query.state.data?.inProgress ? 2000 : false),
@@ -1401,9 +1881,13 @@ function ByokProviderDetail({
 
   const hasMiniMaxOauthAccess =
     isMiniMax &&
-    (minimaxOauthStatus?.connected === true || dbProvider?.hasOauthCredential);
-  const hasSavedApiKey = Boolean(dbProvider?.hasApiKey);
-  const hasSavedAccess = Boolean(hasSavedApiKey || hasMiniMaxOauthAccess);
+    (minimaxOauthStatus?.connected === true || providerConfig?.oauthProfileRef);
+  const hasSavedAwsSdkAccess =
+    isAwsSdkProvider && providerConfig?.auth === "aws-sdk";
+  const hasSavedApiKey = Boolean(providerConfig?.apiKey);
+  const hasSavedAccess = Boolean(
+    hasSavedApiKey || hasMiniMaxOauthAccess || hasSavedAwsSdkAccess,
+  );
 
   const visibleMiniMaxOauthError =
     minimaxOauthStatus?.error &&
@@ -1421,7 +1905,7 @@ function ByokProviderDetail({
   const oauthProviderStatus = useQuery({
     queryKey: ["oauth-provider-status", providerId],
     queryFn: async () => {
-      const res = await getApiV1ProvidersByProviderIdOauthProviderStatus({
+      const res = await getApiV1ModelProvidersByProviderIdOauthProviderStatus({
         path: { providerId },
       });
       return res.data ?? { connected: false };
@@ -1433,7 +1917,7 @@ function ByokProviderDetail({
   const oauthFlowStatus = useQuery({
     queryKey: ["oauth-flow-status", providerId],
     queryFn: async () => {
-      const res = await getApiV1ProvidersByProviderIdOauthStatus({
+      const res = await getApiV1ModelProvidersByProviderIdOauthStatus({
         path: { providerId },
       });
       return res.data ?? { status: "idle" as const };
@@ -1450,8 +1934,9 @@ function ByokProviderDetail({
     if (flowDataStatus === "completed") {
       setOauthPending(false);
       queryClient.invalidateQueries({ queryKey: ["oauth-provider-status"] });
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["model-provider-config"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
       toast.success(t("models.byok.oauthSuccess"));
       markSetupComplete();
     } else if (flowDataStatus === "failed") {
@@ -1462,7 +1947,7 @@ function ByokProviderDetail({
 
   const startOAuthMutation = useMutation({
     mutationFn: async () => {
-      const res = await postApiV1ProvidersByProviderIdOauthStart({
+      const res = await postApiV1ModelProvidersByProviderIdOauthStart({
         path: { providerId },
       });
       return res.data;
@@ -1479,49 +1964,117 @@ function ByokProviderDetail({
 
   const disconnectOAuthMutation = useMutation({
     mutationFn: async () => {
-      const res = await postApiV1ProvidersByProviderIdOauthDisconnect({
+      const res = await postApiV1ModelProvidersByProviderIdOauthDisconnect({
         path: { providerId },
       });
       return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["oauth-provider-status"] });
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
+      queryClient.invalidateQueries({ queryKey: ["model-provider-config"] });
       queryClient.invalidateQueries({ queryKey: ["models"] });
+      queryClient.invalidateQueries({ queryKey: ["desktop-default-model"] });
     },
   });
 
   const isOAuthConnected =
     isOAuthProvider && oauthProviderStatus.data?.connected === true;
   const canSubmitApiKeyConfig = Boolean(
-    isOllama || effectiveApiKey || hasSavedApiKey,
+    isOllama ||
+      isAwsSdkProvider ||
+      effectiveApiKey ||
+      (!isEditingApiKey && hasSavedApiKey),
   );
   const canRefreshModels = Boolean(
-    isOllama || effectiveApiKey || hasSavedApiKey,
+    isOllama || isAwsSdkProvider || effectiveApiKey || hasSavedApiKey,
   );
   const isProviderConfigured = Boolean(
     isOllama || hasSavedAccess || isOAuthConnected,
   );
+  const storedModelIds = useMemo(
+    () => providerConfig?.models?.map((model) => model.id) ?? [],
+    [providerConfig?.models],
+  );
+  const persistedApiKey =
+    effectiveApiKey || (!isEditingApiKey ? providerConfig?.apiKey : undefined);
+  const validationApiKey =
+    typeof persistedApiKey === "string" ? persistedApiKey : undefined;
+
+  const buildProviderConfig = useCallback(
+    (modelIds: string[]): StoredProviderConfig => ({
+      ...(providerConfig?.providerTemplateId
+        ? { providerTemplateId: providerConfig.providerTemplateId }
+        : {}),
+      ...(providerConfig?.instanceId
+        ? { instanceId: providerConfig.instanceId }
+        : {}),
+      enabled: true,
+      auth: isAwsSdkProvider ? "aws-sdk" : "api-key",
+      api: provider.apiKind,
+      ...(!isAwsSdkProvider && persistedApiKey
+        ? { apiKey: persistedApiKey }
+        : {}),
+      baseUrl: baseUrl || getProviderDefaultBaseUrl(provider),
+      ...(isMiniMax ? { oauthRegion } : {}),
+      displayName:
+        providerConfig?.providerTemplateId && providerConfig.displayName?.trim()
+          ? providerConfig.displayName
+          : providerDisplayName,
+      ...(providerConfig?.headers ? { headers: providerConfig.headers } : {}),
+      ...(providerConfig?.metadata
+        ? { metadata: providerConfig.metadata }
+        : {}),
+      models: buildStoredModels(provider, modelIds),
+    }),
+    [
+      baseUrl,
+      isMiniMax,
+      oauthRegion,
+      persistedApiKey,
+      provider,
+      providerDisplayName,
+      providerConfig?.headers,
+      providerConfig?.displayName,
+      providerConfig?.instanceId,
+      isAwsSdkProvider,
+      providerConfig?.providerTemplateId,
+      providerConfig?.metadata,
+    ],
+  );
 
   // ── Z.AI Coding Plan state ───────────────────────────
-  const isZaiProvider = providerId === "glm";
+  const isZaiProvider = providerId === "zai";
   const [codingPlanKey, setCodingPlanKey] = useState("");
   const [codingPlanRegion, setCodingPlanRegion] = useState<"global" | "cn">(
     "global",
   );
+  const codingPlanBaseUrl: string =
+    codingPlanRegion === "cn"
+      ? "https://open.bigmodel.cn/api/coding/paas/v4"
+      : "https://api.z.ai/api/coding/paas/v4";
 
   const saveCodingPlanMutation = useMutation({
     mutationFn: () =>
-      saveProvider(providerId, {
-        apiKey: codingPlanKey,
-        baseUrl: ZAI_CODING_PLAN_URLS[codingPlanRegion],
-        displayName: "GLM",
+      onSaveProviderConfig(provider, {
+        ...(providerConfig?.providerTemplateId
+          ? { providerTemplateId: providerConfig.providerTemplateId }
+          : {}),
+        ...(providerConfig?.instanceId
+          ? { instanceId: providerConfig.instanceId }
+          : {}),
         enabled: true,
-        modelsJson: JSON.stringify(ZAI_CODING_PLAN_MODELS),
+        auth: "api-key",
+        api: provider.apiKind,
+        apiKey: codingPlanKey,
+        baseUrl: codingPlanBaseUrl,
+        ...(providerConfig?.headers ? { headers: providerConfig.headers } : {}),
+        ...(providerConfig?.metadata
+          ? { metadata: providerConfig.metadata }
+          : {}),
+        displayName: "Zhipu",
+        models: buildStoredModels(provider, ZAI_CODING_PLAN_MODELS),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
-      queryClient.invalidateQueries({ queryKey: ["models"] });
       setCodingPlanKey("");
       markSetupComplete();
       const preferred = selectPreferredModel(ZAI_CODING_PLAN_MODELS);
@@ -1534,15 +2087,15 @@ function ByokProviderDetail({
   // Reset form when provider changes
   useEffect(() => {
     setApiKey("");
-    setBaseUrl(dbProvider?.baseUrl ?? meta.defaultProxyUrl ?? "");
-    setAuthMode(getDefaultMiniMaxAuthMode(providerId, dbProvider));
-    setOauthRegion(dbProvider?.oauthRegion ?? "global");
-    setIsEditingApiKey(!dbProvider?.hasApiKey);
+    setBaseUrl(providerConfig?.baseUrl ?? getProviderDefaultBaseUrl(provider));
+    setAuthMode(getDefaultMiniMaxAuthMode(provider, providerConfig));
+    setOauthRegion(providerConfig?.oauthRegion ?? "global");
+    setIsEditingApiKey(!providerConfig?.apiKey);
     setVerifiedModels(null);
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
-  }, [dbProvider, meta.defaultProxyUrl, providerId]);
+  }, [provider, providerConfig]);
 
   useEffect(() => {
     if (!isMiniMax) {
@@ -1554,21 +2107,26 @@ function ByokProviderDetail({
       return;
     }
 
-    const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
-    setVerifiedModels(stored.length > 0 ? stored : null);
-  }, [authMode, dbProvider?.modelsJson, isMiniMax]);
+    setVerifiedModels(storedModelIds.length > 0 ? storedModelIds : null);
+  }, [authMode, isMiniMax, storedModelIds]);
 
   // ── Verify mutation ──────────────────────────────────
   const verifyMutation = useMutation({
     mutationFn: () =>
-      verifyApiKey(providerId, effectiveApiKey, baseUrl || undefined),
+      verifyApiKey(
+        providerKey,
+        providerId,
+        validationApiKey,
+        baseUrl || undefined,
+      ),
     onSuccess: (result) => {
       track("workspace_provider_check", {
         provider_name: providerId,
         success: result.valid,
       });
-      if (result.valid && result.models) {
-        setVerifiedModels(result.models);
+      const modelIds = normalizeVerifiedModelIds(result.models);
+      if (result.valid) {
+        setVerifiedModels(modelIds);
       }
     },
     onError: () => {
@@ -1582,8 +2140,9 @@ function ByokProviderDetail({
   const refreshModelsMutation = useMutation({
     mutationFn: async () => {
       const result = await verifyApiKey(
+        providerKey,
         providerId,
-        effectiveApiKey,
+        validationApiKey,
         baseUrl || undefined,
       );
 
@@ -1591,20 +2150,11 @@ function ByokProviderDetail({
         throw new Error(result.error ?? t("models.byok.keyInvalidUnknown"));
       }
 
-      const models = result.models ?? [];
+      const models = normalizeVerifiedModelIds(result.models);
       setVerifiedModels(models);
 
       if (hasSavedAccess || isOllama) {
-        await saveProvider(providerId, {
-          apiKey: effectiveApiKey || undefined,
-          baseUrl: baseUrl || null,
-          displayName: meta.name,
-          enabled: true,
-          authMode: "apiKey",
-          modelsJson: JSON.stringify(models),
-        });
-        await queryClient.invalidateQueries({ queryKey: ["providers"] });
-        await queryClient.invalidateQueries({ queryKey: ["models"] });
+        await onSaveProviderConfig(provider, buildProviderConfig(models));
       }
 
       return models;
@@ -1621,26 +2171,20 @@ function ByokProviderDetail({
   const saveMutation = useMutation({
     mutationFn: async () => {
       let models = displayModels;
-      if (isOllama || effectiveApiKey || hasSavedApiKey) {
+      if (isOllama || isAwsSdkProvider || effectiveApiKey || hasSavedApiKey) {
         const result = await verifyApiKey(
+          providerKey,
           providerId,
-          effectiveApiKey,
+          validationApiKey,
           baseUrl || undefined,
         );
         if (result.valid && result.models) {
-          models = result.models;
-          setVerifiedModels(result.models);
+          models = normalizeVerifiedModelIds(result.models);
+          setVerifiedModels(models);
         }
       }
 
-      await saveProvider(providerId, {
-        apiKey: effectiveApiKey || undefined,
-        baseUrl: baseUrl || null,
-        displayName: meta.name,
-        enabled: true,
-        authMode: "apiKey",
-        modelsJson: JSON.stringify(models),
-      });
+      await onSaveProviderConfig(provider, buildProviderConfig(models));
 
       return { models };
     },
@@ -1648,8 +2192,6 @@ function ByokProviderDetail({
       track("workspace_provider_save", {
         provider_name: providerId,
       });
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
-      queryClient.invalidateQueries({ queryKey: ["models"] });
       setApiKey("");
       setIsEditingApiKey(false);
       markSetupComplete();
@@ -1661,12 +2203,15 @@ function ByokProviderDetail({
     },
   });
 
+  const resetProviderActionState = useCallback(() => {
+    verifyMutation.reset();
+    saveMutation.reset();
+  }, [saveMutation, verifyMutation]);
+
   // ── Delete mutation ──────────────────────────────────
   const deleteMutation = useMutation({
-    mutationFn: () => deleteProvider(providerId),
+    mutationFn: () => onDeleteProviderConfig(provider),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["providers"] });
-      queryClient.invalidateQueries({ queryKey: ["models"] });
       if (isMiniMax) {
         queryClient.setQueryData(["minimax-oauth-status"], {
           connected: false,
@@ -1677,7 +2222,7 @@ function ByokProviderDetail({
         queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
       }
       setApiKey("");
-      setBaseUrl(meta.defaultProxyUrl ?? "");
+      setBaseUrl(getProviderDefaultBaseUrl(provider));
       setIsEditingApiKey(true);
       setVerifiedModels(null);
     },
@@ -1690,7 +2235,7 @@ function ByokProviderDetail({
           region: oauthRegion,
         });
       }
-      const { data, error } = await postApiV1ProvidersMinimaxOauthLogin({
+      const { data, error } = await postApiV1ModelProvidersMinimaxOauthLogin({
         body: { region: oauthRegion },
       });
       if (error || !data) {
@@ -1722,7 +2267,8 @@ function ByokProviderDetail({
       if (hostBridge) {
         return hostBridge.invoke("desktop:cancel-minimax-oauth", undefined);
       }
-      const { data, error } = await deleteApiV1ProvidersMinimaxOauthLogin();
+      const { data, error } =
+        await deleteApiV1ModelProvidersMinimaxOauthLogin();
       if (error || !data) {
         throw new Error("Failed to cancel MiniMax OAuth login");
       }
@@ -1746,17 +2292,14 @@ function ByokProviderDetail({
     }
 
     const syncOauthModels = async () => {
-      const providers = await queryClient.fetchQuery({
-        queryKey: ["providers"],
-        queryFn: fetchProviders,
+      const config = await queryClient.fetchQuery({
+        queryKey: ["model-provider-config"],
+        queryFn: fetchModelProviderConfig,
       });
-      const minimaxProvider = providers.find(
-        (provider) => provider.providerId === "minimax",
-      );
-
-      const providerModels: string[] = JSON.parse(
-        minimaxProvider?.modelsJson ?? "[]",
-      );
+      const providerModels =
+        getProviderConfigMatch(config, "minimax")?.config.models?.map(
+          (model) => model.id,
+        ) ?? [];
       if (providerModels.length > 0) {
         setVerifiedModels(providerModels);
       }
@@ -1771,17 +2314,16 @@ function ByokProviderDetail({
   // Model list to show: verified > DB stored > defaults
   const displayModels = useMemo(() => {
     if (verifiedModels && verifiedModels.length > 0) return verifiedModels;
-    const stored: string[] = JSON.parse(dbProvider?.modelsJson ?? "[]");
-    if (stored.length > 0) return stored;
-    return DEFAULT_MODELS[providerId] ?? [];
-  }, [verifiedModels, dbProvider, providerId]);
+    if (storedModelIds.length > 0) return storedModelIds;
+    return [];
+  }, [storedModelIds, verifiedModels]);
 
   const getScopedByokModelId = useCallback(
     (modelId: string) =>
-      modelId.startsWith(`${providerId}/`)
+      modelId.startsWith(`${providerKey}/`)
         ? modelId
-        : `${providerId}/${modelId}`,
-    [providerId],
+        : `${providerKey}/${modelId}`,
+    [providerKey],
   );
 
   return (
@@ -1795,11 +2337,11 @@ function ByokProviderDetail({
           <div>
             <div className="flex items-center gap-2">
               <div className="text-[14px] font-semibold text-text-primary">
-                {meta.name}
+                {providerDisplayName}
               </div>
-              {meta.apiDocsUrl && (
+              {providerApiDocsUrl && (
                 <a
-                  href={meta.apiDocsUrl}
+                  href={providerApiDocsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-link text-[11px]"
@@ -1810,7 +2352,7 @@ function ByokProviderDetail({
               )}
             </div>
             <div className="text-[11px] text-text-tertiary">
-              {t(meta.descriptionKey)}
+              {providerDescriptionKey ? t(providerDescriptionKey) : ""}
             </div>
           </div>
         </div>
@@ -1951,10 +2493,10 @@ function ByokProviderDetail({
                   oauthRegion === "cn" ? "api.minimaxi.com" : "api.minimax.io",
               })}
             </div>
-            {minimaxOauthStatus?.connected || dbProvider?.hasOauthCredential ? (
+            {minimaxOauthStatus?.connected ||
+            providerConfig?.oauthProfileRef ? (
               <div className="mb-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-700">
                 {t("models.byok.minimax.connected")}
-                {dbProvider?.oauthEmail ? ` · ${dbProvider.oauthEmail}` : ""}
               </div>
             ) : null}
             {visibleMiniMaxOauthError ? (
@@ -2114,7 +2656,7 @@ function ByokProviderDetail({
 
       {!isOAuthConnected && (!isMiniMax || authMode === "apiKey") && (
         <div className="space-y-4 mb-6">
-          {!isOllama && (
+          {!isOllama && !isAwsSdkProvider && (
             <div>
               <label
                 htmlFor={`apikey-${providerId}`}
@@ -2122,7 +2664,7 @@ function ByokProviderDetail({
               >
                 {t("models.byok.apiKey")}
               </label>
-              {dbProvider?.hasApiKey && !isEditingApiKey ? (
+              {hasSavedApiKey && !isEditingApiKey ? (
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-brand-primary)]/25 bg-[var(--color-brand-subtle)] px-3 py-2.5">
                   <div className="min-w-0">
                     <div className="text-[12px] font-medium text-text-primary">
@@ -2146,8 +2688,11 @@ function ByokProviderDetail({
                     id={`apikey-${providerId}`}
                     type="password"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={meta.apiKeyPlaceholder}
+                    onChange={(e) => {
+                      resetProviderActionState();
+                      setApiKey(e.target.value);
+                    }}
+                    placeholder={providerApiKeyPlaceholder}
                     className="flex-1 rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
                   />
                   <button
@@ -2194,6 +2739,16 @@ function ByokProviderDetail({
               )}
             </div>
           )}
+          {isAwsSdkProvider && (
+            <div className="rounded-lg border border-border bg-surface-0 px-3 py-2.5">
+              <div className="text-[12px] font-medium text-text-primary">
+                {t("models.byok.awsSdkAuth")}
+              </div>
+              <div className="mt-1 text-[10px] text-text-muted">
+                {t("models.byok.awsSdkAuthHint")}
+              </div>
+            </div>
+          )}
           <div>
             <label
               htmlFor={`baseurl-${providerId}`}
@@ -2225,8 +2780,13 @@ function ByokProviderDetail({
               id={`baseurl-${providerId}`}
               type="text"
               value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder={meta.defaultProxyUrl || "https://api.example.com/v1"}
+              onChange={(e) => {
+                resetProviderActionState();
+                setBaseUrl(e.target.value);
+              }}
+              placeholder={
+                providerDefaultProxyUrl || "https://api.example.com/v1"
+              }
               className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-primary)]/20 focus:border-[var(--color-brand-primary)]/30"
             />
             {isOllama && verifyMutation.isSuccess && (
@@ -2270,9 +2830,11 @@ function ByokProviderDetail({
               {saveMutation.isPending && (
                 <Loader2 size={13} className="animate-spin" />
               )}
-              {dbProvider?.hasApiKey
+              {hasSavedApiKey
                 ? t("models.byok.updateConfig")
-                : t("models.byok.saveAndEnable")}
+                : hasSavedAccess
+                  ? t("models.byok.updateConfig")
+                  : t("models.byok.saveAndEnable")}
             </button>
           )}
 
@@ -2351,7 +2913,7 @@ function ByokProviderDetail({
           {displayModels.map((modelId) => {
             const scopedModelId = getScopedByokModelId(modelId);
             const isSelected = isByokModelSelected(
-              providerId,
+              providerKey,
               modelId,
               currentModelId,
             );

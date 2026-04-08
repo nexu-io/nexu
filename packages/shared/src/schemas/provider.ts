@@ -39,6 +39,11 @@ export const verifyProviderBodySchema = z.object({
   baseUrl: z.string().optional(),
 });
 
+export const validateProviderInstanceBodySchema =
+  verifyProviderBodySchema.extend({
+    instanceKey: z.string().min(1),
+  });
+
 export const refreshModelsResponseSchema = z.object({
   models: z.array(z.string()),
   error: z.string().optional(),

@@ -38,3 +38,4 @@ apps/desktop/build-config.json
 .claude/worktrees
 .claude/worktrees/
 .task/
+.opencode/
