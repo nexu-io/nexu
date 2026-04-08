@@ -1,4 +1,5 @@
 import { logger } from "../lib/logger.js";
+import { CreditGuardStateWriter } from "../runtime/credit-guard-state-writer.js";
 import { GatewayClient } from "../runtime/gateway-client.js";
 import { startHealthLoop } from "../runtime/loops.js";
 import { startAnalyticsLoop } from "../runtime/loops.js";
@@ -23,12 +24,14 @@ import { ArtifactService } from "../services/artifact-service.js";
 import { ChannelFallbackService } from "../services/channel-fallback-service.js";
 import { ChannelService } from "../services/channel-service.js";
 import { DesktopLocalService } from "../services/desktop-local-service.js";
+import { GithubStarVerificationService } from "../services/github-star-verification-service.js";
 import { IntegrationService } from "../services/integration-service.js";
 import { LocalUserService } from "../services/local-user-service.js";
 import { ModelProviderService } from "../services/model-provider-service.js";
 import { OpenClawAuthService } from "../services/openclaw-auth-service.js";
 import { OpenClawGatewayService } from "../services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../services/openclaw-sync-service.js";
+import { QuotaFallbackService } from "../services/quota-fallback-service.js";
 import { RuntimeConfigService } from "../services/runtime-config-service.js";
 import { RuntimeModelStateService } from "../services/runtime-model-state-service.js";
 import { SessionService } from "../services/session-service.js";
@@ -61,6 +64,8 @@ export interface ControllerContainer {
   skillhubService: SkillhubService;
   openclawSyncService: OpenClawSyncService;
   openclawAuthService: OpenClawAuthService;
+  quotaFallbackService: QuotaFallbackService;
+  githubStarVerificationService: GithubStarVerificationService;
   wsClient: OpenClawWsClient;
   gatewayService: OpenClawGatewayService;
   runtimeState: ControllerRuntimeState;
@@ -72,12 +77,10 @@ const NEXU_OFFICIAL_MODEL_REFRESH_INTERVAL_MS = 60 * 1000;
 export async function createContainer(): Promise<ControllerContainer> {
   const configStore = new NexuConfigStore(env);
   await configStore.reconcileConfiguredDesktopCloudState();
-  if (env.manageOpenclawProcess) {
-    await configStore.syncManagedRuntimeGateway({
-      port: env.openclawGatewayPort,
-      authMode: env.openclawGatewayToken ? "token" : "none",
-    });
-  }
+  await configStore.syncManagedRuntimeGateway({
+    port: env.openclawGatewayPort,
+    authMode: env.openclawGatewayToken ? "token" : "none",
+  });
   const artifactsStore = new ArtifactsStore(env);
   const compiledStore = new CompiledOpenClawStore(env);
   const configWriter = new OpenClawConfigWriter(env);
@@ -85,6 +88,7 @@ export async function createContainer(): Promise<ControllerContainer> {
   const authProfilesWriter = new OpenClawAuthProfilesWriter(authProfilesStore);
   const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
   const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
+  const creditGuardStateWriter = new CreditGuardStateWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
   const gatewayClient = new GatewayClient(env);
@@ -120,6 +124,7 @@ export async function createContainer(): Promise<ControllerContainer> {
     authProfilesStore,
     runtimePluginWriter,
     runtimeModelWriter,
+    creditGuardStateWriter,
     templateWriter,
     watchTrigger,
     gatewayService,
@@ -141,6 +146,11 @@ export async function createContainer(): Promise<ControllerContainer> {
   );
   modelProviderService.setAuthService(openclawAuthService);
   const runtimeModelStateService = new RuntimeModelStateService(env);
+  const quotaFallbackService = new QuotaFallbackService(
+    configStore,
+    openclawSyncService,
+  );
+  const githubStarVerificationService = new GithubStarVerificationService();
 
   // Wire cloud state change callback to sync refreshed cloud inventory without
   // auto-switching the default model during startup or first-channel connect.
@@ -167,6 +177,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       openclawProcess,
       runtimeHealth,
       wsClient,
+      quotaFallbackService,
     ),
     channelFallbackService,
     sessionService: new SessionService(sessionsRuntime),
@@ -189,6 +200,8 @@ export async function createContainer(): Promise<ControllerContainer> {
     skillhubService,
     openclawSyncService,
     openclawAuthService,
+    quotaFallbackService,
+    githubStarVerificationService,
     wsClient,
     gatewayService,
     configStore,

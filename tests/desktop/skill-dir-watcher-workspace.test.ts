@@ -1,8 +1,8 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SkillDb } from "#controller/services/skillhub/skill-db";
 import { SkillDirWatcher } from "#controller/services/skillhub/skill-dir-watcher";
 
@@ -34,9 +34,32 @@ describe("SkillDirWatcher workspace reconciliation", () => {
   }
 
   function removeWorkspaceSkill(botId: string, slug: string): void {
-    rmSync(path.join(stateDir, "agents", botId, "skills", slug, "SKILL.md"), {
+    const skillDir = path.join(stateDir, "agents", botId, "skills", slug);
+    unlinkSync(path.join(skillDir, "SKILL.md"));
+    rmSync(skillDir, {
+      recursive: true,
       force: true,
     });
+  }
+
+  function writeWorkspaceFile(relativePath: string, content = "data"): void {
+    const fullPath = path.join(stateDir, relativePath);
+    mkdirSync(path.dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
+  }
+
+  async function waitUntil(
+    predicate: () => boolean,
+    timeoutMs = 5_000,
+    intervalMs = 50,
+  ): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (predicate()) return;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error("Timed out waiting for watcher state");
   }
 
   it("records workspace skills with agentId on syncNow", () => {
@@ -180,25 +203,87 @@ describe("SkillDirWatcher workspace reconciliation", () => {
     expect(bot2Skills[0].slug).toBe("shared-tool");
   });
 
-  it("reconciles workspace removals after start", () => {
-    createWorkspaceSkill("bot-1", "live-tool");
+  it(
+    "watches workspace directories after start and reconciles removals",
+    { timeout: 10_000 },
+    async () => {
+      createWorkspaceSkill("bot-1", "live-tool");
 
-    const watcher = new SkillDirWatcher({
-      skillsDir,
-      skillDb: db,
-      openclawStateDir: stateDir,
-      botIds: ["bot-1"],
-      debounceMs: 50,
-    });
+      const watcher = new SkillDirWatcher({
+        skillsDir,
+        skillDb: db,
+        openclawStateDir: stateDir,
+        botIds: ["bot-1"],
+        debounceMs: 50,
+      });
 
-    watcher.syncNow();
-    watcher.start();
-    expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
+      watcher.syncNow();
+      watcher.start();
+      expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    removeWorkspaceSkill("bot-1", "live-tool");
-    watcher.syncNow();
+      removeWorkspaceSkill("bot-1", "live-tool");
+      writeWorkspaceFile("agents/bot-1/skills/watch-trigger.txt", "trigger");
 
-    expect(db.getInstalledByAgent("bot-1")).toHaveLength(0);
-    watcher.stop();
-  });
+      await waitUntil(
+        () => db.getInstalledByAgent("bot-1").length === 0,
+        8_000,
+      );
+      watcher.stop();
+    },
+  );
+
+  it(
+    "ignores non-skill workspace writes under openclawStateDir",
+    { timeout: 10_000 },
+    async () => {
+      const watcher = new SkillDirWatcher({
+        skillsDir,
+        skillDb: db,
+        openclawStateDir: stateDir,
+        botIds: ["bot-1"],
+        debounceMs: 50,
+      });
+
+      const syncSpy = vi.spyOn(watcher as never, "syncNow");
+      watcher.start();
+
+      writeWorkspaceFile("agents/bot-1/runtime/logs.txt", "noise");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      expect(syncSpy).not.toHaveBeenCalled();
+      watcher.stop();
+    },
+  );
+
+  it(
+    "processes workspace skill path writes under agents/<bot>/skills",
+    { timeout: 10_000 },
+    async () => {
+      createWorkspaceSkill("bot-1", "agent-tool");
+
+      const watcher = new SkillDirWatcher({
+        skillsDir,
+        skillDb: db,
+        openclawStateDir: stateDir,
+        botIds: ["bot-1"],
+        debounceMs: 50,
+      });
+
+      const syncSpy = vi.spyOn(watcher as never, "syncNow");
+      watcher.start();
+
+      writeWorkspaceFile(
+        "agents/bot-1/skills/agent-tool/README.md",
+        "touch to trigger watcher",
+      );
+
+      await waitUntil(() => syncSpy.mock.calls.length > 0);
+      expect(syncSpy).toHaveBeenCalled();
+      expect(db.getInstalledByAgent("bot-1").map((s) => s.slug)).toContain(
+        "agent-tool",
+      );
+      watcher.stop();
+    },
+  );
 });

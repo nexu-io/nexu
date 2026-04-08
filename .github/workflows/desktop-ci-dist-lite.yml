@@ -19,6 +19,27 @@ on:
       - "pnpm-workspace.yaml"
       - ".github/workflows/desktop-ci-dist-lite.yml"
       - ".github/workflows/desktop-ci-dist-full.yml"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/desktop/**"
+      - "apps/controller/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "openclaw-runtime/**"
+      - "openclaw-runtime-patches/**"
+      - "scripts/desktop-check-dist.sh"
+      - "scripts/desktop-verify-extracted-runner.sh"
+      - "scripts/desktop-ci-check.mjs"
+      - "scripts/postinstall.mjs"
+      - ".npmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/desktop-ci-dist-lite.yml"
+      - ".github/workflows/desktop-ci-dist-full.yml"
 
 permissions:
   contents: read
@@ -77,61 +98,46 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Show desktop toolchain versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm exec electron --version
+        shell: pwsh
+        run: pnpm exec electron --version
 
-      - name: Build unsigned macOS desktop bundle
+      - name: Build unsigned desktop bundle
         env:
           NEXU_DESKTOP_TARGET_ARCH: arm64
           NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL: "1"
         run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          shopt -s nullglob
+          $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci"
+          $packagedHome = Join-Path $env:RUNNER_TEMP "desktop-home"
+          $tmpDir = Join-Path $env:RUNNER_TEMP "desktop-tmp"
+          New-Item -ItemType Directory -Force -Path $captureDir, $packagedHome, $tmpDir | Out-Null
 
-          runner_home="$HOME"
-          packaged_home="$RUNNER_TEMP/desktop-home"
-          packaged_user_data_dir="$packaged_home/Library/Application Support/@nexu/desktop"
-          packaged_logs_dir="$packaged_user_data_dir/logs"
-          packaged_runtime_logs_dir="$packaged_logs_dir/runtime-units"
-          default_user_data_dir="$runner_home/Library/Application Support/@nexu/desktop"
-          default_logs_dir="$default_user_data_dir/logs"
-          default_runtime_logs_dir="$default_logs_dir/runtime-units"
-          packaged_apps=(apps/desktop/release/mac*/Nexu.app)
+          $packagedUserDataDir = Join-Path $packagedHome "Library/Application Support/@nexu/desktop"
+          $packagedApp = "apps/desktop/release/mac-arm64/Nexu.app"
+          $packagedExecutable = "$packagedApp/Contents/MacOS/Nexu"
 
-          if [ "${#packaged_apps[@]}" -eq 0 ]; then
-            echo "No packaged app bundle found under apps/desktop/release/mac*" >&2
-            exit 1
-          fi
+          $packagedLogsDir = Join-Path $packagedUserDataDir "logs"
+          $packagedRuntimeLogsDir = Join-Path $packagedLogsDir "runtime-units"
 
-          packaged_app="${packaged_apps[0]}"
-          packaged_executable="$packaged_app/Contents/MacOS/Nexu"
-
-          mkdir -p "$RUNNER_TEMP/desktop-ci" "$packaged_home" "$RUNNER_TEMP/desktop-tmp"
-
-          {
-            echo "PACKAGED_HOME=$packaged_home"
-            echo "PACKAGED_LOGS_DIR=$packaged_logs_dir"
-            echo "PACKAGED_USER_DATA_DIR=$packaged_user_data_dir"
-            echo "PACKAGED_RUNTIME_LOGS_DIR=$packaged_runtime_logs_dir"
-            echo "DEFAULT_LOGS_DIR=$default_logs_dir"
-            echo "DEFAULT_USER_DATA_DIR=$default_user_data_dir"
-            echo "DEFAULT_RUNTIME_LOGS_DIR=$default_runtime_logs_dir"
-            echo "PACKAGED_APP=$packaged_app"
-            echo "PACKAGED_EXECUTABLE=$packaged_executable"
-          } >> "$GITHUB_ENV"
+          @(
+            "PACKAGED_HOME=$packagedHome",
+            "PACKAGED_LOGS_DIR=$packagedLogsDir",
+            "PACKAGED_USER_DATA_DIR=$packagedUserDataDir",
+            "PACKAGED_RUNTIME_LOGS_DIR=$packagedRuntimeLogsDir",
+            "DEFAULT_LOGS_DIR=$packagedLogsDir",
+            "DEFAULT_USER_DATA_DIR=$packagedUserDataDir",
+            "DEFAULT_RUNTIME_LOGS_DIR=$packagedRuntimeLogsDir",
+            "PACKAGED_APP=$packagedApp",
+            "PACKAGED_EXECUTABLE=$packagedExecutable"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Verify packaged desktop artifacts
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
-
           packaged_apps=(apps/desktop/release/mac*/Nexu.app)
 
           if [ "${#packaged_apps[@]}" -eq 0 ]; then
@@ -144,8 +150,8 @@ jobs:
 
           test -d "$PACKAGED_APP"
           test -x "$PACKAGED_EXECUTABLE"
-
       - name: Verify packaged runtime unit health
+        if: matrix.os == 'macos'
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
           NEXU_DESKTOP_CHECK_TMPDIR: ${{ runner.temp }}/desktop-tmp

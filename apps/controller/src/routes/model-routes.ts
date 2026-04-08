@@ -1,22 +1,40 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  isCustomProviderTemplate,
+  isSupportedByokProviderId,
   minimaxOauthCancelResponseSchema,
   minimaxOauthStartBodySchema,
   minimaxOauthStartResponseSchema,
   minimaxOauthStatusResponseSchema,
   modelListResponseSchema,
-  providerListResponseSchema,
-  providerResponseSchema,
-  upsertProviderBodySchema,
+  modelProviderConfigDocumentEnvelopeSchema,
+  persistedModelsConfigSchema,
+  providerRegistryResponseSchema,
+  quotaFallbackResponseSchema,
+  restoreManagedBodySchema,
+  supportedByokProviderIds,
+  validateProviderInstanceBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
-import { supportedByokProviderIds } from "../lib/byok-providers.js";
 import type { ControllerBindings } from "../types.js";
 
 const providerIdParamSchema = z.object({
   providerId: z.enum(supportedByokProviderIds),
+});
+
+const verifyProviderIdParamSchema = z.object({
+  providerId: z
+    .string()
+    .refine(
+      (providerId) =>
+        isSupportedByokProviderId(providerId) ||
+        isCustomProviderTemplate(providerId),
+      {
+        message: "Unsupported provider",
+      },
+    ),
 });
 
 export function registerModelRoutes(
@@ -41,62 +59,80 @@ export function registerModelRoutes(
   app.openapi(
     createRoute({
       method: "get",
-      path: "/api/v1/providers",
-      tags: ["Providers"],
+      path: "/api/v1/model-providers/registry",
+      tags: ["Model Providers"],
       responses: {
         200: {
           content: {
-            "application/json": { schema: providerListResponseSchema },
+            "application/json": { schema: providerRegistryResponseSchema },
           },
-          description: "Provider list",
+          description: "Model provider registry",
         },
       },
     }),
     async (c) =>
-      c.json(await container.modelProviderService.listProviders(), 200),
+      c.json(
+        { registry: container.modelProviderService.listProviderRegistry() },
+        200,
+      ),
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/api/v1/model-providers/config",
+      tags: ["Model Providers"],
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: modelProviderConfigDocumentEnvelopeSchema,
+            },
+          },
+          description: "Model provider config document",
+        },
+      },
+    }),
+    async (c) =>
+      c.json(
+        {
+          config:
+            await container.modelProviderService.getModelProviderConfigDocument(),
+        },
+        200,
+      ),
   );
 
   app.openapi(
     createRoute({
       method: "put",
-      path: "/api/v1/providers/{providerId}",
-      tags: ["Providers"],
+      path: "/api/v1/model-providers/config",
+      tags: ["Model Providers"],
       request: {
-        params: providerIdParamSchema,
         body: {
-          content: { "application/json": { schema: upsertProviderBodySchema } },
+          content: {
+            "application/json": { schema: persistedModelsConfigSchema },
+          },
         },
       },
       responses: {
         200: {
           content: {
             "application/json": {
-              schema: z.object({ provider: providerResponseSchema }),
+              schema: modelProviderConfigDocumentEnvelopeSchema,
             },
           },
-          description: "Updated provider",
-        },
-        201: {
-          content: {
-            "application/json": {
-              schema: z.object({ provider: providerResponseSchema }),
-            },
-          },
-          description: "Created provider",
+          description: "Updated model provider config document",
         },
       },
     }),
     async (c) => {
-      const { providerId } = c.req.valid("param");
       const beforeInventory =
         await container.modelProviderService.getInventoryStatus();
-      const result = await container.modelProviderService.upsertProvider(
-        providerId,
-        c.req.valid("json"),
-      );
-      const modelResult =
-        await container.modelProviderService.ensureValidDefaultModel();
-      await container.openclawSyncService.syncAll();
+      const config =
+        await container.modelProviderService.setModelProviderConfigDocument(
+          c.req.valid("json"),
+        );
       const afterInventory =
         await container.modelProviderService.getInventoryStatus();
       if (
@@ -105,43 +141,70 @@ export function registerModelRoutes(
       ) {
         await container.desktopLocalService.restartRuntime();
       }
-      return c.json(
-        {
-          provider: result.provider,
-          modelAutoSelected: modelResult.changed ? modelResult : undefined,
+      return c.json({ config }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/model-providers/instances/validate",
+      tags: ["Model Providers"],
+      request: {
+        body: {
+          content: {
+            "application/json": { schema: validateProviderInstanceBodySchema },
+          },
         },
-        result.created ? 201 : 200,
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: verifyProviderResponseSchema },
+          },
+          description: "Validate model provider instance credentials",
+        },
+      },
+    }),
+    async (c) => {
+      const { instanceKey, ...input } = c.req.valid("json");
+      return c.json(
+        await container.modelProviderService.verifyProviderInstance(
+          instanceKey,
+          input,
+        ),
+        200,
       );
     },
   );
 
   app.openapi(
     createRoute({
-      method: "delete",
-      path: "/api/v1/providers/{providerId}",
-      tags: ["Providers"],
-      request: { params: providerIdParamSchema },
+      method: "post",
+      path: "/api/v1/model-providers/{providerId}/validate",
+      tags: ["Model Providers"],
+      request: {
+        params: verifyProviderIdParamSchema,
+        body: {
+          content: { "application/json": { schema: verifyProviderBodySchema } },
+        },
+      },
       responses: {
         200: {
           content: {
-            "application/json": { schema: z.object({ ok: z.boolean() }) },
+            "application/json": { schema: verifyProviderResponseSchema },
           },
-          description: "Deleted provider",
+          description: "Validate model provider credentials",
         },
       },
     }),
     async (c) => {
       const { providerId } = c.req.valid("param");
-      const ok =
-        await container.modelProviderService.deleteProvider(providerId);
-      const modelResult =
-        await container.modelProviderService.ensureValidDefaultModel();
-      await container.openclawSyncService.syncAll();
       return c.json(
-        {
-          ok,
-          modelAutoSelected: modelResult.changed ? modelResult : undefined,
-        },
+        await container.modelProviderService.verifyProvider(
+          providerId,
+          c.req.valid("json"),
+        ),
         200,
       );
     },
@@ -150,8 +213,8 @@ export function registerModelRoutes(
   app.openapi(
     createRoute({
       method: "get",
-      path: "/api/v1/providers/minimax/oauth/status",
-      tags: ["Providers"],
+      path: "/api/v1/model-providers/minimax/oauth/status",
+      tags: ["Model Providers"],
       responses: {
         200: {
           content: {
@@ -168,8 +231,8 @@ export function registerModelRoutes(
   app.openapi(
     createRoute({
       method: "post",
-      path: "/api/v1/providers/minimax/oauth/login",
-      tags: ["Providers"],
+      path: "/api/v1/model-providers/minimax/oauth/login",
+      tags: ["Model Providers"],
       request: {
         body: {
           content: {
@@ -198,8 +261,8 @@ export function registerModelRoutes(
   app.openapi(
     createRoute({
       method: "delete",
-      path: "/api/v1/providers/minimax/oauth/login",
-      tags: ["Providers"],
+      path: "/api/v1/model-providers/minimax/oauth/login",
+      tags: ["Model Providers"],
       responses: {
         200: {
           content: {
@@ -244,6 +307,53 @@ export function registerModelRoutes(
         ),
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/quota/fallback-to-byok",
+      tags: ["Quota"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: quotaFallbackResponseSchema },
+          },
+          description: "Trigger automatic fallback to BYOK provider",
+        },
+      },
+    }),
+    async (c) => {
+      const result = await container.quotaFallbackService.triggerFallback();
+      return c.json({ ok: result.success, newModelId: result.newModelId }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/quota/restore-managed",
+      tags: ["Quota"],
+      request: {
+        body: {
+          content: { "application/json": { schema: restoreManagedBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: quotaFallbackResponseSchema },
+          },
+          description: "Restore default model to managed (cloud) model",
+        },
+      },
+    }),
+    async (c) => {
+      const { managedModelId } = c.req.valid("json");
+      const result =
+        await container.quotaFallbackService.restoreManaged(managedModelId);
+      return c.json({ ok: result.success, newModelId: result.newModelId }, 200);
     },
   );
 }

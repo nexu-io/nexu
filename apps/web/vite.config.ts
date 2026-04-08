@@ -5,6 +5,10 @@ import { defineConfig } from "vite";
 
 process.env.VITE_COMMIT_HASH ??= "local-dev";
 
+const webHost = process.env.WEB_HOST ?? "127.0.0.1";
+const webPort = Number.parseInt(process.env.WEB_PORT ?? "5173", 10);
+const webApiOrigin = process.env.WEB_API_ORIGIN ?? "http://127.0.0.1:3010";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -13,11 +17,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    host: webHost,
+    port: webPort,
+    strictPort: true,
     proxy: {
-      "/v1": "http://localhost:3000",
-      "/api": "http://localhost:3000",
-      "/openapi.json": "http://localhost:3000",
+      "/v1": webApiOrigin,
+      "/api": webApiOrigin,
+      "/openapi.json": webApiOrigin,
     },
   },
 });

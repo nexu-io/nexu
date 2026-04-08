@@ -10,6 +10,7 @@ on:
       - 'openclaw-runtime/**'
       - 'tests/desktop/**'
       - 'scripts/dev-launchd.sh'
+      - 'scripts/dev/**'
       - 'scripts/desktop-check-dev.sh'
       - 'scripts/desktop-stop-smoke.sh'
       - 'scripts/desktop-ci-check.mjs'
@@ -23,6 +24,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/desktop-ci-dev.yml'
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -34,6 +36,7 @@ on:
       - 'openclaw-runtime/**'
       - 'tests/desktop/**'
       - 'scripts/dev-launchd.sh'
+      - 'scripts/dev/**'
       - 'scripts/desktop-check-dev.sh'
       - 'scripts/desktop-stop-smoke.sh'
       - 'scripts/desktop-ci-check.mjs'
@@ -57,7 +60,16 @@ concurrency:
 
 jobs:
   desktop-ci:
-    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            runs_on: macos-14
+          - os: windows
+            runs_on: windows-latest
+
+    runs-on: ${{ matrix.runs_on }}
     timeout-minutes: 45
 
     steps:
@@ -101,17 +113,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install tmux
+        if: matrix.os == 'macos'
         shell: bash
         run: |
           set -euo pipefail
           brew install tmux
 
       - name: Show desktop toolchain versions
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
           pnpm exec electron --version
-          tmux -V
+          if ("${{ matrix.os }}" -eq "macos") {
+            tmux -V
+          }
 
       - name: Build all
         run: pnpm build
@@ -124,19 +138,37 @@ jobs:
         run: bash scripts/launchd-lifecycle-e2e.sh
 
       - name: Verify desktop runtime unit health
+        if: matrix.os == 'macos'
         env:
           NEXU_DESKTOP_CHECK_CAPTURE_DIR: ${{ runner.temp }}/desktop-ci
           NEXU_USE_LAUNCHD: "0"
         run: pnpm check:dev
 
+      - name: Verify Windows desktop build pipeline
+        if: matrix.os == 'windows'
+        run: pnpm --filter @nexu/desktop build
+
       - name: Capture desktop logs
         if: always()
+        shell: pwsh
+        run: |
+          $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci"
+          New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
+          if (Test-Path ".tmp/dev/logs") {
+            Copy-Item ".tmp/dev/logs" (Join-Path $captureDir "repo-logs") -Recurse -Force
+          }
+          if (Test-Path ".tmp/desktop/electron/logs") {
+            Copy-Item ".tmp/desktop/electron/logs" (Join-Path $captureDir "electron-logs") -Recurse -Force
+          }
+
+      - name: Capture tmux log
+        if: always() && matrix.os == 'macos'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/desktop-ci"
-          if [ -d .tmp/logs ]; then
-            cp -R .tmp/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
+          if [ -d .tmp/dev/logs ]; then
+            cp -R .tmp/dev/logs "$RUNNER_TEMP/desktop-ci/repo-logs"
           fi
           if [ -d .tmp/desktop/electron/logs ]; then
             cp -R .tmp/desktop/electron/logs "$RUNNER_TEMP/desktop-ci/electron-logs"
@@ -149,7 +181,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-ci-logs
+          name: desktop-ci-logs-${{ matrix.os }}
           path: ${{ runner.temp }}/desktop-ci
           if-no-files-found: warn
           retention-days: 7

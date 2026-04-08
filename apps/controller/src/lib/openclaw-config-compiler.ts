@@ -3,30 +3,21 @@ import { openclawConfigSchema } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import type { OAuthConnectionState } from "../runtime/openclaw-auth-profiles-store.js";
 import type { NexuConfig } from "../store/schemas.js";
-import { isSupportedByokProviderId } from "./byok-providers.js";
 import {
   compileChannelBindings,
   compileChannelsConfig,
   resolveManagedChannelPluginId,
 } from "./channel-binding-compiler.js";
+import {
+  buildProviderRuntimeModelId,
+  buildProviderRuntimeModelRef,
+  findProviderDescriptorForModelRef,
+  listModelProviderRuntimeDescriptors,
+  resolveModelProviderApiKey,
+} from "./model-provider-runtime.js";
 import { normalizeProviderBaseUrl } from "./provider-base-url.js";
 
 export type { OAuthConnectionState };
-
-const BYOK_DEFAULT_BASE_URLS: Record<string, string> = {
-  anthropic: "https://api.anthropic.com/v1",
-  openai: "https://api.openai.com/v1",
-  google: "https://generativelanguage.googleapis.com/v1beta/openai",
-  ollama: "http://127.0.0.1:11434",
-  siliconflow: "https://api.siliconflow.cn/v1",
-  ppio: "https://api.ppinfra.com/v3/openai",
-  openrouter: "https://openrouter.ai/api/v1",
-  minimax: "https://api.minimax.io/anthropic",
-  kimi: "https://api.moonshot.cn/v1",
-  glm: "https://open.bigmodel.cn/api/paas/v4",
-  moonshot: "https://api.moonshot.cn/v1",
-  zai: "https://open.bigmodel.cn/api/paas/v4",
-};
 
 const LINK_PROVIDER_HEADERS = {
   "User-Agent": "Mozilla/5.0",
@@ -39,64 +30,6 @@ const EMPTY_OAUTH_CONNECTION_STATE: OAuthConnectionState = {
 const OAUTH_PROVIDER_MAP: Record<string, string> = {
   openai: "openai-codex",
 };
-
-const SILICONFLOW_OFFICIAL_API_BASE_URLS = [
-  "https://api.siliconflow.cn/v1",
-  "https://api.siliconflow.com/v1",
-] as const;
-
-function resolveByokDefaultBaseUrlAliases(input: {
-  providerId: string;
-  oauthRegion: "global" | "cn" | null;
-}): string[] {
-  if (resolveOpenClawProviderId(input.providerId) === "siliconflow") {
-    return [...SILICONFLOW_OFFICIAL_API_BASE_URLS];
-  }
-
-  const defaultBaseUrl = resolveByokDefaultBaseUrl(input);
-  return defaultBaseUrl ? [defaultBaseUrl] : [];
-}
-
-function resolveByokDefaultBaseUrl(input: {
-  providerId: string;
-  oauthRegion: "global" | "cn" | null;
-}): string | undefined {
-  const openclawProviderId = resolveOpenClawProviderId(input.providerId);
-
-  if (openclawProviderId === "minimax" && input.oauthRegion === "cn") {
-    return "https://api.minimaxi.com/anthropic";
-  }
-
-  return BYOK_DEFAULT_BASE_URLS[openclawProviderId];
-}
-
-function resolveOpenClawProviderId(providerId: string): string {
-  switch (providerId) {
-    case "kimi":
-      return "moonshot";
-    case "glm":
-      return "zai";
-    default:
-      return providerId;
-  }
-}
-
-function resolveOpenClawProviderApi(providerId: string): string {
-  switch (resolveOpenClawProviderId(providerId)) {
-    case "minimax":
-      return "anthropic-messages";
-    case "ollama":
-      return "ollama";
-    default:
-      return "openai-completions";
-  }
-}
-
-function resolveOpenClawProviderAuthHeader(
-  providerId: string,
-): boolean | undefined {
-  return resolveOpenClawProviderId(providerId) === "minimax" ? true : undefined;
-}
 
 function isDesktopCloudConfig(value: unknown): value is {
   linkUrl: string;
@@ -120,56 +53,6 @@ function getDesktopSelectedModel(config: NexuConfig): string | null {
   return typeof selectedModelId === "string" && selectedModelId.length > 0
     ? selectedModelId
     : null;
-}
-
-function isByokProviderProxied(
-  providerId: string,
-  baseUrl: string | null,
-  oauthRegion: "global" | "cn" | null,
-): boolean {
-  const normalizedBaseUrl = normalizeProviderBaseUrl(baseUrl);
-
-  if (!normalizedBaseUrl) {
-    return false;
-  }
-
-  const normalizedDefaultBaseUrls = new Set(
-    resolveByokDefaultBaseUrlAliases({ providerId, oauthRegion })
-      .map((value) => normalizeProviderBaseUrl(value))
-      .filter((value): value is string => value !== null),
-  );
-
-  return (
-    normalizedDefaultBaseUrls.size > 0 &&
-    !normalizedDefaultBaseUrls.has(normalizedBaseUrl)
-  );
-}
-
-function getByokProviderKey(input: {
-  id: string;
-  providerId: string;
-  baseUrl: string | null;
-  oauthRegion: "global" | "cn" | null;
-}): string {
-  const openclawProviderId = resolveOpenClawProviderId(input.providerId);
-  return isByokProviderProxied(
-    input.providerId,
-    input.baseUrl,
-    input.oauthRegion,
-  )
-    ? `byok_${openclawProviderId}`
-    : openclawProviderId;
-}
-
-function getByokProviderModelId(
-  providerKey: string,
-  providerId: string,
-  modelId: string,
-): string {
-  const openclawProviderId = resolveOpenClawProviderId(providerId);
-  return providerKey === `byok_${openclawProviderId}`
-    ? `${openclawProviderId}/${modelId}`
-    : modelId;
 }
 
 function buildModelEntry(id: string, name?: string) {
@@ -227,45 +110,28 @@ function compileModelsConfig(
     };
   }
 
-  for (const provider of config.providers.filter(
-    (item) =>
-      item.enabled &&
-      (item.apiKey !== null || item.authMode === "oauth") &&
-      isSupportedByokProviderId(item.providerId),
-  )) {
-    const providerKey = getByokProviderKey({
-      id: provider.id,
-      providerId: provider.providerId,
-      baseUrl: provider.baseUrl,
-      oauthRegion: provider.oauthRegion,
-    });
-    const baseUrl =
-      normalizeProviderBaseUrl(
-        provider.baseUrl ??
-          resolveByokDefaultBaseUrl({
-            providerId: provider.providerId,
-            oauthRegion: provider.oauthRegion,
-          }),
-      ) ?? normalizeProviderBaseUrl(BYOK_DEFAULT_BASE_URLS.openai);
-
-    if (baseUrl === null) {
+  for (const descriptor of listModelProviderRuntimeDescriptors(config)) {
+    if (!descriptor.provider.enabled) {
       continue;
     }
 
-    providers[providerKey] = {
-      baseUrl,
-      apiKey:
-        provider.authMode === "oauth"
-          ? (provider.oauthCredential?.access ?? "")
-          : (provider.apiKey ?? ""),
-      api: resolveOpenClawProviderApi(provider.providerId),
-      ...(resolveOpenClawProviderAuthHeader(provider.providerId)
-        ? { authHeader: true }
+    const apiKey = resolveModelProviderApiKey(descriptor);
+    if (apiKey === null && descriptor.provider.auth !== "oauth") {
+      continue;
+    }
+
+    providers[descriptor.runtimeKey] = {
+      baseUrl: descriptor.provider.baseUrl,
+      apiKey: apiKey ?? "",
+      api: descriptor.apiKind,
+      ...(descriptor.authHeader ? { authHeader: true } : {}),
+      ...(descriptor.defaultHeaders
+        ? { headers: descriptor.defaultHeaders }
         : {}),
-      models: provider.models.map((modelId) =>
+      models: descriptor.provider.models.map((model) =>
         buildModelEntry(
-          getByokProviderModelId(providerKey, provider.providerId, modelId),
-          modelId,
+          buildProviderRuntimeModelId(descriptor, model.id),
+          model.name,
         ),
       ),
     };
@@ -304,51 +170,30 @@ export function resolveModelId(
     return rawModelId;
   }
 
-  const byokPrefixToKey = new Map<string, string>();
-  const byokPrefixToProvider = new Map<string, string>();
-  for (const provider of config.providers.filter((item) => item.enabled)) {
-    if (!isSupportedByokProviderId(provider.providerId)) {
-      continue;
+  const descriptors = listModelProviderRuntimeDescriptors(config).filter(
+    (descriptor) => descriptor.provider.enabled,
+  );
+  const matchedDescriptor = findProviderDescriptorForModelRef(
+    descriptors,
+    rawModelId,
+  );
+
+  if (matchedDescriptor) {
+    const oauthTarget =
+      OAUTH_PROVIDER_MAP[matchedDescriptor.descriptor.providerId];
+    if (
+      oauthTarget &&
+      oauthState.connectedProviderIds.includes(
+        matchedDescriptor.descriptor.providerId,
+      )
+    ) {
+      return `${oauthTarget}/${matchedDescriptor.modelId}`;
     }
 
-    const openclawProviderId = resolveOpenClawProviderId(provider.providerId);
-    byokPrefixToKey.set(
-      provider.providerId,
-      getByokProviderKey({
-        id: provider.id,
-        providerId: provider.providerId,
-        baseUrl: provider.baseUrl,
-        oauthRegion: provider.oauthRegion,
-      }),
+    return buildProviderRuntimeModelRef(
+      matchedDescriptor.descriptor,
+      matchedDescriptor.modelId,
     );
-    byokPrefixToProvider.set(provider.providerId, openclawProviderId);
-  }
-
-  const slashIndex = rawModelId.indexOf("/");
-  if (slashIndex > 0) {
-    const prefix = rawModelId.slice(0, slashIndex);
-    const modelSuffix = rawModelId.slice(slashIndex + 1);
-    const byokKey = byokPrefixToKey.get(prefix);
-    const openclawProviderId = byokPrefixToProvider.get(prefix);
-    if (byokKey && openclawProviderId) {
-      const oauthTarget = OAUTH_PROVIDER_MAP[prefix];
-      if (oauthTarget) {
-        const provider = config.providers.find(
-          (item) => item.providerId === prefix,
-        );
-        if (
-          provider?.enabled &&
-          oauthState.connectedProviderIds.includes(prefix)
-        ) {
-          return `${oauthTarget}/${modelSuffix}`;
-        }
-      }
-
-      const providerScopedModelId = `${openclawProviderId}/${modelSuffix}`;
-      return byokKey === openclawProviderId
-        ? providerScopedModelId
-        : `${byokKey}/${providerScopedModelId}`;
-    }
   }
 
   if (isDesktopCloudConfig(config.desktop.cloud)) {
@@ -408,12 +253,12 @@ function compilePlugins(
   config: NexuConfig,
   env: ControllerEnv,
 ): OpenClawConfig["plugins"] {
-  const hasMiniMaxOauth = config.providers.some(
-    (provider) =>
-      provider.providerId === "minimax" &&
-      provider.enabled &&
-      provider.authMode === "oauth" &&
-      provider.oauthCredential !== null,
+  const resolvedMiniMaxOauth = listModelProviderRuntimeDescriptors(config).some(
+    (descriptor) =>
+      descriptor.providerId === "minimax" &&
+      descriptor.provider.enabled &&
+      descriptor.provider.auth === "oauth" &&
+      descriptor.legacyOauthCredential !== null,
   );
 
   const connectedPluginIds = [
@@ -424,12 +269,26 @@ function compilePlugins(
         .filter((pluginId): pluginId is string => pluginId !== null),
     ),
   ];
+  const platformPluginIds = [
+    "nexu-runtime-model",
+    "nexu-credit-guard",
+    "nexu-platform-bootstrap",
+    ...(resolvedMiniMaxOauth ? ["minimax-portal-auth"] : []),
+  ];
+
+  // Sort and dedup defensively so `plugins.allow` is fully deterministic.
+  // Without this, channel reorderings or brief status flaps change the
+  // output order, which OpenClaw treats as a config change and triggers
+  // a SIGUSR1 restart + 11s gateway drain per reload.
+  const allow = Array.from(
+    new Set([...connectedPluginIds, ...platformPluginIds]),
+  ).sort();
 
   return {
     load: {
       paths: [env.openclawExtensionsDir],
     },
-    ...(connectedPluginIds.length > 0 ? { allow: connectedPluginIds } : {}),
+    allow,
     entries: {
       feishu: {
         enabled: true,
@@ -464,7 +323,13 @@ function compilePlugins(
       "nexu-feishu-card": {
         enabled: true,
       },
-      ...(hasMiniMaxOauth
+      "nexu-credit-guard": {
+        enabled: true,
+        config: {
+          contactUrl: "https://nexu.app/contact",
+        },
+      },
+      ...(resolvedMiniMaxOauth
         ? {
             "minimax-portal-auth": {
               enabled: true,
@@ -519,8 +384,14 @@ export function compileOpenClawConfig(
       defaults: {
         model: { primary: defaultModelId },
         compaction: {
+          // "safeguard" mode: Pi framework auto-compacts when prompt
+          // approaches context window. The safeguard extension (compaction-
+          // safeguard.ts) handles LLM summarization with quality guards.
           mode: "safeguard",
-          maxHistoryShare: 0.5,
+          // Max fraction of context window for retained history after
+          // compaction. 0.3 = 70% reserved for system prompt + response.
+          // Tested: 0.5 was too tight for models with large system prompts.
+          maxHistoryShare: 0.3,
           keepRecentTokens: 20000,
           recentTurnsPreserve: 5,
           qualityGuard: { enabled: true },
@@ -528,6 +399,12 @@ export function compileOpenClawConfig(
             enabled: true,
           },
         },
+        // LLM call timeout. Default is 600s (10min) which causes the bot to
+        // appear unresponsive when the provider is down. 300s (5min) leaves
+        // room for reasoning models (o1/o3 long thinking chains) while
+        // cutting max wait time in half. Aligns with compaction's own 300s
+        // safety timeout (EMBEDDED_COMPACTION_TIMEOUT_MS).
+        timeoutSeconds: 300,
         humanDelay: {
           mode: "off",
         },

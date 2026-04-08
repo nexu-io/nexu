@@ -10,6 +10,7 @@ import {
   hostInvokeChannels,
 } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { resolveWebviewPreloadUrl } from "./webview-preload-url";
 
 const validChannels = new Set<string>(hostInvokeChannels);
 
@@ -30,8 +31,11 @@ const hostBridge: HostBridge = {
   bootstrap: {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
+    posthogApiKey: runtimeConfig.posthogApiKey,
+    posthogHost: runtimeConfig.posthogHost,
     isPackaged: !process.defaultApp,
     needsSetupAnimation: false,
+    webviewPreloadUrl: resolveWebviewPreloadUrl(import.meta.dirname),
   },
 
   invoke<TChannel extends HostInvokeChannel>(

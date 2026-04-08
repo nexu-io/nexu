@@ -1,0 +1,8 @@
+{
+  "name": "nexu-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "feishu:ws": "node ./feishu-ws-smoke.mjs"
+  }
+}

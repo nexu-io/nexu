@@ -12,6 +12,8 @@ import {
 import { join } from "node:path";
 import { app } from "electron";
 import type { UpdateSource } from "../../shared/host";
+import { resolvePlatformArchiveComponent } from "../platforms/platform-identifiers";
+import { resolveRuntimePlatform } from "../platforms/platform-resolver";
 
 const GITHUB_BASE_URL = "https://github.com/nexu-io/nexu/releases/download";
 export const R2_BASE_URL = "https://desktop-releases.nexu.io";
@@ -159,13 +161,13 @@ export class ComponentUpdater {
   }
 
   private buildManifestUrl(appVersion: string): string {
-    const platform = process.platform;
+    const platform = resolvePlatformArchiveComponent(resolveRuntimePlatform());
     const arch = process.arch;
     return `${this.baseUrl}/desktop-v${appVersion}/component-manifest-${platform}-${arch}.json`;
   }
 
   private buildDownloadUrl(appVersion: string, componentId: string): string {
-    const platform = process.platform;
+    const platform = resolvePlatformArchiveComponent(resolveRuntimePlatform());
     const arch = process.arch;
     return `${this.baseUrl}/desktop-v${appVersion}/${componentId}-${platform}-${arch}.tar.gz`;
   }

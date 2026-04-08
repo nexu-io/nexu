@@ -39,12 +39,15 @@ type TranscriptEntry = {
   };
 };
 
+type AnalyticsMessageState = "Success" | "false";
+
 type UserMessageCandidate = {
   id: string;
   timestampMs: number;
   createdAt: string | null;
   providerName: string | null;
   channel: AnalyticsChannel;
+  state: AnalyticsMessageState;
 };
 
 type SkillUseCandidate = {
@@ -61,6 +64,8 @@ type ResolvedSkillInfo = {
   filePath: string | null;
   source: string | null;
 };
+
+const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
 const EMPTY_ANALYTICS_STATE: AnalyticsState = {
   sessionStartSent: false,
@@ -160,7 +165,7 @@ export class AnalyticsService {
   ) {}
 
   async poll(): Promise<void> {
-    if (!this.env.amplitudeApiKey) {
+    if (!this.env.posthogApiKey) {
       return;
     }
 
@@ -209,12 +214,13 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendEvent(
+        await this.sendAnalyticsEvent(
           profile.id,
           "user_message_sent",
           {
             channel: userMessage.channel,
             model_provider: userMessage.providerName,
+            state: userMessage.state,
           },
           userMessage.timestampMs,
         );
@@ -230,7 +236,7 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendEvent(
+        await this.sendAnalyticsEvent(
           profile.id,
           "skill_use",
           {
@@ -247,7 +253,7 @@ export class AnalyticsService {
     }
 
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
-      await this.sendEvent(
+      await this.sendAnalyticsEvent(
         profile.id,
         "nexu_first_conversation_start",
         {
@@ -445,6 +451,38 @@ export class AnalyticsService {
         continue;
       }
 
+      // Resolve any pending user messages as failed when openclaw reports a
+      // prompt error. Each error entry's parentId points back to the user
+      // message that triggered it; the cheapest correct interpretation is
+      // "any user message that hasn't yet been answered when this error
+      // arrives is a failure".
+      if (
+        entry.type === "custom" &&
+        entry.customType === "openclaw:prompt-error"
+      ) {
+        const errorProvider =
+          typeof entry.data?.provider === "string" ? entry.data.provider : null;
+        if (errorProvider) {
+          currentProvider = errorProvider;
+        }
+        for (const index of pendingUserIndexes) {
+          const message = userMessages[index];
+          if (!message) {
+            continue;
+          }
+          userMessages[index] = {
+            id: message.id,
+            timestampMs: message.timestampMs,
+            createdAt: message.createdAt,
+            providerName: errorProvider ?? message.providerName,
+            channel: message.channel,
+            state: "false",
+          };
+        }
+        pendingUserIndexes.length = 0;
+        continue;
+      }
+
       if (entry.type !== "message" || !entry.message) {
         continue;
       }
@@ -463,6 +501,7 @@ export class AnalyticsService {
           createdAt: entry.timestamp ?? null,
           providerName: currentProvider,
           channel: params.channel,
+          state: "Success",
         });
         pendingUserIndexes.push(userMessages.length - 1);
         continue;
@@ -489,6 +528,7 @@ export class AnalyticsService {
             createdAt: message.createdAt,
             providerName,
             channel: message.channel,
+            state: message.state,
           };
         }
       }
@@ -552,33 +592,41 @@ export class AnalyticsService {
     return "builtin";
   }
 
-  private async sendEvent(
-    userId: string,
+  private getPosthogCaptureUrl(): string | null {
+    const host = this.env.posthogHost?.trim() || DEFAULT_POSTHOG_HOST;
+    if (!host) {
+      return null;
+    }
+    return `${host.replace(/\/+$/, "")}/i/v0/e/`;
+  }
+
+  private async sendAnalyticsEvent(
+    distinctId: string,
     eventType: string,
     eventProperties: Record<string, unknown>,
-    time: number,
+    timestampMs: number,
   ): Promise<void> {
+    const captureUrl = this.getPosthogCaptureUrl();
+    if (!captureUrl || !this.env.posthogApiKey) {
+      return;
+    }
+
     try {
-      const response = await proxyFetch(
-        "https://api2.amplitude.com/2/httpapi",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            api_key: this.env.amplitudeApiKey,
-            events: [
-              {
-                user_id: userId,
-                event_type: eventType,
-                event_properties: eventProperties,
-                time,
-              },
-            ],
-          }),
+      const response = await proxyFetch(captureUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          api_key: this.env.posthogApiKey,
+          distinct_id: distinctId,
+          event: eventType,
+          properties: {
+            ...eventProperties,
+          },
+          timestamp: new Date(timestampMs).toISOString(),
+        }),
+      });
 
       if (!response.ok) {
         logger.warn(

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 vi.mock("node:os", () => ({
   homedir: vi.fn(() => "/Users/testuser"),
 }));
@@ -117,18 +121,35 @@ describe("generatePlist", () => {
     const controllerPlist = generatePlist("controller", mockEnv);
     const openclawPlist = generatePlist("openclaw", mockEnv);
 
-    expect(controllerPlist).toContain(
+    expect(normalizePath(controllerPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/controller.log</string>",
     );
-    expect(controllerPlist).toContain(
+    expect(normalizePath(controllerPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/controller.error.log</string>",
     );
-    expect(openclawPlist).toContain(
+    expect(normalizePath(openclawPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.log</string>",
     );
-    expect(openclawPlist).toContain(
+    expect(normalizePath(openclawPlist)).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
     );
+  });
+
+  it("renders PostHog analytics env vars when configured", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const plist = generatePlist("controller", {
+      ...mockEnv,
+      posthogApiKey: "phc_test_key",
+      posthogHost: "https://us.i.posthog.com",
+    });
+
+    expect(plist).toContain("<key>POSTHOG_API_KEY</key>");
+    expect(plist).toContain("<string>phc_test_key</string>");
+    expect(plist).toContain("<key>POSTHOG_HOST</key>");
+    expect(plist).toContain("<string>https://us.i.posthog.com</string>");
   });
 
   // -----------------------------------------------------------------------
@@ -217,7 +238,7 @@ describe("generatePlist", () => {
     );
     const plist = generatePlist("openclaw", mockEnv);
 
-    expect(plist).toContain(
+    expect(normalizePath(plist)).toContain(
       "<key>WorkingDirectory</key>\n    <string>/app</string>",
     );
   });
@@ -228,7 +249,7 @@ describe("generatePlist", () => {
     );
     const plist = generatePlist("openclaw", mockEnv);
 
-    expect(plist).toContain(
+    expect(normalizePath(plist)).toContain(
       "<string>/Users/testuser/.nexu/logs/openclaw.error.log</string>",
     );
   });
@@ -262,7 +283,7 @@ describe("generatePlist", () => {
     );
     const plist = generatePlist("controller", mockEnv);
 
-    expect(plist).toContain(
+    expect(normalizePath(plist)).toContain(
       "<key>WorkingDirectory</key>\n    <string>/app/controller</string>",
     );
   });

@@ -28,8 +28,6 @@ export const CURATED_SKILL_SLUGS: readonly string[] = [
   "session-logs",
   // Skill management
   "skill-creator",
-  // Browser & web
-  "agent-browser",
   // Skill discovery
   "find-skill",
   // Search & content (ClawHub)

@@ -39,6 +39,11 @@ export const verifyProviderBodySchema = z.object({
   baseUrl: z.string().optional(),
 });
 
+export const validateProviderInstanceBodySchema =
+  verifyProviderBodySchema.extend({
+    instanceKey: z.string().min(1),
+  });
+
 export const refreshModelsResponseSchema = z.object({
   models: z.array(z.string()),
   error: z.string().optional(),
@@ -108,6 +113,7 @@ export const cloudProfileSchema = z.object({
 export const cloudProfileStatusSchema = cloudProfileSchema.extend({
   connected: z.boolean(),
   polling: z.boolean().optional(),
+  userId: z.string().nullable().optional(),
   userName: z.string().nullable().optional(),
   userEmail: z.string().nullable().optional(),
   connectedAt: z.string().nullable().optional(),
@@ -117,6 +123,7 @@ export const cloudProfileStatusSchema = cloudProfileSchema.extend({
 export const cloudStatusResponseSchema = z.object({
   connected: z.boolean(),
   polling: z.boolean().optional(),
+  userId: z.string().nullable().optional(),
   userName: z.string().nullable().optional(),
   userEmail: z.string().nullable().optional(),
   connectedAt: z.string().nullable().optional(),
@@ -161,8 +168,15 @@ export const cloudProfileDeleteBodySchema = z.object({
   name: z.string().min(1),
 });
 
+export const cloudConnectBodySchema = z
+  .object({
+    source: z.string().min(1).optional(),
+  })
+  .optional();
+
 export const cloudProfileConnectBodySchema = z.object({
   name: z.string().min(1),
+  source: z.string().min(1).optional(),
 });
 
 export const cloudProfileDisconnectBodySchema = z.object({
