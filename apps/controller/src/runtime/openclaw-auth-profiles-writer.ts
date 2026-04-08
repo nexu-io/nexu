@@ -60,7 +60,10 @@ export class OpenClawAuthProfilesWriter {
       updatedAt: "",
     }));
 
-    const profileEntries = buildProfileEntries(providerSource);
+    const profileEntries = await buildProfileEntries(
+      this.authProfilesStore,
+      providerSource,
+    );
 
     const effectiveEntries =
       profileEntries.length > 0
@@ -137,12 +140,13 @@ export class OpenClawAuthProfilesWriter {
   }
 }
 
-function buildProfileEntries(
+async function buildProfileEntries(
+  authProfilesStore: OpenClawAuthProfilesStore,
   providerSource:
     | ControllerProvider[]
     | PersistedModelsConfig["providers"]
     | undefined,
-): AuthProfileEntry[] {
+): Promise<AuthProfileEntry[]> {
   if (!providerSource) {
     return [];
   }
@@ -206,6 +210,20 @@ function buildProfileEntries(
 
   const descriptors =
     listModelProviderRuntimeDescriptorsFromProviders(providerSource);
+  const providerRefs = Array.from(
+    new Set(
+      descriptors.flatMap((descriptor) =>
+        descriptor.provider.auth === "oauth" && descriptor.authProfileRef
+          ? [descriptor.authProfileRef]
+          : [],
+      ),
+    ),
+  );
+  const oauthEntriesByProvider = await loadOAuthEntriesByProvider(
+    authProfilesStore,
+    providerRefs,
+  );
+
   return descriptors.flatMap((descriptor): AuthProfileEntry[] => {
     if (!descriptor.provider.enabled) {
       return [];
@@ -247,6 +265,13 @@ function buildProfileEntries(
     }
 
     if (
+      descriptor.provider.auth === "oauth" &&
+      descriptor.authProfileRef !== null
+    ) {
+      return oauthEntriesByProvider.get(descriptor.authProfileRef) ?? [];
+    }
+
+    if (
       typeof descriptor.provider.apiKey === "string" &&
       descriptor.provider.apiKey.length > 0
     ) {
@@ -264,4 +289,79 @@ function buildProfileEntries(
 
     return [];
   });
+}
+
+async function loadOAuthEntriesByProvider(
+  authProfilesStore: OpenClawAuthProfilesStore,
+  providerRefs: readonly string[],
+): Promise<Map<string, AuthProfileEntry[]>> {
+  if (providerRefs.length === 0) {
+    return new Map();
+  }
+
+  const remainingProviders = new Set(providerRefs);
+  const entriesByProvider = new Map<string, Map<string, AuthProfileEntry>>();
+  const filePaths = await authProfilesStore.listAgentAuthProfilesPaths();
+
+  for (const filePath of filePaths) {
+    if (remainingProviders.size === 0) {
+      break;
+    }
+
+    const data = await authProfilesStore.readAuthProfiles(filePath, {
+      missingOk: true,
+    });
+    if (!data) {
+      continue;
+    }
+
+    for (const [key, profile] of Object.entries(data.profiles)) {
+      if (typeof profile !== "object" || profile === null) {
+        continue;
+      }
+
+      const typed = profile as Record<string, unknown>;
+      if (typed.type !== "oauth") {
+        continue;
+      }
+
+      const provider =
+        typeof typed.provider === "string" ? typed.provider : null;
+      const access = typeof typed.access === "string" ? typed.access : null;
+      if (
+        provider === null ||
+        access === null ||
+        !remainingProviders.has(provider)
+      ) {
+        continue;
+      }
+
+      const providerEntries =
+        entriesByProvider.get(provider) ?? new Map<string, AuthProfileEntry>();
+      providerEntries.set(key, [
+        key,
+        {
+          type: "oauth",
+          provider,
+          access,
+          ...(typeof typed.refresh === "string"
+            ? { refresh: typed.refresh }
+            : {}),
+          ...(typeof typed.expires === "number"
+            ? { expires: typed.expires }
+            : {}),
+          ...(typeof typed.email === "string" ? { email: typed.email } : {}),
+        },
+      ]);
+      entriesByProvider.set(provider, providerEntries);
+      remainingProviders.delete(provider);
+    }
+  }
+
+  return new Map(
+    [...entriesByProvider.entries()].map(([provider, entries]) => [
+      provider,
+      [...entries.values()],
+    ]),
+  );
 }
