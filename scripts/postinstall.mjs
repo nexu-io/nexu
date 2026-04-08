@@ -111,14 +111,6 @@ async function buildDevUtils() {
   ]);
 }
 
-async function buildOpenclawRuntimePackage() {
-  await run(process.execPath, [
-    resolve(repoRoot, "node_modules", "typescript", "bin", "tsc"),
-    "-p",
-    "./packages/openclaw-runtime/tsconfig.json",
-  ]);
-}
-
 if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
   console.log(
     "Skipping runtime postinstall via NEXU_SKIP_RUNTIME_POSTINSTALL.",
@@ -129,4 +121,3 @@ if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
 await installOpenClawRuntime();
 await installWeixinRuntimePlugin();
 await buildDevUtils();
-await buildOpenclawRuntimePackage();

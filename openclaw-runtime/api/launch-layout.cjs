@@ -1,17 +1,10 @@
-import path from "node:path";
+const path = require("node:path");
 
-import { resolveRepoLocalOpenClawInstallLayout } from "./install-layout.js";
+const {
+  resolveRepoLocalOpenClawInstallLayout,
+} = require("./install-layout.cjs");
 
-export type OpenClawLaunchLayout = {
-  openclawPath: string;
-  openclawCwd: string;
-  openclawBinPath: string;
-  openclawExtensionsDir: string;
-};
-
-export function resolvePackagedOpenClawLaunchLayout(
-  sidecarRoot: string,
-): OpenClawLaunchLayout {
+function resolvePackagedOpenClawLaunchLayout(sidecarRoot) {
   return {
     openclawPath: path.join(
       sidecarRoot,
@@ -30,9 +23,7 @@ export function resolvePackagedOpenClawLaunchLayout(
   };
 }
 
-export function resolveRepoLocalOpenClawLaunchLayout(
-  repoRoot: string,
-): OpenClawLaunchLayout {
+function resolveRepoLocalOpenClawLaunchLayout(repoRoot) {
   const installLayout = resolveRepoLocalOpenClawInstallLayout(repoRoot);
 
   return {
@@ -57,3 +48,8 @@ export function resolveRepoLocalOpenClawLaunchLayout(
     ),
   };
 }
+
+module.exports = {
+  resolvePackagedOpenClawLaunchLayout,
+  resolveRepoLocalOpenClawLaunchLayout,
+};

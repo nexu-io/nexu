@@ -7,7 +7,7 @@
 | `core-beliefs.md` | Engineering principles and constraints |
 | `openclaw-multi-tenant.md` | Full system architecture, data model, phased plan |
 | `openclaw-architecture-internals.md` | Upstream OpenClaw runtime analysis |
-| `openclaw-runtime-boundary.md` | Boundary and ownership rules for `packages/openclaw-runtime` |
+| `openclaw-runtime-boundary.md` | Boundary and ownership rules for repo-root `openclaw-runtime/` |
 | `openclaw-startup-crash-analysis.md` | Gateway startup crash scenarios and mitigations |
 
 ## Adding design docs

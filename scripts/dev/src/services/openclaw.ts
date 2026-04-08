@@ -12,7 +12,6 @@ import {
   terminateProcess,
   waitForProcessStart,
 } from "@nexu/dev-utils";
-import { prepareRepoLocalDevOpenclawRuntime } from "@nexu/openclaw-runtime";
 import { ensure } from "@nexu/shared";
 
 import {
@@ -21,6 +20,7 @@ import {
 } from "../shared/dev-runtime-config.js";
 import { getScriptsDevLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
+import { prepareRepoLocalDevOpenclawRuntime } from "../shared/openclaw-runtime-bridge.js";
 import {
   getOpenclawDevLogPath,
   getOpenclawRuntimeStageRootPath,
@@ -312,7 +312,7 @@ export async function startOpenclawDevProcess(options: {
 
   logOpenclawTiming("filesystem-ready", startedAt);
   logger.info(
-    "prepared openclaw runtime entry path from @nexu/openclaw-runtime",
+    "prepared openclaw runtime entry path from repo-root openclaw runtime bridge",
     {
       openclawEntryPath,
       runtimeStageRoot: getOpenclawRuntimeStageRootPath(),

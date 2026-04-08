@@ -1,9 +1,11 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { refreshRepoLocalOpenClawRuntimeLock } from "@nexu/openclaw-runtime/runtime-maintenance";
+import runtimeMaintenance from "./runtime-maintenance.cjs";
+import runtimePolicy from "./runtime-policy.cjs";
 
-import { pruneTargets } from "@nexu/openclaw-runtime/runtime-policy";
+const { refreshRepoLocalOpenClawRuntimeLock } = runtimeMaintenance;
+const { pruneTargets } = runtimePolicy;
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 

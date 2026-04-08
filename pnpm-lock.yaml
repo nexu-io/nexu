@@ -54,9 +54,6 @@ importers:
       '@hono/zod-openapi':
         specifier: ^0.18.4
         version: 0.18.4(hono@4.12.2)(zod@3.25.76)
-      '@nexu/openclaw-runtime':
-        specifier: workspace:*
-        version: link:../../packages/openclaw-runtime
       '@nexu/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -116,9 +113,6 @@ importers:
       '@hey-api/client-fetch':
         specifier: ^0.8.4
         version: 0.8.4
-      '@nexu/openclaw-runtime':
-        specifier: workspace:*
-        version: link:../../packages/openclaw-runtime
       '@radix-ui/react-dialog':
         specifier: ^1.1.6
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -329,16 +323,6 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  packages/openclaw-runtime:
-    dependencies:
-      '@nexu/dev-utils':
-        specifier: workspace:*
-        version: link:../dev-utils
-    devDependencies:
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
   packages/pkg-utils: {}
 
   packages/platform-utils: {}
@@ -358,9 +342,6 @@ importers:
       '@nexu/dev-utils':
         specifier: workspace:*
         version: link:../../packages/dev-utils
-      '@nexu/openclaw-runtime':
-        specifier: workspace:*
-        version: link:../../packages/openclaw-runtime
       cac:
         specifier: ^6.7.14
         version: 6.7.14

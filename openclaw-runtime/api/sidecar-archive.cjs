@@ -1,14 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+const { existsSync, mkdirSync, readFileSync, statSync } = require("node:fs");
+const path = require("node:path");
 
-function ensureDir(dirPath: string): string {
+function ensureDir(dirPath) {
   mkdirSync(dirPath, { recursive: true });
   return dirPath;
 }
 
-export function resolvePackagedOpenclawArchivePath(
-  packagedSidecarRoot: string,
-): string | undefined {
+function resolvePackagedOpenclawArchivePath(packagedSidecarRoot) {
   const archiveMetadataPath = path.resolve(packagedSidecarRoot, "archive.json");
 
   const archivePath = existsSync(archiveMetadataPath)
@@ -21,18 +19,11 @@ export function resolvePackagedOpenclawArchivePath(
   return existsSync(archivePath) ? archivePath : undefined;
 }
 
-export function resolvePackagedOpenclawExtractedSidecarRoot(
-  runtimeRoot: string,
-): string {
+function resolvePackagedOpenclawExtractedSidecarRoot(runtimeRoot) {
   return ensureDir(path.resolve(runtimeRoot, "openclaw-sidecar"));
 }
 
-export function isPackagedOpenclawExtractionNeeded(input: {
-  extractedSidecarRoot: string;
-  archivePath: string;
-  archiveEntryPath: string;
-  stampFileName?: string;
-}): boolean {
+function isPackagedOpenclawExtractionNeeded(input) {
   const stampPath = path.resolve(
     input.extractedSidecarRoot,
     input.stampFileName ?? ".archive-stamp",
@@ -51,3 +42,9 @@ export function isPackagedOpenclawExtractionNeeded(input: {
 
   return readFileSync(stampPath, "utf8") !== archiveStamp;
 }
+
+module.exports = {
+  isPackagedOpenclawExtractionNeeded,
+  resolvePackagedOpenclawArchivePath,
+  resolvePackagedOpenclawExtractedSidecarRoot,
+};

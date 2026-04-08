@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { getOpenClawCommandSpec } from "@nexu/openclaw-runtime";
 import {
   type Model,
   type ModelProviderConfig,
@@ -20,6 +19,7 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { getOpenClawCommandSpec } from "../lib/openclaw-runtime-bridge.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";

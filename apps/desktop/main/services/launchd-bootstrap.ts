@@ -19,7 +19,7 @@ import {
   resolvePackagedOpenClawLaunchLayout,
   resolveRepoLocalOpenClawInstallLayout,
   resolveRepoLocalOpenClawLaunchLayout,
-} from "@nexu/openclaw-runtime";
+} from "../shared/openclaw-runtime-bridge";
 
 const execFileAsync = promisify(execFile);
 import { getWorkspaceRoot } from "../../shared/workspace-paths";

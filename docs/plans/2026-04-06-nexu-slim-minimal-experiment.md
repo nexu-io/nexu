@@ -110,7 +110,7 @@ Must not own:
 - Electron main concerns
 - runtime file layout assumptions beyond IPC-returned facts
 
-### `packages/openclaw-runtime`
+### repo-root runtime integration helpers
 
 Owns only:
 
@@ -140,7 +140,7 @@ Must not be treated as:
 
 ## Minimal runtime model
 
-`packages/openclaw-runtime` stays intentionally thin.
+The repo-root runtime integration helper layer stays intentionally thin.
 
 Phase 1 API surface should stay near:
 
@@ -304,7 +304,7 @@ The cleanest minimal experiment is:
 
 - one Electron app in `apps/desktop`
 - one renderer package in `packages/desktop-renderer`
-- one thin runtime adapter in `packages/openclaw-runtime`
+- one thin runtime adapter co-located under repo-root `openclaw-runtime/`
 - one top-level `openclaw-runtime/` payload source
 
 That is the smallest structure that still preserves the ideal monorepo shape, keeps the runtime boundary explicit, and gives enough IPC/diagnostic surface for low-intervention autonomous iteration.

@@ -1,7 +1,6 @@
-import { createHash } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+const { createHash } = require("node:crypto");
+const { access, readFile } = require("node:fs/promises");
+const path = require("node:path");
 
 async function exists(targetPath) {
   try {
@@ -12,11 +11,11 @@ async function exists(targetPath) {
   }
 }
 
-const packageRoot = path.dirname(fileURLToPath(import.meta.url));
+const runtimeDir = __dirname;
 
-export const cacheFileName = ".postinstall-cache.json";
+const cacheFileName = ".postinstall-cache.json";
 
-export const criticalRuntimeFiles = [
+const criticalRuntimeFiles = [
   path.join("node_modules", "openclaw", "dist"),
   path.join("node_modules", "@whiskeysockets", "baileys", "lib", "index.js"),
   path.join(
@@ -43,7 +42,7 @@ const daveyNativeTargets = [
 
 const shouldPruneDavey = process.env.NEXU_OPENCLAW_PRUNE_DAVEY === "1";
 
-export const pruneDependencyTargets = [
+const pruneDependencyTargets = [
   "node_modules/koffi",
   "node_modules/node-llama-cpp",
   "node_modules/@node-llama-cpp",
@@ -65,7 +64,7 @@ export const pruneDependencyTargets = [
   "node_modules/sqlite-vec-darwin-arm64/vec0.dylib",
 ];
 
-export const docsPruneTargets = [
+const docsPruneTargets = [
   "node_modules/@mariozechner/pi-coding-agent/docs",
   "node_modules/pino/docs",
   "node_modules/smart-buffer/docs",
@@ -77,9 +76,9 @@ export const docsPruneTargets = [
   "node_modules/openclaw/docs/ja-JP",
 ];
 
-export const pruneTargets = [...pruneDependencyTargets, ...docsPruneTargets];
+const pruneTargets = [...pruneDependencyTargets, ...docsPruneTargets];
 
-export const runtimeCacheInputs = [
+const runtimeCacheInputs = [
   "package.json",
   "package-lock.json",
   "clean-node-modules.mjs",
@@ -91,16 +90,13 @@ export const runtimeCacheInputs = [
   "refresh-lock.mjs",
 ];
 
-export const packageCacheInputs = [
-  "runtime-maintenance.mjs",
-  "runtime-policy.mjs",
-];
+const packageCacheInputs = ["runtime-maintenance.cjs", "runtime-policy.cjs"];
 
-export const cacheInputs = runtimeCacheInputs;
+const cacheInputs = runtimeCacheInputs;
 
-export const cacheEnvInputs = ["NEXU_OPENCLAW_PRUNE_DAVEY"];
+const cacheEnvInputs = ["NEXU_OPENCLAW_PRUNE_DAVEY"];
 
-export async function computeFingerprint(runtimeDir) {
+async function computeFingerprint(runtimeDirPath) {
   const hash = createHash("sha256");
   hash.update(process.platform);
   hash.update("\0");
@@ -117,7 +113,7 @@ export async function computeFingerprint(runtimeDir) {
   }
 
   for (const relativePath of runtimeCacheInputs) {
-    const absolutePath = path.join(runtimeDir, relativePath);
+    const absolutePath = path.join(runtimeDirPath, relativePath);
     hash.update(`runtime:${relativePath}`);
     hash.update("\0");
 
@@ -131,7 +127,7 @@ export async function computeFingerprint(runtimeDir) {
   }
 
   for (const relativePath of packageCacheInputs) {
-    const absolutePath = path.join(packageRoot, relativePath);
+    const absolutePath = path.join(runtimeDir, relativePath);
     hash.update(`package:${relativePath}`);
     hash.update("\0");
 
@@ -146,3 +142,16 @@ export async function computeFingerprint(runtimeDir) {
 
   return hash.digest("hex");
 }
+
+module.exports = {
+  cacheEnvInputs,
+  cacheFileName,
+  cacheInputs,
+  computeFingerprint,
+  criticalRuntimeFiles,
+  docsPruneTargets,
+  packageCacheInputs,
+  pruneDependencyTargets,
+  pruneTargets,
+  runtimeCacheInputs,
+};

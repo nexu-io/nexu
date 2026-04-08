@@ -1,22 +1,10 @@
-import path from "node:path";
+const path = require("node:path");
 
-import { repoRootPath } from "@nexu/dev-utils";
+function getRepoRoot() {
+  return path.resolve(__dirname, "..", "..");
+}
 
-export type OpenClawInstallLayout = {
-  runtimePackageRoot: string;
-  runtimeNodeModulesPath: string;
-  runtimeEntryPath: string;
-  runtimeBinPath: string;
-  runtimeGatewayBinPath: string;
-  runtimePackageJsonPath: string;
-  runtimeLockfilePath: string;
-  runtimePostinstallCachePath: string;
-  criticalRuntimePaths: string[];
-};
-
-export function resolveRepoLocalOpenClawInstallLayout(
-  workspaceRoot: string = repoRootPath,
-): OpenClawInstallLayout {
+function resolveRepoLocalOpenClawInstallLayout(workspaceRoot = getRepoRoot()) {
   const runtimePackageRoot = path.join(workspaceRoot, "openclaw-runtime");
   const runtimeNodeModulesPath = path.join(runtimePackageRoot, "node_modules");
 
@@ -65,3 +53,7 @@ export function resolveRepoLocalOpenClawInstallLayout(
     ],
   };
 }
+
+module.exports = {
+  resolveRepoLocalOpenClawInstallLayout,
+};

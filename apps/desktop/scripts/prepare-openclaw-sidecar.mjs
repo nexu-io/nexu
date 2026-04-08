@@ -14,7 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRepoLocalOpenClawInstallLayout } from "@nexu/openclaw-runtime";
+import { resolveRepoLocalOpenClawInstallLayout } from "./lib/openclaw-runtime-bridge.mjs";
 import {
   electronRoot,
   getSidecarRoot,

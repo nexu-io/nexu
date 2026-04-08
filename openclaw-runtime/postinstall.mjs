@@ -1,12 +1,15 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runRepoLocalOpenClawRuntimePostinstall } from "@nexu/openclaw-runtime/runtime-maintenance";
-import {
+import runtimeMaintenance from "./runtime-maintenance.cjs";
+import runtimePolicy from "./runtime-policy.cjs";
+
+const { runRepoLocalOpenClawRuntimePostinstall } = runtimeMaintenance;
+const {
   cacheFileName,
   computeFingerprint,
   criticalRuntimeFiles,
   pruneTargets,
-} from "@nexu/openclaw-runtime/runtime-policy";
+} = runtimePolicy;
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const nodeModulesDir = path.join(runtimeDir, "node_modules");

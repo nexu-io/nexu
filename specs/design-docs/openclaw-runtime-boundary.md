@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`packages/openclaw-runtime` is Nexu's runtime integration boundary around OpenClaw.
+Repo-root `openclaw-runtime/` is Nexu's runtime integration boundary around OpenClaw.
 
 It exists to hold the lowest practical, reusable Node-level helpers required to locate, resolve, and invoke the OpenClaw runtime across Nexu's controller, desktop, development, and packaging flows.
 
@@ -10,7 +10,7 @@ It is not the OpenClaw product itself, and it is not a general orchestration lay
 
 ## What this package is
 
-`packages/openclaw-runtime` is a platform-minimal runtime integration package.
+Repo-root `openclaw-runtime/` is a platform-minimal runtime integration area.
 
 It owns the parts of the Nexu/OpenClaw integration that are fundamentally about runtime shape and runtime invocation, such as:
 
@@ -39,7 +39,7 @@ If a piece of code primarily coordinates systems, owns workflow sequencing, or i
 
 ## Ownership
 
-`packages/openclaw-runtime` owns only runtime integration concerns that are generic enough to be reused across controller, desktop, dev tooling, or dist flows without importing higher-level policy.
+Repo-root `openclaw-runtime/` owns only runtime integration concerns that are generic enough to be reused across controller, desktop, dev tooling, or dist flows without importing higher-level policy.
 
 Examples of owned responsibilities:
 
@@ -52,7 +52,7 @@ Examples of owned responsibilities:
 
 ## Non-ownership
 
-`packages/openclaw-runtime` must not own:
+Repo-root `openclaw-runtime/` must not own:
 
 - controller startup or restart policy
 - controller process supervision
@@ -120,7 +120,7 @@ If the code answers one of these questions, it should stay outside:
 
 ## Inclusion criteria for future migrations
 
-Move code into `packages/openclaw-runtime` only if all of the following are true:
+Move code into repo-root `openclaw-runtime/` only if all of the following are true:
 
 1. The code is directly about locating, resolving, or invoking the OpenClaw runtime.
 2. The code can be expressed as a low-level Node-compatible helper.
@@ -205,11 +205,11 @@ Distribution code must still own:
 
 The platform compatibility of OpenClaw itself is a separate concern.
 
-`packages/openclaw-runtime` does not own upstream OpenClaw platform support. It owns only Nexu's Node-level runtime integration seam around OpenClaw.
+Repo-root `openclaw-runtime/` does not own upstream OpenClaw platform support. It owns only Nexu's Node-level runtime integration seam around OpenClaw.
 
 ## Summary
 
-`packages/openclaw-runtime` should stay:
+Repo-root `openclaw-runtime/` should stay:
 
 - small
 - Node-oriented
@@ -220,4 +220,4 @@ The platform compatibility of OpenClaw itself is a separate concern.
 
 Higher-level systems own behavior and workflow.
 
-`packages/openclaw-runtime` owns only the runtime edge.
+Repo-root `openclaw-runtime/` owns only the runtime edge.

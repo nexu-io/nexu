@@ -7,12 +7,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import * as path from "node:path";
-import {
-  isPackagedOpenclawExtractionNeeded,
-  resolvePackagedOpenclawArchivePath,
-  resolvePackagedOpenclawExtractedSidecarRoot,
-  resolvePackagedOpenclawSidecarRoot,
-} from "@nexu/openclaw-runtime";
 import { getOpenclawSkillsDir } from "../../shared/desktop-paths";
 import { buildChildProcessProxyEnv } from "../../shared/proxy-config";
 import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
@@ -20,6 +14,12 @@ import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import { resolveRuntimeManifestsRoots } from "../platforms/shared/runtime-roots";
 import { createAsyncArchiveSidecarMaterializer } from "../platforms/shared/sidecar-materializer";
 import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/openclaw-runtime-locator";
+import {
+  isPackagedOpenclawExtractionNeeded,
+  resolvePackagedOpenclawArchivePath,
+  resolvePackagedOpenclawExtractedSidecarRoot,
+  resolvePackagedOpenclawSidecarRoot,
+} from "../shared/openclaw-runtime-bridge";
 import { writeDesktopMainLog } from "./runtime-logger";
 import type { RuntimeUnitManifest } from "./types";
 

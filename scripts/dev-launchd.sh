@@ -29,7 +29,7 @@ OPENCLAW_PORT="${OPENCLAW_PORT:-18789}"
 # Paths
 NODE_BIN="${NODE_BIN:-$(which node)}"
 CONTROLLER_ENTRY="$REPO_ROOT/apps/controller/dist/index.js"
-OPENCLAW_PATH="$($NODE_BIN --input-type=module -e 'import { resolveRepoLocalOpenClawLaunchLayout } from "@nexu/openclaw-runtime"; process.stdout.write(resolveRepoLocalOpenClawLaunchLayout(process.argv[1]).openclawPath);' "$REPO_ROOT")"
+OPENCLAW_PATH="$($NODE_BIN -e 'const path = require("node:path"); const { resolveRepoLocalOpenClawLaunchLayout } = require(path.resolve(process.argv[1], "openclaw-runtime", "api", "launch-layout.cjs")); process.stdout.write(resolveRepoLocalOpenClawLaunchLayout(process.argv[1]).openclawPath);' "$REPO_ROOT")"
 # Dev state dirs — repo-scoped, isolated from packaged app's ~/.nexu/
 OPENCLAW_STATE_DIR="$DEV_NEXU_HOME/runtime/openclaw/state"
 OPENCLAW_CONFIG="$OPENCLAW_STATE_DIR/openclaw.json"

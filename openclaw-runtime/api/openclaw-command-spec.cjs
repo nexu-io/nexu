@@ -1,33 +1,15 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
+const { existsSync } = require("node:fs");
+const path = require("node:path");
 
-import { resolveRepoLocalOpenClawInstallLayout } from "./install-layout.js";
+const {
+  resolveRepoLocalOpenClawInstallLayout,
+} = require("./install-layout.cjs");
 
-export interface OpenClawCommandSpecInput {
-  openclawBin: string;
-  openclawElectronExecutable?: string | null;
-  workspaceRoot?: string | null;
-}
-
-export interface OpenClawEntryResolutionInput {
-  openclawBin: string;
-  workspaceRoot?: string | null;
-}
-
-export interface OpenClawCommandSpec {
-  command: string;
-  argsPrefix: string[];
-  extraEnv: Record<string, string>;
-}
-
-function logOpenClawRuntimeResolution(
-  message: string,
-  details: Record<string, unknown>,
-): void {
+function logOpenClawRuntimeResolution(message, details) {
   console.info(`[openclaw-runtime] ${message}`, details);
 }
 
-function findWorkspaceRoot(startDir: string): string | null {
+function findWorkspaceRoot(startDir) {
   let currentDir = path.resolve(startDir);
   for (let index = 0; index < 10; index += 1) {
     if (existsSync(path.join(currentDir, "pnpm-workspace.yaml"))) {
@@ -40,7 +22,7 @@ function findWorkspaceRoot(startDir: string): string | null {
   return null;
 }
 
-function resolveOpenclawEntryFromBin(binPath: string): string | null {
+function resolveOpenclawEntryFromBin(binPath) {
   const resolvedBinPath = path.resolve(binPath.trim());
   if (resolvedBinPath.endsWith(".mjs") && existsSync(resolvedBinPath)) {
     return resolvedBinPath;
@@ -53,9 +35,7 @@ function resolveOpenclawEntryFromBin(binPath: string): string | null {
   return existsSync(entry) ? entry : null;
 }
 
-export function resolveOpenClawEntryPath(
-  input: OpenClawEntryResolutionInput,
-): string | null {
+function resolveOpenClawEntryPath(input) {
   const workspaceRoot =
     input.workspaceRoot?.trim() || findWorkspaceRoot(process.cwd());
   const runtimeEntryPath = workspaceRoot
@@ -84,9 +64,7 @@ export function resolveOpenClawEntryPath(
   return null;
 }
 
-export function getOpenClawCommandSpec(
-  input: OpenClawCommandSpecInput,
-): OpenClawCommandSpec {
+function getOpenClawCommandSpec(input) {
   const workspaceRoot =
     input.workspaceRoot?.trim() || findWorkspaceRoot(process.cwd());
   const runtimeEntryPath = workspaceRoot
@@ -98,10 +76,11 @@ export function getOpenClawCommandSpec(
       openclawBin: input.openclawBin,
       workspaceRoot: input.workspaceRoot,
     });
-    if (!entry)
+    if (!entry) {
       throw new Error(
         "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
       );
+    }
     return {
       command: input.openclawElectronExecutable,
       argsPrefix: [entry],
@@ -147,3 +126,8 @@ export function getOpenClawCommandSpec(
   });
   return { command: input.openclawBin, argsPrefix: [], extraEnv: {} };
 }
+
+module.exports = {
+  getOpenClawCommandSpec,
+  resolveOpenClawEntryPath,
+};

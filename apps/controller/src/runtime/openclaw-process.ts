@@ -5,9 +5,9 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import { resolveOpenClawEntryPath } from "@nexu/openclaw-runtime";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { resolveOpenClawEntryPath } from "../lib/openclaw-runtime-bridge.js";
 
 const MAX_CONSECUTIVE_RESTARTS = 10;
 const BASE_RESTART_DELAY_MS = 3000;
@@ -140,7 +140,7 @@ export class OpenClawProcessManager {
           entry,
           electronExec,
         },
-        "controller resolved openclaw entry via @nexu/openclaw-runtime",
+        "controller resolved openclaw entry via repo-root openclaw runtime bridge",
       );
       cmd = electronExec;
       args = [entry, "gateway", "run"];

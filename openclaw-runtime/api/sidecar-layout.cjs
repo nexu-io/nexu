@@ -1,14 +1,14 @@
-import path from "node:path";
+const path = require("node:path");
 
-import {
+const {
   resolvePackagedOpenclawArchivePath,
   resolvePackagedOpenclawExtractedSidecarRoot,
-} from "./sidecar-archive.js";
+} = require("./sidecar-archive.cjs");
 
-export function resolvePackagedOpenclawSidecarRoot(
-  runtimeSidecarBaseRoot: string,
-  runtimeRoot: string,
-): string {
+function resolvePackagedOpenclawSidecarRoot(
+  runtimeSidecarBaseRoot,
+  runtimeRoot,
+) {
   const packagedSidecarRoot = path.resolve(runtimeSidecarBaseRoot, "openclaw");
   const archivePath = resolvePackagedOpenclawArchivePath(packagedSidecarRoot);
 
@@ -18,3 +18,7 @@ export function resolvePackagedOpenclawSidecarRoot(
 
   return resolvePackagedOpenclawExtractedSidecarRoot(runtimeRoot);
 }
+
+module.exports = {
+  resolvePackagedOpenclawSidecarRoot,
+};

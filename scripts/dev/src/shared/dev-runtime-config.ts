@@ -6,7 +6,7 @@ import {
   getPreparedDevOpenclawManifestPath,
   resolveOpenClawRepoLocalLayout,
   resolvePreparedDevOpenclawLayout,
-} from "@nexu/openclaw-runtime";
+} from "./openclaw-runtime-bridge.js";
 
 import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
 

@@ -1,5 +1,4 @@
-export {
-  docsPruneTargets,
-  pruneDependencyTargets,
-  pruneTargets,
-} from "@nexu/openclaw-runtime/runtime-policy";
+import runtimePolicy from "./runtime-policy.cjs";
+
+export const { docsPruneTargets, pruneDependencyTargets, pruneTargets } =
+  runtimePolicy;

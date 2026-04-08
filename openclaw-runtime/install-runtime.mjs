@@ -1,6 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { installRepoLocalOpenClawRuntime } from "@nexu/openclaw-runtime/runtime-maintenance";
+import runtimeMaintenance from "./runtime-maintenance.cjs";
+
+const { installRepoLocalOpenClawRuntime } = runtimeMaintenance;
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 

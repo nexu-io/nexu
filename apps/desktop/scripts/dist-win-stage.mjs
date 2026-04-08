@@ -15,7 +15,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveRepoLocalOpenClawInstallLayout } from "@nexu/openclaw-runtime";
+import { resolveRepoLocalOpenClawInstallLayout } from "./lib/openclaw-runtime-bridge.mjs";
 import { resolvePnpmCommand } from "./platforms/filesystem-compat.mjs";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 import { createPlatformCommandSpec } from "./platforms/process-compat.mjs";

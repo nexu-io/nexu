@@ -1,7 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { pruneOpenClawRuntimePaths } from "@nexu/openclaw-runtime/runtime-maintenance";
-import { pruneTargets } from "@nexu/openclaw-runtime/runtime-policy";
+import runtimeMaintenance from "./runtime-maintenance.cjs";
+import runtimePolicy from "./runtime-policy.cjs";
+
+const { pruneOpenClawRuntimePaths } = runtimeMaintenance;
+const { pruneTargets } = runtimePolicy;
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const isDryRun = process.argv.includes("--dry-run");

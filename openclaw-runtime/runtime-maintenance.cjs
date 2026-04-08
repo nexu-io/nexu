@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
-import { access, readFile, rename, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
+const { spawn } = require("node:child_process");
+const { access, readFile, rename, rm, writeFile } = require("node:fs/promises");
+const path = require("node:path");
 
 async function exists(targetPath) {
   try {
@@ -53,7 +53,7 @@ async function run(command, args, runtimeDir) {
   });
 }
 
-export async function installRepoLocalOpenClawRuntime({
+async function installRepoLocalOpenClawRuntime({
   runtimeDir,
   mode = "pruned",
   logger = console,
@@ -91,7 +91,7 @@ export async function installRepoLocalOpenClawRuntime({
   );
 }
 
-export async function refreshRepoLocalOpenClawRuntimeLock({
+async function refreshRepoLocalOpenClawRuntimeLock({
   runtimeDir,
   pruneTargets,
   logger = console,
@@ -107,7 +107,7 @@ export async function refreshRepoLocalOpenClawRuntimeLock({
   });
 }
 
-export async function cleanRepoLocalOpenClawRuntimeNodeModules({
+async function cleanRepoLocalOpenClawRuntimeNodeModules({
   runtimeDir,
   dryRun = false,
   logger = console,
@@ -129,7 +129,7 @@ export async function cleanRepoLocalOpenClawRuntimeNodeModules({
   return { removed: true, reason: "removed", nodeModulesDir };
 }
 
-export async function pruneOpenClawRuntimePaths({
+async function pruneOpenClawRuntimePaths({
   runtimeDir,
   pruneTargets,
   dryRun = false,
@@ -236,7 +236,7 @@ async function writeRuntimeCacheFile({ cacheFilePath, fingerprint }) {
   await rename(tempCacheFilePath, cacheFilePath);
 }
 
-export async function runRepoLocalOpenClawRuntimePostinstall({
+async function runRepoLocalOpenClawRuntimePostinstall({
   runtimeDir,
   nodeModulesDir,
   cacheFilePath,
@@ -290,3 +290,11 @@ export async function runRepoLocalOpenClawRuntimePostinstall({
   logger.log("openclaw-runtime cache updated.");
   return { skipped: false, reason: "updated" };
 }
+
+module.exports = {
+  cleanRepoLocalOpenClawRuntimeNodeModules,
+  installRepoLocalOpenClawRuntime,
+  pruneOpenClawRuntimePaths,
+  refreshRepoLocalOpenClawRuntimeLock,
+  runRepoLocalOpenClawRuntimePostinstall,
+};
