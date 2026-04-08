@@ -1116,8 +1116,11 @@ export type GetApiInternalDesktopRewardsResponses = {
         }>;
         cloudBalance?: {
             totalBalance: number;
+            giftBalance?: number;
             totalRecharged: number;
             totalConsumed: number;
+            syncedAt: string;
+            updatedAt: string;
         };
         autoFallbackTriggered?: boolean;
     };
@@ -1217,8 +1220,11 @@ export type PostApiInternalDesktopRewardsClaimResponses = {
             }>;
             cloudBalance?: {
                 totalBalance: number;
+                giftBalance?: number;
                 totalRecharged: number;
                 totalConsumed: number;
+                syncedAt: string;
+                updatedAt: string;
             };
             autoFallbackTriggered?: boolean;
         };
@@ -1279,8 +1285,11 @@ export type PostApiInternalDesktopRewardsSetBalanceResponses = {
         }>;
         cloudBalance?: {
             totalBalance: number;
+            giftBalance?: number;
             totalRecharged: number;
             totalConsumed: number;
+            syncedAt: string;
+            updatedAt: string;
         };
         autoFallbackTriggered?: boolean;
     };

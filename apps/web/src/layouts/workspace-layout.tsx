@@ -213,6 +213,16 @@ function resolveCloudUsageUrl(cloudUrl?: string | null): string {
   }
 }
 
+type RewardsBalanceSource = {
+  cloudBalance: { giftBalance: number } | null;
+};
+
+export function getWorkspaceGiftBalance(
+  rewardsStatus: RewardsBalanceSource,
+): number | null {
+  return rewardsStatus.cloudBalance?.giftBalance ?? null;
+}
+
 const GitHubIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
     <title>GitHub</title>
@@ -585,18 +595,23 @@ function WorkspaceLayoutInner() {
     cloudConnected &&
     !rewardsStatus.cloudBalance &&
     (rewardsStatusLoading || !rewardsStatusResolved);
+  const rewardsBalanceUnavailable =
+    cloudConnected &&
+    !rewardsBalancePending &&
+    rewardsStatus.cloudBalance === null;
   const canOpenBalancePopup =
     cloudConnected || rewardsStatus.cloudBalance !== null;
   const rewardBalanceValue = rewardsStatus.cloudBalance
     ? `${rewardsStatus.cloudBalance.totalBalance} ${t("layout.sidebar.balanceUnit")}`
     : cloudConnected
-      ? rewardsBalancePending
-        ? t("layout.sidebar.balancePlaceholder")
-        : `0 ${t("layout.sidebar.balanceUnit")}`
+      ? t("layout.sidebar.balancePlaceholder")
       : t("layout.sidebar.balancePlaceholder");
   const rewardBalancePopupValue = rewardsStatus.cloudBalance
     ? String(rewardsStatus.cloudBalance.totalBalance)
-    : rewardBalanceValue;
+    : t("layout.sidebar.balancePlaceholder");
+  const rewardGiftBalanceValue = rewardsBalanceUnavailable
+    ? t("layout.sidebar.balancePlaceholder")
+    : String(getWorkspaceGiftBalance(rewardsStatus) ?? 0);
   const shouldShowRewardsBanner =
     cloudConnected &&
     rewardsStatus.progress.totalCount > 0 &&
@@ -1061,7 +1076,7 @@ function WorkspaceLayoutInner() {
                             </span>
                           </span>
                           <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {rewardsStatus.progress.earnedCredits}
+                            {rewardGiftBalanceValue}
                           </span>
                         </div>
                       </div>

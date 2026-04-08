@@ -3208,6 +3208,11 @@
                           "type": "integer",
                           "minimum": 0
                         },
+                        "giftBalance": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
                         "totalRecharged": {
                           "type": "integer",
                           "minimum": 0
@@ -3215,13 +3220,21 @@
                         "totalConsumed": {
                           "type": "integer",
                           "minimum": 0
+                        },
+                        "syncedAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
                         }
                       },
                       "default": null,
                       "required": [
                         "totalBalance",
                         "totalRecharged",
-                        "totalConsumed"
+                        "totalConsumed",
+                        "syncedAt",
+                        "updatedAt"
                       ]
                     },
                     "autoFallbackTriggered": {
@@ -3514,6 +3527,11 @@
                               "type": "integer",
                               "minimum": 0
                             },
+                            "giftBalance": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "default": 0
+                            },
                             "totalRecharged": {
                               "type": "integer",
                               "minimum": 0
@@ -3521,13 +3539,21 @@
                             "totalConsumed": {
                               "type": "integer",
                               "minimum": 0
+                            },
+                            "syncedAt": {
+                              "type": "string"
+                            },
+                            "updatedAt": {
+                              "type": "string"
                             }
                           },
                           "default": null,
                           "required": [
                             "totalBalance",
                             "totalRecharged",
-                            "totalConsumed"
+                            "totalConsumed",
+                            "syncedAt",
+                            "updatedAt"
                           ]
                         },
                         "autoFallbackTriggered": {
@@ -3746,6 +3772,11 @@
                           "type": "integer",
                           "minimum": 0
                         },
+                        "giftBalance": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
                         "totalRecharged": {
                           "type": "integer",
                           "minimum": 0
@@ -3753,13 +3784,21 @@
                         "totalConsumed": {
                           "type": "integer",
                           "minimum": 0
+                        },
+                        "syncedAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
                         }
                       },
                       "default": null,
                       "required": [
                         "totalBalance",
                         "totalRecharged",
-                        "totalConsumed"
+                        "totalConsumed",
+                        "syncedAt",
+                        "updatedAt"
                       ]
                     },
                     "autoFallbackTriggered": {

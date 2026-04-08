@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { creditBalanceSummarySchema } from "./credit.js";
 
 export const rewardGroupSchema = z.enum(["daily", "opensource", "social"]);
 export const rewardShareModeSchema = z.enum(["link", "tweet", "image"]);
@@ -173,13 +174,7 @@ export const desktopRewardsViewerSchema = z.object({
   usingManagedModel: z.boolean(),
 });
 
-export const cloudCreditBalanceSchema = z
-  .object({
-    totalBalance: z.number().int().nonnegative(),
-    totalRecharged: z.number().int().nonnegative(),
-    totalConsumed: z.number().int().nonnegative(),
-  })
-  .nullable();
+export const cloudCreditBalanceSchema = creditBalanceSummarySchema.nullable();
 
 export const desktopRewardsStatusSchema = z.object({
   viewer: desktopRewardsViewerSchema,

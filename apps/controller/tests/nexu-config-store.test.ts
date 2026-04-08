@@ -751,10 +751,28 @@ describe("NexuConfigStore", () => {
       progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
       cloudBalance: {
         totalBalance: 4200,
+        giftBalance: 84,
         totalRecharged: 4200,
         totalConsumed: 0,
         syncedAt: "2026-04-01T00:00:00.000Z",
         updatedAt: "2026-04-01T00:00:00.000Z",
+      },
+    };
+    const creditsSummaryResponse = {
+      appUserId: "user-1",
+      balance: {
+        totalBalance: 4200,
+        giftBalance: 84,
+        totalRecharged: 4200,
+        totalConsumed: 0,
+        syncedAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      },
+      usageSummary: {
+        totalEntries: 0,
+        totalDueCredits: 0,
+        totalChargedCredits: 0,
+        totalCostUsd: "0.00",
       },
     };
 
@@ -769,24 +787,35 @@ describe("NexuConfigStore", () => {
           return new Response(null, { status: 204 });
         }
 
-        return new Response(JSON.stringify(statusResponse), { status: 200 });
+        if (fetchCalls === 2) {
+          return new Response(JSON.stringify(creditsSummaryResponse), {
+            status: 200,
+          });
+        }
+
+        if (fetchCalls === 3) {
+          return new Response(JSON.stringify(statusResponse), { status: 200 });
+        }
+
+        throw new Error(`unexpected fetch call ${fetchCalls}`);
       }),
     );
 
     try {
       const status = await store.setDesktopRewardBalance(4200);
-      expect(fetchCalls).toBe(2);
+      expect(fetchCalls).toBe(3);
       expect(JSON.parse(capturedBody ?? "{}")).toEqual({
         targetBalance: 4200,
         idempotencyKey: expect.stringContaining("desktop-set-balance-"),
       });
       expect(status.cloudBalance?.totalBalance).toBe(4200);
+      expect(status.cloudBalance?.giftBalance).toBe(84);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it("getDesktopRewardsStatus preserves cloud balance when cloud returns unknown task ids", async () => {
+  it("getDesktopRewardsStatus returns rewards status without waiting on a slow credits summary", async () => {
     await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
     await writeFile(
       path.join(rootDir, ".nexu", "config.json"),
@@ -849,11 +878,37 @@ describe("NexuConfigStore", () => {
 
     const store = new NexuConfigStore(env);
 
+    let fetchCalls = 0;
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () =>
-          new Response(
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          return new Response(
+            JSON.stringify({
+              appUserId: "user-1",
+              balance: {
+                totalBalance: 1,
+                giftBalance: 9,
+                totalRecharged: 1210,
+                totalConsumed: 1209,
+                syncedAt: "2026-04-07T09:36:51.342Z",
+                updatedAt: "2026-04-07T09:36:51.342Z",
+              },
+              usageSummary: {
+                totalEntries: 0,
+                totalDueCredits: 0,
+                totalChargedCredits: 0,
+                totalCostUsd: "0.00",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        if (fetchCalls === 2) {
+          return new Response(
             JSON.stringify({
               tasks: [
                 {
@@ -897,17 +952,231 @@ describe("NexuConfigStore", () => {
               },
             }),
             { status: 200 },
-          ),
-      ),
+          );
+        }
+
+        throw new Error(`unexpected fetch call ${fetchCalls}`);
+      }),
     );
 
     try {
+      const startedAt = Date.now();
       const status = await store.getDesktopRewardsStatus();
+      expect(Date.now() - startedAt).toBeLessThan(600);
+      expect(fetchCalls).toBe(2);
       expect(status.cloudBalance?.totalBalance).toBe(1);
+      expect(status.cloudBalance?.giftBalance).toBe(0);
       expect(status.tasks).toHaveLength(1);
       expect(status.tasks[0]?.id).toBe("daily_checkin");
       expect(status.progress.claimedCount).toBe(1);
       expect(status.progress.totalCount).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("getDesktopRewardsStatus keeps gift balance when credits summary returns quickly", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          runtime: {
+            defaultModelId: "gemini-3-flash-preview",
+          },
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "http://localhost:8080",
+              apiKey: "valid-key",
+              models: [],
+            },
+            activeCloudProfileName: "Local",
+            cloudSessions: {
+              Local: {
+                connected: true,
+                polling: false,
+                userName: "Cloud User",
+                userEmail: "user@nexu.io",
+                connectedAt: "2026-04-01T00:00:00.000Z",
+                linkUrl: "http://localhost:8080",
+                apiKey: "valid-key",
+                models: [],
+              },
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      path.join(rootDir, ".nexu", "cloud-profiles.json"),
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          profiles: [
+            {
+              name: "Local",
+              cloudUrl: "http://localhost:5173",
+              linkUrl: "http://localhost:8080",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              appUserId: "user-1",
+              balance: {
+                totalBalance: 1,
+                giftBalance: 9,
+                totalRecharged: 1210,
+                totalConsumed: 1209,
+                syncedAt: "2026-04-07T09:36:51.342Z",
+                updatedAt: "2026-04-07T09:36:51.342Z",
+              },
+              usageSummary: {
+                totalEntries: 0,
+                totalDueCredits: 0,
+                totalChargedCredits: 0,
+                totalCostUsd: "0.00",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        if (fetchCalls === 2) {
+          return new Response(
+            JSON.stringify({
+              tasks: [],
+              progress: {
+                claimedCount: 0,
+                totalCount: 0,
+                earnedCredits: 0,
+              },
+              cloudBalance: {
+                totalBalance: 1,
+                totalRecharged: 1210,
+                totalConsumed: 1209,
+                syncedAt: "2026-04-07T09:36:51.342Z",
+                updatedAt: "2026-04-07T09:36:51.342Z",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        throw new Error(`unexpected fetch call ${fetchCalls}`);
+      }),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(fetchCalls).toBe(2);
+      expect(status.cloudBalance?.totalBalance).toBe(1);
+      expect(status.cloudBalance?.giftBalance).toBe(9);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("getDesktopRewardsStatus keeps the credits summary balance when rewards status fails", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "http://localhost:8080",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              appUserId: "user-1",
+              balance: {
+                totalBalance: 1,
+                giftBalance: 9,
+                totalRecharged: 1210,
+                totalConsumed: 1209,
+                syncedAt: "2026-04-07T09:36:51.342Z",
+                updatedAt: "2026-04-07T09:36:51.342Z",
+              },
+              usageSummary: {
+                totalEntries: 0,
+                totalDueCredits: 0,
+                totalChargedCredits: 0,
+                totalCostUsd: "0.00",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        if (fetchCalls === 2) {
+          return new Response(null, { status: 500 });
+        }
+
+        throw new Error(`unexpected fetch call ${fetchCalls}`);
+      }),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(fetchCalls).toBe(2);
+      expect(status.progress).toEqual({
+        claimedCount: 0,
+        totalCount: 0,
+        earnedCredits: 0,
+      });
+      expect(status.tasks).toHaveLength(0);
+      expect(status.cloudBalance?.totalBalance).toBe(1);
+      expect(status.cloudBalance?.giftBalance).toBe(9);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -1068,7 +1337,7 @@ describe("NexuConfigStore", () => {
     }
   });
 
-  it("claimDesktopReward uses status from claim response without extra fetch", async () => {
+  it("claimDesktopReward returns claim status without waiting on credits summary", async () => {
     await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
 
     const mockTask = {
@@ -1094,7 +1363,6 @@ describe("NexuConfigStore", () => {
         cloudBalance: null,
       },
     };
-
     await writeFile(
       path.join(rootDir, ".nexu", "config.json"),
       JSON.stringify(
@@ -1128,28 +1396,135 @@ describe("NexuConfigStore", () => {
       "fetch",
       vi.fn(async (_input, init) => {
         fetchCallCount += 1;
-        claimBody = init?.body ?? null;
-        return new Response(JSON.stringify(claimResponse), { status: 200 });
+        if (fetchCallCount === 1) {
+          claimBody = init?.body ?? null;
+          return new Response(JSON.stringify(claimResponse), {
+            status: 200,
+          });
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return new Response(JSON.stringify(claimResponse), {
+          status: 200,
+        });
       }),
     );
 
     try {
+      const startedAt = Date.now();
       const result = await store.claimDesktopReward("daily_checkin", {
         url: "https://x.com/nexu_io/status/1900000000000000000",
       });
+      expect(Date.now() - startedAt).toBeLessThan(600);
       expect(result.ok).toBe(true);
       expect(result.alreadyClaimed).toBe(false);
       expect(result.status.tasks).toHaveLength(1);
       expect(result.status.tasks[0]?.isClaimed).toBe(true);
       expect(result.status.progress.claimedCount).toBe(1);
-      // Only one fetch call for claim — no extra status fetch
-      expect(fetchCallCount).toBe(1);
+      expect(result.status.cloudBalance).toBeNull();
+      expect(fetchCallCount).toBe(2);
       expect(claimBody).toBe(
         JSON.stringify({
           taskId: "daily_checkin",
           proofUrl: "https://x.com/nexu_io/status/1900000000000000000",
         }),
       );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("claimDesktopReward keeps gift balance when credits summary returns quickly", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+
+    const claimResponse = {
+      ok: true,
+      alreadyClaimed: false,
+      status: {
+        tasks: [],
+        progress: { claimedCount: 1, totalCount: 1, earnedCredits: 100 },
+        cloudBalance: {
+          totalBalance: 10,
+          totalRecharged: 10,
+          totalConsumed: 0,
+          syncedAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      },
+    };
+
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCallCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        fetchCallCount += 1;
+        if (fetchCallCount === 1) {
+          expect(init?.body).toBe(
+            JSON.stringify({
+              taskId: "daily_checkin",
+              proofUrl: undefined,
+            }),
+          );
+          return new Response(JSON.stringify(claimResponse), {
+            status: 200,
+          });
+        }
+
+        return new Response(
+          JSON.stringify({
+            appUserId: "user-1",
+            balance: {
+              totalBalance: 10,
+              giftBalance: 4,
+              totalRecharged: 10,
+              totalConsumed: 0,
+              syncedAt: "2026-04-01T00:00:00.000Z",
+              updatedAt: "2026-04-01T00:00:00.000Z",
+            },
+            usageSummary: {
+              totalEntries: 0,
+              totalDueCredits: 0,
+              totalChargedCredits: 0,
+              totalCostUsd: "0.00",
+            },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    try {
+      const result = await store.claimDesktopReward("daily_checkin");
+      expect(fetchCallCount).toBe(2);
+      expect(result.status.cloudBalance?.totalBalance).toBe(10);
+      expect(result.status.cloudBalance?.giftBalance).toBe(4);
     } finally {
       vi.unstubAllGlobals();
     }

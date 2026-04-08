@@ -21,6 +21,7 @@ describe("registerDesktopRewardsRoutes", () => {
       tasks: [],
       cloudBalance: {
         totalBalance: 0,
+        giftBalance: 0,
         totalRecharged: 900,
         totalConsumed: 900,
       },
@@ -71,6 +72,7 @@ describe("registerDesktopRewardsRoutes", () => {
       tasks: [],
       cloudBalance: {
         totalBalance: 1337,
+        giftBalance: 0,
         totalRecharged: 1337,
         totalConsumed: 0,
       },

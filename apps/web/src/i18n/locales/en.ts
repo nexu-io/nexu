@@ -163,9 +163,9 @@ const en = {
   "layout.sidebar.balancePopup.recharged": "Plan credits (cumulative)",
   "layout.sidebar.balancePopup.rechargedTooltip":
     "Total credits added from your subscription plan",
-  "layout.sidebar.balancePopup.earned": "Reward credits",
+  "layout.sidebar.balancePopup.earned": "Gift credit balance",
   "layout.sidebar.balancePopup.earnedTooltip":
-    "Earned from signup rewards, completed tasks, and activities. Consumption order: plan credits → credit packs → reward credits.",
+    "Credits granted from rewards and promotions. Consumption order: plan credits → credit packs → gift credits.",
   "layout.sidebar.balancePopup.consumed": "Consumed",
   "layout.sidebar.balancePopup.viewDetail": "View details",
   "layout.mobile.settings": "Settings",

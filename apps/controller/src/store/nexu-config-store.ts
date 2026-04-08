@@ -40,6 +40,7 @@ import { logger } from "../lib/logger.js";
 import { resolveManagedCloudModel } from "../lib/managed-models.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import {
+  type CreditSummaryResponse,
   type RewardStatusResponse,
   createCloudRewardService,
 } from "../services/cloud-reward-service.js";
@@ -92,6 +93,8 @@ type CloudPollingState = {
 type DesktopRewardClaimResponse = z.infer<
   typeof claimDesktopRewardResponseSchema
 >;
+
+const CLOUD_REWARD_CREDITS_SUMMARY_BEST_EFFORT_MS = 1500;
 
 const defaultCloudProfile: CloudProfileEntry = {
   name: "Default",
@@ -492,6 +495,7 @@ function convertCloudStatusToDesktop(
     activeModelId: string | null;
     activeManagedModel: { provider?: string } | null | undefined;
   },
+  creditsBalance: CreditSummaryResponse["balance"] | null,
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
   const tasks = cloudStatus.tasks.flatMap((task) => {
@@ -532,13 +536,18 @@ function convertCloudStatusToDesktop(
       totalCount: tasks.length,
     },
     tasks,
-    cloudBalance: cloudStatus.cloudBalance
-      ? {
-          totalBalance: cloudStatus.cloudBalance.totalBalance,
-          totalRecharged: cloudStatus.cloudBalance.totalRecharged,
-          totalConsumed: cloudStatus.cloudBalance.totalConsumed,
-        }
-      : null,
+    cloudBalance:
+      creditsBalance ??
+      (cloudStatus.cloudBalance
+        ? {
+            totalBalance: cloudStatus.cloudBalance.totalBalance,
+            giftBalance: 0,
+            totalRecharged: cloudStatus.cloudBalance.totalRecharged,
+            totalConsumed: cloudStatus.cloudBalance.totalConsumed,
+            syncedAt: cloudStatus.cloudBalance.syncedAt,
+            updatedAt: cloudStatus.cloudBalance.updatedAt,
+          }
+        : null),
   };
 }
 
@@ -728,6 +737,24 @@ export class NexuConfigStore {
         reject(new Error("aborted"));
       });
     });
+  }
+
+  private async readBestEffortCreditsBalance(
+    creditsSummaryPromise: Promise<
+      | { ok: true; data: CreditSummaryResponse }
+      | { ok: false; reason: string; message?: string }
+    >,
+  ): Promise<CreditSummaryResponse["balance"] | null> {
+    const result = await Promise.race([
+      creditsSummaryPromise,
+      this.sleep(CLOUD_REWARD_CREDITS_SUMMARY_BEST_EFFORT_MS).then(() => null),
+    ]);
+
+    if (!result || !result.ok) {
+      return null;
+    }
+
+    return result.data.balance;
   }
 
   private isCurrentPollingSignal(signal: AbortSignal): boolean {
@@ -1712,7 +1739,7 @@ export class NexuConfigStore {
       activeModelId,
       cloud.models ?? [],
     );
-
+    let creditsBalance: CreditSummaryResponse["balance"] | null = null;
     if (cloud.connected && cloud.apiKey) {
       const { activeProfile } =
         await this.readConfiguredDesktopCloudProfile(config);
@@ -1721,15 +1748,34 @@ export class NexuConfigStore {
         cloudUrl,
         apiKey: cloud.apiKey,
       });
+      const creditsSummaryPromise = service.getCreditsSummary();
       const cloudResult = await service.getRewardsStatus();
 
       if (cloudResult.ok) {
-        const cloudStatus = cloudResult.data;
-        return convertCloudStatusToDesktop(cloudStatus, {
-          cloudConnected: true,
-          activeModelId,
-          activeManagedModel,
-        });
+        const creditsBalance = await this.readBestEffortCreditsBalance(
+          creditsSummaryPromise,
+        );
+        return convertCloudStatusToDesktop(
+          cloudResult.data,
+          {
+            cloudConnected: true,
+            activeModelId,
+            activeManagedModel,
+          },
+          creditsBalance,
+        );
+      }
+
+      const creditsSummaryResult = await creditsSummaryPromise;
+      creditsBalance = creditsSummaryResult.ok
+        ? creditsSummaryResult.data.balance
+        : null;
+
+      if (!creditsSummaryResult.ok) {
+        logger.warn(
+          { reason: creditsSummaryResult.reason },
+          "desktop_credits_summary_cloud_fallback",
+        );
       }
 
       if (cloudResult.reason === "auth_failed") {
@@ -1746,7 +1792,7 @@ export class NexuConfigStore {
           },
           progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
           tasks: [],
-          cloudBalance: null,
+          cloudBalance: creditsBalance,
         };
       }
 
@@ -1769,7 +1815,7 @@ export class NexuConfigStore {
       },
       progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
       tasks: [],
-      cloudBalance: null,
+      cloudBalance: creditsBalance,
     };
   }
 
@@ -1813,15 +1859,22 @@ export class NexuConfigStore {
       activeModelId2,
       cloud2.models ?? [],
     );
+    const creditsBalance = await this.readBestEffortCreditsBalance(
+      service.getCreditsSummary(),
+    );
 
     return {
       ok: claimData.ok,
       alreadyClaimed: claimData.alreadyClaimed,
-      status: convertCloudStatusToDesktop(claimData.status, {
-        cloudConnected: true,
-        activeModelId: activeModelId2,
-        activeManagedModel: activeManagedModel2,
-      }),
+      status: convertCloudStatusToDesktop(
+        claimData.status,
+        {
+          cloudConnected: true,
+          activeModelId: activeModelId2,
+          activeManagedModel: activeManagedModel2,
+        },
+        creditsBalance,
+      ),
     };
   }
 

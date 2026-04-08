@@ -21,6 +21,7 @@ export type CreditUsageSummary = z.infer<typeof creditUsageSummarySchema>;
 
 export const creditBalanceSummarySchema = z.object({
   totalBalance: z.number().int().nonnegative(),
+  giftBalance: z.number().int().nonnegative().optional().default(0),
   totalRecharged: z.number().int().nonnegative(),
   totalConsumed: z.number().int().nonnegative(),
   syncedAt: z.string(),
