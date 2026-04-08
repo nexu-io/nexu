@@ -264,7 +264,7 @@ describe("RewardsPage", () => {
     });
 
     expect(markup).toContain("budget.viral.rules");
-    expect(markup).toContain("https://docs.nexu.io/rewards");
+    expect(markup).toContain("https://docs.nexu.io/guide/rewards");
   });
 
   it("uses the积分 copy and hides the redundant cloud balance summary card", () => {
@@ -353,7 +353,7 @@ describe("RewardsPage", () => {
     expect(markup).not.toContain("1 / 3");
     expect(markup).not.toContain("+1 积分");
     expect(markup).not.toContain('data-rewards-summary-loading="true"');
-    expect(markup).toContain("reward.daily.name");
+    expect(markup).toContain("reward.daily_checkin.name");
   });
 });
 
@@ -365,8 +365,8 @@ describe("Rewards locale parity", () => {
     );
     expect(zhCN["reward.github_star.name"]).toBe("Star us");
     expect(zhCN["reward.reddit.name"]).toBe("发帖到 Reddit");
-    expect(zhCN["reward.xiaohongshu.name"]).toBe("发帖到小红书");
-    expect(zhCN["reward.lingying.name"]).toBe("发帖到瓴英");
-    expect(zhCN["reward.jike.name"]).toBe("发帖到即刻");
+    expect(zhCN["reward.lingying.name"]).toBe("发帖到领英");
+    expect(zhCN["reward.facebook.name"]).toBe("分享到 Facebook");
+    expect(zhCN["reward.whatsapp.name"]).toBe("分享到 WhatsApp");
   });
 });
