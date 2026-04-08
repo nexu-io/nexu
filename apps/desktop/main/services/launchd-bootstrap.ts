@@ -1811,6 +1811,8 @@ function buildRuntimeExtractionStamp(
   return JSON.stringify({
     appVersion,
     bundleVersion,
+    // Mirrored in platforms/mac/launchd-paths.ts — both copies must agree.
+    arch: process.arch,
   });
 }
 

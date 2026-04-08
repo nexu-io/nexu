@@ -57,6 +57,9 @@ function buildRuntimeExtractionStamp(
   return JSON.stringify({
     appVersion,
     bundleVersion,
+    // Forces a re-clone on x64 ↔ arm64 reinstalls of the same version,
+    // otherwise cached native bindings mismatch the running Electron.
+    arch: process.arch,
   });
 }
 
