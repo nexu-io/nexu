@@ -83,6 +83,9 @@ type BudgetBannerDebugMode = "actual" | Exclude<BudgetBannerStatus, "healthy">;
 
 const budgetBannerDebugStorageKey = "nexu_budget_banner_debug_mode";
 const showBudgetBannerDebugPanel = import.meta.env.DEV;
+const STARTUP_GRACE_MS = 15_000;
+const GATEWAY_RESTART_COALESCE_MS = 10_000;
+const GATEWAY_HEALTHY_POLLS_TO_SETTLE = 2;
 
 function formatRelativeTime(
   date: string | null | undefined,
@@ -373,12 +376,15 @@ export function HomePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoHover, setVideoHover] = useState(false);
   const [pendingChannelId, setPendingChannelId] = useState<string | null>(null);
+  const [pendingGatewayRestartUntil, setPendingGatewayRestartUntil] = useState<
+    number | null
+  >(null);
   const connectingToastIdRef = useRef<string | number | null>(null);
   const previousLiveStatusesRef = useRef<Record<string, ChannelLiveStatus>>({});
+  const stableGatewayPollsRef = useRef(0);
   // Suppress status-change toasts during startup grace period (first config
   // push triggers SIGUSR1 → brief disconnect → reconnect cycle).
   const mountedAtRef = useRef(Date.now());
-  const STARTUP_GRACE_MS = 15_000;
 
   const CHANNEL_OPTIONS = useMemo(() => getChannelOptions(t), [t]);
 
@@ -596,9 +602,24 @@ export function HomePage() {
     return new Map(entries.map((entry) => [entry.channelId, entry]));
   }, [liveStatus]);
 
+  const isPendingGatewayRestartCoalesced = useMemo(() => {
+    return (
+      pendingChannelId !== null &&
+      pendingGatewayRestartUntil !== null &&
+      Date.now() < pendingGatewayRestartUntil
+    );
+  }, [pendingChannelId, pendingGatewayRestartUntil]);
+
   const agentIndicator = useMemo(() => {
     if (!hasOperationalContext || !liveStatus?.agent) {
       return null;
+    }
+    if (isPendingGatewayRestartCoalesced) {
+      return {
+        colorClass: "bg-[var(--color-warning)]",
+        pulse: true,
+        label: t("home.agent.starting"),
+      };
     }
     return liveStatus.agent.alive
       ? {
@@ -611,7 +632,7 @@ export function HomePage() {
           pulse: true,
           label: t("home.agent.starting"),
         };
-  }, [hasOperationalContext, liveStatus, t]);
+  }, [hasOperationalContext, isPendingGatewayRestartCoalesced, liveStatus, t]);
   const budgetBannerDebugPanel = showBudgetBannerDebugPanel ? (
     <BudgetBannerDebugPanel
       actualStatus="healthy"
@@ -638,6 +659,8 @@ export function HomePage() {
   const handleChannelCreated = useCallback(
     (channelId: string) => {
       setPendingChannelId(channelId);
+      setPendingGatewayRestartUntil(Date.now() + GATEWAY_RESTART_COALESCE_MS);
+      stableGatewayPollsRef.current = 0;
       connectingToastIdRef.current = toast.loading(
         t("home.channel.phase.connecting"),
       );
@@ -656,26 +679,47 @@ export function HomePage() {
       toast.loading(t("home.channel.phase.configuring"), { id: toastId });
       return;
     }
-    if (pending.status === "connected") {
+    const gatewayHealthy =
+      liveStatus?.gatewayConnected === true && liveStatus?.agent.alive === true;
+    if (pending.status === "connected" && gatewayHealthy) {
+      stableGatewayPollsRef.current += 1;
+      const shouldSettleNow =
+        !isPendingGatewayRestartCoalesced ||
+        stableGatewayPollsRef.current >= GATEWAY_HEALTHY_POLLS_TO_SETTLE;
+      if (!shouldSettleNow) {
+        toast.loading(t("home.channel.phase.configuring"), { id: toastId });
+        return;
+      }
       toast.success(t("home.channel.phase.done"), { id: toastId });
       connectingToastIdRef.current = null;
       setPendingChannelId(null);
+      setPendingGatewayRestartUntil(null);
+      stableGatewayPollsRef.current = 0;
       return;
     }
+    stableGatewayPollsRef.current = 0;
     if (pending.status === "error") {
       toast.error(pending.lastError ?? t("home.channel.error"), {
         id: toastId,
       });
       connectingToastIdRef.current = null;
       setPendingChannelId(null);
+      setPendingGatewayRestartUntil(null);
       return;
     }
-    if (pending.status === "restarting") {
+    if (pending.status === "restarting" || isPendingGatewayRestartCoalesced) {
       toast.loading(t("home.channel.phase.configuring"), { id: toastId });
       return;
     }
     toast.loading(t("home.channel.phase.almostReady"), { id: toastId });
-  }, [liveStatusByChannelId, pendingChannelId, t]);
+  }, [
+    isPendingGatewayRestartCoalesced,
+    liveStatus?.agent.alive,
+    liveStatus?.gatewayConnected,
+    liveStatusByChannelId,
+    pendingChannelId,
+    t,
+  ]);
 
   useEffect(() => {
     const previous = previousLiveStatusesRef.current;
@@ -1063,9 +1107,12 @@ export function HomePage() {
                   const isPendingChannel =
                     actionableChannelId === pendingChannelId;
                   const effectiveStatus: ChannelLiveStatus | undefined =
-                    isPendingChannel &&
-                    (!statusEntry || statusEntry.status === "disconnected")
-                      ? "connecting"
+                    isPendingChannel && pendingGatewayRestartUntil !== null
+                      ? isPendingGatewayRestartCoalesced
+                        ? "restarting"
+                        : !statusEntry || statusEntry.status === "disconnected"
+                          ? "connecting"
+                          : statusEntry.status
                       : statusEntry?.status;
                   const statusMeta = getChannelStatusMeta(
                     effectiveStatus,
