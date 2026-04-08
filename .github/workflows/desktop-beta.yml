@@ -62,11 +62,11 @@ jobs:
         id: meta
         shell: pwsh
         run: |
-          $baseVersion = node -e "process.stdout.write(require('./apps/desktop/package.json').version)"
+          $baseVersion = (node apps/desktop/scripts/desktop-package-version.mjs get).Trim()
           $buildDate = Get-Date -Format 'yyyyMMdd'
           $shortSha = "${env:GITHUB_SHA}".Substring(0, 7)
           $desktopVersion = "$baseVersion-$env:CHANNEL.$buildDate"
-          node -e "const fs=require('node:fs'); const path='apps/desktop/package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.version=process.argv[1]; fs.writeFileSync(path, JSON.stringify(pkg, null, 2)+'`n');" "$desktopVersion"
+          node apps/desktop/scripts/desktop-package-version.mjs set "$desktopVersion" | Out-Null
           "desktop_version=$desktopVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "build_date=$buildDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "short_sha=$shortSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
