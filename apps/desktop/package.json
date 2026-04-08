@@ -22,6 +22,7 @@
     "dist:mac:unsigned": "node ./scripts/dist-mac.mjs --unsigned",
     "dist:win": "node ./scripts/dist-win.mjs",
     "dist:win:local": "node ./scripts/dist-win.mjs --local",
+    "dist:win:custom": "node ./scripts/dist-win-custom.mjs",
     "dist:win:unsigned": "node ./scripts/dist-win.mjs --target=dir",
     "dist:mac:unsigned:arm64": "NEXU_DESKTOP_TARGET_ARCH=arm64 node ./scripts/dist-mac.mjs --unsigned",
     "dist:mac:unsigned:x64": "NEXU_DESKTOP_TARGET_ARCH=x64 node ./scripts/dist-mac.mjs --unsigned",
@@ -149,7 +150,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": false,
+      "allowToChangeInstallationDirectory": true,
       "include": "build/installer.nsh",
       "deleteAppDataOnUninstall": false,
       "artifactName": "nexu-setup-${version}-${arch}.${ext}"

@@ -31,7 +31,8 @@
     "dist:mac:x64": "pnpm --filter @nexu/desktop dist:mac:x64",
     "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
     "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
-    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64"
+    "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64",
+    "dist:win:custom": "pnpm --filter @nexu/desktop dist:win:custom"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

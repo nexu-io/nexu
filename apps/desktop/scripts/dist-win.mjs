@@ -645,6 +645,24 @@ function getGitValue(args) {
   }
 }
 
+function resolveLocal7ZipCommand() {
+  const candidates = ["7z.exe", "7z"];
+
+  for (const candidate of candidates) {
+    try {
+      execFileSync(candidate, ["i"], {
+        encoding: "utf8",
+        stdio: ["ignore", "ignore", "ignore"],
+      });
+      return candidate;
+    } catch {}
+  }
+
+  throw new Error(
+    '[dist:win] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).',
+  );
+}
+
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
     const commandSpec = createPlatformCommandSpec({
@@ -900,6 +918,65 @@ async function cleanupReleaseIntermediates(releaseRoot) {
   }
 }
 
+async function runWindowsElectronBuilderStage({
+  buildCapabilities,
+  dirOnly,
+  electronBuilderEnv,
+  electronVersion,
+  buildVersion,
+  extraArgs = [],
+  releaseRoot,
+  stageName,
+  targets,
+  prepackagedPath = null,
+  windowsPwdShimDir,
+}) {
+  const electronBuilderArgs = [
+    ...buildCapabilities.createElectronBuilderArgs({
+      electronVersion,
+      buildVersion,
+      dirOnly,
+      targets,
+    }),
+    ...(prepackagedPath ? [`--prepackaged=${prepackagedPath}`] : []),
+    ...extraArgs,
+  ];
+  const builderPhaseObserver =
+    buildTargetPlatform === "win"
+      ? createWindowsBuilderPhaseObserver({
+          releaseRoot,
+          dirOnly,
+          nsisFromExistingDir: prepackagedPath !== null,
+        })
+      : null;
+
+  await builderPhaseObserver?.start();
+
+  try {
+    await runElectronBuilder(electronBuilderArgs, {
+      cwd: electronRoot,
+      timeoutMs: diagnosticsEnabled
+        ? getStepTimeoutMs("run electron-builder")
+        : 0,
+      label: `electron-builder:${stageName} ${electronBuilderArgs.join(" ")}`,
+      env: {
+        ...electronBuilderEnv,
+        DEBUG:
+          electronBuilderEnv.DEBUG ?? "electron-builder,electron-builder:*",
+        ...(windowsPwdShimDir
+          ? {
+              PATH: `${windowsPwdShimDir};${electronBuilderEnv.PATH ?? process.env.PATH ?? ""}`,
+            }
+          : {}),
+      },
+    });
+    await builderPhaseObserver?.stop("success");
+  } catch (error) {
+    await builderPhaseObserver?.stop("error");
+    throw error;
+  }
+}
+
 async function main() {
   const rawArgs = new Set(process.argv.slice(2));
   const localMode = rawArgs.has("--local");
@@ -912,6 +989,11 @@ async function main() {
       `[dist:win] Windows packaging must run with target platform "win": host=${process.platform}, target=${buildTargetPlatform}.`,
     );
   }
+  const local7ZipCommand = await timedStep(
+    "preflight local 7z",
+    async () => resolveLocal7ZipCommand(),
+    timings,
+  );
   const buildContext = createDesktopBuildContext({
     electronRoot,
     repoRoot,
@@ -939,6 +1021,7 @@ async function main() {
       `[dist:win] local mode enabled dirOnly=${dirOnly} reuseBuilds=false reuseRuntimeInstall=false reuseSidecars=false`,
     );
   }
+  console.log(`[dist:win] using local 7-Zip command: ${local7ZipCommand}`);
 
   if (nsisFromExistingDir) {
     const reuseCheck = await validateWinUnpackedReuse(releaseRoot);
@@ -1178,69 +1261,76 @@ async function main() {
   );
 
   await timedStep(
-    "run electron-builder",
+    "stage win-unpacked payload",
     async () => {
-      if (dirOnly && shouldReuseExistingWinUnpacked) {
+      if (shouldReuseExistingWinUnpacked) {
         const reuseCheck = await validateWinUnpackedReuse(releaseRoot);
         if (reuseCheck.valid) {
           console.log("[dist:win] reusing existing win-unpacked stage");
-          return;
+          if (dirOnly) {
+            return;
+          }
+        } else if (dirOnly) {
+          console.log(
+            `[dist:win] win-unpacked reuse unavailable, rebuilding: ${reuseCheck.reason}`,
+          );
+        } else {
+          throw new Error(
+            `[dist:win] expected reusable win-unpacked stage before NSIS packaging: ${reuseCheck.reason}`,
+          );
         }
-        console.log(
-          `[dist:win] win-unpacked reuse unavailable, rebuilding: ${reuseCheck.reason}`,
-        );
       }
-      const electronBuilderArgs = [
-        ...buildCapabilities.createElectronBuilderArgs({
-          electronVersion,
-          buildVersion,
-          dirOnly,
-        }),
-        ...(nsisFromExistingDir
-          ? [`--prepackaged=${resolve(releaseRoot, "win-unpacked")}`]
-          : []),
-        ...(localMode
+
+      if (shouldReuseExistingWinUnpacked) {
+        return;
+      }
+
+      await runWindowsElectronBuilderStage({
+        buildCapabilities,
+        dirOnly: true,
+        electronBuilderEnv,
+        electronVersion,
+        buildVersion,
+        extraArgs: localMode
           ? ["--config.npmRebuild=false", "--config.nodeGypRebuild=false"]
-          : []),
-      ];
-      const builderPhaseObserver =
-        buildTargetPlatform === "win"
-          ? createWindowsBuilderPhaseObserver({
-              releaseRoot,
-              dirOnly,
-              nsisFromExistingDir,
-            })
-          : null;
-      await builderPhaseObserver?.start();
-      try {
-        await runElectronBuilder(electronBuilderArgs, {
-          cwd: electronRoot,
-          timeoutMs: diagnosticsEnabled
-            ? getStepTimeoutMs("run electron-builder")
-            : 0,
-          label: `electron-builder ${electronBuilderArgs.join(" ")}`,
-          env: {
-            ...electronBuilderEnv,
-            DEBUG:
-              electronBuilderEnv.DEBUG ?? "electron-builder,electron-builder:*",
-            ...(windowsPwdShimDir
-              ? {
-                  PATH: `${windowsPwdShimDir};${electronBuilderEnv.PATH ?? process.env.PATH ?? ""}`,
-                }
-              : {}),
-          },
-        });
-        await builderPhaseObserver?.stop("success");
-      } catch (error) {
-        await builderPhaseObserver?.stop("error");
-        throw error;
-      }
-      if (dirOnly) {
-        await writeWinUnpackedManifest(releaseRoot);
-      }
+          : [],
+        releaseRoot,
+        stageName: "dir",
+        targets: ["dir"],
+        windowsPwdShimDir,
+      });
+      await writeWinUnpackedManifest(releaseRoot);
     },
     timings,
   );
+
+  if (!dirOnly) {
+    await timedStep(
+      "build nsis installer from win-unpacked",
+      async () => {
+        const reuseCheck = await validateWinUnpackedReuse(releaseRoot);
+        if (!reuseCheck.valid) {
+          throw new Error(
+            `[dist:win] NSIS packaging requires a valid win-unpacked stage: ${reuseCheck.reason}`,
+          );
+        }
+
+        await runWindowsElectronBuilderStage({
+          buildCapabilities,
+          dirOnly: false,
+          electronBuilderEnv,
+          electronVersion,
+          buildVersion,
+          releaseRoot,
+          stageName: "nsis-from-win-unpacked",
+          targets: ["nsis"],
+          prepackagedPath: resolve(releaseRoot, "win-unpacked"),
+          windowsPwdShimDir,
+        });
+      },
+      timings,
+    );
+  }
   await timedStep(
     "clean release intermediates",
     async () => {
