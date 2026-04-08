@@ -81,7 +81,7 @@ let rendererSentryInitialized = false;
 let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
 let currentPosthogUserId: string | null = null;
-let currentPosthogPersonPropertiesKey: string | null = null;
+let currentPosthogIdentifyKey: string | null = null;
 
 function buildPostHogPersonPropertiesKey(input: {
   email?: string | null;
@@ -191,35 +191,34 @@ function syncPostHogIdentity(input: {
     posthog.reset();
     posthog.register(posthogSuperProperties);
     currentPosthogUserId = null;
-    currentPosthogPersonPropertiesKey = null;
+    currentPosthogIdentifyKey = null;
+    return;
+  }
+
+  const nextIdentifyKey = JSON.stringify([
+    userId,
+    buildPostHogPersonPropertiesKey({
+      email: input.userEmail ?? null,
+      name: input.userName ?? null,
+    }),
+  ]);
+
+  if (currentPosthogIdentifyKey === nextIdentifyKey) {
     return;
   }
 
   if (currentPosthogUserId && currentPosthogUserId !== userId) {
     posthog.reset();
     posthog.register(posthogSuperProperties);
-    currentPosthogPersonPropertiesKey = null;
+    currentPosthogIdentifyKey = null;
   }
 
-  if (currentPosthogUserId !== userId) {
-    posthog.identify(userId);
-    currentPosthogUserId = userId;
-  }
-
-  const nextPersonPropertiesKey = buildPostHogPersonPropertiesKey({
+  posthog.identify(userId, {
     email: input.userEmail ?? null,
     name: input.userName ?? null,
   });
-
-  if (currentPosthogPersonPropertiesKey === nextPersonPropertiesKey) {
-    return;
-  }
-
-  posthog.setPersonProperties({
-    email: input.userEmail ?? null,
-    name: input.userName ?? null,
-  });
-  currentPosthogPersonPropertiesKey = nextPersonPropertiesKey;
+  currentPosthogUserId = userId;
+  currentPosthogIdentifyKey = nextIdentifyKey;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {

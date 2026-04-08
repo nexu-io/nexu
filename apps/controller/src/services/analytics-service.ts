@@ -169,8 +169,12 @@ export class AnalyticsService {
       return;
     }
 
+    const analyticsDistinctId = await this.resolveAnalyticsDistinctId();
+    if (!analyticsDistinctId) {
+      return;
+    }
+
     await this.ensureStateLoaded();
-    const profile = await this.configStore.getLocalProfile();
     const sessions = await this.sessionsRuntime.listSessions();
     const skillLedger = await this.readSkillLedgerSources();
     let stateChanged = false;
@@ -215,7 +219,7 @@ export class AnalyticsService {
         }
 
         await this.sendAnalyticsEvent(
-          profile.id,
+          analyticsDistinctId,
           "user_message_sent",
           {
             channel: userMessage.channel,
@@ -237,7 +241,7 @@ export class AnalyticsService {
         }
 
         await this.sendAnalyticsEvent(
-          profile.id,
+          analyticsDistinctId,
           "skill_use",
           {
             skill_name: skillUse.skillName,
@@ -254,7 +258,7 @@ export class AnalyticsService {
 
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
       await this.sendAnalyticsEvent(
-        profile.id,
+        analyticsDistinctId,
         "nexu_first_conversation_start",
         {
           channel: firstSessionCandidate.channel,
@@ -598,6 +602,23 @@ export class AnalyticsService {
       return null;
     }
     return `${host.replace(/\/+$/, "")}/i/v0/e/`;
+  }
+
+  private async resolveAnalyticsDistinctId(): Promise<string | null> {
+    try {
+      const cloudStatus = await this.configStore.getDesktopCloudStatus();
+      const userId =
+        typeof cloudStatus?.userId === "string"
+          ? cloudStatus.userId.trim()
+          : "";
+      if (!userId || userId === "desktop-local-user") {
+        return null;
+      }
+
+      return userId;
+    } catch {
+      return null;
+    }
   }
 
   private async sendAnalyticsEvent(

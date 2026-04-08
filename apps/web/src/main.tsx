@@ -14,10 +14,9 @@ import { LocaleProvider } from "./hooks/use-locale";
 import "./lib/api";
 import { getAnalyticsAppMetadata } from "./lib/analytics-app-metadata";
 import {
-  identify,
+  identifyAuthenticatedUser,
   initializeAnalytics,
   resetAnalytics,
-  setUserId,
 } from "./lib/tracking";
 import "./i18n";
 import "./index.css";
@@ -63,8 +62,7 @@ function AnalyticsSessionSync() {
           return;
         }
 
-        setUserId(userId);
-        identify({
+        identifyAuthenticatedUser(userId, {
           email: userEmail,
           name: userName,
         });

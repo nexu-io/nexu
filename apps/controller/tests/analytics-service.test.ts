@@ -14,6 +14,7 @@ type AnalyticsServiceInternals = {
     eventProperties: Record<string, unknown>,
     timestampMs: number,
   ) => Promise<void>;
+  resolveAnalyticsDistinctId: () => Promise<string | null>;
 };
 
 function createEnv(overrides: Partial<ControllerEnv> = {}): ControllerEnv {
@@ -152,6 +153,56 @@ describe("AnalyticsService transport", () => {
       Date.now(),
     );
 
+    expect(proxyFetch).not.toHaveBeenCalled();
+  });
+
+  it("resolves analytics distinct id from cloud user id", async () => {
+    const service = new AnalyticsService(
+      createEnv(),
+      {
+        getDesktopCloudStatus: async () => ({ userId: "cloud-user-123" }),
+      } as never,
+      {
+        listSessions: async () => [],
+      } as never,
+    );
+
+    const internals = service as unknown as AnalyticsServiceInternals;
+    await expect(internals.resolveAnalyticsDistinctId()).resolves.toBe(
+      "cloud-user-123",
+    );
+  });
+
+  it("skips analytics distinct id for desktop-local-user", async () => {
+    const service = new AnalyticsService(
+      createEnv(),
+      {
+        getDesktopCloudStatus: async () => ({ userId: "desktop-local-user" }),
+      } as never,
+      {
+        listSessions: async () => [],
+      } as never,
+    );
+
+    const internals = service as unknown as AnalyticsServiceInternals;
+    await expect(internals.resolveAnalyticsDistinctId()).resolves.toBeNull();
+  });
+
+  it("does not poll sessions when no real cloud user id is available", async () => {
+    const listSessions = vi.fn().mockResolvedValue([]);
+    const service = new AnalyticsService(
+      createEnv(),
+      {
+        getDesktopCloudStatus: async () => ({ userId: null }),
+      } as never,
+      {
+        listSessions,
+      } as never,
+    );
+
+    await service.poll();
+
+    expect(listSessions).not.toHaveBeenCalled();
     expect(proxyFetch).not.toHaveBeenCalled();
   });
 });
