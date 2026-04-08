@@ -9,8 +9,10 @@ import {
   completeRewardWithVirtualCheck,
   getRewardCheckingDescriptionKey,
 } from "@/lib/reward-virtual-check";
+import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
+  type RewardTaskId,
   type RewardTaskStatus,
   rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
@@ -24,6 +26,23 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 const MOBILE_SHARE_QR_URL = "https://github.com/nexu-io/nexu";
+
+// PM-defined tracking type names per reward task. mobile_share is intentionally
+// excluded from click tracking (the click only opens the QR modal, the
+// meaningful signal is the actual screenshot upload tracked via `done`).
+const TASK_CLICK_TRACKING_TYPE: Partial<Record<RewardTaskId, string>> = {
+  github_star: "star_us",
+  x_share: "X",
+  reddit: "Reddit",
+  lingying: "linkedin",
+  facebook: "Facebook",
+  whatsapp: "Whatsapp",
+};
+
+const TASK_DONE_TRACKING_TYPE: Partial<Record<RewardTaskId, string>> = {
+  ...TASK_CLICK_TRACKING_TYPE,
+  mobile_share: "mobile",
+};
 
 const REWARD_GROUPS: Array<{
   key: RewardTaskStatus["group"];
@@ -295,6 +314,11 @@ export function RewardsPage() {
       return;
     }
 
+    const clickTrackingType = TASK_CLICK_TRACKING_TYPE[task.id];
+    if (clickTrackingType) {
+      track("workspace_task_click", { type: clickTrackingType });
+    }
+
     if (rewardTaskRequiresGithubStarSession(task.id)) {
       let sessionId: string | null = null;
       try {
@@ -343,40 +367,6 @@ export function RewardsPage() {
               {t("budget.viral.rules")}
             </a>
           </p>
-        </div>
-
-        <div className="mb-6">
-          {loading ? (
-            <div data-rewards-summary-loading="true" className="animate-pulse">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="h-3 w-14 rounded-full bg-border/70" />
-                <div className="h-3 w-10 rounded-full bg-border/70" />
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-border/60">
-                <div className="h-full w-1/3 rounded-full bg-border/80" />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="tabular-nums text-[12px] font-medium text-text-secondary">
-                  {status.progress.claimedCount} / {status.progress.totalCount}
-                </span>
-                <span className="tabular-nums text-[12px] font-medium text-[var(--color-success)]">
-                  +{formatRewardAmount(status.progress.earnedCredits)}{" "}
-                  {t("layout.sidebar.balanceUnit")}
-                </span>
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-border/60">
-                <div
-                  className="h-full rounded-full bg-[var(--color-success)] transition-all duration-500"
-                  style={{
-                    width: `${status.progress.totalCount > 0 ? (status.progress.claimedCount / status.progress.totalCount) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </>
-          )}
         </div>
 
         {!loading && !status.viewer.cloudConnected ? (
@@ -740,6 +730,11 @@ export function RewardsPage() {
                 toast.success(t("rewards.claimAlreadyDone"));
               } else {
                 toast.success(t("rewards.claimSuccess"));
+                const doneTrackingType =
+                  TASK_DONE_TRACKING_TYPE[confirmTask.id];
+                if (doneTrackingType) {
+                  track("workspace_task_done", { type: doneTrackingType });
+                }
               }
               setConfirmPhase("idle");
               setConfirmTaskId(null);

@@ -464,9 +464,9 @@ describe("NexuConfigStore", () => {
                   shareMode: "link",
                   icon: "calendar",
                   url: null,
-                  isClaimed: false,
-                  claimCount: 0,
-                  lastClaimedAt: null,
+                  isClaimed: true,
+                  claimCount: 1,
+                  lastClaimedAt: "2026-04-08T00:00:00.000Z",
                 },
                 {
                   id: "xiaohongshu",
@@ -483,7 +483,7 @@ describe("NexuConfigStore", () => {
                 },
               ],
               progress: {
-                claimedCount: 0,
+                claimedCount: 1,
                 totalCount: 2,
                 earnedCredits: 0,
               },
@@ -505,6 +505,8 @@ describe("NexuConfigStore", () => {
       expect(status.cloudBalance?.totalBalance).toBe(1);
       expect(status.tasks).toHaveLength(1);
       expect(status.tasks[0]?.id).toBe("daily_checkin");
+      expect(status.progress.claimedCount).toBe(1);
+      expect(status.progress.totalCount).toBe(1);
     } finally {
       vi.unstubAllGlobals();
     }

@@ -95,13 +95,13 @@ function renderHomePage({
 }
 
 function renderRewardsPage(rewardsStatus?: {
-  viewer: {
+  viewer?: {
     cloudConnected: boolean;
     activeModelId: string | null;
     activeModelProviderId: string | null;
     usingManagedModel: boolean;
   };
-  progress: {
+  progress?: {
     claimedCount: number;
     totalCount: number;
     earnedCredits: number;
@@ -128,12 +128,14 @@ function renderRewardsPage(rewardsStatus?: {
       activeModelId: null,
       activeModelProviderId: null,
       usingManagedModel: false,
+      ...rewardsStatus?.viewer,
     },
     progress: rewardsStatus?.progress ?? {
       claimedCount: 2,
       totalCount: rewardTasks.length,
       earnedCredits: 5,
       availableCredits: rewardTasks.reduce((sum, task) => sum + task.reward, 0),
+      ...rewardsStatus?.progress,
     },
     tasks:
       rewardsStatus?.tasks ??
@@ -332,6 +334,29 @@ describe("HomePage", () => {
 });
 
 describe("RewardsPage", () => {
+  it("does not render the removed progress summary when rewards are loaded", () => {
+    const markup = renderRewardsPage({
+      progress: {
+        claimedCount: 1,
+        totalCount: 1,
+        earnedCredits: 100,
+      },
+      tasks: [
+        {
+          ...rewardTasks[0],
+          isClaimed: true,
+          lastClaimedAt: "2026-04-08T00:00:00.000Z",
+          claimCount: 1,
+        },
+      ],
+    });
+
+    expect(markup).not.toContain("1 / 1");
+    expect(markup).not.toContain("+100 积分");
+    expect(markup).toContain("reward.daily_checkin.name");
+    expect(markup).not.toContain("reward.github_star.name");
+  });
+
   it("renders the merged social rewards group including Facebook and WhatsApp", () => {
     const markup = renderRewardsPage();
 
