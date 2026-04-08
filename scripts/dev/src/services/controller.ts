@@ -82,7 +82,11 @@ async function cleanupStaleControllerPort(): Promise<void> {
     await terminateProcess(workerPid);
     await waitFor(
       async () => {
-        await getControllerPortPid();
+        try {
+          await getControllerPortPid();
+        } catch {
+          return;
+        }
         throw new Error("controller dev server listener is still active");
       },
       () => new Error("controller dev server listener did not stop in time"),

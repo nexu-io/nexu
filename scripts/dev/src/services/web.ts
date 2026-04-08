@@ -84,7 +84,11 @@ async function cleanupStaleWebPort(): Promise<void> {
     await terminateProcess(listenerPid);
     await waitFor(
       async () => {
-        await getWebPortPid();
+        try {
+          await getWebPortPid();
+        } catch {
+          return;
+        }
         throw new Error("web dev server listener is still active");
       },
       () => new Error("web dev server listener did not stop in time"),
