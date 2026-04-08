@@ -311,6 +311,93 @@ describe("ModelProviderService", () => {
     }
   });
 
+  it("verifies Google AI Studio providers via Gemini models endpoint and x-goog-api-key", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe(
+        "https://generativelanguage.googleapis.com/models",
+      );
+      expect(init?.headers).toEqual({
+        "x-goog-api-key": "google-test-key",
+      });
+
+      return new Response(
+        JSON.stringify({
+          models: [
+            { name: "models/gemini-2.5-pro" },
+            { name: "gemini-2.5-flash" },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("google", {
+        apiKey: "google-test-key",
+        baseUrl: "https://generativelanguage.googleapis.com",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["gemini-2.5-pro", "gemini-2.5-flash"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("keeps bearer verification for non-Google providers", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe("https://api.openai.com/v1/models");
+      expect(init?.headers).toEqual({
+        Authorization: "Bearer openai-test-key",
+      });
+
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "gpt-4.1" }, { id: "gpt-4.1-mini" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("openai", {
+        apiKey: "openai-test-key",
+        baseUrl: "https://api.openai.com/v1",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["gpt-4.1", "gpt-4.1-mini"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("verifies custom provider instances with stored api key and anthropic headers", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);

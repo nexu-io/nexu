@@ -1222,6 +1222,17 @@ export function ModelsPage() {
     [activeProvider, customProviderDrafts],
   );
 
+  const activeBuiltinProviderMatch = useMemo(
+    () =>
+      activeProvider?.kind === "builtin-byok" && activeProvider.registryEntry
+        ? getProviderConfigMatch(
+            providerConfigDoc,
+            activeProvider.registryEntry.id,
+          )
+        : null,
+    [activeProvider, providerConfigDoc],
+  );
+
   // Clear setup param once user interacts
   const clearSetupParam = useCallback(() => {
     if (isSetupMode) {
@@ -1472,11 +1483,13 @@ export function ModelsPage() {
                   <ByokProviderDetail
                     key={
                       activeProvider.providerKey ??
+                      activeBuiltinProviderMatch?.key ??
                       (activeProvider.registryEntry as ByokProviderEntry).id
                     }
                     provider={activeProvider.registryEntry as ByokProviderEntry}
                     providerKey={
                       activeProvider.providerKey ??
+                      activeBuiltinProviderMatch?.key ??
                       (activeProvider.registryEntry as ByokProviderEntry).id
                     }
                     providerConfig={
@@ -1485,10 +1498,7 @@ export function ModelsPage() {
                           ? providerConfigDoc.providers?.[
                               activeProvider.providerKey
                             ]
-                          : getProviderConfigMatch(
-                              providerConfigDoc,
-                              activeProvider.registryEntry.id,
-                            )?.config
+                          : activeBuiltinProviderMatch?.config
                         : undefined
                     }
                     onSaveProviderConfig={

@@ -213,6 +213,21 @@ function buildProviderUrl(
   return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
+function normalizeGoogleModelId(name: string | undefined): string {
+  if (typeof name !== "string") {
+    return "";
+  }
+
+  const trimmedName = name.trim();
+  if (trimmedName.length === 0) {
+    return "";
+  }
+
+  return trimmedName.startsWith("models/")
+    ? trimmedName.slice("models/".length)
+    : trimmedName;
+}
+
 function getMiniMaxBaseUrl(region: MiniMaxRegion): string {
   return region === "cn"
     ? MINI_MAX_API_BASE_URL_CN
@@ -732,6 +747,32 @@ export class ModelProviderService {
 
       if (!apiKey) {
         return { valid: false, error: "API key required" };
+      }
+
+      if (runtimePolicy.apiKind === "google-generative-ai") {
+        const response = await proxyFetch(verifyUrl, {
+          headers: {
+            "x-goog-api-key": apiKey,
+          },
+          timeoutMs: 10000,
+        });
+
+        if (!response.ok) {
+          return { valid: false, error: `HTTP ${response.status}` };
+        }
+
+        const payload = (await response.json()) as {
+          models?: Array<{ name?: string }>;
+        };
+
+        return {
+          valid: true,
+          models: Array.isArray(payload.models)
+            ? payload.models
+                .map((item) => normalizeGoogleModelId(item.name))
+                .filter((item) => item.length > 0)
+            : [],
+        };
       }
 
       const headers: Record<string, string> =

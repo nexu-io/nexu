@@ -1,4 +1,5 @@
 import {
+  getBundledProviderModelIds,
   isSupportedByokProviderId,
   parseCustomProviderKey,
 } from "@nexu/shared";
@@ -59,14 +60,15 @@ export class QuotaFallbackService {
       if (!provider.apiKey) {
         continue;
       }
-      const firstModel = provider.models[0];
-      if (!firstModel) {
+      const firstModelId =
+        provider.models[0]?.id ?? getBundledProviderModelIds(providerId)[0];
+      if (!firstModelId) {
         continue;
       }
       return {
         providerKey,
         providerId,
-        modelId: `${providerKey}/${firstModel.id}`,
+        modelId: `${providerKey}/${firstModelId}`,
       };
     }
     return null;
