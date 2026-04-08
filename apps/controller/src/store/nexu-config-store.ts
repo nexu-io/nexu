@@ -13,6 +13,7 @@ import type {
   DesktopRewardsStatus,
   ModelProviderConfig,
   PersistedModelsConfig,
+  RewardTask,
   RewardTaskId,
 } from "@nexu/shared";
 import {
@@ -27,6 +28,7 @@ import {
   type refreshIntegrationSchema,
   rewardGroupSchema,
   rewardTaskIdSchema,
+  rewardTasks,
   type updateAuthSourceSchema,
   type updateUserProfileSchema,
   type upsertProviderBodySchema,
@@ -96,6 +98,10 @@ const defaultCloudProfile: CloudProfileEntry = {
   cloudUrl: "https://nexu.io",
   linkUrl: "https://link.nexu.io",
 };
+
+const rewardTaskTemplateById = new Map<RewardTaskId, RewardTask>(
+  rewardTasks.map((task) => [task.id, task]),
+);
 
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
@@ -488,6 +494,29 @@ function convertCloudStatusToDesktop(
   },
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
+  const tasks = cloudStatus.tasks.flatMap((task) => {
+    const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
+    const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
+    if (!parsedTaskId.success || !parsedGroupId.success) {
+      return [];
+    }
+
+    return {
+      id: parsedTaskId.data as RewardTaskId,
+      group: parsedGroupId.data,
+      icon: task.icon ?? "gift",
+      reward: task.rewardPoints,
+      shareMode: task.shareMode as "link" | "tweet" | "image",
+      repeatMode: task.repeatMode as "once" | "daily" | "weekly",
+      requiresScreenshot: task.shareMode === "image",
+      actionUrl:
+        rewardTaskTemplateById.get(parsedTaskId.data)?.actionUrl ?? null,
+      isClaimed: task.isClaimed,
+      lastClaimedAt: task.lastClaimedAt,
+      claimCount: task.claimCount,
+    };
+  });
+
   return {
     viewer: {
       cloudConnected,
@@ -497,28 +526,12 @@ function convertCloudStatusToDesktop(
         (activeManagedModel ? "nexu" : (activeModelId?.split("/")[0] ?? null)),
       usingManagedModel: activeManagedModel != null,
     },
-    progress: cloudStatus.progress,
-    tasks: cloudStatus.tasks.flatMap((task) => {
-      const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
-      const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
-      if (!parsedTaskId.success || !parsedGroupId.success) {
-        return [];
-      }
-
-      return {
-        id: parsedTaskId.data as RewardTaskId,
-        group: parsedGroupId.data,
-        icon: task.icon ?? "gift",
-        reward: task.rewardPoints,
-        shareMode: task.shareMode as "link" | "tweet" | "image",
-        repeatMode: task.repeatMode as "once" | "daily" | "weekly",
-        requiresScreenshot: task.shareMode === "image",
-        actionUrl: task.url,
-        isClaimed: task.isClaimed,
-        lastClaimedAt: task.lastClaimedAt,
-        claimCount: task.claimCount,
-      };
-    }),
+    progress: {
+      ...cloudStatus.progress,
+      claimedCount: tasks.filter((task) => task.isClaimed).length,
+      totalCount: tasks.length,
+    },
+    tasks,
     cloudBalance: cloudStatus.cloudBalance
       ? {
           totalBalance: cloudStatus.cloudBalance.totalBalance,

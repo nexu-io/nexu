@@ -364,9 +364,9 @@ const zhCN = {
   "budget.banner.warningTitle": "云端额度即将耗尽",
   "budget.banner.depletedTitle": "云端额度已用尽",
   "budget.banner.warningHeadline":
-    "套餐额度即将耗尽，可采取以下方式避免任务中断",
+    "可用积分即将耗尽，可采取以下方式避免任务中断",
   "budget.banner.depletedHeadline":
-    "套餐额度已用尽（明天重置），可采取以下方式继续使用",
+    "可用积分已用尽（明天重置），可采取以下方式继续使用",
   "budget.banner.description":
     "完成任务赚取更多积分，或使用自带 API Key (BYOK) 继续使用。",
   "budget.banner.warningDescription":

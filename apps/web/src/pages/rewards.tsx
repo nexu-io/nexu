@@ -9,8 +9,10 @@ import {
   completeRewardWithVirtualCheck,
   getRewardCheckingDescriptionKey,
 } from "@/lib/reward-virtual-check";
+import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
+  type RewardTaskId,
   type RewardTaskStatus,
   rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
@@ -25,6 +27,23 @@ import { toast } from "sonner";
 
 const MOBILE_SHARE_QR_URL = "https://github.com/nexu-io/nexu";
 
+// PM-defined tracking type names per reward task. mobile_share is intentionally
+// excluded from click tracking (the click only opens the QR modal, the
+// meaningful signal is the actual screenshot upload tracked via `done`).
+const TASK_CLICK_TRACKING_TYPE: Partial<Record<RewardTaskId, string>> = {
+  github_star: "star_us",
+  x_share: "X",
+  reddit: "Reddit",
+  lingying: "linkedin",
+  facebook: "Facebook",
+  whatsapp: "Whatsapp",
+};
+
+const TASK_DONE_TRACKING_TYPE: Partial<Record<RewardTaskId, string>> = {
+  ...TASK_CLICK_TRACKING_TYPE,
+  mobile_share: "mobile",
+};
+
 const REWARD_GROUPS: Array<{
   key: RewardTaskStatus["group"];
   labelKey: string;
@@ -33,6 +52,19 @@ const REWARD_GROUPS: Array<{
   { key: "opensource", labelKey: "rewards.group.opensource" },
   { key: "social", labelKey: "rewards.group.social" },
 ];
+
+function getRewardsModelHintState(input: {
+  loading: boolean;
+  cloudConnected: boolean;
+  usingManagedModel: boolean;
+  cloudBalance: { totalBalance: number } | null;
+}): "switch-back" | "none" {
+  if (input.loading) return "none";
+  if (!input.cloudConnected) return "none";
+  if (input.usingManagedModel) return "none";
+  if ((input.cloudBalance?.totalBalance ?? 0) <= 0) return "none";
+  return "switch-back";
+}
 
 function RewardConfirmModal({
   task,
@@ -247,6 +279,12 @@ export function RewardsPage() {
       tasks: status.tasks.filter((task) => task.group === group.key),
     })).filter((group) => group.tasks.length > 0);
   }, [status.tasks]);
+  const modelHintState = getRewardsModelHintState({
+    loading,
+    cloudConnected: status.viewer.cloudConnected,
+    usingManagedModel: status.viewer.usingManagedModel,
+    cloudBalance: status.cloudBalance,
+  });
 
   const handleTaskAction = async (task: RewardTaskStatus) => {
     if (task.isClaimed) {
@@ -274,6 +312,11 @@ export function RewardsPage() {
         toast.error(t("rewards.claimFailed"));
       }
       return;
+    }
+
+    const clickTrackingType = TASK_CLICK_TRACKING_TYPE[task.id];
+    if (clickTrackingType) {
+      track("workspace_task_click", { type: clickTrackingType });
     }
 
     if (rewardTaskRequiresGithubStarSession(task.id)) {
@@ -326,40 +369,6 @@ export function RewardsPage() {
           </p>
         </div>
 
-        <div className="mb-6">
-          {loading ? (
-            <div data-rewards-summary-loading="true" className="animate-pulse">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="h-3 w-14 rounded-full bg-border/70" />
-                <div className="h-3 w-10 rounded-full bg-border/70" />
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-border/60">
-                <div className="h-full w-1/3 rounded-full bg-border/80" />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="tabular-nums text-[12px] font-medium text-text-secondary">
-                  {status.progress.claimedCount} / {status.progress.totalCount}
-                </span>
-                <span className="tabular-nums text-[12px] font-medium text-[var(--color-success)]">
-                  +{formatRewardAmount(status.progress.earnedCredits)}{" "}
-                  {t("layout.sidebar.balanceUnit")}
-                </span>
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-border/60">
-                <div
-                  className="h-full rounded-full bg-[var(--color-success)] transition-all duration-500"
-                  style={{
-                    width: `${status.progress.totalCount > 0 ? (status.progress.claimedCount / status.progress.totalCount) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </>
-          )}
-        </div>
-
         {!loading && !status.viewer.cloudConnected ? (
           <div className="mb-6 rounded-[18px] border border-[#d6c7aa] bg-[#faf3e6] px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -387,9 +396,7 @@ export function RewardsPage() {
           </div>
         ) : null}
 
-        {!loading &&
-        status.viewer.cloudConnected &&
-        !status.viewer.usingManagedModel ? (
+        {modelHintState === "switch-back" ? (
           <div className="mb-6 rounded-[18px] border border-border bg-surface-0 px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -723,6 +730,11 @@ export function RewardsPage() {
                 toast.success(t("rewards.claimAlreadyDone"));
               } else {
                 toast.success(t("rewards.claimSuccess"));
+                const doneTrackingType =
+                  TASK_DONE_TRACKING_TYPE[confirmTask.id];
+                if (doneTrackingType) {
+                  track("workspace_task_done", { type: doneTrackingType });
+                }
               }
               setConfirmPhase("idle");
               setConfirmTaskId(null);

@@ -31,11 +31,15 @@ function resolvePrimaryModelRef(
   oauthState: OAuthConnectionState,
 ): string {
   const availableRuntimeModels = collectRuntimeModelRefs(compiled);
+  const configuredProviderKeys = new Set(
+    Object.keys(compiled.models?.providers ?? {}),
+  );
 
   if (typeof model === "string") {
     return resolveAvailableRuntimeModel(
       resolveModelId(config, env, model, oauthState),
       availableRuntimeModels,
+      configuredProviderKeys,
     );
   }
 
@@ -43,12 +47,14 @@ function resolvePrimaryModelRef(
     return resolveAvailableRuntimeModel(
       resolveModelId(config, env, model.primary, oauthState),
       availableRuntimeModels,
+      configuredProviderKeys,
     );
   }
 
   return resolveAvailableRuntimeModel(
     resolveModelId(config, env, env.defaultModelId, oauthState),
     availableRuntimeModels,
+    configuredProviderKeys,
   );
 }
 
@@ -71,6 +77,7 @@ const OAUTH_PROVIDER_PREFIXES = ["openai-codex/"];
 function resolveAvailableRuntimeModel(
   desiredRef: string,
   availableRuntimeModels: Array<{ id: string; name: string }>,
+  configuredProviderKeys: ReadonlySet<string>,
 ): string {
   if (availableRuntimeModels.some((model) => model.id === desiredRef)) {
     return desiredRef;
@@ -79,6 +86,19 @@ function resolveAvailableRuntimeModel(
   // Trust OAuth provider model refs — they're managed by OpenClaw's
   // auth-profiles.json and won't appear in compiled models.providers.
   if (OAUTH_PROVIDER_PREFIXES.some((prefix) => desiredRef.startsWith(prefix))) {
+    return desiredRef;
+  }
+
+  // Trust any model ref whose provider is configured in compiled.models.providers,
+  // even if the provider's explicit `models` list is empty. This covers BYOK
+  // flows where the user enabled a provider (e.g. Anthropic) with their own
+  // API key but never added models to its allowlist — OpenClaw's
+  // resolveModelWithRegistry has a generic-fallback path that builds a
+  // synthetic model entry when providerConfig is present, so the request
+  // still goes through. Without this, the user's explicit selection is
+  // silently overridden with the link default.
+  const providerKey = desiredRef.split("/", 1)[0];
+  if (providerKey && configuredProviderKeys.has(providerKey)) {
     return desiredRef;
   }
 

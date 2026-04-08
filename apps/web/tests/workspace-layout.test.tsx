@@ -446,17 +446,14 @@ describe("WorkspaceLayout", () => {
 
     expect(markup).toContain('data-sidebar-growth-card="rewards"');
     expect(markup).toContain("layout.sidebar.rewardsTitle");
-    expect(markup).toContain("4/10");
+    expect(markup).not.toContain("4/10");
     expect(markup).toContain('data-sidebar-rewards-balance="true"');
-    expect(markup).toContain('data-sidebar-rewards-balance-popup="true"');
-    expect(markup).toContain('data-sidebar-rewards-balance-detail="true"');
-    expect(markup).toContain('href="https://nexu.net/bill"');
     expect(markup).toContain("layout.sidebar.balanceLabel");
     expect(markup).toContain("200 layout.sidebar.balanceUnit");
     expect(markup).not.toContain("layout.sidebar.loginTitle");
   });
 
-  it("routes the balance detail CTA to the test billing page for the test cloud profile", () => {
+  it("uses the test cloud profile to keep the rewards shell visible", () => {
     const markup = renderWorkspaceLayout(
       "/workspace/sessions/sess-1",
       {
@@ -483,7 +480,8 @@ describe("WorkspaceLayout", () => {
       },
     );
 
-    expect(markup).toContain('href="https://nexu.powerformer.net/bill"');
+    expect(markup).toContain('data-sidebar-growth-card="rewards"');
+    expect(markup).toContain("layout.sidebar.balanceLabel");
   });
 
   it("renders zero balance when connected but cloud balance is null", () => {
@@ -565,6 +563,37 @@ describe("WorkspaceLayout", () => {
 
     expect(markup).toContain("layout.sidebar.rewardsTitle");
     expect(markup).not.toContain("layout.sidebar.loginTitle");
+  });
+
+  it("does not render the removed rewards task counter in the sidebar card", () => {
+    const markup = renderWorkspaceLayout(
+      "/workspace/sessions/sess-1",
+      {
+        viewer: {
+          cloudConnected: true,
+          activeModelId: "link/gemini",
+          activeModelProviderId: "link",
+          usingManagedModel: true,
+        },
+        progress: {
+          claimedCount: 0,
+          totalCount: 12,
+          earnedCredits: 0,
+        },
+        cloudBalance: {
+          totalBalance: 200,
+          totalRecharged: 900,
+          totalConsumed: 700,
+        },
+      },
+      {
+        connected: true,
+      },
+    );
+
+    expect(markup).toContain('data-sidebar-growth-card="rewards"');
+    expect(markup).toContain("layout.sidebar.rewardsTitle");
+    expect(markup).not.toContain("0/12");
   });
 
   it("renders WhatsApp sessions with the correct sidebar icon and label", () => {

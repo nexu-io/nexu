@@ -210,10 +210,10 @@ describe("HomePage", () => {
 });
 
 describe("RewardsPage", () => {
-  it("renders a loading summary instead of fake zero values before rewards resolve", () => {
+  it("does not render the removed progress summary before rewards resolve", () => {
     const markup = renderRewardsPage();
 
-    expect(markup).toContain('data-rewards-summary-loading="true"');
+    expect(markup).not.toContain('data-rewards-summary-loading="true"');
     expect(markup).not.toContain("+$0");
     expect(markup).not.toContain("0 / 11");
   });
@@ -321,6 +321,39 @@ describe("RewardsPage", () => {
     expect(markup).not.toContain("max-w-[520px]");
     expect(markup).not.toContain("rewards.badge");
     expect(markup).not.toContain("rewards.refresh");
+  });
+
+  it("does not render the removed progress summary after rewards resolve", () => {
+    const markup = renderRewardsPage({
+      viewer: {
+        cloudConnected: true,
+        activeModelId: "link/gemini",
+        activeModelProviderId: "link",
+        usingManagedModel: true,
+      },
+      progress: {
+        claimedCount: 1,
+        totalCount: 3,
+        earnedCredits: 1,
+        availableCredits: 3,
+      },
+      cloudBalance: {
+        totalBalance: 10,
+        totalRecharged: 11,
+        totalConsumed: 1,
+      },
+      tasks: rewardTasks.slice(0, 3).map((task, index) => ({
+        ...task,
+        isClaimed: index === 0,
+        claimCount: index === 0 ? 1 : 0,
+        lastClaimedAt: null,
+      })),
+    });
+
+    expect(markup).not.toContain("1 / 3");
+    expect(markup).not.toContain("+1 积分");
+    expect(markup).not.toContain('data-rewards-summary-loading="true"');
+    expect(markup).toContain("reward.daily.name");
   });
 });
 

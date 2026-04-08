@@ -45,6 +45,20 @@ export class LaunchdManager {
     const plistPath = path.join(this.plistDir, `${label}.plist`);
     await fs.mkdir(this.plistDir, { recursive: true });
 
+    // Always clear any persistent "disabled" override left by legacy
+    // `launchctl unload -w`. `launchctl enable` is idempotent (no-op when
+    // not disabled), so this is safe to run on every boot. Without this,
+    // upgrades that leave the plist unchanged hit the early-return below
+    // and leak the disabled flag, causing OpenClaw's SIGUSR1 self-restart
+    // to fail with "Bootstrap failed: 5".
+    const disabled = await this.isServiceDisabled(label);
+    if (disabled) {
+      this.log(
+        `installService: ${label} has disabled override, clearing with launchctl enable`,
+      );
+      await this.enableService(label);
+    }
+
     const isRegistered = await this.isServiceRegistered(label);
 
     if (isRegistered) {
@@ -73,16 +87,6 @@ export class LaunchdManager {
     }
 
     await fs.writeFile(plistPath, plistContent, "utf8");
-
-    // Clear any persistent "disabled" override left by legacy `launchctl unload -w`.
-    // Without this, bootstrap fails with error 5 (Input/output error).
-    const disabled = await this.isServiceDisabled(label);
-    if (disabled) {
-      this.log(
-        `installService: ${label} has disabled override, clearing with launchctl enable`,
-      );
-      await this.enableService(label);
-    }
 
     // Bootstrap with retry: "Input/output error" (code 5) means launchd
     // has stale state for this label. Bootout to clear it, then retry.
