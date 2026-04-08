@@ -431,11 +431,19 @@ function compilePlugins(
     ...(hasMiniMaxOauth ? ["minimax-portal-auth"] : []),
   ];
 
+  // Sort and dedup defensively so `plugins.allow` is fully deterministic.
+  // Without this, channel reorderings or brief status flaps change the
+  // output order, which OpenClaw treats as a config change and triggers
+  // a SIGUSR1 restart + 11s gateway drain per reload.
+  const allow = Array.from(
+    new Set([...connectedPluginIds, ...platformPluginIds]),
+  ).sort();
+
   return {
     load: {
       paths: [env.openclawExtensionsDir],
     },
-    allow: [...connectedPluginIds, ...platformPluginIds],
+    allow,
     entries: {
       feishu: {
         enabled: true,
