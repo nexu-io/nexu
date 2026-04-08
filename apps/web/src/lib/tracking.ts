@@ -4,7 +4,7 @@ import posthog, {
   type Property,
 } from "posthog-js";
 
-export type AnalyticsAuthSource = "welcome_page" | "settings";
+export type AnalyticsAuthSource = "welcome_page" | "settings" | "home";
 export type AnalyticsChannel =
   | "qqbot"
   | "dingtalk"
@@ -208,6 +208,9 @@ export function normalizeAuthSource(
 ): AnalyticsAuthSource | null {
   if (source === "settings") {
     return "settings";
+  }
+  if (source === "home") {
+    return "home";
   }
   if (!source || source === "Landing" || source === "welcome_page") {
     return "welcome_page";

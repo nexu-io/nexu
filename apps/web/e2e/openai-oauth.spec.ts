@@ -26,32 +26,31 @@ const _API_URL = "http://localhost:3010";
 // Mock Data
 // ---------------------------------------------------------------------------
 
-const MOCK_PROVIDERS_EMPTY = {
-  providers: [
-    {
-      id: "prov-openai-001",
-      providerId: "openai",
-      displayName: "OpenAI",
-      enabled: false,
-      baseUrl: null,
-      hasApiKey: false,
-      modelsJson: "[]",
-    },
-  ],
+const MOCK_PROVIDER_CONFIG_EMPTY = {
+  config: {
+    mode: "merge",
+    providers: {},
+  },
 };
 
-const MOCK_PROVIDERS_OAUTH_CONNECTED = {
-  providers: [
-    {
-      id: "prov-openai-001",
-      providerId: "openai",
-      displayName: "OpenAI",
-      enabled: true,
-      baseUrl: "https://chatgpt.com/backend-api/codex/v1",
-      hasApiKey: true,
-      modelsJson: JSON.stringify(["gpt-5.1", "gpt-5-mini", "o4-mini"]),
+const MOCK_PROVIDER_CONFIG_OAUTH_CONNECTED = {
+  config: {
+    mode: "merge",
+    providers: {
+      openai: {
+        enabled: true,
+        displayName: "OpenAI",
+        baseUrl: "https://chatgpt.com/backend-api/codex/v1",
+        auth: "oauth",
+        oauthProfileRef: "openai-codex",
+        models: [
+          { id: "gpt-5.1", name: "gpt-5.1" },
+          { id: "gpt-5-mini", name: "gpt-5-mini" },
+          { id: "o4-mini", name: "o4-mini" },
+        ],
+      },
     },
-  ],
+  },
 };
 
 const MOCK_OAUTH_START = {
@@ -90,13 +89,13 @@ async function goToModelsPage(page: Page): Promise<void> {
  * Call this in beforeEach, then override specific routes as needed.
  */
 async function mockDefaultProviderApis(page: Page): Promise<void> {
-  // Mock providers list
-  await page.route("**/api/v1/providers", async (route) => {
+  // Mock canonical provider config document
+  await page.route("**/api/v1/model-providers/config", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_PROVIDERS_EMPTY),
+        body: JSON.stringify(MOCK_PROVIDER_CONFIG_EMPTY),
       });
     } else {
       await route.continue();
@@ -114,7 +113,7 @@ async function mockDefaultProviderApis(page: Page): Promise<void> {
 
   // Mock OAuth provider-status (disconnected by default)
   await page.route(
-    "**/api/v1/providers/openai/oauth/provider-status",
+    "**/api/v1/model-providers/openai/oauth/provider-status",
     async (route) => {
       await route.fulfill({
         status: 200,
@@ -125,13 +124,16 @@ async function mockDefaultProviderApis(page: Page): Promise<void> {
   );
 
   // Mock OAuth flow status (idle by default)
-  await page.route("**/api/v1/providers/openai/oauth/status", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ status: "idle" }),
-    });
-  });
+  await page.route(
+    "**/api/v1/model-providers/openai/oauth/status",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "idle" }),
+      });
+    },
+  );
 
   // Mock desktop/ready and other common endpoints
   await page.route("**/api/internal/desktop/ready", async (route) => {
@@ -206,7 +208,7 @@ test.describe("openai-oauth-connect", () => {
   }) => {
     // Mock the start endpoint
     await page.route(
-      "**/api/v1/providers/openai/oauth/start",
+      "**/api/v1/model-providers/openai/oauth/start",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -234,7 +236,7 @@ test.describe("openai-oauth-connect", () => {
   test("[mock] UI shows spinner during pending state", async ({ page }) => {
     // Mock start
     await page.route(
-      "**/api/v1/providers/openai/oauth/start",
+      "**/api/v1/model-providers/openai/oauth/start",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -245,9 +247,9 @@ test.describe("openai-oauth-connect", () => {
     );
 
     // Mock status to return pending
-    await page.unroute("**/api/v1/providers/openai/oauth/status");
+    await page.unroute("**/api/v1/model-providers/openai/oauth/status");
     await page.route(
-      "**/api/v1/providers/openai/oauth/status",
+      "**/api/v1/model-providers/openai/oauth/status",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -276,7 +278,7 @@ test.describe("openai-oauth-connect", () => {
   }) => {
     // Mock start
     await page.route(
-      "**/api/v1/providers/openai/oauth/start",
+      "**/api/v1/model-providers/openai/oauth/start",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -288,9 +290,9 @@ test.describe("openai-oauth-connect", () => {
 
     // Mock status: first pending, then failed
     let statusCallCount = 0;
-    await page.unroute("**/api/v1/providers/openai/oauth/status");
+    await page.unroute("**/api/v1/model-providers/openai/oauth/status");
     await page.route(
-      "**/api/v1/providers/openai/oauth/status",
+      "**/api/v1/model-providers/openai/oauth/status",
       async (route) => {
         statusCallCount++;
         const body =
@@ -322,7 +324,7 @@ test.describe("openai-oauth-connect", () => {
   }) => {
     // Mock start
     await page.route(
-      "**/api/v1/providers/openai/oauth/start",
+      "**/api/v1/model-providers/openai/oauth/start",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -334,9 +336,9 @@ test.describe("openai-oauth-connect", () => {
 
     // Mock status: first pending, then completed
     let statusCallCount = 0;
-    await page.unroute("**/api/v1/providers/openai/oauth/status");
+    await page.unroute("**/api/v1/model-providers/openai/oauth/status");
     await page.route(
-      "**/api/v1/providers/openai/oauth/status",
+      "**/api/v1/model-providers/openai/oauth/status",
       async (route) => {
         statusCallCount++;
         const body =
@@ -353,9 +355,11 @@ test.describe("openai-oauth-connect", () => {
 
     // After completion, provider-status returns connected
     let providerStatusCallCount = 0;
-    await page.unroute("**/api/v1/providers/openai/oauth/provider-status");
+    await page.unroute(
+      "**/api/v1/model-providers/openai/oauth/provider-status",
+    );
     await page.route(
-      "**/api/v1/providers/openai/oauth/provider-status",
+      "**/api/v1/model-providers/openai/oauth/provider-status",
       async (route) => {
         providerStatusCallCount++;
         const body =
@@ -371,15 +375,15 @@ test.describe("openai-oauth-connect", () => {
     );
 
     // After completion, providers list returns connected
-    await page.unroute("**/api/v1/providers");
+    await page.unroute("**/api/v1/model-providers/config");
     let providersCallCount = 0;
-    await page.route("**/api/v1/providers", async (route) => {
+    await page.route("**/api/v1/model-providers/config", async (route) => {
       if (route.request().method() === "GET") {
         providersCallCount++;
         const body =
           providersCallCount <= 1
-            ? MOCK_PROVIDERS_EMPTY
-            : MOCK_PROVIDERS_OAUTH_CONNECTED;
+            ? MOCK_PROVIDER_CONFIG_EMPTY
+            : MOCK_PROVIDER_CONFIG_OAUTH_CONNECTED;
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -412,9 +416,11 @@ test.describe("openai-oauth-connected", () => {
     await mockDefaultProviderApis(page);
 
     // Override: provider-status returns connected
-    await page.unroute("**/api/v1/providers/openai/oauth/provider-status");
+    await page.unroute(
+      "**/api/v1/model-providers/openai/oauth/provider-status",
+    );
     await page.route(
-      "**/api/v1/providers/openai/oauth/provider-status",
+      "**/api/v1/model-providers/openai/oauth/provider-status",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -425,13 +431,13 @@ test.describe("openai-oauth-connected", () => {
     );
 
     // Override: providers list returns connected with models
-    await page.unroute("**/api/v1/providers");
-    await page.route("**/api/v1/providers", async (route) => {
+    await page.unroute("**/api/v1/model-providers/config");
+    await page.route("**/api/v1/model-providers/config", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify(MOCK_PROVIDERS_OAUTH_CONNECTED),
+          body: JSON.stringify(MOCK_PROVIDER_CONFIG_OAUTH_CONNECTED),
         });
       } else {
         await route.continue();
@@ -481,7 +487,7 @@ test.describe("openai-oauth-connected", () => {
   }) => {
     // Mock disconnect endpoint
     await page.route(
-      "**/api/v1/providers/openai/oauth/disconnect",
+      "**/api/v1/model-providers/openai/oauth/disconnect",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -493,9 +499,11 @@ test.describe("openai-oauth-connected", () => {
 
     // After disconnect, provider-status returns disconnected
     let disconnected = false;
-    await page.unroute("**/api/v1/providers/openai/oauth/provider-status");
+    await page.unroute(
+      "**/api/v1/model-providers/openai/oauth/provider-status",
+    );
     await page.route(
-      "**/api/v1/providers/openai/oauth/provider-status",
+      "**/api/v1/model-providers/openai/oauth/provider-status",
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -510,16 +518,16 @@ test.describe("openai-oauth-connected", () => {
     );
 
     // After disconnect, providers returns empty
-    await page.unroute("**/api/v1/providers");
-    await page.route("**/api/v1/providers", async (route) => {
+    await page.unroute("**/api/v1/model-providers/config");
+    await page.route("**/api/v1/model-providers/config", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify(
             disconnected
-              ? MOCK_PROVIDERS_EMPTY
-              : MOCK_PROVIDERS_OAUTH_CONNECTED,
+              ? MOCK_PROVIDER_CONFIG_EMPTY
+              : MOCK_PROVIDER_CONFIG_OAUTH_CONNECTED,
           ),
         });
       } else {
@@ -552,26 +560,13 @@ test.describe("openai-oauth-negative", () => {
     await mockDefaultProviderApis(page);
 
     // Add Anthropic provider
-    await page.unroute("**/api/v1/providers");
-    await page.route("**/api/v1/providers", async (route) => {
+    await page.unroute("**/api/v1/model-providers/config");
+    await page.route("**/api/v1/model-providers/config", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({
-            providers: [
-              ...MOCK_PROVIDERS_EMPTY.providers,
-              {
-                id: "prov-anthropic-001",
-                providerId: "anthropic",
-                displayName: "Anthropic",
-                enabled: false,
-                baseUrl: null,
-                hasApiKey: false,
-                modelsJson: "[]",
-              },
-            ],
-          }),
+          body: JSON.stringify(MOCK_PROVIDER_CONFIG_EMPTY),
         });
       } else {
         await route.continue();

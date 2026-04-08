@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import path, { resolve } from "node:path";
+import { resolve } from "node:path";
 import { selectPreferredModel } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
@@ -9,6 +8,7 @@ import {
   compileOpenClawConfig,
   resolveModelId,
 } from "../lib/openclaw-config-compiler.js";
+import type { CreditGuardStateWriter } from "../runtime/credit-guard-state-writer.js";
 import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-store.js";
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
@@ -31,11 +31,15 @@ function resolvePrimaryModelRef(
   oauthState: OAuthConnectionState,
 ): string {
   const availableRuntimeModels = collectRuntimeModelRefs(compiled);
+  const configuredProviderKeys = new Set(
+    Object.keys(compiled.models?.providers ?? {}),
+  );
 
   if (typeof model === "string") {
     return resolveAvailableRuntimeModel(
       resolveModelId(config, env, model, oauthState),
       availableRuntimeModels,
+      configuredProviderKeys,
     );
   }
 
@@ -43,12 +47,14 @@ function resolvePrimaryModelRef(
     return resolveAvailableRuntimeModel(
       resolveModelId(config, env, model.primary, oauthState),
       availableRuntimeModels,
+      configuredProviderKeys,
     );
   }
 
   return resolveAvailableRuntimeModel(
     resolveModelId(config, env, env.defaultModelId, oauthState),
     availableRuntimeModels,
+    configuredProviderKeys,
   );
 }
 
@@ -71,6 +77,7 @@ const OAUTH_PROVIDER_PREFIXES = ["openai-codex/"];
 function resolveAvailableRuntimeModel(
   desiredRef: string,
   availableRuntimeModels: Array<{ id: string; name: string }>,
+  configuredProviderKeys: ReadonlySet<string>,
 ): string {
   if (availableRuntimeModels.some((model) => model.id === desiredRef)) {
     return desiredRef;
@@ -79,6 +86,19 @@ function resolveAvailableRuntimeModel(
   // Trust OAuth provider model refs — they're managed by OpenClaw's
   // auth-profiles.json and won't appear in compiled models.providers.
   if (OAUTH_PROVIDER_PREFIXES.some((prefix) => desiredRef.startsWith(prefix))) {
+    return desiredRef;
+  }
+
+  // Trust any model ref whose provider is configured in compiled.models.providers,
+  // even if the provider's explicit `models` list is empty. This covers BYOK
+  // flows where the user enabled a provider (e.g. Anthropic) with their own
+  // API key but never added models to its allowlist — OpenClaw's
+  // resolveModelWithRegistry has a generic-fallback path that builds a
+  // synthetic model entry when providerConfig is present, so the request
+  // still goes through. Without this, the user's explicit selection is
+  // silently overridden with the link default.
+  const providerKey = desiredRef.split("/", 1)[0];
+  if (providerKey && configuredProviderKeys.has(providerKey)) {
     return desiredRef;
   }
 
@@ -107,6 +127,7 @@ export class OpenClawSyncService {
     private readonly authProfilesStore: OpenClawAuthProfilesStore,
     private readonly runtimePluginWriter: OpenClawRuntimePluginWriter,
     private readonly runtimeModelWriter: OpenClawRuntimeModelWriter,
+    private readonly creditGuardStateWriter: CreditGuardStateWriter,
     private readonly templateWriter: WorkspaceTemplateWriter,
     private readonly watchTrigger: OpenClawWatchTrigger,
     private readonly gatewayService: OpenClawGatewayService,
@@ -285,7 +306,10 @@ export class OpenClawSyncService {
 
     // 2. Always write files once (persistence + watcher hot-reload path).
     await this.configWriter.write(compiled);
-    await this.authProfilesWriter.writeForAgents(compiled, config.providers);
+    await this.authProfilesWriter.writeForAgents(
+      compiled,
+      config.models.providers,
+    );
     this.gatewayService.noteConfigWritten(compiled);
     const runtimeModelRef = resolvePrimaryModelRef(
       compiled.agents.defaults?.model,
@@ -296,20 +320,13 @@ export class OpenClawSyncService {
     );
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
     await this.runtimeModelWriter.write(runtimeModelRef);
-
     // Write locale state for the credit-guard patch in OpenClaw runtime.
     // Match the controller's own locale default: unset → "en" (not "zh-CN").
-    const desktopLocale = (config.desktop as Record<string, unknown>).locale;
-    const locale = desktopLocale === "zh-CN" ? "zh-CN" : "en";
-    await mkdir(path.dirname(this.env.creditGuardStatePath), {
-      recursive: true,
-    });
-    await writeFile(
-      this.env.creditGuardStatePath,
-      `${JSON.stringify({ locale })}\n`,
-      "utf8",
-    );
-
+    const locale =
+      (config.desktop as Record<string, unknown>).locale === "zh-CN"
+        ? "zh-CN"
+        : "en";
+    await this.creditGuardStateWriter.write(locale);
     await this.compiledStore.saveConfig(compiled);
 
     // 3. If OpenClaw is not connected yet, nudge the file watcher after the

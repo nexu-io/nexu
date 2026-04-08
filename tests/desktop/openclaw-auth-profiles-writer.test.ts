@@ -130,4 +130,165 @@ describe("OpenClawAuthProfilesWriter", () => {
       key: "anthropic-key",
     });
   });
+
+  it("writes canonical model-provider credentials into auth-profiles", async () => {
+    const env = createEnv(tempDir);
+    const writer = new OpenClawAuthProfilesWriter(
+      new OpenClawAuthProfilesStore(env),
+    );
+
+    await writer.writeForAgents(
+      {
+        agents: {
+          list: [
+            {
+              id: "bot_1",
+              name: "Bot One",
+              workspace: resolve(env.openclawStateDir, "agents", "bot_1"),
+            },
+          ],
+        },
+      } as never,
+      {
+        "custom-openai/team-gateway": {
+          providerTemplateId: "custom-openai",
+          instanceId: "team-gateway",
+          enabled: true,
+          auth: "api-key",
+          api: "openai-completions",
+          apiKey: "canonical-custom-key",
+          baseUrl: "https://gateway.example.com/v1",
+          models: [
+            {
+              id: "gpt-4.1",
+              name: "GPT-4.1",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    );
+
+    const authProfilesPath = resolve(
+      env.openclawStateDir,
+      "agents",
+      "bot_1",
+      "agent",
+      "auth-profiles.json",
+    );
+    const parsed = JSON.parse(readFileSync(authProfilesPath, "utf8")) as {
+      version: number;
+      profiles: Record<string, { type: string; provider: string; key: string }>;
+    };
+
+    expect(parsed.profiles["custom-openai/team-gateway:default"]).toEqual({
+      type: "api_key",
+      provider: "custom-openai/team-gateway",
+      key: "canonical-custom-key",
+    });
+  });
+
+  it("copies existing OAuth profiles into new canonical-provider workspaces", async () => {
+    const env = createEnv(tempDir);
+    const store = new OpenClawAuthProfilesStore(env);
+    const writer = new OpenClawAuthProfilesWriter(store);
+    const existingWorkspace = resolve(env.openclawStateDir, "agents", "bot_1");
+    const newWorkspace = resolve(env.openclawStateDir, "agents", "bot_2");
+
+    await store.updateAuthProfiles(
+      resolve(existingWorkspace, "agent", "auth-profiles.json"),
+      async () => ({
+        version: 1,
+        profiles: {
+          "openai-codex:default": {
+            type: "oauth",
+            provider: "openai-codex",
+            access: "oauth-access-token",
+            refresh: "oauth-refresh-token",
+            expires: 1_900_000_000_000,
+          },
+        },
+      }),
+    );
+
+    await writer.writeForAgents(
+      {
+        agents: {
+          list: [
+            {
+              id: "bot_1",
+              name: "Bot One",
+              workspace: existingWorkspace,
+            },
+            {
+              id: "bot_2",
+              name: "Bot Two",
+              workspace: newWorkspace,
+            },
+          ],
+        },
+      } as never,
+      {
+        openai: {
+          enabled: true,
+          auth: "oauth",
+          oauthProfileRef: "openai-codex",
+          api: "openai-codex-responses",
+          baseUrl: "https://api.openai.com/v1",
+          models: [
+            {
+              id: "gpt-5.4",
+              name: "gpt-5.4",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    );
+
+    const newAuthProfilesPath = resolve(
+      newWorkspace,
+      "agent",
+      "auth-profiles.json",
+    );
+    const parsed = JSON.parse(readFileSync(newAuthProfilesPath, "utf8")) as {
+      version: number;
+      profiles: Record<
+        string,
+        {
+          type: string;
+          provider: string;
+          access: string;
+          refresh?: string;
+          expires?: number;
+        }
+      >;
+    };
+
+    expect(parsed.profiles["openai-codex:default"]).toEqual({
+      type: "oauth",
+      provider: "openai-codex",
+      access: "oauth-access-token",
+      refresh: "oauth-refresh-token",
+      expires: 1_900_000_000_000,
+    });
+  });
 });

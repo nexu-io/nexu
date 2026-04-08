@@ -98,8 +98,17 @@ function getReadinessUrls(mode, portConfig) {
     api: `${controllerUrl}/api/internal/desktop/ready`,
     web: `${webUrl}/api/internal/desktop/ready`,
     webSurface: `${webUrl}/workspace`,
+    webOrigin: safeUrlOrigin(webUrl) ?? webUrl,
     openclawHealth: `${openclawBaseUrl}/health`,
   };
+}
+
+function safeUrlOrigin(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 }
 
 function isBrowserControlRequired() {
@@ -559,24 +568,45 @@ function getDiagnosticsUnit(diagnostics, unitId) {
   return isRuntimeUnitState(match) ? match : null;
 }
 
-function getLatestWorkspaceWebview(diagnostics) {
+// Locate the diagnostics entry for the embedded "web surface" webview that
+// the desktop shell mounts on top of the local web sidecar. The earlier
+// implementation looked for `lastUrl.includes("/workspace")`, but that
+// asserted *product state* (the user has reached the workspace route) rather
+// than runtime health: in fresh-state CI runs the renderer mounts /workspace,
+// then the SPA's AuthLayout / WorkspaceLayout immediately Navigate('/')
+// because there is no auth session and SETUP_COMPLETE_KEY is unset, and
+// because the diagnostics reporter records `contents.getURL()` at
+// did-finish-load time it captures the post-redirect URL.
+//
+// The runtime health invariant we actually care about is that *some* webview
+// successfully loaded a page from the local web sidecar's origin, i.e. the
+// embed handshake worked, the renderer is alive, and there was no fail-load.
+// We accept any path under that origin (root, /workspace, /welcome, ...).
+function getLatestWebSurfaceWebview(diagnostics, webOrigin) {
   if (!Array.isArray(diagnostics?.embeddedContents)) {
     return null;
   }
 
-  const workspaceEntries = diagnostics.embeddedContents.filter(
-    (entry) =>
-      isRecord(entry) &&
-      entry.type === "webview" &&
-      typeof entry.lastUrl === "string" &&
-      entry.lastUrl.includes("/workspace"),
-  );
-
-  if (workspaceEntries.length === 0) {
+  if (typeof webOrigin !== "string" || webOrigin.length === 0) {
     return null;
   }
 
-  return workspaceEntries.reduce((latest, entry) => {
+  const webSurfaceEntries = diagnostics.embeddedContents.filter((entry) => {
+    if (!isRecord(entry)) return false;
+    if (entry.type !== "webview") return false;
+    if (typeof entry.lastUrl !== "string") return false;
+    try {
+      return new URL(entry.lastUrl).origin === webOrigin;
+    } catch {
+      return false;
+    }
+  });
+
+  if (webSurfaceEntries.length === 0) {
+    return null;
+  }
+
+  return webSurfaceEntries.reduce((latest, entry) => {
     const latestEventAt =
       typeof latest.lastEventAt === "string"
         ? Date.parse(latest.lastEventAt)
@@ -600,12 +630,12 @@ function getLatestWorkspaceWebview(diagnostics) {
   });
 }
 
-function diagnosticsChecksPassed(diagnostics) {
+function diagnosticsChecksPassed(diagnostics, webOrigin) {
   if (!isRecord(diagnostics)) {
     return false;
   }
 
-  const workspaceWebview = getLatestWorkspaceWebview(diagnostics);
+  const webSurfaceWebview = getLatestWebSurfaceWebview(diagnostics, webOrigin);
   const requiredUnitsRunning = requiredDiagnosticsUnitIds.every((unitId) => {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
     return unit?.phase === "running" && unit.lastError === null;
@@ -615,14 +645,14 @@ function diagnosticsChecksPassed(diagnostics) {
     diagnostics.coldStart?.status === "succeeded" &&
     diagnostics.renderer?.didFinishLoad === true &&
     diagnostics.renderer?.processGone?.seen !== true &&
-    workspaceWebview?.didFinishLoad === true &&
-    workspaceWebview?.processGone?.seen !== true &&
-    workspaceWebview?.lastError === null &&
+    webSurfaceWebview?.didFinishLoad === true &&
+    webSurfaceWebview?.processGone?.seen !== true &&
+    webSurfaceWebview?.lastError === null &&
     requiredUnitsRunning
   );
 }
 
-function probesPassed(results, diagnostics) {
+function probesPassed(results, diagnostics, webOrigin) {
   return (
     results.portResults.every((entry) => entry.listening) &&
     results.apiReady.body.includes('"ready":true') &&
@@ -632,7 +662,7 @@ function probesPassed(results, diagnostics) {
     (!isBrowserControlRequired() || results.browserControlListening) &&
     results.appProcessResults.mainProcess.alive &&
     (results.appProcessResults.tmuxSession?.alive ?? true) &&
-    diagnosticsChecksPassed(diagnostics)
+    diagnosticsChecksPassed(diagnostics, webOrigin)
   );
 }
 
@@ -675,7 +705,7 @@ function collectDiagnosticsIssues(diagnostics, count) {
     .slice(-count);
 }
 
-function collectDiagnosticsFailures(diagnostics) {
+function collectDiagnosticsFailures(diagnostics, webOrigin) {
   if (!isRecord(diagnostics)) {
     return ["diagnostics file is unavailable"];
   }
@@ -695,7 +725,7 @@ function collectDiagnosticsFailures(diagnostics) {
     );
   }
 
-  const workspaceWebview = getLatestWorkspaceWebview(diagnostics);
+  const webSurfaceWebview = getLatestWebSurfaceWebview(diagnostics, webOrigin);
   for (const unitId of requiredDiagnosticsUnitIds) {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
     if (!unit) {
@@ -711,20 +741,22 @@ function collectDiagnosticsFailures(diagnostics) {
     }
   }
 
-  if (!workspaceWebview) {
-    failures.push("workspace webview diagnostics are missing");
+  if (!webSurfaceWebview) {
+    failures.push(
+      `web surface webview diagnostics are missing (no embedded webview reported origin ${webOrigin})`,
+    );
   } else {
-    if (workspaceWebview.didFinishLoad !== true) {
-      failures.push("workspace webview did not finish load");
+    if (webSurfaceWebview.didFinishLoad !== true) {
+      failures.push("web surface webview did not finish load");
     }
-    if (workspaceWebview.processGone?.seen === true) {
+    if (webSurfaceWebview.processGone?.seen === true) {
       failures.push(
-        `workspace webview process gone: ${String(workspaceWebview.processGone.reason ?? "unknown")}`,
+        `web surface webview process gone: ${String(webSurfaceWebview.processGone.reason ?? "unknown")}`,
       );
     }
-    if (typeof workspaceWebview.lastError === "string") {
+    if (typeof webSurfaceWebview.lastError === "string") {
       failures.push(
-        `workspace webview lastError=${workspaceWebview.lastError}`,
+        `web surface webview lastError=${webSurfaceWebview.lastError}`,
       );
     }
   }
@@ -1026,6 +1058,7 @@ async function captureLogs(context, captureDir) {
 
 async function verifyRuntime(context) {
   const maxHealthAttempts = maxHealthAttemptsByMode[context.mode];
+  const webOrigin = context.readinessUrls.webOrigin;
 
   if (context.statusCommand) {
     await runCommand(context.statusCommand[0], context.statusCommand[1]);
@@ -1040,7 +1073,7 @@ async function verifyRuntime(context) {
     );
     const diagnostics = diagnosticsResult.content;
 
-    if (probesPassed(probeResults, diagnostics)) {
+    if (probesPassed(probeResults, diagnostics, webOrigin)) {
       break;
     }
 
@@ -1109,7 +1142,7 @@ async function verifyRuntime(context) {
     );
   }
 
-  for (const detail of collectDiagnosticsFailures(diagnostics)) {
+  for (const detail of collectDiagnosticsFailures(diagnostics, webOrigin)) {
     addMissing("diagnostics", detail);
   }
 

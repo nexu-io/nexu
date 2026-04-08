@@ -310,4 +310,203 @@ describe("ModelProviderService", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("verifies Google AI Studio providers via Gemini models endpoint and x-goog-api-key", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe(
+        "https://generativelanguage.googleapis.com/models",
+      );
+      expect(init?.headers).toEqual({
+        "x-goog-api-key": "google-test-key",
+      });
+
+      return new Response(
+        JSON.stringify({
+          models: [
+            { name: "models/gemini-2.5-pro" },
+            { name: "gemini-2.5-flash" },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("google", {
+        apiKey: "google-test-key",
+        baseUrl: "https://generativelanguage.googleapis.com",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["gemini-2.5-pro", "gemini-2.5-flash"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("keeps bearer verification for non-Google providers", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe("https://api.openai.com/v1/models");
+      expect(init?.headers).toEqual({
+        Authorization: "Bearer openai-test-key",
+      });
+
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "gpt-4.1" }, { id: "gpt-4.1-mini" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("openai", {
+        apiKey: "openai-test-key",
+        baseUrl: "https://api.openai.com/v1",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["gpt-4.1", "gpt-4.1-mini"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("verifies custom provider instances with stored api key and anthropic headers", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+    const instanceKey = "custom-anthropic/my-instance";
+
+    await service.upsertProvider(instanceKey, {
+      baseUrl: "https://custom-anthropic.example",
+      apiKey: "stored-anthropic-key",
+      enabled: true,
+      displayName: "My Custom Anthropic",
+      modelsJson: JSON.stringify([]),
+    });
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe("https://custom-anthropic.example/models");
+      expect(init?.headers).toEqual({
+        "x-api-key": "stored-anthropic-key",
+        "anthropic-version": "2023-06-01",
+      });
+
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "claude-3-7-sonnet" }, { id: "claude-sonnet-4" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProviderInstance(instanceKey, {});
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["claude-3-7-sonnet", "claude-sonnet-4"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("uses bundled Xiaomi MiMo models when discovery endpoint is unavailable", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("https://api.xiaomimimo.com/v1/models");
+
+      return new Response("not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("xiaomi", {
+        apiKey: "xiaomi-test-key",
+        baseUrl: "https://api.xiaomimimo.com/v1",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["mimo-v2-flash", "mimo-v2-pro", "mimo-v2-omni"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("lists bundled Xiaomi MiMo models for enabled providers with empty stored inventory", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+
+    await service.upsertProvider("xiaomi", {
+      baseUrl: "https://api.xiaomimimo.com/v1",
+      apiKey: "xiaomi-test-key",
+      enabled: true,
+      displayName: "Xiaomi MiMo",
+      modelsJson: JSON.stringify([]),
+    });
+
+    const { models } = await service.listModels();
+
+    expect(models.filter((model) => model.provider === "xiaomi")).toEqual([
+      {
+        id: "xiaomi/mimo-v2-flash",
+        name: "mimo-v2-flash",
+        provider: "xiaomi",
+      },
+      {
+        id: "xiaomi/mimo-v2-pro",
+        name: "mimo-v2-pro",
+        provider: "xiaomi",
+      },
+      {
+        id: "xiaomi/mimo-v2-omni",
+        name: "mimo-v2-omni",
+        provider: "xiaomi",
+      },
+    ]);
+  });
 });

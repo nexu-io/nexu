@@ -1,5 +1,6 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  cloudConnectBodySchema,
   cloudConnectResponseSchema,
   cloudDisconnectResponseSchema,
   cloudModelsBodySchema,
@@ -22,7 +23,6 @@ import {
   cloudStatusResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
-import { resolveModelId } from "../lib/openclaw-config-compiler.js";
 import type { ControllerBindings } from "../types.js";
 
 const defaultModelBodySchema = z.object({ modelId: z.string() });
@@ -104,6 +104,14 @@ export function registerDesktopCompatRoutes(
       method: "post",
       path: "/api/internal/desktop/cloud-connect",
       tags: ["Desktop"],
+      request: {
+        body: {
+          required: false,
+          content: {
+            "application/json": { schema: cloudConnectBodySchema },
+          },
+        },
+      },
       responses: {
         200: {
           content: {
@@ -113,8 +121,15 @@ export function registerDesktopCompatRoutes(
         },
       },
     }),
-    async (c) =>
-      c.json(await container.desktopLocalService.connectCloud(), 200),
+    async (c) => {
+      const body = c.req.valid("json");
+      return c.json(
+        await container.desktopLocalService.connectCloud({
+          source: body?.source ?? null,
+        }),
+        200,
+      );
+    },
   );
 
   app.openapi(
@@ -143,6 +158,7 @@ export function registerDesktopCompatRoutes(
       const body = c.req.valid("json");
       const result = await container.desktopLocalService.connectCloudProfile(
         body.name,
+        { source: body.source ?? null },
       );
       const { configPushed } = await container.openclawSyncService.syncAll();
       return c.json({ ...result, configPushed }, 200);
@@ -439,9 +455,7 @@ export function registerDesktopCompatRoutes(
     async (c) => {
       const config = await container.configStore.getConfig();
       const rawModelId = config.runtime.defaultModelId;
-      const modelId = rawModelId
-        ? resolveModelId(config, container.env, rawModelId)
-        : null;
+      const modelId = rawModelId || null;
       return c.json({ modelId }, 200);
     },
   );
@@ -468,9 +482,17 @@ export function registerDesktopCompatRoutes(
     async (c) => {
       const body = c.req.valid("json");
       await container.desktopLocalService.setDefaultModel(body.modelId);
+      const config = await container.configStore.getConfig();
       // Immediately sync so OpenClaw picks up the change
       const { configPushed } = await container.openclawSyncService.syncAll();
-      return c.json({ ok: true, modelId: body.modelId, configPushed }, 200);
+      return c.json(
+        {
+          ok: true,
+          modelId: config.runtime.defaultModelId,
+          configPushed,
+        },
+        200,
+      );
     },
   );
 }

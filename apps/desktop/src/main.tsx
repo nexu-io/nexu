@@ -1,7 +1,13 @@
 import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import posthog, { type PostHogConfig } from "posthog-js";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import setupLoopVideoUrl from "../assets/setup-animation-loop.mp4";
@@ -21,9 +27,11 @@ import type {
   RuntimeUnitState,
 } from "../shared/host";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import { DevelopSetBalanceDialog } from "./components/develop-set-balance-dialog";
 import { SurfaceFrame } from "./components/surface-frame";
 import { UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
+import { ensureDesktopControllerReady } from "./lib/controller-ready";
 import {
   checkComponentUpdates,
   getAppInfo,
@@ -42,6 +50,7 @@ import {
   triggerMainProcessCrash,
   triggerRendererProcessCrash,
 } from "./lib/host-api";
+import { getDesktopOpenClawUrl } from "./lib/openclaw-surface";
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
@@ -65,6 +74,8 @@ const posthogSuperProperties = {
       ? "unknown"
       : window.nexuHost.bootstrap.buildInfo.version,
 };
+
+type ControllerSurfaceState = "polling" | "recovering" | "failed";
 
 let rendererSentryInitialized = false;
 let posthogTelemetryInitialized = false;
@@ -1076,12 +1087,14 @@ function DiagnosticsPage({
 function DesktopShell() {
   const isPackaged = window.nexuHost.bootstrap.isPackaged;
   const [activeSurface, setActiveSurface] = useState<DesktopSurface>("web");
+  const [showSetBalanceDialog, setShowSetBalanceDialog] = useState(false);
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>(
     isPackaged ? "immersive" : "full",
   );
   const webSurfaceVersion = 0;
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
+  const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
   const update = useAutoUpdate();
 
   // Setup animation phases:
@@ -1113,6 +1126,24 @@ function DesktopShell() {
         setSetupPhase((prev) => (prev === "looping" ? "fading" : prev));
       })
       .catch(() => null);
+
+    void getRuntimeState()
+      .then(setRuntimeState)
+      .catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onRuntimeEvent((event) => {
+      setRuntimeState((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return applyRuntimeEvent(current, event);
+      });
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -1121,7 +1152,17 @@ function DesktopShell() {
         void update.check();
         return;
       }
+      if (command.type === "develop:open-set-balance") {
+        setShowSetBalanceDialog(true);
+        return;
+      }
       if (command.type === "setup:complete") {
+        return;
+      }
+      if (
+        command.type !== "develop:focus-surface" &&
+        command.type !== "develop:show-shell"
+      ) {
         return;
       }
 
@@ -1134,53 +1175,71 @@ function DesktopShell() {
   // Note: getRuntimeConfig() IPC handler waits for cold-start to complete, so
   // runtimeConfig always has the final ports (including any fallback).
   const [controllerReady, setControllerReady] = useState(false);
+  const [controllerSurfaceState, setControllerSurfaceState] =
+    useState<ControllerSurfaceState>("polling");
+  const [controllerRetryNonce, setControllerRetryNonce] = useState(0);
+  const controllerRetryNonceRef = useRef(controllerRetryNonce);
+
+  useEffect(() => {
+    controllerRetryNonceRef.current = controllerRetryNonce;
+  }, [controllerRetryNonce]);
+
+  const handleRetryController = useCallback(() => {
+    setControllerReady(false);
+    setControllerSurfaceState("polling");
+    setControllerRetryNonce((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     if (!runtimeConfig) return;
     if (controllerReady) return;
 
+    const retryNonce = controllerRetryNonce;
     let cancelled = false;
+    setControllerSurfaceState("polling");
     const readyUrl = new URL(
       "/api/internal/desktop/ready",
       runtimeConfig.urls.web,
     ).toString();
 
-    async function poll() {
-      while (!cancelled) {
-        try {
-          const res = await fetch(readyUrl, {
-            signal: AbortSignal.timeout(3000),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.ready) {
-              if (!cancelled) setControllerReady(true);
-              return;
-            }
-          }
-        } catch {
-          // Controller or web sidecar not ready yet — keep polling
+    void ensureDesktopControllerReady({
+      readyUrl,
+      startController: async () => {
+        await startUnit("controller");
+      },
+      onStatusChange: (status) => {
+        if (!cancelled && controllerRetryNonceRef.current === retryNonce) {
+          setControllerSurfaceState(status);
         }
-        await new Promise((r) => setTimeout(r, 1000));
+      },
+    }).then((ready) => {
+      if (cancelled || controllerRetryNonceRef.current !== retryNonce) {
+        return;
       }
-    }
 
-    void poll();
+      if (ready) {
+        setControllerReady(true);
+        setControllerSurfaceState("polling");
+        return;
+      }
+
+      setControllerSurfaceState("failed");
+      setActiveSurface((surface) => (surface === "web" ? "control" : surface));
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [runtimeConfig, controllerReady]);
+  }, [runtimeConfig, controllerReady, controllerRetryNonce]);
 
   const desktopWebUrl =
     runtimeConfig && controllerReady
       ? new URL("/workspace", runtimeConfig.urls.web).toString()
       : null;
-  const desktopOpenClawUrl = runtimeConfig
-    ? new URL(
-        `/#token=${runtimeConfig.tokens.gateway}`,
-        runtimeConfig.urls.openclawBase,
-      ).toString()
-    : null;
+  const desktopOpenClawUrl = getDesktopOpenClawUrl({
+    runtimeConfig,
+    runtimeState,
+  });
   return (
     <div
       className={
@@ -1189,6 +1248,10 @@ function DesktopShell() {
           : "desktop-shell"
       }
     >
+      <DevelopSetBalanceDialog
+        open={showSetBalanceDialog}
+        onClose={() => setShowSetBalanceDialog(false)}
+      />
       <div className="window-drag-bar" />
       <aside className="desktop-sidebar">
         <div className="desktop-sidebar-brand">
@@ -1279,13 +1342,61 @@ function DesktopShell() {
           <CloudProfilePage />
         </div>
         <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
-          <SurfaceFrame
-            description="Authenticated workspace surface served by the repo-local web sidecar."
-            src={desktopWebUrl}
-            title="nexu Web"
-            version={webSurfaceVersion}
-            preload={getWebviewPreloadUrl()}
-          />
+          {desktopWebUrl ? (
+            <SurfaceFrame
+              description="Authenticated workspace surface served by the repo-local web sidecar."
+              src={desktopWebUrl}
+              title="nexu Web"
+              version={webSurfaceVersion}
+              preload={getWebviewPreloadUrl()}
+            />
+          ) : controllerSurfaceState === "failed" ||
+            controllerSurfaceState === "recovering" ? (
+            <section className="runtime-empty-state">
+              <span className="runtime-eyebrow">Workspace</span>
+              <h2>
+                {controllerSurfaceState === "recovering"
+                  ? "Restarting controller..."
+                  : "Controller unavailable"}
+              </h2>
+              <p>
+                {controllerSurfaceState === "recovering"
+                  ? "The local controller stopped cleanly, so desktop is starting it again before mounting the workspace."
+                  : "Workspace startup timed out because the local controller did not come back. Retry it here or switch to the control plane."}
+              </p>
+              <div className="runtime-actions">
+                <button
+                  disabled={controllerSurfaceState === "recovering"}
+                  onClick={handleRetryController}
+                  type="button"
+                >
+                  {controllerSurfaceState === "recovering"
+                    ? "Restarting..."
+                    : "Retry controller"}
+                </button>
+                <button
+                  onClick={() => setActiveSurface("control")}
+                  type="button"
+                >
+                  Open control plane
+                </button>
+              </div>
+            </section>
+          ) : (
+            // Normal polling state: show the brand NexuLoader instead of a
+            // text card with a "Retry controller" button. SurfaceFrame with
+            // src={null} renders its built-in NexuLoader overlay, which is
+            // the same loader used once the webview mounts — producing a
+            // seamless visual transition once the controller is ready.
+            // See issue #876.
+            <SurfaceFrame
+              description="Authenticated workspace surface served by the repo-local web sidecar."
+              src={null}
+              title="nexu Web"
+              version={webSurfaceVersion}
+              preload={getWebviewPreloadUrl()}
+            />
+          )}
         </div>
         <div
           style={{

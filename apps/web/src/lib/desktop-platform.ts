@@ -6,3 +6,7 @@ export function getDesktopPlatform(): string | null {
 export function isWindowsDesktopPlatform(): boolean {
   return getDesktopPlatform() === "win32";
 }
+
+export function isMacDesktopPlatform(): boolean {
+  return getDesktopPlatform() === "darwin";
+}

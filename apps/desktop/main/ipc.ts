@@ -1,5 +1,12 @@
 import * as Sentry from "@sentry/electron/main";
-import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
+import {
+  BrowserWindow,
+  app,
+  crashReporter,
+  ipcMain,
+  shell,
+  webContents,
+} from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -388,7 +395,7 @@ export function registerIpcHandlers(
           return fetchControllerJson<
             HostInvokeResultMap["desktop:get-minimax-oauth-status"]
           >(
-            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/status`,
+            `${runtimeConfig.urls.controllerBase}/api/v1/model-providers/minimax/oauth/status`,
           );
         }
 
@@ -398,7 +405,7 @@ export function registerIpcHandlers(
           return fetchControllerJson<
             HostInvokeResultMap["desktop:start-minimax-oauth"]
           >(
-            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/login`,
+            `${runtimeConfig.urls.controllerBase}/api/v1/model-providers/minimax/oauth/login`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -411,11 +418,50 @@ export function registerIpcHandlers(
           return fetchControllerJson<
             HostInvokeResultMap["desktop:cancel-minimax-oauth"]
           >(
-            `${runtimeConfig.urls.controllerBase}/api/v1/providers/minimax/oauth/login`,
+            `${runtimeConfig.urls.controllerBase}/api/v1/model-providers/minimax/oauth/login`,
             {
               method: "DELETE",
             },
           );
+        }
+
+        case "desktop:get-rewards-status": {
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:get-rewards-status"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/rewards`,
+          );
+        }
+
+        case "desktop:set-reward-balance": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:set-reward-balance"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:set-reward-balance"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/rewards/set-balance`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ balance: typedPayload.balance }),
+            },
+          );
+        }
+
+        case "desktop:rewards-updated": {
+          for (const contents of webContents.getAllWebContents()) {
+            if (!contents.isDestroyed()) {
+              contents.send("host:desktop-command", {
+                type: "desktop:rewards-updated",
+              });
+            }
+          }
+
+          const result: HostInvokeResultMap["desktop:rewards-updated"] = {
+            ok: true,
+          };
+
+          return result;
         }
 
         case "shell:open-external": {

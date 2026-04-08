@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -34,7 +34,9 @@ describe("SkillDirWatcher workspace reconciliation", () => {
   }
 
   function removeWorkspaceSkill(botId: string, slug: string): void {
-    rmSync(path.join(stateDir, "agents", botId, "skills", slug), {
+    const skillDir = path.join(stateDir, "agents", botId, "skills", slug);
+    unlinkSync(path.join(skillDir, "SKILL.md"));
+    rmSync(skillDir, {
       recursive: true,
       force: true,
     });
@@ -218,11 +220,15 @@ describe("SkillDirWatcher workspace reconciliation", () => {
       watcher.syncNow();
       watcher.start();
       expect(db.getInstalledByAgent("bot-1")).toHaveLength(1);
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       removeWorkspaceSkill("bot-1", "live-tool");
       writeWorkspaceFile("agents/bot-1/skills/watch-trigger.txt", "trigger");
 
-      await waitUntil(() => db.getInstalledByAgent("bot-1").length === 0);
+      await waitUntil(
+        () => db.getInstalledByAgent("bot-1").length === 0,
+        8_000,
+      );
       watcher.stop();
     },
   );

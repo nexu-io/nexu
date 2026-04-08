@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import {
   createWriteStream,
   existsSync,
@@ -12,6 +12,9 @@ import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 import type {
   DesktopSidecarMaterializer,
   MaterializePackagedSidecarArgs,
@@ -287,7 +290,15 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
         !resolved.archiveMetadata ||
         resolved.archiveMetadata.format === "tar.gz"
       ) {
-        execFileSync("/usr/bin/tar", [
+        // execFileAsync (not execFileSync) so the main process event loop
+        // is not blocked while tar runs. The tar archive is ~tens of MB and
+        // takes ~14s on first install / post-update; blocking the event
+        // loop here means the renderer cannot finish loading dist/index.html
+        // (preload IPC handshake stalls), so the setup-animation video
+        // does not start playing until extraction completes. With the
+        // event loop free, the renderer mounts in seconds and the video
+        // plays in parallel with extraction.
+        await execFileAsync("/usr/bin/tar", [
           "-xzf",
           resolved.archivePath,
           "-C",
@@ -308,7 +319,7 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
         ).catch(() => null);
       }
 
-      rmSync(resolved.extractedSidecarRoot, { recursive: true, force: true });
+      await rm(resolved.extractedSidecarRoot, { recursive: true, force: true });
       await rename(tempExtractedSidecarRoot, resolved.extractedSidecarRoot);
       writeFileSync(resolved.stampPath, resolved.archiveStamp);
 

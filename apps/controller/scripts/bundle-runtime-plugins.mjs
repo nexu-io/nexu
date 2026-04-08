@@ -30,6 +30,11 @@ const MANIFEST_ID_FIXES = {
   "wecom-openclaw-plugin": "wecom",
 };
 
+function shouldCopyPluginPath(source) {
+  const basename = path.basename(source);
+  return basename !== ".bin" && basename !== "node_modules";
+}
+
 function getVirtualStoreNodeModules(realPkgPath) {
   let currentPath = realPkgPath;
   while (currentPath !== dirname(currentPath)) {
@@ -157,7 +162,7 @@ async function bundlePlugin({ id, npmName }) {
     recursive: true,
     force: true,
     dereference: true,
-    filter: (source) => path.basename(source) !== ".bin",
+    filter: shouldCopyPluginPath,
   });
   await maybeFixPluginManifest(outputDir);
 
@@ -217,11 +222,12 @@ async function bundlePlugin({ id, npmName }) {
 
     const destinationPath = path.join(outputNodeModules, packageName);
     await mkdir(path.dirname(destinationPath), { recursive: true });
+    await rm(destinationPath, { recursive: true, force: true });
     await cp(realPackagePath, destinationPath, {
       recursive: true,
       force: true,
       dereference: true,
-      filter: (source) => path.basename(source) !== ".bin",
+      filter: shouldCopyPluginPath,
     });
   }
 }

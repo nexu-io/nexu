@@ -3,6 +3,10 @@ import { join, resolve } from "node:path";
 import { app } from "electron";
 import { getDesktopNexuHomeDir } from "../shared/desktop-paths";
 import { resolveRuntimePlatform } from "./platforms/platform-resolver";
+import {
+  getLegacyPackagedNexuHomeDir,
+  migrateNexuHomeFromUserData,
+} from "./services/nexu-home-migration";
 
 function safeWrite(stream: NodeJS.WriteStream, message: string): void {
   if (stream.destroyed || !stream.writable) {
@@ -145,11 +149,27 @@ function configurePackagedPaths(): void {
   const sessionDataPath = join(effectiveUserDataPath, "session");
   const logsPath = join(effectiveUserDataPath, "logs");
   const nexuHomePath = getDesktopNexuHomeDir(effectiveUserDataPath);
+  const legacyPackagedNexuHomePath = getLegacyPackagedNexuHomeDir(
+    effectiveUserDataPath,
+  );
 
   mkdirSync(effectiveUserDataPath, { recursive: true });
   mkdirSync(sessionDataPath, { recursive: true });
   mkdirSync(logsPath, { recursive: true });
   mkdirSync(nexuHomePath, { recursive: true });
+
+  if (legacyPackagedNexuHomePath !== nexuHomePath) {
+    migrateNexuHomeFromUserData({
+      targetNexuHome: nexuHomePath,
+      sourceNexuHome: legacyPackagedNexuHomePath,
+      log: (message) => {
+        safeWrite(
+          process.stdout,
+          `[desktop:paths] nexu-home-migration: ${message}\n`,
+        );
+      },
+    });
+  }
 
   process.env.NEXU_HOME = nexuHomePath;
 

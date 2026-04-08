@@ -113,8 +113,11 @@ const enSidebar = [
         text: "Channel Configuration",
         link: "/guide/channels",
         items: [
+          { text: "WeCom", link: "/guide/channels/wecom" },
           { text: "WeChat", link: "/guide/channels/wechat" },
           { text: "Feishu", link: "/guide/channels/feishu" },
+          { text: "QQ", link: "/guide/channels/qq" },
+          { text: "DingTalk", link: "/guide/channels/dingtalk" },
           { text: "Slack", link: "/guide/channels/slack" },
           { text: "Discord", link: "/guide/channels/discord" },
           { text: "Telegram", link: "/guide/channels/telegram" },
@@ -161,7 +164,10 @@ const jaSidebar = [
         text: "チャンネル設定",
         link: "/ja/guide/channels",
         items: [
+          { text: "WeCom", link: "/ja/guide/channels/wecom" },
           { text: "Feishu", link: "/ja/guide/channels/feishu" },
+          { text: "QQ", link: "/ja/guide/channels/qq" },
+          { text: "DingTalk", link: "/ja/guide/channels/dingtalk" },
           { text: "Slack", link: "/ja/guide/channels/slack" },
           { text: "Discord", link: "/ja/guide/channels/discord" },
           { text: "Telegram", link: "/ja/guide/channels/telegram" },
@@ -209,7 +215,10 @@ const zhSidebar = [
         link: "/zh/guide/channels",
         items: [
           { text: "微信", link: "/zh/guide/channels/wechat" },
+          { text: "企业微信", link: "/zh/guide/channels/wecom" },
           { text: "飞书", link: "/zh/guide/channels/feishu" },
+          { text: "QQ", link: "/zh/guide/channels/qq" },
+          { text: "钉钉", link: "/zh/guide/channels/dingtalk" },
           { text: "Slack", link: "/zh/guide/channels/slack" },
           { text: "Discord", link: "/zh/guide/channels/discord" },
           { text: "Telegram", link: "/zh/guide/channels/telegram" },

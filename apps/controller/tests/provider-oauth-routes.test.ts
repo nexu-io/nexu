@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { PersistedModelsConfig } from "@nexu/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ControllerContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
@@ -57,20 +58,38 @@ function createEnv(rootDir: string): ControllerEnv {
 
 function createTestContainer(rootDir: string): ControllerContainer {
   const env = createEnv(rootDir);
-  const upsertProvider = vi.fn(async () => ({
-    provider: {
-      id: "provider-1",
-      providerId: "openai",
-      displayName: "OpenAI",
-      enabled: true,
-      baseUrl: null,
-      hasApiKey: false,
-      models: ["gpt-5.4"],
-      createdAt: "2026-03-25T00:00:00.000Z",
-      updatedAt: "2026-03-25T00:00:00.000Z",
+  let config: PersistedModelsConfig = {
+    mode: "merge",
+    providers: {
+      openai: {
+        enabled: true,
+        displayName: "OpenAI",
+        baseUrl: "https://api.openai.com/v1",
+        auth: "api-key",
+        api: "openai-responses",
+        apiKey: "existing-api-key",
+        models: [
+          {
+            id: "gpt-4.1",
+            name: "gpt-4.1",
+            api: "openai-responses",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 0,
+            maxTokens: 0,
+          },
+        ],
+      },
     },
-    created: false,
-  }));
+  };
+  const getModelProviderConfigDocument = vi.fn(async () => config);
+  const setModelProviderConfigDocument = vi.fn(
+    async (nextConfig: PersistedModelsConfig) => {
+      config = nextConfig;
+      return config;
+    },
+  );
   const syncAll = vi.fn(async () => {});
 
   return {
@@ -91,8 +110,8 @@ function createTestContainer(rootDir: string): ControllerContainer {
     runtimeModelStateService:
       {} as ControllerContainer["runtimeModelStateService"],
     modelProviderService: {
-      upsertProvider,
-      deleteProvider: vi.fn(async () => true),
+      getModelProviderConfigDocument,
+      setModelProviderConfigDocument,
       ensureValidDefaultModel: vi.fn(async () => null),
     } as unknown as ControllerContainer["modelProviderService"],
     integrationService: {} as ControllerContainer["integrationService"],
@@ -158,19 +177,34 @@ describe("provider OAuth routes", () => {
     const container = createTestContainer("/tmp/nexu-provider-oauth-routes");
     const app = createApp(container);
 
-    const response = await app.request("/api/v1/providers/openai/oauth/status");
+    const response = await app.request(
+      "/api/v1/model-providers/openai/oauth/status",
+    );
 
     expect(response.status).toBe(200);
-    expect(container.modelProviderService.upsertProvider).toHaveBeenCalledWith(
-      "openai",
-      {
-        displayName: "OpenAI",
-        enabled: true,
-        apiKey: null,
-        modelsJson: JSON.stringify(["gpt-5.4"]),
+    expect(
+      container.modelProviderService.setModelProviderConfigDocument,
+    ).toHaveBeenCalledTimes(1);
+    await expect(
+      container.modelProviderService.getModelProviderConfigDocument(),
+    ).resolves.toMatchObject({
+      providers: {
+        openai: {
+          auth: "oauth",
+          oauthProfileRef: "openai-codex",
+          models: [{ id: "gpt-5.4" }],
+        },
       },
-    );
-    expect(container.openclawSyncService.syncAll).toHaveBeenCalledTimes(1);
+    });
+    await expect(
+      container.modelProviderService.getModelProviderConfigDocument(),
+    ).resolves.not.toMatchObject({
+      providers: {
+        openai: {
+          apiKey: expect.anything(),
+        },
+      },
+    });
     await expect(response.json()).resolves.toMatchObject({
       status: "completed",
       models: ["gpt-5.4"],
@@ -190,19 +224,18 @@ describe("provider OAuth routes", () => {
     const app = createApp(container);
 
     const response = await app.request(
-      "/api/v1/providers/openai/oauth/disconnect",
+      "/api/v1/model-providers/openai/oauth/disconnect",
       { method: "POST" },
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
-    expect(container.modelProviderService.deleteProvider).toHaveBeenCalledWith(
-      "openai",
-    );
+    await expect(
+      container.modelProviderService.getModelProviderConfigDocument(),
+    ).resolves.toMatchObject({ providers: {} });
     expect(
       container.modelProviderService.ensureValidDefaultModel,
     ).toHaveBeenCalledTimes(1);
-    expect(container.openclawSyncService.syncAll).toHaveBeenCalledTimes(1);
   });
 
   it("disconnect does not delete provider when OAuth disconnect fails", async () => {
@@ -218,14 +251,14 @@ describe("provider OAuth routes", () => {
     const app = createApp(container);
 
     const response = await app.request(
-      "/api/v1/providers/openai/oauth/disconnect",
+      "/api/v1/model-providers/openai/oauth/disconnect",
       { method: "POST" },
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: false });
     expect(
-      container.modelProviderService.deleteProvider,
+      container.modelProviderService.setModelProviderConfigDocument,
     ).not.toHaveBeenCalled();
   });
 
@@ -242,18 +275,17 @@ describe("provider OAuth routes", () => {
     const app = createApp(container);
 
     const response = await app.request(
-      "/api/v1/providers/openai/oauth/disconnect",
+      "/api/v1/model-providers/openai/oauth/disconnect",
       { method: "POST" },
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(
-      container.modelProviderService.deleteProvider,
+      container.modelProviderService.setModelProviderConfigDocument,
     ).not.toHaveBeenCalled();
     expect(
       container.modelProviderService.ensureValidDefaultModel,
     ).not.toHaveBeenCalled();
-    expect(container.openclawSyncService.syncAll).not.toHaveBeenCalled();
   });
 });

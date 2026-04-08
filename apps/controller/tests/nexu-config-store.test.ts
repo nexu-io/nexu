@@ -52,7 +52,11 @@ describe("NexuConfigStore", () => {
         ".openclaw",
         "workspace-templates",
       ),
+      openclawOwnershipMode: "external",
+      openclawBaseUrl: "http://127.0.0.1:18789",
       openclawBin: "openclaw",
+      openclawLogDir: path.join(rootDir, ".nexu", "logs", "openclaw"),
+      openclawLaunchdLabel: null,
       litellmBaseUrl: null,
       litellmApiKey: null,
       openclawGatewayPort: 18789,
@@ -62,7 +66,6 @@ describe("NexuConfigStore", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
-      openclawLaunchdLabel: null,
       posthogApiKey: undefined,
       posthogHost: undefined,
     };
@@ -154,6 +157,404 @@ describe("NexuConfigStore", () => {
     expect(result.provider.apiKey).toBeNull();
   });
 
+  it("writes provider changes into canonical config.models.providers only", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.upsertProvider("openai", {
+      apiKey: "sk-test",
+      displayName: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      modelsJson: JSON.stringify(["gpt-5.4"]),
+    });
+
+    const config = await store.getConfig();
+
+    expect(config.models.providers.openai).toMatchObject({
+      enabled: true,
+      displayName: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "api-key",
+      api: "openai-completions",
+      apiKey: "sk-test",
+    });
+    expect(config.models.providers.openai?.models).toEqual([
+      expect.objectContaining({
+        id: "gpt-5.4",
+        name: "gpt-5.4",
+        api: "openai-completions",
+      }),
+    ]);
+    expect(config).not.toHaveProperty("providers");
+    expect(config.schemaVersion).toBe(2);
+  });
+
+  it("migrates legacy config.providers into canonical config.models.providers on read", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [],
+          runtime: {},
+          providers: [
+            {
+              id: "provider-openai",
+              providerId: "openai",
+              displayName: "OpenAI",
+              enabled: true,
+              baseUrl: "https://api.openai.com/v1",
+              authMode: "apiKey",
+              apiKey: "sk-test",
+              oauthRegion: null,
+              oauthCredential: null,
+              models: ["gpt-4o"],
+              createdAt: "2026-04-04T00:00:00.000Z",
+              updatedAt: "2026-04-04T00:00:00.000Z",
+            },
+          ],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {},
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const config = await store.getConfig();
+
+    expect(config.models.providers.openai).toMatchObject({
+      displayName: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "api-key",
+      apiKey: "sk-test",
+    });
+    expect(config.models.providers.openai?.models).toEqual([
+      expect.objectContaining({ id: "gpt-4o", name: "gpt-4o" }),
+    ]);
+    expect(config).not.toHaveProperty("providers");
+    expect(config.schemaVersion).toBe(2);
+  });
+
+  it("derives legacy provider compatibility state from canonical config.models.providers", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [],
+          runtime: {},
+          models: {
+            mode: "merge",
+            providers: {
+              openai: {
+                enabled: true,
+                displayName: "OpenAI",
+                baseUrl: "https://api.openai.com/v1",
+                auth: "api-key",
+                api: "openai-completions",
+                apiKey: "sk-test",
+                models: [
+                  {
+                    id: "gpt-4o-mini",
+                    name: "gpt-4o-mini",
+                    api: "openai-completions",
+                    reasoning: false,
+                    input: ["text"],
+                    cost: {
+                      input: 0,
+                      output: 0,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    contextWindow: 128000,
+                    maxTokens: 16384,
+                  },
+                ],
+              },
+            },
+          },
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {},
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const providers = await store.listProviders();
+
+    expect(providers).toHaveLength(1);
+    expect(providers[0]).toMatchObject({
+      providerId: "openai",
+      displayName: "OpenAI",
+      hasApiKey: true,
+      modelsJson: JSON.stringify(["gpt-4o-mini"]),
+    });
+  });
+
+  it("normalizes persisted saved model refs on read", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 1,
+          app: {},
+          bots: [
+            {
+              id: "bot-1",
+              name: "Assistant",
+              slug: "assistant",
+              poolId: null,
+              status: "active",
+              modelId: "custom-openai__team%20gateway/openai/gpt-4.1",
+              systemPrompt: null,
+              createdAt: "2026-04-05T00:00:00.000Z",
+              updatedAt: "2026-04-05T00:00:00.000Z",
+            },
+          ],
+          runtime: {
+            defaultModelId: "byok_openai/openai/gpt-4.1",
+          },
+          models: {
+            mode: "merge",
+            providers: {
+              openai: {
+                enabled: true,
+                displayName: "OpenAI",
+                baseUrl: "https://api.openai.com/v1",
+                auth: "api-key",
+                api: "openai-completions",
+                apiKey: "sk-test",
+                models: [
+                  {
+                    id: "openai/gpt-4.1",
+                    name: "gpt-4.1",
+                    api: "openai-completions",
+                    reasoning: false,
+                    input: ["text"],
+                    cost: {
+                      input: 0,
+                      output: 0,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    contextWindow: 128000,
+                    maxTokens: 16384,
+                  },
+                ],
+              },
+              "custom-openai/team gateway": {
+                providerTemplateId: "custom-openai",
+                instanceId: "team gateway",
+                enabled: true,
+                displayName: "Team Gateway",
+                baseUrl: "https://gateway.example.com/v1",
+                auth: "api-key",
+                api: "openai-completions",
+                apiKey: "sk-custom",
+                models: [
+                  {
+                    id: "openai/gpt-4.1",
+                    name: "gpt-4.1",
+                    api: "openai-completions",
+                    reasoning: false,
+                    input: ["text"],
+                    cost: {
+                      input: 0,
+                      output: 0,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    contextWindow: 128000,
+                    maxTokens: 16384,
+                  },
+                ],
+              },
+            },
+          },
+          providers: [],
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {
+            selectedModelId: "google/gemini-2.5-flash",
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+    const config = await store.getConfig();
+
+    expect(config.runtime.defaultModelId).toBe("openai/gpt-4.1");
+    expect(config.bots[0]?.modelId).toBe(
+      "custom-openai/team gateway/openai/gpt-4.1",
+    );
+    expect(config.desktop.selectedModelId).toBe("google/gemini-2.5-flash");
+    expect(config.models.providers.openai?.models[0]?.id).toBe("gpt-4.1");
+    expect(
+      config.models.providers["custom-openai/team gateway"]?.models[0]?.id,
+    ).toBe("openai/gpt-4.1");
+  });
+
+  it("rewrites saved model refs to canonical form on save", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.setModelProviderConfigDocument({
+      mode: "merge",
+      providers: {
+        google: {
+          enabled: true,
+          displayName: "Gemini",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+          auth: "api-key",
+          api: "openai-completions",
+          apiKey: "gemini-key",
+          models: [
+            {
+              id: "google/gemini-2.5-flash",
+              name: "gemini-2.5-flash",
+              api: "openai-completions",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 128000,
+              maxTokens: 16384,
+            },
+          ],
+        },
+        "custom-openai/team gateway": {
+          providerTemplateId: "custom-openai",
+          instanceId: "team gateway",
+          enabled: true,
+          displayName: "Team Gateway",
+          baseUrl: "https://gateway.example.com/v1",
+          auth: "api-key",
+          api: "openai-completions",
+          apiKey: "sk-custom",
+          models: [
+            {
+              id: "custom-openai/team gateway/gpt-4.1",
+              name: "gpt-4.1",
+              api: "openai-completions",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 128000,
+              maxTokens: 16384,
+            },
+          ],
+        },
+      },
+    });
+    await store.setDefaultModel("google/gemini-2.5-flash");
+    const bot = await store.createBot({
+      name: "Assistant",
+      slug: "assistant",
+      modelId: "custom-openai__team%20gateway/openai/gpt-4.1",
+    });
+    await store.updateBot(bot.id, {
+      modelId: "byok_gemini/gemini/gemini-2.5-pro",
+    });
+
+    const config = await store.getConfig();
+
+    expect(config.models.providers.google?.models[0]?.id).toBe(
+      "gemini-2.5-flash",
+    );
+    expect(
+      config.models.providers["custom-openai/team gateway"]?.models[0]?.id,
+    ).toBe("gpt-4.1");
+    expect(config.runtime.defaultModelId).toBe("google/gemini-2.5-flash");
+    expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-pro");
+    expect(config).not.toHaveProperty("providers");
+    expect(config.schemaVersion).toBe(2);
+  });
+
+  it("preserves slash-qualified model ids for custom anthropic providers", async () => {
+    const store = new NexuConfigStore(env);
+
+    await store.setModelProviderConfigDocument({
+      mode: "merge",
+      providers: {
+        "custom-anthropic/team gateway": {
+          providerTemplateId: "custom-anthropic",
+          instanceId: "team gateway",
+          enabled: true,
+          displayName: "Team Gateway",
+          baseUrl: "https://gateway.example.com/v1",
+          auth: "api-key",
+          api: "anthropic-messages",
+          apiKey: "sk-custom",
+          models: [
+            {
+              id: "anthropic/claude-haiku-4.5",
+              name: "claude-haiku-4.5",
+              api: "anthropic-messages",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 128000,
+              maxTokens: 16384,
+            },
+          ],
+        },
+      },
+    });
+    const bot = await store.createBot({
+      name: "Assistant",
+      slug: "assistant",
+      modelId: "custom-anthropic__team%20gateway/anthropic/claude-haiku-4.5",
+    });
+
+    const config = await store.getConfig();
+
+    expect(
+      config.models.providers["custom-anthropic/team gateway"]?.models[0]?.id,
+    ).toBe("anthropic/claude-haiku-4.5");
+    expect(config.bots.find((item) => item.id === bot.id)?.modelId).toBe(
+      "custom-anthropic/team gateway/anthropic/claude-haiku-4.5",
+    );
+  });
+
   it("recovers from a broken primary config using backup-compatible data", async () => {
     const brokenConfigPath = env.nexuConfigPath;
     const backupPath = `${brokenConfigPath}.bak`;
@@ -183,7 +584,7 @@ describe("NexuConfigStore", () => {
     const store = new NexuConfigStore(env);
     const config = await store.getConfig();
 
-    expect(config.schemaVersion).toBe(1);
+    expect(config.schemaVersion).toBe(2);
     expect(config.$schema).toBe("https://nexu.io/config.json");
   });
 
@@ -308,6 +709,257 @@ describe("NexuConfigStore", () => {
     ]);
   });
 
+  it("claimDesktopReward returns ok:false when cloud is not connected", async () => {
+    const store = new NexuConfigStore(env);
+
+    const result = await store.claimDesktopReward("daily_checkin");
+    expect(result.ok).toBe(false);
+    expect(result.alreadyClaimed).toBe(false);
+  });
+
+  it("setDesktopRewardBalance posts the requested balance and refreshes rewards status", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    const statusResponse = {
+      tasks: [],
+      progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+      cloudBalance: {
+        totalBalance: 4200,
+        totalRecharged: 4200,
+        totalConsumed: 0,
+        syncedAt: "2026-04-01T00:00:00.000Z",
+        updatedAt: "2026-04-01T00:00:00.000Z",
+      },
+    };
+
+    let fetchCalls = 0;
+    let capturedBody: string | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          capturedBody = init?.body as string;
+          return new Response(null, { status: 204 });
+        }
+
+        return new Response(JSON.stringify(statusResponse), { status: 200 });
+      }),
+    );
+
+    try {
+      const status = await store.setDesktopRewardBalance(4200);
+      expect(fetchCalls).toBe(2);
+      expect(JSON.parse(capturedBody ?? "{}")).toEqual({
+        targetBalance: 4200,
+        idempotencyKey: expect.stringContaining("desktop-set-balance-"),
+      });
+      expect(status.cloudBalance?.totalBalance).toBe(4200);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("getDesktopRewardsStatus preserves cloud balance when cloud returns unknown task ids", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          runtime: {
+            defaultModelId: "gemini-3-flash-preview",
+          },
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "http://localhost:8080",
+              apiKey: "valid-key",
+              models: [],
+            },
+            activeCloudProfileName: "Local",
+            cloudSessions: {
+              Local: {
+                connected: true,
+                polling: false,
+                userName: "Cloud User",
+                userEmail: "user@nexu.io",
+                connectedAt: "2026-04-01T00:00:00.000Z",
+                linkUrl: "http://localhost:8080",
+                apiKey: "valid-key",
+                models: [],
+              },
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      path.join(rootDir, ".nexu", "cloud-profiles.json"),
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          profiles: [
+            {
+              name: "Local",
+              cloudUrl: "http://localhost:5173",
+              linkUrl: "http://localhost:8080",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              tasks: [
+                {
+                  id: "daily_checkin",
+                  displayName: "Daily Check-in",
+                  groupId: "daily",
+                  rewardPoints: 100,
+                  repeatMode: "daily",
+                  shareMode: "link",
+                  icon: "calendar",
+                  url: null,
+                  isClaimed: true,
+                  claimCount: 1,
+                  lastClaimedAt: "2026-04-08T00:00:00.000Z",
+                },
+                {
+                  id: "xiaohongshu",
+                  displayName: "Share on Xiaohongshu",
+                  groupId: "social",
+                  rewardPoints: 200,
+                  repeatMode: "weekly",
+                  shareMode: "image",
+                  icon: "xiaohongshu",
+                  url: null,
+                  isClaimed: false,
+                  claimCount: 0,
+                  lastClaimedAt: null,
+                },
+              ],
+              progress: {
+                claimedCount: 1,
+                totalCount: 2,
+                earnedCredits: 0,
+              },
+              cloudBalance: {
+                totalBalance: 1,
+                totalRecharged: 1210,
+                totalConsumed: 1209,
+                syncedAt: "2026-04-07T09:36:51.342Z",
+                updatedAt: "2026-04-07T09:36:51.342Z",
+              },
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.cloudBalance?.totalBalance).toBe(1);
+      expect(status.tasks).toHaveLength(1);
+      expect(status.tasks[0]?.id).toBe("daily_checkin");
+      expect(status.progress.claimedCount).toBe(1);
+      expect(status.progress.totalCount).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("getDesktopRewardsStatus returns empty fallback when cloud is not connected", async () => {
+    const store = new NexuConfigStore(env);
+
+    const status = await store.getDesktopRewardsStatus();
+    expect(status.viewer.cloudConnected).toBe(false);
+    expect(status.tasks).toHaveLength(0);
+    expect(status.progress.earnedCredits).toBe(0);
+    expect(status.cloudBalance).toBeNull();
+  });
+
+  it("treats link-prefixed default models as managed even before cloud inventory hydrates", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          runtime: {
+            defaultModelId: "link/gemini-3-flash-preview",
+          },
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    const status = await store.getDesktopRewardsStatus();
+    expect(status.viewer.cloudConnected).toBe(true);
+    expect(status.viewer.activeModelId).toBe("link/gemini-3-flash-preview");
+    expect(status.viewer.usingManagedModel).toBe(true);
+  });
+
   it("backfills missing desktop cloud userId from /api/v1/me during bootstrap", async () => {
     const store = new NexuConfigStore(env);
 
@@ -366,5 +1018,140 @@ describe("NexuConfigStore", () => {
     expect(desktop.cloud?.userId).toBe("user-backfilled");
     expect(desktop.cloud?.models).toEqual([{ id: "m1", name: "Model 1" }]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("getDesktopRewardsStatus preserves connected state when cloud returns 401 auth_failed", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "expired-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+          }),
+      ),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.viewer.cloudConnected).toBe(true);
+      expect(status.tasks).toHaveLength(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("claimDesktopReward uses status from claim response without extra fetch", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+
+    const mockTask = {
+      id: "daily_checkin",
+      displayName: "Daily Check-in",
+      groupId: "daily",
+      rewardPoints: 100,
+      repeatMode: "daily",
+      shareMode: "link",
+      icon: "calendar",
+      url: null,
+      isClaimed: true,
+      claimCount: 1,
+      lastClaimedAt: "2026-04-01T00:00:00.000Z",
+    };
+
+    const claimResponse = {
+      ok: true,
+      alreadyClaimed: false,
+      status: {
+        tasks: [mockTask],
+        progress: { claimedCount: 1, totalCount: 1, earnedCredits: 100 },
+        cloudBalance: null,
+      },
+    };
+
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCallCount = 0;
+    let claimBody: unknown = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        fetchCallCount += 1;
+        claimBody = init?.body ?? null;
+        return new Response(JSON.stringify(claimResponse), { status: 200 });
+      }),
+    );
+
+    try {
+      const result = await store.claimDesktopReward("daily_checkin", {
+        url: "https://x.com/nexu_io/status/1900000000000000000",
+      });
+      expect(result.ok).toBe(true);
+      expect(result.alreadyClaimed).toBe(false);
+      expect(result.status.tasks).toHaveLength(1);
+      expect(result.status.tasks[0]?.isClaimed).toBe(true);
+      expect(result.status.progress.claimedCount).toBe(1);
+      // Only one fetch call for claim — no extra status fetch
+      expect(fetchCallCount).toBe(1);
+      expect(claimBody).toBe(
+        JSON.stringify({
+          taskId: "daily_checkin",
+          proofUrl: "https://x.com/nexu_io/status/1900000000000000000",
+        }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

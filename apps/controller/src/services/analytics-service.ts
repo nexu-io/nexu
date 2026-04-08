@@ -39,12 +39,15 @@ type TranscriptEntry = {
   };
 };
 
+type AnalyticsMessageState = "Success" | "false";
+
 type UserMessageCandidate = {
   id: string;
   timestampMs: number;
   createdAt: string | null;
   providerName: string | null;
   channel: AnalyticsChannel;
+  state: AnalyticsMessageState;
 };
 
 type SkillUseCandidate = {
@@ -217,6 +220,7 @@ export class AnalyticsService {
           {
             channel: userMessage.channel,
             model_provider: userMessage.providerName,
+            state: userMessage.state,
           },
           userMessage.timestampMs,
         );
@@ -447,6 +451,38 @@ export class AnalyticsService {
         continue;
       }
 
+      // Resolve any pending user messages as failed when openclaw reports a
+      // prompt error. Each error entry's parentId points back to the user
+      // message that triggered it; the cheapest correct interpretation is
+      // "any user message that hasn't yet been answered when this error
+      // arrives is a failure".
+      if (
+        entry.type === "custom" &&
+        entry.customType === "openclaw:prompt-error"
+      ) {
+        const errorProvider =
+          typeof entry.data?.provider === "string" ? entry.data.provider : null;
+        if (errorProvider) {
+          currentProvider = errorProvider;
+        }
+        for (const index of pendingUserIndexes) {
+          const message = userMessages[index];
+          if (!message) {
+            continue;
+          }
+          userMessages[index] = {
+            id: message.id,
+            timestampMs: message.timestampMs,
+            createdAt: message.createdAt,
+            providerName: errorProvider ?? message.providerName,
+            channel: message.channel,
+            state: "false",
+          };
+        }
+        pendingUserIndexes.length = 0;
+        continue;
+      }
+
       if (entry.type !== "message" || !entry.message) {
         continue;
       }
@@ -465,6 +501,7 @@ export class AnalyticsService {
           createdAt: entry.timestamp ?? null,
           providerName: currentProvider,
           channel: params.channel,
+          state: "Success",
         });
         pendingUserIndexes.push(userMessages.length - 1);
         continue;
@@ -491,6 +528,7 @@ export class AnalyticsService {
             createdAt: message.createdAt,
             providerName,
             channel: message.channel,
+            state: message.state,
           };
         }
       }

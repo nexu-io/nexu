@@ -26,6 +26,7 @@
     "check:dev": "node ./scripts/desktop-check-dev.mjs",
     "check:dist": "node ./scripts/desktop-check-dist.mjs",
     "probe:slack": "node scripts/probe/slack-reply-probe.mjs",
+    "probe:model": "node scripts/probe/model-call-probe.mjs",
     "dist:mac": "pnpm --filter @nexu/desktop dist:mac",
     "dist:mac:arm64": "pnpm --filter @nexu/desktop dist:mac:arm64",
     "dist:mac:x64": "pnpm --filter @nexu/desktop dist:mac:x64",
