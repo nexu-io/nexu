@@ -312,6 +312,28 @@ function convertCloudStatusToDesktop(
   },
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
+  const tasks = cloudStatus.tasks.flatMap((task) => {
+    const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
+    const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
+    if (!parsedTaskId.success || !parsedGroupId.success) {
+      return [];
+    }
+
+    return {
+      id: parsedTaskId.data as RewardTaskId,
+      group: parsedGroupId.data,
+      icon: task.icon ?? "gift",
+      reward: task.rewardPoints,
+      shareMode: task.shareMode as "link" | "tweet" | "image",
+      repeatMode: task.repeatMode as "once" | "daily" | "weekly",
+      requiresScreenshot: task.shareMode === "image",
+      actionUrl: task.url,
+      isClaimed: task.isClaimed,
+      lastClaimedAt: task.lastClaimedAt,
+      claimCount: task.claimCount,
+    };
+  });
+
   return {
     viewer: {
       cloudConnected,
@@ -321,28 +343,12 @@ function convertCloudStatusToDesktop(
         (activeManagedModel ? "nexu" : (activeModelId?.split("/")[0] ?? null)),
       usingManagedModel: activeManagedModel != null,
     },
-    progress: cloudStatus.progress,
-    tasks: cloudStatus.tasks.flatMap((task) => {
-      const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
-      const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
-      if (!parsedTaskId.success || !parsedGroupId.success) {
-        return [];
-      }
-
-      return {
-        id: parsedTaskId.data as RewardTaskId,
-        group: parsedGroupId.data,
-        icon: task.icon ?? "gift",
-        reward: task.rewardPoints,
-        shareMode: task.shareMode as "link" | "tweet" | "image",
-        repeatMode: task.repeatMode as "once" | "daily" | "weekly",
-        requiresScreenshot: task.shareMode === "image",
-        actionUrl: task.url,
-        isClaimed: task.isClaimed,
-        lastClaimedAt: task.lastClaimedAt,
-        claimCount: task.claimCount,
-      };
-    }),
+    progress: {
+      ...cloudStatus.progress,
+      claimedCount: tasks.filter((task) => task.isClaimed).length,
+      totalCount: tasks.length,
+    },
+    tasks,
     cloudBalance: cloudStatus.cloudBalance
       ? {
           totalBalance: cloudStatus.cloudBalance.totalBalance,

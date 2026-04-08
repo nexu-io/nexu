@@ -94,7 +94,21 @@ function renderHomePage({
   );
 }
 
-function renderRewardsPage(): string {
+function renderRewardsPage(rewardsStatus?: {
+  viewer?: {
+    cloudConnected: boolean;
+    activeModelId: string | null;
+    activeModelProviderId: string | null;
+    usingManagedModel: boolean;
+  };
+  progress?: {
+    claimedCount: number;
+    totalCount: number;
+    earnedCredits: number;
+    availableCredits?: number;
+  };
+  tasks?: Array<Record<string, unknown>>;
+}): string {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -109,20 +123,24 @@ function renderRewardsPage(): string {
       activeModelId: null,
       activeModelProviderId: null,
       usingManagedModel: false,
+      ...rewardsStatus?.viewer,
     },
     progress: {
       claimedCount: 2,
       totalCount: rewardTasks.length,
       earnedCredits: 5,
       availableCredits: rewardTasks.reduce((sum, task) => sum + task.reward, 0),
+      ...rewardsStatus?.progress,
     },
-    tasks: rewardTasks.map((task) => ({
-      ...task,
-      isClaimed: task.id === "daily_checkin" || task.id === "github_star",
-      lastClaimedAt: null,
-      claimCount:
-        task.id === "daily_checkin" || task.id === "github_star" ? 1 : 0,
-    })),
+    tasks:
+      rewardsStatus?.tasks ??
+      rewardTasks.map((task) => ({
+        ...task,
+        isClaimed: task.id === "daily_checkin" || task.id === "github_star",
+        lastClaimedAt: null,
+        claimCount:
+          task.id === "daily_checkin" || task.id === "github_star" ? 1 : 0,
+      })),
   });
 
   return renderToStaticMarkup(
@@ -310,6 +328,28 @@ describe("HomePage", () => {
 });
 
 describe("RewardsPage", () => {
+  it("renders a progress summary aligned with the returned task list", () => {
+    const markup = renderRewardsPage({
+      progress: {
+        claimedCount: 1,
+        totalCount: 1,
+        earnedCredits: 100,
+      },
+      tasks: [
+        {
+          ...rewardTasks[0],
+          isClaimed: true,
+          lastClaimedAt: "2026-04-08T00:00:00.000Z",
+          claimCount: 1,
+        },
+      ],
+    });
+
+    expect(markup).toContain("1 / 1");
+    expect(markup).toContain("reward.daily_checkin.name");
+    expect(markup).not.toContain("reward.github_star.name");
+  });
+
   it("renders the merged social rewards group including Facebook and WhatsApp", () => {
     const markup = renderRewardsPage();
 
