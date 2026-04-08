@@ -103,6 +103,14 @@ export async function getDesktopCloudStatus() {
   return getHostBridge().invoke("desktop:get-cloud-status", undefined);
 }
 
+export async function getDesktopRewardsStatus() {
+  return getHostBridge().invoke("desktop:get-rewards-status", undefined);
+}
+
+export async function setDesktopRewardBalance(balance: number) {
+  return getHostBridge().invoke("desktop:set-reward-balance", { balance });
+}
+
 export async function notifyDesktopRewardsUpdated(): Promise<void> {
   await getHostBridge().invoke("desktop:rewards-updated", undefined);
 }

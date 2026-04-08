@@ -27,6 +27,8 @@ export const hostInvokeChannels = [
   "desktop:get-minimax-oauth-status",
   "desktop:start-minimax-oauth",
   "desktop:cancel-minimax-oauth",
+  "desktop:get-rewards-status",
+  "desktop:set-reward-balance",
   "desktop:rewards-updated",
   "shell:open-external",
   "update:check",
@@ -133,6 +135,10 @@ export type HostInvokePayloadMap = {
     region: "global" | "cn";
   };
   "desktop:cancel-minimax-oauth": undefined;
+  "desktop:get-rewards-status": undefined;
+  "desktop:set-reward-balance": {
+    balance: number;
+  };
   "desktop:rewards-updated": undefined;
   "shell:open-external": {
     url: string;
@@ -402,6 +408,16 @@ export type HostInvokeResultMap = {
     region?: "global" | "cn" | null;
     error?: string | null;
     cancelled: boolean;
+  };
+  "desktop:get-rewards-status": {
+    cloudBalance?: {
+      totalBalance?: number | null;
+    } | null;
+  };
+  "desktop:set-reward-balance": {
+    cloudBalance?: {
+      totalBalance?: number | null;
+    } | null;
   };
   "desktop:rewards-updated": {
     ok: boolean;

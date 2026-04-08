@@ -4,7 +4,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { postApiInternalDesktopCloudConnect } from "../../lib/api/sdk.gen";
+import {
+  getApiInternalDesktopCloudStatus,
+  postApiInternalDesktopCloudConnect,
+  postApiInternalDesktopCloudDisconnect,
+} from "../../lib/api/sdk.gen";
 import { syncDesktopCloudQueries } from "./use-desktop-cloud-status";
 
 interface UseCloudConnectOptions {
@@ -31,6 +35,24 @@ export function useCloudConnect({
         });
 
         if (data?.error === "Connection attempt already in progress") {
+          const statusResult = await getApiInternalDesktopCloudStatus().catch(
+            () => null,
+          );
+          if (!statusResult?.data?.polling) {
+            await postApiInternalDesktopCloudDisconnect().catch(
+              () => undefined,
+            );
+            const retryResult = await postApiInternalDesktopCloudConnect({
+              body: source ? { source } : undefined,
+            });
+            if (!retryResult.data?.error) {
+              if (retryResult.data?.browserUrl) {
+                await openExternalUrl(retryResult.data.browserUrl);
+                toast.info(t("welcome.browserOpened"));
+              }
+              return;
+            }
+          }
           toast.info(t("welcome.cloudConnectInProgress"));
           return;
         }

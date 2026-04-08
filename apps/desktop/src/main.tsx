@@ -1250,7 +1250,6 @@ function DesktopShell() {
     >
       <DevelopSetBalanceDialog
         open={showSetBalanceDialog}
-        webBaseUrl={runtimeConfig?.urls.web ?? null}
         onClose={() => setShowSetBalanceDialog(false)}
       />
       <div className="window-drag-bar" />
