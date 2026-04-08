@@ -982,11 +982,25 @@ app.on("web-contents-created", (_event, contents) => {
 
   // In production, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R, F5)
   // at the webContents level to prevent exposing internal startup screens (#399).
-  // Unlockable at runtime via Cmd+Shift+Alt+D (toggles productionDebugMode).
+  // Unlockable at runtime via Cmd/Ctrl+Shift+Alt+D (toggles productionDebugMode).
   if (app.isPackaged) {
     contents.on("before-input-event", (event, input) => {
-      if (productionDebugMode) return;
       if (input.type !== "keyDown") return;
+      // Toggle debug mode: Cmd+Shift+Alt+D (mac) / Ctrl+Shift+Alt+D (win/linux).
+      // Handled here in addition to globalShortcut so it works on Windows even
+      // when system-level registration is blocked by other software.
+      if (
+        input.key.toLowerCase() === "d" &&
+        input.shift &&
+        input.alt &&
+        (input.meta || input.control)
+      ) {
+        event.preventDefault();
+        productionDebugMode = !productionDebugMode;
+        installApplicationMenu();
+        return;
+      }
+      if (productionDebugMode) return;
       const isReload =
         (input.key.toLowerCase() === "r" && (input.meta || input.control)) ||
         input.key === "F5";
