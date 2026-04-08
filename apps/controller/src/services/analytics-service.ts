@@ -170,9 +170,7 @@ export class AnalyticsService {
     }
 
     const analyticsDistinctId = await this.resolveAnalyticsDistinctId();
-    if (!analyticsDistinctId) {
-      return;
-    }
+    const shouldSendAnalytics = analyticsDistinctId !== null;
 
     await this.ensureStateLoaded();
     const sessions = await this.sessionsRuntime.listSessions();
@@ -218,16 +216,18 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendAnalyticsEvent(
-          analyticsDistinctId,
-          "user_message_sent",
-          {
-            channel: userMessage.channel,
-            model_provider: userMessage.providerName,
-            state: userMessage.state,
-          },
-          userMessage.timestampMs,
-        );
+        if (shouldSendAnalytics) {
+          await this.sendAnalyticsEvent(
+            analyticsDistinctId,
+            "user_message_sent",
+            {
+              channel: userMessage.channel,
+              model_provider: userMessage.providerName,
+              state: userMessage.state,
+            },
+            userMessage.timestampMs,
+          );
+        }
         this.sentUserMessageIds.add(userMessage.id);
         stateChanged = true;
       }
@@ -240,32 +240,36 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendAnalyticsEvent(
-          analyticsDistinctId,
-          "skill_use",
-          {
-            skill_name: skillUse.skillName,
-            skill_source: skillUse.skillSource,
-            channel: skillUse.channel,
-            model_provider: skillUse.providerName,
-          },
-          skillUse.timestampMs,
-        );
+        if (shouldSendAnalytics) {
+          await this.sendAnalyticsEvent(
+            analyticsDistinctId,
+            "skill_use",
+            {
+              skill_name: skillUse.skillName,
+              skill_source: skillUse.skillSource,
+              channel: skillUse.channel,
+              model_provider: skillUse.providerName,
+            },
+            skillUse.timestampMs,
+          );
+        }
         this.sentSkillUseIds.add(skillUse.id);
         stateChanged = true;
       }
     }
 
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
-      await this.sendAnalyticsEvent(
-        analyticsDistinctId,
-        "nexu_first_conversation_start",
-        {
-          channel: firstSessionCandidate.channel,
-          model_provider: firstSessionCandidate.providerName,
-        },
-        firstSessionCandidate.timestampMs,
-      );
+      if (shouldSendAnalytics) {
+        await this.sendAnalyticsEvent(
+          analyticsDistinctId,
+          "nexu_first_conversation_start",
+          {
+            channel: firstSessionCandidate.channel,
+            model_provider: firstSessionCandidate.providerName,
+          },
+          firstSessionCandidate.timestampMs,
+        );
+      }
       this.state.sessionStartSent = true;
       stateChanged = true;
     }

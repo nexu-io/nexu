@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import { proxyFetch } from "../src/lib/proxy-fetch.js";
@@ -202,7 +205,74 @@ describe("AnalyticsService transport", () => {
 
     await service.poll();
 
-    expect(listSessions).not.toHaveBeenCalled();
+    expect(listSessions).toHaveBeenCalledTimes(1);
     expect(proxyFetch).not.toHaveBeenCalled();
+  });
+
+  it("advances dedupe state without sending events when no real cloud user id is available", async () => {
+    const tempDir = mkdtempSync(path.join(tmpdir(), "analytics-service-test-"));
+    const transcriptPath = path.join(tempDir, "session.jsonl");
+    writeFileSync(
+      transcriptPath,
+      `${[
+        JSON.stringify({
+          type: "model_change",
+          provider: "openai",
+        }),
+        JSON.stringify({
+          id: "message-1",
+          type: "message",
+          timestamp: "2026-04-08T00:00:00.000Z",
+          message: {
+            role: "user",
+          },
+        }),
+        JSON.stringify({
+          id: "assistant-1",
+          type: "message",
+          timestamp: "2026-04-08T00:00:01.000Z",
+          message: {
+            role: "assistant",
+            provider: "openai",
+            content: [],
+          },
+        }),
+      ].join("\n")}
+`,
+      "utf8",
+    );
+
+    const listSessions = vi.fn().mockResolvedValue([
+      {
+        id: "session-1",
+        channelType: "slack",
+        metadata: {
+          path: transcriptPath,
+        },
+      },
+    ]);
+
+    const service = new AnalyticsService(
+      createEnv({
+        analyticsStatePath: path.join(tempDir, "analytics-state.json"),
+      }),
+      {
+        getDesktopCloudStatus: async () => ({ userId: null }),
+      } as never,
+      {
+        listSessions,
+      } as never,
+    );
+
+    const sendAnalyticsEvent = vi.spyOn(
+      service as unknown as AnalyticsServiceInternals,
+      "sendAnalyticsEvent",
+    );
+
+    await service.poll();
+    await service.poll();
+
+    expect(listSessions).toHaveBeenCalledTimes(2);
+    expect(sendAnalyticsEvent).not.toHaveBeenCalled();
   });
 });
