@@ -10,7 +10,10 @@ import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
 import { openExternalUrl } from "@/lib/desktop-links";
-import { isWindowsDesktopPlatform } from "@/lib/desktop-platform";
+import {
+  isMacDesktopPlatform,
+  isWindowsDesktopPlatform,
+} from "@/lib/desktop-platform";
 import { resetAnalytics } from "@/lib/tracking";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
@@ -636,6 +639,7 @@ function WorkspaceLayoutInner() {
             ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
             : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
   const isWindowsDesktopClient = isDesktopClient && isWindowsDesktopPlatform();
+  const isMacDesktopClient = isDesktopClient && isMacDesktopPlatform();
   const desktopGlassTint = isWindowsDesktopClient
     ? "#ffffff"
     : "rgba(255, 255, 255, 0.08)";
@@ -672,7 +676,12 @@ function WorkspaceLayoutInner() {
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="fixed top-[16px] left-[24px] h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
+          className={cn(
+            "fixed h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50",
+            isMacDesktopClient
+              ? "top-[10px] left-[76px]"
+              : "top-[16px] left-[24px]",
+          )}
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           title={
             collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
@@ -724,6 +733,7 @@ function WorkspaceLayoutInner() {
           <div
             className={cn(
               "flex items-center justify-between px-3 pb-2 shrink-0",
+              isMacDesktopClient && "-mt-14 h-14 pl-[76px] pt-[10px] pr-3 pb-0",
               !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
             )}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
