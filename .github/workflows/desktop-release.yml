@@ -572,7 +572,7 @@ jobs:
       - name: Install packaging tools
         shell: pwsh
         run: |
-          choco install nsis 7zip awscli -y --no-progress
+          choco install nsis awscli -y --no-progress
 
       - name: Install dependencies
         shell: pwsh

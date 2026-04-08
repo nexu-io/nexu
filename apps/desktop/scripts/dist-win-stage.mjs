@@ -643,24 +643,6 @@ function getGitValue(args) {
   }
 }
 
-function resolveLocal7ZipCommand() {
-  const candidates = ["7z.exe", "7z"];
-
-  for (const candidate of candidates) {
-    try {
-      execFileSync(candidate, ["i"], {
-        encoding: "utf8",
-        stdio: ["ignore", "ignore", "ignore"],
-      });
-      return candidate;
-    } catch {}
-  }
-
-  throw new Error(
-    "[dist:win] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).",
-  );
-}
-
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
     const commandSpec = createPlatformCommandSpec({
@@ -992,11 +974,6 @@ async function main() {
       `[dist:win] Windows packaging must run with target platform "win": host=${process.platform}, target=${buildTargetPlatform}.`,
     );
   }
-  const local7ZipCommand = await timedStep(
-    "preflight local 7z",
-    async () => resolveLocal7ZipCommand(),
-    timings,
-  );
   const buildContext = createDesktopBuildContext({
     electronRoot,
     repoRoot,
@@ -1024,8 +1001,6 @@ async function main() {
       `[dist:win] local mode enabled dirOnly=${dirOnly} reuseBuilds=false reuseRuntimeInstall=false reuseSidecars=false`,
     );
   }
-  console.log(`[dist:win] using local 7-Zip command: ${local7ZipCommand}`);
-
   if (nsisFromExistingDir) {
     const reuseCheck = await validateWinUnpackedReuse(releaseRoot);
     if (!reuseCheck.valid) {

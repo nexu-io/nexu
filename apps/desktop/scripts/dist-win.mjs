@@ -80,16 +80,6 @@ function resolvePathCommand(candidates, probeArgs = ["/VERSION"]) {
   return null;
 }
 
-function resolveLocal7ZipCommand() {
-  const command = resolvePathCommand(["7z.exe", "7z"], ["i"]);
-  if (!command) {
-    throw new Error(
-      "[dist:win] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).",
-    );
-  }
-  return command;
-}
-
 function resolveMakensisCommand() {
   const command = resolvePathCommand([
     "makensis.exe",
@@ -151,7 +141,6 @@ async function main() {
     );
   }
 
-  const sevenZipCommand = resolveLocal7ZipCommand();
   const makensisCommand = resolveMakensisCommand();
   const version = await readDesktopPackageVersion();
   const releaseRoot = resolve(electronRoot, "release");
@@ -178,7 +167,7 @@ async function main() {
     );
   }
 
-  console.log(`[dist:win] using 7-Zip CLI: ${sevenZipCommand}`);
+  console.log(`[dist:win] using 7-Zip CLI: ${vendored7zExePath}`);
   console.log(`[dist:win] using vendored 7z.exe: ${vendored7zExePath}`);
   console.log(`[dist:win] using vendored 7z.dll: ${vendored7zDllPath}`);
   console.log(`[dist:win] using makensis: ${makensisCommand}`);
@@ -235,7 +224,7 @@ async function main() {
         );
         await rm(payloadPath, { force: true, maxRetries: 5, retryDelay: 200 });
         await run(
-          sevenZipCommand,
+          vendored7zExePath,
           ["a", "-t7z", "-mx=1", "-ms=off", payloadPath, ".\\*"],
           {
             cwd: winUnpackedDir,
