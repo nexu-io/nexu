@@ -24,7 +24,10 @@ export type PrepareGithubStarSessionResult = {
 
 export type VerifyGithubStarSessionResult =
   | { ok: true; currentStars: number }
-  | { ok: false; reason: "missing" | "expired" | "not_increased" | "too_early" };
+  | {
+      ok: false;
+      reason: "missing" | "expired" | "not_increased" | "too_early";
+    };
 
 export class GithubStarVerificationService {
   private readonly sessions = new Map<string, GithubStarSession>();
