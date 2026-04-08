@@ -94,6 +94,8 @@ type DesktopRewardClaimResponse = z.infer<
   typeof claimDesktopRewardResponseSchema
 >;
 
+const CLOUD_REWARD_CREDITS_SUMMARY_BEST_EFFORT_MS = 150;
+
 const defaultCloudProfile: CloudProfileEntry = {
   name: "Default",
   cloudUrl: "https://nexu.io",
@@ -493,7 +495,7 @@ function convertCloudStatusToDesktop(
     activeModelId: string | null;
     activeManagedModel: { provider?: string } | null | undefined;
   },
-  creditsSummary: CreditSummaryResponse | null,
+  creditsBalance: CreditSummaryResponse["balance"] | null,
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
   const tasks = cloudStatus.tasks.flatMap((task) => {
@@ -535,7 +537,7 @@ function convertCloudStatusToDesktop(
     },
     tasks,
     cloudBalance:
-      creditsSummary?.balance ??
+      creditsBalance ??
       (cloudStatus.cloudBalance
         ? {
             totalBalance: cloudStatus.cloudBalance.totalBalance,
@@ -735,6 +737,24 @@ export class NexuConfigStore {
         reject(new Error("aborted"));
       });
     });
+  }
+
+  private async readBestEffortCreditsBalance(
+    creditsSummaryPromise: Promise<
+      | { ok: true; data: CreditSummaryResponse }
+      | { ok: false; reason: string; message?: string }
+    >,
+  ): Promise<CreditSummaryResponse["balance"] | null> {
+    const result = await Promise.race([
+      creditsSummaryPromise,
+      this.sleep(CLOUD_REWARD_CREDITS_SUMMARY_BEST_EFFORT_MS).then(() => null),
+    ]);
+
+    if (!result || !result.ok) {
+      return null;
+    }
+
+    return result.data.balance;
   }
 
   private isCurrentPollingSignal(signal: AbortSignal): boolean {
@@ -1728,9 +1748,13 @@ export class NexuConfigStore {
         cloudUrl,
         apiKey: cloud.apiKey,
       });
+      const creditsSummaryPromise = service.getCreditsSummary();
       const cloudResult = await service.getRewardsStatus();
 
       if (cloudResult.ok) {
+        const creditsBalance = await this.readBestEffortCreditsBalance(
+          creditsSummaryPromise,
+        );
         return convertCloudStatusToDesktop(
           cloudResult.data,
           {
@@ -1738,11 +1762,11 @@ export class NexuConfigStore {
             activeModelId,
             activeManagedModel,
           },
-          null,
+          creditsBalance,
         );
       }
 
-      const creditsSummaryResult = await service.getCreditsSummary();
+      const creditsSummaryResult = await creditsSummaryPromise;
       creditsBalance = creditsSummaryResult.ok
         ? creditsSummaryResult.data.balance
         : null;
@@ -1835,6 +1859,9 @@ export class NexuConfigStore {
       activeModelId2,
       cloud2.models ?? [],
     );
+    const creditsBalance = await this.readBestEffortCreditsBalance(
+      service.getCreditsSummary(),
+    );
 
     return {
       ok: claimData.ok,
@@ -1846,7 +1873,7 @@ export class NexuConfigStore {
           activeModelId: activeModelId2,
           activeManagedModel: activeManagedModel2,
         },
-        null,
+        creditsBalance,
       ),
     };
   }
