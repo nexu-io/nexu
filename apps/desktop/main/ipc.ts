@@ -1,5 +1,12 @@
 import * as Sentry from "@sentry/electron/main";
-import { BrowserWindow, app, crashReporter, ipcMain, shell } from "electron";
+import {
+  BrowserWindow,
+  app,
+  crashReporter,
+  ipcMain,
+  shell,
+  webContents,
+} from "electron";
 import {
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
@@ -416,6 +423,45 @@ export function registerIpcHandlers(
               method: "DELETE",
             },
           );
+        }
+
+        case "desktop:get-rewards-status": {
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:get-rewards-status"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/rewards`,
+          );
+        }
+
+        case "desktop:set-reward-balance": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:set-reward-balance"];
+          return fetchControllerJson<
+            HostInvokeResultMap["desktop:set-reward-balance"]
+          >(
+            `${runtimeConfig.urls.controllerBase}/api/internal/desktop/rewards/set-balance`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ balance: typedPayload.balance }),
+            },
+          );
+        }
+
+        case "desktop:rewards-updated": {
+          for (const contents of webContents.getAllWebContents()) {
+            if (!contents.isDestroyed()) {
+              contents.send("host:desktop-command", {
+                type: "desktop:rewards-updated",
+              });
+            }
+          }
+
+          const result: HostInvokeResultMap["desktop:rewards-updated"] = {
+            ok: true,
+          };
+
+          return result;
         }
 
         case "shell:open-external": {

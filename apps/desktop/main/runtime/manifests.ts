@@ -31,6 +31,29 @@ function getBooleanEnv(name: string, fallback: boolean): boolean {
   return value === "1" || value.toLowerCase() === "true";
 }
 
+function getOptionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
+
+function getCoverageEnvFromProcess(): Record<string, string> {
+  const nodeV8Coverage = getOptionalEnv("NODE_V8_COVERAGE");
+  const desktopE2ECoverage = getOptionalEnv("NEXU_DESKTOP_E2E_COVERAGE");
+  const desktopE2ECoverageRunId = getOptionalEnv(
+    "NEXU_DESKTOP_E2E_COVERAGE_RUN_ID",
+  );
+
+  return {
+    ...(nodeV8Coverage ? { NODE_V8_COVERAGE: nodeV8Coverage } : {}),
+    ...(desktopE2ECoverage
+      ? { NEXU_DESKTOP_E2E_COVERAGE: desktopE2ECoverage }
+      : {}),
+    ...(desktopE2ECoverageRunId
+      ? { NEXU_DESKTOP_E2E_COVERAGE_RUN_ID: desktopE2ECoverageRunId }
+      : {}),
+  };
+}
+
 function resolveElectronNodeRunner(): string {
   return process.execPath;
 }
@@ -413,6 +436,7 @@ export function createRuntimeUnitManifests(
   const openclawNodePath = buildOpenclawNodePath(resolvedOpenclawSidecarRoot);
   const skillNodePath = buildSkillNodePath(electronRoot, isPackaged);
   const childProcessProxyEnv = buildChildProcessProxyEnv(runtimeConfig.proxy);
+  const coverageEnv = getCoverageEnvFromProcess();
 
   // Keep all default ports and local URLs defined from this one manifest factory. Other desktop
   // entry points still mirror a few of these defaults directly, so changes here should be treated
@@ -438,6 +462,7 @@ export function createRuntimeUnitManifests(
         WEB_PORT: String(webPort),
         WEB_API_ORIGIN: runtimeConfig.urls.controllerBase,
         ...childProcessProxyEnv,
+        ...coverageEnv,
       },
     },
     {
@@ -513,6 +538,7 @@ export function createRuntimeUnitManifests(
         RUNTIME_GATEWAY_PROBE_ENABLED: "false",
         ...(openclawNodePath ? { PATH: openclawNodePath } : {}),
         ...childProcessProxyEnv,
+        ...coverageEnv,
       },
     },
     {

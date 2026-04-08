@@ -1,4 +1,5 @@
 import { ActivityFeed } from "@/components/activity-feed";
+import { BudgetWarningBanner } from "@/components/budget-warning-banner";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { DingtalkSetupView } from "@/components/channel-setup/dingtalk-setup-view";
 import { QqbotSetupView } from "@/components/channel-setup/qqbot-setup-view";
@@ -21,6 +22,8 @@ import {
   SeedancePromoBanner,
   SeedancePromoModal,
 } from "@/components/seedance-promo";
+import { useDesktopBudgetGuard } from "@/hooks/use-desktop-budget-guard";
+import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import { normalizeChannel, track } from "@/lib/tracking";
@@ -74,6 +77,12 @@ type LiveStatusResponse = {
     alive: boolean;
   };
 };
+
+type BudgetBannerStatus = "healthy" | "warning" | "depleted";
+type BudgetBannerDebugMode = "actual" | Exclude<BudgetBannerStatus, "healthy">;
+
+const budgetBannerDebugStorageKey = "nexu_budget_banner_debug_mode";
+const showBudgetBannerDebugPanel = import.meta.env.DEV;
 
 function formatRelativeTime(
   date: string | null | undefined,
@@ -317,6 +326,35 @@ export function HomePage() {
   const [modalChannel, setModalChannel] = useState<
     "feishu" | "slack" | "discord" | null
   >(null);
+  const [budgetBannerDebugMode, setBudgetBannerDebugMode] =
+    useState<BudgetBannerDebugMode>(() => {
+      if (!showBudgetBannerDebugPanel) return "actual";
+      try {
+        const stored = localStorage.getItem(budgetBannerDebugStorageKey);
+        if (stored === "warning" || stored === "depleted") {
+          return stored;
+        }
+      } catch {
+        // ignore storage errors
+      }
+      return "actual";
+    });
+
+  const handleBudgetBannerDebugModeChange = useCallback(
+    (mode: BudgetBannerDebugMode) => {
+      setBudgetBannerDebugMode(mode);
+      try {
+        if (mode === "actual") {
+          localStorage.removeItem(budgetBannerDebugStorageKey);
+          return;
+        }
+        localStorage.setItem(budgetBannerDebugStorageKey, mode);
+      } catch {
+        // ignore storage errors
+      }
+    },
+    [],
+  );
   const [wechatQrOpen, setWechatQrOpen] = useState(false);
   const [telegramOpen, setTelegramOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
@@ -468,15 +506,7 @@ export function HomePage() {
     },
   });
 
-  const { data: channelsData, isLoading: channelsLoading } = useQuery({
-    queryKey: ["channels"],
-    queryFn: async () => {
-      const { data } = await getApiV1Channels();
-      return data;
-    },
-  });
-
-  const { data: sessionsData } = useQuery({
+  const { data: sessionsData, isLoading: sessionsLoading } = useQuery({
     queryKey: ["sessions"],
     queryFn: async () => {
       const { data } = await getApiV1Sessions();
@@ -485,6 +515,17 @@ export function HomePage() {
   });
 
   const sessions = sessionsData?.sessions ?? [];
+  const hasSessionHistory = sessions.length > 0;
+
+  const { data: channelsData, isLoading: channelsLoading } = useQuery({
+    queryKey: ["channels"],
+    queryFn: async () => {
+      const { data } = await getApiV1Channels();
+      return data;
+    },
+    refetchInterval: hasSessionHistory ? 3000 : false,
+  });
+
   const { messagesToday, lastActiveAt } = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -504,12 +545,13 @@ export function HomePage() {
   const activeChannels = channels.filter(
     (channel) => channel.status === "connected",
   );
-  const connectedCount = activeChannels.length;
+  const configuredConnectedTypes = useMemo(() => {
+    return new Set(activeChannels.map((channel) => channel.channelType));
+  }, [activeChannels]);
+  const connectedCount = configuredConnectedTypes.size;
   const hasChannel = connectedCount > 0;
-  const shouldPollLiveStatus = hasChannel || pendingChannelId !== null;
-  const connectedTypes = new Set<string>(
-    activeChannels.map((c) => c.channelType),
-  );
+  const shouldPollLiveStatus =
+    hasChannel || pendingChannelId !== null || hasSessionHistory;
 
   const { data: liveStatus } = useQuery({
     queryKey: ["channels-live-status"],
@@ -534,13 +576,28 @@ export function HomePage() {
     return new Map(entries.map((entry) => [entry.channelType, entry]));
   }, [liveStatus]);
 
+  const liveConnectedTypes = useMemo(() => {
+    return new Set(
+      (liveStatus?.channels ?? [])
+        .filter((entry) => entry.status === "connected")
+        .map((entry) => entry.channelType),
+    );
+  }, [liveStatus]);
+
+  const effectiveConnectedTypes = useMemo(() => {
+    return new Set([...configuredConnectedTypes, ...liveConnectedTypes]);
+  }, [configuredConnectedTypes, liveConnectedTypes]);
+
+  const hasOperationalContext =
+    effectiveConnectedTypes.size > 0 || hasSessionHistory;
+
   const liveStatusByChannelId = useMemo(() => {
     const entries = liveStatus?.channels ?? [];
     return new Map(entries.map((entry) => [entry.channelId, entry]));
   }, [liveStatus]);
 
   const agentIndicator = useMemo(() => {
-    if (!hasChannel || !liveStatus?.agent) {
+    if (!hasOperationalContext || !liveStatus?.agent) {
       return null;
     }
     return liveStatus.agent.alive
@@ -554,7 +611,20 @@ export function HomePage() {
           pulse: true,
           label: t("home.agent.starting"),
         };
-  }, [hasChannel, liveStatus, t]);
+  }, [hasOperationalContext, liveStatus, t]);
+  const budgetBannerDebugPanel = showBudgetBannerDebugPanel ? (
+    <BudgetBannerDebugPanel
+      actualStatus="healthy"
+      mode={budgetBannerDebugMode}
+      onModeChange={handleBudgetBannerDebugModeChange}
+    />
+  ) : null;
+  const { status: rewardsStatus } = useDesktopRewardsStatus();
+  const { bannerDismissible, budgetStatus, dismissBanner, shouldShowPrompt } =
+    useDesktopBudgetGuard({
+      pathname: "/workspace/home",
+      cloudConnected: rewardsStatus.viewer.cloudConnected,
+    });
 
   const dismissSeedancePromo = useCallback(() => {
     setShowSeedancePromo(false);
@@ -654,7 +724,7 @@ export function HomePage() {
   /* ══════════════════════════════════════════════════════════════════════
      Scene A: First-run — No channels connected (Idle state)
      ══════════════════════════════════════════════════════════════════════ */
-  if (!hasChannel && !channelsLoading) {
+  if (!hasOperationalContext && !channelsLoading && !sessionsLoading) {
     return (
       <div className="h-full overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
@@ -708,6 +778,14 @@ export function HomePage() {
               </span>
             </div>
           </div>
+
+          {shouldShowPrompt && budgetStatus !== "healthy" ? (
+            <BudgetWarningBanner
+              status={budgetStatus}
+              dismissible={bannerDismissible}
+              onDismiss={dismissBanner}
+            />
+          ) : null}
 
           {/* ═══ MIDDLE: Channels — default open, Feishu highlighted ═══ */}
           <div className="card card-static overflow-visible">
@@ -776,7 +854,6 @@ export function HomePage() {
             />
           ) : null}
         </div>
-
         {modalChannel && (
           <ChannelConnectModal
             channelType={modalChannel}
@@ -816,6 +893,7 @@ export function HomePage() {
             }}
           />
         )}
+        {budgetBannerDebugPanel}
 
         {qqbotOpen && (
           <QqbotModal
@@ -943,6 +1021,14 @@ export function HomePage() {
           </div>
         </div>
 
+        {shouldShowPrompt && budgetStatus !== "healthy" ? (
+          <BudgetWarningBanner
+            status={budgetStatus}
+            dismissible={bannerDismissible}
+            onDismiss={dismissBanner}
+          />
+        ) : null}
+
         {showSeedancePromo ? (
           <SeedancePromoBanner
             isDismissed={false}
@@ -960,203 +1046,207 @@ export function HomePage() {
           </div>
           <div className="px-5 pb-5 space-y-3">
             {/* Connected channels — full width rows with green dot */}
-            {CHANNEL_OPTIONS.filter((ch) => connectedTypes.has(ch.id)).length >
-              0 && (
+            {CHANNEL_OPTIONS.filter((ch) => effectiveConnectedTypes.has(ch.id))
+              .length > 0 && (
               <div className="space-y-1.5">
-                {CHANNEL_OPTIONS.filter((ch) => connectedTypes.has(ch.id)).map(
-                  (ch) => {
-                    const connectedChannel = activeChannels.find(
-                      (c) => c.channelType === ch.id,
+                {CHANNEL_OPTIONS.filter((ch) =>
+                  effectiveConnectedTypes.has(ch.id),
+                ).map((ch) => {
+                  const connectedChannel = activeChannels.find(
+                    (c) => c.channelType === ch.id,
+                  );
+                  const statusEntry = connectedChannel
+                    ? liveStatusByChannelId.get(connectedChannel.id)
+                    : liveStatusByChannelType.get(ch.id);
+                  const actionableChannelId =
+                    connectedChannel?.id ?? statusEntry?.channelId;
+                  const isPendingChannel =
+                    actionableChannelId === pendingChannelId;
+                  const effectiveStatus: ChannelLiveStatus | undefined =
+                    isPendingChannel &&
+                    (!statusEntry || statusEntry.status === "disconnected")
+                      ? "connecting"
+                      : statusEntry?.status;
+                  const statusMeta = getChannelStatusMeta(
+                    effectiveStatus,
+                    t,
+                    statusEntry?.lastError,
+                  );
+                  const isConnectedLive = effectiveStatus === "connected";
+                  const channelChatUrl = connectedChannel
+                    ? getChannelChatUrl(
+                        ch.id,
+                        connectedChannel.appId,
+                        connectedChannel.botUserId,
+                        connectedChannel.accountId,
+                      )
+                    : "";
+                  const handleOpenChannel = () => {
+                    const channel = normalizeChannel(ch.id);
+                    if (!channelChatUrl || !channel) {
+                      return;
+                    }
+                    track("workspace_chat_in_im_click", {
+                      channel,
+                      where: "home",
+                    });
+                    window.open(
+                      channelChatUrl,
+                      "_blank",
+                      "noopener,noreferrer",
                     );
-                    const statusEntry = connectedChannel
-                      ? liveStatusByChannelId.get(connectedChannel.id)
-                      : liveStatusByChannelType.get(ch.id);
-                    const isPendingChannel =
-                      connectedChannel?.id === pendingChannelId;
-                    const effectiveStatus: ChannelLiveStatus | undefined =
-                      isPendingChannel &&
-                      (!statusEntry || statusEntry.status === "disconnected")
-                        ? "connecting"
-                        : statusEntry?.status;
-                    const statusMeta = getChannelStatusMeta(
-                      effectiveStatus,
-                      t,
-                      statusEntry?.lastError,
-                    );
-                    const isConnectedLive = effectiveStatus === "connected";
-                    const channelChatUrl = connectedChannel
-                      ? getChannelChatUrl(
-                          ch.id,
-                          connectedChannel.appId,
-                          connectedChannel.botUserId,
-                          connectedChannel.accountId,
-                        )
-                      : "";
-                    const handleOpenChannel = () => {
-                      const channel = normalizeChannel(ch.id);
-                      if (!channelChatUrl || !channel) {
-                        return;
-                      }
-                      track("workspace_chat_in_im_click", {
-                        channel,
-                        where: "home",
-                      });
-                      window.open(
-                        channelChatUrl,
-                        "_blank",
-                        "noopener,noreferrer",
-                      );
-                    };
+                  };
 
-                    return (
-                      <div
-                        key={ch.id}
-                        role={channelChatUrl ? "button" : undefined}
-                        tabIndex={channelChatUrl ? 0 : undefined}
-                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 text-left transition-all hover:bg-surface-1"
-                        onClick={handleOpenChannel}
-                        onKeyDown={(event) => {
-                          if (!channelChatUrl) {
-                            return;
-                          }
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            handleOpenChannel();
+                  return (
+                    <div
+                      key={ch.id}
+                      role={channelChatUrl ? "button" : undefined}
+                      tabIndex={channelChatUrl ? 0 : undefined}
+                      className="flex w-full items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 text-left transition-all hover:bg-surface-1"
+                      onClick={handleOpenChannel}
+                      onKeyDown={(event) => {
+                        if (!channelChatUrl) {
+                          return;
+                        }
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleOpenChannel();
+                        }
+                      }}
+                    >
+                      <div className="w-8 h-8 rounded-[10px] flex items-center justify-center border border-border bg-white shrink-0">
+                        {homeChannelIcon(ch)}
+                      </div>
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <span className="text-[13px] font-semibold text-text-primary">
+                          {ch.name}
+                        </span>
+                        <span
+                          title={statusEntry?.lastError ?? statusMeta.label}
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusMeta.colorClass} ${statusMeta.pulse ? "animate-pulse" : ""}`}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={
+                          isConnectedLive
+                            ? t("home.disconnect")
+                            : statusMeta.label
+                        }
+                        title={
+                          isConnectedLive
+                            ? t("home.disconnect")
+                            : statusMeta.label
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (actionableChannelId) {
+                            const channel = normalizeChannel(ch.id);
+                            track("workspace_channel_disconnect_click", {
+                              channel: channel ?? ch.id,
+                            });
+                            disconnectChannel.mutate(actionableChannelId);
                           }
                         }}
+                        disabled={
+                          disconnectChannel.isPending || !actionableChannelId
+                        }
+                        className="group rounded-[8px] px-[14px] py-[5px] text-[12px] font-medium bg-surface-2 text-text-secondary hover:text-[var(--color-danger)] hover:bg-surface-3 transition-colors shrink-0 disabled:opacity-50"
                       >
-                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center border border-border bg-white shrink-0">
-                          {homeChannelIcon(ch)}
-                        </div>
-                        <div className="flex-1 min-w-0 flex items-center gap-2">
-                          <span className="text-[13px] font-semibold text-text-primary">
-                            {ch.name}
-                          </span>
-                          <span
-                            title={statusEntry?.lastError ?? statusMeta.label}
-                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusMeta.colorClass} ${statusMeta.pulse ? "animate-pulse" : ""}`}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          aria-label={
-                            isConnectedLive
-                              ? t("home.disconnect")
-                              : statusMeta.label
-                          }
-                          title={
-                            isConnectedLive
-                              ? t("home.disconnect")
-                              : statusMeta.label
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (connectedChannel) {
-                              const channel = normalizeChannel(ch.id);
-                              track("workspace_channel_disconnect_click", {
-                                channel: channel ?? ch.id,
-                              });
-                              disconnectChannel.mutate(connectedChannel.id);
-                            }
-                          }}
-                          disabled={disconnectChannel.isPending}
-                          className="group rounded-[8px] px-[14px] py-[5px] text-[12px] font-medium bg-surface-2 text-text-secondary hover:text-[var(--color-danger)] hover:bg-surface-3 transition-colors shrink-0 disabled:opacity-50"
-                        >
-                          {isConnectedLive ? (
-                            <>
-                              <span
-                                className="group-hover:hidden"
-                                aria-hidden="true"
-                              >
-                                {statusMeta.label}
-                              </span>
-                              <span
-                                className="hidden group-hover:inline"
-                                aria-hidden="true"
-                              >
-                                {t("home.disconnect")}
-                              </span>
-                            </>
-                          ) : (
-                            statusMeta.label
-                          )}
-                        </button>
-                        {ch.id !== "wechat" && channelChatUrl && (
-                          <a
-                            href={channelChatUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            onClickCapture={() => {
-                              const channel = normalizeChannel(ch.id);
-                              if (!channel) {
-                                return;
-                              }
-                              track("workspace_chat_in_im_click", {
-                                channel,
-                                where: "home",
-                              });
-                            }}
-                            className="inline-flex items-center gap-1 text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors ml-3 shrink-0 leading-none"
-                          >
-                            Chat
-                            <ArrowUpRight size={12} className="-mt-px" />
-                          </a>
+                        {isConnectedLive ? (
+                          <>
+                            <span
+                              className="group-hover:hidden"
+                              aria-hidden="true"
+                            >
+                              {statusMeta.label}
+                            </span>
+                            <span
+                              className="hidden group-hover:inline"
+                              aria-hidden="true"
+                            >
+                              {t("home.disconnect")}
+                            </span>
+                          </>
+                        ) : (
+                          statusMeta.label
                         )}
-                      </div>
-                    );
-                  },
-                )}
+                      </button>
+                      {ch.id !== "wechat" && channelChatUrl && (
+                        <a
+                          href={channelChatUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          onClickCapture={() => {
+                            const channel = normalizeChannel(ch.id);
+                            if (!channel) {
+                              return;
+                            }
+                            track("workspace_chat_in_im_click", {
+                              channel,
+                              where: "home",
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors ml-3 shrink-0 leading-none"
+                        >
+                          Chat
+                          <ArrowUpRight size={12} className="-mt-px" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             {/* Not-yet-connected channels — dashed border grid */}
-            {CHANNEL_OPTIONS.filter((ch) => !connectedTypes.has(ch.id)).length >
-              0 && (
+            {CHANNEL_OPTIONS.filter((ch) => !effectiveConnectedTypes.has(ch.id))
+              .length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {CHANNEL_OPTIONS.filter((ch) => !connectedTypes.has(ch.id)).map(
-                  (ch) => (
-                    <button
-                      key={ch.id}
-                      type="button"
-                      onClick={() => {
-                        const channel = normalizeChannel(ch.id);
-                        if (channel) {
-                          track("workspace_channel_connect_click", { channel });
-                        }
-                        if (ch.id === "wechat") {
-                          setWechatQrOpen(true);
-                        } else if (ch.id === "telegram") {
-                          setTelegramOpen(true);
-                        } else if (ch.id === "whatsapp") {
-                          setWhatsappOpen(true);
-                        } else if (ch.id === "dingtalk") {
-                          setDingtalkOpen(true);
-                        } else if (ch.id === "qqbot") {
-                          setQqbotOpen(true);
-                        } else if (ch.id === "wecom") {
-                          setWecomOpen(true);
-                        } else {
-                          setModalChannel(
-                            ch.id as "feishu" | "slack" | "discord",
-                          );
-                        }
-                      }}
-                      className="group flex items-center gap-2.5 rounded-lg border border-dashed border-border bg-surface-0 px-3 py-2 text-left hover:border-solid hover:border-border-hover hover:bg-surface-1 transition-all"
-                    >
-                      <div className="w-6 h-6 rounded-md flex items-center justify-center bg-surface-1 shrink-0">
-                        {homeChannelIcon(ch, "compact")}
-                      </div>
-                      <span className="text-[12px] font-medium text-text-muted group-hover:text-text-secondary flex-1 truncate">
-                        {ch.name}
-                      </span>
-                      <Cable
-                        size={12}
-                        className="text-text-muted group-hover:text-text-primary transition-colors shrink-0"
-                      />
-                    </button>
-                  ),
-                )}
+                {CHANNEL_OPTIONS.filter(
+                  (ch) => !effectiveConnectedTypes.has(ch.id),
+                ).map((ch) => (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => {
+                      const channel = normalizeChannel(ch.id);
+                      if (channel) {
+                        track("workspace_channel_connect_click", { channel });
+                      }
+                      if (ch.id === "wechat") {
+                        setWechatQrOpen(true);
+                      } else if (ch.id === "telegram") {
+                        setTelegramOpen(true);
+                      } else if (ch.id === "whatsapp") {
+                        setWhatsappOpen(true);
+                      } else if (ch.id === "dingtalk") {
+                        setDingtalkOpen(true);
+                      } else if (ch.id === "qqbot") {
+                        setQqbotOpen(true);
+                      } else if (ch.id === "wecom") {
+                        setWecomOpen(true);
+                      } else {
+                        setModalChannel(
+                          ch.id as "feishu" | "slack" | "discord",
+                        );
+                      }
+                    }}
+                    className="group flex items-center gap-2.5 rounded-lg border border-dashed border-border bg-surface-0 px-3 py-2 text-left hover:border-solid hover:border-border-hover hover:bg-surface-1 transition-all"
+                  >
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-surface-1 shrink-0">
+                      {homeChannelIcon(ch, "compact")}
+                    </div>
+                    <span className="text-[12px] font-medium text-text-muted group-hover:text-text-secondary flex-1 truncate">
+                      {ch.name}
+                    </span>
+                    <Cable
+                      size={12}
+                      className="text-text-muted group-hover:text-text-primary transition-colors shrink-0"
+                    />
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -1176,7 +1266,6 @@ export function HomePage() {
           }
         />
       </div>
-
       {modalChannel && (
         <ChannelConnectModal
           channelType={modalChannel}
@@ -1215,6 +1304,7 @@ export function HomePage() {
           }}
         />
       )}
+      {budgetBannerDebugPanel}
 
       {qqbotOpen && (
         <QqbotModal
@@ -1251,6 +1341,57 @@ export function HomePage() {
         onClose={() => setSeedancePromoOpen(false)}
         shouldAutoAdvanceAfterStar={!hasChannel}
       />
+    </div>
+  );
+}
+
+function BudgetBannerDebugPanel({
+  actualStatus,
+  mode,
+  onModeChange,
+}: {
+  actualStatus: BudgetBannerStatus;
+  mode: BudgetBannerDebugMode;
+  onModeChange: (mode: BudgetBannerDebugMode) => void;
+}) {
+  const options: Array<{
+    label: string;
+    value: BudgetBannerDebugMode;
+  }> = [
+    { label: "真实状态", value: "actual" },
+    { label: "预警", value: "warning" },
+    { label: "耗尽", value: "depleted" },
+  ];
+
+  return (
+    <div className="pointer-events-none fixed bottom-6 right-6 z-40">
+      <div className="pointer-events-auto w-[220px] rounded-2xl border border-border bg-white/95 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.16)] backdrop-blur">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+          Budget Debug
+        </div>
+        <div className="mt-1 text-[12px] text-text-secondary">
+          当前真实状态：{actualStatus}
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-1.5">
+          {options.map((option) => {
+            const active = mode === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onModeChange(option.value)}
+                className={
+                  active
+                    ? "rounded-lg bg-[#111317] px-2 py-2 text-[12px] font-medium text-white transition"
+                    : "rounded-lg border border-border bg-surface-1 px-2 py-2 text-[12px] font-medium text-text-secondary transition hover:border-border-hover hover:bg-surface-2"
+                }
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

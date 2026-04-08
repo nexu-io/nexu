@@ -554,6 +554,7 @@ export type GetApiInternalDesktopCloudStatusResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -571,6 +572,7 @@ export type GetApiInternalDesktopCloudStatusResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -582,7 +584,9 @@ export type GetApiInternalDesktopCloudStatusResponses = {
 export type GetApiInternalDesktopCloudStatusResponse = GetApiInternalDesktopCloudStatusResponses[keyof GetApiInternalDesktopCloudStatusResponses];
 
 export type PostApiInternalDesktopCloudConnectData = {
-    body?: never;
+    body?: {
+        source?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/internal/desktop/cloud-connect';
@@ -603,6 +607,7 @@ export type PostApiInternalDesktopCloudConnectResponse = PostApiInternalDesktopC
 export type PostApiInternalDesktopCloudProfileConnectData = {
     body: {
         name: string;
+        source?: string;
     };
     path?: never;
     query?: never;
@@ -619,6 +624,7 @@ export type PostApiInternalDesktopCloudProfileConnectResponses = {
         status: {
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -636,6 +642,7 @@ export type PostApiInternalDesktopCloudProfileConnectResponses = {
                 linkUrl: string;
                 connected: boolean;
                 polling?: boolean;
+                userId?: string;
                 userName?: string;
                 userEmail?: string;
                 connectedAt?: string;
@@ -662,6 +669,7 @@ export type PostApiInternalDesktopCloudRefreshResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -679,6 +687,7 @@ export type PostApiInternalDesktopCloudRefreshResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -710,6 +719,7 @@ export type PostApiInternalDesktopCloudProfileCreateResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -727,6 +737,7 @@ export type PostApiInternalDesktopCloudProfileCreateResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -760,6 +771,7 @@ export type PostApiInternalDesktopCloudProfileUpdateResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -777,6 +789,7 @@ export type PostApiInternalDesktopCloudProfileUpdateResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -805,6 +818,7 @@ export type PostApiInternalDesktopCloudProfileDeleteResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -822,6 +836,7 @@ export type PostApiInternalDesktopCloudProfileDeleteResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -868,6 +883,7 @@ export type PostApiInternalDesktopCloudProfileDisconnectResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -885,6 +901,7 @@ export type PostApiInternalDesktopCloudProfileDisconnectResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -913,6 +930,7 @@ export type PostApiInternalDesktopCloudProfileSelectResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -930,6 +948,7 @@ export type PostApiInternalDesktopCloudProfileSelectResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -962,6 +981,7 @@ export type PostApiInternalDesktopCloudProfilesImportResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -979,6 +999,7 @@ export type PostApiInternalDesktopCloudProfilesImportResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -1055,6 +1076,217 @@ export type PutApiInternalDesktopDefaultModelResponses = {
 };
 
 export type PutApiInternalDesktopDefaultModelResponse = PutApiInternalDesktopDefaultModelResponses[keyof PutApiInternalDesktopDefaultModelResponses];
+
+export type GetApiInternalDesktopRewardsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards';
+};
+
+export type GetApiInternalDesktopRewardsResponses = {
+    /**
+     * Desktop rewards status
+     */
+    200: {
+        viewer: {
+            cloudConnected: boolean;
+            activeModelId: string;
+            activeModelProviderId: string;
+            usingManagedModel: boolean;
+        };
+        progress: {
+            claimedCount: number;
+            totalCount: number;
+            earnedCredits: number;
+            availableCredits?: number;
+        };
+        tasks: Array<{
+            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+            group: 'daily' | 'opensource' | 'social';
+            icon: string;
+            reward: number;
+            shareMode: 'link' | 'tweet' | 'image';
+            repeatMode: 'once' | 'daily' | 'weekly';
+            requiresScreenshot: boolean;
+            actionUrl?: string;
+            isClaimed: boolean;
+            lastClaimedAt: string;
+            claimCount: number;
+        }>;
+        cloudBalance?: {
+            totalBalance: number;
+            totalRecharged: number;
+            totalConsumed: number;
+        };
+        autoFallbackTriggered?: boolean;
+    };
+};
+
+export type GetApiInternalDesktopRewardsResponse = GetApiInternalDesktopRewardsResponses[keyof GetApiInternalDesktopRewardsResponses];
+
+export type PostApiInternalDesktopRewardsGithubStarSessionData = {
+    body?: {
+        [key: string]: unknown;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/github-star-session';
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionErrors = {
+    /**
+     * GitHub star verification is temporarily unavailable
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionError = PostApiInternalDesktopRewardsGithubStarSessionErrors[keyof PostApiInternalDesktopRewardsGithubStarSessionErrors];
+
+export type PostApiInternalDesktopRewardsGithubStarSessionResponses = {
+    /**
+     * Prepare a GitHub star verification session
+     */
+    200: {
+        sessionId: string;
+        baselineStars: number;
+        expiresAt: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionResponse = PostApiInternalDesktopRewardsGithubStarSessionResponses[keyof PostApiInternalDesktopRewardsGithubStarSessionResponses];
+
+export type PostApiInternalDesktopRewardsClaimData = {
+    body?: {
+        taskId: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+        proof?: {
+            url?: string;
+            githubSessionId?: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/claim';
+};
+
+export type PostApiInternalDesktopRewardsClaimErrors = {
+    /**
+     * Invalid claim proof
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsClaimError = PostApiInternalDesktopRewardsClaimErrors[keyof PostApiInternalDesktopRewardsClaimErrors];
+
+export type PostApiInternalDesktopRewardsClaimResponses = {
+    /**
+     * Claim a desktop reward
+     */
+    200: {
+        ok: boolean;
+        alreadyClaimed: boolean;
+        status: {
+            viewer: {
+                cloudConnected: boolean;
+                activeModelId: string;
+                activeModelProviderId: string;
+                usingManagedModel: boolean;
+            };
+            progress: {
+                claimedCount: number;
+                totalCount: number;
+                earnedCredits: number;
+                availableCredits?: number;
+            };
+            tasks: Array<{
+                id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+                group: 'daily' | 'opensource' | 'social';
+                icon: string;
+                reward: number;
+                shareMode: 'link' | 'tweet' | 'image';
+                repeatMode: 'once' | 'daily' | 'weekly';
+                requiresScreenshot: boolean;
+                actionUrl?: string;
+                isClaimed: boolean;
+                lastClaimedAt: string;
+                claimCount: number;
+            }>;
+            cloudBalance?: {
+                totalBalance: number;
+                totalRecharged: number;
+                totalConsumed: number;
+            };
+            autoFallbackTriggered?: boolean;
+        };
+    };
+};
+
+export type PostApiInternalDesktopRewardsClaimResponse = PostApiInternalDesktopRewardsClaimResponses[keyof PostApiInternalDesktopRewardsClaimResponses];
+
+export type PostApiInternalDesktopRewardsSetBalanceData = {
+    body?: {
+        balance: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/set-balance';
+};
+
+export type PostApiInternalDesktopRewardsSetBalanceErrors = {
+    /**
+     * Unable to update the desktop test balance
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsSetBalanceError = PostApiInternalDesktopRewardsSetBalanceErrors[keyof PostApiInternalDesktopRewardsSetBalanceErrors];
+
+export type PostApiInternalDesktopRewardsSetBalanceResponses = {
+    /**
+     * Update the desktop test balance
+     */
+    200: {
+        viewer: {
+            cloudConnected: boolean;
+            activeModelId: string;
+            activeModelProviderId: string;
+            usingManagedModel: boolean;
+        };
+        progress: {
+            claimedCount: number;
+            totalCount: number;
+            earnedCredits: number;
+            availableCredits?: number;
+        };
+        tasks: Array<{
+            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+            group: 'daily' | 'opensource' | 'social';
+            icon: string;
+            reward: number;
+            shareMode: 'link' | 'tweet' | 'image';
+            repeatMode: 'once' | 'daily' | 'weekly';
+            requiresScreenshot: boolean;
+            actionUrl?: string;
+            isClaimed: boolean;
+            lastClaimedAt: string;
+            claimCount: number;
+        }>;
+        cloudBalance?: {
+            totalBalance: number;
+            totalRecharged: number;
+            totalConsumed: number;
+        };
+        autoFallbackTriggered?: boolean;
+    };
+};
+
+export type PostApiInternalDesktopRewardsSetBalanceResponse = PostApiInternalDesktopRewardsSetBalanceResponses[keyof PostApiInternalDesktopRewardsSetBalanceResponses];
 
 export type GetApiV1ChannelsData = {
     body?: never;
@@ -1570,6 +1802,9 @@ export type GetApiV1BotQuotaResponses = {
     200: {
         available: boolean;
         resetsAt: string;
+        usingByok?: boolean;
+        byokAvailable?: boolean;
+        autoFallbackTriggered?: boolean;
     };
 };
 
@@ -2559,6 +2794,71 @@ export type PostApiV1ModelProvidersMinimaxOauthLoginResponses = {
 };
 
 export type PostApiV1ModelProvidersMinimaxOauthLoginResponse = PostApiV1ModelProvidersMinimaxOauthLoginResponses[keyof PostApiV1ModelProvidersMinimaxOauthLoginResponses];
+
+export type PostApiV1ProvidersByProviderIdVerifyData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+    };
+    path: {
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'nvidia' | 'stepfun' | 'amazon-bedrock' | 'deepseek' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+    };
+    query?: never;
+    url: '/api/v1/providers/{providerId}/verify';
+};
+
+export type PostApiV1ProvidersByProviderIdVerifyResponses = {
+    /**
+     * Verify provider
+     */
+    200: {
+        valid: boolean;
+        models?: Array<string>;
+        error?: string;
+    };
+};
+
+export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
+
+export type PostApiV1QuotaFallbackToByokData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/fallback-to-byok';
+};
+
+export type PostApiV1QuotaFallbackToByokResponses = {
+    /**
+     * Trigger automatic fallback to BYOK provider
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaFallbackToByokResponse = PostApiV1QuotaFallbackToByokResponses[keyof PostApiV1QuotaFallbackToByokResponses];
+
+export type PostApiV1QuotaRestoreManagedData = {
+    body?: {
+        managedModelId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/restore-managed';
+};
+
+export type PostApiV1QuotaRestoreManagedResponses = {
+    /**
+     * Restore default model to managed (cloud) model
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaRestoreManagedResponse = PostApiV1QuotaRestoreManagedResponses[keyof PostApiV1QuotaRestoreManagedResponses];
 
 export type PostApiV1ModelProvidersByProviderIdOauthStartData = {
     body?: never;

@@ -10,6 +10,7 @@ export type SkillDirWatcherLogFn = (
 ) => void;
 
 const defaultLog: SkillDirWatcherLogFn = () => {};
+const workspaceSkillPathPattern = /^agents\/[^/]+\/skills(?:\/|$)/;
 
 export class SkillDirWatcher {
   private readonly skillsDir: string;
@@ -24,6 +25,7 @@ export class SkillDirWatcher {
   private sharedWatcher: FSWatcher | null = null;
   private userWatcher: FSWatcher | null = null;
   private workspaceWatcher: FSWatcher | null = null;
+  private workspaceSkillWatchers = new Map<string, FSWatcher>();
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(opts: {
@@ -231,18 +233,9 @@ export class SkillDirWatcher {
       return;
     }
 
-    this.sharedWatcher = watch(
-      this.skillsDir,
-      { recursive: true },
-      (_event, filename) => {
-        if (!filename || filename.endsWith("SKILL.md")) {
-          this.scheduleSync();
-          return;
-        }
-
-        this.scheduleSync();
-      },
-    );
+    this.sharedWatcher = watch(this.skillsDir, { recursive: true }, () => {
+      this.scheduleSync();
+    });
 
     this.sharedWatcher.on("error", (err: unknown) => {
       this.log(
@@ -254,15 +247,9 @@ export class SkillDirWatcher {
     this.log("info", `Watching skills directory: ${this.skillsDir}`);
 
     if (this.userSkillsDir && existsSync(this.userSkillsDir)) {
-      this.userWatcher = watch(
-        this.userSkillsDir,
-        { recursive: true },
-        (_event, filename) => {
-          if (filename?.endsWith("SKILL.md")) {
-            this.scheduleSync();
-          }
-        },
-      );
+      this.userWatcher = watch(this.userSkillsDir, { recursive: true }, () => {
+        this.scheduleSync();
+      });
 
       this.userWatcher.on("error", (err: unknown) => {
         this.log(
@@ -275,19 +262,19 @@ export class SkillDirWatcher {
     }
 
     if (this.openclawStateDir && existsSync(this.openclawStateDir)) {
+      this.startWorkspaceSkillWatchers();
+
       this.workspaceWatcher = watch(
         this.openclawStateDir,
         { recursive: true },
-        (_event, filename) => {
-          const normalized = filename?.replaceAll("\\", "/");
-          if (
-            normalized &&
-            /(^|\/)agents\/[^/]+\/skills\/[^/]+(?:\/SKILL\.md)?$/.test(
-              normalized,
-            )
-          ) {
-            this.scheduleSync();
+        (_eventType, fileName) => {
+          if (fileName !== null) {
+            this.ensureWorkspaceSkillWatcherForPath(String(fileName));
           }
+          if (!this.shouldProcessWorkspaceEvent(fileName)) {
+            return;
+          }
+          this.scheduleSync();
         },
       );
 
@@ -303,6 +290,17 @@ export class SkillDirWatcher {
         `Watching workspace skill directories under: ${this.openclawStateDir}`,
       );
     }
+  }
+
+  private shouldProcessWorkspaceEvent(
+    fileName: string | Buffer | null,
+  ): boolean {
+    if (fileName === null) {
+      return false;
+    }
+
+    const normalized = String(fileName).replace(/\\/g, "/");
+    return workspaceSkillPathPattern.test(normalized);
   }
 
   stop(): void {
@@ -325,6 +323,70 @@ export class SkillDirWatcher {
       this.workspaceWatcher.close();
       this.workspaceWatcher = null;
     }
+
+    for (const watcher of this.workspaceSkillWatchers.values()) {
+      watcher.close();
+    }
+    this.workspaceSkillWatchers.clear();
+  }
+
+  private startWorkspaceSkillWatchers(): void {
+    for (const botId of this.getWorkspaceBotIds()) {
+      this.ensureWorkspaceSkillWatcher(botId);
+    }
+  }
+
+  private ensureWorkspaceSkillWatcherForPath(relativePath: string): void {
+    const normalized = relativePath.replace(/\\/g, "/");
+    const match = normalized.match(/^agents\/([^/]+)\//);
+    if (!match) {
+      return;
+    }
+
+    const botId = match[1];
+    if (!botId) {
+      return;
+    }
+
+    this.ensureWorkspaceSkillWatcher(botId);
+  }
+
+  private ensureWorkspaceSkillWatcher(botId: string): void {
+    if (!this.openclawStateDir || this.workspaceSkillWatchers.has(botId)) {
+      return;
+    }
+
+    const wsSkillsDir = resolve(
+      this.openclawStateDir,
+      "agents",
+      botId,
+      "skills",
+    );
+    if (!existsSync(wsSkillsDir)) {
+      return;
+    }
+
+    let watcher: FSWatcher;
+    try {
+      watcher = watch(wsSkillsDir, { recursive: true }, () => {
+        this.scheduleSync();
+      });
+    } catch (err) {
+      this.log(
+        "warn",
+        `Unable to watch workspace skills for ${botId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return;
+    }
+
+    watcher.on("error", (err: unknown) => {
+      this.log(
+        "error",
+        `Workspace skill watcher error (${botId}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
+
+    this.workspaceSkillWatchers.set(botId, watcher);
   }
 
   private scheduleSync(): void {

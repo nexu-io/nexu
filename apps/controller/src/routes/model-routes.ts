@@ -10,12 +10,19 @@ import {
   modelProviderConfigDocumentEnvelopeSchema,
   persistedModelsConfigSchema,
   providerRegistryResponseSchema,
+  quotaFallbackResponseSchema,
+  restoreManagedBodySchema,
+  supportedByokProviderIds,
   validateProviderInstanceBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
 import type { ControllerBindings } from "../types.js";
+
+const providerIdParamSchema = z.object({
+  providerId: z.enum(supportedByokProviderIds),
+});
 
 const verifyProviderIdParamSchema = z.object({
   providerId: z
@@ -268,6 +275,85 @@ export function registerModelRoutes(
     async (c) => {
       const status = await container.modelProviderService.cancelMiniMaxOauth();
       return c.json({ ...status, cancelled: true }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/providers/{providerId}/verify",
+      tags: ["Providers"],
+      request: {
+        params: providerIdParamSchema,
+        body: {
+          content: { "application/json": { schema: verifyProviderBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: verifyProviderResponseSchema },
+          },
+          description: "Verify provider",
+        },
+      },
+    }),
+    async (c) => {
+      const { providerId } = c.req.valid("param");
+      return c.json(
+        await container.modelProviderService.verifyProvider(
+          providerId,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/quota/fallback-to-byok",
+      tags: ["Quota"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: quotaFallbackResponseSchema },
+          },
+          description: "Trigger automatic fallback to BYOK provider",
+        },
+      },
+    }),
+    async (c) => {
+      const result = await container.quotaFallbackService.triggerFallback();
+      return c.json({ ok: result.success, newModelId: result.newModelId }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/quota/restore-managed",
+      tags: ["Quota"],
+      request: {
+        body: {
+          content: { "application/json": { schema: restoreManagedBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: quotaFallbackResponseSchema },
+          },
+          description: "Restore default model to managed (cloud) model",
+        },
+      },
+    }),
+    async (c) => {
+      const { managedModelId } = c.req.valid("json");
+      const result =
+        await container.quotaFallbackService.restoreManaged(managedModelId);
+      return c.json({ ok: result.success, newModelId: result.newModelId }, 200);
     },
   );
 }

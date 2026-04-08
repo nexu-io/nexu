@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DesktopRuntimeConfig } from "../../shared/host";
-import { getRuntimeConfig } from "../lib/host-api";
+import { ensureDesktopControllerReady } from "../lib/controller-ready";
+import { getRuntimeConfig, startUnit } from "../lib/host-api";
 
 export function useDesktopRuntimeConfig() {
   const [runtimeConfig, setRuntimeConfig] =
@@ -23,27 +24,17 @@ export function useDesktopRuntimeConfig() {
       runtimeConfig.urls.web,
     ).toString();
 
-    async function poll() {
-      while (!cancelled) {
-        try {
-          const res = await fetch(readyUrl, {
-            signal: AbortSignal.timeout(3000),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.ready) {
-              if (!cancelled) setApiReady(true);
-              return;
-            }
-          }
-        } catch {
-          // API or web sidecar not ready yet — keep polling
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+    void ensureDesktopControllerReady({
+      readyUrl,
+      startController: async () => {
+        await startUnit("controller");
+      },
+    }).then((ready) => {
+      if (!cancelled && ready) {
+        setApiReady(true);
       }
-    }
+    });
 
-    void poll();
     return () => {
       cancelled = true;
     };

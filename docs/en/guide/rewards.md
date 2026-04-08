@@ -1,81 +1,79 @@
 # How to Earn Points by Sharing nexu
 
-`nexu` offers an extra points reward system. You can earn additional points through daily check-ins, supporting our open-source project, and sharing `nexu` on social platforms. These points can be used to continue exploring more features and capabilities.
+`nexu` offers an extra points reward system. You can earn additional points through daily point drops, supporting the open-source project, and sharing `nexu` on social platforms.
 
-## What Points Can You Earn
+## What Points You Can Earn
 
-The currently available rewards are:
+Here are the rewards currently available:
 
-- Daily check-in: +100 points, once per day
-- GitHub Star: +300 points, one-time only
-- Share to X: +200 points, once per week
-- Post on Reddit: +200 points, once per week
-- Post on Xiaohongshu: +200 points, once per week
-- Post on LinkedIn: +200 points, once per week
-- Post on Jike: +200 points, once per week
-- Share to WeChat: +100 points, once per week
-- Share to Feishu: +100 points, once per week
-- Share to Facebook: +200 points, once per week
-- Share to WhatsApp: +200 points, once per week
+- Daily points: +100 points, automatically sent to your `nexu` account every day and expire the next day at midnight
+- GitHub Star: +700 points, one-time only
+- Share on X: +200 points, available once per week
+- Post on Reddit: +200 points, available once per week
+- Post on LinkedIn: +200 points, available once per week
+- Share on Facebook: +200 points, available once per week
+- Share on WhatsApp: +200 points, available once per week
+- Share the `nexu` GitHub repository from mobile to Feishu, WeChat, and similar apps: +200 points, available once per week
 
-## How to Claim Points
+## How to Get Points
 
-You can view all reward tasks on the `Rewards` page inside the `nexu` client. After finishing a task, return to the page and confirm it to claim the corresponding points.
+You can check all reward tasks and your current points status on the `Rewards` page in the `nexu` client.
 
-Here is how the different task types work.
+Different tasks work as follows.
 
-## 1. Daily Check-In
+### 1. Daily points are granted automatically
 
-Open the `Rewards` page and complete the daily check-in confirmation to receive 100 points.
+Daily points are automatically sent to your `nexu` account every day. No manual check-in or claiming is required.
 
-This is the most stable source of extra points if you use `nexu` regularly. As long as you stay active, you can keep earning more.
+### 2. Star us on GitHub
 
-## 2. Star Us on GitHub
+Open the GitHub link in the task, star the `nexu` repository, then return to the `Rewards` page to complete confirmation.
 
-If you like `nexu`, we would love your support on GitHub. After starring the repository, return to the client and confirm the task to receive 300 points.
+Repository: [nexu-io/nexu](https://github.com/nexu-io/nexu)
 
-This is a one-time reward. For `nexu`, a GitHub Star is more than support. It also helps the project gain visibility, attract contributors, and continue improving.
+### 3. Share nexu on social platforms
 
-## 3. Share nexu on Social Platforms
+You can share `nexu` on X, Reddit, LinkedIn, Facebook, or WhatsApp. After sharing, return to the `Rewards` page and follow the prompt to claim the reward.
 
-You can also earn points by sharing `nexu` on social platforms. The currently supported platforms are:
-
-- X
-- Reddit
-- Xiaohongshu
-- LinkedIn
-- Jike
-- WeChat
-- Feishu
-- Facebook
-- WhatsApp
-
-The task flow varies slightly by platform:
-
-- Link-based platforms: clicking the task opens the target page, and after sharing you return to `nexu` to confirm
-- Post-based platforms: for example X, where `nexu` opens a pre-filled post composer and you return after publishing
-- Image-based platforms: for example Xiaohongshu, Jike, WeChat, and Feishu, where `nexu` prepares a share card and caption for you before you post and confirm
+You can also share the `nexu` GitHub repository from mobile directly to apps such as Feishu or WeChat. This also qualifies for reward points.
 
 ## Notes
 
-Please keep these rules in mind when claiming points:
+- Daily points are granted automatically, so no manual check-in is needed
+- The `GitHub Star` reward can only be claimed once
+- Social sharing tasks are currently weekly tasks
+- The mobile GitHub sharing task for Feishu, WeChat, and similar apps is also a weekly task
 
-- Daily check-in is calculated by calendar day and can be claimed once per day
-- Weekly sharing tasks can be claimed once per week
-- GitHub Star is a one-time reward
-- After completing a task, you need to return to the `Rewards` page and confirm it manually
-- If reward items, point values, or claim frequency change in the future, the `Rewards` page inside the `nexu` client should be considered the source of truth
+## Task Refresh Time
+
+- Daily tasks: refresh every day at UTC 0:00
+- Weekly tasks: social sharing tasks refresh every Monday at UTC 0:00
+
+## Point Expiration
+
+- Daily points: expire at UTC 23:59:59 on the same day
+- Social sharing points: expire at UTC 23:59:59 seven days later
+- GitHub Star points: expire at UTC 23:59:59 one month later
+- Registration bonus points: expire at UTC 23:59:59 one month later
 
 ## FAQ
 
-**Q: Why haven't I received points after completing a sharing task?**
+**Q: Why did I finish the task but not receive points immediately?**
 
-After completing the task, you still need to return to the `Rewards` page and confirm it before the points are granted.
+Social sharing and `GitHub Star` tasks usually still require confirmation on the `Rewards` page. If the points do not show up right away, refresh the page or try again later.
 
-**Q: Why do some platforms download images first?**
+**Q: Do I need to manually check in for daily points?**
 
-Platforms such as Xiaohongshu, Jike, WeChat, and Feishu are better suited for image-based sharing cards. `nexu` prepares both the image and the suggested copy in advance so you do not need to organize everything manually.
+No. Daily points are sent to your `nexu` account automatically every day.
 
-**Q: Can the reward rules change?**
+**Q: When do weekly tasks refresh?**
 
-Yes. We may update the rules based on campaign planning and the actual performance of different channels. If anything changes, please refer to what is shown in the client.
+Social sharing tasks refresh every Monday at UTC 0:00.
+
+**Q: Is the registration bonus only for new users?**
+
+No. Existing registered users also receive 300 bonus points.
+
+**Q: Can I claim social sharing rewards again?**
+
+Most social sharing rewards can be claimed once per week. After the next eligible cycle starts, you can complete the task again and claim the reward again.

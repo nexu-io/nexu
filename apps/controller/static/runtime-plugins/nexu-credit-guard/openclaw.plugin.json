@@ -1,0 +1,15 @@
+{
+  "id": "nexu-credit-guard",
+  "name": "Nexu Credit Guard",
+  "description": "Intercepts generic LLM error replies and replaces them with Nexu-specific localised user-facing messages.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "contactUrl": {
+        "type": "string",
+        "description": "URL for the 'Contact us' link in error messages"
+      }
+    }
+  }
+}

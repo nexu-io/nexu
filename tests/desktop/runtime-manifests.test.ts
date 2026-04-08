@@ -108,7 +108,8 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
     },
     sentryDsn: null,
     runtimeMode: "internal",
-    amplitudeApiKey: null,
+    posthogApiKey: null,
+    posthogHost: null,
   };
 }
 
@@ -117,6 +118,7 @@ describe("desktop runtime manifests", () => {
     fsState.paths.clear();
     fsState.stampContents.clear();
     execFileSyncMock.mockReset();
+    vi.unstubAllEnvs();
   });
 
   describe("buildSkillNodePath", () => {
@@ -502,6 +504,62 @@ describe("desktop runtime manifests", () => {
   });
 
   describe("createRuntimeUnitManifests", () => {
+    it("propagates coverage env to managed web and controller manifests when present", () => {
+      vi.stubEnv("NODE_V8_COVERAGE", "/tmp/nexu-coverage/node-v8");
+      vi.stubEnv("NEXU_DESKTOP_E2E_COVERAGE", "1");
+      vi.stubEnv("NEXU_DESKTOP_E2E_COVERAGE_RUN_ID", "run-abc");
+
+      const manifests = createRuntimeUnitManifests(
+        "/repo/apps/desktop",
+        "/tmp/user-data",
+        false,
+        createRuntimeConfig(),
+      );
+
+      const webManifest = manifests.find((manifest) => manifest.id === "web");
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(webManifest?.env).toMatchObject({
+        NODE_V8_COVERAGE: "/tmp/nexu-coverage/node-v8",
+        NEXU_DESKTOP_E2E_COVERAGE: "1",
+        NEXU_DESKTOP_E2E_COVERAGE_RUN_ID: "run-abc",
+      });
+      expect(controllerManifest?.env).toMatchObject({
+        NODE_V8_COVERAGE: "/tmp/nexu-coverage/node-v8",
+        NEXU_DESKTOP_E2E_COVERAGE: "1",
+        NEXU_DESKTOP_E2E_COVERAGE_RUN_ID: "run-abc",
+      });
+    });
+
+    it("omits coverage env from managed manifests when not set", () => {
+      const manifests = createRuntimeUnitManifests(
+        "/repo/apps/desktop",
+        "/tmp/user-data",
+        false,
+        createRuntimeConfig(),
+      );
+
+      const webManifest = manifests.find((manifest) => manifest.id === "web");
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(webManifest?.env?.NODE_V8_COVERAGE).toBeUndefined();
+      expect(webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE).toBeUndefined();
+      expect(
+        webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
+      ).toBeUndefined();
+      expect(controllerManifest?.env?.NODE_V8_COVERAGE).toBeUndefined();
+      expect(
+        controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE,
+      ).toBeUndefined();
+      expect(
+        controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
+      ).toBeUndefined();
+    });
+
     it("resolves runtime roots for manifest assembly", () => {
       const roots = resolveRuntimeManifestsRoots({
         app: {

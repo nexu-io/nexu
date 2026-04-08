@@ -14,6 +14,7 @@ import {
   updaterEvents,
 } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
+import { resolveWebviewPreloadUrl } from "./webview-preload-url";
 
 const validChannels = new Set<string>(hostInvokeChannels);
 
@@ -62,12 +63,11 @@ const hostBridge: HostBridge = {
   bootstrap: {
     buildInfo: runtimeConfig.buildInfo,
     sentryDsn: runtimeConfig.sentryDsn,
+    posthogApiKey: runtimeConfig.posthogApiKey,
+    posthogHost: runtimeConfig.posthogHost,
     isPackaged: !process.defaultApp,
     needsSetupAnimation: process.env.NEXU_NEEDS_SETUP_ANIMATION === "1",
-    webviewPreloadUrl: new URL(
-      "./webview-preload.js",
-      import.meta.url,
-    ).toString(),
+    webviewPreloadUrl: resolveWebviewPreloadUrl(import.meta.dirname),
   },
 
   invoke<TChannel extends HostInvokeChannel>(

@@ -42,6 +42,9 @@ describe("controller plist env var parity with manifests", () => {
       NO_PROXY: "example.com,localhost,127.0.0.1,::1",
       NODE_USE_ENV_PROXY: "1",
     },
+    nodeV8Coverage: "/tmp/nexu-coverage/node-v8",
+    desktopE2ECoverage: "1",
+    desktopE2ECoverageRunId: "run-123",
   };
 
   /**
@@ -79,6 +82,9 @@ describe("controller plist env var parity with manifests", () => {
     "ALL_PROXY",
     "NO_PROXY",
     "NODE_USE_ENV_PROXY",
+    "NODE_V8_COVERAGE",
+    "NEXU_DESKTOP_E2E_COVERAGE",
+    "NEXU_DESKTOP_E2E_COVERAGE_RUN_ID",
     // Runtime control
     "RUNTIME_MANAGE_OPENCLAW_PROCESS",
     "RUNTIME_GATEWAY_PROBE_ENABLED",
@@ -137,6 +143,9 @@ describe("controller plist env var parity with manifests", () => {
       nexuHome: undefined,
       gatewayToken: undefined,
       systemPath: undefined,
+      nodeV8Coverage: undefined,
+      desktopE2ECoverage: undefined,
+      desktopE2ECoverageRunId: undefined,
     };
 
     const plist = generatePlist("controller", minimalEnv);
@@ -144,6 +153,9 @@ describe("controller plist env var parity with manifests", () => {
     expect(plist).not.toContain("<key>NEXU_HOME</key>");
     expect(plist).not.toContain("<key>OPENCLAW_GATEWAY_TOKEN</key>");
     expect(plist).not.toContain("<key>PATH</key>");
+    expect(plist).not.toContain("<key>NODE_V8_COVERAGE</key>");
+    expect(plist).not.toContain("<key>NEXU_DESKTOP_E2E_COVERAGE</key>");
+    expect(plist).not.toContain("<key>NEXU_DESKTOP_E2E_COVERAGE_RUN_ID</key>");
     // Required vars should still be present
     expect(plist).toContain("<key>PORT</key>");
     expect(plist).toContain("<key>OPENCLAW_CONFIG_PATH</key>");
@@ -169,6 +181,9 @@ describe("controller plist env var parity with manifests", () => {
       "ALL_PROXY",
       "NO_PROXY",
       "NODE_USE_ENV_PROXY",
+      "NODE_V8_COVERAGE",
+      "NEXU_DESKTOP_E2E_COVERAGE",
+      "NEXU_DESKTOP_E2E_COVERAGE_RUN_ID",
     ];
 
     for (const key of REQUIRED_OPENCLAW_KEYS) {

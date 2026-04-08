@@ -8,6 +8,7 @@ import {
   compileOpenClawConfig,
   resolveModelId,
 } from "../lib/openclaw-config-compiler.js";
+import type { CreditGuardStateWriter } from "../runtime/credit-guard-state-writer.js";
 import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-store.js";
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
@@ -106,6 +107,7 @@ export class OpenClawSyncService {
     private readonly authProfilesStore: OpenClawAuthProfilesStore,
     private readonly runtimePluginWriter: OpenClawRuntimePluginWriter,
     private readonly runtimeModelWriter: OpenClawRuntimeModelWriter,
+    private readonly creditGuardStateWriter: CreditGuardStateWriter,
     private readonly templateWriter: WorkspaceTemplateWriter,
     private readonly watchTrigger: OpenClawWatchTrigger,
     private readonly gatewayService: OpenClawGatewayService,
@@ -298,6 +300,13 @@ export class OpenClawSyncService {
     );
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
     await this.runtimeModelWriter.write(runtimeModelRef);
+    // Write locale state for the credit-guard patch in OpenClaw runtime.
+    // Match the controller's own locale default: unset → "en" (not "zh-CN").
+    const locale =
+      (config.desktop as Record<string, unknown>).locale === "zh-CN"
+        ? "zh-CN"
+        : "en";
+    await this.creditGuardStateWriter.write(locale);
     await this.compiledStore.saveConfig(compiled);
 
     // 3. If OpenClaw is not connected yet, nudge the file watcher after the

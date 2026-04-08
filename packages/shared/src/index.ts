@@ -19,6 +19,8 @@ export * from "./schemas/composio.js";
 export * from "./schemas/provider.js";
 export * from "./schemas/provider-registry.js";
 export * from "./model-providers/index.js";
+export * from "./schemas/rewards.js";
+export * from "./schemas/credit.js";
 export * from "./lifecycle/index.js";
 export * from "./platform/index.js";
 export { ensure } from "./ensure/index.js";

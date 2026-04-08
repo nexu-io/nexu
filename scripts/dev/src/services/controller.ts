@@ -8,6 +8,7 @@ import {
   resolveTsxPaths,
   spawnHiddenProcess,
   terminateProcess,
+  waitFor,
   waitForListeningPortPid,
   waitForProcessStart,
   writeDevLock,
@@ -75,6 +76,28 @@ async function waitForControllerPortPid(): Promise<number> {
   );
 }
 
+async function cleanupStaleControllerPort(): Promise<void> {
+  try {
+    const workerPid = await getControllerPortPid();
+    await terminateProcess(workerPid);
+    await waitFor(
+      async () => {
+        try {
+          await getControllerPortPid();
+        } catch {
+          return;
+        }
+        throw new Error("controller dev server listener is still active");
+      },
+      () => new Error("controller dev server listener did not stop in time"),
+      {
+        attempts: 20,
+        delayMs: 250,
+      },
+    ).catch(() => terminateProcess(workerPid));
+  } catch {}
+}
+
 async function ensureOpenclawReadyForController(): Promise<void> {
   const runtimeConfig = getScriptsDevRuntimeConfig();
   const healthUrl = `${runtimeConfig.openclawBaseUrl}/health`;
@@ -126,6 +149,8 @@ export async function startControllerDevProcess(options: {
         "controller dev process is already running; run `pnpm dev stop controller` first",
       ),
   );
+
+  await cleanupStaleControllerPort();
 
   const runId = options.sessionId;
   const sessionId = options.sessionId;

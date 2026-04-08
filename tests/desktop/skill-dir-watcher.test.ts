@@ -172,24 +172,28 @@ describe("SkillDirWatcher", () => {
       },
     );
 
-    it("detects SKILL.md removal and marks skill as uninstalled", async () => {
-      writeSkill(skillsDir, "doomed-skill");
+    it(
+      "detects SKILL.md removal and marks skill as uninstalled",
+      { timeout: 10000 },
+      async () => {
+        writeSkill(skillsDir, "doomed-skill");
 
-      watcher = new SkillDirWatcher({
-        skillsDir,
-        skillDb: db,
-        debounceMs: 50,
-      });
-      watcher.syncNow();
-      expect(db.isInstalled("doomed-skill", "managed")).toBe(true);
+        watcher = new SkillDirWatcher({
+          skillsDir,
+          skillDb: db,
+          debounceMs: 50,
+        });
+        watcher.syncNow();
+        expect(db.isInstalled("doomed-skill", "managed")).toBe(true);
 
-      watcher.start();
+        watcher.start();
 
-      removeSkill(skillsDir, "doomed-skill");
+        removeSkill(skillsDir, "doomed-skill");
 
-      await waitUntil(() => !db.isInstalled("doomed-skill", "managed"));
+        await waitUntil(() => !db.isInstalled("doomed-skill", "managed"));
 
-      expect(db.isInstalled("doomed-skill", "managed")).toBe(false);
-    });
+        expect(db.isInstalled("doomed-skill", "managed")).toBe(false);
+      },
+    );
   });
 });

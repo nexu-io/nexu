@@ -19,8 +19,60 @@ CAPTURE_DIR="$REPO_ROOT/captures"
 RUN_ROOT="${TMPDIR:-/tmp}/nexu-desktop-e2e"
 PERSISTENT_HOME="$REPO_ROOT/.tmp/home"
 SKIP_CODESIGN="${NEXU_DESKTOP_E2E_SKIP_CODESIGN:-false}"
+COVERAGE_ENABLED="${NEXU_DESKTOP_E2E_COVERAGE:-0}"
+COVERAGE_DIR="$CAPTURE_DIR/coverage"
+RAW_COVERAGE_DIR="$COVERAGE_DIR/raw"
+NODE_V8_COVERAGE_DIR="$RAW_COVERAGE_DIR/node-v8"
+RAW_COVERAGE_META_PATH="$RAW_COVERAGE_DIR/run-context.json"
 
 log() { printf '[e2e:%s] %s\n' "$MODE" "$1" >&2; }
+
+init_coverage() {
+  if [ "$COVERAGE_ENABLED" != "1" ]; then
+    return 0
+  fi
+
+  mkdir -p "$NODE_V8_COVERAGE_DIR" "$RAW_COVERAGE_DIR/chromium"
+
+  local git_sha workflow_run_id source_label coverage_run_id started_at
+  git_sha="${NEXU_DESKTOP_E2E_GIT_SHA:-${GITHUB_SHA:-unknown}}"
+  workflow_run_id="${NEXU_DESKTOP_E2E_WORKFLOW_RUN_ID:-${GITHUB_RUN_ID:-local}}"
+  source_label="${NEXU_DESKTOP_E2E_SOURCE:-unknown}"
+  coverage_run_id="${NEXU_DESKTOP_E2E_COVERAGE_RUN_ID:-${workflow_run_id}-${MODE}-$$}"
+  started_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+  export NEXU_DESKTOP_E2E_GIT_SHA="$git_sha"
+  export NEXU_DESKTOP_E2E_WORKFLOW_RUN_ID="$workflow_run_id"
+  export NEXU_DESKTOP_E2E_SOURCE="$source_label"
+  export NEXU_DESKTOP_E2E_COVERAGE_RUN_ID="$coverage_run_id"
+  export NEXU_DESKTOP_E2E_COVERAGE_STARTED_AT="$started_at"
+  export NODE_V8_COVERAGE="$NODE_V8_COVERAGE_DIR"
+
+  python3 - "$RAW_COVERAGE_META_PATH" <<'PY'
+import json
+import os
+import sys
+
+path = sys.argv[1]
+payload = {
+    "gitSha": os.environ.get("NEXU_DESKTOP_E2E_GIT_SHA", "unknown"),
+    "workflowRunId": os.environ.get("NEXU_DESKTOP_E2E_WORKFLOW_RUN_ID", "local"),
+    "mode": os.environ.get("MODE", "unknown"),
+    "source": os.environ.get("NEXU_DESKTOP_E2E_SOURCE", "unknown"),
+    "coverageEnabled": os.environ.get("NEXU_DESKTOP_E2E_COVERAGE") == "1",
+    "coverageRunId": os.environ.get("NEXU_DESKTOP_E2E_COVERAGE_RUN_ID"),
+    "startedAt": os.environ.get("NEXU_DESKTOP_E2E_COVERAGE_STARTED_AT"),
+    "captureDir": os.environ.get("NEXU_DESKTOP_E2E_CAPTURE_DIR"),
+    "nodeV8CoverageDir": os.environ.get("NODE_V8_COVERAGE"),
+    "pathNormalizationVersion": 1,
+}
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(payload, handle, indent=2)
+    handle.write("\n")
+PY
+
+  log "Coverage enabled (run-id=$coverage_run_id)"
+}
 
 resolve_mac_arch() {
   local arm64_capable
@@ -49,6 +101,9 @@ resolve_mac_arch() {
 # -----------------------------------------------------------------------
 cleanup_machine() {
   mkdir -p "$CAPTURE_DIR"
+  if [ "$COVERAGE_ENABLED" = "1" ]; then
+    rm -rf "$COVERAGE_DIR"
+  fi
   log "Cleaning existing Nexu processes"
   bash "$REPO_ROOT/scripts/kill-all.sh" > "$CAPTURE_DIR/kill-all.log" 2>&1 || true
 
@@ -172,6 +227,7 @@ launch_and_wait() {
   HOME="$home_dir" \
   TMPDIR="$RUN_ROOT/tmp" \
   NEXU_DESKTOP_USER_DATA_ROOT="$user_data_dir" \
+  NEXU_DESKTOP_E2E_COVERAGE="$COVERAGE_ENABLED" \
     "$executable" > "$log_path" 2>&1 &
 
   local app_pid=$!
@@ -1020,6 +1076,10 @@ run_resilience() {
 # Main flow
 # -----------------------------------------------------------------------
 mkdir -p "$PERSISTENT_HOME" "$CAPTURE_DIR"
+export MODE
+export NEXU_DESKTOP_E2E_CAPTURE_DIR="$CAPTURE_DIR"
+cleanup_machine
+init_coverage
 
 cleanup_on_exit() {
   local rc=$?
@@ -1037,7 +1097,6 @@ zip_path="$(resolve_artifact zip)" || exit 1
 export NEXU_DESKTOP_E2E_ZIP_PATH="$zip_path"
 
 # --- Clean state ---
-cleanup_machine
 wait_ports_free
 # Reset home for smoke/login/resilience (need clean welcome page)
 # Keep home for model/update (test with existing state from prior usage)

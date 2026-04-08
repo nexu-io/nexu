@@ -135,6 +135,23 @@ describe("generatePlist", () => {
     );
   });
 
+  it("renders PostHog analytics env vars when configured", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const plist = generatePlist("controller", {
+      ...mockEnv,
+      posthogApiKey: "phc_test_key",
+      posthogHost: "https://us.i.posthog.com",
+    });
+
+    expect(plist).toContain("<key>POSTHOG_API_KEY</key>");
+    expect(plist).toContain("<string>phc_test_key</string>");
+    expect(plist).toContain("<key>POSTHOG_HOST</key>");
+    expect(plist).toContain("<string>https://us.i.posthog.com</string>");
+  });
+
   // -----------------------------------------------------------------------
   // ProgramArguments ordering — controller
   // -----------------------------------------------------------------------
