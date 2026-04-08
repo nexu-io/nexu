@@ -9,6 +9,7 @@ import {
   resolveTsxPaths,
   spawnHiddenProcess,
   terminateProcess,
+  waitFor,
   waitForListeningPortPid,
   waitForProcessStart,
   writeDevLock,
@@ -77,6 +78,28 @@ async function waitForWebPortPid(): Promise<number> {
   );
 }
 
+async function cleanupStaleWebPort(): Promise<void> {
+  try {
+    const listenerPid = await getWebPortPid();
+    await terminateProcess(listenerPid);
+    await waitFor(
+      async () => {
+        try {
+          await getWebPortPid();
+        } catch {
+          return;
+        }
+        throw new Error("web dev server listener is still active");
+      },
+      () => new Error("web dev server listener did not stop in time"),
+      {
+        attempts: 20,
+        delayMs: 250,
+      },
+    ).catch(() => terminateProcess(listenerPid));
+  } catch {}
+}
+
 export async function startWebDevProcess(options: {
   sessionId: string;
 }): Promise<WebDevSnapshot> {
@@ -88,6 +111,8 @@ export async function startWebDevProcess(options: {
         "web dev process is already running; run `pnpm dev stop web` first",
       ),
   );
+
+  await cleanupStaleWebPort();
 
   const runId = options.sessionId;
   const sessionId = options.sessionId;

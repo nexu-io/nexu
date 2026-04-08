@@ -11,6 +11,7 @@ import type {
   ConnectWecomInput,
   DesktopRewardClaimProof,
   DesktopRewardsStatus,
+  RewardTask,
   RewardTaskId,
 } from "@nexu/shared";
 import {
@@ -23,6 +24,7 @@ import {
   type refreshIntegrationSchema,
   rewardGroupSchema,
   rewardTaskIdSchema,
+  rewardTasks,
   type updateAuthSourceSchema,
   type updateUserProfileSchema,
   type upsertProviderBodySchema,
@@ -93,6 +95,10 @@ const defaultCloudProfile: CloudProfileEntry = {
   cloudUrl: "https://nexu.io",
   linkUrl: "https://link.nexu.io",
 };
+
+const rewardTaskTemplateById = new Map<RewardTaskId, RewardTask>(
+  rewardTasks.map((task) => [task.id, task]),
+);
 
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
@@ -312,6 +318,29 @@ function convertCloudStatusToDesktop(
   },
 ): DesktopRewardsStatus {
   const { cloudConnected, activeModelId, activeManagedModel } = viewer;
+  const tasks = cloudStatus.tasks.flatMap((task) => {
+    const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
+    const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
+    if (!parsedTaskId.success || !parsedGroupId.success) {
+      return [];
+    }
+
+    return {
+      id: parsedTaskId.data as RewardTaskId,
+      group: parsedGroupId.data,
+      icon: task.icon ?? "gift",
+      reward: task.rewardPoints,
+      shareMode: task.shareMode as "link" | "tweet" | "image",
+      repeatMode: task.repeatMode as "once" | "daily" | "weekly",
+      requiresScreenshot: task.shareMode === "image",
+      actionUrl:
+        rewardTaskTemplateById.get(parsedTaskId.data)?.actionUrl ?? null,
+      isClaimed: task.isClaimed,
+      lastClaimedAt: task.lastClaimedAt,
+      claimCount: task.claimCount,
+    };
+  });
+
   return {
     viewer: {
       cloudConnected,
@@ -321,28 +350,12 @@ function convertCloudStatusToDesktop(
         (activeManagedModel ? "nexu" : (activeModelId?.split("/")[0] ?? null)),
       usingManagedModel: activeManagedModel != null,
     },
-    progress: cloudStatus.progress,
-    tasks: cloudStatus.tasks.flatMap((task) => {
-      const parsedTaskId = rewardTaskIdSchema.safeParse(task.id);
-      const parsedGroupId = rewardGroupSchema.safeParse(task.groupId);
-      if (!parsedTaskId.success || !parsedGroupId.success) {
-        return [];
-      }
-
-      return {
-        id: parsedTaskId.data as RewardTaskId,
-        group: parsedGroupId.data,
-        icon: task.icon ?? "gift",
-        reward: task.rewardPoints,
-        shareMode: task.shareMode as "link" | "tweet" | "image",
-        repeatMode: task.repeatMode as "once" | "daily" | "weekly",
-        requiresScreenshot: task.shareMode === "image",
-        actionUrl: task.url,
-        isClaimed: task.isClaimed,
-        lastClaimedAt: task.lastClaimedAt,
-        claimCount: task.claimCount,
-      };
-    }),
+    progress: {
+      ...cloudStatus.progress,
+      claimedCount: tasks.filter((task) => task.isClaimed).length,
+      totalCount: tasks.length,
+    },
+    tasks,
     cloudBalance: cloudStatus.cloudBalance
       ? {
           totalBalance: cloudStatus.cloudBalance.totalBalance,
@@ -538,6 +551,15 @@ export class NexuConfigStore {
     });
   }
 
+  private isCurrentPollingSignal(signal: AbortSignal): boolean {
+    // The polling loop may still be processing a response when a newer
+    // connectDesktopCloud() call has already aborted it and installed a fresh
+    // pollingState. Identifying the active poll by AbortSignal identity lets
+    // any final-state write from a stale loop become a no-op instead of
+    // clobbering the new flow's pollingState or persisted credentials.
+    return this.pollingState?.abortController.signal === signal;
+  }
+
   private async pollDesktopCloudAuthorization(
     cloudApiUrl: string,
     deviceId: string,
@@ -584,6 +606,9 @@ export class NexuConfigStore {
               : ((await this.fetchDesktopCloudModels(linkUrl, data.apiKey)) ??
                 []);
 
+          if (signal.aborted || !this.isCurrentPollingSignal(signal)) {
+            return;
+          }
           this.pollingState = null;
           await this.setDesktopCloudState({
             connected: true,
@@ -605,6 +630,9 @@ export class NexuConfigStore {
         }
 
         if (data.status === "expired") {
+          if (signal.aborted || !this.isCurrentPollingSignal(signal)) {
+            return;
+          }
           this.pollingState = null;
           await this.setDesktopCloudState({
             connected: false,
@@ -626,6 +654,9 @@ export class NexuConfigStore {
       }
     }
 
+    if (signal.aborted || !this.isCurrentPollingSignal(signal)) {
+      return;
+    }
     this.pollingState = null;
     await this.setDesktopCloudState({
       connected: false,
@@ -1815,16 +1846,37 @@ export class NexuConfigStore {
     });
   }
 
+  private abortDesktopCloudPolling(): void {
+    if (this.pollingState) {
+      this.pollingState.abortController.abort();
+      this.pollingState = null;
+    }
+  }
+
   async connectDesktopCloud(options?: { source?: string | null }) {
     const config = await this.getConfig();
     const current = readDesktopCloud(config);
     const { activeProfile } =
       await this.readConfiguredDesktopCloudProfile(config);
-    if (this.pollingState || current.polling) {
-      return { error: "Connection attempt already in progress" };
-    }
     if (current.connected && current.apiKey) {
       return { error: "Already connected. Disconnect first." };
+    }
+    // If a previous connect attempt is still polling (e.g. the user closed the
+    // authorization tab without completing the flow), cancel it and clear the
+    // persisted polling flag so this call can start a fresh browser login.
+    if (this.pollingState || current.polling) {
+      this.abortDesktopCloudPolling();
+      await this.setDesktopCloudState({
+        connected: false,
+        polling: false,
+        userId: null,
+        userName: null,
+        userEmail: null,
+        connectedAt: null,
+        linkUrl: null,
+        apiKey: null,
+        models: [],
+      });
     }
     const trimmedSource = options?.source?.trim();
     const sourceQuery =
@@ -2040,10 +2092,7 @@ export class NexuConfigStore {
 
     const previousCloud = readDesktopCloud(await this.getConfig());
 
-    if (this.pollingState) {
-      this.pollingState.abortController.abort();
-      this.pollingState = null;
-    }
+    this.abortDesktopCloudPolling();
 
     await this.store.update((config) => {
       const currentProfile = readLocalProfile(config);
@@ -2107,10 +2156,7 @@ export class NexuConfigStore {
       throw new Error(`Unknown cloud profile: ${name}`);
     }
 
-    if (this.pollingState) {
-      this.pollingState.abortController.abort();
-      this.pollingState = null;
-    }
+    this.abortDesktopCloudPolling();
 
     await this.store.update((currentConfig) => {
       const sessions = readDesktopCloudSessions(currentConfig);
@@ -2252,10 +2298,7 @@ export class NexuConfigStore {
 
   async disconnectDesktopCloud() {
     const previousCloud = readDesktopCloud(await this.getConfig());
-    if (this.pollingState) {
-      this.pollingState.abortController.abort();
-      this.pollingState = null;
-    }
+    this.abortDesktopCloudPolling();
 
     await this.setDesktopCloudState({
       connected: false,

@@ -4,13 +4,19 @@ import { PlatformIcon } from "@/components/platform-icons";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
 import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
-import { useDesktopBudgetGuard } from "@/hooks/use-desktop-budget-guard";
+import {
+  getBudgetBannerRouteVariant,
+  useDesktopBudgetGuard,
+} from "@/hooks/use-desktop-budget-guard";
 import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
 import { openExternalUrl } from "@/lib/desktop-links";
-import { isWindowsDesktopPlatform } from "@/lib/desktop-platform";
+import {
+  isMacDesktopPlatform,
+  isWindowsDesktopPlatform,
+} from "@/lib/desktop-platform";
 import { resetAnalytics } from "@/lib/tracking";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
@@ -575,7 +581,6 @@ function WorkspaceLayoutInner() {
   const userName = me?.name?.trim() || session?.user?.name || userEmail;
   const userImage = me?.image ?? session?.user?.image ?? null;
   const userInitial = (userName[0] ?? userEmail[0] ?? "U").toUpperCase();
-  const rewardTaskCountLabel = `${rewardsStatus.progress.claimedCount}/${rewardsStatus.progress.totalCount}`;
   const rewardsBalancePending =
     cloudConnected &&
     !rewardsStatus.cloudBalance &&
@@ -603,6 +608,9 @@ function WorkspaceLayoutInner() {
       pathname: location.pathname,
       cloudConnected,
     });
+  const budgetBannerRouteVariant = getBudgetBannerRouteVariant(
+    location.pathname,
+  );
 
   const showEmptyState =
     sessions.length === 0 &&
@@ -636,6 +644,7 @@ function WorkspaceLayoutInner() {
             ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
             : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
   const isWindowsDesktopClient = isDesktopClient && isWindowsDesktopPlatform();
+  const isMacDesktopClient = isDesktopClient && isMacDesktopPlatform();
   const desktopGlassTint = isWindowsDesktopClient
     ? "#ffffff"
     : "rgba(255, 255, 255, 0.08)";
@@ -672,7 +681,12 @@ function WorkspaceLayoutInner() {
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="fixed top-[16px] left-[24px] h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50"
+          className={cn(
+            "fixed h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50",
+            isMacDesktopClient
+              ? "top-[10px] left-[76px]"
+              : "top-[16px] left-[24px]",
+          )}
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           title={
             collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
@@ -724,6 +738,7 @@ function WorkspaceLayoutInner() {
           <div
             className={cn(
               "flex items-center justify-between px-3 pb-2 shrink-0",
+              isMacDesktopClient && "-mt-14 h-14 pl-[76px] pt-[10px] pr-3 pb-0",
               !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
             )}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -982,9 +997,6 @@ function WorkspaceLayoutInner() {
                   </div>
                   <span className="min-w-0 flex-1 text-[12px] font-medium leading-[1.3] text-text-primary">
                     {t("layout.sidebar.rewardsTitle")}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-[11px] text-text-tertiary">
-                    {rewardTaskCountLabel}
                   </span>
                   <ChevronRight
                     size={14}
@@ -1546,10 +1558,9 @@ function WorkspaceLayoutInner() {
           </div>
 
           <main className="flex-1 overflow-y-auto min-h-0">
-            {shouldShowPrompt &&
-            budgetStatus !== "healthy" &&
-            location.pathname !== "/workspace" &&
-            location.pathname !== "/workspace/home" ? (
+            {budgetBannerRouteVariant === "global" &&
+            shouldShowPrompt &&
+            budgetStatus !== "healthy" ? (
               <div className="mx-auto max-w-4xl px-4 pb-0 pt-4 sm:px-6 md:px-8">
                 <BudgetWarningBanner
                   status={budgetStatus}
