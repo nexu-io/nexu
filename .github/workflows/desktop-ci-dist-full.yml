@@ -26,6 +26,15 @@ on:
       - "scripts/postinstall.mjs"
       - ".github/workflows/desktop-ci-dist-full.yml"
   workflow_dispatch:
+    inputs:
+      auto_update_enabled:
+        description: "Enable auto-update in CI build artifacts"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: read
@@ -168,6 +177,7 @@ jobs:
           NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
           NEXU_DESKTOP_USE_EXISTING_BUILDS: "1"
           NEXU_DESKTOP_USE_EXISTING_RUNTIME_INSTALL: "1"
+          NEXU_DESKTOP_AUTO_UPDATE_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.auto_update_enabled || 'false' }}
         run: pnpm dist:mac:unsigned
 
       - name: Set packaged app paths
@@ -282,5 +292,119 @@ jobs:
         with:
           name: desktop-ci-logs-${{ matrix.arch }}
           path: ${{ runner.temp }}/desktop-ci
+          if-no-files-found: warn
+          retention-days: 3
+
+  package-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Restore npm cache for runtime installs
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\npm-cache
+          key: desktop-npm-cache-${{ runner.os }}-x64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          restore-keys: |
+            desktop-npm-cache-${{ runner.os }}-x64-
+            desktop-npm-cache-${{ runner.os }}-
+
+      - name: Restore Electron build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+            apps/desktop/.cache
+          key: desktop-electron-cache-${{ runner.os }}-x64-${{ hashFiles('pnpm-lock.yaml', 'apps/desktop/package.json') }}
+          restore-keys: |
+            desktop-electron-cache-${{ runner.os }}-x64-
+            desktop-electron-cache-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Show desktop toolchain versions
+        shell: pwsh
+        run: pnpm exec electron --version
+
+      - name: Build workspace artifacts
+        run: pnpm build
+
+      - name: Build unsigned Windows desktop bundle
+        env:
+          NEXU_DESKTOP_AUTO_UPDATE_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.auto_update_enabled || 'false' }}
+        run: pnpm --filter @nexu/desktop dist:win
+
+      - name: Verify packaged Windows artifacts
+        shell: pwsh
+        run: |
+          $releaseDir = Join-Path $PWD "apps/desktop/release"
+          $installerArtifacts = Get-ChildItem -Path $releaseDir -Filter "*.exe" -File
+          if ($installerArtifacts.Count -eq 0) {
+            Write-Error "No Windows installer artifact was produced"
+          }
+
+          $unpackedExecutable = Join-Path $releaseDir "win-unpacked/Nexu.exe"
+          if (-not (Test-Path $unpackedExecutable)) {
+            Write-Error "Missing unpacked Windows app executable: $unpackedExecutable"
+          }
+
+          $archiveMetadata = Join-Path $PWD "apps/desktop/.dist-runtime/openclaw/archive.json"
+          if (-not (Test-Path $archiveMetadata)) {
+            Write-Error "Missing OpenClaw archive metadata: $archiveMetadata"
+          }
+
+          Write-Host "Built Windows artifacts:"
+          $installerArtifacts | ForEach-Object { Write-Host " - $($_.FullName)" }
+          Write-Host " - $unpackedExecutable"
+          Write-Host " - $archiveMetadata"
+
+      - name: Upload Windows build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-dist-win-x64
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/win-unpacked/**
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Capture Windows build logs
+        if: always()
+        shell: pwsh
+        run: |
+          $captureDir = Join-Path $env:RUNNER_TEMP "desktop-ci-win"
+          New-Item -ItemType Directory -Force -Path $captureDir | Out-Null
+
+          if (Test-Path "apps/desktop/.dist-runtime") {
+            Copy-Item "apps/desktop/.dist-runtime" (Join-Path $captureDir "dist-runtime") -Recurse -Force
+          }
+          if (Test-Path ".tmp") {
+            Copy-Item ".tmp" (Join-Path $captureDir "repo-tmp") -Recurse -Force
+          }
+
+      - name: Upload Windows build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-ci-logs-win-x64
+          path: ${{ runner.temp }}/desktop-ci-win
           if-no-files-found: warn
           retention-days: 3

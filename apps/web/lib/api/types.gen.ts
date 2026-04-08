@@ -513,6 +513,33 @@ export type PatchApiInternalDesktopPreferencesResponses = {
 
 export type PatchApiInternalDesktopPreferencesResponse = PatchApiInternalDesktopPreferencesResponses[keyof PatchApiInternalDesktopPreferencesResponses];
 
+export type GetApiAuthGetSessionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/get-session';
+};
+
+export type GetApiAuthGetSessionResponses = {
+    /**
+     * Desktop-local auth session
+     */
+    200: {
+        session: {
+            id: string;
+            expiresAt: string;
+        };
+        user: {
+            id: string;
+            email: string;
+            name: string;
+            image: string;
+        };
+    };
+};
+
+export type GetApiAuthGetSessionResponse = GetApiAuthGetSessionResponses[keyof GetApiAuthGetSessionResponses];
+
 export type GetApiInternalDesktopCloudStatusData = {
     body?: never;
     path?: never;
@@ -527,6 +554,7 @@ export type GetApiInternalDesktopCloudStatusResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -544,6 +572,7 @@ export type GetApiInternalDesktopCloudStatusResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -555,7 +584,9 @@ export type GetApiInternalDesktopCloudStatusResponses = {
 export type GetApiInternalDesktopCloudStatusResponse = GetApiInternalDesktopCloudStatusResponses[keyof GetApiInternalDesktopCloudStatusResponses];
 
 export type PostApiInternalDesktopCloudConnectData = {
-    body?: never;
+    body?: {
+        source?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/internal/desktop/cloud-connect';
@@ -576,6 +607,7 @@ export type PostApiInternalDesktopCloudConnectResponse = PostApiInternalDesktopC
 export type PostApiInternalDesktopCloudProfileConnectData = {
     body: {
         name: string;
+        source?: string;
     };
     path?: never;
     query?: never;
@@ -592,6 +624,7 @@ export type PostApiInternalDesktopCloudProfileConnectResponses = {
         status: {
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -609,6 +642,7 @@ export type PostApiInternalDesktopCloudProfileConnectResponses = {
                 linkUrl: string;
                 connected: boolean;
                 polling?: boolean;
+                userId?: string;
                 userName?: string;
                 userEmail?: string;
                 connectedAt?: string;
@@ -635,6 +669,7 @@ export type PostApiInternalDesktopCloudRefreshResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -652,6 +687,7 @@ export type PostApiInternalDesktopCloudRefreshResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -683,6 +719,7 @@ export type PostApiInternalDesktopCloudProfileCreateResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -700,6 +737,7 @@ export type PostApiInternalDesktopCloudProfileCreateResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -733,6 +771,7 @@ export type PostApiInternalDesktopCloudProfileUpdateResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -750,6 +789,7 @@ export type PostApiInternalDesktopCloudProfileUpdateResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -778,6 +818,7 @@ export type PostApiInternalDesktopCloudProfileDeleteResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -795,6 +836,7 @@ export type PostApiInternalDesktopCloudProfileDeleteResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -841,6 +883,7 @@ export type PostApiInternalDesktopCloudProfileDisconnectResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -858,6 +901,7 @@ export type PostApiInternalDesktopCloudProfileDisconnectResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -886,6 +930,7 @@ export type PostApiInternalDesktopCloudProfileSelectResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -903,6 +948,7 @@ export type PostApiInternalDesktopCloudProfileSelectResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -935,6 +981,7 @@ export type PostApiInternalDesktopCloudProfilesImportResponses = {
     200: {
         connected: boolean;
         polling?: boolean;
+        userId?: string;
         userName?: string;
         userEmail?: string;
         connectedAt?: string;
@@ -952,6 +999,7 @@ export type PostApiInternalDesktopCloudProfilesImportResponses = {
             linkUrl: string;
             connected: boolean;
             polling?: boolean;
+            userId?: string;
             userName?: string;
             userEmail?: string;
             connectedAt?: string;
@@ -1028,6 +1076,217 @@ export type PutApiInternalDesktopDefaultModelResponses = {
 };
 
 export type PutApiInternalDesktopDefaultModelResponse = PutApiInternalDesktopDefaultModelResponses[keyof PutApiInternalDesktopDefaultModelResponses];
+
+export type GetApiInternalDesktopRewardsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards';
+};
+
+export type GetApiInternalDesktopRewardsResponses = {
+    /**
+     * Desktop rewards status
+     */
+    200: {
+        viewer: {
+            cloudConnected: boolean;
+            activeModelId: string;
+            activeModelProviderId: string;
+            usingManagedModel: boolean;
+        };
+        progress: {
+            claimedCount: number;
+            totalCount: number;
+            earnedCredits: number;
+            availableCredits?: number;
+        };
+        tasks: Array<{
+            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+            group: 'daily' | 'opensource' | 'social';
+            icon: string;
+            reward: number;
+            shareMode: 'link' | 'tweet' | 'image';
+            repeatMode: 'once' | 'daily' | 'weekly';
+            requiresScreenshot: boolean;
+            actionUrl?: string;
+            isClaimed: boolean;
+            lastClaimedAt: string;
+            claimCount: number;
+        }>;
+        cloudBalance?: {
+            totalBalance: number;
+            totalRecharged: number;
+            totalConsumed: number;
+        };
+        autoFallbackTriggered?: boolean;
+    };
+};
+
+export type GetApiInternalDesktopRewardsResponse = GetApiInternalDesktopRewardsResponses[keyof GetApiInternalDesktopRewardsResponses];
+
+export type PostApiInternalDesktopRewardsGithubStarSessionData = {
+    body?: {
+        [key: string]: unknown;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/github-star-session';
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionErrors = {
+    /**
+     * GitHub star verification is temporarily unavailable
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionError = PostApiInternalDesktopRewardsGithubStarSessionErrors[keyof PostApiInternalDesktopRewardsGithubStarSessionErrors];
+
+export type PostApiInternalDesktopRewardsGithubStarSessionResponses = {
+    /**
+     * Prepare a GitHub star verification session
+     */
+    200: {
+        sessionId: string;
+        baselineStars: number;
+        expiresAt: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsGithubStarSessionResponse = PostApiInternalDesktopRewardsGithubStarSessionResponses[keyof PostApiInternalDesktopRewardsGithubStarSessionResponses];
+
+export type PostApiInternalDesktopRewardsClaimData = {
+    body?: {
+        taskId: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+        proof?: {
+            url?: string;
+            githubSessionId?: string;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/claim';
+};
+
+export type PostApiInternalDesktopRewardsClaimErrors = {
+    /**
+     * Invalid claim proof
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsClaimError = PostApiInternalDesktopRewardsClaimErrors[keyof PostApiInternalDesktopRewardsClaimErrors];
+
+export type PostApiInternalDesktopRewardsClaimResponses = {
+    /**
+     * Claim a desktop reward
+     */
+    200: {
+        ok: boolean;
+        alreadyClaimed: boolean;
+        status: {
+            viewer: {
+                cloudConnected: boolean;
+                activeModelId: string;
+                activeModelProviderId: string;
+                usingManagedModel: boolean;
+            };
+            progress: {
+                claimedCount: number;
+                totalCount: number;
+                earnedCredits: number;
+                availableCredits?: number;
+            };
+            tasks: Array<{
+                id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+                group: 'daily' | 'opensource' | 'social';
+                icon: string;
+                reward: number;
+                shareMode: 'link' | 'tweet' | 'image';
+                repeatMode: 'once' | 'daily' | 'weekly';
+                requiresScreenshot: boolean;
+                actionUrl?: string;
+                isClaimed: boolean;
+                lastClaimedAt: string;
+                claimCount: number;
+            }>;
+            cloudBalance?: {
+                totalBalance: number;
+                totalRecharged: number;
+                totalConsumed: number;
+            };
+            autoFallbackTriggered?: boolean;
+        };
+    };
+};
+
+export type PostApiInternalDesktopRewardsClaimResponse = PostApiInternalDesktopRewardsClaimResponses[keyof PostApiInternalDesktopRewardsClaimResponses];
+
+export type PostApiInternalDesktopRewardsSetBalanceData = {
+    body?: {
+        balance: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/internal/desktop/rewards/set-balance';
+};
+
+export type PostApiInternalDesktopRewardsSetBalanceErrors = {
+    /**
+     * Unable to update the desktop test balance
+     */
+    400: {
+        message: string;
+    };
+};
+
+export type PostApiInternalDesktopRewardsSetBalanceError = PostApiInternalDesktopRewardsSetBalanceErrors[keyof PostApiInternalDesktopRewardsSetBalanceErrors];
+
+export type PostApiInternalDesktopRewardsSetBalanceResponses = {
+    /**
+     * Update the desktop test balance
+     */
+    200: {
+        viewer: {
+            cloudConnected: boolean;
+            activeModelId: string;
+            activeModelProviderId: string;
+            usingManagedModel: boolean;
+        };
+        progress: {
+            claimedCount: number;
+            totalCount: number;
+            earnedCredits: number;
+            availableCredits?: number;
+        };
+        tasks: Array<{
+            id: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
+            group: 'daily' | 'opensource' | 'social';
+            icon: string;
+            reward: number;
+            shareMode: 'link' | 'tweet' | 'image';
+            repeatMode: 'once' | 'daily' | 'weekly';
+            requiresScreenshot: boolean;
+            actionUrl?: string;
+            isClaimed: boolean;
+            lastClaimedAt: string;
+            claimCount: number;
+        }>;
+        cloudBalance?: {
+            totalBalance: number;
+            totalRecharged: number;
+            totalConsumed: number;
+        };
+        autoFallbackTriggered?: boolean;
+    };
+};
+
+export type PostApiInternalDesktopRewardsSetBalanceResponse = PostApiInternalDesktopRewardsSetBalanceResponses[keyof PostApiInternalDesktopRewardsSetBalanceResponses];
 
 export type GetApiV1ChannelsData = {
     body?: never;
@@ -1543,6 +1802,9 @@ export type GetApiV1BotQuotaResponses = {
     200: {
         available: boolean;
         resetsAt: string;
+        usingByok?: boolean;
+        byokAvailable?: boolean;
+        autoFallbackTriggered?: boolean;
     };
 };
 
@@ -2156,127 +2418,323 @@ export type GetApiV1ModelsResponses = {
 
 export type GetApiV1ModelsResponse = GetApiV1ModelsResponses[keyof GetApiV1ModelsResponses];
 
-export type GetApiV1ProvidersData = {
+export type GetApiV1ModelProvidersRegistryData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/providers';
+    url: '/api/v1/model-providers/registry';
 };
 
-export type GetApiV1ProvidersResponses = {
+export type GetApiV1ModelProvidersRegistryResponses = {
     /**
-     * Provider list
+     * Model provider registry
      */
     200: {
-        providers: Array<{
+        registry: Array<{
             id: string;
-            providerId: string;
+            canonicalOpenClawId: string;
+            aliases: Array<string>;
+            authModes: Array<'api-key' | 'aws-sdk' | 'oauth' | 'token'>;
+            apiKind: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+            defaultBaseUrls: Array<string>;
+            controllerConfigurable?: boolean;
+            modelsPageVisible?: boolean;
+            region?: 'global' | 'china' | 'local';
+            signupUrl?: string;
+            supportsCustomBaseUrl?: boolean;
+            supportsModelDiscovery?: boolean;
+            supportsProxyMode?: boolean;
+            managedByAuthProfiles?: boolean;
+            requiresOauthRegion?: boolean;
+            authHeader?: boolean;
+            defaultHeaders?: {
+                [key: string]: string;
+            };
+            experimental?: boolean;
+            hidden?: boolean;
             displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
+            displayNameKey?: string;
+            descriptionKey?: string;
+            apiDocsUrl?: string;
+            apiKeyPlaceholder?: string;
+            defaultProxyUrl?: string;
+            logo?: string;
         }>;
     };
 };
 
-export type GetApiV1ProvidersResponse = GetApiV1ProvidersResponses[keyof GetApiV1ProvidersResponses];
+export type GetApiV1ModelProvidersRegistryResponse = GetApiV1ModelProvidersRegistryResponses[keyof GetApiV1ModelProvidersRegistryResponses];
 
-export type DeleteApiV1ProvidersByProviderIdData = {
-    body?: never;
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}';
-};
-
-export type DeleteApiV1ProvidersByProviderIdResponses = {
-    /**
-     * Deleted provider
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteApiV1ProvidersByProviderIdResponse = DeleteApiV1ProvidersByProviderIdResponses[keyof DeleteApiV1ProvidersByProviderIdResponses];
-
-export type PutApiV1ProvidersByProviderIdData = {
-    body?: {
-        apiKey?: string;
-        baseUrl?: string;
-        enabled?: boolean;
-        displayName?: string;
-        authMode?: 'apiKey' | 'oauth';
-        modelsJson?: string;
-    };
-    path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
-    };
-    query?: never;
-    url: '/api/v1/providers/{providerId}';
-};
-
-export type PutApiV1ProvidersByProviderIdResponses = {
-    /**
-     * Updated provider
-     */
-    200: {
-        provider: {
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        };
-    };
-    /**
-     * Created provider
-     */
-    201: {
-        provider: {
-            id: string;
-            providerId: string;
-            displayName: string;
-            enabled: boolean;
-            baseUrl: string;
-            authMode?: 'apiKey' | 'oauth';
-            hasApiKey: boolean;
-            hasOauthCredential?: boolean;
-            oauthRegion?: 'global' | 'cn';
-            oauthEmail?: string;
-            modelsJson: string;
-            createdAt?: string;
-            updatedAt?: string;
-        };
-    };
-};
-
-export type PutApiV1ProvidersByProviderIdResponse = PutApiV1ProvidersByProviderIdResponses[keyof PutApiV1ProvidersByProviderIdResponses];
-
-export type GetApiV1ProvidersMinimaxOauthStatusData = {
+export type GetApiV1ModelProvidersConfigData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/providers/minimax/oauth/status';
+    url: '/api/v1/model-providers/config';
 };
 
-export type GetApiV1ProvidersMinimaxOauthStatusResponses = {
+export type GetApiV1ModelProvidersConfigResponses = {
+    /**
+     * Model provider config document
+     */
+    200: {
+        config: {
+            mode?: 'merge' | 'replace';
+            providers?: {
+                [key: string]: {
+                    providerTemplateId?: string;
+                    instanceId?: string;
+                    enabled?: boolean;
+                    auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    apiKey?: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                    baseUrl: string;
+                    oauthRegion?: 'global' | 'cn';
+                    oauthProfileRef?: string;
+                    displayName?: string;
+                    headers?: {
+                        [key: string]: string | {
+                            source: 'env' | 'file' | 'exec';
+                            provider: string;
+                            id: string;
+                        };
+                    };
+                    models?: Array<{
+                        id: string;
+                        name: string;
+                        api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                        reasoning?: boolean;
+                        input?: Array<'text' | 'image'>;
+                        cost?: {
+                            input: number;
+                            output: number;
+                            cacheRead: number;
+                            cacheWrite: number;
+                        };
+                        contextWindow?: number;
+                        maxTokens?: number;
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        compat?: {
+                            [key: string]: unknown;
+                        };
+                    }>;
+                    metadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            bedrockDiscovery?: {
+                enabled?: boolean;
+                region?: string;
+                providerFilter?: Array<string>;
+                refreshInterval?: number;
+                defaultContextWindow?: number;
+                defaultMaxTokens?: number;
+            };
+        };
+    };
+};
+
+export type GetApiV1ModelProvidersConfigResponse = GetApiV1ModelProvidersConfigResponses[keyof GetApiV1ModelProvidersConfigResponses];
+
+export type PutApiV1ModelProvidersConfigData = {
+    body?: {
+        mode?: 'merge' | 'replace';
+        providers?: {
+            [key: string]: {
+                providerTemplateId?: string;
+                instanceId?: string;
+                enabled?: boolean;
+                auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                apiKey?: string | {
+                    source: 'env' | 'file' | 'exec';
+                    provider: string;
+                    id: string;
+                };
+                baseUrl: string;
+                oauthRegion?: 'global' | 'cn';
+                oauthProfileRef?: string;
+                displayName?: string;
+                headers?: {
+                    [key: string]: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                };
+                models?: Array<{
+                    id: string;
+                    name: string;
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    reasoning?: boolean;
+                    input?: Array<'text' | 'image'>;
+                    cost?: {
+                        input: number;
+                        output: number;
+                        cacheRead: number;
+                        cacheWrite: number;
+                    };
+                    contextWindow?: number;
+                    maxTokens?: number;
+                    headers?: {
+                        [key: string]: string;
+                    };
+                    compat?: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                metadata?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        bedrockDiscovery?: {
+            enabled?: boolean;
+            region?: string;
+            providerFilter?: Array<string>;
+            refreshInterval?: number;
+            defaultContextWindow?: number;
+            defaultMaxTokens?: number;
+        };
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/config';
+};
+
+export type PutApiV1ModelProvidersConfigResponses = {
+    /**
+     * Updated model provider config document
+     */
+    200: {
+        config: {
+            mode?: 'merge' | 'replace';
+            providers?: {
+                [key: string]: {
+                    providerTemplateId?: string;
+                    instanceId?: string;
+                    enabled?: boolean;
+                    auth?: 'api-key' | 'aws-sdk' | 'oauth' | 'token';
+                    api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                    apiKey?: string | {
+                        source: 'env' | 'file' | 'exec';
+                        provider: string;
+                        id: string;
+                    };
+                    baseUrl: string;
+                    oauthRegion?: 'global' | 'cn';
+                    oauthProfileRef?: string;
+                    displayName?: string;
+                    headers?: {
+                        [key: string]: string | {
+                            source: 'env' | 'file' | 'exec';
+                            provider: string;
+                            id: string;
+                        };
+                    };
+                    models?: Array<{
+                        id: string;
+                        name: string;
+                        api?: 'openai-completions' | 'openai-responses' | 'openai-codex-responses' | 'anthropic-messages' | 'google-generative-ai' | 'github-copilot' | 'bedrock-converse-stream' | 'ollama';
+                        reasoning?: boolean;
+                        input?: Array<'text' | 'image'>;
+                        cost?: {
+                            input: number;
+                            output: number;
+                            cacheRead: number;
+                            cacheWrite: number;
+                        };
+                        contextWindow?: number;
+                        maxTokens?: number;
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        compat?: {
+                            [key: string]: unknown;
+                        };
+                    }>;
+                    metadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            bedrockDiscovery?: {
+                enabled?: boolean;
+                region?: string;
+                providerFilter?: Array<string>;
+                refreshInterval?: number;
+                defaultContextWindow?: number;
+                defaultMaxTokens?: number;
+            };
+        };
+    };
+};
+
+export type PutApiV1ModelProvidersConfigResponse = PutApiV1ModelProvidersConfigResponses[keyof PutApiV1ModelProvidersConfigResponses];
+
+export type PostApiV1ModelProvidersInstancesValidateData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+        instanceKey: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/instances/validate';
+};
+
+export type PostApiV1ModelProvidersInstancesValidateResponses = {
+    /**
+     * Validate model provider instance credentials
+     */
+    200: {
+        valid: boolean;
+        models?: Array<string>;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersInstancesValidateResponse = PostApiV1ModelProvidersInstancesValidateResponses[keyof PostApiV1ModelProvidersInstancesValidateResponses];
+
+export type PostApiV1ModelProvidersByProviderIdValidateData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/model-providers/{providerId}/validate';
+};
+
+export type PostApiV1ModelProvidersByProviderIdValidateResponses = {
+    /**
+     * Validate model provider credentials
+     */
+    200: {
+        valid: boolean;
+        models?: Array<string>;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersByProviderIdValidateResponse = PostApiV1ModelProvidersByProviderIdValidateResponses[keyof PostApiV1ModelProvidersByProviderIdValidateResponses];
+
+export type GetApiV1ModelProvidersMinimaxOauthStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/minimax/oauth/status';
+};
+
+export type GetApiV1ModelProvidersMinimaxOauthStatusResponses = {
     /**
      * MiniMax OAuth status
      */
@@ -2288,16 +2746,16 @@ export type GetApiV1ProvidersMinimaxOauthStatusResponses = {
     };
 };
 
-export type GetApiV1ProvidersMinimaxOauthStatusResponse = GetApiV1ProvidersMinimaxOauthStatusResponses[keyof GetApiV1ProvidersMinimaxOauthStatusResponses];
+export type GetApiV1ModelProvidersMinimaxOauthStatusResponse = GetApiV1ModelProvidersMinimaxOauthStatusResponses[keyof GetApiV1ModelProvidersMinimaxOauthStatusResponses];
 
-export type DeleteApiV1ProvidersMinimaxOauthLoginData = {
+export type DeleteApiV1ModelProvidersMinimaxOauthLoginData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/api/v1/providers/minimax/oauth/login';
+    url: '/api/v1/model-providers/minimax/oauth/login';
 };
 
-export type DeleteApiV1ProvidersMinimaxOauthLoginResponses = {
+export type DeleteApiV1ModelProvidersMinimaxOauthLoginResponses = {
     /**
      * Cancel MiniMax OAuth login
      */
@@ -2310,18 +2768,18 @@ export type DeleteApiV1ProvidersMinimaxOauthLoginResponses = {
     };
 };
 
-export type DeleteApiV1ProvidersMinimaxOauthLoginResponse = DeleteApiV1ProvidersMinimaxOauthLoginResponses[keyof DeleteApiV1ProvidersMinimaxOauthLoginResponses];
+export type DeleteApiV1ModelProvidersMinimaxOauthLoginResponse = DeleteApiV1ModelProvidersMinimaxOauthLoginResponses[keyof DeleteApiV1ModelProvidersMinimaxOauthLoginResponses];
 
-export type PostApiV1ProvidersMinimaxOauthLoginData = {
+export type PostApiV1ModelProvidersMinimaxOauthLoginData = {
     body?: {
         region: 'global' | 'cn';
     };
     path?: never;
     query?: never;
-    url: '/api/v1/providers/minimax/oauth/login';
+    url: '/api/v1/model-providers/minimax/oauth/login';
 };
 
-export type PostApiV1ProvidersMinimaxOauthLoginResponses = {
+export type PostApiV1ModelProvidersMinimaxOauthLoginResponses = {
     /**
      * Start MiniMax OAuth login
      */
@@ -2335,7 +2793,7 @@ export type PostApiV1ProvidersMinimaxOauthLoginResponses = {
     };
 };
 
-export type PostApiV1ProvidersMinimaxOauthLoginResponse = PostApiV1ProvidersMinimaxOauthLoginResponses[keyof PostApiV1ProvidersMinimaxOauthLoginResponses];
+export type PostApiV1ModelProvidersMinimaxOauthLoginResponse = PostApiV1ModelProvidersMinimaxOauthLoginResponses[keyof PostApiV1ModelProvidersMinimaxOauthLoginResponses];
 
 export type PostApiV1ProvidersByProviderIdVerifyData = {
     body?: {
@@ -2343,7 +2801,7 @@ export type PostApiV1ProvidersByProviderIdVerifyData = {
         baseUrl?: string;
     };
     path: {
-        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'openrouter' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
+        providerId: 'anthropic' | 'openai' | 'google' | 'ollama' | 'siliconflow' | 'ppio' | 'nvidia' | 'stepfun' | 'amazon-bedrock' | 'deepseek' | 'openrouter' | 'mistral' | 'xai' | 'together' | 'huggingface' | 'qwen' | 'volcengine' | 'qianfan' | 'vllm' | 'byteplus' | 'venice' | 'github-copilot' | 'xiaomi' | 'chutes' | 'minimax' | 'kimi' | 'glm' | 'moonshot' | 'zai';
     };
     query?: never;
     url: '/api/v1/providers/{providerId}/verify';
@@ -2362,16 +2820,56 @@ export type PostApiV1ProvidersByProviderIdVerifyResponses = {
 
 export type PostApiV1ProvidersByProviderIdVerifyResponse = PostApiV1ProvidersByProviderIdVerifyResponses[keyof PostApiV1ProvidersByProviderIdVerifyResponses];
 
-export type PostApiV1ProvidersByProviderIdOauthStartData = {
+export type PostApiV1QuotaFallbackToByokData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/fallback-to-byok';
+};
+
+export type PostApiV1QuotaFallbackToByokResponses = {
+    /**
+     * Trigger automatic fallback to BYOK provider
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaFallbackToByokResponse = PostApiV1QuotaFallbackToByokResponses[keyof PostApiV1QuotaFallbackToByokResponses];
+
+export type PostApiV1QuotaRestoreManagedData = {
+    body?: {
+        managedModelId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/quota/restore-managed';
+};
+
+export type PostApiV1QuotaRestoreManagedResponses = {
+    /**
+     * Restore default model to managed (cloud) model
+     */
+    200: {
+        ok: boolean;
+        newModelId?: string;
+    };
+};
+
+export type PostApiV1QuotaRestoreManagedResponse = PostApiV1QuotaRestoreManagedResponses[keyof PostApiV1QuotaRestoreManagedResponses];
+
+export type PostApiV1ModelProvidersByProviderIdOauthStartData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/start';
+    url: '/api/v1/model-providers/{providerId}/oauth/start';
 };
 
-export type PostApiV1ProvidersByProviderIdOauthStartResponses = {
+export type PostApiV1ModelProvidersByProviderIdOauthStartResponses = {
     /**
      * OAuth flow started
      */
@@ -2381,18 +2879,18 @@ export type PostApiV1ProvidersByProviderIdOauthStartResponses = {
     };
 };
 
-export type PostApiV1ProvidersByProviderIdOauthStartResponse = PostApiV1ProvidersByProviderIdOauthStartResponses[keyof PostApiV1ProvidersByProviderIdOauthStartResponses];
+export type PostApiV1ModelProvidersByProviderIdOauthStartResponse = PostApiV1ModelProvidersByProviderIdOauthStartResponses[keyof PostApiV1ModelProvidersByProviderIdOauthStartResponses];
 
-export type GetApiV1ProvidersByProviderIdOauthStatusData = {
+export type GetApiV1ModelProvidersByProviderIdOauthStatusData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/status';
+    url: '/api/v1/model-providers/{providerId}/oauth/status';
 };
 
-export type GetApiV1ProvidersByProviderIdOauthStatusResponses = {
+export type GetApiV1ModelProvidersByProviderIdOauthStatusResponses = {
     /**
      * Current OAuth flow status
      */
@@ -2403,18 +2901,18 @@ export type GetApiV1ProvidersByProviderIdOauthStatusResponses = {
     };
 };
 
-export type GetApiV1ProvidersByProviderIdOauthStatusResponse = GetApiV1ProvidersByProviderIdOauthStatusResponses[keyof GetApiV1ProvidersByProviderIdOauthStatusResponses];
+export type GetApiV1ModelProvidersByProviderIdOauthStatusResponse = GetApiV1ModelProvidersByProviderIdOauthStatusResponses[keyof GetApiV1ModelProvidersByProviderIdOauthStatusResponses];
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusData = {
+export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/provider-status';
+    url: '/api/v1/model-providers/{providerId}/oauth/provider-status';
 };
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponses = {
+export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses = {
     /**
      * OAuth provider connection status
      */
@@ -2426,18 +2924,18 @@ export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponses = {
     };
 };
 
-export type GetApiV1ProvidersByProviderIdOauthProviderStatusResponse = GetApiV1ProvidersByProviderIdOauthProviderStatusResponses[keyof GetApiV1ProvidersByProviderIdOauthProviderStatusResponses];
+export type GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponse = GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses[keyof GetApiV1ModelProvidersByProviderIdOauthProviderStatusResponses];
 
-export type PostApiV1ProvidersByProviderIdOauthDisconnectData = {
+export type PostApiV1ModelProvidersByProviderIdOauthDisconnectData = {
     body?: never;
     path: {
         providerId: string;
     };
     query?: never;
-    url: '/api/v1/providers/{providerId}/oauth/disconnect';
+    url: '/api/v1/model-providers/{providerId}/oauth/disconnect';
 };
 
-export type PostApiV1ProvidersByProviderIdOauthDisconnectResponses = {
+export type PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses = {
     /**
      * OAuth provider disconnected
      */
@@ -2446,7 +2944,7 @@ export type PostApiV1ProvidersByProviderIdOauthDisconnectResponses = {
     };
 };
 
-export type PostApiV1ProvidersByProviderIdOauthDisconnectResponse = PostApiV1ProvidersByProviderIdOauthDisconnectResponses[keyof PostApiV1ProvidersByProviderIdOauthDisconnectResponses];
+export type PostApiV1ModelProvidersByProviderIdOauthDisconnectResponse = PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses[keyof PostApiV1ModelProvidersByProviderIdOauthDisconnectResponses];
 
 export type GetApiV1IntegrationsData = {
     body?: never;

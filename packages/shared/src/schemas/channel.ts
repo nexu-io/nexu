@@ -169,6 +169,21 @@ export type SlackOAuthUrlResponse = z.infer<typeof slackOAuthUrlResponseSchema>;
 export const botQuotaResponseSchema = z.object({
   available: z.boolean(),
   resetsAt: z.string(),
+  usingByok: z.boolean().optional(),
+  byokAvailable: z.boolean().optional(),
+  autoFallbackTriggered: z.boolean().optional(),
 });
 
 export type BotQuotaResponse = z.infer<typeof botQuotaResponseSchema>;
+
+export const quotaFallbackResponseSchema = z.object({
+  ok: z.boolean(),
+  newModelId: z.string().optional(),
+});
+
+export const restoreManagedBodySchema = z.object({
+  managedModelId: z.string().min(1),
+});
+
+export type QuotaFallbackResponse = z.infer<typeof quotaFallbackResponseSchema>;
+export type RestoreManagedBody = z.infer<typeof restoreManagedBodySchema>;

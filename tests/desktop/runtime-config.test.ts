@@ -18,4 +18,17 @@ describe("desktop runtime config", () => {
 
     expect(config.updates.channel).toBe("nightly");
   });
+
+  it("reads PostHog env overrides", () => {
+    const config = getDesktopRuntimeConfig(
+      {
+        POSTHOG_API_KEY: "phc_test_key",
+        POSTHOG_HOST: "https://us.i.posthog.com",
+      },
+      { useBuildConfig: false },
+    );
+
+    expect(config.posthogApiKey).toBe("phc_test_key");
+    expect(config.posthogHost).toBe("https://us.i.posthog.com");
+  });
 });

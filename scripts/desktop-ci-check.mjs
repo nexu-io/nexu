@@ -10,6 +10,21 @@ const maxHealthAttemptsByMode = {
 };
 const probeTimeoutMs = 5_000;
 const requiredDiagnosticsUnitIds = ["controller", "openclaw"];
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
+function createCommandSpec(command, args) {
+  if (
+    process.platform === "win32" &&
+    (command === "pnpm" || command === "pnpm.cmd")
+  ) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", ["pnpm", ...args].join(" ")],
+    };
+  }
+
+  return { command, args };
+}
 
 function parseArgs(argv) {
   const [mode, ...rest] = argv;
@@ -44,7 +59,71 @@ function compactPaths(paths) {
   return [...new Set(paths.filter(Boolean))];
 }
 
+function readNumberEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function getPortConfig(mode) {
+  return {
+    controllerPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_CONTROLLER_PORT" : "NEXU_CONTROLLER_PORT",
+      50800,
+    ),
+    webPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_WEB_PORT" : "NEXU_WEB_PORT",
+      50810,
+    ),
+    openclawPort: readNumberEnv(
+      mode === "dev" ? "NEXU_DEV_OPENCLAW_PORT" : "NEXU_OPENCLAW_PORT",
+      18789,
+    ),
+  };
+}
+
+function getReadinessUrls(mode, portConfig) {
+  const controllerUrl =
+    process.env[
+      mode === "dev" ? "NEXU_DEV_CONTROLLER_URL" : "NEXU_CONTROLLER_URL"
+    ] ?? `http://127.0.0.1:${portConfig.controllerPort}`;
+  const webUrl =
+    process.env[mode === "dev" ? "NEXU_DEV_WEB_URL" : "NEXU_WEB_URL"] ??
+    `http://127.0.0.1:${portConfig.webPort}`;
+  const openclawBaseUrl =
+    process.env[
+      mode === "dev" ? "NEXU_DEV_OPENCLAW_BASE_URL" : "NEXU_OPENCLAW_BASE_URL"
+    ] ?? `http://127.0.0.1:${portConfig.openclawPort}`;
+
+  return {
+    api: `${controllerUrl}/api/internal/desktop/ready`,
+    web: `${webUrl}/api/internal/desktop/ready`,
+    webSurface: `${webUrl}/workspace`,
+    webOrigin: safeUrlOrigin(webUrl) ?? webUrl,
+    openclawHealth: `${openclawBaseUrl}/health`,
+  };
+}
+
+function safeUrlOrigin(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isBrowserControlRequired() {
+  const value = process.env.NEXU_DESKTOP_CHECK_REQUIRE_BROWSER_CONTROL;
+
+  if (value === undefined) {
+    return true;
+  }
+
+  return value === "1" || value.toLowerCase() === "true";
+}
+
 function createCheckContext(mode) {
+  const portConfig = getPortConfig(mode);
+
   if (mode === "dev") {
     const desktopRoot = resolve(repoRoot, ".tmp/desktop/electron");
     const desktopUserDataRoot = resolve(desktopRoot, "user-data");
@@ -53,19 +132,15 @@ function createCheckContext(mode) {
 
     return {
       mode,
-      statusCommand: ["pnpm", ["status"]],
+      statusCommand: [pnpmCommand, ["dev", "status"]],
       ports: [
-        { unit: "controller", port: 50800 },
-        { unit: "web", port: 50810 },
+        { unit: "controller", port: portConfig.controllerPort },
+        { unit: "web", port: portConfig.webPort },
       ],
-      readinessUrls: {
-        api: "http://127.0.0.1:50800/api/internal/desktop/ready",
-        web: "http://127.0.0.1:50810/api/internal/desktop/ready",
-        webSurface: "http://127.0.0.1:50810/workspace",
-        openclawHealth: "http://127.0.0.1:18789/health",
-      },
+      readinessUrls: getReadinessUrls(mode, portConfig),
       processChecks: {
-        tmuxSessionName: "nexu-desktop",
+        lockFile: resolve(repoRoot, ".tmp/dev/desktop.pid"),
+        pidKey: "pid",
       },
       diagnosticsFiles: [resolve(desktopLogsDir, "desktop-diagnostics.json")],
       logs: {
@@ -82,9 +157,10 @@ function createCheckContext(mode) {
         ]),
       },
       capturePaths: [
-        { source: resolve(repoRoot, ".tmp/logs"), target: "repo-logs" },
+        { source: resolve(repoRoot, ".tmp/dev/logs"), target: "repo-logs" },
         { source: desktopLogsDir, target: "electron-logs" },
       ],
+      portConfig,
     };
   }
 
@@ -101,15 +177,10 @@ function createCheckContext(mode) {
     mode,
     statusCommand: null,
     ports: [
-      { unit: "controller", port: 50800 },
-      { unit: "web", port: 50810 },
+      { unit: "controller", port: portConfig.controllerPort },
+      { unit: "web", port: portConfig.webPort },
     ],
-    readinessUrls: {
-      api: "http://127.0.0.1:50800/api/internal/desktop/ready",
-      web: "http://127.0.0.1:50810/api/internal/desktop/ready",
-      webSurface: "http://127.0.0.1:50810/workspace",
-      openclawHealth: "http://127.0.0.1:18789/health",
-    },
+    readinessUrls: getReadinessUrls(mode, portConfig),
     processChecks: {
       pidFile: process.env.NEXU_DESKTOP_PACKAGED_PID_PATH ?? null,
     },
@@ -179,12 +250,14 @@ function createCheckContext(mode) {
           ]
         : []),
     ],
+    portConfig,
   };
 }
 
 async function runCommand(command, args) {
   await new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(command, args, {
+    const commandSpec = createCommandSpec(command, args);
+    const child = spawn(commandSpec.command, commandSpec.args, {
       cwd: repoRoot,
       env: process.env,
       stdio: "inherit",
@@ -271,6 +344,37 @@ async function readFirstExistingJson(paths) {
 }
 
 async function isPortListening(port) {
+  if (process.platform === "win32") {
+    return new Promise((resolvePromise, rejectPromise) => {
+      const child = spawn("netstat", ["-ano", "-p", "tcp"], {
+        cwd: repoRoot,
+        env: process.env,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+
+      const chunks = [];
+      child.stdout.on("data", (chunk) => chunks.push(chunk));
+      child.on("error", rejectPromise);
+      child.on("exit", (code) => {
+        if (code !== 0) {
+          resolvePromise(false);
+          return;
+        }
+
+        const output = Buffer.concat(chunks).toString("utf8");
+        const lines = output.split(/\r?\n/u);
+        const listening = lines.some((line) => {
+          const normalized = line.trim().replace(/\s+/gu, " ");
+          return (
+            normalized.includes(`:${String(port)} `) &&
+            normalized.includes(" LISTENING ")
+          );
+        });
+        resolvePromise(listening);
+      });
+    });
+  }
+
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn("lsof", [`-iTCP:${String(port)}`, "-sTCP:LISTEN"], {
       cwd: repoRoot,
@@ -279,19 +383,6 @@ async function isPortListening(port) {
     });
 
     child.on("error", rejectPromise);
-    child.on("exit", (code) => resolvePromise(code === 0));
-  });
-}
-
-async function isTmuxSessionRunning(sessionName) {
-  return new Promise((resolvePromise) => {
-    const child = spawn("tmux", ["has-session", "-t", sessionName], {
-      cwd: repoRoot,
-      env: process.env,
-      stdio: "ignore",
-    });
-
-    child.on("error", () => resolvePromise(false));
     child.on("exit", (code) => resolvePromise(code === 0));
   });
 }
@@ -326,6 +417,32 @@ async function readPidIfAlive(pidFile) {
     : { alive: false, pid, detail: `pid ${pid} is not running` };
 }
 
+async function readStatePidIfAlive(stateFile) {
+  if (!stateFile || !(await fileExists(stateFile))) {
+    return { alive: false, pid: null, detail: "state file is missing" };
+  }
+
+  let parsedState;
+  try {
+    parsedState = JSON.parse(await readFile(stateFile, "utf8"));
+  } catch {
+    return { alive: false, pid: null, detail: "state file is invalid JSON" };
+  }
+
+  const pid = parsedState?.electronPid;
+  if (!Number.isInteger(pid)) {
+    return {
+      alive: false,
+      pid: null,
+      detail: "state file does not contain a valid electronPid",
+    };
+  }
+
+  return isPidAlive(pid)
+    ? { alive: true, pid, detail: `pid ${pid} is running` }
+    : { alive: false, pid, detail: `pid ${pid} is not running` };
+}
+
 async function fetchText(url) {
   try {
     const response = await fetch(url, {
@@ -343,24 +460,64 @@ async function fetchText(url) {
 }
 
 async function collectAppProcessResults(context) {
+  if (context.processChecks.lockFile) {
+    return {
+      mainProcess: await readJsonPidIfAlive(
+        context.processChecks.lockFile,
+        context.processChecks.pidKey ?? "pid",
+      ),
+      auxiliaryProcess: null,
+    };
+  }
+
   if (context.processChecks.pidFile) {
     return {
       mainProcess: await readPidIfAlive(context.processChecks.pidFile),
-      tmuxSession: null,
+      auxiliaryProcess: null,
+    };
+  }
+
+  if (context.processChecks.stateFile) {
+    return {
+      mainProcess: await readStatePidIfAlive(context.processChecks.stateFile),
+      auxiliaryProcess: null,
     };
   }
 
   return {
     mainProcess: {
-      alive: true,
+      alive: false,
       pid: null,
-      detail: "dev app liveness is tracked via tmux session",
+      detail: "no desktop process check configured",
     },
-    tmuxSession: {
-      alive: await isTmuxSessionRunning(context.processChecks.tmuxSessionName),
-      detail: `tmux session ${context.processChecks.tmuxSessionName}`,
-    },
+    auxiliaryProcess: null,
   };
+}
+
+async function readJsonPidIfAlive(filePath, pidKey) {
+  if (!filePath || !(await fileExists(filePath))) {
+    return { alive: false, pid: null, detail: "pid file is missing" };
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return { alive: false, pid: null, detail: "pid file is invalid JSON" };
+  }
+
+  const pid = parsed?.[pidKey];
+  if (!Number.isInteger(pid)) {
+    return {
+      alive: false,
+      pid: null,
+      detail: `pid file does not contain a valid ${pidKey}`,
+    };
+  }
+
+  return isPidAlive(pid)
+    ? { alive: true, pid, detail: `pid ${pid} is running` }
+    : { alive: false, pid, detail: `pid ${pid} is not running` };
 }
 
 function buildMissingCheckSummary(missingChecks) {
@@ -411,24 +568,45 @@ function getDiagnosticsUnit(diagnostics, unitId) {
   return isRuntimeUnitState(match) ? match : null;
 }
 
-function getLatestWorkspaceWebview(diagnostics) {
+// Locate the diagnostics entry for the embedded "web surface" webview that
+// the desktop shell mounts on top of the local web sidecar. The earlier
+// implementation looked for `lastUrl.includes("/workspace")`, but that
+// asserted *product state* (the user has reached the workspace route) rather
+// than runtime health: in fresh-state CI runs the renderer mounts /workspace,
+// then the SPA's AuthLayout / WorkspaceLayout immediately Navigate('/')
+// because there is no auth session and SETUP_COMPLETE_KEY is unset, and
+// because the diagnostics reporter records `contents.getURL()` at
+// did-finish-load time it captures the post-redirect URL.
+//
+// The runtime health invariant we actually care about is that *some* webview
+// successfully loaded a page from the local web sidecar's origin, i.e. the
+// embed handshake worked, the renderer is alive, and there was no fail-load.
+// We accept any path under that origin (root, /workspace, /welcome, ...).
+function getLatestWebSurfaceWebview(diagnostics, webOrigin) {
   if (!Array.isArray(diagnostics?.embeddedContents)) {
     return null;
   }
 
-  const workspaceEntries = diagnostics.embeddedContents.filter(
-    (entry) =>
-      isRecord(entry) &&
-      entry.type === "webview" &&
-      typeof entry.lastUrl === "string" &&
-      entry.lastUrl.includes("/workspace"),
-  );
-
-  if (workspaceEntries.length === 0) {
+  if (typeof webOrigin !== "string" || webOrigin.length === 0) {
     return null;
   }
 
-  return workspaceEntries.reduce((latest, entry) => {
+  const webSurfaceEntries = diagnostics.embeddedContents.filter((entry) => {
+    if (!isRecord(entry)) return false;
+    if (entry.type !== "webview") return false;
+    if (typeof entry.lastUrl !== "string") return false;
+    try {
+      return new URL(entry.lastUrl).origin === webOrigin;
+    } catch {
+      return false;
+    }
+  });
+
+  if (webSurfaceEntries.length === 0) {
+    return null;
+  }
+
+  return webSurfaceEntries.reduce((latest, entry) => {
     const latestEventAt =
       typeof latest.lastEventAt === "string"
         ? Date.parse(latest.lastEventAt)
@@ -452,12 +630,12 @@ function getLatestWorkspaceWebview(diagnostics) {
   });
 }
 
-function diagnosticsChecksPassed(diagnostics) {
+function diagnosticsChecksPassed(diagnostics, webOrigin) {
   if (!isRecord(diagnostics)) {
     return false;
   }
 
-  const workspaceWebview = getLatestWorkspaceWebview(diagnostics);
+  const webSurfaceWebview = getLatestWebSurfaceWebview(diagnostics, webOrigin);
   const requiredUnitsRunning = requiredDiagnosticsUnitIds.every((unitId) => {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
     return unit?.phase === "running" && unit.lastError === null;
@@ -467,24 +645,24 @@ function diagnosticsChecksPassed(diagnostics) {
     diagnostics.coldStart?.status === "succeeded" &&
     diagnostics.renderer?.didFinishLoad === true &&
     diagnostics.renderer?.processGone?.seen !== true &&
-    workspaceWebview?.didFinishLoad === true &&
-    workspaceWebview?.processGone?.seen !== true &&
-    workspaceWebview?.lastError === null &&
+    webSurfaceWebview?.didFinishLoad === true &&
+    webSurfaceWebview?.processGone?.seen !== true &&
+    webSurfaceWebview?.lastError === null &&
     requiredUnitsRunning
   );
 }
 
-function probesPassed(results, diagnostics) {
+function probesPassed(results, diagnostics, webOrigin) {
   return (
     results.portResults.every((entry) => entry.listening) &&
     results.apiReady.body.includes('"ready":true') &&
     results.webReady.body.includes('"ready":true') &&
     results.webSurface.body.includes('<div id="root"></div>') &&
     results.openclawHealth.ok &&
-    results.browserControlListening &&
+    (!isBrowserControlRequired() || results.browserControlListening) &&
     results.appProcessResults.mainProcess.alive &&
     (results.appProcessResults.tmuxSession?.alive ?? true) &&
-    diagnosticsChecksPassed(diagnostics)
+    diagnosticsChecksPassed(diagnostics, webOrigin)
   );
 }
 
@@ -527,7 +705,7 @@ function collectDiagnosticsIssues(diagnostics, count) {
     .slice(-count);
 }
 
-function collectDiagnosticsFailures(diagnostics) {
+function collectDiagnosticsFailures(diagnostics, webOrigin) {
   if (!isRecord(diagnostics)) {
     return ["diagnostics file is unavailable"];
   }
@@ -547,7 +725,7 @@ function collectDiagnosticsFailures(diagnostics) {
     );
   }
 
-  const workspaceWebview = getLatestWorkspaceWebview(diagnostics);
+  const webSurfaceWebview = getLatestWebSurfaceWebview(diagnostics, webOrigin);
   for (const unitId of requiredDiagnosticsUnitIds) {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
     if (!unit) {
@@ -563,20 +741,22 @@ function collectDiagnosticsFailures(diagnostics) {
     }
   }
 
-  if (!workspaceWebview) {
-    failures.push("workspace webview diagnostics are missing");
+  if (!webSurfaceWebview) {
+    failures.push(
+      `web surface webview diagnostics are missing (no embedded webview reported origin ${webOrigin})`,
+    );
   } else {
-    if (workspaceWebview.didFinishLoad !== true) {
-      failures.push("workspace webview did not finish load");
+    if (webSurfaceWebview.didFinishLoad !== true) {
+      failures.push("web surface webview did not finish load");
     }
-    if (workspaceWebview.processGone?.seen === true) {
+    if (webSurfaceWebview.processGone?.seen === true) {
       failures.push(
-        `workspace webview process gone: ${String(workspaceWebview.processGone.reason ?? "unknown")}`,
+        `web surface webview process gone: ${String(webSurfaceWebview.processGone.reason ?? "unknown")}`,
       );
     }
-    if (typeof workspaceWebview.lastError === "string") {
+    if (typeof webSurfaceWebview.lastError === "string") {
       failures.push(
-        `workspace webview lastError=${workspaceWebview.lastError}`,
+        `web surface webview lastError=${webSurfaceWebview.lastError}`,
       );
     }
   }
@@ -878,6 +1058,7 @@ async function captureLogs(context, captureDir) {
 
 async function verifyRuntime(context) {
   const maxHealthAttempts = maxHealthAttemptsByMode[context.mode];
+  const webOrigin = context.readinessUrls.webOrigin;
 
   if (context.statusCommand) {
     await runCommand(context.statusCommand[0], context.statusCommand[1]);
@@ -892,7 +1073,7 @@ async function verifyRuntime(context) {
     );
     const diagnostics = diagnosticsResult.content;
 
-    if (probesPassed(probeResults, diagnostics)) {
+    if (probesPassed(probeResults, diagnostics, webOrigin)) {
       break;
     }
 
@@ -943,7 +1124,7 @@ async function verifyRuntime(context) {
     addMissing("web", "root document did not contain app mount node");
   }
 
-  if (!probeResults.browserControlListening) {
+  if (isBrowserControlRequired() && !probeResults.browserControlListening) {
     addMissing("openclaw", "browser control port 18791 is not listening");
   }
 
@@ -954,10 +1135,6 @@ async function verifyRuntime(context) {
     );
   }
 
-  if (probeResults.appProcessResults.tmuxSession?.alive === false) {
-    addMissing("desktop-shell", "tmux session nexu-desktop is not running");
-  }
-
   if (!probeResults.openclawHealth.ok) {
     addMissing(
       "openclaw",
@@ -965,7 +1142,7 @@ async function verifyRuntime(context) {
     );
   }
 
-  for (const detail of collectDiagnosticsFailures(diagnostics)) {
+  for (const detail of collectDiagnosticsFailures(diagnostics, webOrigin)) {
     addMissing("diagnostics", detail);
   }
 

@@ -1,0 +1,55 @@
+name: Cancel closed PR Desktop E2E runs
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  cancel-desktop-e2e-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel stale Desktop E2E pull_request runs for this PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const workflowId = "desktop-e2e.yml";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id: workflowId,
+              event: "pull_request",
+              per_page: 100,
+            });
+
+            const cancellableRuns = workflowRuns.filter((run) => {
+              const matchesPr = run.pull_requests?.some((pr) => pr.number === prNumber);
+              const isCancellable = run.status !== "completed";
+
+              return matchesPr && isCancellable;
+            });
+
+            if (cancellableRuns.length === 0) {
+              core.info(`No queued or in-progress Desktop E2E pull_request runs found for PR #${prNumber}.`);
+              return;
+            }
+
+            for (const run of cancellableRuns) {
+              core.info(`Canceling Desktop E2E run ${run.id} for PR #${prNumber} (status: ${run.status}).`);
+
+              await github.rest.actions.cancelWorkflowRun({
+                owner,
+                repo,
+                run_id: run.id,
+              });
+            }
+
+            core.info(`Requested cancellation for ${cancellableRuns.length} Desktop E2E run(s) for PR #${prNumber}.`);

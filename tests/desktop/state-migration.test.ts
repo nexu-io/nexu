@@ -17,6 +17,10 @@ import {
   migrateOpenclawState,
 } from "../../apps/desktop/main/services/state-migration";
 
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^[A-Za-z]:/, "");
+}
+
 let sourceDir: string;
 let targetDir: string;
 const logMessages: string[] = [];
@@ -174,12 +178,12 @@ describe("migrateOpenclawState", () => {
 describe("getLegacyNexuHomeStateDir", () => {
   it("expands ~ to homedir", () => {
     const dir = getLegacyNexuHomeStateDir("~/.nexu");
-    expect(dir).toContain("runtime/openclaw/state");
+    expect(normalizePath(dir)).toContain("runtime/openclaw/state");
     expect(dir).not.toContain("~");
   });
 
   it("handles absolute paths without tilde", () => {
     const dir = getLegacyNexuHomeStateDir("/custom/nexu");
-    expect(dir).toBe("/custom/nexu/runtime/openclaw/state");
+    expect(normalizePath(dir)).toBe("/custom/nexu/runtime/openclaw/state");
   });
 });

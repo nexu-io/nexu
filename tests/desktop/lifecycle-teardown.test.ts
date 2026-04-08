@@ -1,3 +1,4 @@
+import path from "node:path";
 /**
  * Lifecycle Teardown Smoke Tests
  *
@@ -93,13 +94,35 @@ const labels = {
   openclaw: "io.nexu.openclaw",
 };
 
-const repoControllerPattern = "/repo/apps/controller/dist/index\\.js";
-const repoOpenclawPattern =
-  "/repo/openclaw-runtime/node_modules/openclaw/openclaw\\.mjs";
-const repoOpenclawGatewayPattern =
-  "/repo/openclaw-runtime/bin/openclaw-gateway";
-const packagedControllerPattern =
-  "/Users/testuser/\\.nexu/runtime/controller-sidecar/dist/index\\.js";
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const repoControllerPattern = escapeRegexLiteral(
+  path.join("/repo", "apps", "controller", "dist", "index.js"),
+);
+const repoOpenclawPattern = escapeRegexLiteral(
+  path.join(
+    "/repo",
+    "openclaw-runtime",
+    "node_modules",
+    "openclaw",
+    "openclaw.mjs",
+  ),
+);
+const repoOpenclawGatewayPattern = escapeRegexLiteral(
+  path.join("/repo", "openclaw-runtime", "bin", "openclaw-gateway"),
+);
+const packagedControllerPattern = escapeRegexLiteral(
+  path.join(
+    "/Users/testuser",
+    ".nexu",
+    "runtime",
+    "controller-sidecar",
+    "dist",
+    "index.js",
+  ),
+);
 const packagedOpenclawPattern = "\\.nexu/(runtime/)?openclaw-sidecar";
 const packagedOpenclawGatewayPattern =
   "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway";

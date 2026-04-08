@@ -188,28 +188,74 @@ export class OpenClawGatewayService {
   async sendChannelMessage(
     input: SendChannelMessageInput,
   ): Promise<SendChannelMessageResult> {
-    return this.wsClient.request<SendChannelMessageResult>("send", {
-      to: input.to,
-      message: input.message,
-      channel: input.channel,
-      accountId: input.accountId,
-      threadId: input.threadId,
-      sessionKey: input.sessionKey,
-      idempotencyKey:
-        input.idempotencyKey ??
-        createHash("sha256")
-          .update(
-            JSON.stringify({
-              channel: input.channel,
-              to: input.to,
-              message: input.message,
-              accountId: input.accountId ?? null,
-              threadId: input.threadId ?? null,
-              sessionKey: input.sessionKey ?? null,
-            }),
-          )
-          .digest("hex"),
-    });
+    const startedAt = Date.now();
+    const idempotencyKey =
+      input.idempotencyKey ??
+      createHash("sha256")
+        .update(
+          JSON.stringify({
+            channel: input.channel,
+            to: input.to,
+            message: input.message,
+            accountId: input.accountId ?? null,
+            threadId: input.threadId ?? null,
+            sessionKey: input.sessionKey ?? null,
+          }),
+        )
+        .digest("hex");
+
+    logger.info(
+      {
+        channel: input.channel,
+        to: input.to,
+        accountId: input.accountId ?? null,
+        threadId: input.threadId ?? null,
+        sessionKey: input.sessionKey ?? null,
+        idempotencyKey,
+        messageLength: input.message.length,
+      },
+      "openclaw_send_request_start",
+    );
+
+    try {
+      const result = await this.wsClient.request<SendChannelMessageResult>(
+        "send",
+        {
+          to: input.to,
+          message: input.message,
+          channel: input.channel,
+          accountId: input.accountId,
+          threadId: input.threadId,
+          sessionKey: input.sessionKey,
+          idempotencyKey,
+        },
+      );
+
+      logger.info(
+        {
+          channel: input.channel,
+          idempotencyKey,
+          durationMs: Date.now() - startedAt,
+          runId: result.runId ?? null,
+          messageId: result.messageId ?? null,
+          conversationId: result.conversationId ?? null,
+        },
+        "openclaw_send_request_success",
+      );
+
+      return result;
+    } catch (error) {
+      logger.warn(
+        {
+          channel: input.channel,
+          idempotencyKey,
+          durationMs: Date.now() - startedAt,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "openclaw_send_request_failure",
+      );
+      throw error;
+    }
   }
 
   async logoutChannelAccount(
@@ -364,6 +410,29 @@ export class OpenClawGatewayService {
             derivedStatus = "connecting";
           } else {
             derivedStatus = "disconnected";
+          }
+
+          if (
+            openclawChannelId === "openclaw-weixin" &&
+            derivedStatus !== "connected"
+          ) {
+            logger.info(
+              {
+                channelId: channel.id,
+                accountId: channel.accountId,
+                rawSnapshot: {
+                  running,
+                  configured,
+                  connected,
+                  enabled,
+                  restartPending: snapshot.restartPending === true,
+                  lastError,
+                  probeOk: hasProbeOk,
+                },
+                derivedStatus,
+              },
+              "openclaw_weixin_live_status_non_connected",
+            );
           }
 
           return {

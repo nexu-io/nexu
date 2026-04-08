@@ -56,7 +56,7 @@ These probes record whether:
 - the renderer main module started
 - React render actually committed
 - renderer Sentry initialization succeeded or failed
-- Amplitude initialization succeeded or failed
+- PostHog initialization succeeded or failed
 - the main process observed `did-finish-load`, `did-fail-load`, or `render-process-gone`
 
 The probes are continuously written into `desktop-diagnostics.json`. During export, the app also produces a startup-focused summary so we can quickly tell whether failure happened:

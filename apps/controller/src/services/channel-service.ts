@@ -33,6 +33,7 @@ import type { RuntimeHealth } from "../runtime/runtime-health.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
+import type { QuotaFallbackService } from "./quota-fallback-service.js";
 
 const execFileAsync = promisify(execFile);
 function sleep(ms: number) {
@@ -376,6 +377,20 @@ function registerWeChatAccount(env: ControllerEnv, accountId: string): void {
   );
 }
 
+function getWeChatAccountStateDiagnostics(
+  env: ControllerEnv,
+  accountId: string,
+) {
+  const stateDir = resolveWeChatPluginStateDir(env);
+  return {
+    stateDir,
+    accountFileExists: existsSync(
+      path.join(stateDir, "accounts", `${accountId}.json`),
+    ),
+    indexFileExists: existsSync(resolveWeChatAccountIndexPath(env)),
+  };
+}
+
 function purgeExpiredWechatLogins(): void {
   const now = Date.now();
   for (const [sessionKey, login] of activeWechatLogins) {
@@ -699,6 +714,7 @@ export class ChannelService {
     private readonly openclawProcess: OpenClawProcessManager,
     private readonly runtimeHealth: RuntimeHealth,
     private readonly wsClient: OpenClawWsClient,
+    private readonly quotaFallbackService?: QuotaFallbackService,
   ) {}
 
   async listChannels() {
@@ -710,9 +726,27 @@ export class ChannelService {
   }
 
   async getBotQuota(): Promise<BotQuotaResponse> {
-    return {
+    const base: BotQuotaResponse = {
       available: true,
       resetsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    if (!this.quotaFallbackService) {
+      return base;
+    }
+
+    const [usingByok, byokProvider] = await Promise.all([
+      this.quotaFallbackService
+        .isUsingManagedModel()
+        .then((managed) => !managed),
+      this.quotaFallbackService.getAvailableByokProvider(),
+    ]);
+
+    return {
+      ...base,
+      usingByok,
+      byokAvailable: byokProvider !== null,
+      autoFallbackTriggered: usingByok,
     };
   }
 
@@ -810,7 +844,23 @@ export class ChannelService {
   async connectWechat(accountId: string) {
     const channel = await this.configStore.connectWechat({ accountId });
     await this.syncService.writePlatformTemplatesForBot(channel.botId);
+    logger.info(
+      {
+        accountId,
+        phase: "before",
+        ...getWeChatAccountStateDiagnostics(this.env, accountId),
+      },
+      "wechat_connect_sync_all",
+    );
     await this.syncService.syncAll();
+    logger.info(
+      {
+        accountId,
+        phase: "after",
+        ...getWeChatAccountStateDiagnostics(this.env, accountId),
+      },
+      "wechat_connect_sync_all",
+    );
     // Don't block on readiness — the prewarm hot-reload + monitor startup
     // can take 15-30s depending on the previous long-poll cycle. Blocking
     // here keeps the connect modal open and risks a rollback that triggers
@@ -893,6 +943,13 @@ export class ChannelService {
           userId: status.ilink_user_id,
         });
         registerWeChatAccount(this.env, normalizedAccountId);
+        logger.info(
+          {
+            accountId: normalizedAccountId,
+            ...getWeChatAccountStateDiagnostics(this.env, normalizedAccountId),
+          },
+          "wechat_qr_confirmation_state_written",
+        );
         activeWechatLogins.delete(sessionKey);
         return {
           connected: true,

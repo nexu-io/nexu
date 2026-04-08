@@ -27,6 +27,9 @@ export const hostInvokeChannels = [
   "desktop:get-minimax-oauth-status",
   "desktop:start-minimax-oauth",
   "desktop:cancel-minimax-oauth",
+  "desktop:get-rewards-status",
+  "desktop:set-reward-balance",
+  "desktop:rewards-updated",
   "shell:open-external",
   "update:check",
   "update:download",
@@ -132,6 +135,11 @@ export type HostInvokePayloadMap = {
     region: "global" | "cn";
   };
   "desktop:cancel-minimax-oauth": undefined;
+  "desktop:get-rewards-status": undefined;
+  "desktop:set-reward-balance": {
+    balance: number;
+  };
+  "desktop:rewards-updated": undefined;
   "shell:open-external": {
     url: string;
   };
@@ -169,6 +177,7 @@ export type HostInvokeResultMap = {
   "desktop:get-cloud-status": {
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -186,6 +195,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -196,6 +206,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -213,6 +224,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -230,6 +242,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -247,6 +260,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -258,6 +272,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -275,6 +290,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -286,6 +302,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -303,6 +320,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -314,6 +332,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -331,6 +350,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -342,6 +362,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
     connected: boolean;
     polling?: boolean;
+    userId?: string | null;
     userName?: string | null;
     userEmail?: string | null;
     connectedAt?: string | null;
@@ -359,6 +380,7 @@ export type HostInvokeResultMap = {
       linkUrl: string;
       connected: boolean;
       polling?: boolean;
+      userId?: string | null;
       userName?: string | null;
       userEmail?: string | null;
       connectedAt?: string | null;
@@ -386,6 +408,19 @@ export type HostInvokeResultMap = {
     region?: "global" | "cn" | null;
     error?: string | null;
     cancelled: boolean;
+  };
+  "desktop:get-rewards-status": {
+    cloudBalance?: {
+      totalBalance?: number | null;
+    } | null;
+  };
+  "desktop:set-reward-balance": {
+    cloudBalance?: {
+      totalBalance?: number | null;
+    } | null;
+  };
+  "desktop:rewards-updated": {
+    ok: boolean;
   };
   "shell:open-external": {
     ok: boolean;
@@ -455,6 +490,12 @@ export type HostDesktopCommand =
       type: "desktop:check-for-updates";
     }
   | {
+      type: "develop:open-set-balance";
+    }
+  | {
+      type: "desktop:rewards-updated";
+    }
+  | {
       type: "setup:complete";
     };
 
@@ -479,7 +520,8 @@ export type RuntimeUnitLaunchStrategy =
   | "embedded"
   | "managed"
   | "delegated"
-  | "launchd";
+  | "launchd"
+  | "external";
 
 export type RuntimeUnitPhase =
   | "idle"
@@ -512,7 +554,9 @@ export type RuntimeReasonCode =
   | "launchd_stopped"
   | "launchd_start_requested"
   | "launchd_stop_requested"
-  | "launchd_log_line";
+  | "launchd_log_line"
+  | "external_available"
+  | "external_unavailable";
 
 export type RuntimeLogEntry = {
   id: string;
@@ -567,8 +611,11 @@ export type HostBridge = {
 export type HostBootstrap = {
   buildInfo: DesktopBuildInfo;
   sentryDsn: string | null;
+  posthogApiKey: string | null;
+  posthogHost: string | null;
   isPackaged: boolean;
   needsSetupAnimation: boolean;
+  webviewPreloadUrl: string;
 };
 
 export type UpdateSource = "r2" | "github";

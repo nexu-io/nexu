@@ -190,8 +190,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           NEXU_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          VITE_AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
-          AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
+          VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         run: pnpm --filter @nexu/desktop dist:mac
 
       - name: Set packaged app paths
@@ -549,3 +549,14 @@ jobs:
               ref: context.ref || 'main',
               inputs: { mode: 'model', channel: '${{ steps.channel.outputs.channel }}' },
             });
+
+  package-windows:
+    name: Windows (placeholder)
+    runs-on: windows-latest
+    steps:
+      - name: Reserve Windows lane
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows placeholder"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Channel: release"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Status: reserved only; no Windows artifacts are published by this workflow yet"

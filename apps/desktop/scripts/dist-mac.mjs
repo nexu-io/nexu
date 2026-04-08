@@ -13,6 +13,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
@@ -26,6 +27,10 @@ const isUnsigned =
   process.env.NEXU_DESKTOP_MAC_UNSIGNED?.toLowerCase() === "true";
 const targetMacArch = resolveTargetMacArch();
 const macTargets = resolveMacTargets();
+const buildTargetPlatform = resolveBuildTargetPlatform({
+  env: process.env,
+  platform: process.platform,
+});
 const dmgBuilderReleaseName = "dmg-builder@1.2.0";
 const dmgBuilderReleaseVersion = "75c8a6c";
 const dmgBuilderArch = targetMacArch === "arm64" ? "arm64" : "x86_64";
@@ -109,6 +114,21 @@ async function ensureExistingRuntimeInstall() {
       "openclaw-runtime cache",
     ),
   ]);
+}
+
+// Only honor an explicitly provided electron dist override (used by e2e
+// coverage tooling). When unset, return null so electron-builder falls back
+// to its default electron resolution. Pointing electron-builder directly at
+// the pnpm-stored Electron.app caused codesign to fail with "bundle format is
+// ambiguous" because the framework symlink layout did not survive the copy
+// from the pnpm content-addressable store (regression from #698).
+async function resolveElectronDistPath() {
+  const override = process.env.NEXU_DESKTOP_ELECTRON_DIST_PATH;
+  if (!override) {
+    return null;
+  }
+  await ensureExistingPath(override, "electron dist override");
+  return override;
 }
 
 async function timedStep(stepName, fn, timings) {
@@ -566,10 +586,15 @@ async function ensureBuildConfig() {
       merged.NEXU_DESKTOP_BUILD_TIME ??
       existingConfig.NEXU_DESKTOP_BUILD_TIME ??
       defaultMetadata.NEXU_DESKTOP_BUILD_TIME,
-    ...((merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY)
+    ...((merged.POSTHOG_API_KEY ?? existingConfig.POSTHOG_API_KEY)
       ? {
-          AMPLITUDE_API_KEY:
-            merged.AMPLITUDE_API_KEY ?? existingConfig.AMPLITUDE_API_KEY,
+          POSTHOG_API_KEY:
+            merged.POSTHOG_API_KEY ?? existingConfig.POSTHOG_API_KEY,
+        }
+      : {}),
+    ...((merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST)
+      ? {
+          POSTHOG_HOST: merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST,
         }
       : {}),
   };
@@ -600,9 +625,9 @@ async function getElectronVersion() {
 
 async function main() {
   const timings = [];
-  if (process.platform !== "darwin") {
+  if (buildTargetPlatform !== "mac") {
     throw new Error(
-      `[dist:mac] mac packaging must run on macOS: platform=${process.platform}, target=${targetMacArch}.`,
+      `[dist:mac] mac packaging must run with target platform "mac": host=${process.platform}, target=${buildTargetPlatform}, arch=${targetMacArch}.`,
     );
   }
 
@@ -768,6 +793,7 @@ async function main() {
   // Falls back to "dev" for local builds outside a git repo.
   let buildVersion = "dev";
   const electronVersion = await getElectronVersion();
+  const electronDistPath = await resolveElectronDistPath();
   try {
     buildVersion = execFileSync("git", ["rev-parse", "--short=7", "HEAD"], {
       encoding: "utf8",
@@ -786,6 +812,9 @@ async function main() {
         "--publish",
         "never",
         `--config.electronVersion=${electronVersion}`,
+        ...(electronDistPath
+          ? [`--config.electronDist=${electronDistPath}`]
+          : []),
         `--config.buildVersion=${buildVersion}`,
         `--config.directories.output=${releaseRoot}`,
         ...(isFastCiMode

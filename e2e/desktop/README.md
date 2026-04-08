@@ -163,13 +163,14 @@ Build/Release workflows **asynchronously dispatch** the E2E workflow. E2E succes
 
 ### Manual Trigger
 
-When triggering manually from the GitHub Actions page, three parameters are available:
+When triggering manually from the GitHub Actions page, four parameters are available:
 
 | Parameter | Options | Description |
 |-----------|---------|-------------|
 | **Source** | `download` (default) / `build` | `download` fetches a published build; `build` checks out the current branch and builds unsigned locally |
 | **Channel** | `nightly` (default) / `beta` / `stable` | Only applies to `download` source — selects which channel to fetch |
 | **Mode** | `smoke` / `login` / `model` (default) / `update` / `resilience` / `full` | Which test scenarios to run |
+| **Coverage** | `false` (default) / `true` | Enables the precise desktop E2E coverage path. `true` is only valid with `source=build`. |
 
 #### Source = download (test published builds)
 
@@ -179,6 +180,8 @@ Trigger → download signed build for the selected channel → run E2E
 
 Typical use case: verify a just-published nightly/beta/stable build works correctly.
 
+`Coverage=true` is not supported for this path because precise coverage must be collected from artifacts built from the current checkout.
+
 #### Source = build (test current branch)
 
 ```
@@ -186,6 +189,18 @@ Trigger → checkout current branch → pnpm install → build unsigned → run 
 ```
 
 Typical use case: verify changes on a feature branch don't break the packaged app, without publishing first.
+
+This is also the only source mode that supports `Coverage=true`.
+
+### Coverage Mode
+
+Precise desktop E2E coverage is opt-in and currently intended only for manual `source=build` runs.
+
+```text
+Trigger → source=build → coverage=true → build unsigned from current branch → preserve remap artifacts → run E2E
+```
+
+Scheduled nightly runs keep coverage disabled by default so the functional regression signal stays cheaper and faster.
 
 ### Failure Diagnostics
 

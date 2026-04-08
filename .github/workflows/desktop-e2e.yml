@@ -1,6 +1,28 @@
 name: Desktop E2E
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
+  pull_request:
+    paths:
+      - "apps/controller/**"
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "e2e/desktop/**"
+      - ".github/workflows/desktop-e2e.yml"
+      - "codecov.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/controller/**"
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "e2e/desktop/**"
+      - ".github/workflows/desktop-e2e.yml"
+      - "codecov.yml"
   workflow_dispatch:
     inputs:
       mode:
@@ -23,6 +45,12 @@ on:
         default: 'nightly'
         type: choice
         options: [nightly, beta, stable]
+      coverage:
+        description: 'Enable precise coverage collection (build source only)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
   schedule:
     # Run nightly at 03:00 UTC (11:00 CST)
     - cron: '0 3 * * *'
@@ -30,14 +58,33 @@ on:
 env:
   RELEASE_BASE: https://desktop-releases.nexu.io
 
+concurrency:
+  group: desktop-e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  validate-inputs:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate coverage input
+        if: github.event.inputs.coverage == 'true' && github.event.inputs.source != 'build'
+        run: |
+          echo "coverage=true requires source=build for precise path remapping and per-run source map parity."
+          echo "Use source=build for coverage runs, or set coverage=false when testing downloaded artifacts."
+          exit 1
+
   # --------------------------------------------------------------------------
   # Option A: Build unsigned from current branch
   # --------------------------------------------------------------------------
   build:
-    if: github.event.inputs.source == 'build'
+    needs: [validate-inputs]
+    if: always() && (needs.validate-inputs.result == 'success' || needs.validate-inputs.result == 'skipped') && (github.event_name != 'workflow_dispatch' || github.event.inputs.source == 'build') && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event_name == 'push')
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 30
+    env:
+      E2E_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || 'model' }}
+      E2E_COVERAGE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.coverage == 'true') || github.event_name == 'pull_request' || github.event_name == 'push' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,7 +105,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build unsigned desktop (arm64)
-        run: pnpm dist:mac:unsigned:arm64
+        run: |
+          rm -f apps/desktop/release/*.dmg apps/desktop/release/*.zip
+          pnpm dist:mac:unsigned:arm64
 
       - name: Copy build artifacts to E2E
         run: |
@@ -68,6 +117,23 @@ jobs:
           cp apps/desktop/release/*.zip e2e/desktop/artifacts/
           echo "Artifacts:"
           ls -lh e2e/desktop/artifacts/
+
+      - name: Collect coverage remap artifacts
+        if: env.E2E_COVERAGE == 'true'
+        run: |
+          mkdir -p e2e/desktop/artifacts/source-maps/dist
+          mkdir -p e2e/desktop/artifacts/source-maps/dist-electron/preload
+          mkdir -p e2e/desktop/artifacts/source-maps/web-dist
+          cp -R apps/desktop/dist/. e2e/desktop/artifacts/source-maps/dist/
+          cp -R apps/desktop/dist-electron/preload/. e2e/desktop/artifacts/source-maps/dist-electron/preload/
+          cp -R apps/web/dist/. e2e/desktop/artifacts/source-maps/web-dist/
+
+      - name: Write coverage build manifest
+        if: env.E2E_COVERAGE == 'true'
+        run: |
+          node -e "const fs = require('node:fs'); const path = require('node:path'); const manifestPath = path.join('e2e', 'desktop', 'artifacts', 'coverage-build-manifest.json'); const manifest = { gitSha: process.env.GITHUB_SHA, workflowRunId: process.env.GITHUB_RUN_ID, mode: process.env.NEXU_DESKTOP_E2E_MODE, source: 'build', coverageEnabled: true, builtAt: new Date().toISOString(), pathNormalizationVersion: 1, sourceMaps: ['source-maps/dist/**', 'source-maps/dist-electron/preload/**', 'source-maps/web-dist/**'] }; fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');"
+        env:
+          NEXU_DESKTOP_E2E_MODE: ${{ env.E2E_MODE }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -80,10 +146,15 @@ jobs:
   # E2E test
   # --------------------------------------------------------------------------
   e2e:
-    needs: [build]
-    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: [validate-inputs, build]
+    if: always() && (needs.validate-inputs.result == 'success' || needs.validate-inputs.result == 'skipped') && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 30
+    env:
+      E2E_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || 'model' }}
+      E2E_SOURCE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source || (github.event_name == 'schedule' && 'download' || 'build') }}
+      E2E_CHANNEL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.channel || 'nightly' }}
+      E2E_COVERAGE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.coverage == 'true') || github.event_name == 'pull_request' || github.event_name == 'push' }}
     defaults:
       run:
         working-directory: e2e/desktop
@@ -102,18 +173,18 @@ jobs:
 
       # --- Download source ---
       - name: Download published artifacts
-        if: github.event.inputs.source != 'build'
+        if: env.E2E_SOURCE != 'build'
         env:
-          CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
-          NEXU_DESKTOP_E2E_DMG_URL: ${{ env.RELEASE_BASE }}/${{ github.event.inputs.channel || 'nightly' }}/arm64/nexu-latest-${{ github.event.inputs.channel || 'nightly' }}-mac-arm64.dmg
-          NEXU_DESKTOP_E2E_ZIP_URL: ${{ env.RELEASE_BASE }}/${{ github.event.inputs.channel || 'nightly' }}/arm64/nexu-latest-${{ github.event.inputs.channel || 'nightly' }}-mac-arm64.zip
+          CHANNEL: ${{ env.E2E_CHANNEL }}
+          NEXU_DESKTOP_E2E_DMG_URL: ${{ env.RELEASE_BASE }}/${{ env.E2E_CHANNEL }}/arm64/nexu-latest-${{ env.E2E_CHANNEL }}-mac-arm64.dmg
+          NEXU_DESKTOP_E2E_ZIP_URL: ${{ env.RELEASE_BASE }}/${{ env.E2E_CHANNEL }}/arm64/nexu-latest-${{ env.E2E_CHANNEL }}-mac-arm64.zip
         run: |
           echo "Channel: $CHANNEL"
           npm run download
 
       # --- Build source ---
       - name: Download build artifacts
-        if: github.event.inputs.source == 'build'
+        if: env.E2E_SOURCE == 'build'
         uses: actions/download-artifact@v4
         with:
           name: desktop-e2e-build-${{ github.run_id }}
@@ -128,16 +199,55 @@ jobs:
 
       - name: Run desktop E2E
         env:
-          NEXU_DESKTOP_E2E_SKIP_CODESIGN: ${{ github.event.inputs.source == 'build' && 'true' || 'false' }}
-        run: bash scripts/run-e2e.sh "${{ github.event.inputs.mode || 'model' }}"
+          NEXU_DESKTOP_E2E_SKIP_CODESIGN: ${{ env.E2E_SOURCE == 'build' && 'true' || 'false' }}
+          NEXU_DESKTOP_E2E_COVERAGE: ${{ env.E2E_COVERAGE == 'true' && '1' || '0' }}
+          NEXU_DESKTOP_E2E_COVERAGE_RUN_ID: desktop-e2e-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.E2E_MODE }}
+          NEXU_DESKTOP_E2E_GIT_SHA: ${{ github.sha }}
+          NEXU_DESKTOP_E2E_SOURCE: ${{ env.E2E_SOURCE }}
+          NEXU_DESKTOP_E2E_WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: bash scripts/run-e2e.sh "${{ env.E2E_MODE }}"
+
+      - name: Merge desktop E2E coverage
+        if: always() && env.E2E_COVERAGE == 'true'
+        run: npm run coverage:merge
+
+      - name: Write desktop E2E coverage summary
+        if: always() && env.E2E_COVERAGE == 'true'
+        run: npm run coverage:report
+
+      - name: Upload desktop E2E coverage artifacts
+        if: always() && env.E2E_COVERAGE == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-coverage-${{ env.E2E_MODE }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            e2e/desktop/captures/coverage/
+            e2e/desktop/artifacts/coverage-build-manifest.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload desktop E2E coverage to Codecov
+        if: ${{ !cancelled() && env.E2E_COVERAGE == 'true' && hashFiles('e2e/desktop/captures/coverage/lcov.info') != '' }}
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: true
+          skip_validation: true
+          disable_search: true
+          files: e2e/desktop/captures/coverage/lcov.info
+          flags: desktop-e2e
+          name: desktop-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          fail_ci_if_error: false
+          verbose: true
+          os: macos
 
       - name: Upload E2E diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-e2e-${{ github.event.inputs.source || 'download' }}-${{ github.event.inputs.channel || 'nightly' }}-${{ github.event.inputs.mode || 'model' }}-${{ github.run_id }}
+          name: desktop-e2e-${{ env.E2E_SOURCE }}-${{ env.E2E_CHANNEL }}-${{ env.E2E_MODE }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             e2e/desktop/captures/
+            !e2e/desktop/captures/coverage/**
           if-no-files-found: warn
           retention-days: 14
 
@@ -145,9 +255,9 @@ jobs:
         if: always()
         env:
           FEISHU_WEBHOOK: ${{ secrets.NIGHTLY_FEISHU_WEBHOOK }}
-          E2E_MODE: ${{ github.event.inputs.mode || 'model' }}
-          E2E_SOURCE: ${{ github.event.inputs.source || 'download' }}
-          E2E_CHANNEL: ${{ github.event.inputs.channel || 'nightly' }}
+          E2E_MODE: ${{ env.E2E_MODE }}
+          E2E_SOURCE: ${{ env.E2E_SOURCE }}
+          E2E_CHANNEL: ${{ env.E2E_CHANNEL }}
           E2E_STATUS: ${{ job.status }}
         shell: bash
         run: |

@@ -1,4 +1,9 @@
 import {
+  syncDesktopCloudQueries,
+  useDesktopCloudStatus,
+} from "@/hooks/use-desktop-cloud-status";
+import { useQueryClient } from "@tanstack/react-query";
+import {
   ArrowRight,
   Check,
   ChevronLeft,
@@ -21,6 +26,8 @@ import { LanguageSwitcher } from "../components/language-switcher";
 import { ProviderLogo } from "../components/provider-logo";
 import { useLocale } from "../hooks/use-locale";
 import { usePageTitle } from "../hooks/use-page-title";
+import { authClient } from "../lib/auth-client";
+import { openExternalUrl } from "../lib/desktop-links";
 import { track } from "../lib/tracking";
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
@@ -51,64 +58,24 @@ function FadeIn({
 const PROVIDER_OPTIONS = [
   { id: "anthropic", name: "Anthropic", placeholder: "sk-ant-..." },
   { id: "openai", name: "OpenAI", placeholder: "sk-..." },
-  { id: "google", name: "Google AI", placeholder: "AIza..." },
+  { id: "google", name: "Google AI Studio", placeholder: "AIza..." },
   { id: "siliconflow", name: "SiliconFlow", placeholder: "sk-..." },
   { id: "ppio", name: "PPIO", placeholder: "sk-..." },
   { id: "openrouter", name: "OpenRouter", placeholder: "sk-or-..." },
   { id: "minimax", name: "MiniMax", placeholder: "sk-..." },
-  { id: "kimi", name: "Kimi", placeholder: "sk-..." },
-  { id: "glm", name: "GLM", placeholder: "eyJ..." },
+  { id: "kimi", name: "Moonshot", placeholder: "sk-..." },
+  { id: "glm", name: "Zhipu", placeholder: "eyJ..." },
 ] as const;
 
 type Mode = "choose" | "byok";
-
-type HostInvokeBridge = {
-  invoke: (
-    channel: "shell:open-external",
-    payload: { url: string },
-  ) => Promise<{ ok: boolean }>;
-};
-
-function getHostInvokeBridge(): HostInvokeBridge | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const candidate = (window as Window & { nexuHost?: unknown }).nexuHost;
-  if (!candidate || typeof candidate !== "object") {
-    return null;
-  }
-
-  const invoke = Reflect.get(candidate, "invoke");
-  if (typeof invoke !== "function") {
-    return null;
-  }
-
-  return {
-    invoke: (channel, payload) =>
-      invoke.call(candidate, channel, payload) as Promise<{ ok: boolean }>,
-  };
-}
-
-async function openExternalUrl(url: string): Promise<void> {
-  const hostBridge = getHostInvokeBridge();
-  if (hostBridge) {
-    await hostBridge.invoke("shell:open-external", { url });
-    return;
-  }
-
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
 export function WelcomePage() {
   const { t } = useLocale();
   usePageTitle(t("welcome.pageTitle"));
   const navigate = useNavigate();
-
-  // If already set up, skip welcome
-  if (isSetupComplete()) {
-    return <Navigate to="/workspace" replace />;
-  }
+  const queryClient = useQueryClient();
+  const { data: session, isPending: authPending } = authClient.useSession();
+  const setupComplete = isSetupComplete();
 
   const [mode, setMode] = useState<Mode>("choose");
 
@@ -119,53 +86,38 @@ export function WelcomePage() {
   const [verified, setVerified] = useState(false);
   const [cloudConnecting, setCloudConnecting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [cloudStatus, setCloudStatus] = useState({
-    connected: false,
-    polling: false,
-  });
+  const { data: cloudStatus, refetch: refetchDesktopCloudStatus } =
+    useDesktopCloudStatus();
+  const cloudConnected = cloudStatus?.connected ?? false;
+  const cloudPolling = cloudStatus?.polling ?? false;
+
+  if (setupComplete && authPending) {
+    return <div className="min-h-screen bg-[#0b0b0d]" />;
+  }
+
+  if (setupComplete && session?.user) {
+    return <Navigate to="/workspace" replace />;
+  }
 
   useEffect(() => {
-    let cancelled = false;
+    if (!cloudConnected) {
+      return;
+    }
 
-    const restoreCloudStatus = async () => {
-      try {
-        const { data } = await getApiInternalDesktopCloudStatus();
-        if (cancelled) return;
-
-        setCloudStatus({
-          connected: Boolean(data?.connected),
-          polling: Boolean(data?.polling),
-        });
-
-        if (data?.connected) {
-          markSetupComplete();
-          navigate("/workspace", { replace: true });
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    void restoreCloudStatus();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [navigate]);
+    markSetupComplete();
+    navigate("/workspace", { replace: true });
+  }, [cloudConnected, navigate]);
 
   // Poll cloud-status while waiting for browser login
   useEffect(() => {
-    if (!cloudConnecting && !cloudStatus.polling) return;
+    if (!cloudConnecting && !cloudPolling) return;
     const interval = setInterval(async () => {
       try {
-        const { data } = await getApiInternalDesktopCloudStatus();
-        setCloudStatus({
-          connected: Boolean(data?.connected),
-          polling: Boolean(data?.polling),
-        });
-        if (data?.connected) {
+        const result = await refetchDesktopCloudStatus();
+        if (result.data?.connected) {
           setCloudConnecting(false);
           setLoginError(null);
+          await syncDesktopCloudQueries(queryClient);
           markSetupComplete();
           navigate("/workspace");
         }
@@ -174,88 +126,59 @@ export function WelcomePage() {
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [cloudConnecting, cloudStatus.polling, navigate]);
+  }, [
+    cloudConnecting,
+    cloudPolling,
+    navigate,
+    queryClient,
+    refetchDesktopCloudStatus,
+  ]);
 
   const activePreset =
     PROVIDER_OPTIONS.find((p) => p.id === selectedProvider) ??
     PROVIDER_OPTIONS[0];
-  const chooseOptions = [
-    {
-      id: "login" as const,
-      title: t("welcome.option.login.title"),
-      badge: t("welcome.option.login.badge"),
-      description: t("welcome.option.login.description"),
-      highlights: [
-        "Claude Sonnet 4.5",
-        "GPT-4o",
-        t("welcome.option.login.highlight.unlimited"),
-      ],
-      meta: [
-        t("welcome.option.login.meta.1"),
-        t("welcome.option.login.meta.2"),
-        t("welcome.option.login.meta.3"),
-      ],
-      icon: Zap,
-      tone: "primary" as const,
-    },
-    {
-      id: "byok" as const,
-      title: t("welcome.option.byok.title"),
-      badge: t("welcome.option.byok.badge"),
-      description: t("welcome.option.byok.description"),
-      highlights: ["Anthropic", "OpenAI", "Google AI"],
-      meta: [
-        t("welcome.option.byok.meta.1"),
-        t("welcome.option.byok.meta.2"),
-        t("welcome.option.byok.meta.3"),
-      ],
-      icon: Key,
-      tone: "secondary" as const,
-    },
-  ];
+  const loginOption = {
+    title: t("welcome.option.login.title"),
+    badge: t("welcome.option.login.badge"),
+    description: t("welcome.option.login.description"),
+    highlights: [
+      "Claude Sonnet 4.5",
+      "GPT-4o",
+      t("welcome.option.login.highlight.unlimited"),
+    ],
+    meta: [
+      t("welcome.option.login.meta.1"),
+      t("welcome.option.login.meta.2"),
+      t("welcome.option.login.meta.3"),
+    ],
+    icon: Zap,
+  };
 
   const handleAccountLogin = async () => {
     track("welcome_option_click", { option: "nexu_account" });
     setCloudConnecting(true);
     setLoginError(null);
     try {
-      let { data } = await postApiInternalDesktopCloudConnect();
-      // If a stale polling session exists, disconnect and retry once. But if
-      // the desktop runtime is already polling, keep the current waiting state
-      // instead of resetting the browser auth flow.
-      if (data?.error === "Connection attempt already in progress") {
-        const statusResponse = await getApiInternalDesktopCloudStatus();
-        const status = statusResponse.data;
-
-        setCloudStatus({
-          connected: Boolean(status?.connected),
-          polling: Boolean(status?.polling),
-        });
-
-        if (status?.connected) {
-          setCloudConnecting(false);
-          markSetupComplete();
-          navigate("/workspace", { replace: true });
-          return;
-        }
-
-        if (status?.polling) {
-          return;
-        }
-
-        setCloudConnecting(false);
-        setLoginError(null);
-        return;
-      }
+      let { data } = await postApiInternalDesktopCloudConnect({
+        body: { source: "welcome_page" },
+      });
+      // The controller now auto-aborts any stale poll and starts a fresh
+      // device flow on re-click, so we no longer special-case
+      // "Connection attempt already in progress" — the generic data?.error
+      // recovery branch below handles any residual edge case by calling
+      // disconnect + reconnect.
       if (data?.error === "Already connected. Disconnect first.") {
         setLoginError(null);
+        await syncDesktopCloudQueries(queryClient);
         markSetupComplete();
         navigate("/workspace", { replace: true });
         return;
       }
       if (data?.error) {
         await postApiInternalDesktopCloudDisconnect().catch(() => {});
-        ({ data } = await postApiInternalDesktopCloudConnect());
+        ({ data } = await postApiInternalDesktopCloudConnect({
+          body: { source: "welcome_page" },
+        }));
       }
       if (data?.error) {
         setLoginError(data.error ?? t("welcome.connectFailed"));
@@ -275,7 +198,7 @@ export function WelcomePage() {
         const connected = Boolean(status?.connected);
         const polling = Boolean(status?.polling);
 
-        setCloudStatus({ connected, polling });
+        await refetchDesktopCloudStatus();
 
         if (connected) {
           setCloudConnecting(false);
@@ -324,7 +247,7 @@ export function WelcomePage() {
   const handleByokEntry = () => {
     track("welcome_option_click", { option: "byok" });
     markSetupComplete();
-    navigate("/workspace/settings?setup=1&tab=providers");
+    navigate("/workspace/models?setup=1&tab=providers");
   };
 
   return (
@@ -346,7 +269,7 @@ export function WelcomePage() {
                 className="flex items-center cursor-pointer text-accent"
               >
                 <img
-                  src="/logo.svg"
+                  src="/brand/logo-black-1.svg"
                   alt="nexu"
                   className="h-5 w-auto object-contain"
                 />
@@ -369,151 +292,123 @@ export function WelcomePage() {
                     >
                       {t("welcome.title")}
                     </h2>
+                    <p className="mt-3 max-w-[480px] text-[14px] leading-[1.8] text-text-secondary">
+                      {t("welcome.subtitle")}
+                    </p>
                   </div>
 
                   <div className="mt-5 space-y-3">
-                    {chooseOptions.map((option, index) => (
-                      <FadeIn key={option.id} delay={180 + index * 90}>
-                        {/* Login card: show waiting overlay when polling */}
-                        {option.id === "login" && cloudConnecting ? (
-                          <div className="relative w-full rounded-[28px] border border-black/12 bg-[linear-gradient(135deg,#7c2d12_0%,#c2410c_100%)] p-5 text-white">
-                            <div className="flex flex-col items-center gap-4 py-4">
-                              <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-                              <div className="text-center">
-                                <div className="text-[15px] font-semibold">
-                                  {t("welcome.waitingLogin")}
-                                </div>
-                                <p className="mt-2 text-[12px] text-white/50">
-                                  {t("welcome.waitingLoginHint")}
-                                </p>
+                    <FadeIn delay={180}>
+                      {cloudConnecting ? (
+                        <div className="relative w-full rounded-[28px] border border-black/12 bg-[linear-gradient(135deg,#7c2d12_0%,#c2410c_100%)] p-5 text-white">
+                          <div className="flex flex-col items-center gap-4 py-4">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+                            <div className="text-center">
+                              <div className="text-[15px] font-semibold">
+                                {t("welcome.waitingLogin")}
                               </div>
-                              {loginError && (
-                                <p className="text-[12px] text-red-400">
-                                  {loginError}
-                                </p>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => void handleCancelLogin()}
-                                className="mt-1 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[12px] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white cursor-pointer"
-                              >
-                                {t("welcome.cancel")}
-                              </button>
+                              <p className="mt-2 text-[12px] text-white/50">
+                                {t("welcome.waitingLoginHint")}
+                              </p>
                             </div>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (option.id === "login") {
-                                void handleAccountLogin();
-                                return;
-                              }
-                              handleByokEntry();
-                            }}
-                            disabled={cloudConnecting}
-                            className={`group w-full rounded-[28px] border p-5 text-left transition-all duration-300 ${
-                              cloudConnecting
-                                ? "opacity-40 cursor-not-allowed"
-                                : `cursor-pointer ${
-                                    option.tone === "primary"
-                                      ? "hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(0,0,0,0.16)]"
-                                      : "hover:-translate-y-0.5 hover:border-black/18 hover:shadow-[0_12px_26px_rgba(0,0,0,0.06)]"
-                                  }`
-                            } ${
-                              option.tone === "primary"
-                                ? "border-black/12 bg-[linear-gradient(135deg,#18181b_0%,#232327_100%)] text-white"
-                                : "border-black/10 bg-[#f5f2ea] text-text-primary"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div
-                                  className={`flex h-11 w-11 items-center justify-center rounded-2xl shrink-0 ${
-                                    option.tone === "primary"
-                                      ? "bg-white/[0.08] text-white"
-                                      : "bg-white text-text-primary border border-black/8"
-                                  }`}
-                                >
-                                  <option.icon size={18} />
-                                </div>
-                                <div
-                                  className={`text-[22px] leading-none tracking-tight ${
-                                    option.tone === "primary"
-                                      ? "text-white"
-                                      : "text-[#1b1b19]"
-                                  }`}
-                                  style={{
-                                    fontFamily:
-                                      "Georgia, Times New Roman, serif",
-                                  }}
-                                >
-                                  {option.title}
-                                </div>
-                              </div>
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] shrink-0 ${
-                                  option.tone === "primary"
-                                    ? "bg-white/[0.08] text-white/75"
-                                    : "border border-black/10 bg-white/70 text-text-secondary"
-                                }`}
-                              >
-                                {option.badge}
-                              </span>
-                            </div>
-
-                            <div className="mt-4 flex items-start justify-between gap-4">
-                              <div>
-                                <p
-                                  className={`mt-3 max-w-[430px] text-[13px] leading-[1.75] ${
-                                    option.tone === "primary"
-                                      ? "text-white/64"
-                                      : "text-text-secondary"
-                                  }`}
-                                >
-                                  {option.description}
-                                </p>
-                              </div>
-                              <ArrowRight
-                                size={16}
-                                className={`mt-4 shrink-0 ${option.tone === "primary" ? "text-white/55" : "text-text-muted"}`}
-                              />
-                            </div>
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {option.highlights.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] ${
-                                    option.tone === "primary"
-                                      ? "border border-white/10 bg-white/[0.06] text-white/78"
-                                      : "border border-black/8 bg-white/70 text-text-secondary"
-                                  }`}
-                                >
-                                  {tag ===
-                                    t(
-                                      "welcome.option.login.highlight.unlimited",
-                                    ) && <InfinityIcon size={11} />}
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-
-                            <div
-                              className={`mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${
-                                option.tone === "primary"
-                                  ? "text-white/44"
-                                  : "text-text-muted"
-                              }`}
+                            {loginError && (
+                              <p className="text-[12px] text-red-400">
+                                {loginError}
+                              </p>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => void handleCancelLogin()}
+                              className="mt-1 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[12px] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white cursor-pointer"
                             >
-                              {option.meta.map((item) => (
-                                <span key={item}>{item}</span>
-                              ))}
+                              {t("welcome.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleAccountLogin();
+                          }}
+                          disabled={cloudConnecting}
+                          className={`group w-full rounded-[28px] border p-5 text-left transition-all duration-300 ${
+                            cloudConnecting
+                              ? "opacity-40 cursor-not-allowed"
+                              : "cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(0,0,0,0.16)]"
+                          } ${"border-black/12 bg-[linear-gradient(135deg,#18181b_0%,#232327_100%)] text-white"}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-2xl shrink-0 bg-white/[0.08] text-white">
+                                <loginOption.icon size={18} />
+                              </div>
+                              <div
+                                className="text-[22px] leading-none tracking-tight text-white"
+                                style={{
+                                  fontFamily: "Georgia, Times New Roman, serif",
+                                }}
+                              >
+                                {loginOption.title}
+                              </div>
                             </div>
-                          </button>
-                        )}
-                      </FadeIn>
-                    ))}
+                            <span className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75 shrink-0">
+                              {loginOption.badge}
+                            </span>
+                          </div>
+
+                          <div className="mt-4 flex items-start justify-between gap-4">
+                            <div>
+                              <p className="mt-3 max-w-[430px] text-[13px] leading-[1.75] text-white/64">
+                                {loginOption.description}
+                              </p>
+                            </div>
+                            <ArrowRight
+                              size={16}
+                              className="mt-4 shrink-0 text-white/55"
+                            />
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {loginOption.highlights.map((tag) => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/78"
+                              >
+                                {tag ===
+                                  t(
+                                    "welcome.option.login.highlight.unlimited",
+                                  ) && <InfinityIcon size={11} />}
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/44">
+                            {loginOption.meta.map((item) => (
+                              <span key={item}>{item}</span>
+                            ))}
+                          </div>
+                        </button>
+                      )}
+                    </FadeIn>
+
+                    <FadeIn delay={250}>
+                      <button
+                        type="button"
+                        onClick={handleByokEntry}
+                        className="flex w-full items-center justify-between rounded-[22px] border border-black/10 bg-[#f5f2ea] px-4 py-3 text-left text-[13px] text-text-secondary transition-all hover:-translate-y-0.5 hover:border-black/16 hover:text-text-primary hover:shadow-[0_10px_22px_rgba(0,0,0,0.05)] cursor-pointer"
+                      >
+                        <span>{t("welcome.byokLink")}</span>
+                        <ArrowRight size={15} className="text-text-muted" />
+                      </button>
+                    </FadeIn>
+
+                    <FadeIn delay={320}>
+                      <div className="rounded-[22px] border border-black/8 bg-[#f5f1e7] px-4 py-3 text-[12px] leading-[1.75] text-text-secondary">
+                        {t("welcome.rewardsHint")}
+                      </div>
+                    </FadeIn>
                   </div>
 
                   <FadeIn delay={380}>

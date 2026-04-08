@@ -26,7 +26,8 @@ type BuildConfig = {
   NEXU_DESKTOP_BUILD_COMMIT?: string;
   NEXU_DESKTOP_BUILD_TIME?: string;
   NEXU_DESKTOP_UPDATE_CHANNEL?: UpdateChannelName;
-  AMPLITUDE_API_KEY?: string;
+  POSTHOG_API_KEY?: string;
+  POSTHOG_HOST?: string;
 };
 
 function readBuildConfigString(
@@ -87,7 +88,8 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
       NEXU_DESKTOP_UPDATE_CHANNEL: readUpdateChannel(
         readBuildConfigString(record, "NEXU_DESKTOP_UPDATE_CHANNEL"),
       ),
-      AMPLITUDE_API_KEY: readBuildConfigString(record, "AMPLITUDE_API_KEY"),
+      POSTHOG_API_KEY: readBuildConfigString(record, "POSTHOG_API_KEY"),
+      POSTHOG_HOST: readBuildConfigString(record, "POSTHOG_HOST"),
     };
   } catch {
     return {};
@@ -178,6 +180,7 @@ function parseEnvBoolean(value: string | undefined): boolean | null {
 }
 
 export type DesktopRuntimeConfig = {
+  runtimeMode: "internal" | "external";
   buildInfo: DesktopBuildInfo;
   proxy: ProxyPolicy;
   updates: {
@@ -207,7 +210,8 @@ export type DesktopRuntimeConfig = {
     password: string;
   };
   sentryDsn: string | null;
-  amplitudeApiKey: string | null;
+  posthogApiKey: string | null;
+  posthogHost: string | null;
 };
 
 export function getDesktopRuntimeConfig(
@@ -219,6 +223,12 @@ export function getDesktopRuntimeConfig(
     useBuildConfig?: boolean;
   },
 ): DesktopRuntimeConfig {
+  const runtimeMode =
+    env.NEXU_DESKTOP_RUNTIME_MODE === "external" ||
+    env.NEXU_DESKTOP_EXTERNAL_RUNTIME === "1" ||
+    env.NEXU_DESKTOP_EXTERNAL_RUNTIME?.toLowerCase() === "true"
+      ? "external"
+      : "internal";
   const buildConfig =
     defaults?.useBuildConfig === false
       ? {}
@@ -262,6 +272,7 @@ export function getDesktopRuntimeConfig(
   };
 
   return {
+    runtimeMode,
     buildInfo: {
       version:
         defaults?.appVersion ??
@@ -310,7 +321,7 @@ export function getDesktopRuntimeConfig(
       env.NEXU_DESKTOP_SENTRY_DSN ??
       buildConfig.NEXU_DESKTOP_SENTRY_DSN ??
       null,
-    amplitudeApiKey:
-      env.AMPLITUDE_API_KEY ?? buildConfig.AMPLITUDE_API_KEY ?? null,
+    posthogApiKey: env.POSTHOG_API_KEY ?? buildConfig.POSTHOG_API_KEY ?? null,
+    posthogHost: env.POSTHOG_HOST ?? buildConfig.POSTHOG_HOST ?? null,
   };
 }

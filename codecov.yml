@@ -1,0 +1,39 @@
+flags:
+  unit:
+    carryforward: true
+  desktop-e2e:
+    carryforward: true
+
+coverage:
+  status:
+    project:
+      unit:
+        flags:
+          - unit
+        target: auto
+        threshold: 5%
+        informational: true
+      desktop-e2e:
+        flags:
+          - desktop-e2e
+        target: auto
+        threshold: 5%
+        informational: true
+    patch:
+      unit:
+        flags:
+          - unit
+        target: 40%
+        threshold: 20%
+        informational: true
+      desktop-e2e:
+        flags:
+          - desktop-e2e
+        target: 60%
+        threshold: 20%
+        informational: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  require_changes: true
+  behavior: default

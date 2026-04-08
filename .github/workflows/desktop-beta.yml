@@ -27,3 +27,14 @@ jobs:
       release_name: "Nexu Desktop Beta"
       channel: "beta"
     secrets: inherit
+
+  package-windows:
+    name: Windows (placeholder)
+    runs-on: windows-latest
+    steps:
+      - name: Reserve Windows lane
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows placeholder"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Channel: beta"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Status: reserved only; no Windows artifacts are published by this workflow yet"

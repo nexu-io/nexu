@@ -1,9 +1,10 @@
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WorkspaceSkillScanner } from "#controller/services/skillhub/workspace-skill-scanner.js";
+import { KnownSymlinkPlatformGapError, createSymlink } from "./create-symlink";
 
 describe("WorkspaceSkillScanner", () => {
   let tmpDir: string;
@@ -86,7 +87,14 @@ describe("WorkspaceSkillScanner", () => {
 
     const linkDir = path.join(stateDir, "agents", "bot-1", "skills");
     mkdirSync(linkDir, { recursive: true });
-    symlinkSync(realDir, path.join(linkDir, "obsidian"));
+    try {
+      createSymlink(realDir, path.join(linkDir, "obsidian"));
+    } catch (error) {
+      if (error instanceof KnownSymlinkPlatformGapError) {
+        return;
+      }
+      throw error;
+    }
 
     const scanner = new WorkspaceSkillScanner(stateDir);
     const result = scanner.scanAll(["bot-1"]);
