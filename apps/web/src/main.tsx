@@ -8,11 +8,11 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import { getApiInternalDesktopCloudStatus } from "../lib/api/sdk.gen";
-import webPackageJson from "../package.json";
 import { App } from "./app";
 import { DESKTOP_REWARDS_QUERY_KEY } from "./hooks/use-desktop-rewards";
-import "./lib/api";
 import { LocaleProvider } from "./hooks/use-locale";
+import "./lib/api";
+import { getAnalyticsAppMetadata } from "./lib/analytics-app-metadata";
 import {
   identify,
   initializeAnalytics,
@@ -24,12 +24,13 @@ import "./index.css";
 
 const posthogApiKey = import.meta.env.VITE_POSTHOG_API_KEY;
 if (posthogApiKey) {
+  const { appName, appVersion } = getAnalyticsAppMetadata();
   initializeAnalytics({
     apiKey: posthogApiKey,
     apiHost: import.meta.env.VITE_POSTHOG_HOST,
     environment: import.meta.env.MODE,
-    appName: webPackageJson.name.replace("@nexu/", "nexu-"),
-    appVersion: webPackageJson.version,
+    appName,
+    appVersion,
   });
 }
 
