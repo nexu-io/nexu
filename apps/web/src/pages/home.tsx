@@ -84,7 +84,7 @@ type BudgetBannerDebugMode = "actual" | Exclude<BudgetBannerStatus, "healthy">;
 const budgetBannerDebugStorageKey = "nexu_budget_banner_debug_mode";
 const showBudgetBannerDebugPanel = import.meta.env.DEV;
 const STARTUP_GRACE_MS = 15_000;
-const GATEWAY_RESTART_COALESCE_MS = 10_000;
+const GATEWAY_RESTART_COALESCE_MS = 30_000;
 const GATEWAY_HEALTHY_POLLS_TO_SETTLE = 2;
 
 function formatRelativeTime(
