@@ -440,8 +440,11 @@ export function createRuntimeUnitManifests(
       ),
       NODE_PATH: skillNodePath,
       TMPDIR: openclawTempDir,
-      ...(runtimeConfig.amplitudeApiKey
-        ? { AMPLITUDE_API_KEY: runtimeConfig.amplitudeApiKey }
+      ...(runtimeConfig.posthogApiKey
+        ? { POSTHOG_API_KEY: runtimeConfig.posthogApiKey }
+        : {}),
+      ...(runtimeConfig.posthogHost
+        ? { POSTHOG_HOST: runtimeConfig.posthogHost }
         : {}),
     },
   };

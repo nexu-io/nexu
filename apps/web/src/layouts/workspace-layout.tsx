@@ -1,19 +1,29 @@
 import { BrandMark } from "@/components/brand-mark";
+import { BudgetWarningBanner } from "@/components/budget-warning-banner";
 import { PlatformIcon } from "@/components/platform-icons";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
+import { useCloudConnect } from "@/hooks/use-cloud-connect";
 import { useCommunitySkills } from "@/hooks/use-community-catalog";
+import { useDesktopBudgetGuard } from "@/hooks/use-desktop-budget-guard";
+import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
+import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
+import { openExternalUrl } from "@/lib/desktop-links";
 import { isWindowsDesktopPlatform } from "@/lib/desktop-platform";
+import { resetAnalytics } from "@/lib/tracking";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
   BookOpen,
+  ChevronRight,
   ChevronUp,
   CircleHelp,
+  Gift,
   Globe,
   Home,
+  Info,
   LogOut,
   Mail,
   Menu,
@@ -187,6 +197,15 @@ function LanguageToggle({ collapsed }: { collapsed: boolean }) {
 
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
+function resolveCloudUsageUrl(cloudUrl?: string | null): string {
+  if (!cloudUrl) return "https://nexu.io/workspace/usage";
+  try {
+    const origin = new URL(cloudUrl).origin;
+    return `${origin}/workspace/usage`;
+  } catch {
+    return "https://nexu.io/workspace/usage";
+  }
+}
 
 const GitHubIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -346,6 +365,11 @@ function WorkspaceLayoutInner() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const {
+    status: rewardsStatus,
+    loading: rewardsStatusLoading,
+    resolved: rewardsStatusResolved,
+  } = useDesktopRewardsStatus();
   const update = useAutoUpdate();
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const hasUpdate =
@@ -404,14 +428,26 @@ function WorkspaceLayoutInner() {
     [sidebarWidth],
   );
 
+  const [showBalancePopup, setShowBalancePopup] = useState(false);
   const logoutRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+  const balanceRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
   const { data: skillsData } = useCommunitySkills();
+  const {
+    data: desktopCloudStatus,
+    isLoading: cloudStatusLoading,
+    refetch: refetchDesktopCloudStatus,
+  } = useDesktopCloudStatus();
   const installedSkillsCount = skillsData?.installedSkills?.length ?? 0;
+  const cloudConnected = desktopCloudStatus?.connected ?? false;
+  const { cloudConnecting, handleCloudConnect } = useCloudConnect({
+    cloudConnected,
+    onPoll: refetchDesktopCloudStatus,
+  });
 
   useEffect(() => {
     track("workspace_view");
@@ -476,6 +512,20 @@ function WorkspaceLayoutInner() {
   }, [showLangMenu]);
 
   useEffect(() => {
+    if (!showBalancePopup) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        balanceRef.current &&
+        !balanceRef.current.contains(e.target as Node)
+      ) {
+        setShowBalancePopup(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showBalancePopup]);
+
+  useEffect(() => {
     if (!mobileDrawerOpen) return;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -507,6 +557,7 @@ function WorkspaceLayoutInner() {
   const isHomePage =
     location.pathname === "/workspace" ||
     location.pathname === "/workspace/home";
+  const isRewardsPage = location.pathname.includes("/rewards");
   const isSkillsPage = location.pathname.includes("/skills");
   const isModelsPage =
     location.pathname.includes("/models") ||
@@ -515,6 +566,7 @@ function WorkspaceLayoutInner() {
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     track("workspace_logout_click");
+    resetAnalytics();
     await authClient.signOut();
     window.location.href = "/";
   };
@@ -523,10 +575,39 @@ function WorkspaceLayoutInner() {
   const userName = me?.name?.trim() || session?.user?.name || userEmail;
   const userImage = me?.image ?? session?.user?.image ?? null;
   const userInitial = (userName[0] ?? userEmail[0] ?? "U").toUpperCase();
+  const rewardTaskCountLabel = `${rewardsStatus.progress.claimedCount}/${rewardsStatus.progress.totalCount}`;
+  const rewardsBalancePending =
+    cloudConnected &&
+    !rewardsStatus.cloudBalance &&
+    (rewardsStatusLoading || !rewardsStatusResolved);
+  const canOpenBalancePopup =
+    cloudConnected || rewardsStatus.cloudBalance !== null;
+  const rewardBalanceValue = rewardsStatus.cloudBalance
+    ? `${rewardsStatus.cloudBalance.totalBalance} ${t("layout.sidebar.balanceUnit")}`
+    : cloudConnected
+      ? rewardsBalancePending
+        ? t("layout.sidebar.balancePlaceholder")
+        : `0 ${t("layout.sidebar.balanceUnit")}`
+      : t("layout.sidebar.balancePlaceholder");
+  const rewardBalancePopupValue = rewardsStatus.cloudBalance
+    ? String(rewardsStatus.cloudBalance.totalBalance)
+    : rewardBalanceValue;
+  const shouldShowRewardsBanner =
+    cloudConnected &&
+    rewardsStatus.progress.totalCount > 0 &&
+    rewardsStatus.progress.claimedCount < rewardsStatus.progress.totalCount;
+  const rewardsCardLoading =
+    cloudStatusLoading && desktopCloudStatus === undefined;
+  const { bannerDismissible, budgetStatus, dismissBanner, shouldShowPrompt } =
+    useDesktopBudgetGuard({
+      pathname: location.pathname,
+      cloudConnected,
+    });
 
   const showEmptyState =
     sessions.length === 0 &&
     !isHomePage &&
+    !isRewardsPage &&
     !isSkillsPage &&
     !isModelsPage &&
     !selectedSessionId;
@@ -536,20 +617,24 @@ function WorkspaceLayoutInner() {
     : null;
   const mobileTitle = isHomePage
     ? t("layout.mobile.home")
-    : isSkillsPage
-      ? t("layout.mobile.skills")
-      : isModelsPage
-        ? t("layout.mobile.settings")
-        : selectedSession?.title || t("layout.mobile.conversations");
+    : isRewardsPage
+      ? t("layout.mobile.rewards")
+      : isSkillsPage
+        ? t("layout.mobile.skills")
+        : isModelsPage
+          ? t("layout.mobile.settings")
+          : selectedSession?.title || t("layout.mobile.conversations");
   const mobileSubtitle = isHomePage
     ? t("layout.mobile.homeSubtitle")
-    : isSkillsPage
-      ? t("layout.mobile.skillsSubtitle")
-      : isModelsPage
-        ? t("layout.mobile.settingsSubtitle")
-        : selectedSession
-          ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
-          : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
+    : isRewardsPage
+      ? t("layout.mobile.rewardsSubtitle")
+      : isSkillsPage
+        ? t("layout.mobile.skillsSubtitle")
+        : isModelsPage
+          ? t("layout.mobile.settingsSubtitle")
+          : selectedSession
+            ? `${getPlatformLabel(selectedSession.channelType)} · ${formatTime(selectedSession.lastTime)}`
+            : `${sessions.length} conversation${sessions.length === 1 ? "" : "s"}`;
   const isWindowsDesktopClient = isDesktopClient && isWindowsDesktopPlatform();
   const desktopGlassTint = isWindowsDesktopClient
     ? "#ffffff"
@@ -808,6 +893,190 @@ function WorkspaceLayoutInner() {
               })}
             </div>
           </div>
+        </div>
+
+        {/* Sidebar growth card */}
+        <div
+          className="pb-1 shrink-0"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        >
+          {rewardsCardLoading ? (
+            <div data-rewards-card-loading="true" className="animate-pulse">
+              <div className="mx-3 mb-2 flex items-center gap-3 rounded-[12px] border border-[#F5DFC0]/40 bg-gradient-to-br from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] px-3.5 py-3">
+                <div className="h-7 w-7 rounded-[8px] bg-[#F6D7A8]" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-28 rounded-full bg-[#E7D4B5]" />
+                  <div className="h-2.5 w-14 rounded-full bg-[#F0E1C8]" />
+                </div>
+                <div className="h-3 w-8 rounded-full bg-[#E7D4B5]" />
+              </div>
+              <div className="px-3 mb-1.5">
+                <div className="w-full rounded-[8px] px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-2.5 w-2.5 rounded-full bg-border/70" />
+                      <div className="h-2.5 w-12 rounded-full bg-border/70" />
+                    </div>
+                    <div className="h-2.5 w-16 rounded-full bg-border/60" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : !cloudConnected ? (
+            <div className="px-3 mb-1.5">
+              <button
+                type="button"
+                data-sidebar-growth-card="login"
+                onClick={() =>
+                  void handleCloudConnect(
+                    isHomePage ? "home" : isModelsPage ? "settings" : "home",
+                  )
+                }
+                className="group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-primary)]"
+              >
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-border bg-surface-2">
+                  {cloudConnecting ? (
+                    <Sparkles
+                      size={12}
+                      className="animate-pulse text-text-secondary"
+                    />
+                  ) : (
+                    <img
+                      src="/brand/logo-black-1.svg"
+                      alt="nexu"
+                      className="h-3.5 w-3.5"
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 text-left">
+                  <div className="truncate text-[11px] font-medium text-text-secondary">
+                    {t("layout.sidebar.loginTitle")}
+                  </div>
+                  <div className="mt-0.5 text-[10px] leading-none text-text-muted">
+                    {cloudConnecting
+                      ? t("layout.sidebar.loginPending")
+                      : t("layout.sidebar.loginSubtitle")}
+                  </div>
+                </div>
+                <ChevronRight
+                  size={12}
+                  className="shrink-0 text-text-muted transition-transform duration-200 group-hover:translate-x-0.5"
+                />
+              </button>
+            </div>
+          ) : (
+            <div>
+              {shouldShowRewardsBanner && (
+                <Link
+                  to="/workspace/rewards"
+                  data-sidebar-growth-card="rewards"
+                  className="group mx-3 mb-2 flex items-center gap-3 rounded-[12px] border border-[#F5DFC0]/50 bg-gradient-to-br from-[#FFF8F0] via-[#FFFAF5] to-[#FFF5EB] px-3.5 py-3 shadow-[0_1px_3px_rgba(245,200,120,0.08)] transition-all duration-200 hover:border-[#F0D0A0]/60 hover:shadow-[0_2px_8px_rgba(245,200,120,0.15)]"
+                  onClick={() => {
+                    track("workspace_growth_rewards_click");
+                    track("workspace_rewards_click");
+                    track("workspace_sidebar_click", { target: "rewards" });
+                  }}
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[linear-gradient(135deg,#fbbf24_0%,#fb923c_100%)] text-white shadow-[0_1px_3px_rgba(245,158,11,0.25)]">
+                    <Gift size={14} />
+                  </div>
+                  <span className="min-w-0 flex-1 text-[12px] font-medium leading-[1.3] text-text-primary">
+                    {t("layout.sidebar.rewardsTitle")}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-[11px] text-text-tertiary">
+                    {rewardTaskCountLabel}
+                  </span>
+                  <ChevronRight
+                    size={14}
+                    className="shrink-0 text-text-muted transition-transform duration-200 group-hover:translate-x-0.5"
+                  />
+                </Link>
+              )}
+              <div className="px-3 mb-1.5 relative" ref={balanceRef}>
+                <button
+                  type="button"
+                  data-sidebar-rewards-balance="true"
+                  className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5 text-left"
+                  onClick={() => {
+                    if (canOpenBalancePopup) {
+                      setShowBalancePopup((prev) => !prev);
+                    } else {
+                      track("workspace_rewards_click");
+                      track("workspace_sidebar_click", { target: "credits" });
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="text-[11px] text-[var(--color-brand-primary)]">
+                        ✦
+                      </span>
+                      <span className="truncate text-[11px] font-semibold leading-none text-text-secondary">
+                        {t("layout.sidebar.balanceLabel")}
+                      </span>
+                    </div>
+                    <span className="shrink-0 tabular-nums text-[11px] font-medium leading-none text-text-secondary">
+                      {rewardBalanceValue}
+                    </span>
+                  </div>
+                </button>
+                {canOpenBalancePopup && showBalancePopup ? (
+                  <div
+                    data-sidebar-rewards-balance-popup="true"
+                    className="absolute bottom-full left-0 right-0 z-30 pb-2"
+                  >
+                    <div className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-[13px] font-semibold text-text-primary">
+                          ✦ {t("layout.sidebar.balancePopup.total")}
+                        </span>
+                        <span className="tabular-nums text-[14px] font-bold text-text-primary">
+                          {rewardBalancePopupValue}
+                        </span>
+                      </div>
+                      <div className="space-y-2 border-t border-border/60 pt-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
+                            {t("layout.sidebar.balancePopup.earned")}
+                            <span className="group relative inline-flex cursor-default items-center">
+                              <Info size={10} className="text-text-muted/60" />
+                              <span
+                                role="tooltip"
+                                className="pointer-events-none absolute bottom-full left-0 z-40 mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                              >
+                                {t("layout.sidebar.balancePopup.earnedTooltip")}
+                              </span>
+                            </span>
+                          </span>
+                          <span className="tabular-nums text-[11px] font-medium text-text-secondary">
+                            {rewardsStatus.progress.earnedCredits}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        data-sidebar-rewards-balance-detail="true"
+                        className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+                        onClick={() => {
+                          setShowBalancePopup(false);
+                          track("workspace_click_usage_detail");
+                          track("workspace_sidebar_click", {
+                            target: "credits_popup_detail",
+                          });
+                          void openExternalUrl(
+                            resolveCloudUsageUrl(desktopCloudStatus?.cloudUrl),
+                          );
+                        }}
+                      >
+                        {t("layout.sidebar.balancePopup.viewDetail")}
+                        <ChevronRight size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom action row */}
@@ -1277,6 +1546,18 @@ function WorkspaceLayoutInner() {
           </div>
 
           <main className="flex-1 overflow-y-auto min-h-0">
+            {shouldShowPrompt &&
+            budgetStatus !== "healthy" &&
+            location.pathname !== "/workspace" &&
+            location.pathname !== "/workspace/home" ? (
+              <div className="mx-auto max-w-4xl px-4 pb-0 pt-4 sm:px-6 md:px-8">
+                <BudgetWarningBanner
+                  status={budgetStatus}
+                  dismissible={bannerDismissible}
+                  onDismiss={dismissBanner}
+                />
+              </div>
+            ) : null}
             {showEmptyState ? (
               <EmptyState onGoConfig={() => navigate("/workspace/settings")} />
             ) : (

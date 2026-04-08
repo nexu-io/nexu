@@ -76,7 +76,8 @@ describe("OpenClawSyncService", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
-      amplitudeApiKey: undefined,
+      posthogApiKey: undefined,
+      posthogHost: undefined,
     };
   });
 

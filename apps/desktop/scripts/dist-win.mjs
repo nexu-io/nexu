@@ -659,7 +659,7 @@ function resolveLocal7ZipCommand() {
   }
 
   throw new Error(
-    '[dist:win] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).',
+    "[dist:win] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).",
   );
 }
 

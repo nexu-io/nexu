@@ -1,5 +1,6 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
+  cloudConnectBodySchema,
   cloudConnectResponseSchema,
   cloudDisconnectResponseSchema,
   cloudModelsBodySchema,
@@ -104,6 +105,14 @@ export function registerDesktopCompatRoutes(
       method: "post",
       path: "/api/internal/desktop/cloud-connect",
       tags: ["Desktop"],
+      request: {
+        body: {
+          required: false,
+          content: {
+            "application/json": { schema: cloudConnectBodySchema },
+          },
+        },
+      },
       responses: {
         200: {
           content: {
@@ -113,8 +122,15 @@ export function registerDesktopCompatRoutes(
         },
       },
     }),
-    async (c) =>
-      c.json(await container.desktopLocalService.connectCloud(), 200),
+    async (c) => {
+      const body = c.req.valid("json");
+      return c.json(
+        await container.desktopLocalService.connectCloud({
+          source: body?.source ?? null,
+        }),
+        200,
+      );
+    },
   );
 
   app.openapi(
@@ -143,6 +159,7 @@ export function registerDesktopCompatRoutes(
       const body = c.req.valid("json");
       const result = await container.desktopLocalService.connectCloudProfile(
         body.name,
+        { source: body.source ?? null },
       );
       const { configPushed } = await container.openclawSyncService.syncAll();
       return c.json({ ...result, configPushed }, 200);

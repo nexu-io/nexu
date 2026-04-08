@@ -33,6 +33,7 @@ import type { RuntimeHealth } from "../runtime/runtime-health.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
+import type { QuotaFallbackService } from "./quota-fallback-service.js";
 
 const execFileAsync = promisify(execFile);
 function sleep(ms: number) {
@@ -713,6 +714,7 @@ export class ChannelService {
     private readonly openclawProcess: OpenClawProcessManager,
     private readonly runtimeHealth: RuntimeHealth,
     private readonly wsClient: OpenClawWsClient,
+    private readonly quotaFallbackService?: QuotaFallbackService,
   ) {}
 
   async listChannels() {
@@ -724,9 +726,27 @@ export class ChannelService {
   }
 
   async getBotQuota(): Promise<BotQuotaResponse> {
-    return {
+    const base: BotQuotaResponse = {
       available: true,
       resetsAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    if (!this.quotaFallbackService) {
+      return base;
+    }
+
+    const [usingByok, byokProvider] = await Promise.all([
+      this.quotaFallbackService
+        .isUsingManagedModel()
+        .then((managed) => !managed),
+      this.quotaFallbackService.getAvailableByokProvider(),
+    ]);
+
+    return {
+      ...base,
+      usingByok,
+      byokAvailable: byokProvider !== null,
+      autoFallbackTriggered: usingByok,
     };
   }
 

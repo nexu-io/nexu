@@ -6,10 +6,23 @@ import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const electronRoot = resolve(scriptDir, "..");
-const repoRoot = process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
+const repoRoot =
+  process.env.NEXU_WORKSPACE_ROOT ?? resolve(electronRoot, "../..");
 const desktopPackageJsonPath = resolve(electronRoot, "package.json");
-const vendored7zExePath = resolve(electronRoot, "vendor", "7zip", "win-x64", "7z.exe");
-const vendored7zDllPath = resolve(electronRoot, "vendor", "7zip", "win-x64", "7z.dll");
+const vendored7zExePath = resolve(
+  electronRoot,
+  "vendor",
+  "7zip",
+  "win-x64",
+  "7z.exe",
+);
+const vendored7zDllPath = resolve(
+  electronRoot,
+  "vendor",
+  "7zip",
+  "win-x64",
+  "7z.dll",
+);
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(3)}s`;
@@ -45,7 +58,9 @@ function run(command, args, options = {}) {
         return;
       }
       rejectRun(
-        new Error(`${command} ${args.join(" ")} exited with code ${code ?? "null"}.`),
+        new Error(
+          `${command} ${args.join(" ")} exited with code ${code ?? "null"}.`,
+        ),
       );
     });
   });
@@ -69,7 +84,7 @@ function resolveLocal7ZipCommand() {
   const command = resolvePathCommand(["7z.exe", "7z"], ["i"]);
   if (!command) {
     throw new Error(
-      '[dist:win:custom] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).',
+      "[dist:win:custom] Windows packaging requires a local 7-Zip CLI on PATH (tried: 7z.exe, 7z).",
     );
   }
   return command;
@@ -99,9 +114,16 @@ async function pathExists(targetPath) {
 }
 
 async function readDesktopPackageVersion() {
-  const desktopPackage = JSON.parse(await readFile(desktopPackageJsonPath, "utf8"));
-  if (typeof desktopPackage.version !== "string" || desktopPackage.version.length === 0) {
-    throw new Error(`[dist:win:custom] missing version in ${desktopPackageJsonPath}`);
+  const desktopPackage = JSON.parse(
+    await readFile(desktopPackageJsonPath, "utf8"),
+  );
+  if (
+    typeof desktopPackage.version !== "string" ||
+    desktopPackage.version.length === 0
+  ) {
+    throw new Error(
+      `[dist:win:custom] missing version in ${desktopPackageJsonPath}`,
+    );
   }
   return desktopPackage.version;
 }
@@ -139,8 +161,15 @@ async function main() {
   const customRoot = resolve(releaseRoot, "custom");
   const payloadRoot = resolve(customRoot, "payload");
   const payloadPath = resolve(payloadRoot, "payload.7z");
-  const installerPath = resolve(releaseRoot, `nexu-setup-custom-${version}-x64.exe`);
-  const installerScriptPath = resolve(electronRoot, "build", "win-custom-installer.nsi");
+  const installerPath = resolve(
+    releaseRoot,
+    `nexu-setup-custom-${version}-x64.exe`,
+  );
+  const installerScriptPath = resolve(
+    electronRoot,
+    "build",
+    "win-custom-installer.nsi",
+  );
   const iconPath = resolve(electronRoot, "build", "icon.ico");
   const timingLogPath = resolve(customRoot, "timing.json");
   if (!(await pathExists(vendored7zExePath))) {
@@ -149,7 +178,9 @@ async function main() {
     );
   }
   if (!(await pathExists(vendored7zDllPath))) {
-    throw new Error(`[dist:win:custom] missing vendored 7-Zip DLL: ${vendored7zDllPath}`);
+    throw new Error(
+      `[dist:win:custom] missing vendored 7-Zip DLL: ${vendored7zDllPath}`,
+    );
   }
 
   console.log(`[dist:win:custom] using 7-Zip CLI: ${sevenZipCommand}`);
@@ -180,25 +211,35 @@ async function main() {
     await timedStep(
       "stage win-unpacked via dist-win.mjs --local",
       async () => {
-        console.log("[dist:win:custom] staging win-unpacked via dist-win.mjs --local");
-        await run(process.execPath, [resolve(scriptDir, "dist-win.mjs"), "--local"], {
-          cwd: electronRoot,
-          env: process.env,
-        });
+        console.log(
+          "[dist:win:custom] staging win-unpacked via dist-win.mjs --local",
+        );
+        await run(
+          process.execPath,
+          [resolve(scriptDir, "dist-win.mjs"), "--local"],
+          {
+            cwd: electronRoot,
+            env: process.env,
+          },
+        );
       },
       timings,
     );
   }
 
   if (!(await pathExists(winUnpackedDir))) {
-    throw new Error(`[dist:win:custom] missing win-unpacked stage: ${winUnpackedDir}`);
+    throw new Error(
+      `[dist:win:custom] missing win-unpacked stage: ${winUnpackedDir}`,
+    );
   }
 
   if (phase === "all" || phase === "payload") {
     await timedStep(
       "create payload.7z from win-unpacked contents",
       async () => {
-        console.log("[dist:win:custom] creating payload.7z from win-unpacked contents");
+        console.log(
+          "[dist:win:custom] creating payload.7z from win-unpacked contents",
+        );
         await rm(payloadPath, { force: true, maxRetries: 5, retryDelay: 200 });
         await run(
           sevenZipCommand,
@@ -213,8 +254,13 @@ async function main() {
     );
   }
 
-  if ((phase === "all" || phase === "installer") && !(await pathExists(payloadPath))) {
-    throw new Error(`[dist:win:custom] missing payload archive: ${payloadPath}`);
+  if (
+    (phase === "all" || phase === "installer") &&
+    !(await pathExists(payloadPath))
+  ) {
+    throw new Error(
+      `[dist:win:custom] missing payload archive: ${payloadPath}`,
+    );
   }
 
   if (phase === "all" || phase === "installer") {
@@ -222,7 +268,11 @@ async function main() {
       "compile standalone NSIS installer",
       async () => {
         console.log("[dist:win:custom] compiling standalone NSIS installer");
-        await rm(installerPath, { force: true, maxRetries: 5, retryDelay: 200 });
+        await rm(installerPath, {
+          force: true,
+          maxRetries: 5,
+          retryDelay: 200,
+        });
         await run(
           makensisCommand,
           [

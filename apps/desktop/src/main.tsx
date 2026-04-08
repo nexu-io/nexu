@@ -1,8 +1,13 @@
-import * as amplitude from "@amplitude/unified";
-import { Identify } from "@amplitude/unified";
 import * as Sentry from "@sentry/electron/renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import posthog, { type PostHogConfig } from "posthog-js";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type Root, createRoot } from "react-dom/client";
 import { Toaster, toast } from "sonner";
 import setupLoopVideoUrl from "../assets/setup-animation-loop.mp4";
@@ -22,12 +27,15 @@ import type {
   RuntimeUnitState,
 } from "../shared/host";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import { DevelopSetBalanceDialog } from "./components/develop-set-balance-dialog";
 import { SurfaceFrame } from "./components/surface-frame";
 import { UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
+import { ensureDesktopControllerReady } from "./lib/controller-ready";
 import {
   checkComponentUpdates,
   getAppInfo,
+  getDesktopCloudStatus,
   getDiagnosticsInfo,
   getRuntimeConfig,
   getRuntimeState,
@@ -35,20 +43,89 @@ import {
   notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
+  reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
   stopUnit,
   triggerMainProcessCrash,
   triggerRendererProcessCrash,
 } from "./lib/host-api";
+import { getDesktopOpenClawUrl } from "./lib/openclaw-surface";
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
-const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY;
+const posthogApiKey =
+  import.meta.env.VITE_POSTHOG_API_KEY ??
+  (typeof window === "undefined"
+    ? null
+    : window.nexuHost.bootstrap.posthogApiKey);
+const posthogHost =
+  import.meta.env.VITE_POSTHOG_HOST ??
+  (typeof window === "undefined"
+    ? null
+    : window.nexuHost.bootstrap.posthogHost);
 const rendererSentryDsn =
   typeof window === "undefined" ? null : window.nexuHost.bootstrap.sentryDsn;
+const posthogSuperProperties = {
+  environment: import.meta.env.MODE,
+  appName: "nexu-desktop",
+  appVersion:
+    typeof window === "undefined"
+      ? "unknown"
+      : window.nexuHost.bootstrap.buildInfo.version,
+};
+
+type ControllerSurfaceState = "polling" | "recovering" | "failed";
 
 let rendererSentryInitialized = false;
+let posthogTelemetryInitialized = false;
+let rendererCommitReported = false;
+let currentPosthogUserId: string | null = null;
+let currentPosthogPersonPropertiesKey: string | null = null;
+
+function buildPostHogPersonPropertiesKey(input: {
+  email?: string | null;
+  name?: string | null;
+}): string {
+  return JSON.stringify([
+    ["email", input.email ?? null],
+    ["name", input.name ?? null],
+  ]);
+}
+
+function sendRendererStartupProbe(
+  stage: string,
+  status: "ok" | "error",
+  detail?: string | null,
+): void {
+  try {
+    reportStartupProbe({
+      source: "renderer",
+      stage,
+      status,
+      detail: detail ?? null,
+    });
+  } catch (error) {
+    console.error("[desktop] failed to report startup probe", error);
+  }
+}
+
+sendRendererStartupProbe("renderer:module-start", "ok");
+
+window.addEventListener("error", (event) => {
+  const detail =
+    event.error instanceof Error
+      ? (event.error.stack ?? event.error.message)
+      : event.message;
+  sendRendererStartupProbe("renderer:window-error", "error", detail);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  const detail =
+    reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+  sendRendererStartupProbe("renderer:unhandled-rejection", "error", detail);
+});
 
 function initializeRendererSentry(dsn: string): void {
   if (rendererSentryInitialized) {
@@ -71,8 +148,78 @@ function initializeRendererSentry(dsn: string): void {
   rendererSentryInitialized = true;
 }
 
-if (rendererSentryDsn) {
-  initializeRendererSentry(rendererSentryDsn);
+function initializePostHogTelemetry(): void {
+  if (posthogTelemetryInitialized || !posthogApiKey) {
+    return;
+  }
+
+  const config: Partial<PostHogConfig> = {
+    autocapture: true,
+    disable_session_recording: false,
+    loaded: (client) => {
+      client.register(posthogSuperProperties);
+    },
+  };
+
+  if (posthogHost) {
+    config.api_host = posthogHost;
+  }
+
+  posthog.init(posthogApiKey, config);
+  posthogTelemetryInitialized = true;
+}
+
+function syncPostHogIdentity(input: {
+  userId?: string | null;
+  userEmail?: string | null;
+  userName?: string | null;
+}): void {
+  if (!posthogTelemetryInitialized) {
+    return;
+  }
+
+  const userId =
+    typeof input.userId === "string" && input.userId.trim().length > 0
+      ? input.userId
+      : null;
+
+  if (!userId) {
+    if (currentPosthogUserId === null) {
+      return;
+    }
+
+    posthog.reset();
+    posthog.register(posthogSuperProperties);
+    currentPosthogUserId = null;
+    currentPosthogPersonPropertiesKey = null;
+    return;
+  }
+
+  if (currentPosthogUserId && currentPosthogUserId !== userId) {
+    posthog.reset();
+    posthog.register(posthogSuperProperties);
+    currentPosthogPersonPropertiesKey = null;
+  }
+
+  if (currentPosthogUserId !== userId) {
+    posthog.identify(userId);
+    currentPosthogUserId = userId;
+  }
+
+  const nextPersonPropertiesKey = buildPostHogPersonPropertiesKey({
+    email: input.userEmail ?? null,
+    name: input.userName ?? null,
+  });
+
+  if (currentPosthogPersonPropertiesKey === nextPersonPropertiesKey) {
+    return;
+  }
+
+  posthog.setPersonProperties({
+    email: input.userEmail ?? null,
+    name: input.userName ?? null,
+  });
+  currentPosthogPersonPropertiesKey = nextPersonPropertiesKey;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -129,16 +276,6 @@ function formatBuildCommit(value: string | null | undefined): string {
   }
 
   return value.slice(0, 7);
-}
-
-if (amplitudeApiKey) {
-  amplitude.initAll(amplitudeApiKey, {
-    analytics: { autocapture: true },
-    sessionReplay: { sampleRate: 1 },
-  });
-  const env = new Identify();
-  env.set("environment", import.meta.env.MODE);
-  amplitude.identify(env);
 }
 
 const queryClient = new QueryClient({
@@ -950,12 +1087,14 @@ function DiagnosticsPage({
 function DesktopShell() {
   const isPackaged = window.nexuHost.bootstrap.isPackaged;
   const [activeSurface, setActiveSurface] = useState<DesktopSurface>("web");
+  const [showSetBalanceDialog, setShowSetBalanceDialog] = useState(false);
   const [chromeMode, setChromeMode] = useState<DesktopChromeMode>(
     isPackaged ? "immersive" : "full",
   );
   const webSurfaceVersion = 0;
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
+  const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
   const update = useAutoUpdate();
 
   // Setup animation phases:
@@ -987,6 +1126,24 @@ function DesktopShell() {
         setSetupPhase((prev) => (prev === "looping" ? "fading" : prev));
       })
       .catch(() => null);
+
+    void getRuntimeState()
+      .then(setRuntimeState)
+      .catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onRuntimeEvent((event) => {
+      setRuntimeState((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return applyRuntimeEvent(current, event);
+      });
+    });
+
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -995,7 +1152,17 @@ function DesktopShell() {
         void update.check();
         return;
       }
+      if (command.type === "develop:open-set-balance") {
+        setShowSetBalanceDialog(true);
+        return;
+      }
       if (command.type === "setup:complete") {
+        return;
+      }
+      if (
+        command.type !== "develop:focus-surface" &&
+        command.type !== "develop:show-shell"
+      ) {
         return;
       }
 
@@ -1008,53 +1175,71 @@ function DesktopShell() {
   // Note: getRuntimeConfig() IPC handler waits for cold-start to complete, so
   // runtimeConfig always has the final ports (including any fallback).
   const [controllerReady, setControllerReady] = useState(false);
+  const [controllerSurfaceState, setControllerSurfaceState] =
+    useState<ControllerSurfaceState>("polling");
+  const [controllerRetryNonce, setControllerRetryNonce] = useState(0);
+  const controllerRetryNonceRef = useRef(controllerRetryNonce);
+
+  useEffect(() => {
+    controllerRetryNonceRef.current = controllerRetryNonce;
+  }, [controllerRetryNonce]);
+
+  const handleRetryController = useCallback(() => {
+    setControllerReady(false);
+    setControllerSurfaceState("polling");
+    setControllerRetryNonce((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     if (!runtimeConfig) return;
     if (controllerReady) return;
 
+    const retryNonce = controllerRetryNonce;
     let cancelled = false;
+    setControllerSurfaceState("polling");
     const readyUrl = new URL(
       "/api/internal/desktop/ready",
       runtimeConfig.urls.web,
     ).toString();
 
-    async function poll() {
-      while (!cancelled) {
-        try {
-          const res = await fetch(readyUrl, {
-            signal: AbortSignal.timeout(3000),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.ready) {
-              if (!cancelled) setControllerReady(true);
-              return;
-            }
-          }
-        } catch {
-          // Controller or web sidecar not ready yet — keep polling
+    void ensureDesktopControllerReady({
+      readyUrl,
+      startController: async () => {
+        await startUnit("controller");
+      },
+      onStatusChange: (status) => {
+        if (!cancelled && controllerRetryNonceRef.current === retryNonce) {
+          setControllerSurfaceState(status);
         }
-        await new Promise((r) => setTimeout(r, 1000));
+      },
+    }).then((ready) => {
+      if (cancelled || controllerRetryNonceRef.current !== retryNonce) {
+        return;
       }
-    }
 
-    void poll();
+      if (ready) {
+        setControllerReady(true);
+        setControllerSurfaceState("polling");
+        return;
+      }
+
+      setControllerSurfaceState("failed");
+      setActiveSurface((surface) => (surface === "web" ? "control" : surface));
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [runtimeConfig, controllerReady]);
+  }, [runtimeConfig, controllerReady, controllerRetryNonce]);
 
   const desktopWebUrl =
     runtimeConfig && controllerReady
       ? new URL("/workspace", runtimeConfig.urls.web).toString()
       : null;
-  const desktopOpenClawUrl = runtimeConfig
-    ? new URL(
-        `/#token=${runtimeConfig.tokens.gateway}`,
-        runtimeConfig.urls.openclawBase,
-      ).toString()
-    : null;
+  const desktopOpenClawUrl = getDesktopOpenClawUrl({
+    runtimeConfig,
+    runtimeState,
+  });
   return (
     <div
       className={
@@ -1063,6 +1248,10 @@ function DesktopShell() {
           : "desktop-shell"
       }
     >
+      <DevelopSetBalanceDialog
+        open={showSetBalanceDialog}
+        onClose={() => setShowSetBalanceDialog(false)}
+      />
       <div className="window-drag-bar" />
       <aside className="desktop-sidebar">
         <div className="desktop-sidebar-brand">
@@ -1153,13 +1342,61 @@ function DesktopShell() {
           <CloudProfilePage />
         </div>
         <div style={{ display: activeSurface === "web" ? "contents" : "none" }}>
-          <SurfaceFrame
-            description="Authenticated workspace surface served by the repo-local web sidecar."
-            src={desktopWebUrl}
-            title="nexu Web"
-            version={webSurfaceVersion}
-            preload={getWebviewPreloadUrl()}
-          />
+          {desktopWebUrl ? (
+            <SurfaceFrame
+              description="Authenticated workspace surface served by the repo-local web sidecar."
+              src={desktopWebUrl}
+              title="nexu Web"
+              version={webSurfaceVersion}
+              preload={getWebviewPreloadUrl()}
+            />
+          ) : controllerSurfaceState === "failed" ||
+            controllerSurfaceState === "recovering" ? (
+            <section className="runtime-empty-state">
+              <span className="runtime-eyebrow">Workspace</span>
+              <h2>
+                {controllerSurfaceState === "recovering"
+                  ? "Restarting controller..."
+                  : "Controller unavailable"}
+              </h2>
+              <p>
+                {controllerSurfaceState === "recovering"
+                  ? "The local controller stopped cleanly, so desktop is starting it again before mounting the workspace."
+                  : "Workspace startup timed out because the local controller did not come back. Retry it here or switch to the control plane."}
+              </p>
+              <div className="runtime-actions">
+                <button
+                  disabled={controllerSurfaceState === "recovering"}
+                  onClick={handleRetryController}
+                  type="button"
+                >
+                  {controllerSurfaceState === "recovering"
+                    ? "Restarting..."
+                    : "Retry controller"}
+                </button>
+                <button
+                  onClick={() => setActiveSurface("control")}
+                  type="button"
+                >
+                  Open control plane
+                </button>
+              </div>
+            </section>
+          ) : (
+            // Normal polling state: show the brand NexuLoader instead of a
+            // text card with a "Retry controller" button. SurfaceFrame with
+            // src={null} renders its built-in NexuLoader overlay, which is
+            // the same loader used once the webview mounts — producing a
+            // seamless visual transition once the controller is ready.
+            // See issue #876.
+            <SurfaceFrame
+              description="Authenticated workspace surface served by the repo-local web sidecar."
+              src={null}
+              title="nexu Web"
+              version={webSurfaceVersion}
+              preload={getWebviewPreloadUrl()}
+            />
+          )}
         </div>
         <div
           style={{
@@ -1279,6 +1516,94 @@ function RootApp() {
   return <DesktopShell />;
 }
 
+function RendererTelemetryBootstrap() {
+  useEffect(() => {
+    if (rendererSentryDsn && !rendererSentryInitialized) {
+      sendRendererStartupProbe("renderer:sentry-init:start", "ok");
+      try {
+        initializeRendererSentry(rendererSentryDsn);
+        sendRendererStartupProbe("renderer:sentry-init:success", "ok");
+      } catch (error) {
+        sendRendererStartupProbe(
+          "renderer:sentry-init:error",
+          "error",
+          error instanceof Error
+            ? (error.stack ?? error.message)
+            : String(error),
+        );
+        console.error("[desktop] renderer Sentry init failed", error);
+      }
+    }
+
+    if (!posthogApiKey || posthogTelemetryInitialized) {
+      return;
+    }
+
+    sendRendererStartupProbe("renderer:posthog-init:start", "ok");
+    try {
+      initializePostHogTelemetry();
+      sendRendererStartupProbe("renderer:posthog-init:success", "ok");
+    } catch (error) {
+      sendRendererStartupProbe(
+        "renderer:posthog-init:error",
+        "error",
+        error instanceof Error ? (error.stack ?? error.message) : String(error),
+      );
+      console.error("[desktop] renderer PostHog init failed", error);
+    }
+  }, []);
+
+  return null;
+}
+
+function RendererAnalyticsIdentitySync() {
+  useEffect(() => {
+    let cancelled = false;
+
+    const sync = async () => {
+      try {
+        const data = await getDesktopCloudStatus();
+        if (cancelled) {
+          return;
+        }
+
+        syncPostHogIdentity({
+          userId: data.userId ?? null,
+          userEmail: data.userEmail ?? null,
+          userName: data.userName ?? null,
+        });
+      } catch {
+        // Ignore transient fetch errors. Keep existing identity until a
+        // successful status refresh says otherwise.
+      }
+    };
+
+    void sync();
+    const interval = window.setInterval(() => {
+      void sync();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  return null;
+}
+
+function RendererStartupSentinel() {
+  useEffect(() => {
+    if (rendererCommitReported) {
+      return;
+    }
+
+    rendererCommitReported = true;
+    sendRendererStartupProbe("renderer:react-render:committed", "ok");
+  }, []);
+
+  return null;
+}
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
@@ -1295,6 +1620,9 @@ rootWindow.__nexuDesktopRoot = appRoot;
 appRoot.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <RendererStartupSentinel />
+      <RendererTelemetryBootstrap />
+      <RendererAnalyticsIdentitySync />
       <RootApp />
     </QueryClientProvider>
   </React.StrictMode>,

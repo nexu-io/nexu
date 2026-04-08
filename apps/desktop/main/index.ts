@@ -16,7 +16,11 @@ import {
   shell,
 } from "electron";
 import { getOpenclawSkillsDir } from "../shared/desktop-paths";
-import type { DesktopChromeMode, DesktopSurface } from "../shared/host";
+import type {
+  DesktopChromeMode,
+  DesktopSurface,
+  HostDesktopCommand,
+} from "../shared/host";
 import { buildChildProcessProxyEnv } from "../shared/proxy-config";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
@@ -65,6 +69,7 @@ import {
   getLegacyNexuHomeStateDir,
   migrateOpenclawState,
 } from "./services/state-migration";
+import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -345,6 +350,7 @@ async function gracefulShutdown(reason: string): Promise<void> {
     sleepGuard?.dispose(reason);
     await diagnosticsReporter?.flushNow().catch(() => undefined);
     flushRuntimeLoggers();
+    flushV8CoverageIfEnabled();
 
     if (launchdResult) {
       await teardownLaunchdServices({
@@ -392,6 +398,10 @@ function sendDesktopCommand(
   });
 }
 
+function sendHostDesktopCommand(command: HostDesktopCommand): void {
+  mainWindow?.webContents.send("host:desktop-command", command);
+}
+
 function triggerUpdateCheck(): void {
   mainWindow?.webContents.send("host:desktop-command", {
     type: "desktop:check-for-updates",
@@ -425,6 +435,12 @@ function installApplicationMenu(): void {
       {
         label: "Show OpenClaw In Shell",
         click: () => sendDesktopCommand("openclaw", "full"),
+      },
+      { type: "separator" },
+      {
+        label: "Set Test Balance…",
+        click: () =>
+          sendHostDesktopCommand({ type: "develop:open-set-balance" }),
       },
     ],
   };
@@ -770,11 +786,14 @@ async function runLaunchdColdStart(): Promise<void> {
     skillNodePath,
     openclawTmpDir,
     proxyEnv,
-    amplitudeApiKey:
-      process.env.AMPLITUDE_API_KEY ??
-      runtimeConfig.amplitudeApiKey ??
-      undefined,
+    posthogApiKey:
+      process.env.POSTHOG_API_KEY ?? runtimeConfig.posthogApiKey ?? undefined,
+    posthogHost:
+      process.env.POSTHOG_HOST ?? runtimeConfig.posthogHost ?? undefined,
     log: (message: string) => logColdStart(message),
+    nodeV8Coverage: process.env.NODE_V8_COVERAGE,
+    desktopE2ECoverage: process.env.NEXU_DESKTOP_E2E_COVERAGE,
+    desktopE2ECoverageRunId: process.env.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
     buildSource:
@@ -1257,6 +1276,7 @@ app.whenReady().then(async () => {
           sleepGuard?.dispose("launchd-quit");
           await diagnosticsReporter?.flushNow().catch(() => undefined);
           flushRuntimeLoggers();
+          flushV8CoverageIfEnabled();
         },
       };
       installLaunchdQuitHandler(quitOpts);

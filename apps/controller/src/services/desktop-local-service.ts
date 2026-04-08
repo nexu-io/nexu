@@ -25,12 +25,15 @@ export class DesktopLocalService {
     };
   }
 
-  async connectCloud() {
-    return this.configStore.connectDesktopCloud();
+  async connectCloud(options?: { source?: string | null }) {
+    return this.configStore.connectDesktopCloud(options);
   }
 
-  async connectCloudProfile(name: string) {
-    return this.configStore.connectDesktopCloudProfile(name);
+  async connectCloudProfile(
+    name: string,
+    options?: { source?: string | null },
+  ) {
+    return this.configStore.connectDesktopCloudProfile(name, options);
   }
 
   async disconnectCloud() {

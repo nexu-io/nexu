@@ -121,7 +121,8 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
     },
     sentryDsn: null,
     runtimeMode: "internal",
-    amplitudeApiKey: null,
+    posthogApiKey: null,
+    posthogHost: null,
   };
 }
 
@@ -479,7 +480,6 @@ describe("desktop runtime manifests", () => {
         runtimePath("/Users/testuser/.nexu", "openclaw-sidecar"),
       );
       expect(tarAttempts).toBe(2);
-      expect(execFileSyncMock).toHaveBeenCalledWith("sleep", ["1"]);
     });
 
     it("throws after retries when extraction never produces the critical entry", () => {
@@ -512,11 +512,7 @@ describe("desktop runtime manifests", () => {
       const tarCalls = execFileSyncMock.mock.calls.filter(
         ([cmd]) => cmd === "tar",
       );
-      const sleepCalls = execFileSyncMock.mock.calls.filter(
-        ([cmd]) => cmd === "sleep",
-      );
       expect(tarCalls).toHaveLength(3);
-      expect(sleepCalls).toHaveLength(2);
     });
   });
 
@@ -583,6 +579,26 @@ describe("desktop runtime manifests", () => {
     });
 
     it("propagates normalized proxy env to packaged controller manifest", () => {
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      );
+
       const manifests = createRuntimeUnitManifests(
         "/Applications/Nexu.app/Contents/Resources",
         "/Users/testuser/Library/Application Support/@nexu/desktop",
@@ -604,6 +620,26 @@ describe("desktop runtime manifests", () => {
 
     it("includes Electron executable for Windows managed controller manifests", () => {
       Object.defineProperty(process, "platform", { value: "win32" });
+
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      );
 
       const manifests = createRuntimeUnitManifests(
         "/Applications/Nexu.app/Contents/Resources",

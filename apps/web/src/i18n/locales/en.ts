@@ -13,11 +13,13 @@ const en = {
   // ── Welcome ──
   "welcome.pageTitle": "Welcome to nexu",
   "welcome.mobileLabel": "Client",
-  "welcome.title": "Choose how to start",
+  "welcome.title": "Connect nexu in one step",
+  "welcome.subtitle":
+    "Sign in with your nexu account to unlock hosted premium models in your local workspace, then keep earning extra usage through rewards.",
   "welcome.option.login.title": "Use your nexu account",
   "welcome.option.login.badge": "Recommended",
   "welcome.option.login.description":
-    "Complete browser-based sign in and instantly access nexu hosted premium models and the full product experience.",
+    "Complete browser-based sign in to unlock nexu hosted premium models, rewards, and the full workspace experience without manual model setup.",
   "welcome.option.login.meta.1": "Google / GitHub / Email",
   "welcome.option.login.meta.2": "Browser OAuth",
   "welcome.option.login.meta.3": "Best for most users",
@@ -29,6 +31,9 @@ const en = {
   "welcome.option.byok.meta.1": "No sign up required",
   "welcome.option.byok.meta.2": "Local configuration",
   "welcome.option.byok.meta.3": "Best for advanced users",
+  "welcome.byokLink": "Prefer BYOK? Open provider settings instead",
+  "welcome.rewardsHint":
+    "Rewards live inside the workspace after sign-in: 11 task slots across daily check-ins, open source, and social sharing.",
   "welcome.back": "Back to options",
   "welcome.byok.title": "Connect your models",
   "welcome.byok.subtitle":
@@ -106,6 +111,7 @@ const en = {
   "title.claim": "Claim · nexu",
   "title.home": "Home · nexu",
   "title.integrations": "Integrations · nexu",
+  "title.rewards": "Rewards · nexu",
   "title.skills": "Skills · nexu",
   "title.settings": "Settings · nexu",
   "title.linkFeishu": "Link Feishu · nexu",
@@ -115,6 +121,7 @@ const en = {
   // ── Workspace Layout ──
   "layout.brand": "Your digital coworker",
   "layout.nav.home": "Home",
+  "layout.nav.rewards": "Rewards",
   "layout.nav.deployments": "Deployments",
   "layout.nav.skills": "Skills",
   "layout.nav.settings": "Settings",
@@ -136,10 +143,31 @@ const en = {
   "layout.update.badge": "Update",
   "layout.mobile.home": "Home",
   "layout.mobile.homeSubtitle": "Welcome to nexu",
+  "layout.mobile.rewards": "Rewards",
+  "layout.mobile.rewardsSubtitle": "Earn extra usage credits",
   "layout.mobile.deployments": "Deployments",
   "layout.mobile.deploymentsSubtitle": "All deployment records",
   "layout.mobile.skills": "Skills",
   "layout.mobile.skillsSubtitle": "Browse AI capabilities",
+  "layout.sidebar.loginTitle": "Sign in with nexu",
+  "layout.sidebar.loginSubtitle": "Use official credits",
+  "layout.sidebar.loginPending": "Waiting for browser sign-in",
+  "layout.sidebar.rewardsTitle": "Share nexu, earn extra credits",
+  "layout.sidebar.rewardsSubtitle": "Daily, open-source, and social tasks",
+  "layout.sidebar.progressLabel": "Tasks claimed",
+  "layout.sidebar.balanceLabel": "Balance",
+  "layout.sidebar.balanceUnit": "credits",
+  "layout.sidebar.balancePlaceholder": "Balance syncing…",
+  "layout.sidebar.rewardsCta": "Open",
+  "layout.sidebar.balancePopup.total": "Total credits",
+  "layout.sidebar.balancePopup.recharged": "Plan credits (cumulative)",
+  "layout.sidebar.balancePopup.rechargedTooltip":
+    "Total credits added from your subscription plan",
+  "layout.sidebar.balancePopup.earned": "Reward credits",
+  "layout.sidebar.balancePopup.earnedTooltip":
+    "Earned from signup rewards, completed tasks, and activities. Consumption order: plan credits → credit packs → reward credits.",
+  "layout.sidebar.balancePopup.consumed": "Consumed",
+  "layout.sidebar.balancePopup.viewDetail": "View details",
   "layout.mobile.settings": "Settings",
   "layout.mobile.settingsSubtitle": "Manage AI model providers",
   "layout.mobile.conversations": "Conversations",
@@ -150,6 +178,9 @@ const en = {
   "layout.empty.step1": "Connect a platform",
   "layout.empty.step2": "Mention @nexu",
   "layout.empty.step3": "Conversations appear",
+  "layout.loginCta": "Sign in",
+  "layout.credits.label": "Credits",
+  "layout.credits.earned": "earned",
 
   // ── Home Page ──
   "home.running": "Running",
@@ -222,6 +253,15 @@ const en = {
   "home.viewConversationsDesc": "Threads and channel activity",
   "home.manageSkills": "Manage skills",
   "home.manageSkillsDesc": "Tools and capabilities",
+  "home.rewardsTeaser.eyebrow": "Rewards",
+  "home.rewardsTeaser.title": "Turn setup moments into extra usage",
+  "home.rewardsTeaser.description":
+    "Daily check-ins, open-source support, and social shares now roll into one rewards center inside the workspace.",
+  "home.rewardsTeaser.summaryLabel": "Unlocked tasks",
+  "home.rewardsTeaser.summaryValue": "+{{earned}} credits earned",
+  "home.rewardsTeaser.footer":
+    "Facebook and WhatsApp now sit inside the merged social rewards group.",
+  "home.rewardsTeaser.cta": "View rewards",
   "home.starGithub": "Star on GitHub",
   "home.starNexu": "Star Nexu on GitHub",
   "home.starCta":
@@ -250,6 +290,139 @@ const en = {
   "home.seedance.modal.step2.done": "Got it",
   "home.recentActivity": "Recent Activity",
   "home.noRecentActivity": "No recent conversations",
+
+  // ── Rewards ──
+  "rewards.title": "Share nexu, earn extra credits",
+  "rewards.desc":
+    "Share nexu with your communities and complete tasks to earn extra credits.",
+  "rewards.progressLabel": "Completed",
+  "rewards.earnedLabel": "Earned",
+  "rewards.totalCredits": "Reward credits {{n}}",
+  "rewards.taskProgress": "Weekly tasks {{a}} / {{b}}",
+  "rewards.group.daily": "Daily",
+  "rewards.group.opensource": "Open Source",
+  "rewards.group.social": "Social & messaging",
+  "rewards.tab.web": "Web",
+  "rewards.tab.mobile": "Mobile",
+  "rewards.mobileQrHint": "Scan with WeChat, Xiaohongshu, Jike, or Feishu",
+  "rewards.mobileQrDesc":
+    "Open WeChat, Xiaohongshu, Jike, Feishu or similar clients to scan and complete sharing tasks",
+  "rewards.cloudBalance": "Cloud Balance",
+  "rewards.totalEarned": "Total earned",
+  "rewards.totalUsed": "Total used",
+  "rewards.loginTitle": "Sign in to unlock hosted models and reward claims",
+  "rewards.loginBody":
+    "Rewards are available to everyone for browsing, but hosted model usage and reward claiming are designed around your nexu cloud session.",
+  "rewards.loginCta": "Sign in with nexu",
+  "rewards.modelHintTitle":
+    "Switch back to nexu official models to use reward credits",
+  "rewards.modelHintBody":
+    "Your claims are kept, but reward credits are meant for the managed model experience. Switch providers any time in model settings.",
+  "rewards.modelHintCta": "Open model settings",
+  "rewards.claimSuccess": "Reward claimed",
+  "rewards.claimAlreadyDone": "Reward already claimed for this period",
+  "rewards.claimFailed": "Failed to claim reward",
+  "rewards.loginRequired": "Please sign in to your nexu account first",
+  "rewards.githubUnavailable": "Unavailable",
+  "rewards.downloadFailed": "Failed to download share card",
+  "rewards.githubSessionFailed":
+    "Failed to start GitHub star verification. Please try again.",
+  "rewards.proofUrlLabel": "Paste your share URL",
+  "rewards.proofUrlPlaceholder":
+    "Paste the public link you posted on that platform",
+  "rewards.proofUrlHint":
+    "Only public URLs that match the platform format can be claimed.",
+  "rewards.proofUrlInvalid":
+    "The URL does not match the current platform format.",
+  "rewards.proofUrlReopen": "Reopen share page",
+  "rewards.proofUrlLoginGuidance":
+    'If the browser landed on the platform\'s homepage, log in first, then click "Reopen share page" to jump to the pre-filled post page.',
+  "rewards.progress": "{{earned}} / {{total}} completed",
+  "rewards.card.cycle":
+    "Available per weekly cycle, excluding daily repeat claims",
+  "rewards.card.weekly": "One-time plus weekly shares",
+  "rewards.card.localState": "Controller-backed status",
+  "rewards.card.localStateHint":
+    "Claims now come from the desktop controller routes and stay idempotent across app restarts.",
+  "budget.viral.title": "Share nexu, earn extra credits",
+  "budget.viral.loginFirst": "Log in for free AI models",
+  "budget.viral.desc": "Help spread the word, get rewarded.",
+  "budget.viral.rules": "View reward rules →",
+  "budget.viral.summary":
+    "{{claimed}}/{{total}} completed · {{earned}} credits earned",
+  "budget.viral.viewAll": "View all rewards →",
+  "budget.cta.go": "Go",
+  "budget.cta.share": "Share",
+  "budget.cta.download": "Save image",
+  "budget.cta.checkin": "Check in",
+  "budget.cta.done": "+${n} credits earned",
+  "budget.confirm.title": "Confirm: {channel}",
+  "budget.confirm.desc":
+    "After you complete the action, come back and confirm to receive +${n} credits.",
+  "budget.confirm.screenshotDesc":
+    "Share first on the target platform, then come back and confirm to receive +${n} credits.",
+  "budget.confirm.imageDesc":
+    "After you complete the share, come back and confirm to receive +${n} credits.",
+  "budget.confirm.downloadImage": "Download share card",
+  "budget.confirm.done": "I've done it",
+  "budget.confirm.cancel": "Not yet",
+  "budget.confirm.checkinDesc":
+    "Confirm today's check-in to add +${n} credits to your reward balance. This can be claimed once per day.",
+  "budget.confirm.checkingTitle": "Checking task completion",
+  "budget.confirm.checkingDesc":
+    "Please wait while we confirm the task status for you.",
+  "budget.confirm.checkingImageDesc":
+    "Please wait while we confirm the share-card submission flow.",
+  "budget.confirm.checkingCheckinDesc":
+    "Please wait while we confirm today's check-in status.",
+  "budget.confirm.checking": "Checking...",
+  "budget.confirm.claimingTitle": "Claiming reward",
+  "budget.confirm.claimingDesc":
+    "Please wait while the reward credits sync to your account.",
+  "budget.confirm.claiming": "Claiming...",
+  "budget.banner.warningTitle": "Credits running low",
+  "budget.banner.depletedTitle": "Credits depleted",
+  "budget.banner.warningHeadline":
+    "Hosted credits are running low. Take one of the actions below to avoid interruptions.",
+  "budget.banner.depletedHeadline":
+    "Hosted credits are used up for now (reset tomorrow). Take one of the actions below to keep going.",
+  "budget.banner.description":
+    "Complete tasks to earn more credits, or use your own API key (BYOK) to continue.",
+  "budget.banner.warningDescription":
+    "Hosted credits are running low. Claim more task rewards or switch to your own API key to keep tasks running.",
+  "budget.banner.depletedDescription":
+    "Hosted credits are fully used up (reset tomorrow). Claim task rewards or switch to your own API key to continue.",
+  "budget.banner.actionsLabel": "Actions",
+  "budget.banner.apiKey": "Use API key",
+  "budget.banner.upgrade": "Upgrade plan",
+  "budget.banner.earnCredits": "Earn credits",
+  "budget.banner.byok": "Use your API key",
+  "budget.autoFallback.toast":
+    "Cloud credits depleted — automatically switched to your API key to keep things running.",
+  "budget.autoFallback.failed":
+    "Cloud credits are depleted and auto-switch to BYOK failed. Add your API key or earn more credits to continue.",
+  "rewards.action.claimed": "Claimed",
+  "rewards.action.checkIn": "Check in",
+  "rewards.action.download": "Download",
+  "rewards.action.share": "Share",
+  "rewards.action.open": "Open",
+  "reward.daily_checkin.name": "Daily check-in",
+  "reward.daily_checkin.desc": "Once per day",
+  "reward.github_star.name": "Star us",
+  "reward.github_star.desc": "One-time reward",
+  "reward.x_share.name": "Share on X",
+  "reward.x_share.desc": "Once per week",
+  "reward.reddit.name": "Post on Reddit",
+  "reward.reddit.desc": "Once per week",
+  "reward.mobile_share.name": "Share via mobile clients",
+  "reward.mobile_share.desc":
+    "Scan with WeChat, Xiaohongshu, Jike, or Feishu to share and earn credits",
+  "reward.lingying.name": "Post on 瓴英",
+  "reward.lingying.desc": "Once per week",
+  "reward.facebook.name": "Share on Facebook",
+  "reward.facebook.desc": "Once per week",
+  "reward.whatsapp.name": "Share on WhatsApp",
+  "reward.whatsapp.desc": "Once per week",
 
   // ── Models Page ──
   "models.pageTitle": "Settings",
@@ -801,7 +974,6 @@ const en = {
   "qqbotSetup.appSecretLabel": "App Secret",
   "qqbotSetup.appSecretPlaceholder": "Your app secret",
   "qqbotSetup.credentialsRequired": "QQ App ID and App Secret are required",
-  "qqbotSetup.testConnectivity": "Test Connectivity",
   "qqbotSetup.testSuccess": "QQ credentials are valid",
   "qqbotSetup.testFailed": "Failed to verify QQ credentials",
   "qqbotSetup.connect": "Connect QQ",
@@ -825,7 +997,6 @@ const en = {
   "dingtalkSetup.clientSecretPlaceholder": "Your client secret",
   "dingtalkSetup.credentialsRequired":
     "DingTalk Client ID and Client Secret are required",
-  "dingtalkSetup.testConnectivity": "Test Connectivity",
   "dingtalkSetup.testSuccess": "DingTalk credentials are valid",
   "dingtalkSetup.testFailed": "Failed to verify DingTalk credentials",
   "dingtalkSetup.connect": "Connect DingTalk",
@@ -837,7 +1008,8 @@ const en = {
   "wecomSetup.desc":
     "Enter your WeCom bot credentials to enable replies through the bundled OpenClaw plugin.",
   "wecomSetup.quickSetup": "Quick setup",
-  "wecomSetup.step1": "Open WeCom Developer Center.",
+  "wecomSetup.step1LinkLabel": "Open WeCom Developer Center",
+  "wecomSetup.step1Suffix": ".",
   "wecomSetup.step2": "Create or open your bot application.",
   "wecomSetup.step3": "Copy the Bot ID and Secret.",
   "wecomSetup.step4": "Paste the credentials below and verify the connection.",
@@ -846,7 +1018,6 @@ const en = {
   "wecomSetup.secretLabel": "Secret",
   "wecomSetup.secretPlaceholder": "Your bot secret",
   "wecomSetup.credentialsRequired": "WeCom Bot ID and Secret are required",
-  "wecomSetup.testConnectivity": "Test Connectivity",
   "wecomSetup.testSuccess": "WeCom credentials look valid",
   "wecomSetup.testFailed": "Failed to verify WeCom credentials",
   "wecomSetup.connect": "Connect WeCom",

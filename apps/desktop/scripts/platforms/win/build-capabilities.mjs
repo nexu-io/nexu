@@ -13,7 +13,12 @@ export function createWindowsBuildCapabilities({
     },
     webBuildEnv: createDesktopWebBuildEnv(env, processPlatform),
     sidecarReleaseEnv: env,
-    createElectronBuilderArgs({ electronVersion, buildVersion, dirOnly, targets }) {
+    createElectronBuilderArgs({
+      electronVersion,
+      buildVersion,
+      dirOnly,
+      targets,
+    }) {
       const resolvedTargets =
         Array.isArray(targets) && targets.length > 0
           ? targets

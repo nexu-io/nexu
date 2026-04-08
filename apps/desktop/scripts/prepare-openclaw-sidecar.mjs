@@ -42,7 +42,7 @@ const buildCacheRoot = resolve(
   process.env.NEXU_DEV_CACHE_DIR ?? resolve(repoRoot, ".cache", "nexu-dev"),
 );
 const openclawSidecarCacheRoot = resolve(buildCacheRoot, "openclaw-sidecar");
-const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-03-30-openclaw-sidecar-cache-v2";
+const OPENCLAW_SIDECAR_CACHE_VERSION = "2026-04-08-openclaw-sidecar-signing-v3";
 const OPENCLAW_SIDECAR_ARCHIVE_FORMAT =
   resolveBuildTargetPlatform({
     env: process.env,
@@ -1190,7 +1190,9 @@ exit 127
         totalBytes: preArchiveStats.totalBytes,
         archiveBytes: archiveStats.size,
         compressionRatio: Number(
-          (archiveStats.size / Math.max(preArchiveStats.totalBytes, 1)).toFixed(3),
+          (archiveStats.size / Math.max(preArchiveStats.totalBytes, 1)).toFixed(
+            3,
+          ),
         ),
         durationMs: Math.round(performance.now() - archiveStartedAt),
       });

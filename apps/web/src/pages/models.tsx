@@ -1,6 +1,10 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
+import {
+  syncDesktopCloudQueries,
+  useDesktopCloudStatus,
+} from "@/hooks/use-desktop-cloud-status";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
@@ -27,7 +31,6 @@ import { toast } from "sonner";
 import {
   deleteApiV1ProvidersByProviderId,
   deleteApiV1ProvidersMinimaxOauthLogin,
-  getApiInternalDesktopCloudStatus,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
   getApiV1Me,
@@ -1079,9 +1082,11 @@ function ManagedProviderDetail({
 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
-  const [cloudConnected, setCloudConnected] = useState(false);
   const [cloudDisconnecting, setCloudDisconnecting] = useState(false);
   const queryClient = useQueryClient();
+  const { data: desktopCloudStatus, refetch: refetchDesktopCloudStatus } =
+    useDesktopCloudStatus();
+  const cloudConnected = desktopCloudStatus?.connected ?? false;
   const refreshCloudModels = useMutation({
     mutationFn: async () => {
       await postApiInternalDesktopCloudRefresh();
@@ -1096,45 +1101,48 @@ function ManagedProviderDetail({
     },
   });
 
-  // Check if already connected on mount
-  useEffect(() => {
-    getApiInternalDesktopCloudStatus()
-      .then(({ data }) => {
-        if (data?.connected) setCloudConnected(true);
-      })
-      .catch(() => {});
-  }, []);
-
   // Poll cloud-status while waiting for browser login
   useEffect(() => {
     if (!loginBusy) return;
     const interval = setInterval(async () => {
       try {
-        const { data } = await getApiInternalDesktopCloudStatus();
-        if (data?.connected) {
+        const result = await refetchDesktopCloudStatus();
+        if (result.data?.connected) {
           setLoginBusy(false);
-          setCloudConnected(true);
-          queryClient.invalidateQueries({ queryKey: ["models"] });
-          queryClient.invalidateQueries({
-            queryKey: ["desktop-default-model"],
-          });
+          await syncDesktopCloudQueries(queryClient);
         }
       } catch {
         /* ignore */
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [loginBusy, queryClient]);
+  }, [loginBusy, queryClient, refetchDesktopCloudStatus]);
 
   const handleLogin = async () => {
     setLoginBusy(true);
     setLoginError(null);
     try {
       let { data } = await postApiInternalDesktopCloudConnect();
-      // If a stale polling session exists (error field set), disconnect and retry once
-      if (data?.error) {
+      // If a stale polling session exists, disconnect and retry once. Keep the
+      // current flow when another tab/process is already waiting for completion.
+      if (
+        data?.error &&
+        data.error !== "Connection attempt already in progress" &&
+        data.error !== "Already connected. Disconnect first."
+      ) {
         await postApiInternalDesktopCloudDisconnect().catch(() => {});
         ({ data } = await postApiInternalDesktopCloudConnect());
+      }
+      if (data?.error === "Already connected. Disconnect first.") {
+        await syncDesktopCloudQueries(queryClient);
+        setLoginBusy(false);
+        return;
+      }
+      // Another surface/process already kicked off login — treat as pending and
+      // let the polling effect detect completion instead of dropping the user
+      // into an error state.
+      if (data?.error === "Connection attempt already in progress") {
+        return;
       }
       if (data?.error) {
         setLoginError(data.error ?? t("welcome.connectFailed"));
@@ -1154,6 +1162,7 @@ function ManagedProviderDetail({
   const handleCancelLogin = async () => {
     try {
       await postApiInternalDesktopCloudDisconnect();
+      await syncDesktopCloudQueries(queryClient);
     } catch {
       // ignore
     }
@@ -1196,11 +1205,7 @@ function ManagedProviderDetail({
                 setCloudDisconnecting(true);
                 try {
                   await postApiInternalDesktopCloudDisconnect().catch(() => {});
-                  setCloudConnected(false);
-                  queryClient.invalidateQueries({ queryKey: ["models"] });
-                  queryClient.invalidateQueries({
-                    queryKey: ["desktop-default-model"],
-                  });
+                  await syncDesktopCloudQueries(queryClient);
                 } finally {
                   setCloudDisconnecting(false);
                 }

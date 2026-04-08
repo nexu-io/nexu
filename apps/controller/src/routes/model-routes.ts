@@ -7,6 +7,8 @@ import {
   modelListResponseSchema,
   providerListResponseSchema,
   providerResponseSchema,
+  quotaFallbackResponseSchema,
+  restoreManagedBodySchema,
   upsertProviderBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
@@ -244,6 +246,53 @@ export function registerModelRoutes(
         ),
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/quota/fallback-to-byok",
+      tags: ["Quota"],
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: quotaFallbackResponseSchema },
+          },
+          description: "Trigger automatic fallback to BYOK provider",
+        },
+      },
+    }),
+    async (c) => {
+      const result = await container.quotaFallbackService.triggerFallback();
+      return c.json({ ok: result.success, newModelId: result.newModelId }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/quota/restore-managed",
+      tags: ["Quota"],
+      request: {
+        body: {
+          content: { "application/json": { schema: restoreManagedBodySchema } },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: quotaFallbackResponseSchema },
+          },
+          description: "Restore default model to managed (cloud) model",
+        },
+      },
+    }),
+    async (c) => {
+      const { managedModelId } = c.req.valid("json");
+      const result =
+        await container.quotaFallbackService.restoreManaged(managedModelId);
+      return c.json({ ok: result.success, newModelId: result.newModelId }, 200);
     },
   );
 }

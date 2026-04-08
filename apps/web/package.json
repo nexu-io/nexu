@@ -14,7 +14,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@amplitude/unified": "1.0.0-beta.38",
     "@hey-api/client-fetch": "^0.8.4",
     "@lobehub/icons": "2.33.0",
     "@nexu/shared": "workspace:*",
@@ -32,6 +31,7 @@
     "i18next": "^25.8.18",
     "lucide-react": "^0.474.0",
     "markdown-it": "^14.1.1",
+    "posthog-js": "^1.364.6",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

@@ -278,6 +278,12 @@ export function compileChannelsConfig(params: {
       ? {
           feishu: {
             enabled: true,
+            streaming: true,
+            renderMode: "card",
+            dmPolicy: "open",
+            groupPolicy: "open",
+            requireMention: true,
+            allowFrom: ["*"],
             accounts: feishuAccounts,
           },
         }

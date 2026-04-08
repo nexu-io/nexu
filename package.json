@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --dir ./scripts/dev exec tsx ./src/index.ts",
-    "pkg": "node ./scripts/pkg/dist/index.js",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",
@@ -12,6 +11,7 @@
     "lint:fix": "biome check --write --unsafe .",
     "format": "biome check --write .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage --coverage.reporter=lcov",
     "generate-types": "pnpm --filter @nexu/controller generate-openapi && pnpm --filter @nexu/web generate-sdk",
     "openclaw-runtime:install": "npm --prefix ./openclaw-runtime run install:cached",
     "openclaw-runtime:refresh-lock": "npm --prefix ./openclaw-runtime run refresh-lock",
@@ -32,6 +32,7 @@
     "dist:mac:unsigned": "pnpm --filter @nexu/desktop dist:mac:unsigned",
     "dist:mac:unsigned:arm64": "pnpm --filter @nexu/desktop dist:mac:unsigned:arm64",
     "dist:mac:unsigned:x64": "pnpm --filter @nexu/desktop dist:mac:unsigned:x64",
+    "dist:win:local": "pnpm --filter @nexu/desktop dist:win:local",
     "dist:win:custom": "pnpm --filter @nexu/desktop dist:win:custom"
   },
   "devDependencies": {

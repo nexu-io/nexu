@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import {
   createWriteStream,
   existsSync,
@@ -12,11 +12,14 @@ import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { promisify } from "node:util";
 import type {
   DesktopSidecarMaterializer,
   MaterializePackagedSidecarArgs,
 } from "../types";
 import * as platformFilesystem from "./filesystem-compat";
+
+const execFileAsync = promisify(execFile);
 
 const require = createRequire(import.meta.url);
 const yauzl = require("yauzl") as {
@@ -347,7 +350,7 @@ export function createAsyncArchiveSidecarMaterializer(): DesktopSidecarMateriali
         !resolved.archiveMetadata ||
         resolved.archiveMetadata.format === "tar.gz"
       ) {
-        execFileSync("/usr/bin/tar", [
+        await execFileAsync("/usr/bin/tar", [
           "-xzf",
           resolved.archivePath,
           "-C",

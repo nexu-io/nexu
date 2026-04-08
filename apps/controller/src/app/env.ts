@@ -99,6 +99,10 @@ const envSchema = z.object({
   RUNTIME_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
   DEFAULT_MODEL_ID: z.string().default("link/gemini-3-flash-preview"),
   WEB_URL: z.string().default("http://localhost:5173"),
+  POSTHOG_API_KEY: z.string().optional(),
+  VITE_POSTHOG_API_KEY: z.string().optional(),
+  POSTHOG_HOST: z.string().optional(),
+  VITE_POSTHOG_HOST: z.string().optional(),
   AMPLITUDE_API_KEY: z.string().optional(),
   VITE_AMPLITUDE_API_KEY: z.string().optional(),
 });
@@ -160,6 +164,10 @@ export const env = {
     openclawStateDir,
     "nexu-runtime-model.json",
   ),
+  creditGuardStatePath: path.join(
+    openclawStateDir,
+    "nexu-credit-guard-state.json",
+  ),
   skillhubCacheDir: path.join(nexuHomeDir, "skillhub-cache"),
   skillDbPath: path.join(nexuHomeDir, "skill-ledger.json"),
   analyticsStatePath: path.join(nexuHomeDir, "analytics-state.json"),
@@ -191,8 +199,11 @@ export const env = {
   runtimeSyncIntervalMs: parsed.RUNTIME_SYNC_INTERVAL_MS,
   runtimeHealthIntervalMs: parsed.RUNTIME_HEALTH_INTERVAL_MS,
   defaultModelId: parsed.DEFAULT_MODEL_ID,
+  posthogApiKey:
+    parsed.POSTHOG_API_KEY?.trim() || parsed.VITE_POSTHOG_API_KEY?.trim(),
+  posthogHost: parsed.POSTHOG_HOST?.trim() || parsed.VITE_POSTHOG_HOST?.trim(),
   amplitudeApiKey:
-    parsed.AMPLITUDE_API_KEY?.trim() || parsed.VITE_AMPLITUDE_API_KEY,
+    parsed.AMPLITUDE_API_KEY?.trim() || parsed.VITE_AMPLITUDE_API_KEY?.trim(),
 };
 
 export type ControllerEnv = typeof env;

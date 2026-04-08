@@ -1296,6 +1296,70 @@
         }
       }
     },
+    "/api/auth/get-session": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Desktop-local auth session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "expiresAt"
+                      ]
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "image": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "name",
+                        "image"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "user"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/internal/desktop/cloud-status": {
       "get": {
         "tags": [
@@ -1314,6 +1378,10 @@
                     },
                     "polling": {
                       "type": "boolean"
+                    },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "userName": {
                       "type": "string",
@@ -1381,6 +1449,10 @@
                           "polling": {
                             "type": "boolean"
                           },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
+                          },
                           "userName": {
                             "type": "string",
                             "nullable": true
@@ -1427,6 +1499,22 @@
         "tags": [
           "Desktop"
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Cloud connect",
@@ -1464,6 +1552,10 @@
                   "name": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -1495,6 +1587,10 @@
                         },
                         "polling": {
                           "type": "boolean"
+                        },
+                        "userId": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "userName": {
                           "type": "string",
@@ -1561,6 +1657,10 @@
                               },
                               "polling": {
                                 "type": "boolean"
+                              },
+                              "userId": {
+                                "type": "string",
+                                "nullable": true
                               },
                               "userName": {
                                 "type": "string",
@@ -1631,6 +1731,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -1696,6 +1800,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -1798,6 +1906,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -1863,6 +1975,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -1974,6 +2090,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2039,6 +2159,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2127,6 +2251,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2192,6 +2320,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2307,6 +2439,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2372,6 +2508,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2460,6 +2600,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2525,6 +2669,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2634,6 +2782,10 @@
                     "polling": {
                       "type": "boolean"
                     },
+                    "userId": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "userName": {
                       "type": "string",
                       "nullable": true
@@ -2699,6 +2851,10 @@
                           },
                           "polling": {
                             "type": "boolean"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userName": {
                             "type": "string",
@@ -2887,6 +3043,751 @@
                     "ok",
                     "modelId",
                     "configPushed"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/rewards": {
+      "get": {
+        "tags": [
+          "Desktop"
+        ],
+        "responses": {
+          "200": {
+            "description": "Desktop rewards status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "viewer": {
+                      "type": "object",
+                      "properties": {
+                        "cloudConnected": {
+                          "type": "boolean"
+                        },
+                        "activeModelId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "activeModelProviderId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "usingManagedModel": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "cloudConnected",
+                        "activeModelId",
+                        "activeModelProviderId",
+                        "usingManagedModel"
+                      ]
+                    },
+                    "progress": {
+                      "type": "object",
+                      "properties": {
+                        "claimedCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "earnedCredits": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "availableCredits": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "claimedCount",
+                        "totalCount",
+                        "earnedCredits"
+                      ]
+                    },
+                    "tasks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "daily_checkin",
+                              "github_star",
+                              "x_share",
+                              "reddit",
+                              "mobile_share",
+                              "lingying",
+                              "facebook",
+                              "whatsapp"
+                            ]
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "daily",
+                              "opensource",
+                              "social"
+                            ]
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "reward": {
+                            "type": "number",
+                            "minimum": 0,
+                            "exclusiveMinimum": true
+                          },
+                          "shareMode": {
+                            "type": "string",
+                            "enum": [
+                              "link",
+                              "tweet",
+                              "image"
+                            ]
+                          },
+                          "repeatMode": {
+                            "type": "string",
+                            "enum": [
+                              "once",
+                              "daily",
+                              "weekly"
+                            ]
+                          },
+                          "requiresScreenshot": {
+                            "type": "boolean"
+                          },
+                          "actionUrl": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uri",
+                            "default": null
+                          },
+                          "isClaimed": {
+                            "type": "boolean"
+                          },
+                          "lastClaimedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "claimCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "group",
+                          "icon",
+                          "reward",
+                          "shareMode",
+                          "repeatMode",
+                          "requiresScreenshot",
+                          "isClaimed",
+                          "lastClaimedAt",
+                          "claimCount"
+                        ]
+                      }
+                    },
+                    "cloudBalance": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "totalBalance": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalRecharged": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalConsumed": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "default": null,
+                      "required": [
+                        "totalBalance",
+                        "totalRecharged",
+                        "totalConsumed"
+                      ]
+                    },
+                    "autoFallbackTriggered": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "viewer",
+                    "progress",
+                    "tasks"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/rewards/github-star-session": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prepare a GitHub star verification session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "baselineStars": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sessionId",
+                    "baselineStars",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "GitHub star verification is temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/rewards/claim": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "taskId": {
+                    "type": "string",
+                    "enum": [
+                      "daily_checkin",
+                      "github_star",
+                      "x_share",
+                      "reddit",
+                      "mobile_share",
+                      "lingying",
+                      "facebook",
+                      "whatsapp"
+                    ]
+                  },
+                  "proof": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "format": "uri"
+                      },
+                      "githubSessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "taskId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Claim a desktop reward",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "alreadyClaimed": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "object",
+                      "properties": {
+                        "viewer": {
+                          "type": "object",
+                          "properties": {
+                            "cloudConnected": {
+                              "type": "boolean"
+                            },
+                            "activeModelId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "activeModelProviderId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "usingManagedModel": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "cloudConnected",
+                            "activeModelId",
+                            "activeModelProviderId",
+                            "usingManagedModel"
+                          ]
+                        },
+                        "progress": {
+                          "type": "object",
+                          "properties": {
+                            "claimedCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "earnedCredits": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "availableCredits": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "claimedCount",
+                            "totalCount",
+                            "earnedCredits"
+                          ]
+                        },
+                        "tasks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "enum": [
+                                  "daily_checkin",
+                                  "github_star",
+                                  "x_share",
+                                  "reddit",
+                                  "mobile_share",
+                                  "lingying",
+                                  "facebook",
+                                  "whatsapp"
+                                ]
+                              },
+                              "group": {
+                                "type": "string",
+                                "enum": [
+                                  "daily",
+                                  "opensource",
+                                  "social"
+                                ]
+                              },
+                              "icon": {
+                                "type": "string"
+                              },
+                              "reward": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                              },
+                              "shareMode": {
+                                "type": "string",
+                                "enum": [
+                                  "link",
+                                  "tweet",
+                                  "image"
+                                ]
+                              },
+                              "repeatMode": {
+                                "type": "string",
+                                "enum": [
+                                  "once",
+                                  "daily",
+                                  "weekly"
+                                ]
+                              },
+                              "requiresScreenshot": {
+                                "type": "boolean"
+                              },
+                              "actionUrl": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "default": null
+                              },
+                              "isClaimed": {
+                                "type": "boolean"
+                              },
+                              "lastClaimedAt": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "claimCount": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "group",
+                              "icon",
+                              "reward",
+                              "shareMode",
+                              "repeatMode",
+                              "requiresScreenshot",
+                              "isClaimed",
+                              "lastClaimedAt",
+                              "claimCount"
+                            ]
+                          }
+                        },
+                        "cloudBalance": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "totalBalance": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalRecharged": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalConsumed": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "default": null,
+                          "required": [
+                            "totalBalance",
+                            "totalRecharged",
+                            "totalConsumed"
+                          ]
+                        },
+                        "autoFallbackTriggered": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "viewer",
+                        "progress",
+                        "tasks"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "alreadyClaimed",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid claim proof",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/desktop/rewards/set-balance": {
+      "post": {
+        "tags": [
+          "Desktop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "balance": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "balance"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update the desktop test balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "viewer": {
+                      "type": "object",
+                      "properties": {
+                        "cloudConnected": {
+                          "type": "boolean"
+                        },
+                        "activeModelId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "activeModelProviderId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "usingManagedModel": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "cloudConnected",
+                        "activeModelId",
+                        "activeModelProviderId",
+                        "usingManagedModel"
+                      ]
+                    },
+                    "progress": {
+                      "type": "object",
+                      "properties": {
+                        "claimedCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "earnedCredits": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "availableCredits": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "claimedCount",
+                        "totalCount",
+                        "earnedCredits"
+                      ]
+                    },
+                    "tasks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "daily_checkin",
+                              "github_star",
+                              "x_share",
+                              "reddit",
+                              "mobile_share",
+                              "lingying",
+                              "facebook",
+                              "whatsapp"
+                            ]
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "daily",
+                              "opensource",
+                              "social"
+                            ]
+                          },
+                          "icon": {
+                            "type": "string"
+                          },
+                          "reward": {
+                            "type": "number",
+                            "minimum": 0,
+                            "exclusiveMinimum": true
+                          },
+                          "shareMode": {
+                            "type": "string",
+                            "enum": [
+                              "link",
+                              "tweet",
+                              "image"
+                            ]
+                          },
+                          "repeatMode": {
+                            "type": "string",
+                            "enum": [
+                              "once",
+                              "daily",
+                              "weekly"
+                            ]
+                          },
+                          "requiresScreenshot": {
+                            "type": "boolean"
+                          },
+                          "actionUrl": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uri",
+                            "default": null
+                          },
+                          "isClaimed": {
+                            "type": "boolean"
+                          },
+                          "lastClaimedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "claimCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "group",
+                          "icon",
+                          "reward",
+                          "shareMode",
+                          "repeatMode",
+                          "requiresScreenshot",
+                          "isClaimed",
+                          "lastClaimedAt",
+                          "claimCount"
+                        ]
+                      }
+                    },
+                    "cloudBalance": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "totalBalance": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalRecharged": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "totalConsumed": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "default": null,
+                      "required": [
+                        "totalBalance",
+                        "totalRecharged",
+                        "totalConsumed"
+                      ]
+                    },
+                    "autoFallbackTriggered": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "viewer",
+                    "progress",
+                    "tasks"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unable to update the desktop test balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
                   ]
                 }
               }
@@ -4273,6 +5174,15 @@
                     },
                     "resetsAt": {
                       "type": "string"
+                    },
+                    "usingByok": {
+                      "type": "boolean"
+                    },
+                    "byokAvailable": {
+                      "type": "boolean"
+                    },
+                    "autoFallbackTriggered": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -6414,6 +7324,84 @@
                   },
                   "required": [
                     "valid"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quota/fallback-to-byok": {
+      "post": {
+        "tags": [
+          "Quota"
+        ],
+        "responses": {
+          "200": {
+            "description": "Trigger automatic fallback to BYOK provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "newModelId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quota/restore-managed": {
+      "post": {
+        "tags": [
+          "Quota"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "managedModelId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "managedModelId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restore default model to managed (cloud) model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "newModelId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok"
                   ]
                 }
               }
