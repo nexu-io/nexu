@@ -330,6 +330,10 @@ export function RewardsPage() {
     }
 
     if (rewardTaskRequiresGithubStarSession(task.id)) {
+      // Trust-based GitHub star reward: open the browser, wait 5 seconds for
+      // the user to click star, then auto-grant. The cloud `/rewards/claim`
+      // endpoint enforces per-account de-dup via `alreadyClaimed`, so users
+      // can't double-claim by clicking repeatedly.
       let sessionId: string | null = null;
       try {
         const session = await prepareGithubStarSession();
@@ -338,13 +342,32 @@ export function RewardsPage() {
         toast.error(t("rewards.githubSessionFailed"));
         return;
       }
-      setConfirmPhase("idle");
-      setConfirmProofUrl("");
-      setConfirmGithubSessionId(sessionId);
       if (task.actionUrl) {
         await openExternalUrl(task.actionUrl);
       }
-      setConfirmTaskId(task.id);
+      const toastId = toast.loading(t("rewards.githubVerifying"));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      try {
+        const result = await claimTask({
+          taskId: task.id,
+          proof: { githubSessionId: sessionId ?? undefined },
+        });
+        toast.dismiss(toastId);
+        if (result.alreadyClaimed) {
+          toast.success(t("rewards.claimAlreadyDone"));
+        } else if (result.ok) {
+          toast.success(t("rewards.claimSuccess"));
+          const doneTrackingType = TASK_DONE_TRACKING_TYPE[task.id];
+          if (doneTrackingType) {
+            track("workspace_task_done", { type: doneTrackingType });
+          }
+        } else {
+          toast.error(t("rewards.claimFailed"));
+        }
+      } catch {
+        toast.dismiss(toastId);
+        toast.error(t("rewards.claimFailed"));
+      }
       return;
     }
 

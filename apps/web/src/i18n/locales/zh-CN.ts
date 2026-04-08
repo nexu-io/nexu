@@ -319,6 +319,7 @@ const zhCN = {
   "rewards.githubUnavailable": "暂不可用",
   "rewards.downloadFailed": "分享卡下载失败",
   "rewards.githubSessionFailed": "启动 GitHub Star 监测失败，请稍后重试",
+  "rewards.githubVerifying": "请在 GitHub 上为我们点亮星标，5 秒后自动发放奖励...",
   "rewards.proofUrlLabel": "回填分享链接",
   "rewards.proofUrlPlaceholder": "粘贴你在对应平台发布后的公开链接",
   "rewards.proofUrlHint": "只有符合对应平台格式的公开链接才能领取积分。",

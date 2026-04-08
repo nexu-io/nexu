@@ -28,7 +28,15 @@ export class GithubStarVerificationService {
   private readonly sessions = new Map<string, GithubStarSession>();
 
   async prepareSession(): Promise<PrepareGithubStarSessionResult> {
-    const baselineStars = await this.fetchStars();
+    // Best-effort baseline fetch — don't fail the whole flow if GitHub
+    // is rate-limited or unreachable. The trust-based verify path below
+    // does not actually use the baseline, so any value is acceptable.
+    let baselineStars = 0;
+    try {
+      baselineStars = await this.fetchStars();
+    } catch {
+      // ignore — proceed with baseline 0
+    }
     const sessionId = crypto.randomUUID();
     const expiresAt = Date.now() + GITHUB_STAR_SESSION_TTL_MS;
 
@@ -54,13 +62,17 @@ export class GithubStarVerificationService {
       return { ok: false, reason: "expired" };
     }
 
-    const currentStars = await this.fetchStars();
-    if (currentStars <= session.baselineStars) {
-      return { ok: false, reason: "not_increased" };
-    }
-
+    // Trust-based: skip the live GitHub API check. The desktop frontend
+    // opens the GitHub repo page and waits 5 seconds before calling claim,
+    // which is long enough for the user to star but too long to call this
+    // an instant grant. We deliberately avoid hitting the GitHub API here
+    // because the public stars endpoint is rate-limited (60/hr unauthed)
+    // and the star count is not real-time, so verification routinely
+    // fails immediately after the user actually stars. Per-account
+    // de-dup is enforced server-side at the cloud /rewards/claim endpoint
+    // (alreadyClaimed), so a user cannot double-claim this reward.
     this.sessions.delete(sessionId);
-    return { ok: true, currentStars };
+    return { ok: true, currentStars: session.baselineStars };
   }
 
   private async fetchStars(): Promise<number> {
