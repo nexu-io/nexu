@@ -389,6 +389,7 @@ const zhCN = {
   "rewards.action.open": "打开",
   "reward.daily_checkin.name": "每日打卡",
   "reward.daily_checkin.desc": "每天可领一次",
+  "reward.daily_checkin.autoGrantedDesc": "每日奖励自动发放，无需手动领取",
   "reward.github_star.name": "Star us",
   "reward.github_star.desc": "仅限一次",
   "reward.x_share.name": "分享到 X",
