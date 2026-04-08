@@ -65,7 +65,17 @@ function getRewardsModelHintState(input: {
   if ((input.cloudBalance?.totalBalance ?? 0) <= 0) return "none";
   return "switch-back";
 }
+function isReadonlyRewardTask(task: RewardTaskStatus): boolean {
+  return task.id === "daily_checkin";
+}
 
+function getRewardTaskDescriptionKey(task: RewardTaskStatus): string {
+  if (task.id === "daily_checkin") {
+    return "reward.daily_checkin.autoGrantedDesc";
+  }
+
+  return `reward.${task.id}.desc`;
+}
 function RewardConfirmModal({
   task,
   phase,
@@ -287,7 +297,7 @@ export function RewardsPage() {
   });
 
   const handleTaskAction = async (task: RewardTaskStatus) => {
-    if (task.isClaimed) {
+    if (task.isClaimed || isReadonlyRewardTask(task)) {
       return;
     }
 
@@ -320,6 +330,10 @@ export function RewardsPage() {
     }
 
     if (rewardTaskRequiresGithubStarSession(task.id)) {
+      // Trust-based GitHub star reward: open the browser, wait 10 seconds for
+      // the user to click star, then auto-grant. The cloud `/rewards/claim`
+      // endpoint enforces per-account de-dup via `alreadyClaimed`, so users
+      // can't double-claim by clicking repeatedly.
       let sessionId: string | null = null;
       try {
         const session = await prepareGithubStarSession();
@@ -328,13 +342,32 @@ export function RewardsPage() {
         toast.error(t("rewards.githubSessionFailed"));
         return;
       }
-      setConfirmPhase("idle");
-      setConfirmProofUrl("");
-      setConfirmGithubSessionId(sessionId);
       if (task.actionUrl) {
         await openExternalUrl(task.actionUrl);
       }
-      setConfirmTaskId(task.id);
+      const toastId = toast.loading(t("rewards.githubVerifying"));
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      try {
+        const result = await claimTask({
+          taskId: task.id,
+          proof: { githubSessionId: sessionId ?? undefined },
+        });
+        toast.dismiss(toastId);
+        if (result.alreadyClaimed) {
+          toast.success(t("rewards.claimAlreadyDone"));
+        } else if (result.ok) {
+          toast.success(t("rewards.claimSuccess"));
+          const doneTrackingType = TASK_DONE_TRACKING_TYPE[task.id];
+          if (doneTrackingType) {
+            track("workspace_task_done", { type: doneTrackingType });
+          }
+        } else {
+          toast.error(t("rewards.claimFailed"));
+        }
+      } catch {
+        toast.dismiss(toastId);
+        toast.error(t("rewards.claimFailed"));
+      }
       return;
     }
 
@@ -446,22 +479,24 @@ export function RewardsPage() {
                     const isGithubStar = rewardTaskRequiresGithubStarSession(
                       task.id,
                     );
+                    const isReadonlyTask = isReadonlyRewardTask(task);
                     const isPreparingThisTask =
                       isGithubStar && isPreparingGithubStarSession;
-                    const actionLabel = task.isClaimed
-                      ? t("budget.cta.done").replace(
-                          "${n}",
-                          formatRewardAmount(task.reward),
-                        )
-                      : loading
-                        ? "..."
-                        : task.repeatMode === "daily"
-                          ? t("budget.cta.checkin")
-                          : task.shareMode === "image"
-                            ? t("budget.cta.download")
-                            : task.shareMode === "tweet"
-                              ? t("budget.cta.share")
-                              : t("budget.cta.go");
+                    const actionLabel =
+                      task.isClaimed || isReadonlyTask
+                        ? t("budget.cta.done").replace(
+                            "${n}",
+                            formatRewardAmount(task.reward),
+                          )
+                        : loading
+                          ? "..."
+                          : task.repeatMode === "daily"
+                            ? t("budget.cta.checkin")
+                            : task.shareMode === "image"
+                              ? t("budget.cta.download")
+                              : task.shareMode === "tweet"
+                                ? t("budget.cta.share")
+                                : t("budget.cta.go");
 
                     return (
                       <div
@@ -474,7 +509,7 @@ export function RewardsPage() {
                         <div
                           className={cn(
                             "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border transition-colors",
-                            task.isClaimed
+                            task.isClaimed || isReadonlyTask
                               ? "border-border/50 bg-surface-2 opacity-50"
                               : "border-border bg-white",
                           )}
@@ -487,7 +522,7 @@ export function RewardsPage() {
                             <span
                               className={cn(
                                 "text-[13px] font-medium leading-tight",
-                                task.isClaimed
+                                task.isClaimed || isReadonlyTask
                                   ? "text-text-muted"
                                   : "text-text-primary",
                               )}
@@ -502,12 +537,12 @@ export function RewardsPage() {
                           <div
                             className={cn(
                               "mt-0.5 text-[11px]",
-                              task.isClaimed
+                              task.isClaimed || isReadonlyTask
                                 ? "text-text-muted/60"
                                 : "text-text-muted",
                             )}
                           >
-                            {t(`reward.${task.id}.desc`)}
+                            {t(getRewardTaskDescriptionKey(task))}
                           </div>
                         </div>
 
@@ -516,13 +551,14 @@ export function RewardsPage() {
                           disabled={
                             loading ||
                             task.isClaimed ||
+                            isReadonlyTask ||
                             isPreparingThisTask ||
                             claimingTaskId === task.id
                           }
                           onClick={() => void handleTaskAction(task)}
                           className={cn(
                             "inline-flex h-[26px] shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-medium leading-none transition-all",
-                            task.isClaimed
+                            task.isClaimed || isReadonlyTask
                               ? "bg-surface-2 text-text-muted"
                               : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
                           )}

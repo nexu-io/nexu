@@ -1779,6 +1779,88 @@ function readBundleExecutableName(appContentsPath: string): string {
   }
 }
 
+function readBundleInfoValue(
+  appContentsPath: string,
+  key: string,
+): string | null {
+  try {
+    const plistPath = path.join(appContentsPath, "Info.plist");
+    const raw = readFileSync(plistPath, "utf8");
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = raw.match(
+      new RegExp(`<key>${escapedKey}</key>\\s*<string>([^<]+)</string>`),
+    );
+    return match?.[1]?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildRuntimeExtractionStamp(
+  appContentsPath: string,
+  appVersion: string,
+): string {
+  const bundleVersion = readBundleInfoValue(appContentsPath, "CFBundleVersion");
+  return JSON.stringify({
+    appVersion,
+    bundleVersion,
+    // Mirrored in platforms/mac/launchd-paths.ts — both copies must agree.
+    arch: process.arch,
+  });
+}
+
+function readRuntimeExtractionStamp(stampPath: string): string | null {
+  try {
+    return readFileSync(stampPath, "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function shouldReplaceExtractedRuntime(opts: {
+  entryPath: string;
+  stampPath: string;
+  expectedStamp: string;
+}): boolean {
+  const { entryPath, stampPath, expectedStamp } = opts;
+  const hasExistingRuntime = existsSync(entryPath) || existsSync(stampPath);
+
+  if (!hasExistingRuntime) {
+    return false;
+  }
+
+  return readRuntimeExtractionStamp(stampPath) !== expectedStamp;
+}
+
+async function cleanupForPackagedRuntimeReplacement(
+  log: (message: string) => void,
+) {
+  const launchd = new LaunchdManager({ log });
+  const labels = {
+    controller: SERVICE_LABELS.controller(false),
+    openclaw: SERVICE_LABELS.openclaw(false),
+  };
+  const plistDir = getDefaultPlistDir(false);
+
+  log(
+    "packaged runtime identity changed; tearing down launchd services before runtime replacement",
+  );
+  await teardownLaunchdServices({
+    launchd,
+    labels,
+    plistDir,
+  });
+
+  const { clean, remainingPids } = await ensureNexuProcessesDead({
+    timeoutMs: 5_000,
+    intervalMs: 200,
+  });
+  if (!clean) {
+    log(
+      `packaged runtime replacement proceeding with surviving pids=${remainingPids.join(",")}`,
+    );
+  }
+}
 /**
  * Ensure a standalone Electron-as-Node runner exists outside the .app bundle.
  *

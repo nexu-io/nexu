@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/electron/main";
@@ -8,6 +9,7 @@ import {
   type MenuItemConstructorOptions,
   app,
   crashReporter,
+  dialog,
   globalShortcut,
   nativeTheme,
   powerMonitor,
@@ -289,8 +291,121 @@ if (sentryDsn) {
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
-/** When true, the Develop menu and reload shortcuts are visible in production. */
-let productionDebugMode = false;
+/** True if this is the x86_64 build running under Rosetta 2 on Apple Silicon. */
+function isRunningUnderRosetta(): boolean {
+  if (process.platform !== "darwin") return false;
+  if (process.arch !== "x64") return false;
+  try {
+    const out = execFileSync(
+      "/usr/sbin/sysctl",
+      ["-n", "sysctl.proc_translated"],
+      {
+        encoding: "utf8",
+        timeout: 1000,
+      },
+    ).trim();
+    return out === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve the latest arm64 dmg URL from the same update feed (channel) the
+ * user is currently on, so the link mirrors what auto-update would install.
+ * Reads runtimeConfig (not process.env) because packaged builds bake the
+ * channel + feed URL into build-config.json, not live env vars.
+ */
+async function resolveLatestArm64DownloadUrl(): Promise<string> {
+  const R2_BASE = "https://desktop-releases.nexu.io";
+  const channel = runtimeConfig.updates.channel ?? "stable";
+
+  let baseUrl = `${R2_BASE}/${channel}/arm64`;
+  const feedOverride = runtimeConfig.urls.updateFeed;
+  if (feedOverride) {
+    try {
+      const u = new URL(feedOverride);
+      const trimmed = u.pathname.replace(/\/+$/, "");
+      const swapped = trimmed.replace(/\/x64$/, "/arm64");
+      u.pathname = swapped.endsWith("/arm64") ? swapped : `${swapped}/arm64`;
+      u.search = "";
+      u.hash = "";
+      baseUrl = u.toString().replace(/\/+$/, "");
+    } catch {}
+  }
+
+  const ymlUrl = `${baseUrl}/latest-mac.yml`;
+  try {
+    const res = await fetch(ymlUrl, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      // electron-builder latest-mac.yml lists both .zip (for delta updates)
+      // and .dmg under `files:`. We want the dmg.
+      const match = (await res.text()).match(/url:\s*(\S+\.dmg)/);
+      if (match?.[1]) return `${baseUrl}/${match[1]}`;
+    }
+  } catch {}
+  return ymlUrl;
+}
+
+/**
+ * Block startup with a warning if the Intel build is running on Apple
+ * Silicon under Rosetta 2 — the symptoms (slow startup, high CPU, sidecar
+ * native bindings failing to load) give users no hint of the root cause.
+ * Skipped in dev and skippable via NEXU_SKIP_ARCH_WARNING=1.
+ */
+async function warnIfRunningUnderRosetta(): Promise<void> {
+  if (!app.isPackaged) return;
+  if (process.env.NEXU_SKIP_ARCH_WARNING === "1") return;
+  if (!isRunningUnderRosetta()) return;
+
+  const downloadUrl = await resolveLatestArm64DownloadUrl();
+  const isZh = app.getLocale().toLowerCase().startsWith("zh");
+  const messageBox = isZh
+    ? {
+        title: "检测到架构不匹配",
+        message: "正在 Apple Silicon Mac 上运行 Intel 版 Nexu",
+        detail:
+          "macOS 通过 Rosetta 2 翻译运行 Intel 版本，会导致：\n• 启动比正常慢 3-5 倍\n• 界面卡顿、CPU 占用过高\n• 部分原生模块可能加载失败\n\n请下载 Apple Silicon (arm64) 版本以获得最佳体验。",
+        // Trailing space on the default-button label is a workaround for
+        // electron/electron#40466 — non-standard button labels otherwise do
+        // not get the macOS blue default-button highlight. The "(推荐)"
+        // suffix is a textual fallback so the recommended action is still
+        // obvious if the visual highlight ever stops working.
+        downloadButton: "下载 arm64 版本（推荐） ",
+        continueButton: "继续运行",
+      }
+    : {
+        title: "Architecture mismatch detected",
+        message: "Running the Intel build of Nexu on an Apple Silicon Mac",
+        detail:
+          "macOS is running this build through Rosetta 2 translation, which causes:\n• 3-5x slower startup\n• Laggy UI and high CPU usage\n• Possible native module load failures\n\nPlease download the Apple Silicon (arm64) build for the best experience.",
+        downloadButton: "Download arm64 build (recommended) ",
+        continueButton: "Continue anyway",
+      };
+
+  const result = await dialog.showMessageBox({
+    type: "warning",
+    title: messageBox.title,
+    message: messageBox.message,
+    detail: messageBox.detail,
+    buttons: [messageBox.downloadButton, messageBox.continueButton],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+
+  if (result.response === 0) {
+    void shell.openExternal(downloadUrl);
+    app.exit(0);
+  }
+}
+
+/**
+ * Controls whether the Develop menu is visible. In local dev it starts enabled
+ * so the menu matches today's default behavior, but the same shortcut can
+ * still toggle it for validation. In packaged builds it starts disabled.
+ */
+let productionDebugMode = !app.isPackaged;
 let sleepGuard: SleepGuard | null = null;
 let launchdResult: LaunchdBootstrapResult | null = null;
 let proxyManager: ProxyManager | null = null;
@@ -494,8 +609,8 @@ function installApplicationMenu(): void {
       submenu: [
         // Reload shortcuts are dev-only — in production they expose
         // internal "starting local service" screens (see #399).
-        // They can be unlocked at runtime via Cmd+Shift+Alt+D.
-        ...(!app.isPackaged || productionDebugMode
+        // They can be unlocked at runtime via Cmd/Ctrl+Shift+Alt+D.
+        ...(productionDebugMode
           ? ([
               { role: "reload" },
               { role: "forceReload" },
@@ -511,7 +626,7 @@ function installApplicationMenu(): void {
         { role: "togglefullscreen" },
       ],
     },
-    ...(!app.isPackaged || productionDebugMode ? [developMenu] : []),
+    ...(productionDebugMode ? [developMenu] : []),
     { role: "windowMenu" },
     helpMenu,
   ];
@@ -1061,21 +1176,34 @@ app.on("web-contents-created", (_event, contents) => {
     return { action: "deny" };
   });
 
-  // In production, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R, F5)
-  // at the webContents level to prevent exposing internal startup screens (#399).
-  // Unlockable at runtime via Cmd+Shift+Alt+D (toggles productionDebugMode).
-  if (app.isPackaged) {
-    contents.on("before-input-event", (event, input) => {
-      if (productionDebugMode) return;
-      if (input.type !== "keyDown") return;
-      const isReload =
-        (input.key.toLowerCase() === "r" && (input.meta || input.control)) ||
-        input.key === "F5";
-      if (isReload) {
-        event.preventDefault();
-      }
-    });
-  }
+  // In packaged builds, block reload shortcuts (Cmd+R, Ctrl+R, Ctrl+Shift+R,
+  // F5) at the webContents level to prevent exposing internal startup screens
+  // (#399). The same focused-window event path also toggles the Develop menu in
+  // dev so the shortcut can be validated without a packaged build.
+  contents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    // Toggle debug mode: Cmd+Shift+Alt+D (mac) / Ctrl+Shift+Alt+D (win/linux).
+    // Handled here in addition to globalShortcut so it works on Windows even
+    // when system-level registration is blocked by other software.
+    if (
+      input.key.toLowerCase() === "d" &&
+      input.shift &&
+      input.alt &&
+      (input.meta || input.control)
+    ) {
+      event.preventDefault();
+      productionDebugMode = !productionDebugMode;
+      installApplicationMenu();
+      return;
+    }
+    if (!app.isPackaged || productionDebugMode) return;
+    const isReload =
+      (input.key.toLowerCase() === "r" && (input.meta || input.control)) ||
+      input.key === "F5";
+    if (isReload) {
+      event.preventDefault();
+    }
+  });
 
   if (contentType !== "webview") {
     return;
@@ -1165,18 +1293,19 @@ logLaunchTimeline("electron main module evaluated");
 
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
+  // Short-circuit before any heavy startup if running under Rosetta.
+  await warnIfRunningUnderRosetta();
   proxyManager = new ProxyManager(session.defaultSession);
   await proxyManager.applyPolicy(runtimeConfig.proxy);
   installApplicationMenu();
 
-  // Hidden shortcut to toggle debug mode in production (Develop menu + reload).
-  // Harmless in dev since those items are always visible.
-  if (app.isPackaged) {
-    globalShortcut.register("CommandOrControl+Shift+Alt+D", () => {
-      productionDebugMode = !productionDebugMode;
-      installApplicationMenu();
-    });
-  }
+  // Hidden shortcut to toggle the Develop menu and packaged-only reload items.
+  // Registered in both dev and packaged builds so the shortcut itself can be
+  // validated locally, while before-input-event remains the Windows fallback.
+  globalShortcut.register("CommandOrControl+Shift+Alt+D", () => {
+    productionDebugMode = !productionDebugMode;
+    installApplicationMenu();
+  });
   diagnosticsReporter = new DesktopDiagnosticsReporter(orchestrator);
   await refreshProxyDiagnostics();
   diagnosticsReporter.recordStartupProbe({

@@ -32,7 +32,6 @@ export const rewardUrlProofTaskIdSchema = z.enum([
   "reddit",
   "lingying",
   "facebook",
-  "whatsapp",
 ]);
 export type RewardUrlProofTaskId = z.infer<typeof rewardUrlProofTaskIdSchema>;
 
@@ -224,8 +223,6 @@ const rewardUrlProofPatterns = {
     /^https?:\/\/(?:[a-z]{2,3}\.)?linkedin\.com\/(?:feed\/update\/urn:li:(?:share|activity):\d+|posts\/[^/?#]+|pulse\/[^?#]+)(?:[/?#].*)?$/i,
   facebook:
     /^https?:\/\/(?:www\.)?facebook\.com\/(?:[^/?#]+\/posts\/\d+|story\.php\?story_fbid=\d+[^#]*|permalink\.php\?story_fbid=\d+[^#]*|share\/p\/[A-Za-z0-9]+|reel\/\d+)(?:[/?#].*)?$/i,
-  whatsapp:
-    /^https?:\/\/(?:(?:chat|www)\.whatsapp\.com\/(?:invite\/|channel\/)?[A-Za-z0-9/_-]+|wa\.me\/channel\/[A-Za-z0-9]+)(?:[/?#].*)?$/i,
 } as const satisfies Record<RewardUrlProofTaskId, RegExp>;
 
 export function rewardTaskRequiresUrlProof(

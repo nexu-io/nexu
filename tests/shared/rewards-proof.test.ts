@@ -11,11 +11,11 @@ describe("reward proof helpers", () => {
     expect(rewardTaskRequiresUrlProof("reddit")).toBe(true);
     expect(rewardTaskRequiresUrlProof("lingying")).toBe(true);
     expect(rewardTaskRequiresUrlProof("facebook")).toBe(true);
-    expect(rewardTaskRequiresUrlProof("whatsapp")).toBe(true);
 
     expect(rewardTaskRequiresUrlProof("github_star")).toBe(false);
     expect(rewardTaskRequiresUrlProof("daily_checkin")).toBe(false);
-    expect(rewardTaskRequiresUrlProof("xiaohongshu")).toBe(false);
+    expect(rewardTaskRequiresUrlProof("mobile_share")).toBe(false);
+    expect(rewardTaskRequiresUrlProof("whatsapp")).toBe(false);
   });
 
   it("validates platform proof URLs with task-specific regexes", () => {
@@ -41,12 +41,6 @@ describe("reward proof helpers", () => {
       validateRewardProofUrl(
         "facebook",
         "https://www.facebook.com/nexu/posts/1234567890",
-      ),
-    ).toBe(true);
-    expect(
-      validateRewardProofUrl(
-        "whatsapp",
-        "https://chat.whatsapp.com/AbCdEfGhIjKlMnOpQrStUv",
       ),
     ).toBe(true);
   });

@@ -1,6 +1,7 @@
 import { identify, track } from "@/lib/tracking";
 import {
   ExternalLink,
+  FileText,
   KeyRound,
   Loader2,
   MessageCircleMore,
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { postApiV1ChannelsQqbotConnect } from "../../../lib/api/sdk.gen";
 
 const QQBOT_LOGIN_URL = "https://q.qq.com/qqbot/openclaw/login.html";
+const QQBOT_DOCS_URL = "https://docs.nexu.io/guide/channels/qq";
 
 export interface QqbotSetupViewProps {
   onConnected: () => void;
@@ -161,6 +163,17 @@ export function QqbotSetupView({
             />
           </div>
         </div>
+
+        <a
+          href={QQBOT_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+        >
+          <FileText size={13} />
+          {t("modal.viewDocs", { name: t("home.channel.qqbot") })}
+          <ExternalLink size={12} />
+        </a>
 
         <div className="flex flex-wrap items-center gap-2">
           <button

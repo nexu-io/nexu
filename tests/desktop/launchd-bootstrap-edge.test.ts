@@ -364,7 +364,11 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     });
     readFileSync.mockImplementation((target: string) => {
       if (normalizePath(target).endsWith(".nexu-runner-version"))
-        return "1.2.3";
+        return JSON.stringify({
+          appVersion: "1.2.3",
+          bundleVersion: null,
+          arch: process.arch,
+        });
       return "";
     });
 
@@ -539,7 +543,11 @@ describe("resolveLaunchdPaths — packaged mode details", () => {
     );
     // Must NOT be inside the .app bundle
     expect(stampPath).not.toContain("nexu-runner.app/");
-    expect(stampCalls[0][1]).toBe("2.0.0");
+    expect(JSON.parse(stampCalls[0][1] as string)).toEqual({
+      appVersion: "2.0.0",
+      bundleVersion: null,
+      arch: process.arch,
+    });
   });
 
   it("writes version stamp after atomic swap, not before", async () => {

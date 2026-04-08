@@ -1,5 +1,11 @@
 import { identify, track } from "@/lib/tracking";
-import { ExternalLink, KeyRound, Loader2, MessageSquare } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  KeyRound,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -7,6 +13,7 @@ import { postApiV1ChannelsDingtalkConnect } from "../../../lib/api/sdk.gen";
 
 const DINGTALK_OPEN_PLATFORM_URL =
   "https://open-dev.dingtalk.com/?spm=ding_open_doc.document.0.0.4eb96384sA4J3a";
+const DINGTALK_DOCS_URL = "https://docs.nexu.io/guide/channels/dingtalk";
 
 export interface DingtalkSetupViewProps {
   onConnected: () => void;
@@ -156,6 +163,17 @@ export function DingtalkSetupView({
             />
           </div>
         </div>
+
+        <a
+          href={DINGTALK_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[12px] text-accent hover:underline"
+        >
+          <FileText size={13} />
+          {t("modal.viewDocs", { name: t("home.channel.dingtalk") })}
+          <ExternalLink size={12} />
+        </a>
 
         <div className="flex flex-wrap items-center gap-2">
           <button

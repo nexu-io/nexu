@@ -6,7 +6,11 @@ import {
   useDesktopCloudStatus,
 } from "@/hooks/use-desktop-cloud-status";
 import { useGitHubStars } from "@/hooks/use-github-stars";
-import { openLocalFolderUrl, pathToFileUrl } from "@/lib/desktop-links";
+import {
+  openExternalUrl,
+  openLocalFolderUrl,
+  pathToFileUrl,
+} from "@/lib/desktop-links";
 import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
@@ -2243,13 +2247,13 @@ function ByokProviderDetail({
       }
       return data;
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       const browserUrl =
         "browserUrl" in result && typeof result.browserUrl === "string"
           ? result.browserUrl
           : null;
       if (browserUrl) {
-        window.open(browserUrl, "_blank", "noopener,noreferrer");
+        await openExternalUrl(browserUrl);
       }
       queryClient.invalidateQueries({ queryKey: ["minimax-oauth-status"] });
     },
