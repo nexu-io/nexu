@@ -326,40 +326,6 @@ export function RewardsPage() {
           </p>
         </div>
 
-        <div className="mb-6">
-          {loading ? (
-            <div data-rewards-summary-loading="true" className="animate-pulse">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="h-3 w-14 rounded-full bg-border/70" />
-                <div className="h-3 w-10 rounded-full bg-border/70" />
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-border/60">
-                <div className="h-full w-1/3 rounded-full bg-border/80" />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="tabular-nums text-[12px] font-medium text-text-secondary">
-                  {status.progress.claimedCount} / {status.progress.totalCount}
-                </span>
-                <span className="tabular-nums text-[12px] font-medium text-[var(--color-success)]">
-                  +{formatRewardAmount(status.progress.earnedCredits)}{" "}
-                  {t("layout.sidebar.balanceUnit")}
-                </span>
-              </div>
-              <div className="h-[5px] w-full overflow-hidden rounded-full bg-border/60">
-                <div
-                  className="h-full rounded-full bg-[var(--color-success)] transition-all duration-500"
-                  style={{
-                    width: `${status.progress.totalCount > 0 ? (status.progress.claimedCount / status.progress.totalCount) * 100 : 0}%`,
-                  }}
-                />
-              </div>
-            </>
-          )}
-        </div>
-
         {!loading && !status.viewer.cloudConnected ? (
           <div className="mb-6 rounded-[18px] border border-[#d6c7aa] bg-[#faf3e6] px-4 py-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

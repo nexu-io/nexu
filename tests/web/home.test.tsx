@@ -328,7 +328,7 @@ describe("HomePage", () => {
 });
 
 describe("RewardsPage", () => {
-  it("renders a progress summary aligned with the returned task list", () => {
+  it("does not render the removed progress summary when rewards are loaded", () => {
     const markup = renderRewardsPage({
       progress: {
         claimedCount: 1,
@@ -345,7 +345,8 @@ describe("RewardsPage", () => {
       ],
     });
 
-    expect(markup).toContain("1 / 1");
+    expect(markup).not.toContain("1 / 1");
+    expect(markup).not.toContain("+100 积分");
     expect(markup).toContain("reward.daily_checkin.name");
     expect(markup).not.toContain("reward.github_star.name");
   });
