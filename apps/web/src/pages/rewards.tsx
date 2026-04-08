@@ -9,8 +9,10 @@ import {
   completeRewardWithVirtualCheck,
   getRewardCheckingDescriptionKey,
 } from "@/lib/reward-virtual-check";
+import { track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
+  type RewardTaskId,
   type RewardTaskStatus,
   rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
@@ -24,6 +26,23 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 const MOBILE_SHARE_QR_URL = "https://github.com/nexu-io/nexu";
+
+// PM-defined tracking type names per reward task. mobile_share is intentionally
+// excluded from click tracking (the click only opens the QR modal, the
+// meaningful signal is the actual screenshot upload tracked via `done`).
+const TASK_CLICK_TRACKING_TYPE: Partial<Record<RewardTaskId, string>> = {
+  github_star: "star_us",
+  x_share: "X",
+  reddit: "Reddit",
+  lingying: "linkedin",
+  facebook: "Facebook",
+  whatsapp: "Whatsapp",
+};
+
+const TASK_DONE_TRACKING_TYPE: Partial<Record<RewardTaskId, string>> = {
+  ...TASK_CLICK_TRACKING_TYPE,
+  mobile_share: "mobile",
+};
 
 const REWARD_GROUPS: Array<{
   key: RewardTaskStatus["group"];
@@ -274,6 +293,11 @@ export function RewardsPage() {
         toast.error(t("rewards.claimFailed"));
       }
       return;
+    }
+
+    const clickTrackingType = TASK_CLICK_TRACKING_TYPE[task.id];
+    if (clickTrackingType) {
+      track("workspace_task_click", { type: clickTrackingType });
     }
 
     if (rewardTaskRequiresGithubStarSession(task.id)) {
@@ -723,6 +747,11 @@ export function RewardsPage() {
                 toast.success(t("rewards.claimAlreadyDone"));
               } else {
                 toast.success(t("rewards.claimSuccess"));
+                const doneTrackingType =
+                  TASK_DONE_TRACKING_TYPE[confirmTask.id];
+                if (doneTrackingType) {
+                  track("workspace_task_done", { type: doneTrackingType });
+                }
               }
               setConfirmPhase("idle");
               setConfirmTaskId(null);
