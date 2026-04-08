@@ -29,8 +29,19 @@ jobs:
       channel: "nightly"
     secrets: inherit
 
+  package-windows:
+    name: Windows (placeholder)
+    runs-on: windows-latest
+    steps:
+      - name: Reserve Windows lane
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows placeholder"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Channel: nightly"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Status: reserved only; no Windows artifacts are published by this workflow yet"
+
   trigger-e2e:
-    needs: build
+    needs: [build, package-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Desktop E2E (async)
@@ -46,7 +57,7 @@ jobs:
             });
 
   notify:
-    needs: build
+    needs: [build, package-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -549,3 +549,14 @@ jobs:
               ref: context.ref || 'main',
               inputs: { mode: 'model', channel: '${{ steps.channel.outputs.channel }}' },
             });
+
+  package-windows:
+    name: Windows (placeholder)
+    runs-on: windows-latest
+    steps:
+      - name: Reserve Windows lane
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows placeholder"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Channel: release"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Status: reserved only; no Windows artifacts are published by this workflow yet"
