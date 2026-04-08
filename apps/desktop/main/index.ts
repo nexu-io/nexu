@@ -273,24 +273,19 @@ if (sentryDsn) {
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
-/**
- * Detect whether the current process is the x86_64 build of Nexu running
- * on an Apple Silicon Mac under Rosetta 2 translation. Reads the
- * `sysctl.proc_translated` flag, which is the canonical Apple-blessed way
- * to detect Rosetta. Returns false on any non-darwin platform, on darwin
- * arm64 (running natively), or if the sysctl call fails for any reason.
- */
+/** True if this is the x86_64 build running under Rosetta 2 on Apple Silicon. */
 function isRunningUnderRosetta(): boolean {
   if (process.platform !== "darwin") return false;
   if (process.arch !== "x64") return false;
   try {
-    const out = execFileSync("/usr/sbin/sysctl", [
-      "-n",
-      "sysctl.proc_translated",
-    ], {
-      encoding: "utf8",
-      timeout: 1000,
-    }).trim();
+    const out = execFileSync(
+      "/usr/sbin/sysctl",
+      ["-n", "sysctl.proc_translated"],
+      {
+        encoding: "utf8",
+        timeout: 1000,
+      },
+    ).trim();
     return out === "1";
   } catch {
     return false;
@@ -298,28 +293,17 @@ function isRunningUnderRosetta(): boolean {
 }
 
 /**
- * Resolve the latest arm64 dmg download URL from the same update feed the
- * user is currently subscribed to (stable / beta / nightly). Mirrors the
- * channel + R2 layout used by the auto-updater so the link points at the
- * exact build that auto-update would otherwise install.
- *
- * Strategy:
- *  1. If `NEXU_UPDATE_FEED_URL` is set (the canonical feed for this build),
- *     swap any trailing /x64 → /arm64 in its path.
- *  2. Otherwise build from `R2_BASE_URL/{channel}/arm64`, where channel
- *     comes from `NEXU_DESKTOP_UPDATE_CHANNEL` (defaults to "stable").
- *  3. Fetch `latest-mac.yml` from that base, parse the first `url: …dmg`
- *     entry, and return the absolute URL.
- *  4. On any failure (offline, parse error, 404), fall back to the
- *     latest-mac.yml URL itself — modern browsers display it as text and
- *     it still reliably points the user at the right channel.
+ * Resolve the latest arm64 dmg URL from the same update feed (channel) the
+ * user is currently on, so the link mirrors what auto-update would install.
+ * Reads runtimeConfig (not process.env) because packaged builds bake the
+ * channel + feed URL into build-config.json, not live env vars.
  */
 async function resolveLatestArm64DownloadUrl(): Promise<string> {
   const R2_BASE = "https://desktop-releases.nexu.io";
-  const channel = process.env.NEXU_DESKTOP_UPDATE_CHANNEL ?? "stable";
+  const channel = runtimeConfig.updates.channel ?? "stable";
 
   let baseUrl = `${R2_BASE}/${channel}/arm64`;
-  const feedOverride = process.env.NEXU_UPDATE_FEED_URL;
+  const feedOverride = runtimeConfig.urls.updateFeed;
   if (feedOverride) {
     try {
       const u = new URL(feedOverride);
@@ -329,44 +313,27 @@ async function resolveLatestArm64DownloadUrl(): Promise<string> {
       u.search = "";
       u.hash = "";
       baseUrl = u.toString().replace(/\/+$/, "");
-    } catch {
-      // ignore — fall back to default baseUrl
-    }
+    } catch {}
   }
 
   const ymlUrl = `${baseUrl}/latest-mac.yml`;
-
   try {
-    const res = await fetch(ymlUrl, {
-      signal: AbortSignal.timeout(3000),
-    });
+    const res = await fetch(ymlUrl, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
-      const text = await res.text();
-      // electron-builder latest-mac.yml has lines like
-      //   - url: nexu-0.1.10-nightly.20260408.234a3b6-mac-arm64.dmg
-      // and we want the dmg, not the zip (which the auto-updater uses for
-      // delta updates).
-      const match = text.match(/url:\s*(\S+\.dmg)/);
-      if (match?.[1]) {
-        return `${baseUrl}/${match[1]}`;
-      }
+      // electron-builder latest-mac.yml lists both .zip (for delta updates)
+      // and .dmg under `files:`. We want the dmg.
+      const match = (await res.text()).match(/url:\s*(\S+\.dmg)/);
+      if (match?.[1]) return `${baseUrl}/${match[1]}`;
     }
-  } catch {
-    // network failure or timeout — fall through
-  }
-
+  } catch {}
   return ymlUrl;
 }
 
 /**
- * Show a blocking warning dialog if the user is running the Intel build of
- * Nexu on an Apple Silicon Mac. Two real users hit this on 2026-04-08 — both
- * downloaded the wrong dmg, macOS silently launched it under Rosetta, and the
- * resulting symptoms (3-5x slower JS, "Agent 启动中" forever, 100%+ renderer
- * CPU) gave no hint that the root cause was an arch mismatch. Catching this
- * at startup short-circuits hours of mis-directed debugging.
- *
- * Skipped in dev (the test runner is often x64) and skippable via env var.
+ * Block startup with a warning if the Intel build is running on Apple
+ * Silicon under Rosetta 2 — the symptoms (slow startup, high CPU, sidecar
+ * native bindings failing to load) give users no hint of the root cause.
+ * Skipped in dev and skippable via NEXU_SKIP_ARCH_WARNING=1.
  */
 async function warnIfRunningUnderRosetta(): Promise<void> {
   if (!app.isPackaged) return;
@@ -393,18 +360,19 @@ async function warnIfRunningUnderRosetta(): Promise<void> {
         continueButton: "Continue anyway",
       };
 
+  // macOS HIG: default button goes on the right and is visually highlighted.
   const result = await dialog.showMessageBox({
     type: "warning",
     title: messageBox.title,
     message: messageBox.message,
     detail: messageBox.detail,
-    buttons: [messageBox.downloadButton, messageBox.continueButton],
-    defaultId: 0,
-    cancelId: 1,
+    buttons: [messageBox.continueButton, messageBox.downloadButton],
+    defaultId: 1,
+    cancelId: 0,
     noLink: true,
   });
 
-  if (result.response === 0) {
+  if (result.response === 1) {
     void shell.openExternal(downloadUrl);
     app.exit(0);
   }
@@ -1223,12 +1191,7 @@ logLaunchTimeline("electron main module evaluated");
 
 app.whenReady().then(async () => {
   logLaunchTimeline("app.whenReady resolved");
-  // Show the arch-mismatch warning before any heavy startup work so users
-  // who picked the wrong dmg are not stuck waiting on a slow Rosetta cold
-  // start. The dialog is modal; if the user picks "Download arm64", we open
-  // the resolved dmg URL and exit immediately. The download URL is fetched
-  // from the same update feed (channel + arm64) the auto-updater uses, so
-  // it always points at the exact build that auto-update would install.
+  // Short-circuit before any heavy startup if running under Rosetta.
   await warnIfRunningUnderRosetta();
   proxyManager = new ProxyManager(session.defaultSession);
   await proxyManager.applyPolicy(runtimeConfig.proxy);
