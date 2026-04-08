@@ -348,7 +348,12 @@ async function warnIfRunningUnderRosetta(): Promise<void> {
         message: "正在 Apple Silicon Mac 上运行 Intel 版 Nexu",
         detail:
           "macOS 通过 Rosetta 2 翻译运行 Intel 版本，会导致：\n• 启动比正常慢 3-5 倍\n• 界面卡顿、CPU 占用过高\n• 部分原生模块可能加载失败\n\n请下载 Apple Silicon (arm64) 版本以获得最佳体验。",
-        downloadButton: "下载 arm64 版本",
+        // Trailing space on the default-button label is a workaround for
+        // electron/electron#40466 — non-standard button labels otherwise do
+        // not get the macOS blue default-button highlight. The "(推荐)"
+        // suffix is a textual fallback so the recommended action is still
+        // obvious if the visual highlight ever stops working.
+        downloadButton: "下载 arm64 版本（推荐） ",
         continueButton: "继续运行",
       }
     : {
@@ -356,23 +361,22 @@ async function warnIfRunningUnderRosetta(): Promise<void> {
         message: "Running the Intel build of Nexu on an Apple Silicon Mac",
         detail:
           "macOS is running this build through Rosetta 2 translation, which causes:\n• 3-5x slower startup\n• Laggy UI and high CPU usage\n• Possible native module load failures\n\nPlease download the Apple Silicon (arm64) build for the best experience.",
-        downloadButton: "Download arm64 build",
+        downloadButton: "Download arm64 build (recommended) ",
         continueButton: "Continue anyway",
       };
 
-  // macOS HIG: default button goes on the right and is visually highlighted.
   const result = await dialog.showMessageBox({
     type: "warning",
     title: messageBox.title,
     message: messageBox.message,
     detail: messageBox.detail,
-    buttons: [messageBox.continueButton, messageBox.downloadButton],
-    defaultId: 1,
-    cancelId: 0,
+    buttons: [messageBox.downloadButton, messageBox.continueButton],
+    defaultId: 0,
+    cancelId: 1,
     noLink: true,
   });
 
-  if (result.response === 1) {
+  if (result.response === 0) {
     void shell.openExternal(downloadUrl);
     app.exit(0);
   }
