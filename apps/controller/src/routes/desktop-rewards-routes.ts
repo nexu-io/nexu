@@ -145,6 +145,8 @@ export function registerDesktopRewardsRoutes(
           const reason =
             verifyResult.reason === "not_increased"
               ? "You haven't starred the repository yet"
+              : verifyResult.reason === "too_early"
+                ? "Verification still in progress, please wait a few seconds"
               : verifyResult.reason === "expired"
                 ? "Session expired, please start over"
                 : "Invalid session";

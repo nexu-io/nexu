@@ -216,6 +216,45 @@ describe("registerDesktopRewardsRoutes", () => {
     });
   });
 
+  it("rejects GitHub star claims while verification is still pending", async () => {
+    const claimDesktopReward = vi.fn().mockResolvedValue({ ok: true });
+    const verifySession = vi.fn().mockResolvedValue({
+      ok: false,
+      reason: "too_early",
+    });
+    const app = new OpenAPIHono<ControllerBindings>();
+    registerDesktopRewardsRoutes(app, {
+      configStore: {
+        getDesktopRewardsStatus: vi.fn(),
+        claimDesktopReward,
+      },
+      quotaFallbackService: {
+        triggerFallback: vi.fn(),
+      },
+      githubStarVerificationService: {
+        prepareSession: vi.fn(),
+        verifySession,
+      },
+    } as never);
+
+    const response = await app.request("/api/internal/desktop/rewards/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        taskId: "github_star",
+        proof: {
+          githubSessionId: "github-session-1",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      message: "Verification still in progress, please wait a few seconds",
+    });
+    expect(claimDesktopReward).not.toHaveBeenCalled();
+  });
+
   it("prepares GitHub star verification sessions", async () => {
     const prepareSession = vi.fn().mockResolvedValue({
       sessionId: "session-1",
