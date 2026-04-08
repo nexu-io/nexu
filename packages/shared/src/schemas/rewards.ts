@@ -38,18 +38,20 @@ export type RewardUrlProofTaskId = z.infer<typeof rewardUrlProofTaskIdSchema>;
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
 const REDDIT_SHARE_TARGET_URL =
   "https://dev.to/joey_lee_c96e4ad421791371/we-built-an-open-source-openclaw-desktop-client-that-fixes-17-pitfalls-gjn";
-const UNIVERSAL_SHARE_COPY =
+const REDDIT_SHARE_TITLE =
   "The simplest desktop client for OpenClaw 🦞 — bridge your Agent to WeChat, Feishu, Slack & Discord and more in one click. Works with Claude Code, Codex & any LLM. BYOK, Oauth, local-first, chat from your phone 24/7.";
-const UNIVERSAL_SHARE_TEXT = `${UNIVERSAL_SHARE_COPY} ${GITHUB_URL}`;
+const UNIVERSAL_SHARE_COPY =
+  "The simplest desktop client for OpenClaw 🦞 — bridge your Agent to WeChat, Feishu, Slack & Discord and more in one click. Works with Claude Code, Codex & any LLM. BYOK, OAuth, local-first, and chat from your phone 24/7.";
+const UNIVERSAL_SHARE_TEXT = `${UNIVERSAL_SHARE_COPY} GitHub: ${GITHUB_URL}`;
 const X_SHARE_URL = `https://x.com/intent/tweet?text=${encodeURIComponent(
   UNIVERSAL_SHARE_TEXT,
 )}`;
 const REDDIT_SHARE_URL = `https://www.reddit.com/submit?url=${encodeURIComponent(
   REDDIT_SHARE_TARGET_URL,
-)}`;
-const LINKEDIN_SHARE_URL = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-  "https://github.com/nexu-io/nexu",
-)}`;
+)}&title=${encodeURIComponent(REDDIT_SHARE_TITLE)}&type=LINK`;
+const LINKEDIN_SHARE_URL = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(
+  UNIVERSAL_SHARE_COPY,
+)}&shareUrl=${encodeURIComponent(GITHUB_URL)}`;
 const FACEBOOK_SHARE_URL = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
   REDDIT_SHARE_TARGET_URL,
 )}`;

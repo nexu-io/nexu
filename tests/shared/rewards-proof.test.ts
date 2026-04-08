@@ -1,6 +1,7 @@
 import {
   rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
+  rewardTasks,
   validateRewardProofUrl,
 } from "@nexu/shared";
 import { describe, expect, it } from "vitest";
@@ -60,5 +61,21 @@ describe("reward proof helpers", () => {
   it("only requires a GitHub monitoring session for the star task", () => {
     expect(rewardTaskRequiresGithubStarSession("github_star")).toBe(true);
     expect(rewardTaskRequiresGithubStarSession("x_share")).toBe(false);
+  });
+
+  it("prefills Reddit and LinkedIn share links", () => {
+    const redditTask = rewardTasks.find((task) => task.id === "reddit");
+    const linkedinTask = rewardTasks.find((task) => task.id === "lingying");
+
+    expect(redditTask?.actionUrl).toContain("https://www.reddit.com/submit?");
+    expect(redditTask?.actionUrl).toContain("url=");
+    expect(redditTask?.actionUrl).toContain("title=");
+    expect(redditTask?.actionUrl).toContain("type=LINK");
+
+    expect(linkedinTask?.actionUrl).toContain(
+      "https://www.linkedin.com/feed/?shareActive=true",
+    );
+    expect(linkedinTask?.actionUrl).toContain("text=");
+    expect(linkedinTask?.actionUrl).toContain("shareUrl=");
   });
 });
