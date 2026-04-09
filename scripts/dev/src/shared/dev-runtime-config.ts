@@ -215,6 +215,7 @@ export function createWebInjectedEnv(): NodeJS.ProcessEnv {
     WEB_HOST: "127.0.0.1",
     WEB_PORT: String(config.webPort),
     WEB_API_ORIGIN: config.controllerUrl,
+    VITE_DESKTOP_PLATFORM: process.platform,
   };
 }
 

@@ -680,17 +680,12 @@ function WorkspaceLayoutInner() {
         />
       )}
 
-      {/* Collapsed sidebar toggle (desktop client only) */}
-      {!isWindowsDesktopClient && collapsed && (
+      {/* Mac sidebar toggle — fixed next to traffic lights, always visible */}
+      {isMacDesktopClient && (
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            "fixed h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors hidden md:flex items-center justify-center z-50",
-            isMacDesktopClient
-              ? "top-[10px] left-[76px]"
-              : "top-[16px] left-[24px]",
-          )}
+          className="fixed top-[10px] left-[76px] h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors hidden md:flex items-center justify-center z-50"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           title={
             collapsed ? t("layout.expandSidebar") : t("layout.collapseSidebar")
@@ -701,6 +696,18 @@ function WorkspaceLayoutInner() {
           ) : (
             <PanelLeftClose size={16} />
           )}
+        </button>
+      )}
+      {/* Non-mac, non-windows collapsed toggle */}
+      {!isMacDesktopClient && !isWindowsDesktopClient && collapsed && (
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className="fixed top-[16px] left-[24px] h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors hidden md:flex items-center justify-center z-50"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          title={t("layout.expandSidebar")}
+        >
+          <PanelLeftOpen size={16} />
         </button>
       )}
 
@@ -735,18 +742,14 @@ function WorkspaceLayoutInner() {
         }
       >
         {/* Traffic light clearance (desktop client) */}
-        {!isWindowsDesktopClient && (
-          <div
-            className={cn("shrink-0", isMacDesktopClient ? "h-10" : "h-14")}
-          />
-        )}
+        {!isWindowsDesktopClient && <div className={cn("shrink-0", "h-14")} />}
 
         {/* Header / Brand */}
         {!isWindowsDesktopClient && (
           <div
             className={cn(
               "flex items-center justify-between px-3 pb-2 shrink-0",
-              isMacDesktopClient && "h-12 pl-4 pr-3 pt-0 pb-1",
+              isMacDesktopClient && "px-4 pb-1",
               !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
             )}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -768,14 +771,16 @@ function WorkspaceLayoutInner() {
                       {t("layout.update.badge")}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setCollapsed(true)}
-                    className="p-1.5 rounded-lg transition-colors text-text-muted hover:text-text-primary hover:bg-surface-3 shrink-0"
-                    title={t("layout.collapseSidebar")}
-                  >
-                    <PanelLeftClose size={14} />
-                  </button>
+                  {!isMacDesktopClient && (
+                    <button
+                      type="button"
+                      onClick={() => setCollapsed(true)}
+                      className="p-1.5 rounded-lg transition-colors text-text-muted hover:text-text-primary hover:bg-surface-3 shrink-0"
+                      title={t("layout.collapseSidebar")}
+                    >
+                      <PanelLeftClose size={14} />
+                    </button>
+                  )}
                 </div>
               </>
             ) : (
