@@ -65,6 +65,7 @@ import {
   getDefaultPlistDir,
   getLogDir,
   installLaunchdQuitHandler,
+  runTeardownAndExit,
   teardownLaunchdServices,
 } from "./services";
 import {
@@ -287,6 +288,9 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let residentTray: Tray | null = null;
+let launchdQuitOptsForResidentEntry:
+  | Parameters<typeof installLaunchdQuitHandler>[0]
+  | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 
 /** True if this is the x86_64 build running under Rosetta 2 on Apple Silicon. */
@@ -1034,6 +1038,14 @@ function ensureResidentTray(): void {
       {
         label: "Quit",
         click: () => {
+          if (app.isPackaged && launchdQuitOptsForResidentEntry) {
+            void runTeardownAndExit(
+              launchdQuitOptsForResidentEntry,
+              "tray-quit",
+            );
+            return;
+          }
+
           (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
           app.quit();
         },
@@ -1530,6 +1542,7 @@ app.whenReady().then(async () => {
       };
       installLaunchdQuitHandler(quitOpts);
       setQuitHandlerOpts(quitOpts);
+      launchdQuitOptsForResidentEntry = quitOpts;
     }
 
     if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {

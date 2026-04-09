@@ -1283,6 +1283,25 @@ function WorkspaceLayoutInner() {
                       {t("layout.nav.skills")}
                     </span>
                   </Link>
+                  <Link
+                    to="/workspace/settings"
+                    onClick={() => {
+                      track("workspace_settings_click");
+                      track("workspace_sidebar_click", {
+                        target: "settings_mobile",
+                      });
+                      setMobileDrawerOpen(false);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium transition-colors cursor-pointer mt-0.5 px-3 py-2",
+                      isModelsPage
+                        ? "bg-accent/10 text-accent"
+                        : "text-text-muted hover:text-text-primary hover:bg-surface-3",
+                    )}
+                  >
+                    <Settings size={14} />
+                    {t("layout.nav.settings")}
+                  </Link>
                 </div>
 
                 {/* Conversations section */}

@@ -19,8 +19,13 @@ type StoredDesktopShellPreferences = {
 };
 
 const DEFAULT_PREFERENCES: StoredDesktopShellPreferences = {
-  launchAtLogin: false,
+  launchAtLogin: true,
   showInDock: true,
+};
+
+type StoredPreferencesState = {
+  exists: boolean;
+  preferences: StoredDesktopShellPreferences;
 };
 
 function getPreferencesFilePath(): string {
@@ -35,11 +40,14 @@ function supportsShowInDock(): boolean {
   return process.platform === "darwin" || process.platform === "win32";
 }
 
-function readStoredPreferences(): StoredDesktopShellPreferences {
+function readStoredPreferencesState(): StoredPreferencesState {
   const filePath = getPreferencesFilePath();
 
   if (!existsSync(filePath)) {
-    return DEFAULT_PREFERENCES;
+    return {
+      exists: false,
+      preferences: DEFAULT_PREFERENCES,
+    };
   }
 
   try {
@@ -50,17 +58,23 @@ function readStoredPreferences(): StoredDesktopShellPreferences {
         : null;
 
     return {
-      launchAtLogin:
-        typeof candidate?.launchAtLogin === "boolean"
-          ? candidate.launchAtLogin
-          : DEFAULT_PREFERENCES.launchAtLogin,
-      showInDock:
-        typeof candidate?.showInDock === "boolean"
-          ? candidate.showInDock
-          : DEFAULT_PREFERENCES.showInDock,
+      exists: true,
+      preferences: {
+        launchAtLogin:
+          typeof candidate?.launchAtLogin === "boolean"
+            ? candidate.launchAtLogin
+            : DEFAULT_PREFERENCES.launchAtLogin,
+        showInDock:
+          typeof candidate?.showInDock === "boolean"
+            ? candidate.showInDock
+            : DEFAULT_PREFERENCES.showInDock,
+      },
     };
   } catch {
-    return DEFAULT_PREFERENCES;
+    return {
+      exists: false,
+      preferences: DEFAULT_PREFERENCES,
+    };
   }
 }
 
@@ -86,8 +100,22 @@ function getLaunchAtLoginState(
   }
 }
 
+function resolvePreferencesForRead(): StoredDesktopShellPreferences {
+  const storedState = readStoredPreferencesState();
+  if (storedState.exists) {
+    return storedState.preferences;
+  }
+
+  const osLaunchAtLogin = getLaunchAtLoginState(DEFAULT_PREFERENCES);
+
+  return {
+    launchAtLogin: osLaunchAtLogin || DEFAULT_PREFERENCES.launchAtLogin,
+    showInDock: DEFAULT_PREFERENCES.showInDock,
+  };
+}
+
 export function getDesktopShellPreferences(): DesktopShellPreferences {
-  const storedPreferences = readStoredPreferences();
+  const storedPreferences = resolvePreferencesForRead();
 
   return {
     launchAtLogin: getLaunchAtLoginState(storedPreferences),
@@ -120,7 +148,10 @@ function applyStoredPreferences(
 }
 
 export function applyDesktopShellPreferencesOnStartup(): void {
-  const preferences = readStoredPreferences();
+  const storedState = readStoredPreferencesState();
+  const preferences = storedState.exists
+    ? storedState.preferences
+    : resolvePreferencesForRead();
   applyStoredPreferences(preferences);
   runtimeApplyHandler?.(getDesktopShellPreferences());
 }
@@ -129,7 +160,7 @@ export function updateDesktopShellPreferences(input: {
   launchAtLogin?: boolean;
   showInDock?: boolean;
 }): DesktopShellPreferences {
-  const storedPreferences = readStoredPreferences();
+  const storedPreferences = resolvePreferencesForRead();
   const nextPreferences: StoredDesktopShellPreferences = {
     launchAtLogin:
       typeof input.launchAtLogin === "boolean"

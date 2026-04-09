@@ -539,8 +539,8 @@ function _GeneralSettings() {
   const update = useAutoUpdate();
   const queryClient = useQueryClient();
   const [appVersion, setAppVersion] = useState<string | null>(null);
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
-  const [crashReportsEnabled, setCrashReportsEnabled] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [crashReportsEnabled, setCrashReportsEnabled] = useState(true);
   const hostBridge = getModelsHostInvokeBridge();
   const { data: desktopCloudStatus } = useDesktopCloudStatus();
   const isWindowsPlatform =
