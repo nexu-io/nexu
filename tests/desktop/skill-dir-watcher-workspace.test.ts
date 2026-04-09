@@ -285,4 +285,23 @@ describe("SkillDirWatcher workspace reconciliation", () => {
       watcher.stop();
     },
   );
+
+  it("normalizes workspace paths from the agents/<bot>/skills segment", () => {
+    const watcher = new SkillDirWatcher({
+      skillsDir,
+      skillDb: db,
+      openclawStateDir: stateDir,
+      botIds: ["bot-1"],
+    });
+
+    const normalized = (
+      watcher as unknown as {
+        normalizeWorkspaceWatchPath: (filePath: string) => string;
+      }
+    ).normalizeWorkspaceWatchPath(
+      "/tmp/agents/cache/agents/bot-1/skills/agent-tool/README.md",
+    );
+
+    expect(normalized).toBe("agents/bot-1/skills/agent-tool/README.md");
+  });
 });

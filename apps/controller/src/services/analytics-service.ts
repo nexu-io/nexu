@@ -192,6 +192,15 @@ export class AnalyticsService {
     if (
       currentDistinctId &&
       this.state.sessionStartSent &&
+      this.state.firstConversationDistinctId === null
+    ) {
+      this.state.sessionStartSent = false;
+      stateChanged = true;
+    }
+
+    if (
+      currentDistinctId &&
+      this.state.sessionStartSent &&
       this.state.firstConversationDistinctId &&
       this.state.firstConversationDistinctId !== currentDistinctId
     ) {

@@ -353,12 +353,15 @@ export class SkillDirWatcher {
 
   private normalizeWorkspaceWatchPath(filePath: string): string {
     const normalized = filePath.replace(/\\/g, "/");
-    const agentsIndex = normalized.indexOf("agents/");
-    if (agentsIndex < 0) {
+    const match = workspaceSkillPathPattern.exec(normalized);
+    if (!match || typeof match.index !== "number") {
       return normalized;
     }
 
-    return normalized.slice(agentsIndex);
+    const startIndex =
+      normalized[match.index] === "/" ? match.index + 1 : match.index;
+
+    return normalized.slice(startIndex);
   }
 
   private ensureWorkspaceSkillWatcher(botId: string): void {
