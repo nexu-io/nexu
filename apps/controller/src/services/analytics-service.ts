@@ -651,7 +651,13 @@ export class AnalyticsService {
       }
 
       return { status: "ready", distinctId: userId };
-    } catch {
+    } catch (error) {
+      logger.warn(
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "failed_to_resolve_analytics_distinct_id",
+      );
       return { status: "error" };
     }
   }

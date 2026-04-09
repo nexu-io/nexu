@@ -113,17 +113,3 @@ export function getTagLabel(tag: string, locale: string): string {
   if (locale !== "zh") return tag;
   return tagTranslationsZh[tag] ?? tag;
 }
-
-export function composeSkillSearchText(
-  slug: string,
-  name: string | undefined,
-  description: string | undefined,
-  localizedName?: string,
-  localizedDescription?: string,
-): string {
-  const parts = [slug, name, description, localizedName, localizedDescription]
-    .filter((part): part is string => Boolean(part))
-    .flatMap((part) => [part, part.replace(/-/g, " ")]);
-
-  return parts.join(" ").toLowerCase();
-}
