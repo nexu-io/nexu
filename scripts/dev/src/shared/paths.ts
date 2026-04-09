@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { devLogsPath, devTmpPath, repoRootPath } from "@nexu/dev-utils";
+import { getSlimclawRuntimeRoot } from "@nexu/slimclaw";
 
 export const scriptsDevPath = join(repoRootPath, "scripts", "dev");
 export const scriptsDevSourcePath = join(scriptsDevPath, "src");
@@ -70,8 +71,7 @@ export function getDesktopRuntimeRootPath(): string {
 
 export function getOpenclawRuntimeStageRootPath(): string {
   return join(
-    repoRootPath,
-    "openclaw-runtime",
+    getSlimclawRuntimeRoot(repoRootPath),
     "node_modules",
     ".nexu-dev-runtime",
   );

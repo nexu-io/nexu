@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { devTmpPath, repoRootPath } from "@nexu/dev-utils";
+import { resolveSlimclawRuntimePaths } from "@nexu/slimclaw";
 
 import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
 
@@ -30,6 +31,10 @@ type ScriptsDevRuntimeConfig = {
 const scriptsDevEnvPath = join(scriptsDevPath, ".env");
 
 let cachedConfig: ScriptsDevRuntimeConfig | null = null;
+const slimclawRuntimePaths = resolveSlimclawRuntimePaths({
+  workspaceRoot: repoRootPath,
+  requirePrepared: false,
+});
 
 function parseEnvFile(filePath: string): Record<string, string> {
   if (!existsSync(filePath)) {
@@ -127,13 +132,7 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
   );
   const openclawEntryPath = resolvePath(
     mergedEnv.NEXU_DEV_OPENCLAW_ENTRY_PATH,
-    join(
-      repoRootPath,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    ),
+    slimclawRuntimePaths.entryPath,
   );
   const openclawBuiltinExtensionsDir = resolvePath(
     mergedEnv.OPENCLAW_EXTENSIONS_DIR,
