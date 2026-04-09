@@ -269,9 +269,12 @@ function compilePlugins(
         .filter((pluginId): pluginId is string => pluginId !== null),
     ),
   ];
-  // Always-allow channel plugins so channel-binding-compiler's prewarm
-  // accounts hot-reload on first connect instead of triggering SIGUSR1.
-  const prewarmedChannelPluginIds = ["openclaw-weixin"];
+  // Always-allow every managed channel plugin so connect/disconnect only
+  // mutates channel-level config and hot-reloads (~500ms) instead of
+  // changing plugins.allow which triggers a full gateway restart (~11s).
+  const prewarmedChannelPluginIds = Object.values(
+    MANAGED_CHANNEL_PLUGIN_IDS,
+  ).filter((id): id is string => id !== undefined);
   const platformPluginIds = [
     "nexu-runtime-model",
     "nexu-credit-guard",
