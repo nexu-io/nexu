@@ -5,7 +5,9 @@ import { resolveLocale } from "../lib/i18n";
 interface UpdateBannerProps {
   capability: DesktopUpdateCapability | null;
   phase: UpdatePhase;
+  currentVersion: string | null;
   version: string | null;
+  releaseNotes: string | null;
   percent: number;
   errorMessage: string | null;
   dismissed: boolean;
@@ -32,6 +34,9 @@ const i18n = {
     manual: "Open installer",
     later: "Later",
     dismiss: "Dismiss",
+    currentVersion: "Current version",
+    latestVersion: "Latest version",
+    releaseNotes: "Release notes",
     unknownError: "Unknown error",
     closeLabel: "Close",
   },
@@ -51,6 +56,9 @@ const i18n = {
     manual: "打开安装包",
     later: "稍后",
     dismiss: "关闭",
+    currentVersion: "当前版本",
+    latestVersion: "最新版本",
+    releaseNotes: "更新日志",
     unknownError: "未知错误",
     closeLabel: "关闭",
   },
@@ -91,7 +99,9 @@ export function UpdateBadge({
 export function UpdateBanner({
   capability,
   phase,
+  currentVersion,
   version,
+  releaseNotes,
   percent,
   errorMessage,
   dismissed,
@@ -111,6 +121,8 @@ export function UpdateBanner({
   const isReady = phase === "ready";
   const isError = phase === "error";
   const isAvailable = phase === "available";
+  const showsVersionDetails = (isAvailable || isReady) && Boolean(version);
+  const showsReleaseNotes = (isAvailable || isReady) && Boolean(releaseNotes);
   const downloadLabel =
     capability?.downloadMode === "external" ? t.manual : t.download;
   const applyLabel =
@@ -173,6 +185,24 @@ export function UpdateBanner({
             : isInstalling
               ? t.installing
               : t.upToDateDetail}
+        </div>
+      )}
+
+      {showsVersionDetails && version && (
+        <div className="update-card-message">
+          <div>
+            {t.currentVersion}: {currentVersion ? `v${currentVersion}` : "—"}
+          </div>
+          <div>
+            {t.latestVersion}: v{version}
+          </div>
+        </div>
+      )}
+
+      {showsReleaseNotes && releaseNotes && (
+        <div className="update-card-message" style={{ whiteSpace: "pre-wrap" }}>
+          <strong>{t.releaseNotes}</strong>
+          <div>{releaseNotes}</div>
         </div>
       )}
 

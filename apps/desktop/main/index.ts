@@ -6,6 +6,7 @@ import {
   BrowserWindow,
   Menu,
   type MenuItemConstructorOptions,
+  Tray,
   app,
   crashReporter,
   dialog,
@@ -278,6 +279,15 @@ if (sentryDsn) {
 
 let mainWindow: BrowserWindow | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+let systemTray: Tray | null = null;
+
+function isForceQuitInProgress(): boolean {
+  return Boolean((app as unknown as Record<string, unknown>).__nexuForceQuit);
+}
+
+function markForceQuitInProgress(): void {
+  (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+}
 
 /** True if this is the x86_64 build running under Rosetta 2 on Apple Silicon. */
 function isRunningUnderRosetta(): boolean {
@@ -946,6 +956,88 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
+function hideMainWindowToTray(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.hide();
+}
+
+function updateSystemTrayMenu(): void {
+  if (!systemTray) {
+    return;
+  }
+
+  const isVisible = Boolean(
+    mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible(),
+  );
+
+  systemTray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: isVisible ? "Hide Nexu" : "Show Nexu",
+        click: () => {
+          if (isVisible) {
+            hideMainWindowToTray();
+            return;
+          }
+
+          if (!mainWindow || mainWindow.isDestroyed()) {
+            createMainWindow();
+            return;
+          }
+
+          focusMainWindow();
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Quit Nexu",
+        click: () => {
+          app.quit();
+        },
+      },
+    ]),
+  );
+}
+
+async function ensureWindowsTray(): Promise<void> {
+  if (process.platform !== "win32" || !app.isPackaged || systemTray) {
+    return;
+  }
+
+  const trayIcon = await app
+    .getFileIcon(process.execPath, { size: "normal" })
+    .catch(() => undefined);
+
+  if (!trayIcon || trayIcon.isEmpty()) {
+    return;
+  }
+
+  systemTray = new Tray(trayIcon);
+  systemTray.setToolTip("Nexu");
+  updateSystemTrayMenu();
+
+  systemTray.on("click", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createMainWindow();
+      return;
+    }
+
+    if (mainWindow.isVisible()) {
+      hideMainWindowToTray();
+      return;
+    }
+
+    focusMainWindow();
+  });
+
+  systemTray.on("right-click", () => {
+    updateSystemTrayMenu();
+  });
+}
+
 app.on("second-instance", () => {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createMainWindow();
@@ -1106,6 +1198,33 @@ function createMainWindow(): BrowserWindow {
     if (mainWindow === window) {
       mainWindow = null;
     }
+
+    updateSystemTrayMenu();
+  });
+
+  window.on("close", (event) => {
+    if (process.platform !== "win32" || !app.isPackaged) {
+      return;
+    }
+
+    if (!systemTray) {
+      return;
+    }
+
+    if (isForceQuitInProgress()) {
+      return;
+    }
+
+    event.preventDefault();
+    hideMainWindowToTray();
+  });
+
+  window.on("show", () => {
+    updateSystemTrayMenu();
+  });
+
+  window.on("hide", () => {
+    updateSystemTrayMenu();
   });
 
   // During first install / post-update, show the window IMMEDIATELY with a
@@ -1308,6 +1427,7 @@ app.whenReady().then(async () => {
     },
   });
   const win = createMainWindow();
+  await ensureWindowsTray();
   sleepGuard.start("desktop-runtime-active");
 
   void (async () => {
@@ -1462,6 +1582,7 @@ const beforeQuitHandler = (event: Electron.Event) => {
   // Legacy orchestrator mode: run unified shutdown, then quit.
   event.preventDefault();
   void gracefulShutdown("before-quit").finally(() => {
+    markForceQuitInProgress();
     // P1-2: Remove only this specific handler (not all before-quit listeners).
     app.removeListener("before-quit", beforeQuitHandler);
     app.quit();
@@ -1469,3 +1590,7 @@ const beforeQuitHandler = (event: Electron.Event) => {
 };
 
 app.on("before-quit", beforeQuitHandler);
+app.on("before-quit", () => {
+  systemTray?.destroy();
+  systemTray = null;
+});

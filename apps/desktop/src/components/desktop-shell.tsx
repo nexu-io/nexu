@@ -182,6 +182,7 @@ export function DesktopShell() {
 
       <UpdateBanner
         capability={update.capability}
+        currentVersion={runtimeConfig?.buildInfo.version ?? null}
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
         onDismiss={update.dismiss}
@@ -189,6 +190,7 @@ export function DesktopShell() {
         onInstall={() => void update.install()}
         percent={update.percent}
         phase={update.phase}
+        releaseNotes={update.releaseNotes}
         version={update.version}
       />
     </div>
