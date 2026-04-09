@@ -1120,14 +1120,26 @@ function createMainWindow(): BrowserWindow {
     focusMainWindow();
   }
 
-  void window.loadFile(resolve(__dirname, "../../dist/index.html"));
-  diagnosticsReporter?.recordStartupProbe({
-    source: "main",
-    stage: "main:window-load-dispatched",
-    status: "ok",
-    detail: resolve(__dirname, "../../dist/index.html"),
-  });
-  logLaunchTimeline("main window loadFile dispatched");
+  const devServerUrl = process.env.NEXU_DESKTOP_DEV_SERVER_URL;
+  if (devServerUrl) {
+    void window.loadURL(devServerUrl);
+    diagnosticsReporter?.recordStartupProbe({
+      source: "main",
+      stage: "main:window-load-dispatched",
+      status: "ok",
+      detail: devServerUrl,
+    });
+    logLaunchTimeline(`main window loadURL dispatched url=${devServerUrl}`);
+  } else {
+    void window.loadFile(resolve(__dirname, "../../dist/index.html"));
+    diagnosticsReporter?.recordStartupProbe({
+      source: "main",
+      stage: "main:window-load-dispatched",
+      status: "ok",
+      detail: resolve(__dirname, "../../dist/index.html"),
+    });
+    logLaunchTimeline("main window loadFile dispatched");
+  }
   mainWindow = window;
   return window;
 }
