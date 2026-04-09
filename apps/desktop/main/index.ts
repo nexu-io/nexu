@@ -99,29 +99,6 @@ void app.dock?.show();
 const electronRoot = app.isPackaged
   ? process.resourcesPath
   : getDesktopAppRoot();
-
-function resolveDesktopDevServerUrl(): string {
-  const host = process.env.NEXU_DESKTOP_DEV_HOST ?? "127.0.0.1";
-  const port = process.env.NEXU_DESKTOP_DEV_PORT ?? "5180";
-  return `http://${host}:${port}/`;
-}
-
-function resolveMainWindowLocation():
-  | { kind: "url"; target: string }
-  | { kind: "file"; target: string } {
-  if (!app.isPackaged) {
-    return {
-      kind: "url",
-      target: resolveDesktopDevServerUrl(),
-    };
-  }
-
-  return {
-    kind: "file",
-    target: resolve(__dirname, "../../dist/index.html"),
-  };
-}
-
 const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   appVersion: app.getVersion(),
   resourcesPath: app.isPackaged ? electronRoot : undefined,
@@ -1143,21 +1120,14 @@ function createMainWindow(): BrowserWindow {
     focusMainWindow();
   }
 
-  const mainWindowLocation = resolveMainWindowLocation();
-  if (mainWindowLocation.kind === "url") {
-    void window.loadURL(mainWindowLocation.target);
-  } else {
-    void window.loadFile(mainWindowLocation.target);
-  }
+  void window.loadFile(resolve(__dirname, "../../dist/index.html"));
   diagnosticsReporter?.recordStartupProbe({
     source: "main",
     stage: "main:window-load-dispatched",
     status: "ok",
-    detail: mainWindowLocation.target,
+    detail: resolve(__dirname, "../../dist/index.html"),
   });
-  logLaunchTimeline(
-    `main window ${mainWindowLocation.kind === "url" ? "loadURL" : "loadFile"} dispatched`,
-  );
+  logLaunchTimeline("main window loadFile dispatched");
   mainWindow = window;
   return window;
 }
