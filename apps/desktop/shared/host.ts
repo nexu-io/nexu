@@ -34,6 +34,7 @@ export const hostInvokeChannels = [
   "desktop:rewards-updated",
   "shell:open-external",
   "update:check",
+  "update:get-capability",
   "update:download",
   "update:install",
   "update:get-current-version",
@@ -151,6 +152,7 @@ export type HostInvokePayloadMap = {
     url: string;
   };
   "update:check": undefined;
+  "update:get-capability": undefined;
   "update:download": undefined;
   "update:install": undefined;
   "update:get-current-version": undefined;
@@ -445,6 +447,7 @@ export type HostInvokeResultMap = {
     ok: boolean;
   };
   "update:check": { updateAvailable: boolean };
+  "update:get-capability": DesktopUpdateCapability;
   "update:download": { ok: boolean };
   "update:install": undefined;
   "update:get-current-version": { version: string };
@@ -640,6 +643,23 @@ export type HostBootstrap = {
 export type UpdateSource = "r2" | "github";
 export type UpdateChannelName = "stable" | "beta" | "nightly";
 
+export type UpdateDownloadMode = "none" | "in-app" | "external";
+
+export type UpdateApplyMode =
+  | "none"
+  | "in-app"
+  | "external-installer"
+  | "redirect";
+
+export type DesktopUpdateCapability = {
+  platform: NodeJS.Platform;
+  check: boolean;
+  downloadMode: UpdateDownloadMode;
+  applyMode: UpdateApplyMode;
+  applyLabel: string | null;
+  notes: string | null;
+};
+
 export const updaterEvents = [
   "update:checking",
   "update:available",
@@ -665,6 +685,7 @@ export type UpdaterEventMap = {
   "update:available": {
     version: string;
     releaseNotes?: string;
+    actionUrl?: string;
     diagnostic: UpdateCheckDiagnostic;
   };
   "update:up-to-date": {

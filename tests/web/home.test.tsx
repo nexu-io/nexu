@@ -479,7 +479,7 @@ describe("Rewards locale parity", () => {
     );
     expect(zhCN["reward.github_star.name"]).toBe("Star us");
     expect(zhCN["reward.reddit.name"]).toBe("发帖到 Reddit");
-    expect(zhCN["reward.mobile_share.name"]).toBe("移动端扫码分享");
-    expect(zhCN["reward.lingying.name"]).toBe("发帖到瓴英");
+    expect(zhCN["reward.mobile_share.name"]).toBe("从手机邀请");
+    expect(zhCN["reward.lingying.name"]).toBe("发帖到领英");
   });
 });

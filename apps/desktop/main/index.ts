@@ -147,20 +147,26 @@ if (needsSetupExtraction) {
   process.env.NEXU_NEEDS_SETUP_ANIMATION = "1";
 }
 
-const orchestrator = new RuntimeOrchestrator(
-  createRuntimeUnitManifests(
-    electronRoot,
-    app.getPath("userData"),
-    app.isPackaged,
-    runtimeConfig,
-  ),
+const runtimeUnitManifests = createRuntimeUnitManifests(
+  electronRoot,
+  app.getPath("userData"),
+  app.isPackaged,
+  runtimeConfig,
 );
+const orchestrator = new RuntimeOrchestrator(runtimeUnitManifests);
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
 // causing silent popup blocking.  All popups are already caught by
 // setWindowOpenHandler and redirected to shell.openExternal, so this is safe.
 app.commandLine.appendSwitch("disable-popup-blocking");
+
+// Keep the renderer running at full speed when backgrounded — without
+// these, Chromium pauses the setup-animation video the moment the user
+// switches to another app, making the cold-start hand-off look broken.
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 const sentryDsn = runtimeConfig.sentryDsn;
 const embeddedWorkspaceTransparentCss = `
@@ -515,6 +521,27 @@ function triggerUpdateCheck(): void {
   });
 }
 
+function showAboutDialog(): void {
+  const version = app.getVersion();
+  const detailLines = [
+    `Version ${version}`,
+    `Electron ${process.versions.electron}`,
+    `Chromium ${process.versions.chrome}`,
+    `Node ${process.versions.node}`,
+  ];
+  const options = {
+    type: "info" as const,
+    title: "About Nexu",
+    message: "Nexu",
+    detail: detailLines.join("\n"),
+    buttons: ["OK"],
+    noLink: true,
+  };
+  void (mainWindow
+    ? dialog.showMessageBox(mainWindow, options)
+    : dialog.showMessageBox(options));
+}
+
 function installApplicationMenu(): void {
   const developMenu: MenuItemConstructorOptions = {
     label: "Develop",
@@ -552,20 +579,42 @@ function installApplicationMenu(): void {
     ],
   };
 
+  const helpSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: "Export Diagnostics…",
+      click: () => {
+        void exportDiagnostics({
+          orchestrator,
+          runtimeConfig,
+          source: "help-menu",
+        }).catch(() => undefined);
+      },
+    },
+  ];
+
+  // On macOS About/Check-for-Updates live in the application menu by
+  // platform convention. On Windows/Linux there is no app menu, so surface
+  // them in Help instead (issue nexu-io/nexu#784).
+  if (process.platform !== "darwin") {
+    helpSubmenu.push(
+      { type: "separator" },
+      {
+        id: "check-for-updates",
+        label: "Check for Updates…",
+        enabled: app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
+        click: () => triggerUpdateCheck(),
+      },
+      {
+        id: "about-nexu",
+        label: `About Nexu (v${app.getVersion()})`,
+        click: () => showAboutDialog(),
+      },
+    );
+  }
+
   const helpMenu: MenuItemConstructorOptions = {
     role: "help",
-    submenu: [
-      {
-        label: "Export Diagnostics…",
-        click: () => {
-          void exportDiagnostics({
-            orchestrator,
-            runtimeConfig,
-            source: "help-menu",
-          }).catch(() => undefined);
-        },
-      },
-    ],
+    submenu: helpSubmenu,
   };
 
   const template: MenuItemConstructorOptions[] = [
@@ -1063,6 +1112,8 @@ function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: false,
       webviewTag: true,
+      // Window-level backup for the disable-renderer-backgrounding flag.
+      backgroundThrottling: false,
     },
   });
 
@@ -1485,6 +1536,7 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        initialDelayMs: process.platform === "win32" ? 45_000 : 0,
         prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
           ? async (args: PrepareForUpdateInstallArgs) => {
               await runtimeLifecycle.prepareForUpdateInstall?.(args);

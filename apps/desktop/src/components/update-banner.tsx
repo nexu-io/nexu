@@ -1,7 +1,9 @@
+import type { DesktopUpdateCapability } from "../../shared/host";
 import type { UpdatePhase } from "../hooks/use-auto-update";
 import { resolveLocale } from "../lib/i18n";
 
 interface UpdateBannerProps {
+  capability: DesktopUpdateCapability | null;
   phase: UpdatePhase;
   version: string | null;
   percent: number;
@@ -27,6 +29,7 @@ const i18n = {
     upToDateDetail: "This channel is already on the latest available version.",
     download: "Download",
     restart: "Restart",
+    manual: "Open installer",
     later: "Later",
     dismiss: "Dismiss",
     unknownError: "Unknown error",
@@ -45,6 +48,7 @@ const i18n = {
     upToDateDetail: "当前频道已是最新可用版本。",
     download: "下载",
     restart: "重启安装",
+    manual: "打开安装包",
     later: "稍后",
     dismiss: "关闭",
     unknownError: "未知错误",
@@ -85,6 +89,7 @@ export function UpdateBadge({
  * Light frosted-glass card that floats inside the dark sidebar.
  */
 export function UpdateBanner({
+  capability,
   phase,
   version,
   percent,
@@ -106,6 +111,14 @@ export function UpdateBanner({
   const isReady = phase === "ready";
   const isError = phase === "error";
   const isAvailable = phase === "available";
+  const downloadLabel =
+    capability?.downloadMode === "external" ? t.manual : t.download;
+  const applyLabel =
+    capability?.applyLabel ??
+    (capability?.applyMode === "redirect" ||
+    capability?.applyMode === "external-installer"
+      ? t.manual
+      : t.restart);
 
   return (
     <div className={`update-card${isError ? " update-card--error" : ""}`}>
@@ -188,7 +201,7 @@ export function UpdateBanner({
             onClick={onDownload}
             type="button"
           >
-            {t.download}
+            {downloadLabel}
           </button>
           <button
             className="update-card-btn update-card-btn--ghost"
@@ -208,7 +221,7 @@ export function UpdateBanner({
             onClick={onInstall}
             type="button"
           >
-            {t.restart}
+            {applyLabel}
           </button>
           <button
             className="update-card-btn update-card-btn--ghost"

@@ -1,6 +1,7 @@
 import {
   rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
+  rewardTasks,
   validateRewardProofUrl,
 } from "@nexu/shared";
 import { describe, expect, it } from "vitest";
@@ -11,11 +12,11 @@ describe("reward proof helpers", () => {
     expect(rewardTaskRequiresUrlProof("reddit")).toBe(true);
     expect(rewardTaskRequiresUrlProof("lingying")).toBe(true);
     expect(rewardTaskRequiresUrlProof("facebook")).toBe(true);
-    expect(rewardTaskRequiresUrlProof("whatsapp")).toBe(true);
 
     expect(rewardTaskRequiresUrlProof("github_star")).toBe(false);
     expect(rewardTaskRequiresUrlProof("daily_checkin")).toBe(false);
-    expect(rewardTaskRequiresUrlProof("xiaohongshu")).toBe(false);
+    expect(rewardTaskRequiresUrlProof("mobile_share")).toBe(false);
+    expect(rewardTaskRequiresUrlProof("whatsapp")).toBe(false);
   });
 
   it("validates platform proof URLs with task-specific regexes", () => {
@@ -43,12 +44,6 @@ describe("reward proof helpers", () => {
         "https://www.facebook.com/nexu/posts/1234567890",
       ),
     ).toBe(true);
-    expect(
-      validateRewardProofUrl(
-        "whatsapp",
-        "https://chat.whatsapp.com/AbCdEfGhIjKlMnOpQrStUv",
-      ),
-    ).toBe(true);
   });
 
   it("rejects cross-platform or malformed proof URLs", () => {
@@ -66,5 +61,21 @@ describe("reward proof helpers", () => {
   it("only requires a GitHub monitoring session for the star task", () => {
     expect(rewardTaskRequiresGithubStarSession("github_star")).toBe(true);
     expect(rewardTaskRequiresGithubStarSession("x_share")).toBe(false);
+  });
+
+  it("prefills Reddit and LinkedIn share links", () => {
+    const redditTask = rewardTasks.find((task) => task.id === "reddit");
+    const linkedinTask = rewardTasks.find((task) => task.id === "lingying");
+
+    expect(redditTask?.actionUrl).toContain("https://www.reddit.com/submit?");
+    expect(redditTask?.actionUrl).toContain("url=");
+    expect(redditTask?.actionUrl).toContain("title=");
+    expect(redditTask?.actionUrl).toContain("type=LINK");
+
+    expect(linkedinTask?.actionUrl).toContain(
+      "https://www.linkedin.com/feed/?shareActive=true",
+    );
+    expect(linkedinTask?.actionUrl).toContain("text=");
+    expect(linkedinTask?.actionUrl).toContain("shareUrl=");
   });
 });

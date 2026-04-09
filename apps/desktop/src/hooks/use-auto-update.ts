@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { checkForUpdate, downloadUpdate, installUpdate } from "../lib/host-api";
+import type { DesktopUpdateCapability } from "../../shared/host";
+import {
+  checkForUpdate,
+  downloadUpdate,
+  getUpdateCapability,
+  installUpdate,
+} from "../lib/host-api";
 
 export type UpdatePhase =
   | "idle"
@@ -12,9 +18,11 @@ export type UpdatePhase =
   | "error";
 
 export type UpdateState = {
+  capability: DesktopUpdateCapability | null;
   phase: UpdatePhase;
   version: string | null;
   releaseNotes: string | null;
+  actionUrl: string | null;
   percent: number;
   errorMessage: string | null;
   dismissed: boolean;
@@ -32,14 +40,38 @@ export function restorePhaseAfterInstall(
 
 export function useAutoUpdate() {
   const [state, setState] = useState<UpdateState>({
+    capability: null,
     phase: "idle",
     version: null,
     releaseNotes: null,
+    actionUrl: null,
     percent: 0,
     errorMessage: null,
     dismissed: false,
     userInitiated: false,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getUpdateCapability()
+      .then((capability) => {
+        if (cancelled) {
+          return;
+        }
+        setState((prev) => ({ ...prev, capability }));
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setState((prev) => ({ ...prev, capability: null }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const updater = window.nexuUpdater;
@@ -67,6 +99,7 @@ export function useAutoUpdate() {
           phase: "available",
           version: data.version,
           releaseNotes: data.releaseNotes ?? null,
+          actionUrl: data.actionUrl ?? null,
           userInitiated: false,
         }));
       }),
@@ -78,6 +111,7 @@ export function useAutoUpdate() {
           ...prev,
           phase: prev.userInitiated ? "up-to-date" : "idle",
           errorMessage: null,
+          actionUrl: null,
           userInitiated: false,
         }));
       }),
@@ -100,6 +134,7 @@ export function useAutoUpdate() {
           ...prev,
           phase: "ready",
           version: data.version,
+          actionUrl: null,
           percent: 100,
           userInitiated: false,
         }));
@@ -143,6 +178,15 @@ export function useAutoUpdate() {
   }, [state.phase]);
 
   const check = useCallback(async () => {
+    if (!state.capability?.check) {
+      setState((prev) => ({
+        ...prev,
+        phase: "idle",
+        userInitiated: false,
+      }));
+      return;
+    }
+
     setState((prev) => ({
       ...prev,
       phase: "checking",
@@ -155,9 +199,20 @@ export function useAutoUpdate() {
     } catch {
       // Errors are delivered via the update:error event
     }
-  }, []);
+  }, [state.capability]);
 
   const download = useCallback(async () => {
+    if (state.capability?.downloadMode !== "in-app") {
+      if (state.capability?.downloadMode === "external") {
+        try {
+          await downloadUpdate();
+        } catch {
+          // Errors are delivered via the update:error event
+        }
+      }
+      return;
+    }
+
     // Immediately switch to downloading state so the UI shows progress
     // instead of leaving the Download button unresponsive while waiting
     // for the first update:progress event from electron-updater.
@@ -167,9 +222,13 @@ export function useAutoUpdate() {
     } catch {
       // Errors are delivered via the update:error event
     }
-  }, []);
+  }, [state.capability]);
 
   const install = useCallback(async () => {
+    if (state.capability?.applyMode !== "in-app") {
+      return;
+    }
+
     let previousPhase: Exclude<UpdatePhase, "installing"> = "ready";
 
     setState((prev) => {
@@ -182,7 +241,7 @@ export function useAutoUpdate() {
     } catch {
       // Errors are delivered via the update:error event
     }
-  }, []);
+  }, [state.capability]);
 
   const dismiss = useCallback(() => {
     setState((prev) => ({

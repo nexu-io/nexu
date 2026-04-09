@@ -7,9 +7,11 @@ describe("desktop useAutoUpdate", () => {
     expect(
       restoreDesktopPhase(
         {
+          capability: null,
           phase: "installing",
           version: "1.2.3",
           releaseNotes: null,
+          actionUrl: null,
           percent: 100,
           errorMessage: null,
           dismissed: false,
@@ -24,9 +26,11 @@ describe("desktop useAutoUpdate", () => {
     expect(
       restoreDesktopPhase(
         {
+          capability: null,
           phase: "error",
           version: "1.2.3",
           releaseNotes: null,
+          actionUrl: null,
           percent: 100,
           errorMessage: "failed",
           dismissed: false,

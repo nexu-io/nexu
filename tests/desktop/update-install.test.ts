@@ -140,6 +140,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
       launchd: launchdCtx,
     });
 
@@ -185,6 +186,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
       launchd: launchdCtx,
     });
 
@@ -207,6 +209,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -238,6 +241,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -259,6 +263,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -280,6 +285,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -309,6 +315,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -339,6 +346,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -367,6 +375,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -392,6 +401,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
       launchd: launchdCtx,
     });
 
@@ -424,6 +434,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
       launchd: launchdCtx,
     });
 
@@ -452,6 +463,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     // Should NOT throw — dispose error is caught internally
@@ -476,6 +488,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -512,6 +525,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -540,6 +554,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -571,6 +586,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     await mgr.quitAndInstall();
@@ -597,6 +613,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
       launchd: launchdCtx,
     });
 
@@ -633,6 +650,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
       launchd: launchdCtx,
       initialDelayMs: 100,
     });
@@ -671,6 +689,7 @@ describe("UpdateManager.quitAndInstall", () => {
     const mgr = new UpdateManager(win as never, orchestrator as never, {
       channel: "stable",
       feedUrl: null,
+      platform: "darwin",
     });
 
     // ensureNexuProcessesDead throwing should propagate — it's the verification gate

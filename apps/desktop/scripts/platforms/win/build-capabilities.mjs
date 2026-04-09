@@ -13,10 +13,22 @@ export function createWindowsBuildCapabilities({
     },
     webBuildEnv: createDesktopWebBuildEnv(env, processPlatform),
     sidecarReleaseEnv: env,
-    createElectronBuilderArgs({ electronVersion, buildVersion, dirOnly }) {
+    createElectronBuilderArgs({
+      electronVersion,
+      buildVersion,
+      dirOnly,
+      targets,
+    }) {
+      const resolvedTargets =
+        Array.isArray(targets) && targets.length > 0
+          ? targets
+          : dirOnly
+            ? ["dir"]
+            : this.artifactLayout.primaryTargets;
+
       return [
         "--win",
-        ...(dirOnly ? ["dir"] : this.artifactLayout.primaryTargets),
+        ...resolvedTargets,
         "--publish",
         "never",
         `--config.electronVersion=${electronVersion}`,

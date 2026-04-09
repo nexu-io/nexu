@@ -161,7 +161,7 @@ describe("desktop rewards share templates", () => {
                   repeatMode: "weekly",
                   shareMode: "link",
                   icon: "reddit",
-                  url: "https://www.reddit.com/submit?url=https%3A%2F%2Fgithub.com%2Fnexu-io%2Fnexu",
+                  url: "https://www.reddit.com/submit?url=https%3A%2F%2Fdev.to%2Fjoey_lee_c96e4ad421791371%2Fwe-built-an-open-source-openclaw-desktop-client-that-fixes-17-pitfalls-gjn",
                   isClaimed: false,
                   claimCount: 0,
                   lastClaimedAt: null,

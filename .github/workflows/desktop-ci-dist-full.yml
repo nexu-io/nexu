@@ -339,6 +339,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Windows packaging tools
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+
       - name: Show desktop toolchain versions
         shell: pwsh
         run: pnpm exec electron --version
@@ -365,15 +370,26 @@ jobs:
             Write-Error "Missing unpacked Windows app executable: $unpackedExecutable"
           }
 
-          $archiveMetadata = Join-Path $PWD "apps/desktop/.dist-runtime/openclaw/archive.json"
-          if (-not (Test-Path $archiveMetadata)) {
-            Write-Error "Missing OpenClaw archive metadata: $archiveMetadata"
+          $openclawRuntimeRoot = Join-Path $PWD "apps/desktop/.dist-runtime/openclaw"
+          $archiveMetadata = Join-Path $openclawRuntimeRoot "archive.json"
+          $unarchivedPackageJson = Join-Path $openclawRuntimeRoot "package.json"
+          $unarchivedNodeModules = Join-Path $openclawRuntimeRoot "node_modules"
+          if (-not (Test-Path $openclawRuntimeRoot)) {
+            Write-Error "Missing OpenClaw runtime root: $openclawRuntimeRoot"
+          }
+          if (-not (Test-Path $archiveMetadata) -and ((-not (Test-Path $unarchivedPackageJson)) -or (-not (Test-Path $unarchivedNodeModules)))) {
+            Write-Error "Missing OpenClaw runtime payload metadata under: $openclawRuntimeRoot"
           }
 
           Write-Host "Built Windows artifacts:"
           $installerArtifacts | ForEach-Object { Write-Host " - $($_.FullName)" }
           Write-Host " - $unpackedExecutable"
-          Write-Host " - $archiveMetadata"
+          if (Test-Path $archiveMetadata) {
+            Write-Host " - $archiveMetadata"
+          } else {
+            Write-Host " - $unarchivedPackageJson"
+            Write-Host " - $unarchivedNodeModules"
+          }
 
       - name: Upload Windows build artifacts
         if: success()

@@ -68,6 +68,11 @@
     Pop $0
   FunctionEnd
 
+  Function .onInstSuccess
+    Push "install complete"
+    Call LogNexuInstallerEvent
+  FunctionEnd
+
   Function WriteNexuCleanupScript
     Exch $0
     Push $1
@@ -118,6 +123,9 @@
     Push $1
     Push $2
 
+    Push "EnsureNexuNotRunning start"
+    Call LogNexuInstallerEvent
+
   retry:
     nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq Nexu.exe" /NH'
     Pop $0
@@ -131,6 +139,9 @@
       MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Nexu is currently running.$\r$\n$\r$\nPlease quit the app before continuing the installation." /SD IDCANCEL IDRETRY retry
       Abort
     ${EndIf}
+
+    Push "EnsureNexuNotRunning done"
+    Call LogNexuInstallerEvent
 
     Pop $2
     Pop $1

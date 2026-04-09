@@ -164,8 +164,7 @@ const zhCN = {
   "layout.sidebar.balancePopup.rechargedTooltip":
     "从订阅套餐中累计获得的积分总量",
   "layout.sidebar.balancePopup.earned": "赠送积分",
-  "layout.sidebar.balancePopup.earnedTooltip":
-    "来自注册奖励、完成任务等活动。消耗顺序：套餐积分 → 积分包 → 赠送积分。",
+  "layout.sidebar.balancePopup.earnedTooltip": "来自注册奖励、完成任务等活动。",
   "layout.sidebar.balancePopup.consumed": "累计消耗",
   "layout.sidebar.balancePopup.viewDetail": "查看使用情况",
   "layout.empty.title": "暂无对话",
@@ -298,9 +297,9 @@ const zhCN = {
   "rewards.group.social": "社交与即时通讯",
   "rewards.tab.web": "Web 版",
   "rewards.tab.mobile": "移动端",
-  "rewards.mobileQrHint": "用微信、小红书、即刻、飞书等客户端扫码",
+  "rewards.mobileQrHint": "使用相机扫描以从手机邀请",
   "rewards.mobileQrDesc":
-    "打开微信、小红书、即刻、飞书等客户端扫描二维码，完成分享任务即可领取积分",
+    "使用手机相机扫描二维码，从手机发起邀请并完成任务即可领取积分",
   "rewards.cloudBalance": "云端余额",
   "rewards.totalEarned": "累计获得",
   "rewards.totalUsed": "累计消耗",
@@ -397,10 +396,10 @@ const zhCN = {
   "reward.x_share.desc": "每周可领一次",
   "reward.reddit.name": "发帖到 Reddit",
   "reward.reddit.desc": "每周可领一次",
-  "reward.mobile_share.name": "移动端扫码分享",
+  "reward.mobile_share.name": "从手机邀请",
   "reward.mobile_share.desc":
-    "打开微信、小红书、即刻、飞书等客户端扫码完成分享，即可领取积分",
-  "reward.lingying.name": "发帖到瓴英",
+    "使用手机相机扫描二维码，从手机发起邀请即可领取积分",
+  "reward.lingying.name": "发帖到领英",
   "reward.lingying.desc": "每周可领一次",
   "reward.facebook.name": "分享到 Facebook",
   "reward.facebook.desc": "每周可领一次",

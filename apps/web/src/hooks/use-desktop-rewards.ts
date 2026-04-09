@@ -101,7 +101,17 @@ export function useDesktopRewardsStatus() {
   const rewardsQuery = useQuery({
     queryKey: DESKTOP_REWARDS_QUERY_KEY,
     queryFn: fetchDesktopRewardsStatus,
-    refetchInterval: 60_000,
+    // 30s when the window is actually visible AND OS-focused, 60s otherwise.
+    // The 60s floor is a defensive fallback in case focus detection is wrong
+    // — the balance still refreshes every minute no matter what.
+    refetchInterval: () =>
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible" &&
+      document.hasFocus()
+        ? 30_000
+        : 60_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 

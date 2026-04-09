@@ -1,6 +1,6 @@
-import { type BrowserWindow, app, webContents } from "electron";
-import { autoUpdater } from "electron-updater";
+import { type BrowserWindow, app, shell, webContents } from "electron";
 import type {
+  DesktopUpdateCapability,
   UpdateChannelName,
   UpdateCheckDiagnostic,
   UpdateSource,
@@ -14,12 +14,19 @@ import {
   teardownLaunchdServices,
 } from "../services/launchd-bootstrap";
 import type { LaunchdManager } from "../services/launchd-manager";
-import { R2_BASE_URL } from "./component-updater";
+import {
+  MacUpdateDriver,
+  resolveMacUpdateFeedUrlForTests,
+} from "./mac-update-driver";
+import { UnsupportedUpdateDriver } from "./unsupported-update-driver";
+import type { PlatformUpdateDriver } from "./update-driver";
+import { WindowsUpdateDriver } from "./windows-update-driver";
 
 export interface UpdateManagerOptions {
   source?: UpdateSource;
   channel?: UpdateChannelName;
   feedUrl?: string | null;
+  platform?: NodeJS.Platform;
   autoDownload?: boolean;
   checkIntervalMs?: number;
   initialDelayMs?: number;
@@ -32,23 +39,6 @@ export interface UpdateManagerOptions {
   prepareForUpdateInstall?: (
     args: PrepareForUpdateInstallArgs,
   ) => Promise<void>;
-}
-
-function getMacFeedArch(arch: string = process.arch): "arm64" | "x64" {
-  if (arch === "x64" || arch === "arm64") {
-    return arch;
-  }
-
-  throw new Error(
-    `[update-manager] Unsupported mac architecture "${arch}". Expected "x64" or "arm64".`,
-  );
-}
-
-function getDefaultR2FeedUrl(
-  channel: UpdateChannelName,
-  arch: string = process.arch,
-): string {
-  return `${R2_BASE_URL}/${channel}/${getMacFeedArch(arch)}`;
 }
 
 function sanitizeFeedUrl(feedUrl: string): string {
@@ -68,31 +58,37 @@ function sanitizeFeedUrl(feedUrl: string): string {
   }
 }
 
-function resolveUpdateFeedUrl(options: {
-  source: UpdateSource;
-  channel: UpdateChannelName;
-  feedUrl: string | null;
-  arch?: string;
-}): string {
-  const overrideUrl = process.env.NEXU_UPDATE_FEED_URL ?? options.feedUrl;
-  if (overrideUrl) {
-    return overrideUrl;
-  }
-
-  if (options.source === "github") {
-    return "github://nexu-io/nexu";
-  }
-
-  return getDefaultR2FeedUrl(options.channel, options.arch);
-}
-
 export function resolveUpdateFeedUrlForTests(options: {
   source: UpdateSource;
   channel: UpdateChannelName;
   feedUrl: string | null;
   arch?: string;
 }): string {
-  return resolveUpdateFeedUrl(options);
+  return resolveMacUpdateFeedUrlForTests(options);
+}
+
+function createUpdateDriver(
+  platform: NodeJS.Platform,
+  currentVersion: string,
+  autoDownload: boolean,
+): PlatformUpdateDriver {
+  const context = {
+    currentVersion,
+    autoDownload,
+    openExternal: async (url: string) => {
+      await shell.openExternal(url);
+    },
+    writeLog: (_message: string, _diagnostic: UpdateCheckDiagnostic) => {},
+  };
+
+  switch (platform) {
+    case "darwin":
+      return new MacUpdateDriver(context);
+    case "win32":
+      return new WindowsUpdateDriver(context);
+    default:
+      return new UnsupportedUpdateDriver(context);
+  }
 }
 
 export class UpdateManager {
@@ -106,6 +102,8 @@ export class UpdateManager {
   private readonly launchdCtx: UpdateManagerOptions["launchd"];
   private readonly options?: UpdateManagerOptions;
   private currentFeedUrl: string;
+  private readonly platform: NodeJS.Platform;
+  private readonly driver: PlatformUpdateDriver;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private lastProgressLogAt = 0;
   private lastProgressLogPercent: number | null = null;
@@ -127,34 +125,25 @@ export class UpdateManager {
     this.initialDelayMs = options?.initialDelayMs ?? 0;
     this.launchdCtx = options?.launchd;
     this.options = options;
-    this.currentFeedUrl = getDefaultR2FeedUrl(this.channel);
+    this.platform = options?.platform ?? process.platform;
+    this.driver = createUpdateDriver(
+      this.platform,
+      app.getVersion(),
+      options?.autoDownload ?? false,
+    );
+    this.currentFeedUrl = this.driver.getCurrentFeedUrl();
 
-    autoUpdater.autoDownload = options?.autoDownload ?? false;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.forceDevUpdateConfig = !app.isPackaged;
     this.configureFeedUrl();
     this.bindEvents();
   }
 
   private configureFeedUrl(): void {
-    this.currentFeedUrl = resolveUpdateFeedUrl({
+    this.driver.configure({
       source: this.source,
       channel: this.channel,
       feedUrl: this.feedUrl,
     });
-
-    if (this.currentFeedUrl === "github://nexu-io/nexu") {
-      autoUpdater.setFeedURL({
-        provider: "github",
-        owner: "nexu-io",
-        repo: "nexu",
-      });
-    } else {
-      autoUpdater.setFeedURL({
-        provider: "generic",
-        url: this.currentFeedUrl,
-      });
-    }
+    this.currentFeedUrl = this.driver.getCurrentFeedUrl();
 
     this.logCheck("update feed configured", {
       channel: this.channel,
@@ -164,6 +153,10 @@ export class UpdateManager {
       remoteVersion: undefined,
       remoteReleaseDate: undefined,
     });
+  }
+
+  getCapability(): DesktopUpdateCapability {
+    return this.driver.capability;
   }
 
   private getDiagnostic(partial?: {
@@ -192,74 +185,71 @@ export class UpdateManager {
   }
 
   private bindEvents(): void {
-    autoUpdater.on("checking-for-update", () => {
-      const diagnostic = this.getDiagnostic();
-      this.logCheck("update check event: checking for update", diagnostic);
-      this.send("update:checking", diagnostic);
-    });
-
-    autoUpdater.on("update-available", (info) => {
-      const diagnostic = this.getDiagnostic({
-        remoteVersion: info.version,
-        remoteReleaseDate: info.releaseDate,
-      });
-      this.logCheck("update event: update available", diagnostic);
-      this.send("update:available", {
-        version: info.version,
-        releaseNotes:
-          typeof info.releaseNotes === "string" ? info.releaseNotes : undefined,
-        diagnostic,
-      });
-    });
-
-    autoUpdater.on("update-not-available", (info) => {
-      const diagnostic = this.getDiagnostic({
-        remoteVersion: info.version,
-        remoteReleaseDate: info.releaseDate,
-      });
-      this.logCheck("update event: update not available", diagnostic);
-      this.send("update:up-to-date", { diagnostic });
-    });
-
-    autoUpdater.on("download-progress", (progress) => {
-      const now = Date.now();
-      const percent = Math.round(progress.percent);
-      const shouldLog =
-        this.lastProgressLogPercent === null ||
-        Math.abs(percent - this.lastProgressLogPercent) >= 5 ||
-        now - this.lastProgressLogAt >= 5_000 ||
-        percent === 100;
-      if (shouldLog) {
-        this.lastProgressLogAt = now;
-        this.lastProgressLogPercent = percent;
-        this.logCheck(
-          `update event: download progress ${percent}%`,
-          this.getDiagnostic(),
-        );
-      }
-      this.send("update:progress", {
-        percent: progress.percent,
-        bytesPerSecond: progress.bytesPerSecond,
-        transferred: progress.transferred,
-        total: progress.total,
-      });
-    });
-
-    autoUpdater.on("update-downloaded", (info) => {
-      this.logCheck(
-        "update event: downloaded",
-        this.getDiagnostic({
+    this.driver.bindEvents({
+      onChecking: () => {
+        const diagnostic = this.getDiagnostic();
+        this.logCheck("update check event: checking for update", diagnostic);
+        this.send("update:checking", diagnostic);
+      },
+      onAvailable: (info) => {
+        const diagnostic = this.getDiagnostic({
           remoteVersion: info.version,
           remoteReleaseDate: info.releaseDate,
-        }),
-      );
-      this.send("update:downloaded", { version: info.version });
-    });
-
-    autoUpdater.on("error", (error) => {
-      const diagnostic = this.getDiagnostic();
-      this.logCheck(`update error: ${error.message}`, diagnostic);
-      this.send("update:error", { message: error.message, diagnostic });
+        });
+        this.logCheck("update event: update available", diagnostic);
+        this.send("update:available", {
+          version: info.version,
+          releaseNotes: info.releaseNotes,
+          actionUrl: info.actionUrl,
+          diagnostic,
+        });
+      },
+      onUnavailable: (info) => {
+        const diagnostic = this.getDiagnostic({
+          remoteVersion: info.version,
+          remoteReleaseDate: info.releaseDate,
+        });
+        this.logCheck("update event: update not available", diagnostic);
+        this.send("update:up-to-date", { diagnostic });
+      },
+      onProgress: (progress) => {
+        const now = Date.now();
+        const percent = Math.round(progress.percent);
+        const shouldLog =
+          this.lastProgressLogPercent === null ||
+          Math.abs(percent - this.lastProgressLogPercent) >= 5 ||
+          now - this.lastProgressLogAt >= 5_000 ||
+          percent === 100;
+        if (shouldLog) {
+          this.lastProgressLogAt = now;
+          this.lastProgressLogPercent = percent;
+          this.logCheck(
+            `update event: download progress ${percent}%`,
+            this.getDiagnostic(),
+          );
+        }
+        this.send("update:progress", {
+          percent: progress.percent,
+          bytesPerSecond: progress.bytesPerSecond,
+          transferred: progress.transferred,
+          total: progress.total,
+        });
+      },
+      onDownloaded: (info) => {
+        this.logCheck(
+          "update event: downloaded",
+          this.getDiagnostic({
+            remoteVersion: info.version,
+            remoteReleaseDate: info.releaseDate,
+          }),
+        );
+        this.send("update:downloaded", { version: info.version });
+      },
+      onError: (error) => {
+        const diagnostic = this.getDiagnostic();
+        this.logCheck(`update error: ${error.message}`, diagnostic);
+        this.send("update:error", { message: error.message, diagnostic });
+      },
     });
   }
 
@@ -290,20 +280,24 @@ export class UpdateManager {
 
     this.checkInProgress = (async () => {
       try {
-        const result = await autoUpdater.checkForUpdates();
-        const remoteVersion = result?.updateInfo.version;
+        if (!this.driver.capability.check) {
+          this.logCheck(
+            "update check skipped: capability disabled on this platform",
+            this.getDiagnostic(),
+          );
+          return { updateAvailable: false };
+        }
+
+        const result = await this.driver.checkForUpdates();
         const diagnostic = this.getDiagnostic({
-          remoteVersion,
-          remoteReleaseDate: result?.updateInfo.releaseDate,
+          remoteVersion: result.remoteVersion,
+          remoteReleaseDate: result.remoteReleaseDate,
         });
         this.logCheck(
-          `update check result: ${result === null ? "null" : remoteVersion === app.getVersion() ? "no update" : "update available"} (${Date.now() - startedAt}ms)`,
+          `update check result: ${result.updateAvailable ? "update available" : "no update"} (${Date.now() - startedAt}ms)`,
           diagnostic,
         );
-        return {
-          updateAvailable:
-            result !== null && result.updateInfo.version !== app.getVersion(),
-        };
+        return { updateAvailable: result.updateAvailable };
       } catch (error) {
         this.logCheck(
           `check failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -319,8 +313,18 @@ export class UpdateManager {
   }
 
   async downloadUpdate(): Promise<{ ok: boolean }> {
-    await autoUpdater.downloadUpdate();
-    return { ok: true };
+    if (
+      this.driver.capability.downloadMode !== "in-app" &&
+      this.driver.capability.downloadMode !== "external"
+    ) {
+      this.logCheck(
+        "update download skipped: capability disabled on this platform",
+        this.getDiagnostic(),
+      );
+      return { ok: false };
+    }
+
+    return this.driver.downloadUpdate();
   }
 
   async quitAndInstall(): Promise<void> {
@@ -456,10 +460,18 @@ export class UpdateManager {
       );
     }
 
+    if (this.driver.capability.applyMode !== "in-app") {
+      this.logCheck(
+        "quit-and-install skipped: capability disabled on this platform",
+        this.getDiagnostic(),
+      );
+      return;
+    }
+
     // Set force-quit flag so window close handlers don't intercept the exit
     (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
     logStep("triggering autoUpdater.quitAndInstall");
-    autoUpdater.quitAndInstall(false, true);
+    await this.driver.applyUpdate();
   }
 
   setChannel(channel: UpdateChannelName): void {
@@ -473,6 +485,14 @@ export class UpdateManager {
   }
 
   startPeriodicCheck(): void {
+    if (!this.driver.capability.check) {
+      this.logCheck(
+        "periodic update checks disabled on this platform",
+        this.getDiagnostic(),
+      );
+      return;
+    }
+
     if (this.timer || this.initialTimer) {
       return;
     }

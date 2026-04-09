@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   DesktopRuntimeConfig,
+  DesktopUpdateCapability,
   DiagnosticsExportResult,
   DiagnosticsInfo,
   HostDesktopCommand,
@@ -182,6 +183,10 @@ export function onRuntimeEvent(
 export async function checkForUpdate(): Promise<boolean> {
   const result = await getHostBridge().invoke("update:check", undefined);
   return result.updateAvailable;
+}
+
+export async function getUpdateCapability(): Promise<DesktopUpdateCapability> {
+  return getHostBridge().invoke("update:get-capability", undefined);
 }
 
 export async function downloadUpdate(): Promise<boolean> {
