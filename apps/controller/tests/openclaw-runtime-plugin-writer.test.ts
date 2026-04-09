@@ -189,6 +189,41 @@ describe("OpenClawRuntimePluginWriter", () => {
     ).toBe("bundled\n");
   });
 
+  it("keeps bundled qqbot runtime dependencies when materializing extensions", async () => {
+    const bundledPluginDir = path.join(
+      env.bundledRuntimePluginsDir,
+      "openclaw-qqbot",
+    );
+    const bundledSilkWasmDir = path.join(
+      bundledPluginDir,
+      "node_modules",
+      "silk-wasm",
+    );
+
+    await mkdir(bundledSilkWasmDir, { recursive: true });
+    await writeFile(
+      path.join(bundledSilkWasmDir, "package.json"),
+      '{ "name": "silk-wasm" }\n',
+      "utf8",
+    );
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    expect(
+      await readFile(
+        path.join(
+          env.openclawExtensionsDir,
+          "openclaw-qqbot",
+          "node_modules",
+          "silk-wasm",
+          "package.json",
+        ),
+        "utf8",
+      ),
+    ).toContain('"name": "silk-wasm"');
+  });
+
   it("prefers bundled wecom over the legacy runtime plugin source", async () => {
     const bundledPluginDir = path.join(env.bundledRuntimePluginsDir, "wecom");
     const legacyPluginDir = path.join(env.runtimePluginTemplatesDir, "wecom");

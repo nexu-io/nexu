@@ -1,5 +1,5 @@
 import { cp, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   copyRuntimeDependencyClosure,
   getSidecarRoot,
@@ -31,9 +31,39 @@ const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
 const diagnosticsEnabled =
   process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS === "1" ||
   process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS?.toLowerCase() === "true";
+const qqbotPluginRelativeRoot = "openclaw-qqbot";
+const qqbotSilkWasmPackageRelativePath = join(
+  qqbotPluginRelativeRoot,
+  "node_modules",
+  "silk-wasm",
+  "package.json",
+);
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
+async function ensureQqbotPluginDependencyTree(rootDir, label) {
+  const pluginDir = resolve(rootDir, qqbotPluginRelativeRoot);
+  const silkWasmPackagePath = resolve(
+    rootDir,
+    qqbotSilkWasmPackageRelativePath,
+  );
+  const missing = [];
+
+  if (!(await pathExists(pluginDir))) {
+    missing.push(pluginDir);
+  }
+
+  if (!(await pathExists(silkWasmPackagePath))) {
+    missing.push(silkWasmPackagePath);
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[controller-sidecar] ${label} is missing bundled QQ plugin dependencies: ${missing.join(", ")}`,
+    );
+  }
 }
 
 async function ensureBuildArtifacts() {
@@ -78,10 +108,18 @@ async function prepareControllerSidecar() {
   }
 
   if (await pathExists(controllerBundledPluginsRoot)) {
+    await ensureQqbotPluginDependencyTree(
+      controllerBundledPluginsRoot,
+      "controller bundled plugins",
+    );
     await cp(controllerBundledPluginsRoot, sidecarPluginsRoot, {
       recursive: true,
       dereference: true,
     });
+    await ensureQqbotPluginDependencyTree(
+      sidecarPluginsRoot,
+      "controller sidecar plugins",
+    );
   }
 
   const controllerPackageJson = JSON.parse(

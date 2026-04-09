@@ -80,6 +80,15 @@ async function ensureExistingPath(path, label) {
   }
 }
 
+async function pathExists(targetPath) {
+  try {
+    await lstat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureExistingBuildArtifacts() {
   await Promise.all([
     ensureExistingPath(
@@ -463,6 +472,52 @@ async function stapleNotarizedAppBundles() {
   }
 }
 
+async function validatePackagedQqbotDependencies(releaseRoot) {
+  const appBundleDirs = await readdir(releaseRoot, { withFileTypes: true });
+  const packagedMacBundles = appBundleDirs.filter(
+    (entry) =>
+      entry.isDirectory() &&
+      (entry.name === "mac" || entry.name.startsWith("mac-")),
+  );
+
+  if (packagedMacBundles.length === 0) {
+    throw new Error(
+      `[dist:mac] expected packaged macOS app bundles under ${releaseRoot}, but none were found.`,
+    );
+  }
+
+  for (const entry of packagedMacBundles) {
+    const appRoot = resolve(releaseRoot, entry.name, "Nexu.app");
+    const qqbotPluginRoot = resolve(
+      appRoot,
+      "Contents",
+      "Resources",
+      "runtime",
+      "controller",
+      "plugins",
+      "openclaw-qqbot",
+    );
+    const silkWasmPackagePath = resolve(
+      qqbotPluginRoot,
+      "node_modules",
+      "silk-wasm",
+      "package.json",
+    );
+
+    if (!(await pathExists(qqbotPluginRoot))) {
+      throw new Error(
+        `[dist:mac] packaged app is missing openclaw-qqbot: ${qqbotPluginRoot}`,
+      );
+    }
+
+    if (!(await pathExists(silkWasmPackagePath))) {
+      throw new Error(
+        `[dist:mac] packaged app is missing openclaw-qqbot dependency silk-wasm: ${silkWasmPackagePath}`,
+      );
+    }
+  }
+}
+
 async function ensureBuildConfig() {
   const configPath = resolve(electronRoot, "build-config.json");
   const isCi =
@@ -838,6 +893,11 @@ async function main() {
           : notarizeEnv,
       });
     },
+    timings,
+  );
+  await timedStep(
+    "validate packaged qqbot dependencies",
+    async () => validatePackagedQqbotDependencies(releaseRoot),
     timings,
   );
   await timedStep(

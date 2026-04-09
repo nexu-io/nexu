@@ -46,6 +46,16 @@ function getVirtualStoreNodeModules(realPkgPath) {
   return null;
 }
 
+function getPackageNodeModules(packageRoot) {
+  const candidate = path.join(packageRoot, "node_modules");
+  try {
+    readdirSync(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
 function listPackages(nodeModulesDir) {
   const result = [];
 
@@ -166,8 +176,10 @@ async function bundlePlugin({ id, npmName }) {
   });
   await maybeFixPluginManifest(outputDir);
 
-  const rootVirtualNodeModules = getVirtualStoreNodeModules(sourcePackageRoot);
-  if (!rootVirtualNodeModules) {
+  const rootDependencyNodeModules =
+    getPackageNodeModules(sourcePackageRoot) ??
+    getVirtualStoreNodeModules(sourcePackageRoot);
+  if (!rootDependencyNodeModules) {
     throw new Error(`Unable to resolve node_modules for ${npmName}`);
   }
 
@@ -178,7 +190,7 @@ async function bundlePlugin({ id, npmName }) {
     ...Object.keys(packageJson.peerDependencies ?? {}),
   ]);
   const collected = new Map();
-  const queue = [{ nodeModulesDir: rootVirtualNodeModules, skipPkg: npmName }];
+  const queue = [{ nodeModulesDir: rootDependencyNodeModules, skipPkg: npmName }];
 
   while (queue.length > 0) {
     const { nodeModulesDir, skipPkg } = queue.shift();
