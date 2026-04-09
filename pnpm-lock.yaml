@@ -88,6 +88,9 @@ importers:
       '@nexu/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nexu/slimclaw':
+        specifier: workspace:*
+        version: link:../../packages/slimclaw
       '@sentry/electron':
         specifier: ^7.10.0
         version: 7.10.0
@@ -323,10 +326,6 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  packages/pkg-utils: {}
-
-  packages/platform-utils: {}
-
   packages/shared:
     dependencies:
       zod:
@@ -337,11 +336,24 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/slimclaw:
+    dependencies:
+      '@nexu/dev-utils':
+        specifier: workspace:*
+        version: link:../dev-utils
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   scripts/dev:
     devDependencies:
       '@nexu/dev-utils':
         specifier: workspace:*
         version: link:../../packages/dev-utils
+      '@nexu/slimclaw':
+        specifier: workspace:*
+        version: link:../../packages/slimclaw
       cac:
         specifier: ^6.7.14
         version: 6.7.14
@@ -3463,6 +3475,7 @@ packages:
   basic-ftp@5.2.0:
     resolution: {integrity: sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==}
     engines: {node: '>=10.0.0'}
+    deprecated: Security vulnerability fixed in 5.2.1, please upgrade
 
   better-auth@1.4.19:
     resolution: {integrity: sha512-3RlZJcA0+NH25wYD85vpIGwW9oSTuEmLIaGbT8zg41w/Pa2hVWHKedjoUHHJtnzkBXzDb+CShkLnSw7IThDdqQ==}

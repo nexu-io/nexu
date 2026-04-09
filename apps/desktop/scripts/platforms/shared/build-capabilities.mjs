@@ -37,6 +37,6 @@ export function getSharedBuildSteps({ repoRoot }) {
     ["pnpm", ["--dir", repoRoot, "--filter", "@nexu/dev-utils", "build"]],
     ["pnpm", ["--dir", repoRoot, "--filter", "@nexu/shared", "build"]],
     ["pnpm", ["--dir", repoRoot, "--filter", "@nexu/controller", "build"]],
-    ["pnpm", ["--dir", repoRoot, "openclaw-runtime:install"]],
+    ["pnpm", ["--dir", repoRoot, "slimclaw:prepare"]],
   ];
 }

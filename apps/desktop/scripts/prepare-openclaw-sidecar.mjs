@@ -15,6 +15,10 @@ import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  getSlimclawRuntimeRoot,
+  resolveSlimclawRuntimeArtifacts,
+} from "@nexu/slimclaw";
+import {
   electronRoot,
   getSidecarRoot,
   linkOrCopyDirectory,
@@ -26,9 +30,13 @@ import {
 } from "./lib/sidecar-paths.mjs";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
-const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
+const openclawRuntimeRoot = getSlimclawRuntimeRoot(repoRoot);
+const openclawRuntimeArtifacts = resolveSlimclawRuntimeArtifacts(
+  openclawRuntimeRoot,
+  { requirePrepared: false },
+);
 const openclawRuntimeNodeModules = resolve(openclawRuntimeRoot, "node_modules");
-const openclawRoot = resolve(openclawRuntimeNodeModules, "openclaw");
+const openclawRoot = dirname(openclawRuntimeArtifacts.entryPath);
 const openclawRuntimePatchesRoot = resolve(
   repoRoot,
   "openclaw-runtime-patches",

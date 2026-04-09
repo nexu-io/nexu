@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import {
   createNodeOptions,
@@ -6,7 +6,6 @@ import {
   ensureParentDirectory,
   getListeningPortPid,
   isProcessRunning,
-  prepareOpenclawRuntimeStage,
   readDevLock,
   removeDevLock,
   repoRootPath,
@@ -16,7 +15,7 @@ import {
   waitForProcessStart,
 } from "@nexu/dev-utils";
 import { ensure } from "@nexu/shared";
-import { resolveSlimclawRuntimePaths } from "@nexu/slimclaw";
+import { prepareSlimclawRuntimeStage } from "@nexu/slimclaw";
 
 import {
   createOpenclawInjectedEnv,
@@ -209,12 +208,8 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     component: "openclaw-service",
     service: "openclaw",
   });
-  const slimclawRuntimePaths = resolveSlimclawRuntimePaths({
+  const stage = await prepareSlimclawRuntimeStage({
     workspaceRoot: repoRootPath,
-  });
-  const stage = await prepareOpenclawRuntimeStage({
-    sourceOpenclawRoot: dirname(slimclawRuntimePaths.entryPath),
-    patchRoot: join(repoRootPath, "openclaw-runtime-patches"),
     targetStageRoot: getOpenclawRuntimeStageRootPath(),
     log: (message) => logger.info(message),
   });

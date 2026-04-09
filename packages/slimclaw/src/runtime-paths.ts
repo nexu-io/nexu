@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  type PrepareOpenclawRuntimeStageResult,
+  prepareOpenclawRuntimeStage,
+} from "@nexu/dev-utils";
 
 type OpenclawRuntimeCache = {
   fingerprint?: string;
@@ -36,10 +40,29 @@ export type SlimclawRuntimePaths = {
   descriptor: SlimclawRuntimeDescriptor;
 };
 
+export type SlimclawRuntimeArtifactPaths = {
+  entryPath: string;
+  binPath: string;
+  builtinExtensionsDir: string;
+};
+
 export type ResolveSlimclawRuntimePathsOptions = {
   workspaceRoot?: string;
   requirePrepared?: boolean;
 };
+
+export type ResolveSlimclawRuntimeArtifactsOptions = {
+  requirePrepared?: boolean;
+};
+
+export type PrepareSlimclawRuntimeStageOptions = {
+  workspaceRoot?: string;
+  targetStageRoot: string;
+  log?: (message: string) => void;
+};
+
+export type PrepareSlimclawRuntimeStageResult =
+  PrepareOpenclawRuntimeStageResult;
 
 function getDefaultWorkspaceRoot(): string {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +84,12 @@ export function getSlimclawDescriptorPath(
     "slimclaw",
     "runtime-descriptor.json",
   );
+}
+
+export function getSlimclawRuntimePatchesRoot(
+  workspaceRoot = getDefaultWorkspaceRoot(),
+): string {
+  return path.join(workspaceRoot, "openclaw-runtime-patches");
 }
 
 function readJsonFile<T>(filePath: string): T | null {
@@ -111,6 +140,56 @@ function buildDescriptor(runtimeRoot: string): SlimclawRuntimeDescriptor {
   };
 }
 
+function assertRequiredRuntimePaths(
+  requiredPaths: Array<[string, string]>,
+): void {
+  const missingPaths = requiredPaths.filter((entry) => !existsSync(entry[1]));
+
+  if (missingPaths.length === 0) {
+    return;
+  }
+
+  const missingSummary = missingPaths
+    .map(([label, targetPath]) => `${label}: ${targetPath}`)
+    .join(", ");
+  throw new Error(
+    `Slimclaw runtime is not prepared. Missing ${missingSummary}. Run pnpm openclaw-runtime:install first.`,
+  );
+}
+
+export function resolveSlimclawRuntimeArtifacts(
+  runtimeRoot: string,
+  options: ResolveSlimclawRuntimeArtifactsOptions = {},
+): SlimclawRuntimeArtifactPaths {
+  const entryPath = path.join(
+    runtimeRoot,
+    "node_modules",
+    "openclaw",
+    "openclaw.mjs",
+  );
+  const binPath = path.join(runtimeRoot, "bin", "openclaw");
+  const builtinExtensionsDir = path.join(
+    runtimeRoot,
+    "node_modules",
+    "openclaw",
+    "extensions",
+  );
+
+  if (options.requirePrepared ?? true) {
+    assertRequiredRuntimePaths([
+      ["entry", entryPath],
+      ["bin", binPath],
+      ["builtinExtensionsDir", builtinExtensionsDir],
+    ]);
+  }
+
+  return {
+    entryPath,
+    binPath,
+    builtinExtensionsDir,
+  };
+}
+
 function writeDescriptorFile(
   descriptorPath: string,
   descriptor: SlimclawRuntimeDescriptor,
@@ -135,31 +214,13 @@ export function resolveSlimclawRuntimePaths(
   const runtimeRoot = getSlimclawRuntimeRoot(workspaceRoot);
   const descriptor = buildDescriptor(runtimeRoot);
   const descriptorPath = getSlimclawDescriptorPath(workspaceRoot);
-  const entryPath = path.join(runtimeRoot, descriptor.paths.entryPath);
-  const binPath = path.join(runtimeRoot, descriptor.paths.binPath);
-  const builtinExtensionsDir = path.join(
-    runtimeRoot,
-    descriptor.paths.builtinExtensionsDir,
-  );
-
-  writeDescriptorFile(descriptorPath, descriptor);
+  const { entryPath, binPath, builtinExtensionsDir } =
+    resolveSlimclawRuntimeArtifacts(runtimeRoot, {
+      requirePrepared: options.requirePrepared,
+    });
 
   if (options.requirePrepared ?? true) {
-    const requiredPaths: Array<[string, string]> = [
-      ["entry", entryPath],
-      ["bin", binPath],
-      ["builtinExtensionsDir", builtinExtensionsDir],
-    ];
-    const missingPaths = requiredPaths.filter((entry) => !existsSync(entry[1]));
-
-    if (missingPaths.length > 0) {
-      const missingSummary = missingPaths
-        .map(([label, targetPath]) => `${label}: ${targetPath}`)
-        .join(", ");
-      throw new Error(
-        `Slimclaw runtime is not prepared. Missing ${missingSummary}. Run pnpm openclaw-runtime:install first.`,
-      );
-    }
+    writeDescriptorFile(descriptorPath, descriptor);
   }
 
   return {
@@ -170,4 +231,21 @@ export function resolveSlimclawRuntimePaths(
     descriptorPath,
     descriptor,
   };
+}
+
+export async function prepareSlimclawRuntimeStage(
+  options: PrepareSlimclawRuntimeStageOptions,
+): Promise<PrepareSlimclawRuntimeStageResult> {
+  const workspaceRoot = options.workspaceRoot ?? getDefaultWorkspaceRoot();
+  const runtimePaths = resolveSlimclawRuntimePaths({
+    workspaceRoot,
+    requirePrepared: true,
+  });
+
+  return prepareOpenclawRuntimeStage({
+    sourceOpenclawRoot: path.dirname(runtimePaths.entryPath),
+    patchRoot: getSlimclawRuntimePatchesRoot(workspaceRoot),
+    targetStageRoot: options.targetStageRoot,
+    log: options.log,
+  });
 }

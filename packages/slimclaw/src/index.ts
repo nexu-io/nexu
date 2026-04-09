@@ -1,8 +1,15 @@
 export {
+  prepareSlimclawRuntimeStage,
+  resolveSlimclawRuntimeArtifacts,
   getSlimclawDescriptorPath,
   getSlimclawRuntimeRoot,
+  getSlimclawRuntimePatchesRoot,
   resolveSlimclawRuntimePaths,
+  type PrepareSlimclawRuntimeStageOptions,
+  type PrepareSlimclawRuntimeStageResult,
   type ResolveSlimclawRuntimePathsOptions,
+  type ResolveSlimclawRuntimeArtifactsOptions,
   type SlimclawRuntimeDescriptor,
+  type SlimclawRuntimeArtifactPaths,
   type SlimclawRuntimePaths,
 } from "./runtime-paths.js";

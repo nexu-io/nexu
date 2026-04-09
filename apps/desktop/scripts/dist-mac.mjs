@@ -13,6 +13,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSlimclawRuntimeRoot } from "@nexu/slimclaw";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -104,13 +105,14 @@ async function ensureExistingBuildArtifacts() {
 }
 
 async function ensureExistingRuntimeInstall() {
+  const runtimeRoot = getSlimclawRuntimeRoot(repoRoot);
   await Promise.all([
     ensureExistingPath(
-      resolve(repoRoot, "openclaw-runtime/node_modules"),
+      resolve(runtimeRoot, "node_modules"),
       "openclaw-runtime install",
     ),
     ensureExistingPath(
-      resolve(repoRoot, "openclaw-runtime/.postinstall-cache.json"),
+      resolve(runtimeRoot, ".postinstall-cache.json"),
       "openclaw-runtime cache",
     ),
   ]);
@@ -713,14 +715,14 @@ async function main() {
     timings,
   );
   await timedStep(
-    "install openclaw-runtime",
+    "prepare slimclaw runtime",
     async () => {
       if (shouldReuseExistingRuntimeInstall) {
         await ensureExistingRuntimeInstall();
-        console.log("[dist:mac] reusing existing openclaw-runtime install");
+        console.log("[dist:mac] reusing existing slimclaw runtime install");
         return;
       }
-      await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
+      await run("pnpm", ["--dir", repoRoot, "slimclaw:prepare"], {
         env,
       });
     },

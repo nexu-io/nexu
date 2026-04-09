@@ -128,5 +128,5 @@ if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
 
 await installOpenClawRuntime();
 await installWeixinRuntimePlugin();
-await buildSlimclaw();
 await buildDevUtils();
+await buildSlimclaw();

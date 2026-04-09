@@ -4,6 +4,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
+import {
+  resolveSlimclawRuntimeArtifacts,
+  resolveSlimclawRuntimePaths,
+} from "@nexu/slimclaw";
 import { getWorkspaceRoot } from "../../../shared/workspace-paths";
 import { ensurePackagedOpenclawSidecar } from "../../runtime/manifests";
 
@@ -254,29 +258,27 @@ export async function resolveLaunchdPaths(
       runtimeDir,
       nexuHome,
     );
+    const openclawArtifacts = resolveSlimclawRuntimeArtifacts(
+      openclawSidecarRoot,
+      { requirePrepared: false },
+    );
 
     return {
       nodePath,
       controllerEntryPath,
-      openclawPath: path.join(
-        openclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
+      openclawPath: openclawArtifacts.entryPath,
       controllerCwd: controllerRoot,
       openclawCwd: openclawSidecarRoot,
-      openclawBinPath: path.join(openclawSidecarRoot, "bin", "openclaw"),
-      openclawExtensionsDir: path.join(
-        openclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "extensions",
-      ),
+      openclawBinPath: openclawArtifacts.binPath,
+      openclawExtensionsDir: openclawArtifacts.builtinExtensionsDir,
     };
   }
 
   const repoRoot = getWorkspaceRoot();
+  const slimclawRuntimePaths = resolveSlimclawRuntimePaths({
+    workspaceRoot: repoRoot,
+    requirePrepared: false,
+  });
   return {
     nodePath: process.execPath,
     controllerEntryPath: path.join(
@@ -286,31 +288,10 @@ export async function resolveLaunchdPaths(
       "dist",
       "index.js",
     ),
-    openclawPath: path.join(
-      repoRoot,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    ),
+    openclawPath: slimclawRuntimePaths.entryPath,
     controllerCwd: path.join(repoRoot, "apps", "controller"),
-    openclawCwd: repoRoot,
-    openclawBinPath: path.join(
-      repoRoot,
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "bin",
-      "openclaw",
-    ),
-    openclawExtensionsDir: path.join(
-      repoRoot,
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "node_modules",
-      "openclaw",
-      "extensions",
-    ),
+    openclawCwd: slimclawRuntimePaths.runtimeRoot,
+    openclawBinPath: slimclawRuntimePaths.binPath,
+    openclawExtensionsDir: slimclawRuntimePaths.builtinExtensionsDir,
   };
 }

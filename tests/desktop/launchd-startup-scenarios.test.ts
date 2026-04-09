@@ -158,7 +158,7 @@ function makeBootstrapEnv(
     openclawConfigPath: "/tmp/state/openclaw.json",
     openclawStateDir: "/tmp/state",
     controllerCwd: "/repo/apps/controller",
-    openclawCwd: "/repo",
+    openclawCwd: "/repo/openclaw-runtime",
     nexuHome: "/tmp/nexu-home",
     plistDir: "/tmp/test-plist",
     webUrl: "http://127.0.0.1:50810",
@@ -166,7 +166,8 @@ function makeBootstrapEnv(
     skillhubStaticSkillsDir: "/repo/apps/desktop/static/bundled-skills",
     platformTemplatesDir: "/repo/apps/controller/static/platform-templates",
     openclawBinPath: "/repo/openclaw-runtime/bin/openclaw",
-    openclawExtensionsDir: "/repo/node_modules/openclaw/extensions",
+    openclawExtensionsDir:
+      "/repo/openclaw-runtime/node_modules/openclaw/extensions",
     skillNodePath: "/repo/apps/desktop/node_modules",
     openclawTmpDir: "/tmp/state/tmp",
     proxyEnv: {

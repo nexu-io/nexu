@@ -15,6 +15,10 @@ import net, { createConnection } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
+import {
+  resolveSlimclawRuntimeArtifacts,
+  resolveSlimclawRuntimePaths,
+} from "@nexu/slimclaw";
 
 const execFileAsync = promisify(execFile);
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
@@ -2189,32 +2193,30 @@ export async function resolveLaunchdPaths(
       runtimeDir,
       nexuHome,
     );
+    const openclawArtifacts = resolveSlimclawRuntimeArtifacts(
+      openclawSidecarRoot,
+      { requirePrepared: false },
+    );
 
     return {
       nodePath,
       controllerEntryPath,
-      openclawPath: path.join(
-        openclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
+      openclawPath: openclawArtifacts.entryPath,
       // Use nexuHome as cwd instead of .app paths so launchd services
       // don't hold directory file-descriptors inside the bundle.
       controllerCwd: controllerRoot,
       openclawCwd: openclawSidecarRoot,
-      openclawBinPath: path.join(openclawSidecarRoot, "bin", "openclaw"),
-      openclawExtensionsDir: path.join(
-        openclawSidecarRoot,
-        "node_modules",
-        "openclaw",
-        "extensions",
-      ),
+      openclawBinPath: openclawArtifacts.binPath,
+      openclawExtensionsDir: openclawArtifacts.builtinExtensionsDir,
     };
   }
 
   // Development: use local paths
   const repoRoot = getWorkspaceRoot();
+  const slimclawRuntimePaths = resolveSlimclawRuntimePaths({
+    workspaceRoot: repoRoot,
+    requirePrepared: false,
+  });
   return {
     nodePath: process.execPath,
     controllerEntryPath: path.join(
@@ -2224,31 +2226,10 @@ export async function resolveLaunchdPaths(
       "dist",
       "index.js",
     ),
-    openclawPath: path.join(
-      repoRoot,
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-      "openclaw.mjs",
-    ),
+    openclawPath: slimclawRuntimePaths.entryPath,
     controllerCwd: path.join(repoRoot, "apps", "controller"),
-    openclawCwd: repoRoot,
-    openclawBinPath: path.join(
-      repoRoot,
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "bin",
-      "openclaw",
-    ),
-    openclawExtensionsDir: path.join(
-      repoRoot,
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "node_modules",
-      "openclaw",
-      "extensions",
-    ),
+    openclawCwd: slimclawRuntimePaths.runtimeRoot,
+    openclawBinPath: slimclawRuntimePaths.binPath,
+    openclawExtensionsDir: slimclawRuntimePaths.builtinExtensionsDir,
   };
 }
