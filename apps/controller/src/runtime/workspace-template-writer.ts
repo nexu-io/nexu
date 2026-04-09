@@ -16,7 +16,10 @@ export class WorkspaceTemplateWriter {
     const sourceDir = this.env.platformTemplatesDir;
 
     if (!sourceDir) {
-      logger.debug({}, "platformTemplatesDir not configured, skipping");
+      logger.warn(
+        {},
+        "platformTemplatesDir not configured; new agents will be created without platform docs (AGENTS.md, BOOTSTRAP.md, ...)",
+      );
       return;
     }
 

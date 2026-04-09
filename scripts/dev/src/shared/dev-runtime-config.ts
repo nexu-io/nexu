@@ -198,6 +198,13 @@ export function createControllerInjectedEnv(): NodeJS.ProcessEnv {
     OPENCLAW_EXTENSIONS_DIR: config.openclawBuiltinExtensionsDir,
     OPENCLAW_GATEWAY_PORT: String(config.openclawPort),
     OPENCLAW_GATEWAY_TOKEN: config.openclawGatewayToken,
+    PLATFORM_TEMPLATES_DIR: join(
+      repoRootPath,
+      "apps",
+      "controller",
+      "static",
+      "platform-templates",
+    ),
   };
 }
 
