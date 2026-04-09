@@ -131,6 +131,11 @@ const mocks = vi.hoisted(() => {
     skipped: [] as string[],
   }));
 
+  const mockReplaceLibtvVideoFromBundle = vi.fn(() => ({
+    installed: false as boolean,
+    reason: "bundle-missing" as "bundle-missing" | "fresh-install" | "replaced",
+  }));
+
   return {
     mockSkillDbCreate,
     catalogManagerInstances,
@@ -140,6 +145,7 @@ const mocks = vi.hoisted(() => {
     dirWatcherInstances,
     MockSkillDirWatcher,
     mockCopyStaticSkills,
+    mockReplaceLibtvVideoFromBundle,
   };
 });
 
@@ -163,6 +169,7 @@ vi.mock("../src/services/skillhub/skill-dir-watcher.js", () => ({
 
 vi.mock("../src/services/skillhub/curated-skills.js", () => ({
   copyStaticSkills: mocks.mockCopyStaticSkills,
+  replaceLibtvVideoFromBundle: mocks.mockReplaceLibtvVideoFromBundle,
 }));
 
 import { SkillhubService } from "../src/services/skillhub-service.js";
