@@ -180,7 +180,35 @@ export class CatalogManager {
 
       rmSync(extractDir, { recursive: true, force: true });
       mkdirSync(extractDir, { recursive: true });
-      await execFileAsync("tar", ["-xzf", archivePath, "-C", extractDir]);
+      // tar on Windows quirks (only GNU tar — Git Bash's tar.exe — which
+      // commonly precedes the system bsdtar in PATH):
+      //  1. Parses a leading `C:` as a remote rsh `host:path` spec and
+      //     dies with "Cannot connect to C: resolve failed". `--force-local`
+      //     disables that. bsdtar (macOS / Windows System32) does not
+      //     accept `--force-local`, so the flag is Windows-only.
+      //  2. GNU tar also chokes on backslashes inside paths (treats `\n`
+      //     etc. as escape sequences). Forward-slash paths work for both
+      //     GNU tar and bsdtar everywhere, so normalizing is harmless and
+      //     applied unconditionally.
+      const toPosixPath = (p: string): string => p.replace(/\\/g, "/");
+      const baseTarArgs = [
+        "-xzf",
+        toPosixPath(archivePath),
+        "-C",
+        toPosixPath(extractDir),
+      ];
+      if (process.platform === "win32") {
+        // Try with --force-local first (GNU tar needs it for `C:` paths).
+        // Fall back without it for bsdtar (System32\tar.exe) which rejects
+        // the flag.
+        try {
+          await execFileAsync("tar", ["--force-local", ...baseTarArgs]);
+        } catch {
+          await execFileAsync("tar", baseTarArgs);
+        }
+      } else {
+        await execFileAsync("tar", baseTarArgs);
+      }
 
       const skills = this.buildMinimalCatalog(extractDir);
       writeFileSync(this.tempCatalogPath, JSON.stringify(skills), "utf8");

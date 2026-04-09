@@ -233,14 +233,21 @@ export class SessionsRuntime {
                   qqbotDisplayNames?.groupName ?? hints.groupName,
                   "group",
                 )
-              : hints.groupName;
+              : channelType === "openclaw-weixin"
+                ? undefined
+                : hints.groupName;
           const normalizedSenderName =
             channelType === "qqbot"
               ? normalizeQqbotDisplayName(
                   qqbotDisplayNames?.senderName ?? hints.senderName,
                   "user",
                 )
-              : hints.senderName;
+              : channelType === "openclaw-weixin"
+                ? // WeChat protocol exposes only an opaque @im.wechat id;
+                  // skip the per-sender title and fall through to the
+                  // generic "WeChat ClawBot" fallback below.
+                  undefined
+                : hints.senderName;
           if (this.shouldReplaceInferredTitle(title, sessionKey)) {
             if (normalizedGroupName) {
               title =
@@ -1225,7 +1232,10 @@ export class SessionsRuntime {
     }
 
     return (
-      normalized === sessionKey || UUID_LIKE_TITLE_PATTERN.test(normalized)
+      normalized === sessionKey ||
+      UUID_LIKE_TITLE_PATTERN.test(normalized) ||
+      // Heal sessions whose persisted title is the raw opaque wechat id.
+      normalized.endsWith("@im.wechat")
     );
   }
 

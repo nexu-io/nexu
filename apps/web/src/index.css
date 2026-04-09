@@ -331,12 +331,12 @@
 }
 
 .nav-item:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--color-surface-2);
   color: var(--color-text-primary);
 }
 
 .nav-item-active {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--color-surface-2);
   color: var(--color-text-primary);
   font-weight: 600;
 }

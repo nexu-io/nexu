@@ -13,10 +13,12 @@ type ScriptsDevRuntimeConfig = {
   openclawPort: number;
   desktopDevHost: string;
   desktopDevPort: number;
+  desktopInspectPort: number;
   controllerUrl: string;
   webUrl: string;
   openclawBaseUrl: string;
   desktopDevServerUrl: string;
+  desktopInspectUrl: string;
   nexuHomeDir: string;
   openclawStateDir: string;
   openclawConfigPath: string;
@@ -109,6 +111,10 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
   const openclawPort = readNumber(mergedEnv.NEXU_DEV_OPENCLAW_PORT, 18789);
   const desktopDevHost = mergedEnv.NEXU_DEV_DESKTOP_HOST ?? "127.0.0.1";
   const desktopDevPort = readNumber(mergedEnv.NEXU_DEV_DESKTOP_PORT, 5180);
+  const desktopInspectPort = readNumber(
+    mergedEnv.NEXU_DEV_DESKTOP_INSPECT_PORT,
+    5181,
+  );
   const nexuHomeDir = resolvePath(
     mergedEnv.NEXU_DEV_NEXU_HOME_DIR,
     join(devTmpPath, "nexu-home"),
@@ -148,6 +154,7 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     openclawPort,
     desktopDevHost,
     desktopDevPort,
+    desktopInspectPort,
     controllerUrl:
       mergedEnv.NEXU_DEV_CONTROLLER_URL ??
       `http://127.0.0.1:${String(controllerPort)}`,
@@ -158,6 +165,9 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
     desktopDevServerUrl:
       mergedEnv.NEXU_DEV_DESKTOP_SERVER_URL ??
       `http://${desktopDevHost}:${String(desktopDevPort)}`,
+    desktopInspectUrl:
+      mergedEnv.NEXU_DEV_DESKTOP_INSPECT_URL ??
+      `http://${desktopDevHost}:${String(desktopInspectPort)}`,
     nexuHomeDir,
     openclawStateDir,
     openclawConfigPath,
@@ -188,6 +198,13 @@ export function createControllerInjectedEnv(): NodeJS.ProcessEnv {
     OPENCLAW_EXTENSIONS_DIR: config.openclawBuiltinExtensionsDir,
     OPENCLAW_GATEWAY_PORT: String(config.openclawPort),
     OPENCLAW_GATEWAY_TOKEN: config.openclawGatewayToken,
+    PLATFORM_TEMPLATES_DIR: join(
+      repoRootPath,
+      "apps",
+      "controller",
+      "static",
+      "platform-templates",
+    ),
   };
 }
 
@@ -228,6 +245,8 @@ export function createDesktopInjectedEnv(): NodeJS.ProcessEnv {
     NEXU_DESKTOP_DEV_HOST: config.desktopDevHost,
     NEXU_DESKTOP_DEV_PORT: String(config.desktopDevPort),
     NEXU_DESKTOP_DEV_SERVER_URL: config.desktopDevServerUrl,
+    NEXU_DESKTOP_DEV_INSPECT_HOST: config.desktopDevHost,
+    NEXU_DESKTOP_DEV_INSPECT_PORT: String(config.desktopInspectPort),
     NEXU_DESKTOP_DEV_API_ORIGIN: config.controllerUrl,
     NEXU_HOME: config.nexuHomeDir,
   };

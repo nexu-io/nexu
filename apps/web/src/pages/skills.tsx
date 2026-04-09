@@ -26,7 +26,16 @@ import type {
   MinimalSkill,
   SkillSource,
 } from "@/types/desktop";
-import { Compass, Loader2, Plus, Search, Settings2, Zap } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  Loader2,
+  Plus,
+  Search,
+  Settings2,
+  Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
@@ -298,6 +307,18 @@ export function SkillsPage() {
       hasOverflow && el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
     );
     setShowPillFadeLeft(hasOverflow && el.scrollLeft > 2);
+  }, []);
+
+  const scrollPillBy = useCallback((direction: "left" | "right") => {
+    const el = pillScrollRef.current;
+    if (!el) return;
+    // Scroll roughly 80% of the visible width so the user always sees a
+    // bit of the previously-visible pills as a hint of continuity.
+    const delta = el.clientWidth * 0.8;
+    el.scrollBy({
+      left: direction === "left" ? -delta : delta,
+      behavior: "smooth",
+    });
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: topTab triggers re-check on tab switch
@@ -834,10 +855,30 @@ export function SkillsPage() {
               })}
             </div>
             {showPillFadeLeft && (
-              <div className="pointer-events-none absolute top-0 left-0 bottom-0 w-12 bg-gradient-to-r from-[var(--color-surface-0)] to-transparent z-[1]" />
+              <>
+                <div className="pointer-events-none absolute top-0 left-0 bottom-0 w-12 bg-gradient-to-r from-[var(--color-surface-0)] to-transparent z-[1]" />
+                <button
+                  type="button"
+                  aria-label="Scroll categories left"
+                  onClick={() => scrollPillBy("left")}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-[2] flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface-1/95 text-text-secondary shadow-sm backdrop-blur transition-colors hover:text-text-primary hover:border-border-hover cursor-pointer"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              </>
             )}
             {showPillFade && (
-              <div className="pointer-events-none absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-[var(--color-surface-0)] to-transparent z-[1]" />
+              <>
+                <div className="pointer-events-none absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-[var(--color-surface-0)] to-transparent z-[1]" />
+                <button
+                  type="button"
+                  aria-label="Scroll categories right"
+                  onClick={() => scrollPillBy("right")}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[2] flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface-1/95 text-text-secondary shadow-sm backdrop-blur transition-colors hover:text-text-primary hover:border-border-hover cursor-pointer"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </>
             )}
           </div>
         )}

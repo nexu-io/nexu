@@ -1,11 +1,13 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
+import { useAutoUpdate } from "@/hooks/use-auto-update";
 import {
   syncDesktopCloudQueries,
   useDesktopCloudStatus,
 } from "@/hooks/use-desktop-cloud-status";
 import { useGitHubStars } from "@/hooks/use-github-stars";
+import { useLocale } from "@/hooks/use-locale";
+import { authClient } from "@/lib/auth-client";
 import {
   openExternalUrl,
   openLocalFolderUrl,
@@ -25,15 +27,19 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
-  Camera,
   Check,
+  ChevronDown,
   ExternalLink,
   FolderOpen,
+  Globe,
+  Info,
   Loader2,
   LogIn,
-  Pencil,
+  Monitor,
   RefreshCw,
+  Shield,
   Trash2,
+  User,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -51,7 +57,6 @@ import {
   getApiV1ModelProvidersMinimaxOauthStatus,
   getApiV1ModelProvidersRegistry,
   getApiV1Models,
-  patchApiV1Me,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
   postApiInternalDesktopCloudRefresh,
@@ -67,6 +72,16 @@ import type {
   PostApiV1ModelProvidersByProviderIdValidateData,
   PutApiV1ModelProvidersConfigData,
 } from "../../lib/api/types.gen";
+import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
 import { markSetupComplete } from "./welcome";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -186,7 +201,26 @@ type ModelsHostInvokeBridge = {
       channel: "shell:open-external",
       payload: { url: string },
     ): Promise<{ ok: boolean }>;
+    (
+      channel: "update:get-current-version",
+      payload: undefined,
+    ): Promise<{ version: string }>;
+    (
+      channel: "desktop:get-shell-preferences",
+      payload: undefined,
+    ): Promise<DesktopShellPreferences>;
+    (
+      channel: "desktop:update-shell-preferences",
+      payload: { launchAtLogin?: boolean; showInDock?: boolean },
+    ): Promise<DesktopShellPreferences>;
   };
+};
+
+type DesktopShellPreferences = {
+  launchAtLogin: boolean;
+  showInDock: boolean;
+  supportsLaunchAtLogin: boolean;
+  supportsShowInDock: boolean;
 };
 
 function getModelsHostInvokeBridge(): ModelsHostInvokeBridge | null {
@@ -501,12 +535,23 @@ function createCustomProviderDraft(id: string): CustomProviderDraft {
 
 function _GeneralSettings() {
   const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const { locale, setLocale } = useLocale();
+  const update = useAutoUpdate();
   const queryClient = useQueryClient();
-  const [draftName, setDraftName] = useState("");
-  const [draftImage, setDraftImage] = useState<string | null>(null);
-  const [isEditingName, setIsEditingName] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [crashReportsEnabled, setCrashReportsEnabled] = useState(true);
+  const hostBridge = getModelsHostInvokeBridge();
+  const { data: desktopCloudStatus } = useDesktopCloudStatus();
+  const isWindowsPlatform =
+    typeof navigator !== "undefined" &&
+    navigator.userAgent.toLowerCase().includes("windows");
+  const showInShellLabel = isWindowsPlatform
+    ? t("settings.desktop.showInTaskbar")
+    : t("settings.desktop.showInDock");
+  const showInShellHint = isWindowsPlatform
+    ? t("settings.desktop.showInTaskbarHint")
+    : t("settings.desktop.showInDockHint");
 
   const { data: profile } = useQuery({
     queryKey: ["me"],
@@ -516,184 +561,462 @@ function _GeneralSettings() {
     },
   });
 
-  useEffect(() => {
-    setDraftName(profile?.name ?? "");
-    setDraftImage(profile?.image ?? null);
-  }, [profile?.image, profile?.name]);
-
-  useEffect(() => {
-    if (isEditingName) {
-      nameInputRef.current?.focus();
-    }
-  }, [isEditingName]);
-
-  const saveProfile = useMutation({
-    mutationFn: async (input: { name: string; image: string | null }) => {
-      const { data, error } = await patchApiV1Me({
-        body: {
-          name: input.name,
-          image: input.image,
-        },
-      });
-      if (error) {
-        throw new Error("Failed to update profile");
+  const { data: shellPreferences } = useQuery({
+    queryKey: ["desktop-shell-preferences"],
+    queryFn: async () => {
+      if (!hostBridge) {
+        return null;
       }
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["me"] });
-      toast.success(t("settings.general.saved"));
-      setIsEditingName(false);
-    },
-    onError: () => {
-      toast.error(t("settings.general.saveFailed"));
+
+      return hostBridge.invoke("desktop:get-shell-preferences", undefined);
     },
   });
 
-  const persistProfile = (name: string, image: string | null) => {
-    if (!name.trim()) {
-      toast.error(t("settings.general.nameRequired"));
+  const updateShellPreferences = useMutation({
+    mutationFn: async (input: {
+      launchAtLogin?: boolean;
+      showInDock?: boolean;
+    }) => {
+      if (!hostBridge) {
+        throw new Error("Desktop host bridge is unavailable.");
+      }
+
+      return hostBridge.invoke("desktop:update-shell-preferences", input);
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["desktop-shell-preferences"], data);
+    },
+    onError: () => {
+      toast.error(t("settings.desktop.updateFailed"));
+    },
+  });
+
+  useEffect(() => {
+    const hostBridge = getModelsHostInvokeBridge();
+    if (!hostBridge) {
       return;
     }
 
-    saveProfile.mutate({ name: name.trim(), image });
-  };
+    let cancelled = false;
+    void hostBridge
+      .invoke("update:get-current-version", undefined)
+      .then((result) => {
+        if (!cancelled) {
+          setAppVersion(result.version);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAppVersion(null);
+        }
+      });
 
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > 1024 * 1024) {
-      toast.error(t("settings.general.avatarTooLarge"));
-      event.target.value = "";
-      return;
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const displayEmail = desktopCloudStatus?.userEmail ?? profile?.email ?? "—";
+  const initials = (
+    desktopCloudStatus?.userEmail?.[0] ??
+    profile?.email?.[0] ??
+    profile?.name?.[0] ??
+    "U"
+  ).toUpperCase();
+  const updateAction = (() => {
+    switch (update.phase) {
+      case "checking":
+        return {
+          label: t("settings.updates.checking"),
+          onClick: () => void update.check(),
+          disabled: true,
+        };
+      case "available":
+        return {
+          label: t("layout.update.download"),
+          onClick: () => void update.download(),
+          disabled: false,
+        };
+      case "downloading":
+        return {
+          label: t("settings.updates.downloading", {
+            percent: Math.round(update.percent),
+          }),
+          onClick: () => void update.download(),
+          disabled: true,
+        };
+      case "installing":
+        return {
+          label: t("layout.update.installing"),
+          onClick: () => void update.install(),
+          disabled: true,
+        };
+      case "ready":
+        return {
+          label: t("layout.update.install"),
+          onClick: () => void update.install(),
+          disabled: false,
+        };
+      case "error":
+        return {
+          label: t("settings.updates.retry"),
+          onClick: () => void update.check(),
+          disabled: false,
+        };
+      default:
+        return {
+          label: t("settings.updates.checkNow"),
+          onClick: () => void update.check(),
+          disabled: false,
+        };
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const nextImage =
-        typeof reader.result === "string" ? reader.result : null;
-      const nextName = (draftName.trim() || profile?.name || "").trim();
-      setDraftImage(nextImage);
-      persistProfile(nextName, nextImage);
-    };
-    reader.onerror = () => {
-      toast.error(t("settings.general.avatarReadFailed"));
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
+  })();
+  const updateStatusText = (() => {
+    switch (update.phase) {
+      case "checking":
+        return t("settings.updates.checkingHint");
+      case "available":
+        return t("layout.update.available", {
+          version: update.version ?? appVersion ?? "",
+        });
+      case "downloading":
+        return t("settings.updates.downloadingHint", {
+          percent: Math.round(update.percent),
+        });
+      case "installing":
+        return t("layout.update.installing");
+      case "ready":
+        return t("layout.update.readyToInstall");
+      case "error":
+        return update.errorMessage ?? t("settings.updates.error");
+      default:
+        return appVersion ? null : t("settings.updates.versionUnknown");
+    }
+  })();
+  const handleLogout = async () => {
+    await authClient.signOut();
+    window.location.href = "/";
   };
-
-  const handleSave = () => {
-    persistProfile(draftName, draftImage);
-  };
-
-  const currentName = draftName.trim() || profile?.name || "User";
-  const initials = currentName[0]?.toUpperCase() ?? "U";
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div className="overflow-visible rounded-2xl border border-border bg-surface-1">
-        <div className="px-5 pb-1 pt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
-            {t("settings.general.account")}
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
+        <div className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <User size={14} className="text-text-secondary" />
+            <div className="text-[13px] font-semibold text-text-primary">
+              {t("settings.general.account")}
+            </div>
           </div>
         </div>
-
-        <div className="flex items-center justify-between gap-4 px-5 py-3">
-          <div className="text-[13px] text-text-primary">
-            {t("settings.general.avatar")}
-          </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-lg"
-          >
-            {draftImage ? (
-              <img
-                src={draftImage}
-                alt={currentName}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center rounded-lg bg-surface-3 text-[13px] font-semibold text-text-secondary">
-                {initials}
+        <div className="flex items-center justify-between gap-4 px-5 py-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white text-[12px] font-semibold text-text-primary">
+              {profile?.image ? (
+                <img
+                  src={profile.image}
+                  alt={profile.name ?? profile.email ?? "User"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] font-medium text-text-primary">
+                {displayEmail}
               </div>
-            )}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-              <Camera size={14} className="text-white" />
+              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                {t("settings.general.emailHint")}
+              </div>
             </div>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            onChange={handleAvatarChange}
-            className="hidden"
-          />
-        </div>
-
-        <div className="mx-5 border-t border-border-subtle" />
-
-        <div className="flex items-center justify-between gap-4 px-5 py-3">
-          <div className="text-[13px] text-text-primary">
-            {t("settings.general.fullName")}
           </div>
-          {isEditingName ? (
-            <div className="flex items-center gap-2">
-              <input
-                ref={nameInputRef}
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") handleSave();
-                  if (event.key === "Escape") {
-                    setDraftName(profile?.name ?? "");
-                    setIsEditingName(false);
-                  }
-                }}
-                className="w-32 rounded-lg border border-border bg-surface-0 px-3 py-1 text-[13px] text-text-primary outline-none transition focus:ring-2 focus:ring-[var(--color-brand-primary)]/20"
-              />
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saveProfile.isPending}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleLogout()}
+          >
+            {t("layout.signOut")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
+        <div className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Globe size={14} className="text-text-secondary" />
+            <div className="text-[13px] font-semibold text-text-primary">
+              {t("settings.general.language")}
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium text-text-primary">
+                {t("settings.general.language")}
+              </div>
+              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                {t("settings.general.languageHint")}
+              </div>
+            </div>
+            <div className="w-full md:w-[220px] md:shrink-0">
+              <Select
+                value={locale}
+                onValueChange={(value) => setLocale(value as "en" | "zh")}
               >
-                {saveProfile.isPending ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <Check size={13} />
-                )}
-              </button>
+                <SelectTrigger className="h-11 w-full rounded-xl border-border bg-surface-0 px-4 text-[13px] font-medium text-text-primary shadow-none hover:bg-surface-1">
+                  <SelectValue>
+                    {locale === "zh" ? "中文" : "English"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  align="end"
+                  className="rounded-2xl border-border bg-surface-0 text-text-primary shadow-[0_12px_32px_rgba(0,0,0,0.08)]"
+                >
+                  <SelectItem
+                    value="zh"
+                    className="rounded-xl px-4 py-2 text-[13px] text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
+                  >
+                    中文
+                  </SelectItem>
+                  <SelectItem
+                    value="en"
+                    className="rounded-xl px-4 py-2 text-[13px] text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
+                  >
+                    English
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <button
+          </div>
+        </div>
+      </div>
+
+      {shellPreferences &&
+      (shellPreferences.supportsLaunchAtLogin ||
+        shellPreferences.supportsShowInDock) ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Monitor size={14} className="text-text-secondary" />
+              <div className="text-[13px] font-semibold text-text-primary">
+                {t("settings.section.desktop")}
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-border">
+            {shellPreferences.supportsLaunchAtLogin ? (
+              <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-medium text-text-primary">
+                    {t("settings.desktop.launchAtLogin")}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-text-tertiary">
+                    {t("settings.desktop.launchAtLoginHint")}
+                  </div>
+                </div>
+                <Switch
+                  checked={shellPreferences.launchAtLogin}
+                  disabled={updateShellPreferences.isPending}
+                  onCheckedChange={(checked) => {
+                    void updateShellPreferences.mutateAsync({
+                      launchAtLogin: checked,
+                    });
+                  }}
+                />
+              </div>
+            ) : null}
+
+            {shellPreferences.supportsShowInDock ? (
+              <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-medium text-text-primary">
+                    {showInShellLabel}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-text-tertiary">
+                    {showInShellHint}
+                  </div>
+                </div>
+                <Switch
+                  checked={shellPreferences.showInDock}
+                  disabled={updateShellPreferences.isPending}
+                  onCheckedChange={(checked) => {
+                    void updateShellPreferences.mutateAsync({
+                      showInDock: checked,
+                    });
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
+        <div className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Shield size={14} className="text-text-secondary" />
+            <div className="text-[13px] font-semibold text-text-primary">
+              {t("settings.section.data")}
+            </div>
+          </div>
+        </div>
+        <div className="divide-y divide-border">
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium text-text-primary">
+                {t("settings.data.analytics")}
+              </div>
+              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                {t("settings.data.analyticsHint")}
+              </div>
+            </div>
+            <Switch
+              checked={analyticsEnabled}
+              onCheckedChange={setAnalyticsEnabled}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium text-text-primary">
+                {t("settings.data.crashReports")}
+              </div>
+              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                {t("settings.data.crashReportsHint")}
+              </div>
+            </div>
+            <Switch
+              checked={crashReportsEnabled}
+              onCheckedChange={setCrashReportsEnabled}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
+        <div className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <RefreshCw size={14} className="text-text-secondary" />
+            <div className="text-[13px] font-semibold text-text-primary">
+              {t("settings.section.updates")}
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium text-text-primary">
+                {t("settings.updates.version")}
+              </div>
+              <div className="mt-0.5 text-[11px] text-text-tertiary">
+                {appVersion ?? "—"}
+              </div>
+              {updateStatusText ? (
+                <div
+                  className={cn(
+                    "mt-2 text-[11px]",
+                    update.phase === "error"
+                      ? "text-[var(--color-danger)]"
+                      : "text-text-tertiary",
+                  )}
+                >
+                  {updateStatusText}
+                </div>
+              ) : null}
+              {(update.phase === "downloading" ||
+                update.phase === "installing") && (
+                <div className="mt-3 h-1.5 w-full max-w-[240px] overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-[var(--color-brand-primary)] transition-all duration-300 ease-out"
+                    style={{
+                      width:
+                        update.phase === "installing"
+                          ? "100%"
+                          : `${Math.round(update.percent)}%`,
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <Button
               type="button"
-              onClick={() => setIsEditingName(true)}
-              className="group inline-flex items-center gap-2 text-[13px] text-text-primary transition-colors hover:text-accent"
+              variant="outline"
+              size="sm"
+              disabled={updateAction.disabled}
+              onClick={updateAction.onClick}
             >
-              <span>{currentName}</span>
-              <Pencil
-                size={12}
-                className="text-text-tertiary opacity-0 transition-opacity group-hover:opacity-100"
+              {update.phase === "checking" ||
+              update.phase === "downloading" ||
+              update.phase === "installing" ? (
+                <Loader2 className="animate-spin" />
+              ) : null}
+              {updateAction.label}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
+        <div className="border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Info size={14} className="text-text-secondary" />
+            <div className="text-[13px] font-semibold text-text-primary">
+              {t("settings.section.about")}
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-accent/10 to-accent/5">
+              <img
+                src="/brand/logo-black-1.svg"
+                alt="nexu"
+                className="h-6 w-6 object-contain"
               />
-            </button>
-          )}
-        </div>
-
-        <div className="mx-5 border-t border-border-subtle" />
-
-        <div className="px-5 pb-1 pt-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
-            {t("settings.general.preferences")}
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-text-primary">
+                nexu
+              </div>
+              <div className="text-[11px] text-text-tertiary">
+                {appVersion ?? "Desktop client"}
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 px-5 py-3 pb-4">
-          <div className="text-[13px] text-text-primary">
-            {t("settings.general.language")}
+          <div className="space-y-1">
+            {[
+              { label: t("settings.about.docs"), url: "https://docs.nexu.io" },
+              {
+                label: t("settings.about.github"),
+                url: "https://github.com/nexu-io/nexu",
+              },
+              {
+                label: t("settings.about.changelog"),
+                url: "https://github.com/nexu-io/nexu/releases",
+              },
+              {
+                label: t("settings.about.feedback"),
+                url: "https://github.com/nexu-io/nexu/issues/new",
+              },
+            ].map((link) => (
+              <button
+                key={link.label}
+                type="button"
+                onClick={() => void openExternalUrl(link.url)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-[12px] font-medium text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary"
+              >
+                <ExternalLink size={13} className="shrink-0 text-text-muted" />
+                {link.label}
+                <ArrowUpRight
+                  size={10}
+                  className="ml-auto shrink-0 text-text-muted"
+                />
+              </button>
+            ))}
           </div>
-          <LanguageSwitcher variant="muted" size="xs" />
         </div>
       </div>
     </div>
@@ -764,26 +1087,29 @@ function AddCustomProviderDetail({
           >
             {t("models.customProvider.compatibility")}
           </label>
-          <select
-            id="custom-provider-template"
+          <Select
             value={draft.templateId}
-            onChange={(event) =>
+            onValueChange={(value) =>
               onChange({
                 ...draft,
-                templateId: event.target.value as CustomProviderTemplateId,
+                templateId: value as CustomProviderTemplateId,
               })
             }
-            className="w-full rounded-lg border border-border bg-surface-0 px-3 py-2 text-[12px] text-text-primary"
           >
-            {customTemplates.map((item) => (
-              <option key={item.id} value={item.id}>
-                {getCustomProviderTemplateLabel(
-                  item.id as CustomProviderTemplateId,
-                  t,
-                )}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="custom-provider-template" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {customTemplates.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {getCustomProviderTemplateLabel(
+                    item.id as CustomProviderTemplateId,
+                    t,
+                  )}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <label
@@ -880,7 +1206,7 @@ export function ModelsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupMode = searchParams.get("setup") === "1";
   const tabParam = searchParams.get("tab");
-  const _settingsTab = isSettingsTab(tabParam)
+  const settingsTab = isSettingsTab(tabParam)
     ? tabParam
     : isSetupMode
       ? "providers"
@@ -1257,7 +1583,7 @@ export function ModelsPage() {
     clearSetupParam();
   }, [clearSetupParam]);
 
-  const _changeSettingsTab = useCallback(
+  const changeSettingsTab = useCallback(
     (tab: SettingsTab) => {
       const next = new URLSearchParams(searchParams);
       next.set("tab", tab);
@@ -1296,246 +1622,331 @@ export function ModelsPage() {
         className="max-w-4xl mx-auto px-4 sm:px-6 pb-6 sm:pb-8"
         style={{ paddingTop: isDesktopClient ? "2rem" : "0.5rem" }}
       >
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="heading-page">{t("models.pageTitle")}</h2>
-            <p className="heading-page-desc">{t("models.pageSubtitle")}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <GitHubStarCta
-              label={t("home.starGithub")}
-              stars={starNexu}
-              variant="button"
-              onClick={() =>
-                track("workspace_github_click", { source: "settings" })
-              }
-            />
-            <button
-              type="button"
-              onClick={() => {
-                void handleOpenWorkspace();
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-[12px] font-medium text-text-primary hover:border-border-hover hover:bg-surface-1 transition-colors"
-            >
-              <FolderOpen size={13} />
-              Workspace
-            </button>
+        <div className="mb-6">
+          <PageHeader
+            title={t("models.pageTitle")}
+            description={t("models.pageSubtitle")}
+            actions={
+              <>
+                <GitHubStarCta
+                  label={t("home.starGithub")}
+                  stars={starNexu}
+                  variant="button"
+                  onClick={() =>
+                    track("workspace_github_click", { source: "settings" })
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void handleOpenWorkspace();
+                  }}
+                >
+                  <FolderOpen size={13} />
+                  {t("settings.providers.workspace")}
+                </Button>
+              </>
+            }
+          />
+
+          <div className="mt-4 flex items-center gap-0 border-b border-border">
+            {[
+              { id: "general" as SettingsTab, label: t("settings.tabGeneral") },
+              {
+                id: "providers" as SettingsTab,
+                label: t("settings.tabProviders"),
+              },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => changeSettingsTab(tab.id)}
+                className={cn(
+                  "relative px-4 py-2.5 text-[13px] font-medium transition-colors",
+                  settingsTab === tab.id
+                    ? "text-text-primary"
+                    : "text-text-muted hover:text-text-secondary",
+                )}
+              >
+                {tab.label}
+                {settingsTab === tab.id ? (
+                  <span className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full bg-accent" />
+                ) : null}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div>
-          {/* Provider sidebar + detail */}
-          <div
-            className="flex gap-0 rounded-xl border border-border bg-surface-1 overflow-hidden"
-            style={{ minHeight: 500 }}
-          >
-            {/* Left: Provider list */}
-            <div className="w-56 shrink-0 bg-surface-0 flex flex-col border-r border-border-subtle">
-              <div className="flex-1 overflow-y-auto p-2">
-                <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                  Providers
+        {settingsTab === "general" ? (
+          <_GeneralSettings />
+        ) : (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-surface-1 px-4 py-3.5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent/10 to-accent/5">
+                    <img
+                      src="/brand/logo-black-1.svg"
+                      alt="nexu"
+                      className="h-5 w-5 object-contain"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold text-text-primary">
+                      {t("settings.providers.botModelTitle")}
+                    </div>
+                    <div className="text-[11px] text-text-tertiary">
+                      {t("settings.providers.botModelDesc")}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  {sidebarItems.map((item) => {
-                    const isActive = activeProvider?.id === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedProviderId(item.id);
-                          clearSetupParam();
-                        }}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors",
-                          isActive ? "bg-surface-3" : "hover:bg-surface-2",
-                        )}
-                      >
-                        <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
-                          <ProviderLogo
-                            provider={item.registryEntry?.id ?? item.id}
-                            size={14}
-                          />
-                        </span>
-                        <span
-                          className={cn(
-                            "flex-1 text-[12px] truncate",
-                            isActive
-                              ? "font-semibold text-text-primary"
-                              : "font-medium text-text-primary",
-                          )}
-                        >
-                          {item.name}
-                        </span>
-                        {item.modelCount > 0 ? (
-                          <span className="text-[10px] text-text-muted">
-                            {item.modelCount}
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="border-t border-border-subtle p-3">
                 <button
                   type="button"
-                  onClick={handleAddCustomProvider}
-                  className={cn(
-                    "w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
-                    "border-border bg-surface-0 text-text-secondary hover:bg-surface-2 hover:text-text-primary",
-                  )}
+                  onClick={() => {
+                    if (activeProvider) {
+                      setSelectedProviderId(activeProvider.id);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-3 py-1.5 text-[12px] font-medium text-text-primary"
                 >
-                  <span className="text-[14px] leading-none">+</span>
-                  {t("models.customProvider.addButton")}
+                  {activeProvider ? (
+                    <>
+                      <ProviderLogo
+                        provider={
+                          activeProvider.registryEntry?.id ?? activeProvider.id
+                        }
+                        size={14}
+                      />
+                      {activeProvider.name}
+                    </>
+                  ) : (
+                    t("models.selectProvider")
+                  )}
+                  <ChevronDown size={13} className="text-text-muted" />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
-              {activeProvider ? (
-                activeProvider.managed ? (
-                  modelsLoading ? (
+            <div
+              className="flex gap-0 overflow-hidden rounded-xl border border-border bg-surface-1"
+              style={{ minHeight: 500 }}
+            >
+              {/* Left: Provider list */}
+              <div className="w-56 shrink-0 bg-surface-0 flex flex-col border-r border-border-subtle">
+                <div className="flex-1 overflow-y-auto p-2">
+                  <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
+                    {t("settings.tabProviders")}
+                  </div>
+                  <div className="space-y-1">
+                    {sidebarItems.map((item) => {
+                      const isActive = activeProvider?.id === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedProviderId(item.id);
+                            clearSetupParam();
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors",
+                            isActive ? "bg-surface-3" : "hover:bg-surface-2",
+                          )}
+                        >
+                          <span className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md bg-white border border-border-subtle">
+                            <ProviderLogo
+                              provider={item.registryEntry?.id ?? item.id}
+                              size={14}
+                            />
+                          </span>
+                          <span
+                            className={cn(
+                              "flex-1 text-[12px] truncate",
+                              isActive
+                                ? "font-semibold text-text-primary"
+                                : "font-medium text-text-primary",
+                            )}
+                          >
+                            {item.name}
+                          </span>
+                          {item.modelCount > 0 ? (
+                            <span className="text-[10px] text-text-muted">
+                              {item.modelCount}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-border-subtle p-3">
+                  <button
+                    type="button"
+                    onClick={handleAddCustomProvider}
+                    className={cn(
+                      "w-full inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                      "border-border bg-surface-0 text-text-secondary hover:bg-surface-2 hover:text-text-primary",
+                    )}
+                  >
+                    <span className="text-[14px] leading-none">+</span>
+                    {t("models.customProvider.addButton")}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5">
+                {activeProvider ? (
+                  activeProvider.managed ? (
+                    modelsLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-[13px] text-text-muted">
+                          {t("models.loading")}
+                        </div>
+                      </div>
+                    ) : modelsError ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <div className="text-[13px] text-red-500 mb-2">
+                            {t("models.loadFailed")}
+                          </div>
+                          <p className="text-[12px] text-text-muted mb-3">
+                            {t("models.loadFailedHint")}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              queryClient.invalidateQueries({
+                                queryKey: ["models"],
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
+                          >
+                            <RefreshCw size={12} />
+                            {t("models.retry")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <ManagedProviderDetail
+                        provider={
+                          providers.find((p) => p.id === activeProvider.id) ?? {
+                            id: activeProvider.id,
+                            name: activeProvider.name,
+                            description: "models.provider.nexu.description",
+                            managed: true,
+                            models: [],
+                          }
+                        }
+                        currentModelId={currentModelId}
+                        onSelectModel={(modelId) => updateModel.mutate(modelId)}
+                      />
+                    )
+                  ) : providerConfigDoc === undefined ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-[13px] text-text-muted">
                         {t("models.loading")}
                       </div>
                     </div>
-                  ) : modelsError ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <div className="text-[13px] text-red-500 mb-2">
-                          {t("models.loadFailed")}
-                        </div>
-                        <p className="text-[12px] text-text-muted mb-3">
-                          {t("models.loadFailedHint")}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            queryClient.invalidateQueries({
-                              queryKey: ["models"],
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium bg-surface-2 hover:bg-surface-3 text-text-primary transition-colors"
-                        >
-                          <RefreshCw size={12} />
-                          {t("models.retry")}
-                        </button>
-                      </div>
-                    </div>
+                  ) : activeProvider.kind === "custom-draft" ? (
+                    activeCustomProviderDraft ? (
+                      <AddCustomProviderDetail
+                        draft={activeCustomProviderDraft}
+                        customTemplates={Array.from(
+                          customTemplateRegistryMap.values(),
+                        )}
+                        onChange={(draft) => {
+                          setCustomProviderDrafts((previous) =>
+                            previous.map((item) =>
+                              item.id === draft.id ? draft : item,
+                            ),
+                          );
+                        }}
+                        onCreate={async (input) => {
+                          const providerKey = buildCustomProviderKey(
+                            input.template
+                              .id as (typeof customProviderTemplateIds)[number],
+                            input.instanceId,
+                          );
+                          await upsertProviderConfigByKey(providerKey, {
+                            providerTemplateId: input.template.id,
+                            instanceId: input.instanceId,
+                            enabled: true,
+                            api: input.template.apiKind,
+                            baseUrl: input.baseUrl,
+                            displayName: input.displayName,
+                            models: [],
+                          });
+                          removeCustomProviderDraft(
+                            activeCustomProviderDraft.id,
+                          );
+                          setSelectedProviderId(providerKey);
+                        }}
+                        onRemove={() => {
+                          removeCustomProviderDraft(
+                            activeCustomProviderDraft.id,
+                          );
+                        }}
+                      />
+                    ) : null
                   ) : (
-                    <ManagedProviderDetail
-                      provider={
-                        providers.find((p) => p.id === activeProvider.id) ?? {
-                          id: activeProvider.id,
-                          name: activeProvider.name,
-                          description: "models.provider.nexu.description",
-                          managed: true,
-                          models: [],
-                        }
+                    <ByokProviderDetail
+                      key={
+                        activeProvider.providerKey ??
+                        activeBuiltinProviderMatch?.key ??
+                        (activeProvider.registryEntry as ByokProviderEntry).id
                       }
+                      provider={
+                        activeProvider.registryEntry as ByokProviderEntry
+                      }
+                      providerKey={
+                        activeProvider.providerKey ??
+                        activeBuiltinProviderMatch?.key ??
+                        (activeProvider.registryEntry as ByokProviderEntry).id
+                      }
+                      providerConfig={
+                        activeProvider.registryEntry
+                          ? activeProvider.providerKey
+                            ? providerConfigDoc.providers?.[
+                                activeProvider.providerKey
+                              ]
+                            : activeBuiltinProviderMatch?.config
+                          : undefined
+                      }
+                      onSaveProviderConfig={
+                        activeProvider.providerKey
+                          ? (_, config) =>
+                              upsertProviderConfigByKey(
+                                activeProvider.providerKey ?? "",
+                                config,
+                              )
+                          : upsertBuiltinProviderConfig
+                      }
+                      onDeleteProviderConfig={
+                        activeProvider.providerKey
+                          ? () =>
+                              removeProviderConfigByKey(
+                                activeProvider.providerKey ?? "",
+                              )
+                          : removeBuiltinProviderConfig
+                      }
+                      queryClient={queryClient}
                       currentModelId={currentModelId}
+                      onAutoSelectModel={handleAutoSelectModel}
                       onSelectModel={(modelId) => updateModel.mutate(modelId)}
                     />
                   )
-                ) : providerConfigDoc === undefined ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-[13px] text-text-muted">
-                      {t("models.loading")}
-                    </div>
-                  </div>
-                ) : activeProvider.kind === "custom-draft" ? (
-                  activeCustomProviderDraft ? (
-                    <AddCustomProviderDetail
-                      draft={activeCustomProviderDraft}
-                      customTemplates={Array.from(
-                        customTemplateRegistryMap.values(),
-                      )}
-                      onChange={(draft) => {
-                        setCustomProviderDrafts((previous) =>
-                          previous.map((item) =>
-                            item.id === draft.id ? draft : item,
-                          ),
-                        );
-                      }}
-                      onCreate={async (input) => {
-                        const providerKey = buildCustomProviderKey(
-                          input.template
-                            .id as (typeof customProviderTemplateIds)[number],
-                          input.instanceId,
-                        );
-                        await upsertProviderConfigByKey(providerKey, {
-                          providerTemplateId: input.template.id,
-                          instanceId: input.instanceId,
-                          enabled: true,
-                          api: input.template.apiKind,
-                          baseUrl: input.baseUrl,
-                          displayName: input.displayName,
-                          models: [],
-                        });
-                        removeCustomProviderDraft(activeCustomProviderDraft.id);
-                        setSelectedProviderId(providerKey);
-                      }}
-                      onRemove={() => {
-                        removeCustomProviderDraft(activeCustomProviderDraft.id);
-                      }}
-                    />
-                  ) : null
                 ) : (
-                  <ByokProviderDetail
-                    key={
-                      activeProvider.providerKey ??
-                      activeBuiltinProviderMatch?.key ??
-                      (activeProvider.registryEntry as ByokProviderEntry).id
-                    }
-                    provider={activeProvider.registryEntry as ByokProviderEntry}
-                    providerKey={
-                      activeProvider.providerKey ??
-                      activeBuiltinProviderMatch?.key ??
-                      (activeProvider.registryEntry as ByokProviderEntry).id
-                    }
-                    providerConfig={
-                      activeProvider.registryEntry
-                        ? activeProvider.providerKey
-                          ? providerConfigDoc.providers?.[
-                              activeProvider.providerKey
-                            ]
-                          : activeBuiltinProviderMatch?.config
-                        : undefined
-                    }
-                    onSaveProviderConfig={
-                      activeProvider.providerKey
-                        ? (_, config) =>
-                            upsertProviderConfigByKey(
-                              activeProvider.providerKey ?? "",
-                              config,
-                            )
-                        : upsertBuiltinProviderConfig
-                    }
-                    onDeleteProviderConfig={
-                      activeProvider.providerKey
-                        ? () =>
-                            removeProviderConfigByKey(
-                              activeProvider.providerKey ?? "",
-                            )
-                        : removeBuiltinProviderConfig
-                    }
-                    queryClient={queryClient}
-                    currentModelId={currentModelId}
-                    onAutoSelectModel={handleAutoSelectModel}
-                    onSelectModel={(modelId) => updateModel.mutate(modelId)}
-                  />
-                )
-              ) : (
-                <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
-                  {t("models.selectProvider")}
-                </div>
-              )}
+                  <div className="flex items-center justify-center h-full text-[13px] text-text-muted">
+                    {t("models.selectProvider")}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

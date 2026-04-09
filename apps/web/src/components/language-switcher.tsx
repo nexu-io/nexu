@@ -38,7 +38,7 @@ export function LanguageSwitcher({ variant = "light", size = "sm" }: Props) {
 
   const options: Array<{ value: Locale; label: string }> = [
     { value: "en", label: "English" },
-    { value: "zh", label: "简体中文" },
+    { value: "zh", label: "中文" },
   ];
 
   const currentLabel =

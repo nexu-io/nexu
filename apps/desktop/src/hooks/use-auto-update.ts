@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DesktopUpdateCapability } from "../../shared/host";
+import type { DesktopUpdateExperience } from "../../shared/update-policy";
 import {
   checkForUpdate,
   downloadUpdate,
   getUpdateCapability,
   installUpdate,
 } from "../lib/host-api";
+import { resolveLocale } from "../lib/i18n";
 
 export type UpdatePhase =
   | "idle"
@@ -29,6 +31,24 @@ export type UpdateState = {
   userInitiated: boolean;
 };
 
+function normalizeUpdateErrorMessage(
+  message: string,
+  experience: DesktopUpdateExperience,
+): string {
+  if (experience !== "local-test-feed") {
+    return message;
+  }
+
+  if (/404\s+Not\s+Found/i.test(message)) {
+    return resolveLocale({
+      en: "The test update feed is unavailable. Check the guide and verify your NEXU_UPDATE_FEED_URL configuration.",
+      zh: "测试更新源不可用。请查看说明文档，并检查 NEXU_UPDATE_FEED_URL 配置是否正确。",
+    });
+  }
+
+  return message;
+}
+
 export function restorePhaseAfterInstall(
   state: UpdateState,
   previousPhase: Exclude<UpdatePhase, "installing">,
@@ -38,7 +58,10 @@ export function restorePhaseAfterInstall(
     : state;
 }
 
-export function useAutoUpdate() {
+export function useAutoUpdate(options?: {
+  experience?: DesktopUpdateExperience;
+}) {
+  const experience = options?.experience ?? "normal";
   const [state, setState] = useState<UpdateState>({
     capability: null,
     phase: "idle",
@@ -146,7 +169,7 @@ export function useAutoUpdate() {
         setState((prev) => ({
           ...prev,
           phase: "error",
-          errorMessage: data.message,
+          errorMessage: normalizeUpdateErrorMessage(data.message, experience),
           userInitiated: false,
         }));
       }),
@@ -157,7 +180,7 @@ export function useAutoUpdate() {
         dispose();
       }
     };
-  }, []);
+  }, [experience]);
 
   useEffect(() => {
     if (state.phase !== "up-to-date") {

@@ -27,6 +27,7 @@ import type {
   RuntimeUnitState,
 } from "../shared/host";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import { resolveDesktopUpdateExperience } from "../shared/update-policy";
 import { DevelopSetBalanceDialog } from "./components/develop-set-balance-dialog";
 import { SurfaceFrame } from "./components/surface-frame";
 import { UpdateBanner } from "./components/update-banner";
@@ -43,6 +44,7 @@ import {
   notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
+  reportDesktopDevPageError,
   reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
@@ -118,6 +120,16 @@ window.addEventListener("error", (event) => {
       ? (event.error.stack ?? event.error.message)
       : event.message;
   sendRendererStartupProbe("renderer:window-error", "error", detail);
+
+  if (!window.nexuHost.bootstrap.isPackaged) {
+    reportDesktopDevPageError({
+      level: "error",
+      message: detail,
+      url: window.location.href,
+      sourceId: event.filename || null,
+      line: event.lineno || null,
+    });
+  }
 });
 
 window.addEventListener("unhandledrejection", (event) => {
@@ -125,6 +137,16 @@ window.addEventListener("unhandledrejection", (event) => {
   const detail =
     reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
   sendRendererStartupProbe("renderer:unhandled-rejection", "error", detail);
+
+  if (!window.nexuHost.bootstrap.isPackaged) {
+    reportDesktopDevPageError({
+      level: "error",
+      message: `Unhandled promise rejection: ${detail}`,
+      url: window.location.href,
+      sourceId: null,
+      line: null,
+    });
+  }
 });
 
 function initializeRendererSentry(dsn: string): void {
@@ -1095,7 +1117,17 @@ function DesktopShell() {
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
-  const update = useAutoUpdate();
+  const updateExperience = useMemo(
+    () =>
+      runtimeConfig
+        ? resolveDesktopUpdateExperience({
+            buildSource: runtimeConfig.buildInfo.source,
+            updateFeed: runtimeConfig.urls.updateFeed,
+          })
+        : "normal",
+    [runtimeConfig],
+  );
+  const update = useAutoUpdate({ experience: updateExperience });
 
   // Setup animation phases:
   // "playing" → main video (23s) plays once
@@ -1420,14 +1452,22 @@ function DesktopShell() {
       </main>
 
       <UpdateBanner
+        canCheckForUpdates={
+          updateExperience === "local-test-feed" &&
+          Boolean(update.capability?.check)
+        }
         capability={update.capability}
+        currentVersion={runtimeConfig?.buildInfo.version ?? null}
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
+        experience={updateExperience}
+        onCheck={() => void update.check()}
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}
         onInstall={() => void update.install()}
         percent={update.percent}
         phase={update.phase}
+        releaseNotes={update.releaseNotes}
         version={update.version}
       />
 

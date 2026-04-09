@@ -4,6 +4,7 @@ export const supportedDevCommandList = [
   "stop",
   "status",
   "logs",
+  "inspect",
   "help",
 ] as const;
 

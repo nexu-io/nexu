@@ -60,6 +60,9 @@ ShowUninstDetails show
 !define MUI_UNICON "${APP_ICON}"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Nexu.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "$(Lang_FinishRunNexu)"
+!define MUI_FINISHPAGE_SHOWREADME
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "$(Lang_FinishCreateDesktopShortcut)"
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 Page custom UserDataPageCreate UserDataPageLeave
@@ -176,6 +179,17 @@ Function CreateStartMenuShortcutVbs
 done:
   Pop $1
   Pop $0
+FunctionEnd
+
+Function CreateDesktopShortcut
+  Call CreateStartMenuShortcutVbs
+  nsExec::ExecToLog '"$SYSDIR\cscript.exe" //NoLogo "$PLUGINSDIR\create-shortcut.vbs" "$DESKTOP\Nexu.lnk" "$INSTDIR\Nexu.exe" "" "$INSTDIR" "$INSTDIR\Nexu.exe,0"'
+  Pop $0
+  ${If} $0 != "0"
+    Push "failed to create desktop shortcut"
+    Call LogInstallerEvent
+    MessageBox MB_OK|MB_ICONSTOP "$(Lang_ErrorCreateShortcutFailed)"
+  ${EndIf}
 FunctionEnd
 
 Function un.LogInstallerEvent
@@ -476,6 +490,7 @@ Section "Uninstall"
   Push "uninstall section start"
   Call un.LogInstallerEvent
   StrCpy $UninstallDeleteLocalDataSelected "0"
+  Delete "$DESKTOP\Nexu.lnk"
   Delete "$SMPROGRAMS\Nexu\Nexu.lnk"
   Delete "$SMPROGRAMS\Nexu\Uninstall Nexu.lnk"
   RMDir "$SMPROGRAMS\Nexu"

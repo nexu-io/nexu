@@ -10,7 +10,6 @@ import {
 } from "@/hooks/use-desktop-budget-guard";
 import { useDesktopCloudStatus } from "@/hooks/use-desktop-cloud-status";
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
-import { type Locale, useLocale } from "@/hooks/use-locale";
 import { authClient } from "@/lib/auth-client";
 import { openExternalUrl } from "@/lib/desktop-links";
 import {
@@ -27,7 +26,6 @@ import {
   ChevronUp,
   CircleHelp,
   Gift,
-  Globe,
   Home,
   Info,
   LogOut,
@@ -42,6 +40,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -211,29 +210,6 @@ function EmptyState({ onGoConfig }: { onGoConfig: () => void }) {
   );
 }
 
-function LanguageToggle({ collapsed }: { collapsed: boolean }) {
-  const { locale, setLocale } = useLocale();
-  const nextLocale: Locale = locale === "en" ? "zh" : "en";
-  const label = locale === "en" ? "中文" : "EN";
-
-  return (
-    <div className={cn(collapsed ? "px-2" : "px-3", "pb-1")}>
-      <button
-        type="button"
-        onClick={() => setLocale(nextLocale)}
-        title={locale === "en" ? "切换到中文" : "Switch to English"}
-        className={cn(
-          "flex items-center gap-2 w-full rounded-lg text-[12px] font-medium text-text-muted hover:text-text-primary hover:bg-surface-3 transition-colors cursor-pointer",
-          collapsed ? "justify-center p-2" : "px-3 py-2",
-        )}
-      >
-        <Globe size={14} />
-        {!collapsed && label}
-      </button>
-    </div>
-  );
-}
-
 const SETUP_COMPLETE_KEY = "nexu_setup_complete";
 const GITHUB_URL = "https://github.com/nexu-io/nexu";
 function resolveCloudUsageUrl(cloudUrl?: string | null): string {
@@ -392,7 +368,6 @@ export function WorkspaceLayout() {
 
 function WorkspaceLayoutInner() {
   const { t } = useTranslation();
-  const { locale, setLocale } = useLocale();
   const isDesktopClient = useMemo(
     () =>
       typeof navigator !== "undefined" &&
@@ -403,7 +378,6 @@ function WorkspaceLayoutInner() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
-  const [showLangMenu, setShowLangMenu] = useState(false);
   const {
     status: rewardsStatus,
     loading: rewardsStatusLoading,
@@ -470,7 +444,6 @@ function WorkspaceLayoutInner() {
   const [showBalancePopup, setShowBalancePopup] = useState(false);
   const logoutRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
-  const langRef = useRef<HTMLDivElement>(null);
   const balanceRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -540,22 +513,16 @@ function WorkspaceLayoutInner() {
   }, [showHelpMenu]);
 
   useEffect(() => {
-    if (!showLangMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (langRef.current && !langRef.current.contains(e.target as Node)) {
-        setShowLangMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showLangMenu]);
-
-  useEffect(() => {
     if (!showBalancePopup) return;
     const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const portalEl = document.querySelector(
+        "[data-sidebar-rewards-balance-popup]",
+      );
       if (
         balanceRef.current &&
-        !balanceRef.current.contains(e.target as Node)
+        !balanceRef.current.contains(target) &&
+        (!portalEl || !portalEl.contains(target))
       ) {
         setShowBalancePopup(false);
       }
@@ -719,7 +686,7 @@ function WorkspaceLayoutInner() {
           type="button"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "fixed h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-black/5 transition-colors hidden md:flex items-center justify-center z-50",
+            "fixed h-8 w-8 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-2 transition-colors hidden md:flex items-center justify-center z-50",
             isMacDesktopClient
               ? "top-[10px] left-[76px]"
               : "top-[16px] left-[24px]",
@@ -768,14 +735,18 @@ function WorkspaceLayoutInner() {
         }
       >
         {/* Traffic light clearance (desktop client) */}
-        {!isWindowsDesktopClient && <div className="h-14 shrink-0" />}
+        {!isWindowsDesktopClient && (
+          <div
+            className={cn("shrink-0", isMacDesktopClient ? "h-10" : "h-14")}
+          />
+        )}
 
         {/* Header / Brand */}
         {!isWindowsDesktopClient && (
           <div
             className={cn(
               "flex items-center justify-between px-3 pb-2 shrink-0",
-              isMacDesktopClient && "-mt-14 h-14 pl-[76px] pt-[10px] pr-3 pb-0",
+              isMacDesktopClient && "h-12 pl-4 pr-3 pt-0 pb-1",
               !isDesktopClient && "border-b border-border py-3 px-4 gap-2.5",
             )}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -864,20 +835,6 @@ function WorkspaceLayoutInner() {
                   {installedSkillsCount}
                 </span>
               )}
-            </Link>
-            <Link
-              to="/workspace/settings"
-              onClick={() => {
-                track("workspace_settings_click");
-                track("workspace_sidebar_click", { target: "settings" });
-              }}
-              className={cn(
-                "nav-item flex items-center gap-2.5 w-full rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer mt-0.5 px-3 py-2 whitespace-nowrap",
-                isModelsPage && "nav-item-active",
-              )}
-            >
-              <Settings size={16} className="shrink-0" />
-              {t("layout.nav.settings")}
             </Link>
           </div>
 
@@ -984,7 +941,7 @@ function WorkspaceLayoutInner() {
                     isHomePage ? "home" : isModelsPage ? "settings" : "home",
                   )
                 }
-                className="group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left transition-colors hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-primary)]"
+                className="group flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left transition-colors hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-primary)]"
               >
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-border bg-surface-2">
                   {cloudConnecting ? (
@@ -1045,7 +1002,7 @@ function WorkspaceLayoutInner() {
                 <button
                   type="button"
                   data-sidebar-rewards-balance="true"
-                  className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-black/5 text-left"
+                  className="group block w-full rounded-[8px] px-2.5 py-2 transition-colors hover:bg-surface-2 text-left"
                   onClick={() => {
                     if (canOpenBalancePopup) {
                       setShowBalancePopup((prev) => !prev);
@@ -1069,79 +1026,102 @@ function WorkspaceLayoutInner() {
                     </span>
                   </div>
                 </button>
-                {canOpenBalancePopup && showBalancePopup ? (
-                  <div
-                    data-sidebar-rewards-balance-popup="true"
-                    className="absolute bottom-full left-0 right-0 z-30 pb-2"
-                  >
-                    <div className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-[13px] font-semibold text-text-primary">
-                          ✦ {t("layout.sidebar.balancePopup.total")}
-                        </span>
-                        <span className="tabular-nums text-[14px] font-bold text-text-primary">
-                          {rewardBalancePopupValue}
-                        </span>
-                      </div>
-                      <div className="space-y-2 border-t border-border/60 pt-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
-                            {t("layout.sidebar.balancePopup.earned")}
-                            <span className="group relative inline-flex cursor-default items-center">
-                              <Info size={10} className="text-text-muted/60" />
-                              <span
-                                role="tooltip"
-                                className="pointer-events-none absolute bottom-full left-0 z-40 mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
-                              >
-                                {t("layout.sidebar.balancePopup.earnedTooltip")}
-                              </span>
-                            </span>
-                          </span>
-                          <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {sidebarCreditBreakdown.giftedBalance}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
-                            {t("layout.sidebar.balancePopup.recharged")}
-                            <span className="group relative inline-flex cursor-default items-center">
-                              <Info size={10} className="text-text-muted/60" />
-                              <span
-                                role="tooltip"
-                                className="pointer-events-none absolute bottom-full left-0 z-40 mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
-                              >
-                                {t(
-                                  "layout.sidebar.balancePopup.rechargedTooltip",
-                                )}
-                              </span>
-                            </span>
-                          </span>
-                          <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {sidebarCreditBreakdown.planBalance}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        data-sidebar-rewards-balance-detail="true"
-                        className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
-                        onClick={() => {
-                          setShowBalancePopup(false);
-                          track("workspace_click_usage_detail");
-                          track("workspace_sidebar_click", {
-                            target: "credits_popup_detail",
-                          });
-                          void openExternalUrl(
-                            resolveCloudUsageUrl(desktopCloudStatus?.cloudUrl),
-                          );
-                        }}
+                {canOpenBalancePopup && showBalancePopup
+                  ? createPortal(
+                      <div
+                        data-sidebar-rewards-balance-popup="true"
+                        className="fixed z-[9999] pb-2"
+                        style={(() => {
+                          const rect =
+                            balanceRef.current?.getBoundingClientRect();
+                          if (!rect) return { display: "none" };
+                          return {
+                            left: rect.left,
+                            width: Math.max(rect.width, 240),
+                            bottom: window.innerHeight - rect.top,
+                          };
+                        })()}
                       >
-                        {t("layout.sidebar.balancePopup.viewDetail")}
-                        <ChevronRight size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+                        <div className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                          <div className="mb-3 flex items-center justify-between">
+                            <span className="text-[13px] font-semibold text-text-primary">
+                              ✦ {t("layout.sidebar.balancePopup.total")}
+                            </span>
+                            <span className="tabular-nums text-[14px] font-bold text-text-primary">
+                              {rewardBalancePopupValue}
+                            </span>
+                          </div>
+                          <div className="space-y-2 border-t border-border/60 pt-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-[11px] text-text-muted">
+                                {t("layout.sidebar.balancePopup.earned")}
+                                <span className="group relative inline-flex cursor-default items-center">
+                                  <Info
+                                    size={10}
+                                    className="text-text-muted/60"
+                                  />
+                                  <span
+                                    role="tooltip"
+                                    className="pointer-events-none absolute bottom-full left-0 z-[10000] mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                                  >
+                                    {t(
+                                      "layout.sidebar.balancePopup.earnedTooltip",
+                                    )}
+                                  </span>
+                                </span>
+                              </span>
+                              <span className="tabular-nums text-[11px] font-medium text-text-secondary">
+                                {sidebarCreditBreakdown.giftedBalance}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-[11px] text-text-muted">
+                                {t("layout.sidebar.balancePopup.recharged")}
+                                <span className="group relative inline-flex cursor-default items-center">
+                                  <Info
+                                    size={10}
+                                    className="text-text-muted/60"
+                                  />
+                                  <span
+                                    role="tooltip"
+                                    className="pointer-events-none absolute bottom-full left-0 z-[10000] mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                                  >
+                                    {t(
+                                      "layout.sidebar.balancePopup.rechargedTooltip",
+                                    )}
+                                  </span>
+                                </span>
+                              </span>
+                              <span className="tabular-nums text-[11px] font-medium text-text-secondary">
+                                {sidebarCreditBreakdown.planBalance}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            data-sidebar-rewards-balance-detail="true"
+                            className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+                            onClick={() => {
+                              track("workspace_click_usage_detail");
+                              track("workspace_sidebar_click", {
+                                target: "credits_popup_detail",
+                              });
+                              void openExternalUrl(
+                                resolveCloudUsageUrl(
+                                  desktopCloudStatus?.cloudUrl,
+                                ),
+                              );
+                              setShowBalancePopup(false);
+                            }}
+                          >
+                            {t("layout.sidebar.balancePopup.viewDetail")}
+                            <ChevronRight size={12} />
+                          </button>
+                        </div>
+                      </div>,
+                      document.body,
+                    )
+                  : null}
               </div>
             </div>
           )}
@@ -1149,13 +1129,32 @@ function WorkspaceLayoutInner() {
 
         {/* Bottom action row */}
         <div
-          className="px-3 pb-1.5 flex items-center justify-between gap-1 shrink-0"
+          className="shrink-0 border-t border-border/60 pt-1.5 pb-2 px-2 flex items-center gap-0.5"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              track("workspace_settings_click");
+              track("workspace_sidebar_click", { target: "settings_footer" });
+              navigate("/workspace/settings");
+            }}
+            title={t("layout.nav.settings")}
+            className={cn(
+              "nav-item flex flex-1 min-w-0 items-center gap-2 rounded-[var(--radius-6)] text-[13px] transition-colors cursor-pointer px-2.5 py-2",
+              isModelsPage && "nav-item-active",
+            )}
+          >
+            <Settings size={16} className="shrink-0" />
+            <span className="truncate text-left">
+              {t("layout.nav.settings")}
+            </span>
+          </button>
+
+          <div className="flex items-center gap-1 shrink-0">
             <div className="relative" ref={helpRef}>
               {showHelpMenu && (
-                <div className="absolute z-20 bottom-full left-0 mb-2 w-44">
+                <div className="absolute z-20 bottom-full left-1/2 mb-2 w-44 -translate-x-1/2">
                   <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden">
                     <div className="p-1.5">
                       <a
@@ -1165,7 +1164,7 @@ function WorkspaceLayoutInner() {
                         onClick={() =>
                           track("workspace_docs_click", { type: "doc" })
                         }
-                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-all"
                       >
                         <BookOpen size={14} />
                         {t("layout.help.docs")}
@@ -1175,7 +1174,7 @@ function WorkspaceLayoutInner() {
                         onClick={() =>
                           track("workspace_docs_click", { type: "contact" })
                         }
-                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-all"
                       >
                         <Mail size={14} />
                         {t("layout.help.contact")}
@@ -1189,7 +1188,7 @@ function WorkspaceLayoutInner() {
                         onClick={() =>
                           track("workspace_docs_click", { type: "changelog" })
                         }
-                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-black/5 transition-all"
+                        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-all"
                       >
                         <ScrollText size={14} />
                         {t("layout.help.changelog")}
@@ -1205,13 +1204,12 @@ function WorkspaceLayoutInner() {
                     track("workspace_help_menu_open");
                   }
                   setShowHelpMenu(!showHelpMenu);
-                  setShowLangMenu(false);
                 }}
                 className={cn(
                   "w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer",
                   showHelpMenu
-                    ? "text-text-primary bg-black/5"
-                    : "text-text-secondary hover:text-text-primary hover:bg-black/5",
+                    ? "text-text-primary bg-surface-2"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface-2",
                 )}
                 title={t("layout.help.title")}
               >
@@ -1225,63 +1223,11 @@ function WorkspaceLayoutInner() {
               onClick={() =>
                 track("workspace_github_click", { source: "sidebar" })
               }
-              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-black/5 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors"
               title="GitHub"
             >
               <GitHubIcon />
             </a>
-          </div>
-
-          <div className="relative" ref={langRef}>
-            {showLangMenu && (
-              <div className="absolute z-[60] bottom-full right-0 mb-2 w-28">
-                <div className="rounded-xl border bg-surface-1 border-border shadow-xl shadow-black/10 overflow-hidden p-1.5">
-                  {(
-                    [
-                      { value: "en", label: "English" },
-                      { value: "zh", label: "中文" },
-                    ] as const
-                  ).map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        setLocale(option.value as Locale);
-                        setShowLangMenu(false);
-                      }}
-                      className={cn(
-                        "flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium transition-all",
-                        locale === option.value
-                          ? "bg-black/5 text-text-primary"
-                          : "text-text-secondary hover:text-text-primary hover:bg-black/5",
-                      )}
-                    >
-                      <span>{option.label}</span>
-                      {locale === option.value && (
-                        <span className="text-[10px] text-text-muted">✓</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setShowLangMenu(!showLangMenu);
-                setShowHelpMenu(false);
-              }}
-              className={cn(
-                "h-7 inline-flex items-center gap-1.5 rounded-md px-2 text-[11px] font-medium transition-colors cursor-pointer",
-                showLangMenu
-                  ? "text-text-primary bg-black/5"
-                  : "text-text-secondary hover:text-text-primary hover:bg-black/5",
-              )}
-              title={locale === "en" ? "Switch language" : "切换语言"}
-            >
-              <Globe size={14} />
-              <span>{locale === "en" ? "EN" : "中文"}</span>
-            </button>
           </div>
         </div>
 
@@ -1426,7 +1372,9 @@ function WorkspaceLayoutInner() {
                     to="/workspace/settings"
                     onClick={() => {
                       track("workspace_settings_click");
-                      track("workspace_sidebar_click", { target: "settings" });
+                      track("workspace_sidebar_click", {
+                        target: "settings_mobile",
+                      });
                       setMobileDrawerOpen(false);
                     }}
                     className={cn(
@@ -1508,11 +1456,6 @@ function WorkspaceLayoutInner() {
                     })}
                   </div>
                 </div>
-              </div>
-
-              {/* Language toggle (mobile) */}
-              <div className="px-3 pb-1">
-                <LanguageToggle collapsed={false} />
               </div>
 
               <div

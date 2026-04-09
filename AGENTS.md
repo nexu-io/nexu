@@ -33,6 +33,10 @@ pnpm dev stop <service>               # Stop one local-dev service
 pnpm dev restart <service>            # Restart one local-dev service
 pnpm dev status <service>             # Show status for one local-dev service
 pnpm dev logs <service>               # Show active-session log tail (max 200 lines) for one local-dev service
+pnpm dev inspect screenshot           # Capture the current desktop window screenshot (dev desktop only)
+pnpm dev inspect eval "<expr>"        # Evaluate a JS expression in the desktop renderer (dev desktop only)
+pnpm dev inspect dom                  # Dump the current desktop renderer DOM summary (dev desktop only)
+pnpm dev inspect logs                 # Show buffered desktop renderer console/error logs (dev desktop only)
 pnpm dev:controller                   # Legacy controller-only direct dev entrypoint
 pnpm dist:mac                         # Build signed macOS desktop distributables
 pnpm dist:mac:arm64                   # Build signed Apple Silicon macOS desktop distributables
@@ -78,6 +82,7 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 - Default daily flow is: `pnpm dev start` -> `pnpm dev status <service>` / `pnpm dev logs <service>` as needed -> `pnpm dev stop`.
 - Use `pnpm dev restart` for a clean full-stack recycle; use `pnpm dev restart <service>` only when you are intentionally touching one service.
 - Explicit single-service control remains available through `pnpm dev start <desktop|openclaw|controller|web>`, `pnpm dev stop <service>`, `pnpm dev restart <service>`, `pnpm dev status <service>`, and `pnpm dev logs <service>`.
+- Desktop dev inspect is available through `pnpm dev inspect screenshot`, `pnpm dev inspect eval "<expr>"`, `pnpm dev inspect dom`, and `pnpm dev inspect logs` for agent-friendly renderer inspection without exposing a public production API.
 - `pnpm dev` intentionally does not support `all`; the full local stack order remains `openclaw` -> `controller` -> `web` -> `desktop`.
 - `pnpm dev logs <service>` is session-scoped, prints a fixed header, and tails at most the last 200 lines from the active service session.
 - `scripts/dev/.env.example` is the source-of-truth template for dev-only overrides. Copy it to `scripts/dev/.env` only when you need to override ports, URLs, state paths, or the shared OpenClaw gateway token for local development.
@@ -240,6 +245,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | Local dev CLI guidance | `scripts/dev/AGENTS.md` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
+| Desktop update testing guide | `specs/guides/desktop-update-testing.md` |
 | Security posture | `specs/SECURITY.md` |
 | Reliability | `specs/RELIABILITY.md` |
 | Product model | `specs/PRODUCT_SENSE.md` |
@@ -339,6 +345,7 @@ This note should track:
 - Controller env path: `apps/controller/.env`
 - Fresh local-dev cold start: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy scripts/dev/.env.example scripts/dev/.env` (Windows) or `cp scripts/dev/.env.example scripts/dev/.env` (POSIX) -> `pnpm dev start`
 - Daily local-dev flow: `pnpm dev start` -> `pnpm dev logs <service>` / `pnpm dev status <service>` when needed -> `pnpm dev restart` for a clean recycle -> `pnpm dev stop`
+- Desktop inspect quick checks: `pnpm dev inspect screenshot`, `pnpm dev inspect eval "document.title"`, `pnpm dev inspect dom --max-html-length 1200`, `pnpm dev inspect logs --limit 20`
 - Desktop proxy env vars: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (desktop normalizes mixed-case inputs, always merges `localhost,127.0.0.1,::1` into `NO_PROXY`, and propagates uppercase values to child processes)
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`

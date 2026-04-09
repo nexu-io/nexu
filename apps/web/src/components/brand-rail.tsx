@@ -169,7 +169,7 @@ export function BrandRail({
           </div>
         </div>
 
-        <FadeIn delay={520}>
+        <FadeIn delay={520} className="mt-10 xl:mt-12">
           <a
             href={GITHUB_URL}
             target="_blank"

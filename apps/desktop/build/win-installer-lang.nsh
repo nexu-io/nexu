@@ -40,6 +40,9 @@ LangString Lang_ErrorMoveOldInstallFailed 2052 "无法将旧安装从目标目�
 LangString Lang_FinishRunNexu 1033 "Launch Nexu"
 LangString Lang_FinishRunNexu 2052 "立即启动 Nexu"
 
+LangString Lang_FinishCreateDesktopShortcut 1033 "Create desktop shortcut"
+LangString Lang_FinishCreateDesktopShortcut 2052 "创建桌面快捷方式"
+
 LangString Lang_UninstallDeleteLocalData 1033 "Delete local data"
 LangString Lang_UninstallDeleteLocalData 2052 "删除本地数据"
 

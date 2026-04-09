@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import {
   createNodeOptions,
+  devTmpPath,
   ensureParentDirectory,
   getListeningPortPid,
   isProcessRunning,
@@ -15,7 +16,7 @@ import {
 } from "@nexu/dev-utils";
 import { ensure } from "@nexu/shared";
 
-import { stat } from "node:fs/promises";
+import { stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import {
@@ -46,6 +47,7 @@ export type DesktopDevSnapshot = {
   runId?: string;
   sessionId?: string;
   logFilePath?: string;
+  inspectUrl?: string;
 };
 
 type DesktopLaunchEnv = {
@@ -56,6 +58,47 @@ type DesktopLaunchEnv = {
 type DetachedDesktopHandle = {
   pid: number;
   dispose: () => void;
+};
+
+type DesktopDevEvalResponse = {
+  ok: boolean;
+  valueType: string;
+  value: unknown;
+  error?: {
+    name: string;
+    message: string;
+    stack?: string;
+  };
+};
+
+type DesktopDevDomSnapshotResponse = {
+  title: string;
+  url: string;
+  readyState: string;
+  htmlLength: number;
+  htmlSummary: string;
+};
+
+type DesktopDevRendererLogResponse = {
+  entries: Array<{
+    id: string;
+    ts: string;
+    source: "console" | "page-error";
+    level: "debug" | "info" | "warning" | "error";
+    message: string;
+    url: string | null;
+    sourceId: string | null;
+    line: number | null;
+  }>;
+  truncated: boolean;
+};
+
+type DesktopDevScreenshotResponse = {
+  mimeType: "image/png";
+  base64: string;
+  width: number;
+  height: number;
+  scaleFactor: number;
 };
 
 const execFileAsync = promisify(execFile);
@@ -254,6 +297,125 @@ async function waitForDesktopBuildOutputs(startedAt: number): Promise<void> {
   );
 }
 
+async function getDesktopInspectSession(): Promise<{
+  inspectUrl: string;
+  token: string;
+}> {
+  const snapshot = await getCurrentDesktopDevSnapshot();
+
+  ensure(snapshot.status === "running").orThrow(
+    () =>
+      new Error(
+        "desktop is not running; start it with `pnpm dev start desktop` first",
+      ),
+  );
+  const token = snapshot.sessionId;
+
+  ensure(Boolean(token)).orThrow(
+    () =>
+      new Error("desktop inspect token is unavailable for the current session"),
+  );
+
+  return {
+    inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
+    token,
+  };
+}
+
+async function requestDesktopInspect<T>(input: {
+  method: "GET" | "POST";
+  pathname: string;
+  body?: unknown;
+}): Promise<T> {
+  const { inspectUrl, token } = await getDesktopInspectSession();
+  const requestUrl = new URL(input.pathname, inspectUrl);
+  const response = await fetch(requestUrl, {
+    method: input.method,
+    headers: {
+      "content-type": "application/json",
+      "x-nexu-dev-inspect-token": token,
+    },
+    body: input.body === undefined ? undefined : JSON.stringify(input.body),
+  });
+  const payload = (await response.json()) as T | { error?: string };
+
+  if (!response.ok) {
+    const message =
+      typeof payload === "object" && payload !== null && "error" in payload
+        ? payload.error
+        : undefined;
+
+    throw new Error(
+      message || `desktop inspect request failed with ${response.status}`,
+    );
+  }
+
+  return payload as T;
+}
+
+export async function captureDesktopDevInspectScreenshot(options?: {
+  outputPath?: string;
+}): Promise<{
+  outputPath: string;
+  width: number;
+  height: number;
+  scaleFactor: number;
+}> {
+  const result = await requestDesktopInspect<DesktopDevScreenshotResponse>({
+    method: "POST",
+    pathname: "/screenshot",
+  });
+  const outputPath =
+    options?.outputPath ??
+    join(devTmpPath, "inspect", `desktop-${Date.now()}.png`);
+
+  await ensureParentDirectory(outputPath);
+  await writeFile(outputPath, Buffer.from(result.base64, "base64"));
+
+  return {
+    outputPath,
+    width: result.width,
+    height: result.height,
+    scaleFactor: result.scaleFactor,
+  };
+}
+
+export async function evaluateDesktopDevInspectScript(
+  script: string,
+): Promise<DesktopDevEvalResponse> {
+  return requestDesktopInspect<DesktopDevEvalResponse>({
+    method: "POST",
+    pathname: "/eval",
+    body: { script },
+  });
+}
+
+export async function getDesktopDevInspectDomSnapshot(options?: {
+  maxHtmlLength?: number;
+}): Promise<DesktopDevDomSnapshotResponse> {
+  return requestDesktopInspect<DesktopDevDomSnapshotResponse>({
+    method: "POST",
+    pathname: "/dom",
+    body: options,
+  });
+}
+
+export async function getDesktopDevInspectRendererLogs(options?: {
+  limit?: number;
+}): Promise<DesktopDevRendererLogResponse> {
+  const searchParams = new URLSearchParams();
+
+  if (options?.limit) {
+    searchParams.set("limit", String(options.limit));
+  }
+
+  return requestDesktopInspect<DesktopDevRendererLogResponse>({
+    method: "GET",
+    pathname:
+      searchParams.size > 0 ? `/logs?${searchParams.toString()}` : "/logs",
+  });
+}
+
 export async function startDesktopDevProcess(options: {
   sessionId: string;
 }): Promise<DesktopDevSnapshot> {
@@ -293,6 +455,7 @@ export async function startDesktopDevProcess(options: {
       ...desktopLaunch.env,
       NODE_OPTIONS: createNodeOptions(),
       ...createDesktopInjectedEnv(),
+      NEXU_DESKTOP_DEV_INSPECT_TOKEN: sessionId,
       NEXU_DESKTOP_DISABLE_VITE_ELECTRON_STARTUP: "1",
       NEXU_DEV_DESKTOP_RUN_ID: runId,
       NEXU_DEV_SESSION_ID: sessionId,
@@ -330,6 +493,7 @@ export async function startDesktopDevProcess(options: {
       ...desktopLaunch.env,
       NODE_OPTIONS: createNodeOptions(),
       ...createDesktopInjectedEnv(),
+      NEXU_DESKTOP_DEV_INSPECT_TOKEN: sessionId,
       NEXU_DEV_DESKTOP_RUN_ID: runId,
       NEXU_DEV_SESSION_ID: sessionId,
       NEXU_DEV_SERVICE: "desktop",
@@ -398,6 +562,7 @@ export async function startDesktopDevProcess(options: {
     runId,
     sessionId,
     logFilePath,
+    inspectUrl: runtimeConfig.desktopInspectUrl,
   };
 }
 
@@ -490,6 +655,7 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
           runId: lock.runId,
           sessionId: lock.sessionId,
           logFilePath,
+          inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
         };
       }
 
@@ -502,6 +668,7 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
         runId: lock.runId,
         sessionId: lock.sessionId,
         logFilePath,
+        inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
       };
     }
 
@@ -514,6 +681,7 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
       runId: lock.runId,
       sessionId: lock.sessionId,
       logFilePath,
+      inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
     };
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {

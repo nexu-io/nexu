@@ -441,11 +441,28 @@ const en = {
   "settings.general.fullNameHint":
     "Shown in the workspace sidebar and account surfaces",
   "settings.general.email": "Email",
-  "settings.general.emailHint": "Managed by your current sign-in method",
+  "settings.general.emailHint":
+    "Settings sync is on. Premium models available with your Nexu account.",
   "settings.general.preferences": "Preferences",
   "settings.general.language": "Language",
-  "settings.general.languageHint":
-    "Stored locally for this browser or desktop client",
+  "settings.general.languageHint": "Choose your interface language",
+  "settings.section.desktop": "Application behavior",
+  "settings.section.data": "Data & Privacy",
+  "settings.desktop.launchAtLogin": "Launch at startup",
+  "settings.desktop.launchAtLoginHint":
+    "Automatically open Nexu when your computer starts.",
+  "settings.desktop.showInDock": "Show in Dock",
+  "settings.desktop.showInDockHint":
+    "Show nexu in your Mac Dock for quick access.",
+  "settings.desktop.showInTaskbar": "Show in taskbar",
+  "settings.desktop.showInTaskbarHint":
+    "Show nexu in the taskbar; when off, it stays in the system tray only",
+  "settings.desktop.updateFailed": "Failed to update desktop setting",
+  "settings.data.analytics": "Usage analytics",
+  "settings.data.analyticsHint": "Help improve nexu with anonymous usage data",
+  "settings.data.crashReports": "Crash reports",
+  "settings.data.crashReportsHint":
+    "Send crash reports automatically to help fix bugs",
   "settings.general.saveTitle": "Save changes",
   "settings.general.saveHint": "Profile changes are applied after save",
   "settings.general.save": "Save",
@@ -462,6 +479,28 @@ const en = {
   "settings.general.githubStarredBody":
     "You are helping shape the desktop and workspace experience.",
   "settings.general.githubStarredBadge": "Starred",
+  "settings.section.profile": "Profile",
+  "settings.section.updates": "Updates",
+  "settings.section.about": "About",
+  "settings.updates.version": "Version",
+  "settings.updates.checkNow": "Check now",
+  "settings.updates.checking": "Checking...",
+  "settings.updates.retry": "Check again",
+  "settings.updates.idleHint":
+    "Check for updates and install the latest desktop build.",
+  "settings.updates.checkingHint": "Looking for a newer version...",
+  "settings.updates.downloading": "Downloading {{percent}}%",
+  "settings.updates.downloadingHint": "Downloading update: {{percent}}%",
+  "settings.updates.error": "Unable to check for updates right now.",
+  "settings.updates.versionUnknown": "Current version is unavailable.",
+  "settings.about.docs": "Documentation",
+  "settings.about.github": "GitHub Repository",
+  "settings.about.changelog": "Changelog",
+  "settings.about.feedback": "Send feedback",
+  "settings.providers.botModelTitle": "nexu Bot model",
+  "settings.providers.botModelDesc":
+    "Pick the default model used by your desktop workspace.",
+  "settings.providers.workspace": "Workspace",
   "models.loading": "Loading models...",
   "models.retry": "Retry",
   "models.loadFailed": "Failed to load models",

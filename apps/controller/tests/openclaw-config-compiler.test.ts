@@ -194,6 +194,21 @@ describe("compileOpenClawConfig", () => {
     ]);
   });
 
+  it("prewarms openclaw-weixin in plugins.allow even with no connected wechat channel", () => {
+    // Regression: without this, first wechat connect changes plugins.allow
+    // -> SIGUSR1 -> ~11s drain -> GatewayDrainingError on inbound messages.
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [],
+        secrets: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.plugins?.allow).toContain("openclaw-weixin");
+    expect(result.plugins?.entries?.["openclaw-weixin"]?.enabled).toBe(true);
+  });
+
   it("compiles qqbot channels and enables the canonical qq plugin id", () => {
     const now = new Date().toISOString();
     const result = compileOpenClawConfig(

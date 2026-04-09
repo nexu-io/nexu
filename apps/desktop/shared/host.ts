@@ -27,6 +27,8 @@ export const hostInvokeChannels = [
   "desktop:get-minimax-oauth-status",
   "desktop:start-minimax-oauth",
   "desktop:cancel-minimax-oauth",
+  "desktop:get-shell-preferences",
+  "desktop:update-shell-preferences",
   "desktop:get-rewards-status",
   "desktop:set-reward-balance",
   "desktop:rewards-updated",
@@ -136,6 +138,11 @@ export type HostInvokePayloadMap = {
     region: "global" | "cn";
   };
   "desktop:cancel-minimax-oauth": undefined;
+  "desktop:get-shell-preferences": undefined;
+  "desktop:update-shell-preferences": {
+    launchAtLogin?: boolean;
+    showInDock?: boolean;
+  };
   "desktop:get-rewards-status": undefined;
   "desktop:set-reward-balance": {
     balance: number;
@@ -411,6 +418,18 @@ export type HostInvokeResultMap = {
     error?: string | null;
     cancelled: boolean;
   };
+  "desktop:get-shell-preferences": {
+    launchAtLogin: boolean;
+    showInDock: boolean;
+    supportsLaunchAtLogin: boolean;
+    supportsShowInDock: boolean;
+  };
+  "desktop:update-shell-preferences": {
+    launchAtLogin: boolean;
+    showInDock: boolean;
+    supportsLaunchAtLogin: boolean;
+    supportsShowInDock: boolean;
+  };
   "desktop:get-rewards-status": {
     cloudBalance?: {
       totalBalance?: number | null;
@@ -467,6 +486,63 @@ export type DiagnosticsInfo = {
     allProxyRedacted: string | null;
     noProxy: string[];
   };
+};
+
+export type DesktopDevDiagnosticsLogLevel =
+  | "debug"
+  | "info"
+  | "warning"
+  | "error";
+
+export type DesktopDevRendererLogEntry = {
+  id: string;
+  ts: string;
+  source: "console" | "page-error";
+  level: DesktopDevDiagnosticsLogLevel;
+  message: string;
+  url: string | null;
+  sourceId: string | null;
+  line: number | null;
+};
+
+export type DesktopDevRendererLogSnapshot = {
+  entries: DesktopDevRendererLogEntry[];
+  truncated: boolean;
+};
+
+export type DesktopDevScreenshotResult = {
+  mimeType: "image/png";
+  base64: string;
+  width: number;
+  height: number;
+  scaleFactor: number;
+};
+
+export type DesktopDevEvalSerializableValue =
+  | null
+  | boolean
+  | number
+  | string
+  | DesktopDevEvalSerializableValue[]
+  | { [key: string]: DesktopDevEvalSerializableValue };
+
+export type DesktopDevEvalResult = {
+  ok: boolean;
+  valueType: string;
+  value: DesktopDevEvalSerializableValue;
+  error?: {
+    name: string;
+    message: string;
+    stack?: string;
+  };
+};
+
+export type DesktopDevDomSnapshotResult = {
+  title: string;
+  url: string;
+  readyState: string;
+  htmlLength: number;
+  htmlSummary: string;
 };
 
 export type DesktopSurface =
@@ -607,6 +683,11 @@ export type HostBridge = {
     payload: HostInvokePayloadMap[TChannel],
   ): Promise<HostInvokeResultMap[TChannel]>;
   reportStartupProbe(payload: StartupProbePayload): void;
+  reportRendererDiagnosticsLog(
+    payload: Omit<DesktopDevRendererLogEntry, "id" | "ts" | "source"> & {
+      source: "page-error";
+    },
+  ): void;
   onDesktopCommand(listener: (command: HostDesktopCommand) => void): () => void;
   onRuntimeEvent(listener: (event: RuntimeEvent) => void): () => void;
 };

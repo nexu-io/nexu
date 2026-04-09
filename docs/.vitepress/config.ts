@@ -130,6 +130,13 @@ const enSidebar = [
     ],
   },
   {
+    text: "Credits",
+    items: [
+      { text: "Model Credit Consumption", link: "/guide/model-pricing" },
+      { text: "Earn Credits by Sharing", link: "/guide/rewards" },
+    ],
+  },
+  {
     text: "Help",
     items: [
       { text: "Update Guide", link: "/guide/update" },
@@ -142,7 +149,6 @@ const enSidebar = [
       { text: "Contributing", link: "/guide/contributing" },
       { text: "Contact Us", link: "/guide/contact" },
       { text: "Star Us on GitHub", link: "/guide/star" },
-      { text: "Earn Points by Sharing", link: "/guide/rewards" },
       { text: "Changelog", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
@@ -180,6 +186,13 @@ const jaSidebar = [
     ],
   },
   {
+    text: "ポイント",
+    items: [
+      { text: "モデルのポイント消費", link: "/ja/guide/model-pricing" },
+      { text: "シェアしてポイント獲得", link: "/ja/guide/rewards" },
+    ],
+  },
+  {
     text: "ヘルプ",
     items: [
       { text: "アップデートガイド", link: "/ja/guide/update" },
@@ -192,7 +205,6 @@ const jaSidebar = [
       { text: "コントリビュート", link: "/ja/guide/contributing" },
       { text: "お問い合わせ", link: "/ja/guide/contact" },
       { text: "GitHub で Star", link: "/ja/guide/star" },
-      { text: "シェアでポイント獲得", link: "/ja/guide/rewards" },
       { text: "更新ログ", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
@@ -232,6 +244,13 @@ const zhSidebar = [
     ],
   },
   {
+    text: "积分",
+    items: [
+      { text: "模型积分消耗说明", link: "/zh/guide/model-pricing" },
+      { text: "分享赚积分", link: "/zh/guide/rewards" },
+    ],
+  },
+  {
     text: "帮助",
     items: [
       { text: "Windows 内测使用指南", link: "/zh/guide/windows-beta" },
@@ -245,7 +264,6 @@ const zhSidebar = [
       { text: "参与贡献", link: "/zh/guide/contributing" },
       { text: "联系我们", link: "/zh/guide/contact" },
       { text: "给我们 Star", link: "/zh/guide/star" },
-      { text: "分享获得积分", link: "/zh/guide/rewards" },
       { text: "更新日志", link: "https://github.com/nexu-io/nexu/releases" },
     ],
   },
