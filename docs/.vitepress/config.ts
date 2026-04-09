@@ -234,6 +234,7 @@ const zhSidebar = [
   {
     text: "帮助",
     items: [
+      { text: "飞书应用权限配置", link: "/zh/guide/feishu-permissions" },
       { text: "Windows 内测使用指南", link: "/zh/guide/windows-beta" },
       { text: "更新指南", link: "/zh/guide/update" },
       { text: "修复指南", link: "/zh/guide/troubleshooting" },
