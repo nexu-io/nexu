@@ -27,6 +27,8 @@ The user wants every generated page to use one fixed frame:
 
 This frame should be enforced by the skill itself, not by prompt discipline.
 
+This contract also needs an explicit portrait-selection field so the agent chooses a head portrait intentionally instead of relying on runtime randomness.
+
 ## Goals
 
 - Make the provided structure the only accepted content frame for the template.
@@ -87,6 +89,24 @@ The validator does not need to parse semantic subfields out of the subtitle. It 
     - first 4
     - second 4
   - first 4 quick buttons in dialogue section
+
+### 3.5 `portraitId`
+
+- Type: string
+- Required allowed values:
+  - `portrait-1`
+  - `portrait-2`
+  - `portrait-3`
+  - `portrait-4`
+  - `portrait-5`
+  - `portrait-6`
+  - `portrait-7`
+- Used in:
+  - profile avatar
+  - poster avatar
+  - bot avatar in dialogue area
+
+The skill must reject missing or unknown portrait ids. Avatar selection is no longer random.
 
 ### 4. `metrics`
 
@@ -178,7 +198,7 @@ This field appears twice, so validation must be strict enough to avoid bloated l
   - dialogue card
 
 Rendering rules:
-- `bot` avatar uses the random selected avatar image
+- `bot` avatar uses the explicitly selected portrait image
 - `user` avatar uses `👤`
 
 ### 11. `ctaText`

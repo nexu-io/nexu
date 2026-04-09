@@ -1,11 +1,4 @@
-import {
-  mkdir,
-  readFile,
-  readdir,
-  rename,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
@@ -16,8 +9,20 @@ const NEXU_CONFIG_FILENAME = "config.json";
 const GENERATED_DIRNAME = "deploy-skill-generated";
 const DISTILL_AVATAR_ROOT =
   "/Users/alche/Downloads/distill-campaign-clone/images";
+const DISTILL_PORTRAIT_MAP = Object.freeze({
+  "portrait-1": "05ece7aece7d5a8c3ad9aae3ecfbd20b_pixian_ai.png",
+  "portrait-2": "1d8f55fb0ef3d2a6149d2d999aa79c06_pixian_ai.png",
+  "portrait-3": "24a229ae040e9ccb578c01cc6821a2f2_pixian_ai.png",
+  "portrait-4": "4b7b55f162dafff58baf54d05463eb5e_pixian_ai.png",
+  "portrait-5": "b0ed8642ea2fdfbf2e6440772bc9d89b_pixian_ai.png",
+  "portrait-6": "bd74a1adfbec68bf008cba7ce62d22b6_pixian_ai.png",
+  "portrait-7": "f1763ea5ebb1d7b6cc1ddcf41b177f40_pixian_ai.png",
+});
 const NEXU_REPO_URL = "https://github.com/nexu-io/nexu";
 const ROAST_SKILL_URL = "https://github.com/nexu-io/roast-skill";
+const NEXU_LOGO_FILE = "assets/logo.png";
+const NEXU_QR_FILE = "assets/qr.png";
+const NEXU_POSTER_BG_FILE = "assets/poster-bg.png";
 const ACTIVE_JOB_STATUSES = new Set(["queued", "running"]);
 const TERMINAL_JOB_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
 const FINAL_HOST_SUFFIX = ".nexu.space";
@@ -118,6 +123,96 @@ function assertNonEmptyString(value, fieldName) {
   return value.trim();
 }
 
+function stringLength(value) {
+  return Array.from(value).length;
+}
+
+function assertStringLength(value, fieldName, min, max) {
+  if (typeof value !== "string") {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must be a string.`,
+    );
+  }
+  const length = stringLength(value.trim());
+  if (length < min || length > max) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must be ${min}-${max} characters.`,
+    );
+  }
+  return value.trim();
+}
+
+function assertPlainText(value, fieldName, min, max) {
+  const text = assertStringLength(value, fieldName, min, max);
+  if (/\r|\n/u.test(text)) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must not contain newlines.`,
+    );
+  }
+  if (/<[^>]+>/u.test(text)) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must not contain HTML.`,
+    );
+  }
+  if (/[`*_>#]/u.test(text)) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must not contain markdown.`,
+    );
+  }
+  return text;
+}
+
+function assertExactText(value, fieldName, expected) {
+  if (typeof value !== "string" || value !== expected) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must match the required fixed value.`,
+    );
+  }
+  return value;
+}
+
+function assertMetricLabel(value, fieldName, min, max) {
+  const label = assertStringLength(value, fieldName, min, max);
+  if (/\r|\n/u.test(label) || /<[^>]+>/u.test(label)) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must be plain text.`,
+    );
+  }
+  return label;
+}
+
+function assertMetricValue(value, fieldName, { allowPercent = false } = {}) {
+  if (typeof value !== "string") {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must be a string.`,
+    );
+  }
+  const text = value.trim();
+  if (allowPercent) {
+    if (!/^\d+%$/u.test(text)) {
+      throw new Error(
+        `deploy-skill template field ${fieldName} must be a percentage string.`,
+      );
+    }
+    return text;
+  }
+  if (!/^\d+$/u.test(text)) {
+    throw new Error(
+      `deploy-skill template field ${fieldName} must be a numeric string without percent notation.`,
+    );
+  }
+  return text;
+}
+
+function assertPortraitId(value) {
+  if (typeof value !== "string" || !(value in DISTILL_PORTRAIT_MAP)) {
+    throw new Error(
+      `deploy-skill template field portraitId must be one of: ${Object.keys(DISTILL_PORTRAIT_MAP).join(", ")}.`,
+    );
+  }
+  return value;
+}
+
 async function readRequiredFile(filePath) {
   return readFile(filePath, "utf8");
 }
@@ -160,13 +255,37 @@ function parseTemplateContent(templateId, payload) {
     throw new Error("deploy-skill template content must be a JSON object.");
   }
 
-  const title = assertNonEmptyString(payload.title, "title");
+  const title = assertStringLength(payload.title, "title", 2, 10);
   const subtitle = assertNonEmptyString(payload.subtitle, "subtitle");
-  const description = assertNonEmptyString(payload.description, "description");
-  const ctaText = assertNonEmptyString(payload.ctaText, "ctaText");
-  const installText = assertNonEmptyString(payload.installText, "installText");
+  if (
+    stringLength(subtitle) < 15 ||
+    stringLength(subtitle) > 30 ||
+    !subtitle.includes("牛马指数") ||
+    !subtitle.includes("/100") ||
+    !subtitle.includes("—")
+  ) {
+    throw new Error(
+      "deploy-skill template field subtitle must be 15-30 characters and include 牛马指数, /100, and —.",
+    );
+  }
+  const description = assertPlainText(
+    payload.description,
+    "description",
+    150,
+    250,
+  );
+  const ctaText = assertExactText(
+    payload.ctaText,
+    "ctaText",
+    "⭐ 生成我的牛马锐评",
+  );
+  const installText = assertExactText(
+    payload.installText,
+    "installText",
+    "复制链接发给你的 nexu agent：https://github.com/nexu-io/roast-skill",
+  );
   const tags = assertArrayLength(payload.tags, "tags", 1, 8).map((tag, index) =>
-    assertNonEmptyString(tag, `tags[${index}]`),
+    assertStringLength(tag, `tags[${index}]`, 2, 8),
   );
   const metrics = assertArrayLength(payload.metrics, "metrics", 4, 6).map(
     (metric, index) => {
@@ -175,9 +294,21 @@ function parseTemplateContent(templateId, payload) {
           `deploy-skill template field metrics[${index}] is invalid.`,
         );
       }
+      const labelMin = index === 0 ? 6 : 6;
+      const labelMax = index === 0 ? 10 : 12;
       return {
-        label: assertNonEmptyString(metric.label, `metrics[${index}].label`),
-        value: assertNonEmptyString(metric.value, `metrics[${index}].value`),
+        label: assertMetricLabel(
+          metric.label,
+          `metrics[${index}].label`,
+          labelMin,
+          labelMax,
+        ),
+        value:
+          index === 0
+            ? assertMetricValue(metric.value, `metrics[${index}].value`)
+            : assertMetricValue(metric.value, `metrics[${index}].value`, {
+                allowPercent: true,
+              }),
       };
     },
   );
@@ -189,11 +320,18 @@ function parseTemplateContent(templateId, payload) {
         );
       }
       return {
-        question: assertNonEmptyString(
+        question: assertPlainText(
           card.question,
           `qaCards[${index}].question`,
+          3,
+          8,
         ),
-        answer: assertNonEmptyString(card.answer, `qaCards[${index}].answer`),
+        answer: assertPlainText(
+          card.answer,
+          `qaCards[${index}].answer`,
+          80,
+          150,
+        ),
       };
     },
   );
@@ -215,7 +353,7 @@ function parseTemplateContent(templateId, payload) {
       }
       return {
         speaker,
-        text: assertNonEmptyString(dialog.text, `dialogs[${index}].text`),
+        text: assertPlainText(dialog.text, `dialogs[${index}].text`, 15, 80),
       };
     },
   );
@@ -223,6 +361,7 @@ function parseTemplateContent(templateId, payload) {
   return {
     title,
     subtitle,
+    portraitId: assertPortraitId(payload.portraitId),
     tags,
     metrics,
     description,
@@ -230,38 +369,57 @@ function parseTemplateContent(templateId, payload) {
     dialogs,
     ctaText,
     installText,
+    posterSpeciesEmoji: assertStringLength(
+      payload.posterSpeciesEmoji,
+      "posterSpeciesEmoji",
+      1,
+      4,
+    ),
+    posterSpeciesName: assertStringLength(
+      payload.posterSpeciesName,
+      "posterSpeciesName",
+      3,
+      8,
+    ),
+    posterSpeciesSub: assertStringLength(
+      payload.posterSpeciesSub,
+      "posterSpeciesSub",
+      5,
+      8,
+    ),
   };
 }
 
 function renderDistillCampaignHtml(content, selectedAvatar) {
-  const profileTags = content.tags
-    .map((tag, index) => {
-      const types = ["company", "role", "level", "mbti", "vibe"];
-      return `<span class="ptag" data-type="${types[index % types.length]}">${escapeHtml(tag)}</span>`;
-    })
-    .join("");
   const socialTags = content.tags
+    .slice(0, 8)
     .map(
       (tag, index) =>
         `<span class="stag stag-${["purple", "cyan", "orange", "teal", "mint"][index % 5]}">${escapeHtml(tag)}</span>`,
     )
     .join("");
-  const statsMarkup = content.metrics
+  const posterTagsMarkup = content.tags
+    .slice(0, 8)
     .map(
-      (metric) => `
-        <div class="stat-box">
-          <div class="stat-val">${escapeHtml(metric.value)}</div>
-          <div class="stat-label">${escapeHtml(metric.label)}</div>
-        </div>`,
+      (tag, index) =>
+        `<span class="poster-tag stag stag-${["purple", "cyan", "orange", "teal", "mint"][index % 5]}">${escapeHtml(tag)}</span>`,
     )
     .join("");
-  const barsMarkup = content.metrics
+  const posterTagChunks = posterTagsMarkup
+    .split("</span>")
+    .filter(Boolean)
+    .map((part) => `${part}</span>`);
+  const posterTagsRowOne = posterTagChunks.slice(0, 4).join("");
+  const posterTagsRowTwo = posterTagChunks.slice(4, 8).join("");
+  const posterMetric = content.metrics[0];
+  const secondaryMetrics = content.metrics.slice(1);
+  const barsMarkup = secondaryMetrics
     .map(
       (metric, index) => `
         <div class="bar-item">
           <label>${escapeHtml(metric.label)} <span>${escapeHtml(metric.value)}</span></label>
           <div class="bar-track">
-            <div class="bar-fill ${index === content.metrics.length - 1 ? "mint" : index === content.metrics.length - 2 ? "orange" : ""}" style="width:${percentageFromMetricValue(metric.value)}%"></div>
+            <div class="bar-fill ${index === secondaryMetrics.length - 1 ? "mint" : index === secondaryMetrics.length - 2 ? "orange" : ""}" style="width:${percentageFromMetricValue(metric.value)}%"></div>
           </div>
         </div>`,
     )
@@ -282,14 +440,17 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
     .map(
       (dialog) => `
         <div class="chat-msg ${dialog.speaker}">
-          <div class="chat-avatar">${dialog.speaker === "bot" ? "🧠" : "👤"}</div>
+          <div class="chat-avatar">${dialog.speaker === "bot" ? `<img src="images/${escapeHtml(selectedAvatar.fileName)}" alt="${escapeHtml(content.title)}" />` : "👤"}</div>
           <div class="chat-bubble">${escapeHtml(dialog.text)}</div>
         </div>`,
     )
     .join("");
   const promptMarkup = content.tags
     .slice(0, 4)
-    .map((tag) => `<span class="chat-prompt-btn">${escapeHtml(tag)}</span>`)
+    .map(
+      (tag) =>
+        `<button class="chat-prompt-btn" type="button">${escapeHtml(tag)}</button>`,
+    )
     .join("");
   return `<!doctype html>
 <html lang="zh-CN">
@@ -305,29 +466,29 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
   <body>
     <header class="site-header">
       <div class="site-header-inner">
-        <div class="site-brand">nexu</div>
+        <img src="${NEXU_LOGO_FILE}" alt="nexu" class="site-logo" id="site-logo" />
+        <button class="theme-toggle" id="theme-toggle" type="button" onclick="toggleTheme()" title="切换主题">☽</button>
       </div>
     </header>
 
     <div class="layout">
       <div class="left-side">
-        <div class="card profile-header">
-          <div class="avatar-wrap">
-            <div class="avatar-ring">
-              <div class="avatar-inner">
-                <img id="avatar-img" src="images/${escapeHtml(selectedAvatar.fileName)}" alt="${escapeHtml(content.title)}" />
+        <div class="profile-main">
+          <div class="profile-left">
+            <div class="avatar-wrap" id="avatar-wrap" onclick="cycleAvatar()">
+              <div class="avatar-ring">
+                <div class="avatar-inner">
+                  <img id="avatar-img" src="images/${escapeHtml(selectedAvatar.fileName)}" alt="${escapeHtml(content.title)}" />
+                </div>
               </div>
             </div>
+            <div class="avatar-hint">点击切换 · 1/1</div>
           </div>
-          <div class="avatar-hint">随机头像</div>
-          <div class="profile-name">${escapeHtml(content.title)}</div>
-          <div class="profile-sub">${escapeHtml(content.subtitle)}</div>
-          <div class="profile-tags">${profileTags}</div>
-        </div>
-
-        <div class="optical-wrap">
-          <div class="optical"><div class="optical-figure"></div></div>
-          <span class="optical-label">scroll to run</span>
+          <div class="profile-info">
+            <div class="profile-name">${escapeHtml(content.title)}</div>
+            <div class="profile-sub">${escapeHtml(content.subtitle)}</div>
+            <div class="social-tags" style="margin-bottom:0">${socialTags}</div>
+          </div>
         </div>
         <a class="generate-btn" href="${ROAST_SKILL_URL}" target="_blank" rel="noreferrer">⭐ 生成我的赛博分身</a>
       </div>
@@ -335,13 +496,20 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
       <div class="right-side">
         <div class="page-wrap">
           <div class="card">
-            <div class="sec-title">身份标签</div>
-            <div class="social-tags">${socialTags}</div>
-          </div>
-
-          <div class="card">
             <div class="sec-title">核心指标</div>
-            <div class="stats-row">${statsMarkup}</div>
+            <div class="stats-row">
+              <div class="stat-box">
+                <div class="stat-val">${escapeHtml(posterMetric.value)}</div>
+                <div class="stat-label">${escapeHtml(posterMetric.label)}</div>
+              </div>
+              <div class="stat-box species-card">
+                <div class="species-emoji">${escapeHtml(content.posterSpeciesEmoji)}</div>
+                <div class="species-info">
+                  <div class="species-name">${escapeHtml(content.posterSpeciesName)}</div>
+                  <div class="species-sub">${escapeHtml(content.posterSpeciesSub)}</div>
+                </div>
+              </div>
+            </div>
             <div class="roast-text" style="margin-top:16px;">${escapeHtml(content.description)}</div>
             <div class="bar-list" style="margin-top:20px;">${barsMarkup}</div>
           </div>
@@ -370,7 +538,7 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
               <button class="code-copy" id="copy-btn">复制</button>
             </div>
             <div class="skill-progress">
-              <div class="skill-progress-header"><span>${escapeHtml(content.ctaText)}</span><span>100%</span></div>
+              <div class="skill-progress-header"><span>${escapeHtml(content.ctaText)}</span><span>${escapeHtml(posterMetric.value)}</span></div>
               <div class="progress-track"><div class="progress-fill"></div></div>
             </div>
             <a class="download-btn" href="${NEXU_REPO_URL}" target="_blank" rel="noreferrer">⬇ 下载 nexu</a>
@@ -379,9 +547,9 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
           <div class="card">
             <div class="sec-title">分享</div>
             <div class="share-row">
-              <a class="share-btn" id="share-x" href="https://twitter.com/intent/tweet" target="_blank" rel="noreferrer">𝕏 分享</a>
-              <a class="share-btn" id="share-rednote" href="xhsdiscover://post" target="_blank" rel="noreferrer">📕 小红书</a>
-              <a class="share-btn" id="share-jike" href="https://web.okjike.com/" target="_blank" rel="noreferrer">⚡ 即刻</a>
+              <button class="share-btn" id="share-x" type="button" onclick="share('X')">𝕏 分享</button>
+              <button class="share-btn" id="share-rednote" type="button" onclick="share('rednote')">📕 小红书</button>
+              <button class="share-btn" id="share-jike" type="button" onclick="share('jike')">⚡ 即刻</button>
               <button class="share-btn" id="share-poster" type="button" onclick="openPoster()">📸 海报</button>
             </div>
           </div>
@@ -397,25 +565,82 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
       <div class="poster-modal">
         <h3>分享海报</h3>
         <p>长按保存图片，分享给好友</p>
-        <div class="poster-placeholder">🎴 海报暂未接入</div>
-        <button class="poster-close" type="button" onclick="closePoster()">关闭</button>
+        <div class="poster-card">
+          <div class="poster-canvas">
+            <div class="poster-paper"></div>
+            <div class="poster-outer-frame">
+              <div class="poster-inner-frame">
+                <div class="poster-artwork"></div>
+                <div class="poster-avatar-wrap">
+                  <img class="poster-avatar" src="images/${escapeHtml(selectedAvatar.fileName)}" alt="${escapeHtml(content.title)}" />
+                </div>
+                <div class="poster-title">${escapeHtml(content.title)}</div>
+                <div class="poster-divider"></div>
+                <div class="poster-tags poster-tags-row poster-tags-row-1">${posterTagsRowOne}</div>
+                <div class="poster-tags poster-tags-row poster-tags-row-2">${posterTagsRowTwo}</div>
+                <div class="poster-species-card">
+                  <div class="poster-species-emoji">${escapeHtml(content.posterSpeciesEmoji)}</div>
+                  <div class="poster-species-copy">
+                    <div class="poster-species-name">${escapeHtml(content.posterSpeciesName)}</div>
+                    <div class="poster-species-sub">${escapeHtml(content.posterSpeciesSub)}</div>
+                  </div>
+                </div>
+                <div class="poster-stat-card">
+                  <div class="poster-score">${escapeHtml(posterMetric.value)}</div>
+                  <div class="poster-score-label">${escapeHtml(posterMetric.label)}</div>
+                </div>
+                <div class="poster-qr-block">
+                  <img src="${NEXU_QR_FILE}" alt="Nexu QR code" class="poster-qr-image" />
+                </div>
+                <div class="poster-orbit" aria-hidden="true">
+                  <div class="poster-orbit-blue poster-orbit-blue-a"></div>
+                  <div class="poster-orbit-blue poster-orbit-blue-b"></div>
+                  <div class="poster-orbit-blue poster-orbit-blue-c"></div>
+                  <div class="poster-orbit-blue poster-orbit-blue-d"></div>
+                  <div class="poster-orbit-ring poster-orbit-ring-outer"></div>
+                  <div class="poster-orbit-ring poster-orbit-ring-inner"></div>
+                </div>
+              </div>
+            </div>
+            <div class="poster-footer">Github：https://github.com/nexu-io/nexu</div>
+          </div>
+        </div>
+        </div>
+        <div class="poster-btns">
+          <button class="poster-close" type="button" onclick="closePoster()">关闭</button>
+        </div>
       </div>
     </div>
 
     <script>
       const shareText = ${JSON.stringify("我刚用 AI 扒了自己一层皮，来看看我的赛博分身 👉")};
       const installCommand = ${JSON.stringify(content.installText)};
-      const currentUrl = encodeURIComponent(window.location.href);
-      const currentText = encodeURIComponent(\`\${shareText} \${document.title}\`);
-      const shareLinks = {
-        x: \`https://twitter.com/intent/tweet?text=\${currentText}&url=\${currentUrl}\`,
-        rednote: "xhsdiscover://post",
-        jike: "https://web.okjike.com/",
-      };
+      const avatarImgs = [${JSON.stringify(`images/${selectedAvatar.fileName}`)}];
+      let avatarIdx = 0;
 
-      document.getElementById("share-x").href = shareLinks.x;
-      document.getElementById("share-rednote").href = shareLinks.rednote;
-      document.getElementById("share-jike").href = shareLinks.jike;
+      function cycleAvatar() {
+        avatarIdx = (avatarIdx + 1) % avatarImgs.length;
+        const img = document.getElementById("avatar-img");
+        img.style.opacity = "0";
+        setTimeout(() => {
+          img.src = avatarImgs[avatarIdx];
+          img.style.opacity = "1";
+        }, 200);
+        document.querySelector(".avatar-hint").textContent = \`点击切换 · \${avatarIdx + 1}/\${avatarImgs.length}\`;
+      }
+
+      function share(platform) {
+        const text = encodeURIComponent(shareText);
+        const url = encodeURIComponent(window.location.href);
+        const links = {
+          X: \`https://twitter.com/intent/tweet?text=\${text}&url=\${url}\`,
+          rednote: "xhsdiscover://post",
+          jike: "https://web.okjike.com/",
+        };
+        if (links[platform]) {
+          window.open(links[platform], "_blank");
+        }
+      }
 
       function openPoster() {
         document.getElementById("poster-overlay").classList.add("open");
@@ -439,22 +664,38 @@ function renderDistillCampaignHtml(content, selectedAvatar) {
           }, 1800);
         });
       });
+
+      function toggleTheme() {
+        const html = document.documentElement;
+        const nextTheme = html.dataset.theme === "light" ? "dark" : "light";
+        html.dataset.theme = nextTheme;
+        document.getElementById("theme-toggle").textContent =
+          nextTheme === "light" ? "☀" : "☽";
+        localStorage.setItem("theme", nextTheme);
+      }
+
+      (function() {
+        const saved = localStorage.getItem("theme") || "dark";
+        document.documentElement.dataset.theme = saved;
+        document.getElementById("theme-toggle").textContent =
+          saved === "light" ? "☀" : "☽";
+      })();
     </script>
   </body>
 </html>`;
 }
 
-async function selectRandomAvatar(randomImpl = Math.random) {
-  const imageEntries = (await readdir(DISTILL_AVATAR_ROOT)).filter((entry) =>
-    /\.(png|jpg|jpeg|webp)$/iu.test(entry),
-  );
-  if (imageEntries.length === 0) {
+async function selectPortraitAvatar(portraitId) {
+  const fileName = DISTILL_PORTRAIT_MAP[portraitId];
+  if (!fileName) {
+    throw new Error("deploy-skill template field portraitId is invalid.");
+  }
+  await stat(DISTILL_AVATAR_ROOT);
+  const filePath = path.join(DISTILL_AVATAR_ROOT, fileName);
+  const fileStats = await stat(filePath).catch(() => null);
+  if (!fileStats?.isFile()) {
     throw new Error("deploy-skill template is missing avatar images.");
   }
-  const selectedIndex =
-    Math.floor(randomImpl() * imageEntries.length) % imageEntries.length;
-  const fileName = imageEntries.sort()[selectedIndex];
-  const filePath = path.join(DISTILL_AVATAR_ROOT, fileName);
   return {
     fileName,
     bytes: await readFile(filePath),
@@ -465,11 +706,20 @@ async function renderTemplateFiles(templateId, content, deps = {}) {
   if (templateId !== "distill-campaign") {
     throw new Error(`deploy-skill unknown template: ${templateId}`);
   }
-  const selectedAvatar = await selectRandomAvatar(deps.randomImpl);
+  const selectedAvatar = await selectPortraitAvatar(content.portraitId);
   return {
     "index.html": renderDistillCampaignHtml(content, selectedAvatar),
     "styles.css": await readRequiredFile(
       path.join(TEMPLATE_ROOT, "distill-campaign", "styles.css"),
+    ),
+    [NEXU_LOGO_FILE]: await readFile(
+      path.join(TEMPLATE_ROOT, "distill-campaign", NEXU_LOGO_FILE),
+    ),
+    [NEXU_QR_FILE]: await readFile(
+      path.join(TEMPLATE_ROOT, "distill-campaign", NEXU_QR_FILE),
+    ),
+    [NEXU_POSTER_BG_FILE]: await readFile(
+      path.join(TEMPLATE_ROOT, "distill-campaign", NEXU_POSTER_BG_FILE),
     ),
     [`images/${selectedAvatar.fileName}`]: selectedAvatar.bytes,
   };

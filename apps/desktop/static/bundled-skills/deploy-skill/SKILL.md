@@ -78,16 +78,27 @@ node scripts/deploy_skill.js submit \
   [--user-id USER_ID]
 ```
 
-The content file must be structured JSON with:
-- `title`
-- `subtitle`
-- `tags`
-- `metrics`
-- `description`
-- `qaCards`
-- `dialogs`
-- `ctaText`
-- `installText`
+The content file must be structured JSON with this exact frame:
+- `title`: 2-10 characters
+- `subtitle`: 15-30 characters and must include `牛马指数`, `/100`, and `—`
+- `portraitId`: must be one of `portrait-1` through `portrait-7`
+- `tags`: 1-8 strings, each 2-8 characters
+- `metrics`: 4-6 items total
+- `posterSpeciesEmoji`
+- `posterSpeciesName`: 3-8 characters
+- `posterSpeciesSub`: 5-8 characters
+- `description`: 150-250 characters, no markdown, HTML, or newlines
+- `qaCards`: 2-3 items
+- `dialogs`: 3-6 items
+- `ctaText`: must equal `⭐ 生成我的牛马锐评`
+- `installText`: must equal `复制链接发给你的 nexu agent：https://github.com/nexu-io/roast-skill`
+
+If any field violates the frame, the skill rejects the payload and does not render. It never truncates, rewrites, or invents missing values.
+
+Portrait rule:
+- The agent must choose `portraitId` explicitly.
+- The skill does not randomly pick a head portrait anymore.
+- Any missing or unknown `portraitId` is rejected before rendering.
 
 To restore unfinished jobs after a restart:
 

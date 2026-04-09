@@ -33,6 +33,47 @@ describe("deploy skill core", () => {
     );
   }
 
+  function buildCanonicalTemplateContent(overrides = {}) {
+    return {
+      title: "李锦威",
+      subtitle: "牛马指数 92/100 — 龙虾成瘾者",
+      portraitId: "portrait-2",
+      tags: ["nexu", "增长产品", "协作", "ENTJ"],
+      metrics: [
+        { label: "🐂🐴 牛马指数", value: "92" },
+        { label: "⚡ 热点追击", value: "95%" },
+        { label: "🧠 信息密度", value: "88%" },
+        { label: "📈 操盘手感", value: "90%" },
+      ],
+      posterSpeciesEmoji: "🦞",
+      posterSpeciesName: "龙虾成瘾者",
+      posterSpeciesSub: "办公室物种鉴定",
+      description:
+        "你是那种能把信息差、执行力和控制欲拧成一根钢缆的人。你看起来像在推进项目，实际上是在逼时间给你让路。你对热点的嗅觉过于灵敏，对机会的反应快到让同事怀疑你是不是提前收到了剧本。你最大的可怕之处不是卷，而是你卷得很有方法。可你也不是没有裂缝，你只是太习惯在别人慌乱时继续往前走，忘了自己也会累。好在你心里仍然留着一点柔软，所以你不只是一个推进器，还是那个会把团队一起带上岸的人。",
+      qaCards: [
+        {
+          question: "致命优势",
+          answer:
+            "你对节奏的判断极准，知道什么时候该抢，什么时候该守。你不会为了显得聪明而拖慢推进，反而总能在别人犹豫时先把路试出来。你的行动不是盲冲，而是把混乱快速压缩成可执行路径，这种能力很稀缺，也很适合高压协作环境和临场决策，让团队在最短时间里看到清晰结果。",
+        },
+        {
+          question: "人生建议",
+          answer:
+            "继续保持你的锋利，但别把所有事都扛成自己的责任。你真正厉害的地方，不只是能冲，还能让别人跟你一起冲。把部分控制欲换成更稳定的协作，你会更轻松，也会走得更远，而且不会把自己磨得太累。把协作当成放大器，而不是额外负担，效果会更稳。",
+        },
+      ],
+      dialogs: [
+        { speaker: "bot", text: "你又在刷新热点榜单，准备下一轮出手了？" },
+        { speaker: "user", text: "不是刷新，我是在提前埋伏下一轮更大的机会。" },
+        { speaker: "bot", text: "行，你还是那个把流量当氧气吸的人。" },
+      ],
+      ctaText: "⭐ 生成我的牛马锐评",
+      installText:
+        "复制链接发给你的 nexu agent：https://github.com/nexu-io/roast-skill",
+      ...overrides,
+    };
+  }
+
   afterEach(async () => {
     vi.restoreAllMocks();
     if (rootDir) {
@@ -257,52 +298,179 @@ describe("deploy skill core", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("rejects a title outside the 2-10 character limit", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "deploy-skill-"));
+    const contentPath = path.join(rootDir, "bad-title.json");
+    await writeLocalNexuConfig();
+    await savePageDeployConfig(rootDir, {
+      baseUrl: "https://deploy.example.com",
+    });
+    await writeFile(
+      contentPath,
+      JSON.stringify(
+        buildCanonicalTemplateContent({
+          title: "A",
+        }),
+      ),
+    );
+
+    await expect(
+      submitPageDeployTemplateJob(
+        {
+          nexuHome: rootDir,
+          templateId: "distill-campaign",
+          contentFile: contentPath,
+          botId: "bot-1",
+          chatId: "C123",
+          chatType: "channel",
+          channel: "slack",
+          sessionKey: "session-1",
+        },
+        { fetchImpl: vi.fn() },
+      ),
+    ).rejects.toThrow(/title/i);
+  });
+
+  it("rejects subtitle strings that do not match the required overall format", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "deploy-skill-"));
+    const contentPath = path.join(rootDir, "bad-subtitle.json");
+    await writeLocalNexuConfig();
+    await savePageDeployConfig(rootDir, {
+      baseUrl: "https://deploy.example.com",
+    });
+    await writeFile(
+      contentPath,
+      JSON.stringify(
+        buildCanonicalTemplateContent({
+          subtitle: "Founder / Product / Builder",
+        }),
+      ),
+    );
+
+    await expect(
+      submitPageDeployTemplateJob(
+        {
+          nexuHome: rootDir,
+          templateId: "distill-campaign",
+          contentFile: contentPath,
+          botId: "bot-1",
+          chatId: "C123",
+          chatType: "channel",
+          channel: "slack",
+          sessionKey: "session-1",
+        },
+        { fetchImpl: vi.fn() },
+      ),
+    ).rejects.toThrow(/subtitle/i);
+  });
+
+  it("rejects portrait ids outside the allowed bundled set", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "deploy-skill-"));
+    const contentPath = path.join(rootDir, "bad-portrait.json");
+    await writeLocalNexuConfig();
+    await savePageDeployConfig(rootDir, {
+      baseUrl: "https://deploy.example.com",
+    });
+    await writeFile(
+      contentPath,
+      JSON.stringify(
+        buildCanonicalTemplateContent({
+          portraitId: "portrait-99",
+        }),
+      ),
+    );
+
+    await expect(
+      submitPageDeployTemplateJob(
+        {
+          nexuHome: rootDir,
+          templateId: "distill-campaign",
+          contentFile: contentPath,
+          botId: "bot-1",
+          chatId: "C123",
+          chatType: "channel",
+          channel: "slack",
+          sessionKey: "session-1",
+        },
+        { fetchImpl: vi.fn() },
+      ),
+    ).rejects.toThrow(/portraitId/i);
+  });
+
+  it("rejects metrics with a main score that includes percent notation", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "deploy-skill-"));
+    const contentPath = path.join(rootDir, "bad-metrics.json");
+    await writeLocalNexuConfig();
+    await savePageDeployConfig(rootDir, {
+      baseUrl: "https://deploy.example.com",
+    });
+    await writeFile(
+      contentPath,
+      JSON.stringify(
+        buildCanonicalTemplateContent({
+          metrics: [
+            { label: "🐂🐴 牛马指数", value: "92%" },
+            { label: "⚡ 热点追击", value: "95%" },
+            { label: "🧠 信息密度", value: "88%" },
+            { label: "📈 操盘手感", value: "90%" },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      submitPageDeployTemplateJob(
+        {
+          nexuHome: rootDir,
+          templateId: "distill-campaign",
+          contentFile: contentPath,
+          botId: "bot-1",
+          chatId: "C123",
+          chatType: "channel",
+          channel: "slack",
+          sessionKey: "session-1",
+        },
+        { fetchImpl: vi.fn() },
+      ),
+    ).rejects.toThrow(/metrics\[0\]\.value/i);
+  });
+
   it("renders the distill-campaign template into a root-level zip before submit", async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), "deploy-skill-"));
     const contentPath = path.join(rootDir, "distill.json");
     await writeLocalNexuConfig();
     await writeFile(
       contentPath,
-      JSON.stringify({
-        title: "Alice 的赛博分身",
-        subtitle: "Founder / Product / Builder",
-        tags: ["高执行力", "夜间工作流", "AI Native"],
-        metrics: [
-          { label: "执行力", value: "96%" },
-          { label: "画饼力", value: "88%" },
-          { label: "信息密度", value: "91%" },
-          { label: "摸鱼力", value: "6%" },
-        ],
-        description:
-          "Alice is the kind of builder who turns loose notes into a shipped campaign before lunch.",
-        qaCards: [
-          {
-            question: "核心优势",
-            answer: "先用起来，再决定边界。",
-          },
-          {
-            question: "致命弱点",
-            answer: "该收口的时候收口，该冲刺的时候冲刺。",
-          },
-        ],
-        dialogs: [
-          {
-            speaker: "bot",
-            text: "我是 Alice 的赛博分身，随时在线，永不关机。",
-          },
-          {
-            speaker: "user",
-            text: "你怎么看 AI Agent？",
-          },
-          {
-            speaker: "bot",
-            text: "先用起来，再决定边界。",
-          },
-        ],
-        ctaText: "安装 roast-skill",
-        installText:
-          "openclaw skill install https://github.com/nexu-io/roast-skill",
-      }),
+      JSON.stringify(
+        buildCanonicalTemplateContent({
+          title: "Alice分身",
+          subtitle: "牛马指数 88/100 — AI Builder",
+          tags: ["高执行", "夜间", "AI原生"],
+          metrics: [
+            { label: "🐂🐴 牛马指数", value: "96" },
+            { label: "⚡ 画饼能力", value: "88%" },
+            { label: "🧠 信息密度", value: "91%" },
+            { label: "📈 摸鱼强度", value: "6%" },
+          ],
+          dialogs: [
+            {
+              speaker: "bot",
+              text: "我是 Alice 的赛博分身，随时在线，永不关机。",
+            },
+            {
+              speaker: "user",
+              text: "你怎么看 AI Agent 在团队协作里的真实作用和边界？",
+            },
+            {
+              speaker: "bot",
+              text: "先用起来，再决定边界，边跑边补齐。",
+            },
+          ],
+          ctaText: "⭐ 生成我的牛马锐评",
+          installText:
+            "复制链接发给你的 nexu agent：https://github.com/nexu-io/roast-skill",
+        }),
+      ),
     );
 
     await savePageDeployConfig(rootDir, {
@@ -347,29 +515,89 @@ describe("deploy skill core", () => {
 
     const zip = await JSZip.loadAsync(uploadedZipBuffer);
     expect(Object.keys(zip.files)).toEqual(
-      expect.arrayContaining(["index.html", "styles.css"]),
+      expect.arrayContaining([
+        "index.html",
+        "styles.css",
+        "assets/logo.png",
+        "assets/qr.png",
+        "assets/poster-bg.png",
+      ]),
     );
     expect(
       Object.keys(zip.files).some((name) => name.startsWith("images/")),
     ).toBe(true);
     const indexHtml = await zip.file("index.html").async("string");
-    expect(indexHtml).toContain("Alice 的赛博分身");
-    expect(indexHtml).toContain("Founder / Product / Builder");
-    expect(indexHtml).toContain("生成我的赛博分身");
+    expect(indexHtml).toContain("Alice分身");
+    expect(indexHtml).toContain("牛马指数 88/100 — AI Builder");
     expect(indexHtml).toContain("https://github.com/nexu-io/roast-skill");
     expect(indexHtml).toContain("https://github.com/nexu-io/nexu");
+    expect(indexHtml).toContain('class="theme-toggle"');
+    expect(indexHtml).toContain('class="profile-main"');
+    expect(indexHtml).toContain('class="profile-info"');
+    expect(indexHtml).toContain('class="profile-name">Alice分身<');
     expect(indexHtml).toContain("𝕏 分享");
     expect(indexHtml).toContain("📕 小红书");
     expect(indexHtml).toContain("⚡ 即刻");
     expect(indexHtml).toContain("📸 海报");
+    expect(indexHtml).toContain('src="assets/logo.png"');
+    expect(indexHtml).toContain(
+      'src="images/1d8f55fb0ef3d2a6149d2d999aa79c06_pixian_ai.png"',
+    );
     expect(indexHtml).toContain("https://twitter.com/intent/tweet");
     expect(indexHtml).toContain("xhsdiscover://post");
     expect(indexHtml).toContain("https://web.okjike.com");
     expect(indexHtml).toContain("function openPoster()");
+    expect(indexHtml).toContain("function toggleTheme()");
+    expect(indexHtml).toContain("document.documentElement.dataset.theme");
+    expect(indexHtml).not.toContain("scroll to run");
+    expect(indexHtml).toContain('class="poster-card"');
+    expect(indexHtml).toContain('class="poster-canvas"');
+    expect(indexHtml).toContain('class="poster-qr-block"');
+    expect(indexHtml).toContain('class="poster-orbit"');
+    expect(indexHtml).toContain('class="poster-artwork"');
+    expect(indexHtml).toContain('class="poster-title"');
+    expect(indexHtml).toContain('class="poster-divider"');
+    expect(indexHtml).toContain(
+      'class="poster-tags poster-tags-row poster-tags-row-1"',
+    );
+    expect(indexHtml).toContain(
+      'class="poster-tags poster-tags-row poster-tags-row-2"',
+    );
+    expect(indexHtml).toContain('class="poster-species-card"');
+    expect(indexHtml).toContain('class="poster-score"');
+    expect(indexHtml).toContain('class="poster-score-label"');
+    expect(indexHtml).toContain('src="assets/qr.png"');
+    expect(indexHtml).toContain("办公室物种鉴定");
+    expect(indexHtml).toContain("画饼能力");
+    expect(indexHtml).toContain('class="poster-score">96<');
     expect(indexHtml).toContain("我是 Alice 的赛博分身，随时在线，永不关机。");
     expect(indexHtml).toContain(
-      "openclaw skill install https://github.com/nexu-io/roast-skill",
+      "复制链接发给你的 nexu agent：https://github.com/nexu-io/roast-skill",
     );
+    expect(
+      (indexHtml.match(/class="poster-tag\b[^"]*"/g) ?? []).length,
+    ).toBeGreaterThanOrEqual(3);
+    const stylesCss = await zip.file("styles.css").async("string");
+    expect(stylesCss).toContain(
+      'background-image: url("./assets/poster-bg.png")',
+    );
+    expect(stylesCss).toContain('font-family: "Apple Braille", var(--sans);');
+    expect(stylesCss).toContain("font-size: 77px;");
+    expect(stylesCss).toContain(
+      'font-family: "PingFang SC", "Inter", sans-serif;',
+    );
+    expect(stylesCss).toContain("font-size: 13px;");
+    expect(stylesCss).toContain(
+      'font-family: "Archivo Black", "Inter", sans-serif;',
+    );
+    expect(stylesCss).toContain("font-size: 123px;");
+    expect(stylesCss).toContain(
+      'font-family: "Abhaya Libre", "Times New Roman", serif;',
+    );
+    expect(stylesCss).toContain("font-size: 17px;");
+    expect(stylesCss).toContain("--header-bg: rgba(0, 0, 0, 0.88);");
+    expect(stylesCss).toContain("--header-bg: rgba(255, 255, 255, 0.92);");
+    expect(stylesCss).toContain("background: var(--header-bg);");
   });
 
   it("rejects unknown template ids before submission", async () => {
