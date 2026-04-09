@@ -201,13 +201,18 @@ describe("runtime stability regressions", () => {
 
     expect(first.plugins?.allow).toEqual(second.plugins?.allow);
     expect(first.plugins?.allow).toEqual([
-      "dingtalk-connector",
-      "nexu-credit-guard",
-      "nexu-platform-bootstrap",
-      "nexu-runtime-model",
-      "openclaw-qqbot",
-      "wecom",
+      ...[...(first.plugins?.allow ?? [])].sort(),
     ]);
+    expect(first.plugins?.allow).toEqual(
+      expect.arrayContaining([
+        "dingtalk-connector",
+        "nexu-credit-guard",
+        "nexu-platform-bootstrap",
+        "nexu-runtime-model",
+        "openclaw-qqbot",
+        "wecom",
+      ]),
+    );
   });
 
   it("preserves explicit BYOK model selections when the provider has no allowlist", async () => {

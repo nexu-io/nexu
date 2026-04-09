@@ -105,7 +105,9 @@ describe("WorkspaceLayout desktop platform variants", () => {
 
     const markup = renderWorkspaceLayout();
 
-    expect(markup).toContain("-mt-14 h-14 pl-[76px] pt-[10px] pr-3 pb-0");
+    expect(markup).toContain(
+      "flex items-center justify-between px-3 shrink-0 -mt-14 h-14 pl-[76px] pt-[10px] pr-3 pb-0",
+    );
     expect(markup).toContain('title="layout.collapseSidebar"');
   });
 
