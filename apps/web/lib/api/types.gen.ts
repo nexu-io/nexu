@@ -513,62 +513,6 @@ export type PatchApiInternalDesktopPreferencesResponses = {
 
 export type PatchApiInternalDesktopPreferencesResponse = PatchApiInternalDesktopPreferencesResponses[keyof PatchApiInternalDesktopPreferencesResponses];
 
-export type PostApiInternalLibtvNotifyData = {
-    body: {
-        channel: string;
-        to: string;
-        accountId?: string;
-        threadId?: string;
-        sessionKey: string;
-        idempotencyKey: string;
-        kind: 'submitted' | 'progress' | 'success' | 'failed' | 'timeout';
-        sessionId: string;
-        projectUuid?: string;
-        message: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/internal/libtv-notify';
-};
-
-export type PostApiInternalLibtvNotifyErrors = {
-    /**
-     * LibTV notification delivery failed
-     */
-    500: {
-        ok: boolean;
-        result?: {
-            runId?: string;
-            messageId?: string;
-            channel?: string;
-            chatId?: string;
-            conversationId?: string;
-        };
-        error?: string;
-    };
-};
-
-export type PostApiInternalLibtvNotifyError = PostApiInternalLibtvNotifyErrors[keyof PostApiInternalLibtvNotifyErrors];
-
-export type PostApiInternalLibtvNotifyResponses = {
-    /**
-     * LibTV notification delivered through the gateway
-     */
-    200: {
-        ok: boolean;
-        result?: {
-            runId?: string;
-            messageId?: string;
-            channel?: string;
-            chatId?: string;
-            conversationId?: string;
-        };
-        error?: string;
-    };
-};
-
-export type PostApiInternalLibtvNotifyResponse = PostApiInternalLibtvNotifyResponses[keyof PostApiInternalLibtvNotifyResponses];
-
 export type GetApiAuthGetSessionData = {
     body?: never;
     path?: never;

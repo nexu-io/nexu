@@ -1,10 +1,26 @@
 #!/usr/bin/env python3
-"""LibTV Video Skill - AI video/image generation via LibTV Gateway
+"""LibTV Video Skill - AI video/image generation via Nexu Seedance or direct LibTV
+
+Delivery architecture:
+  - `create-session` submits the job, captures the channel + chat_id from
+    OpenClaw env vars, persists them, forks a detached background
+    `wait-and-deliver` process, and returns immediately with a JSON submit
+    confirmation for the parent session's model to acknowledge.
+  - The forked `wait-and-deliver` process polls the upstream API until
+    terminal, then delivers the result directly to the originating channel
+    (currently Feishu only) by shelling out to the per-channel helper
+    `feishu_send_video.py`, which uploads the video to the channel's file
+    API and posts a native media message.
+
+No OpenClaw subagent, no sessions_spawn, no model-speech contract. The
+delivery is a direct HTTP call with stable per-user identifiers (Feishu
+`open_id`/`chat_id`) so it does not depend on the parent session staying
+alive or on per-turn channel bindings.
 
 Usage:
-  libtv_video.py setup --api-key mgk_xxx [--video-ratio 16:9]
+  libtv_video.py setup --api-key <mgk_xxx|sk-libtv_xxx> [--video-ratio 16:9]
   libtv_video.py check
-  libtv_video.py update-key --api-key mgk_xxx
+  libtv_video.py update-key --api-key <mgk_xxx|sk-libtv_xxx>
   libtv_video.py update-ratio --video-ratio 16:9
   libtv_video.py remove-key
   libtv_video.py upload --file /path/to/image.png
@@ -17,9 +33,12 @@ Usage:
 """
 
 import argparse
+import http.client
 import json
 import os
 import re
+import socket
+import subprocess
 import sys
 import time
 import urllib.request
@@ -27,16 +46,28 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+# Transient network errors that should cause the poll loop to retry on the
+# next tick rather than crashing the whole wait-and-deliver session.
+TRANSIENT_POLL_ERRORS = (
+    http.client.RemoteDisconnected,
+    http.client.IncompleteRead,
+    ConnectionError,
+    socket.timeout,
+    urllib.error.URLError,
+    TimeoutError,
+)
+
 # ── Config management ──
 
 GATEWAY_URL = "https://seedance.nexu.io/"
+DIRECT_IM_BASE_URL = "https://im.liblib.tv"
 PROJECT_CANVAS_BASE = "https://www.liblib.tv/canvas?projectId="
-DEFAULT_CONTROLLER_URL = "http://127.0.0.1:50800"
 DEFAULT_POLL_INTERVAL_SECONDS = 8
-DEFAULT_PROGRESS_NOTIFY_INTERVAL_SECONDS = 60
 DEFAULT_MAX_POLLS = 23
 DEFAULT_VIDEO_RATIO = "16:9"
 VIDEO_RATIO_PATTERN = re.compile(r"^\d{1,2}:\d{1,2}$")
+AUTH_MODE_NEXU_GATEWAY = "nexu_gateway"
+AUTH_MODE_LIBTV_DIRECT = "libtv_direct"
 
 def _nexu_home():
     return os.environ.get("NEXU_HOME", "").strip() or os.path.expanduser("~/.nexu")
@@ -62,6 +93,21 @@ def _save_config(config):
 def _get_api_key():
     return _load_config().get("apiKey", "")
 
+def _detect_auth_mode(api_key):
+    if api_key.startswith("mgk_"):
+        return AUTH_MODE_NEXU_GATEWAY
+    if api_key.startswith("sk-libtv-"):
+        return AUTH_MODE_LIBTV_DIRECT
+    return ""
+
+def _require_auth_mode():
+    api_key = _get_api_key()
+    mode = _detect_auth_mode(api_key)
+    if mode:
+        return mode
+    print("❌ Invalid API Key format. Expected mgk_... or sk-libtv-....")
+    sys.exit(1)
+
 def _validate_video_ratio(ratio):
     return bool(ratio and VIDEO_RATIO_PATTERN.fullmatch(ratio))
 
@@ -78,6 +124,10 @@ def _get_gateway_url():
     override = os.environ.get("LIBTV_GATEWAY_URL", "").strip()
     return override or GATEWAY_URL
 
+def _get_direct_base_url():
+    override = os.environ.get("LIBTV_DIRECT_BASE_URL", "").strip()
+    return override or DIRECT_IM_BASE_URL
+
 # ── Session persistence ──
 
 def _sessions_file_path():
@@ -91,43 +141,18 @@ def _load_sessions():
         raw_sessions = json.load(f)
     return [_normalize_session_entry(session) for session in raw_sessions]
 
-def _default_notifications():
-    return {
-        "submitted_sent_at": "",
-        "last_progress_sent_at": "",
-        "progress_count": 0,
-        "terminal_sent_at": "",
-        "last_terminal_kind": "",
-    }
-
-def _default_polling():
-    return {
-        "started_at": "",
-        "last_checked_at": "",
-        "poll_count": 0,
-    }
-
 def _normalize_session_entry(entry):
     normalized = dict(entry)
-    notifications = _default_notifications()
-    notifications.update(entry.get("notifications") or {})
-    if not isinstance(notifications.get("progress_count"), int):
-        notifications["progress_count"] = 0
-    normalized["notifications"] = notifications
-
-    polling = _default_polling()
-    polling.update(entry.get("polling") or {})
-    if not isinstance(polling.get("poll_count"), int):
-        polling["poll_count"] = 0
-    normalized["polling"] = polling
+    normalized["auth_mode"] = entry.get("auth_mode", "")
+    normalized["delivery"] = dict(entry.get("delivery") or {})
     return normalized
 
 def _now_iso():
     return datetime.now().isoformat()
 
 def _save_session(session_id, project_uuid="", status="", text="",
-                   result_urls=None, completed_at="", failure_message="", delivery=None,
-                   notifications=None, polling=None):
+                   result_urls=None, completed_at="", failure_message="",
+                   auth_mode="", delivery=None, delivered_at=""):
     sessions = _load_sessions()
     now = _now_iso()
     for s in sessions:
@@ -144,16 +169,12 @@ def _save_session(session_id, project_uuid="", status="", text="",
                 s["completed_at"] = completed_at
             if failure_message:
                 s["failure_message"] = failure_message
-            if delivery:
-                s["delivery"] = delivery
-            if notifications:
-                next_notifications = dict(s.get("notifications") or _default_notifications())
-                next_notifications.update(notifications)
-                s["notifications"] = next_notifications
-            if polling:
-                next_polling = dict(s.get("polling") or _default_polling())
-                next_polling.update(polling)
-                s["polling"] = next_polling
+            if auth_mode:
+                s["auth_mode"] = auth_mode
+            if delivery is not None:
+                s["delivery"] = dict(delivery)
+            if delivered_at:
+                s["delivered_at"] = delivered_at
             s["updated_at"] = now
             break
     else:
@@ -162,25 +183,20 @@ def _save_session(session_id, project_uuid="", status="", text="",
             "project_uuid": project_uuid,
             "status": status or "submitted",
             "submitted_text": text[:80],
+            "auth_mode": auth_mode,
             "created_at": now,
             "updated_at": now,
         })
+        if delivery is not None:
+            entry["delivery"] = dict(delivery)
         if result_urls:
             entry["result_urls"] = result_urls
         if completed_at:
             entry["completed_at"] = completed_at
         if failure_message:
             entry["failure_message"] = failure_message
-        if delivery:
-            entry["delivery"] = delivery
-        if notifications:
-            next_notifications = dict(entry.get("notifications") or _default_notifications())
-            next_notifications.update(notifications)
-            entry["notifications"] = next_notifications
-        if polling:
-            next_polling = dict(entry.get("polling") or _default_polling())
-            next_polling.update(polling)
-            entry["polling"] = next_polling
+        if delivered_at:
+            entry["delivered_at"] = delivered_at
         sessions.append(entry)
     sessions = sessions[-50:]
     path = _sessions_file_path()
@@ -202,15 +218,6 @@ def _find_session(session_id):
 def _project_canvas_url(project_uuid):
     return f"{PROJECT_CANVAS_BASE}{project_uuid}" if project_uuid else ""
 
-def _controller_base_url():
-    explicit = os.environ.get("NEXU_CONTROLLER_URL", "").strip() or os.environ.get("NEXU_CONTROLLER_BASE_URL", "").strip()
-    if explicit:
-        return explicit.rstrip("/")
-    port = os.environ.get("NEXU_CONTROLLER_PORT", "").strip() or os.environ.get("CONTROLLER_PORT", "").strip()
-    if port:
-        return f"http://127.0.0.1:{port}"
-    return DEFAULT_CONTROLLER_URL
-
 def _read_int_env(name, default_value):
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -221,160 +228,136 @@ def _read_int_env(name, default_value):
         return default_value
     return parsed if parsed >= 0 else default_value
 
-def _normalize_delivery_target(channel, raw_to):
-    if not raw_to:
-        return ""
-    if ":" in raw_to:
-        return raw_to
-    if channel == "feishu":
-        return f"user:{raw_to}"
-    return raw_to
+# ── Delivery context ──
 
-def _collect_delivery_context(session_id=""):
-    delivery = {}
+def _collect_delivery_context(cli_channel="", cli_chat_id=""):
+    """Capture the minimum routing info needed to deliver directly to the
+    originating channel. Only stable per-user identifiers — no account_id,
+    no session_key, no thread_id — so persisted values never go stale.
 
-    channel = os.environ.get("OPENCLAW_CHANNEL_TYPE", "").strip()
-    raw_to = os.environ.get("OPENCLAW_CHAT_ID", "").strip()
-    session_key = os.environ.get("OPENCLAW_SESSION_KEY", "").strip()
-    thread_id = os.environ.get("OPENCLAW_THREAD_ID", "").strip()
-    account_id = os.environ.get("OPENCLAW_ACCOUNT_ID", "").strip()
-    to = _normalize_delivery_target(channel, raw_to)
+    Priority: explicit CLI args (--channel, --chat-id) > OPENCLAW_* env
+    vars (which are not reliably set in practice and are kept only for
+    compatibility). The model is expected to extract the chat_id /
+    channel from the inbound Feishu metadata block and pass them
+    explicitly, the same way deploy-skill's `submit` command takes
+    --chat-id / --channel / etc.
+    """
+    channel = (cli_channel or os.environ.get("OPENCLAW_CHANNEL_TYPE", "")).strip().lower()
+    chat_id = (cli_chat_id or os.environ.get("OPENCLAW_CHAT_ID", "")).strip()
+    if not channel or not chat_id:
+        return {}
+    return {"channel": channel, "chat_id": chat_id}
 
-    if channel:
-        delivery["channel"] = channel
-    if to:
-        delivery["to"] = to
-    if raw_to:
-        delivery["raw_to"] = raw_to
-    if session_key:
-        delivery["session_key"] = session_key
-    if thread_id:
-        delivery["thread_id"] = thread_id
-    if account_id:
-        delivery["account_id"] = account_id
-    if session_key and session_id:
-        delivery["idempotency_prefix"] = f"libtv:{session_key}:{session_id}"
 
-    return delivery
+def _waiter_log_path(session_id):
+    return os.path.join(_nexu_home(), f"libtv-waiter-{session_id}.log")
 
-def _post_json(url, payload, timeout=10):
-    body = json.dumps(payload).encode()
-    req = urllib.request.Request(url, data=body, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("User-Agent", "LibTVSkill/1.0")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = resp.read()
-        return json.loads(data) if data else {}
 
-def _notification_idempotency_key(delivery, kind, progress_index=0):
-    prefix = delivery.get("idempotency_prefix", "").strip()
-    if not prefix:
-        return ""
-    if kind == "progress":
-        return f"{prefix}:{kind}:{progress_index}"
-    return f"{prefix}:{kind}"
+def _spawn_background_waiter(session_id, project_uuid):
+    """Fork a detached `wait-and-deliver` process that survives this command's
+    exit. The child is session-leader (start_new_session=True) and has its
+    own log file so OpenClaw does not wait on it and its output does not
+    collide with our parent stdout/stderr.
 
-def _notification_message(kind, project_uuid="", result_urls=None, error_msg=""):
-    result_urls = list(result_urls or [])
-    canvas_url = _project_canvas_url(project_uuid)
-
-    if kind == "submitted":
-        return "Your video task has been submitted and is now generating. I will notify you when it finishes."
-    if kind == "progress":
-        return "Your video is still generating. I will notify you again when there is a final result."
-    if kind == "success":
-        lines = ["Your video generation is complete."]
-        if result_urls:
-            lines.append("Artifacts:")
-            for url in result_urls:
-                lines.append(url)
-        if canvas_url:
-            lines.append(f"Project canvas: {canvas_url}")
-        return "\n".join(lines)
-    if kind == "timeout":
-        lines = ["Your video task is still not complete and hit the polling timeout."]
-        if canvas_url:
-            lines.append(f"Project canvas: {canvas_url}")
-        return "\n".join(lines)
-
-    lines = [f"Your video task failed: {error_msg or 'Unknown error.'}"]
-    if canvas_url:
-        lines.append(f"Project canvas: {canvas_url}")
-    return "\n".join(lines)
-
-def _send_notification(session, kind, project_uuid="", result_urls=None, error_msg=""):
-    delivery = dict(session.get("delivery") or {})
-    required_fields = ["channel", "to", "session_key", "idempotency_prefix"]
-    if not all(delivery.get(field) for field in required_fields):
-        return False
-
-    notifications = dict(session.get("notifications") or _default_notifications())
-    if kind in ("success", "failed", "timeout") and notifications.get("terminal_sent_at"):
-        return False
-    if kind == "submitted" and notifications.get("submitted_sent_at"):
-        return False
-
-    progress_index = notifications.get("progress_count", 0) + 1 if kind == "progress" else 0
-    idempotency_key = _notification_idempotency_key(delivery, kind, progress_index=progress_index)
-    if not idempotency_key:
-        return False
-
-    payload = {
-        "channel": delivery["channel"],
-        "to": delivery["to"],
-        "sessionKey": delivery["session_key"],
-        "idempotencyKey": idempotency_key,
-        "kind": kind,
-        "sessionId": session["session_id"],
-        "message": _notification_message(
-            kind,
-            project_uuid=project_uuid or session.get("project_uuid", ""),
-            result_urls=result_urls,
-            error_msg=error_msg,
-        ),
-    }
-    if delivery.get("account_id"):
-        payload["accountId"] = delivery["account_id"]
-    if delivery.get("thread_id"):
-        payload["threadId"] = delivery["thread_id"]
-    if project_uuid or session.get("project_uuid"):
-        payload["projectUuid"] = project_uuid or session.get("project_uuid", "")
-
+    The parent closes its own copy of the log file descriptor immediately
+    after `Popen` returns — `Popen` dup()s the fd into the child so the
+    child keeps its own independent reference. This avoids leaking a fd
+    in the parent if this helper is ever called in a longer-lived context.
+    The `try/finally` ensures we still close on Popen failure.
+    """
+    script_path = os.path.abspath(__file__)
+    log_path = _waiter_log_path(session_id)
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    log_file = open(log_path, "a")
     try:
-        _post_json(f"{_controller_base_url()}/api/internal/libtv-notify", payload, timeout=10)
-        return True
-    except Exception as exc:
-        print(f"⚠️ Failed to deliver {kind} notification: {exc}", file=sys.stderr)
-        return False
-
-def _record_notification(session_id, kind):
-    now = _now_iso()
-    if kind == "submitted":
-        _save_session(session_id, notifications={"submitted_sent_at": now})
-        return
-    if kind == "progress":
-        session = _find_session(session_id) or {}
-        current_notifications = dict(session.get("notifications") or _default_notifications())
-        _save_session(
-            session_id,
-            notifications={
-                "last_progress_sent_at": now,
-                "progress_count": current_notifications.get("progress_count", 0) + 1,
-            },
+        log_file.write(
+            f"\n===== spawn waiter {_now_iso()} session={session_id} project={project_uuid} =====\n"
         )
-        return
-    _save_session(
-        session_id,
-        notifications={
-            "terminal_sent_at": now,
-            "last_terminal_kind": kind,
-        },
+        log_file.flush()
+        args = [
+            sys.executable,
+            script_path,
+            "wait-and-deliver",
+            "--session-id",
+            session_id,
+            "--project-id",
+            project_uuid,
+        ]
+        # Pass current env so the child inherits NEXU_HOME and any
+        # OPENCLAW_* values. The child re-reads them for its own
+        # delivery bookkeeping if necessary; the persisted delivery dict
+        # is the source of truth.
+        subprocess.Popen(
+            args,
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
+            close_fds=True,
+            env=os.environ.copy(),
+        )
+    finally:
+        log_file.close()
+
+
+def _feishu_helper_path():
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "feishu_send_video.py")
+
+
+def _deliver_feishu_video(chat_id, video_url, thumbnail_url=""):
+    helper = _feishu_helper_path()
+    if not os.path.exists(helper):
+        print(f"⚠️ Feishu helper missing at {helper}", file=sys.stderr)
+        return False
+    args = [sys.executable, helper, "--video-url", video_url, "--chat-id", chat_id]
+    if thumbnail_url:
+        args.extend(["--thumbnail-url", thumbnail_url])
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=600)
+    except subprocess.TimeoutExpired:
+        print("⚠️ Feishu helper timed out after 600s", file=sys.stderr)
+        return False
+    if result.stdout:
+        print(result.stdout, file=sys.stderr)
+    if result.returncode == 0:
+        return True
+    print(
+        f"⚠️ Feishu helper failed (rc={result.returncode}): {result.stderr[:500]}",
+        file=sys.stderr,
     )
+    return False
+
+
+def _deliver_results(delivery, result_urls):
+    """Dispatch each result URL to the originating channel's helper.
+    Returns True iff every URL was delivered successfully.
+    """
+    if not delivery:
+        print("⚠️ No delivery context recorded — skipping direct delivery.", file=sys.stderr)
+        return False
+    channel = delivery.get("channel", "")
+    chat_id = delivery.get("chat_id", "")
+    if not channel or not chat_id:
+        print("⚠️ Delivery context is missing channel or chat_id.", file=sys.stderr)
+        return False
+    if channel != "feishu":
+        print(
+            f"⚠️ Direct delivery for channel '{channel}' is not implemented yet; only 'feishu' is supported.",
+            file=sys.stderr,
+        )
+        return False
+    if not result_urls:
+        return False
+    all_ok = True
+    for url in result_urls:
+        if not _deliver_feishu_video(chat_id, url):
+            all_ok = False
+    return all_ok
 
 # ── URL extraction ──
 
 LIBTV_RES_PATTERN = re.compile(
-    r"https://libtv-res\.liblib\.art/sd-gen-save-img/[^\s\"'<>)]+"
+    r"https://libtv-res\.liblib\.art/(?:sd-gen-save-img|claw)/[^\s\"'<>)]+"
 )
 
 def extract_result_urls(messages):
@@ -482,6 +465,81 @@ def call_gateway(method, path, **kwargs):
         print(f"❌ Cannot connect to gateway: {e.reason}")
         sys.exit(1)
 
+def call_direct_api(method, path, **kwargs):
+    api_key = _get_api_key()
+    if not api_key:
+        print("❌ API Key not configured. Run: libtv_video.py setup --api-key sk-libtv-yourkey")
+        sys.exit(1)
+
+    url = f"{_get_direct_base_url()}{path}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "LibTVSkill/1.0",
+    }
+
+    json_data = kwargs.get("json_data")
+    files = kwargs.get("files")
+    timeout = kwargs.get("timeout", 30)
+
+    if files:
+        filepath = files["file"]
+        filename = os.path.basename(filepath)
+        import mimetypes
+        content_type, _ = mimetypes.guess_type(filepath)
+        content_type = content_type or "application/octet-stream"
+
+        boundary = f"----LibTVSkillBoundary{int(time.time())}"
+        body = bytearray()
+        body.extend(f"--{boundary}\r\n".encode())
+        body.extend(f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode())
+        body.extend(f"Content-Type: {content_type}\r\n\r\n".encode())
+        with open(filepath, "rb") as f:
+            body.extend(f.read())
+        body.extend(f"\r\n--{boundary}--\r\n".encode())
+
+        req = urllib.request.Request(url, data=bytes(body), method="POST")
+        for k, v in headers.items():
+            req.add_header(k, v)
+        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    elif json_data is not None:
+        data = json.dumps(json_data).encode()
+        req = urllib.request.Request(url, data=data, method=method)
+        for k, v in headers.items():
+            req.add_header(k, v)
+        req.add_header("Content-Type", "application/json")
+    else:
+        req = urllib.request.Request(url, method=method)
+        for k, v in headers.items():
+            req.add_header(k, v)
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = resp.read()
+            return json.loads(data) if data else {}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode()
+        print(f"❌ Direct LibTV request failed (HTTP {e.code}): {err_body[:200]}")
+        sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"❌ Cannot connect to direct LibTV API: {e.reason}")
+        sys.exit(1)
+
+def _unwrap_direct_data(response, required_fields=None):
+    data = response.get("data")
+    if not isinstance(data, dict):
+        print("❌ Direct LibTV response missing data object.")
+        sys.exit(1)
+
+    required_fields = list(required_fields or [])
+    missing = [field for field in required_fields if not str(data.get(field, "")).strip()]
+    if missing:
+        print(
+            "❌ Direct LibTV response missing required field(s): "
+            + ", ".join(missing)
+        )
+        sys.exit(1)
+    return data
+
 # ── Video delivery ──
 
 def deliver_results(urls, project_uuid=""):
@@ -521,8 +579,8 @@ def download_file(url, filepath):
 def cmd_setup(args):
     config = _load_config()
     if args.api_key:
-        if not args.api_key.startswith("mgk_"):
-            print("❌ Invalid API Key format. It should start with mgk_.")
+        if not _detect_auth_mode(args.api_key):
+            print("❌ Invalid API Key format. It should start with mgk_ or sk-libtv-.")
             sys.exit(1)
         config["apiKey"] = args.api_key
         print(f"✅ API Key saved (****{args.api_key[-4:]})")
@@ -540,29 +598,34 @@ def cmd_check(args):
     if not config.get("apiKey"):
         print("❌ API Key not configured.")
         print("   Run: libtv_video.py setup --api-key mgk_yourkey")
+        print("   Or:  libtv_video.py setup --api-key sk-libtv-yourkey")
         sys.exit(1)
 
     key = config["apiKey"]
-    if not key.startswith("mgk_"):
-        print("❌ Invalid API Key format. It should start with mgk_.")
+    mode = _detect_auth_mode(key)
+    if not mode:
+        print("❌ Invalid API Key format. It should start with mgk_ or sk-libtv-.")
         sys.exit(1)
     print(f"🔑 API Key: ****{key[-4:]}")
-    print(f"🌐 Gateway: {_get_gateway_url()}")
     print(f"📐 Video ratio: {_get_video_ratio()}")
     print(f"📁 Config: {_config_path()}")
-
-    result = call_gateway("GET", "/api/v1/key/status")
-    if not isinstance(result.get("remaining_uses"), int) or not isinstance(result.get("max_uses"), int):
-        print("❌ Guard check failed: key status response is missing remaining_uses/max_uses.")
-        sys.exit(1)
-    print("✅ Key valid")
-    print(f"📊 Remaining uses: {result['remaining_uses']}/{result['max_uses']}")
-    if result.get("expires_at"):
-        print(f"⏰ Expires at: {result['expires_at']}")
+    if mode == AUTH_MODE_NEXU_GATEWAY:
+        print(f"🌐 Gateway: {_get_gateway_url()}")
+        result = call_gateway("GET", "/api/v1/key/status")
+        if not isinstance(result.get("remaining_uses"), int) or not isinstance(result.get("max_uses"), int):
+            print("❌ Guard check failed: key status response is missing remaining_uses/max_uses.")
+            sys.exit(1)
+        print("✅ Key valid")
+        print(f"📊 Remaining uses: {result['remaining_uses']}/{result['max_uses']}")
+        if result.get("expires_at"):
+            print(f"⏰ Expires at: {result['expires_at']}")
+    else:
+        print(f"🌐 Direct LibTV: {_get_direct_base_url()}")
+        print("✅ Direct LibTV key configured")
 
 def cmd_update_key(args):
-    if not args.api_key.startswith("mgk_"):
-        print("❌ Invalid API Key format. It should start with mgk_.")
+    if not _detect_auth_mode(args.api_key):
+        print("❌ Invalid API Key format. It should start with mgk_ or sk-libtv-.")
         sys.exit(1)
     config = _load_config()
     old_key = config.get("apiKey")
@@ -612,7 +675,12 @@ def cmd_upload(args):
         print(f"❌ Unsupported file type: {mime}. Only image and video files supported.")
         sys.exit(1)
 
-    result = call_gateway("POST", "/libtv/v1/upload", files={"file": filepath}, timeout=120)
+    mode = _require_auth_mode()
+    if mode == AUTH_MODE_NEXU_GATEWAY:
+        result = call_gateway("POST", "/libtv/v1/upload", files={"file": filepath}, timeout=120)
+    else:
+        response = call_direct_api("POST", "/openapi/file/upload", files={"file": filepath}, timeout=120)
+        result = _unwrap_direct_data(response, required_fields=["url"])
     oss_url = result.get("url", "")
     if not oss_url:
         print("❌ Upload failed: no URL returned")
@@ -642,17 +710,39 @@ def _append_video_ratio_hint(message):
         return message
     return message + VIDEO_RATIO_HINT_TEMPLATE.format(ratio=_get_video_ratio())
 
+def _build_session_message(message, auth_mode):
+    next_message = _append_video_ratio_hint(message)
+    if auth_mode == AUTH_MODE_NEXU_GATEWAY:
+        return _append_model_hint(next_message)
+    return next_message
+
+def _create_session_result(body, auth_mode):
+    if auth_mode == AUTH_MODE_LIBTV_DIRECT:
+        response = call_direct_api("POST", "/openapi/session", json_data=body)
+        return _unwrap_direct_data(response, required_fields=["sessionId", "projectUuid"])
+    return call_gateway("POST", "/libtv/v1/session", json_data=body)
+
+def _query_session_result(session_id, auth_mode, after_seq=0):
+    if auth_mode == AUTH_MODE_LIBTV_DIRECT:
+        response = call_direct_api("GET", f"/openapi/session/{session_id}")
+        return _unwrap_direct_data(response, required_fields=["messages"])
+    path = f"/libtv/v1/session/{session_id}"
+    if after_seq > 0:
+        path += f"?afterSeq={after_seq}"
+    return call_gateway("GET", path)
+
 def cmd_create_session(args):
+    auth_mode = _require_auth_mode()
     body = {}
     if args.session_id:
         body["sessionId"] = args.session_id
     if args.message:
-        body["message"] = _append_model_hint(_append_video_ratio_hint(args.message))
+        body["message"] = _build_session_message(args.message, auth_mode)
     elif not args.session_id:
         print("❌ Guard check failed: create-session requires a message or an existing session-id.")
         sys.exit(1)
 
-    result = call_gateway("POST", "/libtv/v1/session", json_data=body)
+    result = _create_session_result(body, auth_mode)
     session_id = result.get("sessionId", "")
     project_uuid = result.get("projectUuid", "")
 
@@ -663,13 +753,22 @@ def cmd_create_session(args):
         print("❌ Failed: no projectUuid returned")
         sys.exit(1)
 
-    # Persist
-    delivery = _collect_delivery_context(session_id=session_id)
+    # Capture the originating channel + stable chat_id at submit time so
+    # the background waiter can deliver directly without depending on
+    # OpenClaw subagent inheritance. The model is expected to extract
+    # these from the inbound Feishu metadata block (sender_id / chat_id)
+    # and pass them explicitly via --channel and --chat-id.
+    delivery = _collect_delivery_context(
+        cli_channel=getattr(args, "channel", "") or "",
+        cli_chat_id=getattr(args, "chat_id", "") or "",
+    )
+
     _save_session(
         session_id,
         project_uuid=project_uuid,
         status="submitted",
         text=args.message or "",
+        auth_mode=auth_mode,
         delivery=delivery,
     )
     persisted = _find_session(session_id)
@@ -685,53 +784,38 @@ def cmd_create_session(args):
     if persisted.get("status") != "submitted":
         print(f"❌ Guard check failed: unexpected persisted submit status {persisted.get('status')}.")
         sys.exit(1)
-    if delivery and persisted.get("delivery") != delivery:
-        print("❌ Guard check failed: persisted delivery target mismatch.")
-        sys.exit(1)
 
-    if _send_notification(persisted, "submitted", project_uuid=project_uuid):
-        _record_notification(session_id, "submitted")
+    # Fork a detached wait-and-deliver process. It polls libtv until
+    # terminal, then delivers the result directly to the originating
+    # channel. We do this instead of OpenClaw sessions_spawn because
+    # sessions_spawn depends on the subagent model speaking verbatim and
+    # on OpenClaw's channel-binding inheritance — both of which are less
+    # stable than a direct HTTP call from a detached worker.
+    if os.environ.get("LIBTV_SKIP_BACKGROUND_WAITER", "").strip() not in ("1", "true"):
+        _spawn_background_waiter(session_id, project_uuid)
 
-    # Collect env vars for sub-agent
-    passthrough_env = {}
-    for var in [
-        "OPENCLAW_CHANNEL_TYPE", "OPENCLAW_CHAT_ID",
-        "OPENCLAW_ACCOUNT_ID", "OPENCLAW_THREAD_ID",
-        "OPENCLAW_SESSION_KEY",
-        "OPENCLAW_CONFIG", "OPENCLAW_STATE_DIR",
-        "FEISHU_APP_ID", "FEISHU_APP_SECRET",
-        "NEXU_HOME",
-    ]:
-        val = os.environ.get(var, "")
-        if val:
-            passthrough_env[var] = val
-
-    # Output sessions_spawn payload for OpenClaw
-    spawn_payload = {
-        "sessions_spawn": {
-            "instruction": (
-                f"Wait for LibTV session {session_id} to complete, then send results to user. "
-                f"Use command: python3 scripts/libtv_video.py wait-and-deliver "
-                f"--session-id {session_id} --project-id {project_uuid}"
-            ),
-            "runTimeoutSeconds": 600,
-            **({"env": passthrough_env} if passthrough_env else {}),
-        }
-    }
-    print(json.dumps(spawn_payload))
-
-    # Info to stderr
+    # Single-line JSON submit confirmation on stdout for the parent
+    # session's model to acknowledge. The user-facing wording is produced
+    # by the model — we just hand it the structured facts.
     out = {
-        "projectUuid": project_uuid,
+        "status": "submitted",
         "sessionId": session_id,
+        "projectUuid": project_uuid,
         "projectUrl": f"{PROJECT_CANVAS_BASE}{project_uuid}",
+        "channel": delivery.get("channel", ""),
+        "deliverable": bool(delivery),
+        "note": (
+            "Video is generating in the background. "
+            "Results will be delivered to this chat automatically when ready."
+            if delivery
+            else "Video is generating, but no delivery channel was captured — the user will have to ask for the result."
+        ),
     }
-    print(json.dumps(out, ensure_ascii=False, indent=2), file=sys.stderr)
+    print(json.dumps(out, ensure_ascii=False))
     print(
-        "Your video task has been submitted and is now generating. I will notify you when it finishes.",
+        "⏳ Generation submitted. The background waiter will deliver results directly.",
         file=sys.stderr,
     )
-    print("⏳ Generation submitted. Results will be delivered automatically.", file=sys.stderr)
 
 def cmd_query_session(args):
     session_id = args.session_id
@@ -739,11 +823,8 @@ def cmd_query_session(args):
     if not persisted:
         print(f"❌ Unknown LibTV session: {session_id}")
         sys.exit(1)
-    path = f"/libtv/v1/session/{session_id}"
-    if args.after_seq > 0:
-        path += f"?afterSeq={args.after_seq}"
-
-    result = call_gateway("GET", path)
+    auth_mode = persisted.get("auth_mode") or _require_auth_mode()
+    result = _query_session_result(session_id, auth_mode, after_seq=args.after_seq)
     messages = result.get("messages") or []
 
     # Extract result URLs
@@ -752,7 +833,7 @@ def cmd_query_session(args):
     # Persist results to local so recover can read without API
     if urls:
         _save_session(session_id, project_uuid=args.project_id or persisted.get("project_uuid", ""), status="completed",
-                      result_urls=urls, completed_at=_now_iso())
+                      result_urls=urls, completed_at=_now_iso(), auth_mode=auth_mode)
 
     out = {"messages": messages}
     if args.project_id:
@@ -766,8 +847,14 @@ def cmd_download_results(args):
     urls = list(args.urls or [])
 
     if args.session_id:
-        result = call_gateway("GET", f"/libtv/v1/session/{args.session_id}/results")
-        extracted = result.get("urls", [])
+        persisted = _find_session(args.session_id)
+        auth_mode = (persisted or {}).get("auth_mode") or _require_auth_mode()
+        if auth_mode == AUTH_MODE_LIBTV_DIRECT:
+            result = _query_session_result(args.session_id, auth_mode)
+            extracted = extract_result_urls(result.get("messages") or [])
+        else:
+            result = call_gateway("GET", f"/libtv/v1/session/{args.session_id}/results")
+            extracted = result.get("urls", [])
         urls.extend(extracted)
 
     if not urls:
@@ -810,109 +897,111 @@ def cmd_download_results(args):
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 def cmd_wait_and_deliver(args):
+    """Background waiter: poll the upstream API, then deliver the terminal
+    result directly to the originating channel. Called either manually from
+    the CLI (for debugging) or as a detached subprocess forked from
+    cmd_create_session. All output goes to stderr so that the detached log
+    file captures it; nothing is printed to stdout for a parent to parse.
+    """
     session_id = args.session_id
     persisted = _find_session(session_id)
     if not persisted:
-        print(f"❌ Unknown LibTV session: {session_id}")
+        print(f"❌ Unknown LibTV session: {session_id}", file=sys.stderr)
         sys.exit(1)
+    auth_mode = persisted.get("auth_mode") or _require_auth_mode()
     project_uuid = args.project_id or persisted.get("project_uuid", "")
+    delivery = dict(persisted.get("delivery") or {})
+    if persisted.get("delivered_at"):
+        print(
+            f"ℹ️ Session {session_id} already delivered at {persisted['delivered_at']}, skipping.",
+            file=sys.stderr,
+        )
+        return
+
     poll_interval = _read_int_env("LIBTV_POLL_INTERVAL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS)
-    progress_interval = _read_int_env(
-        "LIBTV_PROGRESS_NOTIFY_INTERVAL_SECONDS",
-        DEFAULT_PROGRESS_NOTIFY_INTERVAL_SECONDS,
-    )
     max_polls = _read_int_env("LIBTV_MAX_POLLS", DEFAULT_MAX_POLLS)
 
-    polling_state = dict(persisted.get("polling") or _default_polling())
-    if not polling_state.get("started_at"):
-        polling_state["started_at"] = _now_iso()
-    _save_session(
-        session_id,
-        project_uuid=project_uuid,
-        polling={
-            "started_at": polling_state.get("started_at", ""),
-            "last_checked_at": polling_state.get("last_checked_at", ""),
-            "poll_count": polling_state.get("poll_count", 0),
-        },
-    )
-
     for i in range(max_polls):
-        result = call_gateway("GET", f"/libtv/v1/session/{session_id}")
+        try:
+            result = _query_session_result(session_id, auth_mode)
+        except TRANSIENT_POLL_ERRORS as exc:
+            # Libtv keeps long idle connections open and sometimes closes
+            # them mid-poll. Treat any transient network failure as "no
+            # result yet", log it, and keep polling.
+            print(
+                f"⚠️ Transient error polling session {session_id}: {exc}. Retrying on next tick.",
+                file=sys.stderr,
+            )
+            if poll_interval > 0:
+                time.sleep(poll_interval)
+            continue
         messages = result.get("messages") or []
         urls = extract_result_urls(messages)
-        _save_session(
-            session_id,
-            project_uuid=project_uuid,
-            polling={
-                "started_at": polling_state.get("started_at", ""),
-                "last_checked_at": _now_iso(),
-                "poll_count": i + 1,
-            },
-        )
 
         if urls:
-            _save_session(session_id, project_uuid=project_uuid, status="completed",
-                          result_urls=urls, completed_at=_now_iso())
-            completed_session = _find_session(session_id) or persisted
-            if _send_notification(completed_session, "success", project_uuid=project_uuid, result_urls=urls):
-                _record_notification(session_id, "success")
-            deliver_results(urls, project_uuid=project_uuid)
+            _save_session(
+                session_id,
+                project_uuid=project_uuid,
+                status="completed",
+                result_urls=urls,
+                completed_at=_now_iso(),
+                auth_mode=auth_mode,
+            )
+            print(
+                f"✅ Session {session_id} reached terminal success with {len(urls)} artifact(s).",
+                file=sys.stderr,
+            )
+            for url in urls:
+                print(f"   {url}", file=sys.stderr)
 
-            # Auto-download
+            # Deliver directly to the originating channel. This is the
+            # part that replaced sessions_spawn + model-speech — a
+            # deterministic HTTP call with a stable per-user identifier.
+            delivered_ok = _deliver_results(delivery, urls)
+            if delivered_ok:
+                _save_session(
+                    session_id,
+                    delivered_at=_now_iso(),
+                )
+                print("✅ Delivered to originating channel.", file=sys.stderr)
+            else:
+                print(
+                    "⚠️ Direct channel delivery did not complete. Results are still persisted locally.",
+                    file=sys.stderr,
+                )
+
+            # Auto-download to the user's local results dir as a
+            # convenience / fallback.
             output_dir = os.path.expanduser("~/Downloads/libtv_results")
             os.makedirs(output_dir, exist_ok=True)
-            downloaded = []
             for j, url in enumerate(urls, 1):
                 ext = os.path.splitext(url.split("?")[0])[-1] or ".png"
                 filepath = os.path.join(output_dir, f"{session_id[:8]}_{j:02d}{ext}")
                 fp, err = download_file(url, filepath)
                 if not err:
-                    downloaded.append(fp)
-            if downloaded:
-                print(f"\n📥 Downloaded {len(downloaded)} file(s) to {output_dir}")
-                for d in downloaded:
-                    print(f"   {d}")
+                    print(f"   📥 {fp}", file=sys.stderr)
             return
-
-        current_session = _find_session(session_id) or persisted
-        notifications = dict(current_session.get("notifications") or _default_notifications())
-        last_progress_sent_at = notifications.get("last_progress_sent_at", "")
-        should_send_progress = False
-        if progress_interval == 0:
-            should_send_progress = True
-        elif not last_progress_sent_at:
-            started_at_raw = polling_state.get("started_at", "")
-            if started_at_raw:
-                try:
-                    started_at = datetime.fromisoformat(started_at_raw)
-                    should_send_progress = (datetime.now() - started_at).total_seconds() >= progress_interval
-                except ValueError:
-                    should_send_progress = False
-        else:
-            try:
-                last_progress_sent = datetime.fromisoformat(last_progress_sent_at)
-                should_send_progress = (datetime.now() - last_progress_sent).total_seconds() >= progress_interval
-            except ValueError:
-                should_send_progress = False
-
-        if should_send_progress and _send_notification(current_session, "progress", project_uuid=project_uuid):
-            _record_notification(session_id, "progress")
 
         elapsed = (i + 1) * poll_interval
         total = max_polls * poll_interval
-        print(f"⏳ [{elapsed}s/{total}s] AI is generating, checking again in {poll_interval} seconds...", file=sys.stderr)
+        print(
+            f"⏳ [{elapsed}s/{total}s] AI is generating, checking again in {poll_interval} seconds...",
+            file=sys.stderr,
+        )
         if poll_interval > 0:
             time.sleep(poll_interval)
 
-    # Timeout
-    _save_session(session_id, project_uuid=project_uuid, status="timeout")
-    timeout_session = _find_session(session_id) or persisted
-    if _send_notification(timeout_session, "timeout", project_uuid=project_uuid):
-        _record_notification(session_id, "timeout")
-    print("❌ Generation did not reach a terminal success state before the polling timeout.")
-    print(f"   You can check later with: libtv_video.py query-session {session_id}")
-    if project_uuid:
-        print(f"   Project canvas: {PROJECT_CANVAS_BASE}{project_uuid}")
+    # Timeout path — record it. No direct delivery for timeouts in this
+    # iteration; the user can ask later via query-session or the skill's
+    # recover command. (A text-mode "still generating" notification is a
+    # reasonable follow-up once we confirm the happy path works.)
+    _save_session(
+        session_id, project_uuid=project_uuid, status="timeout", auth_mode=auth_mode
+    )
+    print(
+        f"⏰ Session {session_id} hit the polling timeout without reaching a terminal state.",
+        file=sys.stderr,
+    )
 
 
 def cmd_recover(args):
@@ -947,12 +1036,13 @@ def cmd_recover(args):
             else:
                 # Completed but no local URLs — re-fetch once
                 try:
-                    result = call_gateway("GET", f"/libtv/v1/session/{sid}")
+                    auth_mode = s.get("auth_mode") or _require_auth_mode()
+                    result = _query_session_result(sid, auth_mode)
                     messages = result.get("messages") or []
                     urls = extract_result_urls(messages)
                     if urls:
                         _save_session(sid, project_uuid=project_uuid, status="completed",
-                                      result_urls=urls, completed_at=_now_iso())
+                                      result_urls=urls, completed_at=_now_iso(), auth_mode=auth_mode)
                         print(f"  ✅ {sid[:16]}... Completed ({text})")
                         for url in urls:
                             print(f"     🎬 {url}")
@@ -974,13 +1064,14 @@ def cmd_recover(args):
         text = s.get("submitted_text", "")
 
         try:
-            result = call_gateway("GET", f"/libtv/v1/session/{sid}")
+            auth_mode = s.get("auth_mode") or _require_auth_mode()
+            result = _query_session_result(sid, auth_mode)
             messages = result.get("messages") or []
             urls = extract_result_urls(messages)
 
             if urls:
                 _save_session(sid, project_uuid=project_uuid, status="completed",
-                              result_urls=urls, completed_at=_now_iso())
+                              result_urls=urls, completed_at=_now_iso(), auth_mode=auth_mode)
                 print(f"  ✅ {sid[:16]}... Completed!")
                 for url in urls:
                     print(f"     🎬 {url}")
@@ -994,6 +1085,9 @@ def cmd_recover(args):
             print(f"  ❌ {sid[:16]}... Error checking status: {e}")
 
 def cmd_tasks(args):
+    if _require_auth_mode() == AUTH_MODE_LIBTV_DIRECT:
+        print("❌ The tasks command is only available for Nexu-managed mgk_ keys.")
+        sys.exit(1)
     result = call_gateway("GET", "/api/v1/tasks")
     tasks = result.get("tasks", [])
 
@@ -1032,7 +1126,12 @@ def cmd_tasks(args):
 
 
 def cmd_change_project(args):
-    result = call_gateway("POST", "/libtv/v1/session/change-project", json_data={})
+    auth_mode = _require_auth_mode()
+    if auth_mode == AUTH_MODE_LIBTV_DIRECT:
+        response = call_direct_api("POST", "/openapi/session/change-project", json_data={})
+        result = _unwrap_direct_data(response, required_fields=["projectUuid"])
+    else:
+        result = call_gateway("POST", "/libtv/v1/session/change-project", json_data={})
     project_uuid = result.get("projectUuid", "")
     if not project_uuid:
         print("❌ Failed: no projectUuid returned")
@@ -1052,7 +1151,7 @@ def main():
 
     # setup
     p = sub.add_parser("setup", help="Configure API Key")
-    p.add_argument("--api-key", help="API Key starting with mgk_")
+    p.add_argument("--api-key", help="API Key starting with mgk_ or sk-libtv-")
     p.add_argument("--video-ratio", help="Default video ratio WIDTH:HEIGHT, for example 16:9")
 
     # check
@@ -1060,7 +1159,7 @@ def main():
 
     # update-key
     p = sub.add_parser("update-key", help="Update API Key")
-    p.add_argument("--api-key", required=True, help="New mgk_ Key")
+    p.add_argument("--api-key", required=True, help="New mgk_ or sk-libtv- key")
 
     # update-ratio
     p = sub.add_parser("update-ratio", help="Update default video ratio")
@@ -1077,6 +1176,16 @@ def main():
     p = sub.add_parser("create-session", help="Create session and/or send message")
     p.add_argument("message", nargs="?", default="", help="Message to send")
     p.add_argument("--session-id", default="", help="Existing session ID")
+    p.add_argument(
+        "--channel",
+        default="",
+        help="Originating channel type (e.g. feishu). Pass this so the background waiter can deliver results back to the user automatically.",
+    )
+    p.add_argument(
+        "--chat-id",
+        default="",
+        help="Stable user identifier on the originating channel (Feishu sender_id / open_id, e.g. ou_xxx). Pass this so the background waiter can deliver results back to the user automatically.",
+    )
 
     # query-session
     p = sub.add_parser("query-session", help="Query session messages")

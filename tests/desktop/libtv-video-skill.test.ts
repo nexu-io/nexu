@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { type RequestListener, createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,10 +14,13 @@ function makeTempDir(): string {
   return mkdtempSync(resolve(tmpdir(), "libtv-video-skill-"));
 }
 
-function writeConfig(nexuHome: string): void {
+function writeConfig(
+  nexuHome: string,
+  overrides: Record<string, unknown> = {},
+): void {
   writeFileSync(
     resolve(nexuHome, "libtv.json"),
-    JSON.stringify({ apiKey: "mgk_test_key" }, null, 2),
+    JSON.stringify({ apiKey: "mgk_test_key", ...overrides }, null, 2),
   );
 }
 
@@ -50,7 +53,7 @@ async function runScript(args: string[], env: NodeJS.ProcessEnv) {
 }
 
 async function withGatewayServer(
-  handler: Parameters<typeof createServer>[0],
+  handler: RequestListener,
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = createServer(handler);
   await new Promise<void>((resolvePromise) => {
@@ -75,49 +78,6 @@ async function withGatewayServer(
   };
 }
 
-type RecordedRequest = {
-  method: string;
-  url: string;
-  body: Record<string, unknown>;
-};
-
-type JsonServerRequest = Parameters<typeof createServer>[0] extends (
-  request: infer TRequest,
-  response: infer _TResponse,
-) => unknown
-  ? TRequest
-  : never;
-
-type JsonServerResponse = Parameters<typeof createServer>[0] extends (
-  request: infer _TRequest,
-  response: infer TResponse,
-) => unknown
-  ? TResponse
-  : never;
-
-async function withJsonServer(
-  handler: (
-    request: JsonServerRequest,
-    response: JsonServerResponse,
-    body: Record<string, unknown>,
-  ) => void,
-): Promise<{ baseUrl: string; close: () => Promise<void> }> {
-  return await withGatewayServer((request, response) => {
-    let rawBody = "";
-    request.setEncoding("utf8");
-    request.on("data", (chunk) => {
-      rawBody += chunk;
-    });
-    request.on("end", () => {
-      const body =
-        rawBody.trim().length > 0
-          ? (JSON.parse(rawBody) as Record<string, unknown>)
-          : {};
-      handler(request, response, body);
-    });
-  });
-}
-
 describe("libtv bundled skill", () => {
   const tempDirs: string[] = [];
 
@@ -130,7 +90,7 @@ describe("libtv bundled skill", () => {
     expect(source).toContain('GATEWAY_URL = "https://seedance.nexu.io/"');
   });
 
-  it("persists accepted submissions only after a guarded server response", async () => {
+  it("persists the Feishu delivery context and returns a submit confirmation", async () => {
     const nexuHome = makeTempDir();
     tempDirs.push(nexuHome);
     writeConfig(nexuHome);
@@ -165,16 +125,21 @@ describe("libtv bundled skill", () => {
 
     try {
       const result = await runScript(
-        ["create-session", "make a calm ocean video"],
+        [
+          "create-session",
+          "make a calm ocean video",
+          "--channel",
+          "feishu",
+          "--chat-id",
+          "ou_test_user",
+        ],
         {
           ...process.env,
           NEXU_HOME: nexuHome,
           LIBTV_GATEWAY_URL: gateway.baseUrl,
-          OPENCLAW_CHANNEL_TYPE: "feishu",
-          OPENCLAW_CHAT_ID: "ou_test_user",
-          OPENCLAW_SESSION_KEY: "agent:bot-1:direct:ou_test_user",
-          OPENCLAW_THREAD_ID: "om_thread_1",
-          OPENCLAW_ACCOUNT_ID: "acct_1",
+          // Disable the background fork so the test does not leave a
+          // detached process running after the assertions complete.
+          LIBTV_SKIP_BACKGROUND_WAITER: "1",
         },
       );
 
@@ -182,10 +147,25 @@ describe("libtv bundled skill", () => {
       expect(String(createSessionRequests[0]?.message)).toContain(
         "video ratio 16:9",
       );
+
+      // stdout is a single-line submit confirmation JSON (not sessions_spawn).
       const payload = JSON.parse(result.stdout.trim()) as {
-        sessions_spawn: { instruction: string };
+        status: string;
+        sessionId: string;
+        projectUuid: string;
+        projectUrl: string;
+        channel: string;
+        deliverable: boolean;
+        note: string;
       };
-      expect(payload.sessions_spawn.instruction).toContain("session_123");
+      expect(payload).toMatchObject({
+        status: "submitted",
+        sessionId: "session_123",
+        projectUuid: "project_456",
+        channel: "feishu",
+        deliverable: true,
+      });
+      expect(payload.projectUrl).toContain("project_456");
 
       const persisted = JSON.parse(
         readFileSync(resolve(nexuHome, "libtv-sessions.json"), "utf8"),
@@ -195,18 +175,68 @@ describe("libtv bundled skill", () => {
         session_id: "session_123",
         project_uuid: "project_456",
         status: "submitted",
+        auth_mode: "nexu_gateway",
         delivery: {
           channel: "feishu",
-          to: "user:ou_test_user",
-          raw_to: "ou_test_user",
-          session_key: "agent:bot-1:direct:ou_test_user",
-          thread_id: "om_thread_1",
-          account_id: "acct_1",
-          idempotency_prefix:
-            "libtv:agent:bot-1:direct:ou_test_user:session_123",
+          chat_id: "ou_test_user",
         },
       });
-      expect(result.stderr).toContain("now generating");
+      // No stale routing fields from the old libtv-notify era.
+      const delivery = persisted[0]?.delivery as Record<string, unknown>;
+      expect(delivery).not.toHaveProperty("account_id");
+      expect(delivery).not.toHaveProperty("session_key");
+      expect(delivery).not.toHaveProperty("thread_id");
+    } finally {
+      await gateway.close();
+    }
+  });
+
+  it("records an empty delivery block when no channel context is present", async () => {
+    const nexuHome = makeTempDir();
+    tempDirs.push(nexuHome);
+    writeConfig(nexuHome);
+
+    const gateway = await withGatewayServer((request, response) => {
+      if (request.url === "/libtv/v1/session" && request.method === "POST") {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({
+            sessionId: "session_no_ctx",
+            projectUuid: "project_no_ctx",
+          }),
+        );
+        return;
+      }
+      response.writeHead(404, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: { user_message: "not found" } }));
+    });
+
+    try {
+      const env = { ...process.env };
+      // Explicitly drop any inherited OPENCLAW_* so the skill sees no
+      // channel context.
+      env.OPENCLAW_CHANNEL_TYPE = "";
+      env.OPENCLAW_CHAT_ID = "";
+      env.NEXU_HOME = nexuHome;
+      env.LIBTV_GATEWAY_URL = gateway.baseUrl;
+      env.LIBTV_SKIP_BACKGROUND_WAITER = "1";
+
+      const result = await runScript(
+        ["create-session", "a city at night"],
+        env,
+      );
+      expect(result.status).toBe(0);
+      const payload = JSON.parse(result.stdout.trim()) as {
+        deliverable: boolean;
+        channel: string;
+      };
+      expect(payload.deliverable).toBe(false);
+      expect(payload.channel).toBe("");
+
+      const persisted = JSON.parse(
+        readFileSync(resolve(nexuHome, "libtv-sessions.json"), "utf8"),
+      ) as Array<Record<string, unknown>>;
+      expect(persisted[0]?.delivery).toEqual({});
     } finally {
       await gateway.close();
     }
@@ -249,11 +279,19 @@ describe("libtv bundled skill", () => {
 
     try {
       const result = await runScript(
-        ["create-session", "make a portrait dance video"],
+        [
+          "create-session",
+          "make a portrait dance video",
+          "--channel",
+          "feishu",
+          "--chat-id",
+          "ou_test_user",
+        ],
         {
           ...process.env,
           NEXU_HOME: nexuHome,
           LIBTV_GATEWAY_URL: gateway.baseUrl,
+          LIBTV_SKIP_BACKGROUND_WAITER: "1",
         },
       );
 
@@ -269,218 +307,102 @@ describe("libtv bundled skill", () => {
     }
   });
 
-  it("sends the submit notification through the controller and persists notification bookkeeping", async () => {
+  it("routes sk-libtv keys through the direct LibTV API with the same delivery contract", async () => {
     const nexuHome = makeTempDir();
     tempDirs.push(nexuHome);
-    writeConfig(nexuHome);
+    writeConfig(nexuHome, { apiKey: "sk-libtv-direct-key" });
 
-    const notificationRequests: RecordedRequest[] = [];
-    const gateway = await withGatewayServer((request, response) => {
-      if (request.url === "/libtv/v1/session" && request.method === "POST") {
+    const directRequests: Array<{
+      method: string;
+      url: string;
+      body: Record<string, unknown>;
+    }> = [];
+    const directApi = await withGatewayServer((request, response) => {
+      let rawBody = "";
+      request.setEncoding("utf8");
+      request.on("data", (chunk) => {
+        rawBody += chunk;
+      });
+      request.on("end", () => {
+        const body =
+          rawBody.trim().length > 0
+            ? (JSON.parse(rawBody) as Record<string, unknown>)
+            : {};
+        directRequests.push({
+          method: request.method ?? "",
+          url: request.url ?? "",
+          body,
+        });
+        expect(request.headers.authorization).toBe(
+          "Bearer sk-libtv-direct-key",
+        );
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(
           JSON.stringify({
-            sessionId: "session_notify_123",
-            projectUuid: "project_notify_456",
+            code: 0,
+            message: "success",
+            data: {
+              sessionId: "direct_session_123",
+              projectUuid: "direct_project_456",
+              projectUrl:
+                "https://www.liblib.tv/canvas?projectId=direct_project_456",
+            },
           }),
         );
-        return;
-      }
-
-      response.writeHead(404, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ error: { user_message: "not found" } }));
-    });
-    const controller = await withJsonServer((request, response, body) => {
-      notificationRequests.push({
-        method: request.method ?? "",
-        url: request.url ?? "",
-        body,
       });
-      response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ ok: true, delivered: true }));
     });
 
     try {
       const result = await runScript(
-        ["create-session", "make a calm ocean video"],
+        [
+          "create-session",
+          "make a calm ocean video",
+          "--channel",
+          "feishu",
+          "--chat-id",
+          "ou_direct_user",
+        ],
         {
           ...process.env,
           NEXU_HOME: nexuHome,
-          LIBTV_GATEWAY_URL: gateway.baseUrl,
-          NEXU_CONTROLLER_URL: controller.baseUrl,
-          OPENCLAW_CHANNEL_TYPE: "feishu",
-          OPENCLAW_CHAT_ID: "ou_test_user",
-          OPENCLAW_SESSION_KEY: "agent:bot-1:direct:ou_test_user",
-          OPENCLAW_THREAD_ID: "om_thread_1",
-          OPENCLAW_ACCOUNT_ID: "acct_1",
+          LIBTV_DIRECT_BASE_URL: directApi.baseUrl,
+          LIBTV_SKIP_BACKGROUND_WAITER: "1",
         },
       );
 
       expect(result.status).toBe(0);
-      expect(notificationRequests).toHaveLength(1);
-      expect(notificationRequests[0]).toMatchObject({
+      expect(directRequests).toHaveLength(1);
+      expect(directRequests[0]).toMatchObject({
         method: "POST",
-        url: "/api/internal/libtv-notify",
-        body: {
-          channel: "feishu",
-          to: "user:ou_test_user",
-          accountId: "acct_1",
-          threadId: "om_thread_1",
-          sessionKey: "agent:bot-1:direct:ou_test_user",
-          kind: "submitted",
-          sessionId: "session_notify_123",
-          projectUuid: "project_notify_456",
-        },
+        url: "/openapi/session",
       });
-      expect(String(notificationRequests[0]?.body.idempotencyKey)).toContain(
-        "submitted",
-      );
 
-      const persisted = JSON.parse(
-        readFileSync(resolve(nexuHome, "libtv-sessions.json"), "utf8"),
-      ) as Array<Record<string, unknown>>;
-      expect(persisted[0]?.notifications).toMatchObject({
-        progress_count: 0,
-        last_terminal_kind: "",
+      const payload = JSON.parse(result.stdout.trim()) as {
+        status: string;
+        sessionId: string;
+        channel: string;
+      };
+      expect(payload).toMatchObject({
+        status: "submitted",
+        sessionId: "direct_session_123",
+        channel: "feishu",
       });
-      expect(persisted[0]?.notifications).toHaveProperty("submitted_sent_at");
-    } finally {
-      await controller.close();
-      await gateway.close();
-    }
-  });
-
-  it("sends heartbeat progress updates at the configured interval and a terminal success notification", async () => {
-    const nexuHome = makeTempDir();
-    tempDirs.push(nexuHome);
-    writeConfig(nexuHome);
-
-    let pollCount = 0;
-    const notificationRequests: RecordedRequest[] = [];
-    const gateway = await withGatewayServer((request, response) => {
-      if (request.url === "/libtv/v1/session/manual_session_001") {
-        pollCount += 1;
-        response.writeHead(200, { "Content-Type": "application/json" });
-        if (pollCount < 3) {
-          response.end(JSON.stringify({ messages: [] }));
-          return;
-        }
-        response.end(
-          JSON.stringify({
-            messages: [
-              {
-                role: "assistant",
-                content:
-                  "Final result https://libtv-res.liblib.art/sd-gen-save-img/final.mp4",
-              },
-            ],
-          }),
-        );
-        return;
-      }
-
-      response.writeHead(404, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ error: { user_message: "not found" } }));
-    });
-    const controller = await withJsonServer((request, response, body) => {
-      notificationRequests.push({
-        method: request.method ?? "",
-        url: request.url ?? "",
-        body,
-      });
-      response.writeHead(200, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ ok: true, delivered: true }));
-    });
-
-    writeFileSync(
-      resolve(nexuHome, "libtv-sessions.json"),
-      JSON.stringify(
-        [
-          {
-            session_id: "manual_session_001",
-            project_uuid: "manual_project_001",
-            status: "submitted",
-            submitted_text: "manual smoke prompt",
-            created_at: "2026-04-09T00:00:00",
-            updated_at: "2026-04-09T00:00:00",
-            delivery: {
-              channel: "feishu",
-              to: "user:ou_test_user",
-              raw_to: "ou_test_user",
-              session_key: "agent:bot-1:direct:ou_test_user",
-              thread_id: "om_thread_1",
-              account_id: "acct_1",
-              idempotency_prefix:
-                "libtv:agent:bot-1:direct:ou_test_user:manual_session_001",
-            },
-            notifications: {
-              submitted_sent_at: "2026-04-09T00:00:00",
-              last_progress_sent_at: "",
-              progress_count: 0,
-              terminal_sent_at: "",
-              last_terminal_kind: "",
-            },
-          },
-        ],
-        null,
-        2,
-      ),
-    );
-
-    try {
-      const result = await runScript(
-        [
-          "wait-and-deliver",
-          "--session-id",
-          "manual_session_001",
-          "--project-id",
-          "manual_project_001",
-        ],
-        {
-          ...process.env,
-          NEXU_HOME: nexuHome,
-          LIBTV_GATEWAY_URL: gateway.baseUrl,
-          NEXU_CONTROLLER_URL: controller.baseUrl,
-          LIBTV_POLL_INTERVAL_SECONDS: "1",
-          LIBTV_PROGRESS_NOTIFY_INTERVAL_SECONDS: "1",
-          LIBTV_MAX_POLLS: "4",
-        },
-      );
-
-      expect(result.status).toBe(0);
-      expect(notificationRequests).toHaveLength(2);
-      expect(notificationRequests[0]?.body).toMatchObject({
-        kind: "progress",
-        sessionId: "manual_session_001",
-        projectUuid: "manual_project_001",
-      });
-      expect(notificationRequests[1]?.body).toMatchObject({
-        kind: "success",
-        sessionId: "manual_session_001",
-        projectUuid: "manual_project_001",
-      });
-      expect(String(notificationRequests[1]?.body.message)).toContain(
-        "https://libtv-res.liblib.art/sd-gen-save-img/final.mp4",
-      );
 
       const persisted = JSON.parse(
         readFileSync(resolve(nexuHome, "libtv-sessions.json"), "utf8"),
       ) as Array<Record<string, unknown>>;
       expect(persisted[0]).toMatchObject({
-        status: "completed",
-        result_urls: ["https://libtv-res.liblib.art/sd-gen-save-img/final.mp4"],
+        session_id: "direct_session_123",
+        project_uuid: "direct_project_456",
+        status: "submitted",
+        auth_mode: "libtv_direct",
+        delivery: {
+          channel: "feishu",
+          chat_id: "ou_direct_user",
+        },
       });
-      expect(persisted[0]?.notifications).toMatchObject({
-        progress_count: 1,
-        last_terminal_kind: "success",
-      });
-      expect(persisted[0]?.notifications).toHaveProperty(
-        "last_progress_sent_at",
-      );
-      expect(persisted[0]?.notifications).toHaveProperty("terminal_sent_at");
     } finally {
-      await controller.close();
-      await gateway.close();
+      await directApi.close();
     }
   });
 
@@ -506,11 +428,19 @@ describe("libtv bundled skill", () => {
 
     try {
       const result = await runScript(
-        ["create-session", "make a city at night"],
+        [
+          "create-session",
+          "make a city at night",
+          "--channel",
+          "feishu",
+          "--chat-id",
+          "ou_test_user",
+        ],
         {
           ...process.env,
           NEXU_HOME: nexuHome,
           LIBTV_GATEWAY_URL: gateway.baseUrl,
+          LIBTV_SKIP_BACKGROUND_WAITER: "1",
         },
       );
 

@@ -55,34 +55,6 @@ const desktopPreferencesUpdateSchema = z.object({
   locale: z.enum(["en", "zh-CN"]),
 });
 
-const libtvNotifyRequestSchema = z.object({
-  channel: z.string().min(1),
-  to: z.string().min(1),
-  accountId: z.string().min(1).optional(),
-  threadId: z.string().min(1).optional(),
-  sessionKey: z.string().min(1),
-  idempotencyKey: z.string().min(1),
-  kind: z.enum(["submitted", "progress", "success", "failed", "timeout"]),
-  sessionId: z.string().min(1),
-  projectUuid: z.string().min(1).optional(),
-  message: z.string().min(1),
-});
-
-const libtvNotifyResponseSchema = z.object({
-  ok: z.boolean(),
-  result: z
-    .object({
-      runId: z.string().optional(),
-      messageId: z.string().optional(),
-      channel: z.string().optional(),
-      chatId: z.string().optional(),
-      conversationId: z.string().optional(),
-    })
-    .nullable()
-    .optional(),
-  error: z.string().optional(),
-});
-
 export function registerDesktopRoutes(
   app: OpenAPIHono<ControllerBindings>,
   container: ControllerContainer,
@@ -283,66 +255,6 @@ export function registerDesktopRoutes(
       const locale = await container.configStore.setDesktopLocale(body.locale);
       await container.openclawSyncService.syncAll();
       return c.json({ locale }, 200);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/api/internal/libtv-notify",
-      tags: ["Desktop"],
-      request: {
-        body: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: libtvNotifyRequestSchema,
-            },
-          },
-        },
-      },
-      responses: {
-        200: {
-          description: "LibTV notification delivered through the gateway",
-          content: {
-            "application/json": {
-              schema: libtvNotifyResponseSchema,
-            },
-          },
-        },
-        500: {
-          description: "LibTV notification delivery failed",
-          content: {
-            "application/json": {
-              schema: libtvNotifyResponseSchema,
-            },
-          },
-        },
-      },
-    }),
-    async (c) => {
-      const body = c.req.valid("json");
-
-      try {
-        const result = await container.gatewayService.sendChannelMessage({
-          channel: body.channel,
-          to: body.to,
-          accountId: body.accountId,
-          threadId: body.threadId,
-          sessionKey: body.sessionKey,
-          idempotencyKey: body.idempotencyKey,
-          message: body.message,
-        });
-        return c.json({ ok: true, result }, 200);
-      } catch (err) {
-        return c.json(
-          {
-            ok: false,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          500,
-        );
-      }
     },
   );
 
