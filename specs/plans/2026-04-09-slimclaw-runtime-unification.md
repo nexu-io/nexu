@@ -39,19 +39,15 @@ Today:
 - dev and desktop still own runtime-producer logic
 - pruning, patching, and sidecar layout already define product capability boundaries, but remain encoded as scattered scripts
 
-That fragmentation has a practical cost: it blocks the highest-value runtime work.
-
-The primary reason to split out `packages/slimclaw` is not aesthetic architecture cleanup. It is to create a single closed-loop runtime owner so Nexu can make larger, more aggressive OpenClaw runtime optimizations safely.
+The primary reason to split out `packages/slimclaw` is not aesthetic cleanup. It is to create a single closed-loop runtime owner so Nexu can make high-value runtime optimizations in one place.
 
 The first visible payoffs are expected to be:
 
-- prebundle-driven reductions in install and build time
-- cleaner cold-start strategy with lower startup latency
-- cleaner health/readiness strategy with less startup uncertainty and recovery overhead
+- lower install and build time through prebundle work
+- lower cold-start latency
+- cleaner health/readiness handling
 
-This is why the work is high priority: the expected return is not just architectural neatness, but a faster engineering loop.
-
-The architectural cleanup matters, but mainly because it enables those optimizations to happen in one place instead of being spread across historical runtime scaffolding.
+The architectural cleanup matters because it creates the optimization boundary needed to achieve those gains.
 
 ## Goals
 
@@ -63,15 +59,9 @@ The architectural cleanup matters, but mainly because it enables those optimizat
 
 ## Expected Payoff
 
-The long-term architectural benefit is real, but the main payoff is more concrete: once slimclaw becomes the single runtime owner, Nexu can optimize OpenClaw runtime behavior as a self-contained system.
+Once slimclaw becomes the single runtime owner, OpenClaw runtime optimization becomes a self-contained problem instead of a cross-cutting repo problem.
 
-That enables work that is much harder in the current layout, especially:
-
-- prebundle optimization to cut install and build time
-- better cold-start behavior to reduce startup latency
-- better runtime health/readiness handling to reduce startup delays and monitoring complexity
-
-In other words, `packages/slimclaw` is the natural long-term shape because it turns an already-existing runtime subsystem into a real optimization boundary.
+That is the main payoff of this work. It makes larger improvements practical, especially around prebundle, cold start, and runtime health/readiness.
 
 ## Non-Goals
 
