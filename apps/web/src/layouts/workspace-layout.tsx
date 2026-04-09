@@ -39,6 +39,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   Link,
@@ -1030,60 +1031,80 @@ function WorkspaceLayoutInner() {
                     </span>
                   </div>
                 </button>
-                {canOpenBalancePopup && showBalancePopup ? (
-                  <div
-                    data-sidebar-rewards-balance-popup="true"
-                    className="absolute bottom-full left-0 right-0 z-30 pb-2"
-                  >
-                    <div className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-[13px] font-semibold text-text-primary">
-                          ✦ {t("layout.sidebar.balancePopup.total")}
-                        </span>
-                        <span className="tabular-nums text-[14px] font-bold text-text-primary">
-                          {rewardBalancePopupValue}
-                        </span>
-                      </div>
-                      <div className="space-y-2 border-t border-border/60 pt-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-1 text-[11px] text-text-muted">
-                            {t("layout.sidebar.balancePopup.earned")}
-                            <span className="group relative inline-flex cursor-default items-center">
-                              <Info size={10} className="text-text-muted/60" />
-                              <span
-                                role="tooltip"
-                                className="pointer-events-none absolute bottom-full left-0 z-40 mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
-                              >
-                                {t("layout.sidebar.balancePopup.earnedTooltip")}
-                              </span>
-                            </span>
-                          </span>
-                          <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                            {rewardsStatus.progress.earnedCredits}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        data-sidebar-rewards-balance-detail="true"
-                        className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
-                        onClick={() => {
-                          setShowBalancePopup(false);
-                          track("workspace_click_usage_detail");
-                          track("workspace_sidebar_click", {
-                            target: "credits_popup_detail",
-                          });
-                          void openExternalUrl(
-                            resolveCloudUsageUrl(desktopCloudStatus?.cloudUrl),
-                          );
-                        }}
+                {canOpenBalancePopup && showBalancePopup
+                  ? createPortal(
+                      <div
+                        data-sidebar-rewards-balance-popup="true"
+                        className="fixed z-[9999] pb-2"
+                        style={(() => {
+                          const rect =
+                            balanceRef.current?.getBoundingClientRect();
+                          if (!rect) return { display: "none" };
+                          return {
+                            left: rect.left,
+                            width: Math.max(rect.width, 240),
+                            bottom: window.innerHeight - rect.top,
+                          };
+                        })()}
                       >
-                        {t("layout.sidebar.balancePopup.viewDetail")}
-                        <ChevronRight size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+                        <div className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                          <div className="mb-3 flex items-center justify-between">
+                            <span className="text-[13px] font-semibold text-text-primary">
+                              ✦ {t("layout.sidebar.balancePopup.total")}
+                            </span>
+                            <span className="tabular-nums text-[14px] font-bold text-text-primary">
+                              {rewardBalancePopupValue}
+                            </span>
+                          </div>
+                          <div className="space-y-2 border-t border-border/60 pt-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-[11px] text-text-muted">
+                                {t("layout.sidebar.balancePopup.earned")}
+                                <span className="group relative inline-flex cursor-default items-center">
+                                  <Info
+                                    size={10}
+                                    className="text-text-muted/60"
+                                  />
+                                  <span
+                                    role="tooltip"
+                                    className="pointer-events-none absolute bottom-full left-0 z-[10000] mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                                  >
+                                    {t(
+                                      "layout.sidebar.balancePopup.earnedTooltip",
+                                    )}
+                                  </span>
+                                </span>
+                              </span>
+                              <span className="tabular-nums text-[11px] font-medium text-text-secondary">
+                                {rewardsStatus.progress.earnedCredits}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            data-sidebar-rewards-balance-detail="true"
+                            className="mt-2.5 flex w-full items-center justify-between border-t border-border/60 pt-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:text-text-primary"
+                            onClick={() => {
+                              setShowBalancePopup(false);
+                              track("workspace_click_usage_detail");
+                              track("workspace_sidebar_click", {
+                                target: "credits_popup_detail",
+                              });
+                              void openExternalUrl(
+                                resolveCloudUsageUrl(
+                                  desktopCloudStatus?.cloudUrl,
+                                ),
+                              );
+                            }}
+                          >
+                            {t("layout.sidebar.balancePopup.viewDetail")}
+                            <ChevronRight size={12} />
+                          </button>
+                        </div>
+                      </div>,
+                      document.body,
+                    )
+                  : null}
               </div>
             </div>
           )}
