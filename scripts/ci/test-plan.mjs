@@ -8,6 +8,32 @@ function git(args) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
 
+function hasRef(ref) {
+  try {
+    git(["rev-parse", "--verify", ref]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureBaseRefAvailable(baseRef) {
+  const remoteRef = `origin/${baseRef}`;
+  if (hasRef(remoteRef)) {
+    return remoteRef;
+  }
+
+  git([
+    "fetch",
+    "--no-tags",
+    "--depth=1",
+    "origin",
+    `refs/heads/${baseRef}:refs/remotes/${remoteRef}`,
+  ]);
+
+  return remoteRef;
+}
+
 function listChangedFiles() {
   const eventName = process.env.GITHUB_EVENT_NAME;
   if (eventName !== "pull_request") {
@@ -15,7 +41,8 @@ function listChangedFiles() {
   }
 
   const baseRef = process.env.GITHUB_BASE_REF || "main";
-  const mergeBase = git(["merge-base", "HEAD", `origin/${baseRef}`]);
+  const availableBaseRef = ensureBaseRefAvailable(baseRef);
+  const mergeBase = git(["merge-base", "HEAD", availableBaseRef]);
   const diff = git(["diff", "--name-only", `${mergeBase}...HEAD`]);
   return diff ? diff.split("\n").filter(Boolean) : [];
 }
