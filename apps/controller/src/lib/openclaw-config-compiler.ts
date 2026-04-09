@@ -4,6 +4,7 @@ import type { ControllerEnv } from "../app/env.js";
 import type { OAuthConnectionState } from "../runtime/openclaw-auth-profiles-store.js";
 import type { NexuConfig } from "../store/schemas.js";
 import {
+  MANAGED_CHANNEL_PLUGIN_IDS,
   compileChannelBindings,
   compileChannelsConfig,
   resolveManagedChannelPluginId,
