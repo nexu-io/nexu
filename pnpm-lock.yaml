@@ -337,10 +337,6 @@ importers:
         version: 5.9.3
 
   packages/slimclaw:
-    dependencies:
-      '@nexu/dev-utils':
-        specifier: workspace:*
-        version: link:../dev-utils
     devDependencies:
       typescript:
         specifier: ^5.7.3

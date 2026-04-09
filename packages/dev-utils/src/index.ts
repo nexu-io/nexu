@@ -29,8 +29,3 @@ export {
   removeDevLock,
   writeDevLock,
 } from "./lock.js";
-export {
-  prepareOpenclawRuntimeStage,
-  type PrepareOpenclawRuntimeStageOptions,
-  type PrepareOpenclawRuntimeStageResult,
-} from "./openclaw-runtime-stage.js";

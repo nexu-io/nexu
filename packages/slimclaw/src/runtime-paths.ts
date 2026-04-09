@@ -3,9 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  type PrepareOpenclawRuntimeStageResult,
-  prepareOpenclawRuntimeStage,
-} from "@nexu/dev-utils";
+  type PrepareSlimclawRuntimeStageResult as PrepareSlimclawRuntimeStageResultInternal,
+  computeSlimclawRuntimeStageFingerprint as computeSlimclawRuntimeStageFingerprintInternal,
+  prepareSlimclawRuntimeStageInternal,
+} from "./runtime-stage.js";
 
 type OpenclawRuntimeCache = {
   fingerprint?: string;
@@ -62,7 +63,11 @@ export type PrepareSlimclawRuntimeStageOptions = {
 };
 
 export type PrepareSlimclawRuntimeStageResult =
-  PrepareOpenclawRuntimeStageResult;
+  PrepareSlimclawRuntimeStageResultInternal;
+
+export type ComputeSlimclawRuntimeStageFingerprintOptions = {
+  workspaceRoot?: string;
+};
 
 function getDefaultWorkspaceRoot(): string {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -153,7 +158,7 @@ function assertRequiredRuntimePaths(
     .map(([label, targetPath]) => `${label}: ${targetPath}`)
     .join(", ");
   throw new Error(
-    `Slimclaw runtime is not prepared. Missing ${missingSummary}. Run pnpm openclaw-runtime:install first.`,
+    `Slimclaw runtime is not prepared. Missing ${missingSummary}. Run pnpm slimclaw:prepare first.`,
   );
 }
 
@@ -242,10 +247,25 @@ export async function prepareSlimclawRuntimeStage(
     requirePrepared: true,
   });
 
-  return prepareOpenclawRuntimeStage({
+  return prepareSlimclawRuntimeStageInternal({
     sourceOpenclawRoot: path.dirname(runtimePaths.entryPath),
     patchRoot: getSlimclawRuntimePatchesRoot(workspaceRoot),
     targetStageRoot: options.targetStageRoot,
     log: options.log,
+  });
+}
+
+export async function computeSlimclawRuntimeStageFingerprint(
+  options: ComputeSlimclawRuntimeStageFingerprintOptions = {},
+): Promise<string> {
+  const workspaceRoot = options.workspaceRoot ?? getDefaultWorkspaceRoot();
+  const runtimePaths = resolveSlimclawRuntimePaths({
+    workspaceRoot,
+    requirePrepared: true,
+  });
+
+  return computeSlimclawRuntimeStageFingerprintInternal({
+    sourceOpenclawRoot: path.dirname(runtimePaths.entryPath),
+    patchRoot: getSlimclawRuntimePatchesRoot(workspaceRoot),
   });
 }

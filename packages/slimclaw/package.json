@@ -17,9 +17,6 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@nexu/dev-utils": "workspace:*"
-  },
   "devDependencies": {
     "typescript": "^5.7.3"
   }
