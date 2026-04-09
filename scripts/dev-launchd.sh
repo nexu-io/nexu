@@ -29,7 +29,6 @@ OPENCLAW_PORT="${OPENCLAW_PORT:-18789}"
 # Paths
 NODE_BIN="${NODE_BIN:-$(which node)}"
 CONTROLLER_ENTRY="$REPO_ROOT/apps/controller/dist/index.js"
-OPENCLAW_PATH="$REPO_ROOT/openclaw-runtime/node_modules/openclaw/openclaw.mjs"
 # Dev state dirs — repo-scoped, isolated from packaged app's ~/.nexu/
 OPENCLAW_STATE_DIR="$DEV_NEXU_HOME/runtime/openclaw/state"
 OPENCLAW_CONFIG="$OPENCLAW_STATE_DIR/openclaw.json"

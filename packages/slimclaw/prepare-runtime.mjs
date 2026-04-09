@@ -1,15 +1,16 @@
-import { spawn } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { installRuntime } from "./install-runtime.mjs";
+import { installRuntimeAt } from "./install-runtime.mjs";
 import { computeFingerprint } from "./postinstall-cache.mjs";
+import { pruneRuntimeAt } from "./prune-runtime.mjs";
 import { exists } from "./utils.mjs";
 
-const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(packageRoot, "..", "..");
+const runtimeDir = path.resolve(repoRoot, "openclaw-runtime");
 const nodeModulesDir = path.join(runtimeDir, "node_modules");
-const cacheFileName = ".postinstall-cache.json";
-const cacheFilePath = path.join(runtimeDir, cacheFileName);
+const cacheFilePath = path.join(runtimeDir, ".postinstall-cache.json");
 const criticalRuntimeFiles = [
   path.join("node_modules", "openclaw", "dist"),
   path.join("node_modules", "@whiskeysockets", "baileys", "lib", "index.js"),
@@ -37,38 +38,17 @@ async function readCachedFingerprint() {
   }
 }
 
-async function run(command, args) {
-  await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: runtimeDir,
-      stdio: "inherit",
-    });
-
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(
-        new Error(
-          `${command} ${args.join(" ")} exited with code ${code ?? "unknown"}`,
-        ),
-      );
-    });
-  });
-}
-
 async function hasCompleteRuntimeInstall() {
   for (const relativePath of criticalRuntimeFiles) {
     if (!(await exists(path.join(runtimeDir, relativePath)))) {
       return false;
     }
   }
+
   return true;
 }
-try {
+
+export async function prepareSlimclawOwnedRuntimeInstall() {
   const fingerprint = await computeFingerprint(runtimeDir);
   const cachedFingerprint = await readCachedFingerprint();
   const hasNodeModules = await exists(nodeModulesDir);
@@ -82,7 +62,7 @@ try {
     cachedFingerprint === fingerprint
   ) {
     console.log("openclaw-runtime unchanged, skipping install:pruned.");
-    process.exit(0);
+    return;
   }
 
   if (!hasNodeModules) {
@@ -99,8 +79,8 @@ try {
     console.log("openclaw-runtime inputs changed, running install:pruned.");
   }
 
-  await installRuntime("pruned");
-  await run(process.execPath, ["./prune-runtime.mjs"]);
+  await installRuntimeAt(runtimeDir, "pruned");
+  await pruneRuntimeAt(runtimeDir);
 
   await writeFile(
     cacheFilePath,
@@ -116,7 +96,13 @@ try {
   );
 
   console.log("openclaw-runtime cache updated.");
-} catch (error) {
-  console.error("openclaw-runtime postinstall failed.");
-  throw error;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    await prepareSlimclawOwnedRuntimeInstall();
+  } catch (error) {
+    console.error("slimclaw-owned runtime prepare failed.");
+    throw error;
+  }
 }

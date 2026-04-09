@@ -209,7 +209,6 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     service: "openclaw",
   });
   const stage = await prepareSlimclawRuntimeStage({
-    workspaceRoot: repoRootPath,
     targetStageRoot: getOpenclawRuntimeStageRootPath(),
     log: (message) => logger.info(message),
   });

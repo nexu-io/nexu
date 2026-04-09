@@ -3,8 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exists } from "./utils.mjs";
 
-const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
-const lockfilePath = path.join(runtimeDir, "package-lock.json");
+const packageRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(packageRoot, "..", "..");
+
+function resolveDefaultRuntimeDir() {
+  return path.resolve(repoRoot, "openclaw-runtime");
+}
 
 function createCommandSpec(command, args) {
   if (
@@ -24,11 +28,11 @@ function getPrunedInstallArgs() {
   return ["--omit=peer", "--no-audit", "--no-fund"];
 }
 
-async function run(command, args) {
+async function run(command, args, cwd) {
   await new Promise((resolve, reject) => {
     const commandSpec = createCommandSpec(command, args);
     const child = spawn(commandSpec.command, commandSpec.args, {
-      cwd: runtimeDir,
+      cwd,
       stdio: "inherit",
     });
 
@@ -48,16 +52,16 @@ async function run(command, args) {
   });
 }
 
-export async function installRuntime(mode = "pruned") {
+export async function installRuntimeAt(runtimeDir, mode = "pruned") {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+  const lockfilePath = path.join(runtimeDir, "package-lock.json");
 
   if (mode === "full") {
-    await run(npmCommand, [
-      "install",
-      "--no-audit",
-      "--no-fund",
-      "--prefer-offline",
-    ]);
+    await run(
+      npmCommand,
+      ["install", "--no-audit", "--no-fund", "--prefer-offline"],
+      runtimeDir,
+    );
     return;
   }
 
@@ -65,7 +69,7 @@ export async function installRuntime(mode = "pruned") {
 
   if (await exists(lockfilePath)) {
     try {
-      await run(npmCommand, ["ci", ...installArgs]);
+      await run(npmCommand, ["ci", ...installArgs], runtimeDir);
       return;
     } catch (error) {
       console.warn(
@@ -75,7 +79,11 @@ export async function installRuntime(mode = "pruned") {
     }
   }
 
-  await run(npmCommand, ["install", ...installArgs, "--prefer-offline"]);
+  await run(
+    npmCommand,
+    ["install", ...installArgs, "--prefer-offline"],
+    runtimeDir,
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -85,5 +93,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     throw new Error(`Unsupported install mode: ${mode}`);
   }
 
-  await installRuntime(mode);
+  await installRuntimeAt(resolveDefaultRuntimeDir(), mode);
 }

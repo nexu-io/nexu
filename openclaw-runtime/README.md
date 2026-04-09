@@ -9,7 +9,7 @@
 或者你可以手动运行：
 
 ```bash
-pnpm openclaw-runtime:install
+pnpm slimclaw:prepare
 ```
 
 ## For 本地开发
@@ -35,7 +35,7 @@ OPENCLAW_STATE_DIR="$PWD/.openclaw" \
 
 ## 为什么入口选择 openclaw.mjs
 
-`./openclaw-wrapper` 最终会执行 `openclaw-runtime/node_modules/openclaw/openclaw.mjs`，它是 `openclaw` 包内的 CLI 入口脚本。
+`./openclaw-wrapper` 最终会通过 slimclaw 解析当前 prepared runtime 的 `openclaw.mjs` 入口，它是 `openclaw` 包内的 CLI 入口脚本。
 
 它负责：
 
@@ -71,7 +71,7 @@ npm --prefix ./openclaw-runtime run clean
 
 ### 1. 确定删除策略
 
-先修改 `openclaw-runtime/prune-runtime-paths.mjs`，加入本轮准备删除的路径。
+先修改 `packages/slimclaw/prune-runtime-paths.mjs`，加入本轮准备删除的路径。
 
 ### 2. 重新安装并裁剪
 

@@ -62,15 +62,6 @@ async function run(command, args) {
   });
 }
 
-async function installOpenClawRuntime() {
-  await run(npmCommand, [
-    "--prefix",
-    "./openclaw-runtime",
-    "run",
-    "install:cached",
-  ]);
-}
-
 async function installWeixinRuntimePlugin() {
   const pluginRoot = resolve(
     repoRoot,
@@ -113,9 +104,7 @@ async function buildDevUtils() {
 
 async function buildSlimclaw() {
   await run(process.execPath, [
-    resolve(repoRoot, "node_modules", "typescript", "bin", "tsc"),
-    "-p",
-    "./packages/slimclaw/tsconfig.json",
+    resolve(repoRoot, "packages", "slimclaw", "build.mjs"),
   ]);
 }
 
@@ -126,7 +115,6 @@ if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
   process.exit(0);
 }
 
-await installOpenClawRuntime();
 await installWeixinRuntimePlugin();
 await buildDevUtils();
 await buildSlimclaw();

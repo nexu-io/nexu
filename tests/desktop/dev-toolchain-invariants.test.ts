@@ -161,16 +161,19 @@ describe("ELECTRON_RUN_AS_NODE coverage", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 8. openclaw-process.ts sets ELECTRON_RUN_AS_NODE
+  // 8. controller runtime command resolution preserves ELECTRON_RUN_AS_NODE
   // -----------------------------------------------------------------------
-  it("openclaw-process.ts sets ELECTRON_RUN_AS_NODE when using Electron executable", () => {
+  it("controller runtime command resolution sets ELECTRON_RUN_AS_NODE when using Electron executable", () => {
     const openclawProcess = readFile(
       "apps/controller/src/runtime/openclaw-process.ts",
     );
+    const runtimeResolution = readFile(
+      "apps/controller/src/runtime/openclaw-runtime-resolution.ts",
+    );
 
-    expect(openclawProcess).toContain("ELECTRON_RUN_AS_NODE");
-    // Must be conditionally set when electronExec is used
-    expect(openclawProcess).toContain("OPENCLAW_ELECTRON_EXECUTABLE");
+    expect(openclawProcess).toContain("getOpenClawCommandSpec");
+    expect(runtimeResolution).toContain("ELECTRON_RUN_AS_NODE");
+    expect(runtimeResolution).toContain("OPENCLAW_ELECTRON_EXECUTABLE");
   });
 
   // -----------------------------------------------------------------------

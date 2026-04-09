@@ -15,6 +15,7 @@
   "dependencies": {
     "@hono/node-server": "^1.13.8",
     "@hono/zod-openapi": "^0.18.4",
+    "@nexu/slimclaw": "workspace:*",
     "@nexu/shared": "workspace:*",
     "clawhub": "0.8.0",
     "dotenv": "^16.6.1",

@@ -57,17 +57,12 @@ export type ResolveSlimclawRuntimeArtifactsOptions = {
 };
 
 export type PrepareSlimclawRuntimeStageOptions = {
-  workspaceRoot?: string;
   targetStageRoot: string;
   log?: (message: string) => void;
 };
 
 export type PrepareSlimclawRuntimeStageResult =
   PrepareSlimclawRuntimeStageResultInternal;
-
-export type ComputeSlimclawRuntimeStageFingerprintOptions = {
-  workspaceRoot?: string;
-};
 
 function getDefaultWorkspaceRoot(): string {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -241,7 +236,7 @@ export function resolveSlimclawRuntimePaths(
 export async function prepareSlimclawRuntimeStage(
   options: PrepareSlimclawRuntimeStageOptions,
 ): Promise<PrepareSlimclawRuntimeStageResult> {
-  const workspaceRoot = options.workspaceRoot ?? getDefaultWorkspaceRoot();
+  const workspaceRoot = getDefaultWorkspaceRoot();
   const runtimePaths = resolveSlimclawRuntimePaths({
     workspaceRoot,
     requirePrepared: true,
@@ -255,10 +250,8 @@ export async function prepareSlimclawRuntimeStage(
   });
 }
 
-export async function computeSlimclawRuntimeStageFingerprint(
-  options: ComputeSlimclawRuntimeStageFingerprintOptions = {},
-): Promise<string> {
-  const workspaceRoot = options.workspaceRoot ?? getDefaultWorkspaceRoot();
+export async function computeSlimclawRuntimeStageFingerprint(): Promise<string> {
+  const workspaceRoot = getDefaultWorkspaceRoot();
   const runtimePaths = resolveSlimclawRuntimePaths({
     workspaceRoot,
     requirePrepared: true,

@@ -14,6 +14,7 @@
     }
   },
   "scripts": {
+    "prepare-runtime": "node ./build.mjs",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

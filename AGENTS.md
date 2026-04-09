@@ -344,6 +344,6 @@ This note should track:
 - Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
 - `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
 - Full-stack startup order is `openclaw` -> `controller` -> `web` -> `desktop`; shutdown order is the reverse
-- Prefer `./openclaw-wrapper` over global `openclaw` in local development; it executes `openclaw-runtime/node_modules/openclaw/openclaw.mjs`
+- Prefer `./openclaw-wrapper` over global `openclaw` in local development; it resolves the prepared runtime entry through slimclaw and executes that local OpenClaw CLI entry
 - When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/controller` to avoid launching a second OpenClaw process
 - If behavior differs, verify effective `OPENCLAW_STATE_DIR` / `OPENCLAW_CONFIG_PATH` used by the running controller process.

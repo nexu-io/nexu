@@ -250,7 +250,7 @@ async function collectOpenclawSidecarFingerprintInputs() {
 async function computeOpenclawSidecarFingerprint() {
   const [files, stageFingerprint] = await Promise.all([
     collectOpenclawSidecarFingerprintInputs(),
-    computeSlimclawRuntimeStageFingerprint({ workspaceRoot: repoRoot }),
+    computeSlimclawRuntimeStageFingerprint(),
   ]);
 
   return hashFingerprintInputs({
@@ -603,7 +603,6 @@ async function stagePatchedOpenclawPackage() {
   );
   const stageTargetRoot = resolve(stageRoot, "prepared-openclaw");
   const stageResult = await prepareSlimclawRuntimeStage({
-    workspaceRoot: repoRoot,
     targetStageRoot: stageTargetRoot,
     log: (message) => console.log(message),
   });

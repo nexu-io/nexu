@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   cacheInputs,
   computeFingerprint,
-} from "../../openclaw-runtime/postinstall-cache.mjs";
+} from "../../packages/slimclaw/postinstall-cache.mjs";
 
 const tempDirs = [] as string[];
 
@@ -49,7 +49,13 @@ describe("openclaw-runtime postinstall cache fingerprint", () => {
     const before = await computeFingerprint(runtimeDir);
 
     await writeFile(
-      path.join(runtimeDir, "prune-runtime-paths.mjs"),
+      path.join(
+        runtimeDir,
+        "..",
+        "packages",
+        "slimclaw",
+        "prune-runtime-paths.mjs",
+      ),
       "export const pruneTargets = ['node_modules/foo'];\n",
       "utf8",
     );
@@ -62,7 +68,16 @@ describe("openclaw-runtime postinstall cache fingerprint", () => {
     const runtimeDir = await createRuntimeFixture();
     const before = await computeFingerprint(runtimeDir);
 
-    await rm(path.join(runtimeDir, "postinstall.mjs"), { force: true });
+    await rm(
+      path.join(
+        runtimeDir,
+        "..",
+        "packages",
+        "slimclaw",
+        "postinstall-cache.mjs",
+      ),
+      { force: true },
+    );
 
     const after = await computeFingerprint(runtimeDir);
     expect(after).not.toBe(before);

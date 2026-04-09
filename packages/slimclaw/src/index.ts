@@ -6,7 +6,6 @@ export {
   getSlimclawRuntimeRoot,
   getSlimclawRuntimePatchesRoot,
   resolveSlimclawRuntimePaths,
-  type ComputeSlimclawRuntimeStageFingerprintOptions,
   type PrepareSlimclawRuntimeStageOptions,
   type PrepareSlimclawRuntimeStageResult,
   type ResolveSlimclawRuntimePathsOptions,

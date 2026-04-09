@@ -6,13 +6,13 @@ import { exists } from "./utils.mjs";
 export const cacheInputs = [
   "package.json",
   "package-lock.json",
+  "../packages/slimclaw/prepare-runtime.mjs",
   "clean-node-modules.mjs",
   "install-runtime.mjs",
-  "postinstall.mjs",
-  "postinstall-cache.mjs",
-  "prune-runtime.mjs",
-  "prune-runtime-paths.mjs",
-  "utils.mjs",
+  "../packages/slimclaw/postinstall-cache.mjs",
+  "../packages/slimclaw/prune-runtime.mjs",
+  "../packages/slimclaw/prune-runtime-paths.mjs",
+  "../packages/slimclaw/utils.mjs",
 ];
 
 export const cacheEnvInputs = ["NEXU_OPENCLAW_PRUNE_DAVEY"];
