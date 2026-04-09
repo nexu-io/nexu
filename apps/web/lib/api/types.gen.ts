@@ -1125,45 +1125,11 @@ export type GetApiInternalDesktopRewardsResponses = {
 
 export type GetApiInternalDesktopRewardsResponse = GetApiInternalDesktopRewardsResponses[keyof GetApiInternalDesktopRewardsResponses];
 
-export type PostApiInternalDesktopRewardsGithubStarSessionData = {
-    body?: {
-        [key: string]: unknown;
-    };
-    path?: never;
-    query?: never;
-    url: '/api/internal/desktop/rewards/github-star-session';
-};
-
-export type PostApiInternalDesktopRewardsGithubStarSessionErrors = {
-    /**
-     * GitHub star verification is temporarily unavailable
-     */
-    400: {
-        message: string;
-    };
-};
-
-export type PostApiInternalDesktopRewardsGithubStarSessionError = PostApiInternalDesktopRewardsGithubStarSessionErrors[keyof PostApiInternalDesktopRewardsGithubStarSessionErrors];
-
-export type PostApiInternalDesktopRewardsGithubStarSessionResponses = {
-    /**
-     * Prepare a GitHub star verification session
-     */
-    200: {
-        sessionId: string;
-        baselineStars: number;
-        expiresAt: string;
-    };
-};
-
-export type PostApiInternalDesktopRewardsGithubStarSessionResponse = PostApiInternalDesktopRewardsGithubStarSessionResponses[keyof PostApiInternalDesktopRewardsGithubStarSessionResponses];
-
 export type PostApiInternalDesktopRewardsClaimData = {
     body?: {
         taskId: 'daily_checkin' | 'github_star' | 'x_share' | 'reddit' | 'mobile_share' | 'lingying' | 'facebook' | 'whatsapp';
         proof?: {
             url?: string;
-            githubSessionId?: string;
         };
     };
     path?: never;

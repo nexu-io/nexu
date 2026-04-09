@@ -318,7 +318,6 @@ const zhCN = {
   "rewards.loginRequired": "请先登录 nexu 账号",
   "rewards.githubUnavailable": "暂不可用",
   "rewards.downloadFailed": "分享卡下载失败",
-  "rewards.githubSessionFailed": "启动 GitHub Star 监测失败，请稍后重试",
   "rewards.proofUrlLabel": "回填分享链接",
   "rewards.proofUrlPlaceholder": "粘贴你在对应平台发布后的公开链接",
   "rewards.proofUrlHint": "只有符合对应平台格式的公开链接才能领取积分。",
@@ -350,6 +349,7 @@ const zhCN = {
   "budget.confirm.imageDesc": "完成扫码分享后，回来确认即可领取 +${n} 积分。",
   "budget.confirm.downloadImage": "下载分享卡",
   "budget.confirm.done": "我已完成",
+  "budget.confirm.githubStarDone": "我已 Star",
   "budget.confirm.cancel": "稍后再说",
   "budget.confirm.checkinDesc":
     "确认今日打卡后，+${n} 积分会加入你的奖励额度。每天可领取一次。",

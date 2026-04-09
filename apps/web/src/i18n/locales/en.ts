@@ -325,8 +325,6 @@ const en = {
   "rewards.loginRequired": "Please sign in to your nexu account first",
   "rewards.githubUnavailable": "Unavailable",
   "rewards.downloadFailed": "Failed to download share card",
-  "rewards.githubSessionFailed":
-    "Failed to start GitHub star verification. Please try again.",
   "rewards.proofUrlLabel": "Paste your share URL",
   "rewards.proofUrlPlaceholder":
     "Paste the public link you posted on that platform",
@@ -365,6 +363,7 @@ const en = {
     "After you complete the share, come back and confirm to receive +${n} credits.",
   "budget.confirm.downloadImage": "Download share card",
   "budget.confirm.done": "I've done it",
+  "budget.confirm.githubStarDone": "I've starred it",
   "budget.confirm.cancel": "Not yet",
   "budget.confirm.checkinDesc":
     "Confirm today's check-in to add +${n} credits to your reward balance. This can be claimed once per day.",

@@ -3,9 +3,6 @@ import {
   claimDesktopRewardRequestSchema,
   claimDesktopRewardResponseSchema,
   desktopRewardsStatusSchema,
-  prepareGithubStarSessionRequestSchema,
-  prepareGithubStarSessionResponseSchema,
-  rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
   validateRewardProofUrl,
 } from "@nexu/shared";
@@ -20,8 +17,6 @@ const errorResponseSchema = z.object({
 const setDesktopRewardBalanceRequestSchema = z.object({
   balance: z.number().int().nonnegative(),
 });
-const GITHUB_STAR_REWARD_DISABLED_MESSAGE =
-  "GitHub star reward is temporarily unavailable";
 
 export function registerDesktopRewardsRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -44,52 +39,6 @@ export function registerDesktopRewardsRoutes(
     async (c) => {
       const status = await container.configStore.getDesktopRewardsStatus();
       return c.json(status, 200);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/api/internal/desktop/rewards/github-star-session",
-      tags: ["Desktop"],
-      request: {
-        body: {
-          content: {
-            "application/json": {
-              schema: prepareGithubStarSessionRequestSchema,
-            },
-          },
-        },
-      },
-      responses: {
-        200: {
-          content: {
-            "application/json": {
-              schema: prepareGithubStarSessionResponseSchema,
-            },
-          },
-          description: "Prepare a GitHub star verification session",
-        },
-        400: {
-          content: {
-            "application/json": { schema: errorResponseSchema },
-          },
-          description: "GitHub star verification is temporarily unavailable",
-        },
-      },
-    }),
-    async (c) => {
-      try {
-        const result =
-          await container.githubStarVerificationService.prepareSession();
-        return c.json(result, 200);
-      } catch (error) {
-        logger.warn(
-          { error: error instanceof Error ? error.message : String(error) },
-          "github_star_session_failed",
-        );
-        return c.json({ message: GITHUB_STAR_REWARD_DISABLED_MESSAGE }, 400);
-      }
     },
   );
 
@@ -129,26 +78,6 @@ export function registerDesktopRewardsRoutes(
       if (rewardTaskRequiresUrlProof(body.taskId)) {
         if (!proofUrl || !validateRewardProofUrl(body.taskId, proofUrl)) {
           return c.json({ message: "Invalid proof URL for reward task" }, 400);
-        }
-      }
-
-      if (rewardTaskRequiresGithubStarSession(body.taskId)) {
-        const sessionId = body.proof?.githubSessionId;
-        if (!sessionId) {
-          return c.json({ message: "Missing GitHub star session" }, 400);
-        }
-        const verifyResult =
-          await container.githubStarVerificationService.verifySession(
-            sessionId,
-          );
-        if (!verifyResult.ok) {
-          const reason =
-            verifyResult.reason === "not_increased"
-              ? "You haven't starred the repository yet"
-              : verifyResult.reason === "expired"
-                ? "Session expired, please start over"
-                : "Invalid session";
-          return c.json({ message: reason }, 400);
         }
       }
 

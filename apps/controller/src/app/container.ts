@@ -24,7 +24,6 @@ import { ArtifactService } from "../services/artifact-service.js";
 import { ChannelFallbackService } from "../services/channel-fallback-service.js";
 import { ChannelService } from "../services/channel-service.js";
 import { DesktopLocalService } from "../services/desktop-local-service.js";
-import { GithubStarVerificationService } from "../services/github-star-verification-service.js";
 import { IntegrationService } from "../services/integration-service.js";
 import { LocalUserService } from "../services/local-user-service.js";
 import { ModelProviderService } from "../services/model-provider-service.js";
@@ -65,7 +64,6 @@ export interface ControllerContainer {
   openclawSyncService: OpenClawSyncService;
   openclawAuthService: OpenClawAuthService;
   quotaFallbackService: QuotaFallbackService;
-  githubStarVerificationService: GithubStarVerificationService;
   wsClient: OpenClawWsClient;
   gatewayService: OpenClawGatewayService;
   runtimeState: ControllerRuntimeState;
@@ -150,7 +148,6 @@ export async function createContainer(): Promise<ControllerContainer> {
     configStore,
     openclawSyncService,
   );
-  const githubStarVerificationService = new GithubStarVerificationService();
 
   // Wire cloud state change callback to sync refreshed cloud inventory without
   // auto-switching the default model during startup or first-channel connect.
@@ -201,7 +198,6 @@ export async function createContainer(): Promise<ControllerContainer> {
     openclawSyncService,
     openclawAuthService,
     quotaFallbackService,
-    githubStarVerificationService,
     wsClient,
     gatewayService,
     configStore,

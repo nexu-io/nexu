@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import {
   type RewardTaskId,
   type RewardTaskStatus,
-  rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
   validateRewardProofUrl,
 } from "@nexu/shared";
@@ -118,7 +117,9 @@ function RewardConfirmModal({
     ? t("budget.confirm.checking")
     : isClaiming
       ? t("budget.confirm.claiming")
-      : t("budget.confirm.done");
+      : task.id === "github_star"
+        ? t("budget.confirm.githubStarDone")
+        : t("budget.confirm.done");
 
   return (
     <div
@@ -244,23 +245,13 @@ function RewardConfirmModal({
 
 export function RewardsPage() {
   const { t, i18n } = useTranslation();
-  const {
-    status,
-    loading,
-    refresh,
-    claimTask,
-    claimingTaskId,
-    prepareGithubStarSession,
-    isPreparingGithubStarSession,
-  } = useDesktopRewardsStatus();
+  const { status, loading, refresh, claimTask, claimingTaskId } =
+    useDesktopRewardsStatus();
   const [confirmTaskId, setConfirmTaskId] = useState<
     RewardTaskStatus["id"] | null
   >(null);
   const [confirmPhase, setConfirmPhase] = useState<RewardConfirmPhase>("idle");
   const [confirmProofUrl, setConfirmProofUrl] = useState("");
-  const [confirmGithubSessionId, setConfirmGithubSessionId] = useState<
-    string | null
-  >(null);
 
   const { cloudConnecting, handleCloudConnect } = useCloudConnect({
     cloudConnected: status.viewer.cloudConnected,
@@ -319,28 +310,8 @@ export function RewardsPage() {
       track("workspace_task_click", { type: clickTrackingType });
     }
 
-    if (rewardTaskRequiresGithubStarSession(task.id)) {
-      let sessionId: string | null = null;
-      try {
-        const session = await prepareGithubStarSession();
-        sessionId = session.sessionId;
-      } catch {
-        toast.error(t("rewards.githubSessionFailed"));
-        return;
-      }
-      setConfirmPhase("idle");
-      setConfirmProofUrl("");
-      setConfirmGithubSessionId(sessionId);
-      if (task.actionUrl) {
-        await openExternalUrl(task.actionUrl);
-      }
-      setConfirmTaskId(task.id);
-      return;
-    }
-
     setConfirmPhase("idle");
     setConfirmProofUrl("");
-    setConfirmGithubSessionId(null);
 
     if (task.shareMode !== "image" && task.actionUrl) {
       await openExternalUrl(task.actionUrl);
@@ -443,11 +414,6 @@ export function RewardsPage() {
               const renderTaskList = (tasks: RewardTaskStatus[]) => (
                 <div className="space-y-0">
                   {tasks.map((task, index) => {
-                    const isGithubStar = rewardTaskRequiresGithubStarSession(
-                      task.id,
-                    );
-                    const isPreparingThisTask =
-                      isGithubStar && isPreparingGithubStarSession;
                     const actionLabel = task.isClaimed
                       ? t("budget.cta.done").replace(
                           "${n}",
@@ -516,7 +482,6 @@ export function RewardsPage() {
                           disabled={
                             loading ||
                             task.isClaimed ||
-                            isPreparingThisTask ||
                             claimingTaskId === task.id
                           }
                           onClick={() => void handleTaskAction(task)}
@@ -527,7 +492,7 @@ export function RewardsPage() {
                               : "border border-[var(--color-brand-primary)]/30 text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-primary)]/5",
                           )}
                         >
-                          {claimingTaskId === task.id || isPreparingThisTask ? (
+                          {claimingTaskId === task.id ? (
                             <Loader2 size={13} className="animate-spin" />
                           ) : null}
                           {actionLabel}
@@ -689,7 +654,6 @@ export function RewardsPage() {
             setConfirmPhase("idle");
             setConfirmTaskId(null);
             setConfirmProofUrl("");
-            setConfirmGithubSessionId(null);
           }}
           onConfirm={async () => {
             if (confirmPhase !== "idle") {
@@ -704,16 +668,9 @@ export function RewardsPage() {
                 claim: () =>
                   claimTask({
                     taskId: confirmTask.id,
-                    proof: {
-                      url: rewardTaskRequiresUrlProof(confirmTask.id)
-                        ? confirmProofUrl.trim()
-                        : undefined,
-                      githubSessionId: rewardTaskRequiresGithubStarSession(
-                        confirmTask.id,
-                      )
-                        ? (confirmGithubSessionId ?? undefined)
-                        : undefined,
-                    },
+                    proof: rewardTaskRequiresUrlProof(confirmTask.id)
+                      ? { url: confirmProofUrl.trim() }
+                      : undefined,
                   }),
                 onPhaseChange: (phase) => {
                   if (phase === "claiming") {
@@ -739,7 +696,6 @@ export function RewardsPage() {
               setConfirmPhase("idle");
               setConfirmTaskId(null);
               setConfirmProofUrl("");
-              setConfirmGithubSessionId(null);
             } catch {
               toast.error(t("rewards.claimFailed"));
               setConfirmPhase("idle");

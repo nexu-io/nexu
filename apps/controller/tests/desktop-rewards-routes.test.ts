@@ -36,10 +36,6 @@ describe("registerDesktopRewardsRoutes", () => {
       quotaFallbackService: {
         triggerFallback,
       },
-      githubStarVerificationService: {
-        prepareSession: vi.fn(),
-        verifySession: vi.fn(),
-      },
     } as never);
 
     const response = await app.request("/api/internal/desktop/rewards");
@@ -86,10 +82,6 @@ describe("registerDesktopRewardsRoutes", () => {
       quotaFallbackService: {
         triggerFallback: vi.fn(),
       },
-      githubStarVerificationService: {
-        prepareSession: vi.fn(),
-        verifySession: vi.fn(),
-      },
     } as never);
 
     const response = await app.request(
@@ -126,10 +118,6 @@ describe("registerDesktopRewardsRoutes", () => {
       quotaFallbackService: {
         triggerFallback: vi.fn(),
       },
-      githubStarVerificationService: {
-        prepareSession: vi.fn(),
-        verifySession: vi.fn(),
-      },
     } as never);
 
     const response = await app.request(
@@ -159,10 +147,6 @@ describe("registerDesktopRewardsRoutes", () => {
       quotaFallbackService: {
         triggerFallback: vi.fn(),
       },
-      githubStarVerificationService: {
-        prepareSession: vi.fn(),
-        verifySession: vi.fn(),
-      },
     } as never);
 
     const response = await app.request("/api/internal/desktop/rewards/claim", {
@@ -180,9 +164,8 @@ describe("registerDesktopRewardsRoutes", () => {
     expect(claimDesktopReward).not.toHaveBeenCalled();
   });
 
-  it("verifies GitHub star sessions before forwarding the claim", async () => {
+  it("forwards GitHub star claims directly without verification", async () => {
     const claimDesktopReward = vi.fn().mockResolvedValue({ ok: true });
-    const verifySession = vi.fn().mockResolvedValue({ ok: true });
     const app = new OpenAPIHono<ControllerBindings>();
     registerDesktopRewardsRoutes(app, {
       configStore: {
@@ -192,10 +175,6 @@ describe("registerDesktopRewardsRoutes", () => {
       quotaFallbackService: {
         triggerFallback: vi.fn(),
       },
-      githubStarVerificationService: {
-        prepareSession: vi.fn(),
-        verifySession,
-      },
     } as never);
 
     const response = await app.request("/api/internal/desktop/rewards/claim", {
@@ -203,55 +182,10 @@ describe("registerDesktopRewardsRoutes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         taskId: "github_star",
-        proof: {
-          githubSessionId: "github-session-1",
-        },
       }),
     });
 
     expect(response.status).toBe(200);
-    expect(verifySession).toHaveBeenCalledWith("github-session-1");
-    expect(claimDesktopReward).toHaveBeenCalledWith("github_star", {
-      githubSessionId: "github-session-1",
-    });
-  });
-
-  it("prepares GitHub star verification sessions", async () => {
-    const prepareSession = vi.fn().mockResolvedValue({
-      sessionId: "session-1",
-      baselineStars: 10,
-      expiresAt: "2026-04-07T00:00:00.000Z",
-    });
-    const app = new OpenAPIHono<ControllerBindings>();
-    registerDesktopRewardsRoutes(app, {
-      configStore: {
-        getDesktopRewardsStatus: vi.fn(),
-        claimDesktopReward: vi.fn(),
-      },
-      quotaFallbackService: {
-        triggerFallback: vi.fn(),
-      },
-      githubStarVerificationService: {
-        prepareSession,
-        verifySession: vi.fn(),
-      },
-    } as never);
-
-    const response = await app.request(
-      "/api/internal/desktop/rewards/github-star-session",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      sessionId: "session-1",
-      baselineStars: 10,
-      expiresAt: "2026-04-07T00:00:00.000Z",
-    });
-    expect(prepareSession).toHaveBeenCalledOnce();
+    expect(claimDesktopReward).toHaveBeenCalledWith("github_star", undefined);
   });
 });

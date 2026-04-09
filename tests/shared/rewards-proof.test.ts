@@ -1,5 +1,4 @@
 import {
-  rewardTaskRequiresGithubStarSession,
   rewardTaskRequiresUrlProof,
   validateRewardProofUrl,
 } from "@nexu/shared";
@@ -61,10 +60,5 @@ describe("reward proof helpers", () => {
     expect(
       validateRewardProofUrl("facebook", "https://example.com/not-facebook"),
     ).toBe(false);
-  });
-
-  it("only requires a GitHub monitoring session for the star task", () => {
-    expect(rewardTaskRequiresGithubStarSession("github_star")).toBe(true);
-    expect(rewardTaskRequiresGithubStarSession("x_share")).toBe(false);
   });
 });

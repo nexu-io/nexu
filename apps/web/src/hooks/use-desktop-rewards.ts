@@ -2,19 +2,16 @@ import "@/lib/api";
 import {
   type DesktopRewardClaimProof,
   type DesktopRewardsStatus,
-  type PrepareGithubStarSessionResponse,
   type RewardTaskId,
   type RewardTaskStatus,
   claimDesktopRewardResponseSchema,
   desktopRewardsStatusSchema,
-  prepareGithubStarSessionResponseSchema,
   rewardTasks,
 } from "@nexu/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getApiInternalDesktopRewards,
   postApiInternalDesktopRewardsClaim,
-  postApiInternalDesktopRewardsGithubStarSession,
   postApiInternalDesktopRewardsSetBalance,
 } from "../../lib/api/sdk.gen";
 
@@ -72,18 +69,6 @@ async function claimDesktopReward(input: {
   return claimDesktopRewardResponseSchema.parse(data);
 }
 
-async function prepareGithubStarSession(): Promise<PrepareGithubStarSessionResponse> {
-  const { data, error } = await postApiInternalDesktopRewardsGithubStarSession({
-    body: {},
-  });
-
-  if (error || !data) {
-    throw error ?? new Error("Failed to prepare GitHub star session");
-  }
-
-  return prepareGithubStarSessionResponseSchema.parse(data);
-}
-
 async function setDesktopRewardBalance(input: { balance: number }) {
   const { data, error } = await postApiInternalDesktopRewardsSetBalance({
     body: input,
@@ -111,9 +96,6 @@ export function useDesktopRewardsStatus() {
       queryClient.setQueryData(DESKTOP_REWARDS_QUERY_KEY, response.status);
     },
   });
-  const githubStarSessionMutation = useMutation({
-    mutationFn: prepareGithubStarSession,
-  });
   const setRewardBalanceMutation = useMutation({
     mutationFn: setDesktopRewardBalance,
     onSuccess: (status) => {
@@ -128,13 +110,11 @@ export function useDesktopRewardsStatus() {
     refreshing: rewardsQuery.isFetching && !rewardsQuery.isLoading,
     refresh: rewardsQuery.refetch,
     claimTask: claimMutation.mutateAsync,
-    prepareGithubStarSession: githubStarSessionMutation.mutateAsync,
     setRewardBalance: setRewardBalanceMutation.mutateAsync,
     claimingTaskId: claimMutation.isPending
       ? (claimMutation.variables?.taskId ?? null)
       : null,
     isClaiming: claimMutation.isPending,
-    isPreparingGithubStarSession: githubStarSessionMutation.isPending,
     isSettingRewardBalance: setRewardBalanceMutation.isPending,
   };
 }

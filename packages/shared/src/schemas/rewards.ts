@@ -189,7 +189,6 @@ export const desktopRewardsStatusSchema = z.object({
 export const desktopRewardClaimProofSchema = z
   .object({
     url: z.string().trim().url().max(2048).optional(),
-    githubSessionId: z.string().trim().min(1).max(128).optional(),
   })
   .strict();
 
@@ -202,14 +201,6 @@ export const claimDesktopRewardResponseSchema = z.object({
   ok: z.boolean(),
   alreadyClaimed: z.boolean(),
   status: desktopRewardsStatusSchema,
-});
-
-export const prepareGithubStarSessionRequestSchema = z.object({});
-
-export const prepareGithubStarSessionResponseSchema = z.object({
-  sessionId: z.string().min(1),
-  baselineStars: z.number().int().nonnegative(),
-  expiresAt: z.string(),
 });
 
 const rewardUrlProofPatterns = {
@@ -231,12 +222,6 @@ export function rewardTaskRequiresUrlProof(
   return rewardUrlProofTaskIdSchema.safeParse(taskId).success;
 }
 
-export function rewardTaskRequiresGithubStarSession(
-  taskId: RewardTaskId,
-): boolean {
-  return taskId === "github_star";
-}
-
 export function validateRewardProofUrl(
   taskId: RewardUrlProofTaskId,
   value: string,
@@ -256,7 +241,4 @@ export type RewardTaskStatus = z.infer<typeof rewardTaskStatusSchema>;
 export type DesktopRewardsStatus = z.infer<typeof desktopRewardsStatusSchema>;
 export type DesktopRewardClaimProof = z.infer<
   typeof desktopRewardClaimProofSchema
->;
-export type PrepareGithubStarSessionResponse = z.infer<
-  typeof prepareGithubStarSessionResponseSchema
 >;

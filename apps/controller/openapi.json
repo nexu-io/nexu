@@ -3240,71 +3240,6 @@
         }
       }
     },
-    "/api/internal/desktop/rewards/github-star-session": {
-      "post": {
-        "tags": [
-          "Desktop"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {}
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Prepare a GitHub star verification session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "sessionId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "baselineStars": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "expiresAt": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "sessionId",
-                    "baselineStars",
-                    "expiresAt"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "GitHub star verification is temporarily unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/internal/desktop/rewards/claim": {
       "post": {
         "tags": [
@@ -3336,11 +3271,6 @@
                         "type": "string",
                         "maxLength": 2048,
                         "format": "uri"
-                      },
-                      "githubSessionId": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 128
                       }
                     },
                     "additionalProperties": false
