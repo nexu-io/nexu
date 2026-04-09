@@ -190,7 +190,9 @@ async function bundlePlugin({ id, npmName }) {
     ...Object.keys(packageJson.peerDependencies ?? {}),
   ]);
   const collected = new Map();
-  const queue = [{ nodeModulesDir: rootDependencyNodeModules, skipPkg: npmName }];
+  const queue = [
+    { nodeModulesDir: rootDependencyNodeModules, skipPkg: npmName },
+  ];
 
   while (queue.length > 0) {
     const { nodeModulesDir, skipPkg } = queue.shift();
