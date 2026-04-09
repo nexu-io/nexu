@@ -452,6 +452,136 @@ describe("AnalyticsService transport", () => {
     expect(events).toEqual(["user_message_sent"]);
   });
 
+  it("sends first-conversation analytics for the first authenticated conversation after anonymous usage", async () => {
+    const tempDir = mkdtempSync(
+      path.join(tmpdir(), "analytics-service-authenticated-first-session-"),
+    );
+    const anonymousTranscriptPath = path.join(
+      tempDir,
+      "anonymous-session.jsonl",
+    );
+    const authenticatedTranscriptPath = path.join(
+      tempDir,
+      "authenticated-session.jsonl",
+    );
+    writeFileSync(
+      anonymousTranscriptPath,
+      `${[
+        JSON.stringify({
+          type: "model_change",
+          provider: "openai",
+        }),
+        JSON.stringify({
+          id: "message-anon-1",
+          type: "message",
+          timestamp: "2026-04-08T00:00:00.000Z",
+          message: {
+            role: "user",
+          },
+        }),
+        JSON.stringify({
+          id: "assistant-anon-1",
+          type: "message",
+          timestamp: "2026-04-08T00:00:01.000Z",
+          message: {
+            role: "assistant",
+            provider: "openai",
+            content: [],
+          },
+        }),
+      ].join("\n")}
+`,
+      "utf8",
+    );
+    writeFileSync(
+      authenticatedTranscriptPath,
+      `${[
+        JSON.stringify({
+          type: "model_change",
+          provider: "openai",
+        }),
+        JSON.stringify({
+          id: "message-auth-1",
+          type: "message",
+          timestamp: "2026-04-08T00:05:00.000Z",
+          message: {
+            role: "user",
+          },
+        }),
+        JSON.stringify({
+          id: "assistant-auth-1",
+          type: "message",
+          timestamp: "2026-04-08T00:05:01.000Z",
+          message: {
+            role: "assistant",
+            provider: "openai",
+            content: [],
+          },
+        }),
+      ].join("\n")}
+`,
+      "utf8",
+    );
+
+    const listSessions = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: "session-anonymous",
+          channelType: "slack",
+          metadata: {
+            path: anonymousTranscriptPath,
+          },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "session-anonymous",
+          channelType: "slack",
+          metadata: {
+            path: anonymousTranscriptPath,
+          },
+        },
+        {
+          id: "session-authenticated",
+          channelType: "slack",
+          metadata: {
+            path: authenticatedTranscriptPath,
+          },
+        },
+      ]);
+    const getDesktopCloudStatus = vi
+      .fn()
+      .mockResolvedValueOnce({ userId: null })
+      .mockResolvedValueOnce({ userId: "cloud-user-123" });
+    vi.mocked(proxyFetch).mockResolvedValue(
+      new Response(null, { status: 200 }),
+    );
+
+    const service = new AnalyticsService(
+      createEnv({
+        analyticsStatePath: path.join(tempDir, "analytics-state.json"),
+      }),
+      {
+        getDesktopCloudStatus,
+      } as never,
+      {
+        listSessions,
+      } as never,
+    );
+
+    await service.poll();
+    await service.poll();
+
+    const events = vi
+      .mocked(proxyFetch)
+      .mock.calls.map(([, options]) => JSON.parse(String(options?.body)).event);
+    expect(events).toEqual([
+      "user_message_sent",
+      "nexu_first_conversation_start",
+    ]);
+  });
+
   it("preserves unsent analytics when cloud identity lookup throws", async () => {
     const tempDir = mkdtempSync(
       path.join(tmpdir(), "analytics-service-error-"),

@@ -296,9 +296,9 @@ export class AnalyticsService {
           firstSessionCandidate.timestampMs,
         );
         this.state.firstConversationDistinctId = analyticsDistinctId.distinctId;
+        this.state.sessionStartSent = true;
+        stateChanged = true;
       }
-      this.state.sessionStartSent = true;
-      stateChanged = true;
     }
 
     if (stateChanged) {
