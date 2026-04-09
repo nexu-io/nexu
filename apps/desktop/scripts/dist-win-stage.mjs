@@ -457,6 +457,36 @@ async function validateWinUnpackedReuse(releaseRoot) {
   }
 }
 
+async function validatePackagedQqbotDependencies(releaseRoot) {
+  const winUnpackedRoot = resolve(releaseRoot, "win-unpacked");
+  const qqbotPluginRoot = resolve(
+    winUnpackedRoot,
+    "resources",
+    "runtime",
+    "controller",
+    "plugins",
+    "openclaw-qqbot",
+  );
+  const silkWasmPackagePath = resolve(
+    qqbotPluginRoot,
+    "node_modules",
+    "silk-wasm",
+    "package.json",
+  );
+
+  if (!(await pathExists(qqbotPluginRoot))) {
+    throw new Error(
+      `[dist:win] packaged app is missing openclaw-qqbot: ${qqbotPluginRoot}`,
+    );
+  }
+
+  if (!(await pathExists(silkWasmPackagePath))) {
+    throw new Error(
+      `[dist:win] packaged app is missing openclaw-qqbot dependency silk-wasm: ${silkWasmPackagePath}`,
+    );
+  }
+}
+
 async function ensureExistingBuildArtifacts() {
   await Promise.all([
     ensureExistingPath(
@@ -1279,6 +1309,11 @@ async function main() {
       });
       await writeWinUnpackedManifest(releaseRoot);
     },
+    timings,
+  );
+  await timedStep(
+    "validate packaged qqbot dependencies",
+    async () => validatePackagedQqbotDependencies(releaseRoot),
     timings,
   );
 
