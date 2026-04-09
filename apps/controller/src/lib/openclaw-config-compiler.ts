@@ -4,7 +4,6 @@ import type { ControllerEnv } from "../app/env.js";
 import type { OAuthConnectionState } from "../runtime/openclaw-auth-profiles-store.js";
 import type { NexuConfig } from "../store/schemas.js";
 import {
-  MANAGED_CHANNEL_PLUGIN_IDS,
   compileChannelBindings,
   compileChannelsConfig,
   resolveManagedChannelPluginId,
@@ -270,12 +269,16 @@ function compilePlugins(
         .filter((pluginId): pluginId is string => pluginId !== null),
     ),
   ];
-  // Always-allow every managed channel plugin so connect/disconnect only
-  // mutates channel-level config and hot-reloads (~500ms) instead of
-  // changing plugins.allow which triggers a full gateway restart (~11s).
-  const prewarmedChannelPluginIds = Object.values(
-    MANAGED_CHANNEL_PLUGIN_IDS,
-  ).filter((id): id is string => id !== undefined);
+  // Always-allow channel plugins whose extensions are bundled in every
+  // environment so connect/disconnect only mutates channel-level config
+  // and hot-reloads (~500ms) instead of changing plugins.allow which
+  // triggers a full gateway restart (~11s).
+  // NOTE: Only list plugins guaranteed to load successfully everywhere.
+  // Plugins like wecom/dingtalk-connector/openclaw-qqbot may be present
+  // in the extensions dir but fail to load (missing native deps), which
+  // OpenClaw treats as "not found" and triggers a config validation
+  // error + gateway restart.
+  const prewarmedChannelPluginIds = ["openclaw-weixin"];
   const platformPluginIds = [
     "nexu-runtime-model",
     "nexu-credit-guard",
