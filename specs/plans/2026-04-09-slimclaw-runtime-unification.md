@@ -117,11 +117,27 @@ At minimum, slimclaw should provide a stable path contract for:
 - bin path
 - descriptor path
 
-The descriptor/manifest is part of the packaged artifact contract, not an optional convenience. At minimum it should freeze:
+The descriptor/manifest is part of the prepared artifact contract, not an optional convenience. At minimum it should freeze:
 
 - that a descriptor file exists
-- which invalidation inputs it records
-- whether exposed paths are absolute resolved paths or relative to the artifact root
+- a single `version` field for the descriptor contract
+- a `fingerprint` field for artifact invalidation
+- the OpenClaw version the artifact was prepared from
+- whether exposed paths are relative to the artifact root
+
+For slimclaw's own prepared `dist` output, the minimal descriptor should cover:
+
+- `version`
+- `fingerprint`
+- `preparedAt`
+- `openclawVersion`
+- a relative-to-`distRoot` path map for:
+  - `entryPath`
+  - `binPath`
+  - `gatewayBinPath`
+  - `builtinExtensionsDir`
+
+The slimclaw descriptor does **not** own archive or materialization metadata. Those belong to the upper packaging layers.
 
 ### Contracts to remove
 
@@ -136,7 +152,7 @@ The descriptor/manifest is part of the packaged artifact contract, not an option
 The following capabilities are already justified by current repo behavior and can be frozen in this plan.
 
 1. **Explicit dependency ownership**
-   - slimclaw declares and builds `openclaw` directly.
+   - slimclaw declares and prepares `openclaw` and Nexu-required adjunct runtime dependencies directly.
 
 2. **Default auto-build with explicit opt-out**
    - runtime preparation remains automatic on install.
@@ -145,30 +161,42 @@ The following capabilities are already justified by current repo behavior and ca
    - unchanged inputs should reuse prior outputs
    - changed inputs must invalidate and rebuild
 
-4. **Pruning as an owned build responsibility**
-   - prune policy is part of the build pipeline and part of artifact invalidation
+4. **Workspace-managed dependency model**
+   - slimclaw uses the workspace `pnpm` lockfile directly
+   - prepare-time optimization must happen within that model rather than through a separate npm-managed runtime root
 
-5. **Transactional artifact build**
-   - build into a candidate output, validate it, then switch over
+5. **Pruning as an owned prepare responsibility**
+   - prune policy is part of the prepare pipeline and part of artifact invalidation
+
+6. **Transactional artifact prepare**
+   - prepare into a candidate output, validate it, then switch over
    - do not patch fragile files in-place on the final consumer path
 
-6. **Quick-fail patching**
-   - missing anchors, missing files, or incompatible bundles must fail the build immediately
+7. **Quick-fail patching**
+   - anchor-based patching is the only supported patch representation
+   - missing anchors, missing files, or incompatible bundles must fail the prepare step immediately
 
-7. **Patch taxonomy with explicit ownership**
+8. **Patch taxonomy with explicit ownership**
    - slimclaw owns both packaging/optimization patches and Nexu-required compatibility patches
    - compatibility patches remain required runtime behavior for Nexu and must not be treated as disposable packaging cleanup
 
-8. **Thin artifact output**
+9. **Thin artifact output**
    - slimclaw outputs the runtime artifact plus only the minimal manifest/path data needed by consumers
 
-9. **Archive/descriptor ownership**
-   - slimclaw owns the canonical runtime artifact and its archive/descriptor contract
-   - packaged desktop flows must continue to support archived artifacts and extracted artifacts against that contract
+10. **Dist-only ownership**
+   - slimclaw owns the canonical prepared `dist` artifact and its descriptor contract
+   - archive, materialization, launch, readiness, and health handling remain upper-layer responsibilities
 
-10. **Spawn-by-path and stdout-event compatibility**
+11. **Spawn-by-path and stdout-event compatibility**
    - controller continues to launch runtime by resolved path
    - existing stdout-driven `NEXU_EVENT` consumption remains compatible
+
+12. **Baseline measurement before implementation**
+   - optimization work should be evaluated from a fresh clone baseline
+   - at minimum, record stage timings for `install -> dev -> build`
+
+13. **Node ABI consistency with upstream runtime experience**
+   - slimclaw prepared output must preserve the same runtime experience and native compatibility expectations as the OpenClaw runtime being consumed
 
 ## Consumer Boundary After Refactor
 
@@ -201,7 +229,7 @@ desktop should only:
 
 desktop should no longer patch OpenClaw a second time or own its own runtime-producer logic.
 
-slimclaw owns the canonical artifact plus its archive/descriptor contract. Desktop consumes that contract and must not redefine it.
+More precisely: slimclaw owns the canonical prepared `dist` artifact plus its descriptor contract. Desktop owns any outer archive/materialization behavior built on top of that artifact.
 
 Small transitional adapters are acceptable during rollout, but they must not become new runtime producers.
 
@@ -216,6 +244,7 @@ Done when:
 - all root, dev, controller, desktop, and test entrypoints resolve runtime through slimclaw-owned path contracts
 - any compatibility layer is limited to path redirection, manifest lookup, entry resolution, or small transitional adaptation
 - no compatibility layer patches, stages, or produces runtime artifacts
+- legacy fallback paths must be migrated here rather than deferred to legacy removal
 
 Exit condition: no maintained caller still needs to know the legacy runtime package name or layout.
 
@@ -226,6 +255,7 @@ Move all producer responsibilities into slimclaw.
 Done when:
 
 - patch source of truth is singular
+- anchor-based patching is the only remaining patch representation
 - prune/build/fingerprint/layout ownership is singular
 - dev and desktop no longer own runtime-producer logic
 
@@ -237,6 +267,7 @@ Exit condition: slimclaw is the only place where runtime artifacts are built, pa
 
 Verify:
 
+- fresh-clone baseline timings for `install -> dev -> build`
 - build artifact correctness
 - consumer-chain correctness for dev, controller, and desktop
 - capability regressions for:
@@ -263,10 +294,8 @@ Exit condition: deleting the legacy runtime directories does not break build, de
 
 The following are real implementation topics but should not be frozen at the plan level yet:
 
-- exact patch representation (`overlay` vs imperative vs declarative)
 - exact archive/extraction format or algorithm (`zip`, `tar`, `7z`, sync vs async)
 - exact cache filenames, stamp schemas, or internal directory layout
-- exact node-runtime selection heuristics
 - exact prune allow/deny lists
 - exact shape of temporary desktop transitional adapters
 
