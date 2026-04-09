@@ -429,6 +429,7 @@ export function createRuntimeUnitManifests(
       OPENCLAW_GATEWAY_TOKEN: runtimeConfig.tokens.gateway,
       OPENCLAW_BASE_URL: runtimeConfig.urls.openclawBase,
       OPENCLAW_MDNS_HOSTNAME: openclawMdnsHostname,
+      ...(process.env.CI ? { OPENCLAW_DISABLE_BONJOUR: "1" } : {}),
       OPENCLAW_STATE_DIR: openclawStateDir,
       OPENCLAW_CONFIG_PATH: path.resolve(openclawStateDir, "openclaw.json"),
       OPENCLAW_LOG_DIR: path.resolve(
@@ -494,6 +495,7 @@ export function createRuntimeUnitManifests(
       ...(openclawNodePath ? { NODE_PATH: openclawNodePath } : {}),
       OPENCLAW_CONFIG_PATH: path.resolve(openclawStateDir, "openclaw.json"),
       OPENCLAW_MDNS_HOSTNAME: openclawMdnsHostname,
+      ...(process.env.CI ? { OPENCLAW_DISABLE_BONJOUR: "1" } : {}),
       OPENCLAW_STATE_DIR: openclawStateDir,
     },
   };
