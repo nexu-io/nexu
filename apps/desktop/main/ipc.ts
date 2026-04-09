@@ -488,6 +488,21 @@ export function registerIpcHandlers(
           return updateManager.checkNow();
         }
 
+        case "update:get-capability": {
+          if (!updateManager) {
+            return {
+              platform: process.platform,
+              check: false,
+              downloadMode: "none",
+              applyMode: "none",
+              applyLabel: null,
+              notes:
+                "Desktop updates are unavailable in the current runtime mode.",
+            };
+          }
+          return updateManager.getCapability();
+        }
+
         case "update:download": {
           if (!updateManager) {
             return { ok: false };

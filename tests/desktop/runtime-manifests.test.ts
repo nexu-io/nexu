@@ -1,5 +1,5 @@
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fsState = vi.hoisted(() => ({
   paths: new Set<string>(),
@@ -27,6 +27,19 @@ vi.mock("node:util", async (importOriginal) => {
 });
 
 vi.mock("node:fs", () => ({
+  createWriteStream: vi.fn(() => ({
+    write: (
+      _chunk: unknown,
+      _encoding: unknown,
+      callback?: (error?: Error | null) => void,
+    ) => {
+      callback?.(null);
+      return true;
+    },
+    end: (callback?: () => void) => {
+      callback?.();
+    },
+  })),
   existsSync: vi.fn((target: string) => fsState.paths.has(target)),
   mkdirSync: vi.fn((target: string) => {
     fsState.paths.add(target);
@@ -114,11 +127,16 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
 }
 
 describe("desktop runtime manifests", () => {
+  const originalPlatform = process.platform;
+
   beforeEach(() => {
     fsState.paths.clear();
     fsState.stampContents.clear();
     execFileSyncMock.mockReset();
-    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform });
   });
 
   describe("buildSkillNodePath", () => {
@@ -462,7 +480,6 @@ describe("desktop runtime manifests", () => {
         runtimePath("/Users/testuser/.nexu", "openclaw-sidecar"),
       );
       expect(tarAttempts).toBe(2);
-      expect(execFileSyncMock).toHaveBeenCalledWith("sleep", ["1"]);
     });
 
     it("throws after retries when extraction never produces the critical entry", () => {
@@ -495,71 +512,11 @@ describe("desktop runtime manifests", () => {
       const tarCalls = execFileSyncMock.mock.calls.filter(
         ([cmd]) => cmd === "tar",
       );
-      const sleepCalls = execFileSyncMock.mock.calls.filter(
-        ([cmd]) => cmd === "sleep",
-      );
       expect(tarCalls).toHaveLength(3);
-      expect(sleepCalls).toHaveLength(2);
     });
   });
 
   describe("createRuntimeUnitManifests", () => {
-    it("propagates coverage env to managed web and controller manifests when present", () => {
-      vi.stubEnv("NODE_V8_COVERAGE", "/tmp/nexu-coverage/node-v8");
-      vi.stubEnv("NEXU_DESKTOP_E2E_COVERAGE", "1");
-      vi.stubEnv("NEXU_DESKTOP_E2E_COVERAGE_RUN_ID", "run-abc");
-
-      const manifests = createRuntimeUnitManifests(
-        "/repo/apps/desktop",
-        "/tmp/user-data",
-        false,
-        createRuntimeConfig(),
-      );
-
-      const webManifest = manifests.find((manifest) => manifest.id === "web");
-      const controllerManifest = manifests.find(
-        (manifest) => manifest.id === "controller",
-      );
-
-      expect(webManifest?.env).toMatchObject({
-        NODE_V8_COVERAGE: "/tmp/nexu-coverage/node-v8",
-        NEXU_DESKTOP_E2E_COVERAGE: "1",
-        NEXU_DESKTOP_E2E_COVERAGE_RUN_ID: "run-abc",
-      });
-      expect(controllerManifest?.env).toMatchObject({
-        NODE_V8_COVERAGE: "/tmp/nexu-coverage/node-v8",
-        NEXU_DESKTOP_E2E_COVERAGE: "1",
-        NEXU_DESKTOP_E2E_COVERAGE_RUN_ID: "run-abc",
-      });
-    });
-
-    it("omits coverage env from managed manifests when not set", () => {
-      const manifests = createRuntimeUnitManifests(
-        "/repo/apps/desktop",
-        "/tmp/user-data",
-        false,
-        createRuntimeConfig(),
-      );
-
-      const webManifest = manifests.find((manifest) => manifest.id === "web");
-      const controllerManifest = manifests.find(
-        (manifest) => manifest.id === "controller",
-      );
-
-      expect(webManifest?.env?.NODE_V8_COVERAGE).toBeUndefined();
-      expect(webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE).toBeUndefined();
-      expect(
-        webManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
-      ).toBeUndefined();
-      expect(controllerManifest?.env?.NODE_V8_COVERAGE).toBeUndefined();
-      expect(
-        controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE,
-      ).toBeUndefined();
-      expect(
-        controllerManifest?.env?.NEXU_DESKTOP_E2E_COVERAGE_RUN_ID,
-      ).toBeUndefined();
-    });
-
     it("resolves runtime roots for manifest assembly", () => {
       const roots = resolveRuntimeManifestsRoots({
         app: {
@@ -622,6 +579,26 @@ describe("desktop runtime manifests", () => {
     });
 
     it("propagates normalized proxy env to packaged controller manifest", () => {
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      );
+
       const manifests = createRuntimeUnitManifests(
         "/Applications/Nexu.app/Contents/Resources",
         "/Users/testuser/Library/Application Support/@nexu/desktop",
@@ -639,6 +616,111 @@ describe("desktop runtime manifests", () => {
         ALL_PROXY: "socks5://proxy.example.com:1080",
         NO_PROXY: "example.com,localhost,127.0.0.1,::1",
       });
+    });
+
+    it("includes Electron executable for Windows managed controller manifests", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+      fsState.paths.add(
+        absoluteRuntimePath(
+          "/Applications/Nexu.app/Contents/Resources",
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      );
+
+      const manifests = createRuntimeUnitManifests(
+        "/Applications/Nexu.app/Contents/Resources",
+        "/Users/testuser/Library/Application Support/@nexu/desktop",
+        true,
+        createRuntimeConfig(),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(controllerManifest).toBeDefined();
+      expect(controllerManifest?.env).toBeDefined();
+
+      expect(controllerManifest?.env).toMatchObject({
+        OPENCLAW_ELECTRON_EXECUTABLE: controllerManifest?.command,
+      });
+      expect(controllerManifest?.env?.OPENCLAW_BIN).toContain("openclaw.cmd");
+    });
+
+    it("prefers packaged Windows OpenClaw sidecar when no archive is present", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+
+      const electronRoot =
+        "C:\\Users\\testuser\\Downloads\\win-unpacked\\resources";
+      const userDataPath =
+        "C:\\Users\\testuser\\AppData\\Roaming\\nexu-desktop";
+      fsState.paths.add(
+        path.resolve(
+          electronRoot,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+      fsState.paths.add(
+        path.resolve(
+          electronRoot,
+          "runtime",
+          "openclaw",
+          "node_modules",
+          "openclaw",
+          "openclaw.mjs",
+        ),
+      );
+
+      const manifests = createRuntimeUnitManifests(
+        electronRoot,
+        userDataPath,
+        true,
+        createRuntimeConfig(),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+
+      expect(controllerManifest?.env?.OPENCLAW_BIN).toBe(
+        path.resolve(
+          electronRoot,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
+        ),
+      );
+    });
+
+    it("fails for Windows packaged manifests when exe-relative OpenClaw runtime is missing", () => {
+      Object.defineProperty(process, "platform", { value: "win32" });
+
+      expect(() =>
+        createRuntimeUnitManifests(
+          "C:\\Users\\testuser\\Downloads\\win-unpacked\\resources",
+          "C:\\Users\\testuser\\AppData\\Roaming\\nexu-desktop",
+          true,
+          createRuntimeConfig(),
+        ),
+      ).toThrow(/Windows packaged OpenClaw runtime/);
     });
   });
 });

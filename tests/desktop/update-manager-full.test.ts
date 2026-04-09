@@ -121,6 +121,7 @@ async function createManager(
   const mgr = new UpdateManager(win as never, orchestrator as never, {
     channel: "stable",
     feedUrl: null,
+    platform: "darwin",
     ...options,
   });
   return { mgr, win, orchestrator };
@@ -908,6 +909,20 @@ describe("constructor", () => {
       provider: "generic",
       url: expect.stringContaining("desktop-releases.nexu.io/stable/"),
     });
+  });
+
+  it("exposes a non-in-app capability on Windows without binding autoUpdater", async () => {
+    const { mgr } = await createManager(undefined, { platform: "win32" });
+
+    expect(mgr.getCapability()).toEqual({
+      platform: "win32",
+      check: true,
+      downloadMode: "external",
+      applyMode: "redirect",
+      applyLabel: "Download installer",
+      notes: expect.stringContaining("packaged installer"),
+    });
+    expect(mockAutoUpdater.on).not.toHaveBeenCalled();
   });
 });
 

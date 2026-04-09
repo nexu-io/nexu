@@ -138,14 +138,13 @@ if (needsSetupExtraction) {
   process.env.NEXU_NEEDS_SETUP_ANIMATION = "1";
 }
 
-const orchestrator = new RuntimeOrchestrator(
-  createRuntimeUnitManifests(
-    electronRoot,
-    app.getPath("userData"),
-    app.isPackaged,
-    runtimeConfig,
-  ),
+const runtimeUnitManifests = createRuntimeUnitManifests(
+  electronRoot,
+  app.getPath("userData"),
+  app.isPackaged,
+  runtimeConfig,
 );
+const orchestrator = new RuntimeOrchestrator(runtimeUnitManifests);
 
 // Disable Chromium's popup blocker.  window.open() inside webviews can lose
 // "transient user activation" after async work (fetch → response → open),
@@ -1387,6 +1386,7 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
+        initialDelayMs: process.platform === "win32" ? 45_000 : 0,
         prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
           ? async (args: PrepareForUpdateInstallArgs) => {
               await runtimeLifecycle.prepareForUpdateInstall?.(args);

@@ -29,12 +29,169 @@ jobs:
     secrets: inherit
 
   package-windows:
-    name: Windows (placeholder)
+    needs: build
     runs-on: windows-latest
+    env:
+      CHANNEL: beta
     steps:
-      - name: Reserve Windows lane
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install packaging tools
         shell: pwsh
         run: |
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows placeholder"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Channel: beta"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Status: reserved only; no Windows artifacts are published by this workflow yet"
+          choco install nsis awscli -y --no-progress
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve build metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $baseVersion = (node apps/desktop/scripts/desktop-package-version.mjs get).Trim()
+          $buildDate = Get-Date -Format 'yyyyMMdd'
+          $shortSha = "${env:GITHUB_SHA}".Substring(0, 7)
+          $desktopVersion = "$baseVersion-$env:CHANNEL.$buildDate"
+          node apps/desktop/scripts/desktop-package-version.mjs set "$desktopVersion" | Out-Null
+          "desktop_version=$desktopVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "build_date=$buildDate" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "short_sha=$shortSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          NEXU_CLOUD_URL: https://nexu.io
+          NEXU_LINK_URL: https://link.nexu.io
+          NEXU_DESKTOP_UPDATE_CHANNEL: beta
+          NEXU_DESKTOP_BUILD_SOURCE: beta
+          NEXU_DESKTOP_BUILD_BRANCH: ${{ github.ref_name }}
+          NEXU_DESKTOP_BUILD_COMMIT: ${{ github.sha }}
+          NEXU_UPDATE_FEED_URL: https://desktop-releases.nexu.io/beta/win32/x64/latest-win.json
+          VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          $env:NEXU_DESKTOP_BUILD_TIME = (Get-Date).ToUniversalTime().ToString('o')
+          pnpm --filter @nexu/desktop dist:win
+
+      - name: Prepare Windows release artifacts
+        id: artifacts
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.meta.outputs.desktop_version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          CHANNEL: beta
+          BASE_URL: https://desktop-releases.nexu.io/beta/win32/x64
+        run: |
+          $artifactVersion = "$env:VERSION.$env:SHORT_SHA"
+          $releaseDir = "apps/desktop/release"
+          $channelArtifacts = "apps/desktop/channel-artifacts-win"
+          New-Item -ItemType Directory -Force -Path $channelArtifacts | Out-Null
+          Get-ChildItem -Path $channelArtifacts -File -ErrorAction SilentlyContinue | Remove-Item -Force
+
+          $sourceInstaller = Join-Path $releaseDir "nexu-setup-$env:VERSION-x64.exe"
+          if (-not (Test-Path $sourceInstaller)) {
+            throw "Missing Windows installer: $sourceInstaller"
+          }
+
+          $versionedInstaller = "nexu-setup-$artifactVersion-win-x64.exe"
+          $latestInstaller = "nexu-latest-$env:CHANNEL-win-x64.exe"
+          $checksumFile = "desktop-win-x64-sha256.txt"
+          $manifestFile = "latest-win.json"
+
+          Copy-Item $sourceInstaller (Join-Path $channelArtifacts $versionedInstaller)
+          Copy-Item $sourceInstaller (Join-Path $channelArtifacts $latestInstaller)
+
+          $hash = (Get-FileHash -Algorithm SHA256 (Join-Path $channelArtifacts $versionedInstaller)).Hash.ToLowerInvariant()
+          "$hash  $versionedInstaller" | Out-File -FilePath (Join-Path $channelArtifacts $checksumFile) -Encoding ascii
+
+          $env:INSTALLER_FILE = (Join-Path $channelArtifacts $latestInstaller)
+          $env:MANIFEST_OUTPUT = (Join-Path $channelArtifacts $manifestFile)
+          node apps/desktop/scripts/generate-win-update-manifest.mjs
+
+          "versioned_installer=$versionedInstaller" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "latest_installer=$latestInstaller" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "checksum_file=$checksumFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "manifest_file=$manifestFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload Windows workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-beta-win-x64-${{ steps.meta.outputs.build_date }}-${{ steps.meta.outputs.short_sha }}
+          path: |
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.versioned_installer }}
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.latest_installer }}
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.checksum_file }}
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.manifest_file }}
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish Windows prerelease assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-beta
+          target_commitish: ${{ github.sha }}
+          name: Nexu Desktop Beta
+          prerelease: true
+          draft: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.versioned_installer }}
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.latest_installer }}
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.checksum_file }}
+            apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.manifest_file }}
+
+      - name: Upload Windows artifacts to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_REGION: auto
+        shell: pwsh
+        run: |
+          $prefix = "beta/win32/x64"
+          aws s3 cp "apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.versioned_installer }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.versioned_installer }}" --no-progress
+          aws s3 cp "apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.latest_installer }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.latest_installer }}" --no-progress
+          aws s3 cp "apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.checksum_file }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.checksum_file }}" --no-progress
+          aws s3 cp "apps/desktop/channel-artifacts-win/${{ steps.artifacts.outputs.manifest_file }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.manifest_file }}" --no-progress
+
+      - name: Purge Windows latest CDN artifacts
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_PURGE_API_TOKEN: ${{ secrets.CLOUDFLARE_PURGE_API_TOKEN }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ZONE_ID) -or [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_PURGE_API_TOKEN)) {
+            Write-Host "Skipping Cloudflare purge because required secrets are missing"
+            exit 0
+          }
+
+          $baseUrl = "https://desktop-releases.nexu.io/beta/win32/x64"
+          $files = @(
+            "$baseUrl/${{ steps.artifacts.outputs.latest_installer }}",
+            "$baseUrl/${{ steps.artifacts.outputs.manifest_file }}"
+          ) | ConvertTo-Json
+          $payload = @{ files = ($files | ConvertFrom-Json) } | ConvertTo-Json -Depth 5
+          Invoke-RestMethod -Method Post -Uri "https://api.cloudflare.com/client/v4/zones/$env:CLOUDFLARE_ZONE_ID/purge_cache" -Headers @{ Authorization = "Bearer $env:CLOUDFLARE_PURGE_API_TOKEN" } -ContentType "application/json" -Body $payload | Out-Null
+
+      - name: Publish Windows download links
+        shell: pwsh
+        run: |
+          $baseUrl = "https://desktop-releases.nexu.io/beta/win32/x64"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows Beta Downloads"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Installer: $baseUrl/${{ steps.artifacts.outputs.latest_installer }}"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Manifest: $baseUrl/${{ steps.artifacts.outputs.manifest_file }}"

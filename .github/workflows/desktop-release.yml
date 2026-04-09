@@ -524,19 +524,14 @@ jobs:
           fi
 
   trigger-e2e:
-    needs: release
+    needs: [release, package-windows]
     runs-on: ubuntu-latest
-    if: always() && needs.release.result == 'success'
+    if: always() && needs.release.result == 'success' && needs.package-windows.result == 'success'
     steps:
       - name: Resolve channel
         id: channel
         run: |
-          tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}"
-          if [[ "$tag" == *-* ]]; then
-            echo "channel=beta" >> "$GITHUB_OUTPUT"
-          else
-            echo "channel=stable" >> "$GITHUB_OUTPUT"
-          fi
+          echo "channel=${{ needs.package-windows.outputs.channel }}" >> "$GITHUB_OUTPUT"
 
       - name: Trigger Desktop E2E (async)
         uses: actions/github-script@v7
@@ -551,12 +546,187 @@ jobs:
             });
 
   package-windows:
-    name: Windows (placeholder)
+    needs: release
     runs-on: windows-latest
+    outputs:
+      channel: ${{ steps.meta.outputs.channel }}
     steps:
-      - name: Reserve Windows lane
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install packaging tools
         shell: pwsh
         run: |
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows placeholder"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Channel: release"
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Status: reserved only; no Windows artifacts are published by this workflow yet"
+          choco install nsis awscli -y --no-progress
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $desktopVersion = node -e "const fs=require('node:fs'); const pkg=JSON.parse(fs.readFileSync('apps/desktop/package.json','utf8')); process.stdout.write(pkg.version);"
+          $expectedTag = "v$desktopVersion"
+          $legacyExpectedTag = "desktop-v$desktopVersion"
+
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tagName = "${{ inputs.tag_name }}"
+          } else {
+            $tagName = "${env:GITHUB_REF}" -replace '^refs/tags/', ''
+          }
+
+          if ($tagName -ne $expectedTag -and $tagName -ne $legacyExpectedTag) {
+            throw "Expected desktop release tag $expectedTag (legacy: $legacyExpectedTag) but received $tagName"
+          }
+
+          $prerelease = $desktopVersion.Contains('-')
+          $channel = if ($prerelease) { 'beta' } else { 'stable' }
+          $commitSha = (git rev-parse HEAD).Trim()
+
+          "desktop_version=$desktopVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag_name=$tagName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "prerelease=$($prerelease.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "channel=$channel" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "commit_sha=$commitSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          NEXU_CLOUD_URL: https://nexu.io
+          NEXU_LINK_URL: https://link.nexu.io
+          NEXU_DESKTOP_UPDATE_CHANNEL: ${{ steps.meta.outputs.channel }}
+          NEXU_DESKTOP_BUILD_SOURCE: release
+          NEXU_DESKTOP_BUILD_BRANCH: ${{ github.ref_name }}
+          NEXU_DESKTOP_BUILD_COMMIT: ${{ steps.meta.outputs.commit_sha }}
+          NEXU_UPDATE_FEED_URL: https://desktop-releases.nexu.io/${{ steps.meta.outputs.channel }}/win32/x64/latest-win.json
+          VITE_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          $env:NEXU_DESKTOP_BUILD_TIME = (Get-Date).ToUniversalTime().ToString('o')
+          pnpm --filter @nexu/desktop dist:win
+
+      - name: Prepare Windows release artifacts
+        id: artifacts
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.meta.outputs.desktop_version }}
+          CHANNEL: ${{ steps.meta.outputs.channel }}
+          BASE_URL: https://desktop-releases.nexu.io/${{ steps.meta.outputs.channel }}/win32/x64
+        run: |
+          $releaseDir = "apps/desktop/release"
+          $channelArtifacts = "apps/desktop/release-artifacts-win"
+          New-Item -ItemType Directory -Force -Path $channelArtifacts | Out-Null
+          Get-ChildItem -Path $channelArtifacts -File -ErrorAction SilentlyContinue | Remove-Item -Force
+
+          $sourceInstaller = Join-Path $releaseDir "nexu-setup-$env:VERSION-x64.exe"
+          if (-not (Test-Path $sourceInstaller)) {
+            throw "Missing Windows installer: $sourceInstaller"
+          }
+
+          $versionedInstaller = "nexu-setup-$env:VERSION-win-x64.exe"
+          if ($env:CHANNEL -eq "stable") {
+            $latestInstaller = "nexu-latest-win-x64.exe"
+          } else {
+            $latestInstaller = "nexu-latest-$env:CHANNEL-win-x64.exe"
+          }
+          $checksumFile = "desktop-win-x64-sha256.txt"
+          $manifestFile = "latest-win.json"
+
+          Copy-Item $sourceInstaller (Join-Path $channelArtifacts $versionedInstaller)
+          Copy-Item $sourceInstaller (Join-Path $channelArtifacts $latestInstaller)
+
+          $hash = (Get-FileHash -Algorithm SHA256 (Join-Path $channelArtifacts $versionedInstaller)).Hash.ToLowerInvariant()
+          "$hash  $versionedInstaller" | Out-File -FilePath (Join-Path $channelArtifacts $checksumFile) -Encoding ascii
+
+          $env:INSTALLER_FILE = (Join-Path $channelArtifacts $latestInstaller)
+          $env:MANIFEST_OUTPUT = (Join-Path $channelArtifacts $manifestFile)
+          node apps/desktop/scripts/generate-win-update-manifest.mjs
+
+          "versioned_installer=$versionedInstaller" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "latest_installer=$latestInstaller" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "checksum_file=$checksumFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "manifest_file=$manifestFile" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload Windows workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-release-${{ steps.meta.outputs.tag_name }}-win-x64
+          path: |
+            apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.versioned_installer }}
+            apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.latest_installer }}
+            apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.checksum_file }}
+            apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.manifest_file }}
+          if-no-files-found: error
+
+      - name: Upload Windows assets to existing GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        shell: pwsh
+        run: |
+          gh release upload $env:TAG_NAME `
+            "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.versioned_installer }}" `
+            "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.latest_installer }}" `
+            "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.checksum_file }}" `
+            "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.manifest_file }}" `
+            --clobber
+
+      - name: Upload Windows artifacts to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          AWS_REGION: auto
+          CHANNEL: ${{ steps.meta.outputs.channel }}
+        shell: pwsh
+        run: |
+          $prefix = "$env:CHANNEL/win32/x64"
+          aws s3 cp "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.versioned_installer }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.versioned_installer }}" --no-progress
+          aws s3 cp "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.latest_installer }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.latest_installer }}" --no-progress
+          aws s3 cp "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.checksum_file }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.checksum_file }}" --no-progress
+          aws s3 cp "apps/desktop/release-artifacts-win/${{ steps.artifacts.outputs.manifest_file }}" "s3://nexu-desktop-releases/$prefix/${{ steps.artifacts.outputs.manifest_file }}" --no-progress
+
+      - name: Purge Windows latest CDN artifacts
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_PURGE_API_TOKEN: ${{ secrets.CLOUDFLARE_PURGE_API_TOKEN }}
+          CHANNEL: ${{ steps.meta.outputs.channel }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_ZONE_ID) -or [string]::IsNullOrWhiteSpace($env:CLOUDFLARE_PURGE_API_TOKEN)) {
+            Write-Host "Skipping Cloudflare purge because required secrets are missing"
+            exit 0
+          }
+
+          $baseUrl = "https://desktop-releases.nexu.io/$env:CHANNEL/win32/x64"
+          $files = @(
+            "$baseUrl/${{ steps.artifacts.outputs.latest_installer }}",
+            "$baseUrl/${{ steps.artifacts.outputs.manifest_file }}"
+          ) | ConvertTo-Json
+          $payload = @{ files = ($files | ConvertFrom-Json) } | ConvertTo-Json -Depth 5
+          Invoke-RestMethod -Method Post -Uri "https://api.cloudflare.com/client/v4/zones/$env:CLOUDFLARE_ZONE_ID/purge_cache" -Headers @{ Authorization = "Bearer $env:CLOUDFLARE_PURGE_API_TOKEN" } -ContentType "application/json" -Body $payload | Out-Null
+
+      - name: Publish Windows download links
+        shell: pwsh
+        run: |
+          $baseUrl = "https://desktop-releases.nexu.io/${{ steps.meta.outputs.channel }}/win32/x64"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Windows Release Downloads"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Installer: $baseUrl/${{ steps.artifacts.outputs.latest_installer }}"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "- Manifest: $baseUrl/${{ steps.artifacts.outputs.manifest_file }}"

@@ -1420,6 +1420,7 @@ function DesktopShell() {
       </main>
 
       <UpdateBanner
+        capability={update.capability}
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
         onDismiss={update.dismiss}
