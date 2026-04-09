@@ -22,6 +22,8 @@ Using a typical single-turn conversation as an example — approximately 2,000 i
 | glm-5-turbo | 1.49x | ≈ 1.04 credits | ≈ 96 |
 | gpt-5.4-mini | 1.50x | ≈ 1.05 credits | ≈ 95 |
 
+> **Rate** indicates the cost ratio relative to the default model, gemini-3-flash-preview. For example, 0.50x means half the cost of the default model, while 1.50x means 1.5 times the cost.
+>
 > These are estimates sorted by cost from lowest to highest. Actual consumption depends on conversation length, context size, and model output. Complex tasks or multi-turn conversations will use significantly more tokens.
 
 ## How to Choose the Right Model
