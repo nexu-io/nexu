@@ -340,6 +340,7 @@ let launchdQuitOptsForResidentEntry:
   | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
 let systemTray: Tray | null = null;
+let pendingMacResidentEntryPreferences: DesktopShellPreferences | null = null;
 
 function isZhLocale(): boolean {
   return app.getLocale().toLowerCase().startsWith("zh");
@@ -1041,15 +1042,24 @@ function focusMainWindow(): void {
 }
 
 function shouldUseResidentEntry(preferences: DesktopShellPreferences): boolean {
+  if (process.platform === "darwin") {
+    return true;
+  }
+
   return !preferences.showInDock;
 }
 
 function resolveTrayIconPath(): string | null {
-  const candidate = resolve(
-    app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
-    "build",
-    process.platform === "win32" ? "icon.ico" : "icon.png",
-  );
+  const candidate =
+    process.platform === "darwin"
+      ? app.isPackaged
+        ? join(process.resourcesPath, "tray-icon-mac.png")
+        : resolve(getDesktopAppRoot(), "build", "tray-icon-mac.png")
+      : resolve(
+          app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
+          "build",
+          process.platform === "win32" ? "icon.ico" : "icon.png",
+        );
 
   return existsSync(candidate) ? candidate : null;
 }
@@ -1136,12 +1146,13 @@ function ensureResidentTray(): void {
     return;
   }
 
-  const trayIcon = nativeImage.createFromPath(trayIconPath);
+  let trayIcon = nativeImage.createFromPath(trayIconPath);
   if (trayIcon.isEmpty()) {
     return;
   }
 
   if (process.platform === "darwin") {
+    trayIcon = trayIcon.resize({ height: 18 });
     trayIcon.setTemplateImage(true);
   }
 
@@ -1212,7 +1223,20 @@ function applyResidentEntryPreferences(
   preferences: DesktopShellPreferences,
 ): void {
   if (process.platform === "darwin") {
+    const window = mainWindow;
+    if (window && !window.isDestroyed() && window.isFullScreen()) {
+      pendingMacResidentEntryPreferences = preferences;
+      window.setFullScreen(false);
+      return;
+    }
+
+    pendingMacResidentEntryPreferences = null;
     app.setActivationPolicy(preferences.showInDock ? "regular" : "accessory");
+    if (preferences.showInDock) {
+      void app.dock?.show();
+    } else {
+      app.dock?.hide();
+    }
   }
 
   if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
@@ -1438,6 +1462,16 @@ function createMainWindow(): BrowserWindow {
 
   window.on("hide", () => {
     updateSystemTrayMenu();
+  });
+
+  window.on("leave-full-screen", () => {
+    if (mainWindow !== window || !pendingMacResidentEntryPreferences) {
+      return;
+    }
+
+    const pendingPreferences = pendingMacResidentEntryPreferences;
+    pendingMacResidentEntryPreferences = null;
+    applyResidentEntryPreferences(pendingPreferences);
   });
 
   window.on("close", (event) => {

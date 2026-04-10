@@ -5,15 +5,32 @@ import { exists } from "./utils.mjs";
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const lockfilePath = path.join(runtimeDir, "package-lock.json");
+const nodeBinDir = path.dirname(process.execPath);
+const npmCliPath =
+  process.platform === "win32"
+    ? path.resolve(nodeBinDir, "node_modules", "npm", "bin", "npm-cli.js")
+    : path.resolve(
+        nodeBinDir,
+        "..",
+        "lib",
+        "node_modules",
+        "npm",
+        "bin",
+        "npm-cli.js",
+      );
 
 function createCommandSpec(command, args) {
-  if (
-    process.platform === "win32" &&
-    (command === "npm" || command === "npm.cmd")
-  ) {
+  if (command === "npm") {
+    return {
+      command: process.execPath,
+      args: [npmCliPath, ...args],
+    };
+  }
+
+  if (process.platform === "win32") {
     return {
       command: "cmd.exe",
-      args: ["/d", "/s", "/c", ["npm", ...args].join(" ")],
+      args: ["/d", "/s", "/c", [command, ...args].join(" ")],
     };
   }
 
@@ -49,7 +66,7 @@ async function run(command, args) {
 }
 
 export async function installRuntime(mode = "pruned") {
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+  const npmCommand = "npm";
 
   if (mode === "full") {
     await run(npmCommand, [

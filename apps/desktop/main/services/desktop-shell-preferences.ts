@@ -128,18 +128,25 @@ export function getDesktopShellPreferences(): DesktopShellPreferences {
 function applyStoredPreferences(
   preferences: StoredDesktopShellPreferences,
 ): void {
+  applyLaunchAtLoginPreference(preferences.launchAtLogin);
+  applyDockVisibilityPreference(preferences.showInDock);
+}
+
+function applyLaunchAtLoginPreference(launchAtLogin: boolean): void {
   if (supportsLaunchAtLogin()) {
     try {
       app.setLoginItemSettings({
-        openAtLogin: preferences.launchAtLogin,
+        openAtLogin: launchAtLogin,
       });
     } catch {
       // Ignore platform-specific failures and keep the stored preference.
     }
   }
+}
 
+function applyDockVisibilityPreference(showInDock: boolean): void {
   if (supportsShowInDock()) {
-    if (preferences.showInDock) {
+    if (showInDock) {
       void app.dock?.show();
     } else {
       app.dock?.hide();
@@ -173,7 +180,7 @@ export function updateDesktopShellPreferences(input: {
   };
 
   writeStoredPreferences(nextPreferences);
-  applyStoredPreferences(nextPreferences);
+  applyLaunchAtLoginPreference(nextPreferences.launchAtLogin);
   const resolved = getDesktopShellPreferences();
   runtimeApplyHandler?.(resolved);
   return resolved;

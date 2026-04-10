@@ -7,7 +7,6 @@ import {
 } from "@/hooks/use-desktop-cloud-status";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
-import { authClient } from "@/lib/auth-client";
 import {
   openExternalUrl,
   openLocalFolderUrl,
@@ -28,7 +27,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   Check,
-  ChevronDown,
   ExternalLink,
   FolderOpen,
   Globe,
@@ -50,7 +48,6 @@ import {
   deleteApiV1ModelProvidersMinimaxOauthLogin,
   getApiInternalDesktopDefaultModel,
   getApiInternalDesktopReady,
-  getApiV1Me,
   getApiV1ModelProvidersByProviderIdOauthProviderStatus,
   getApiV1ModelProvidersByProviderIdOauthStatus,
   getApiV1ModelProvidersConfig,
@@ -539,10 +536,13 @@ function _GeneralSettings() {
   const update = useAutoUpdate();
   const queryClient = useQueryClient();
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [accountConnecting, setAccountConnecting] = useState(false);
+  const [accountDisconnecting, setAccountDisconnecting] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [crashReportsEnabled, setCrashReportsEnabled] = useState(true);
   const hostBridge = getModelsHostInvokeBridge();
-  const { data: desktopCloudStatus } = useDesktopCloudStatus();
+  const { data: desktopCloudStatus, refetch: refetchDesktopCloudStatus } =
+    useDesktopCloudStatus();
   const isWindowsPlatform =
     typeof navigator !== "undefined" &&
     navigator.userAgent.toLowerCase().includes("windows");
@@ -552,14 +552,6 @@ function _GeneralSettings() {
   const showInShellHint = isWindowsPlatform
     ? t("settings.desktop.showInTaskbarHint")
     : t("settings.desktop.showInDockHint");
-
-  const { data: profile } = useQuery({
-    queryKey: ["me"],
-    queryFn: async () => {
-      const { data } = await getApiV1Me();
-      return data;
-    },
-  });
 
   const { data: shellPreferences } = useQuery({
     queryKey: ["desktop-shell-preferences"],
@@ -616,13 +608,10 @@ function _GeneralSettings() {
     };
   }, []);
 
-  const displayEmail = desktopCloudStatus?.userEmail ?? profile?.email ?? "—";
-  const initials = (
-    desktopCloudStatus?.userEmail?.[0] ??
-    profile?.email?.[0] ??
-    profile?.name?.[0] ??
-    "U"
-  ).toUpperCase();
+  const cloudConnected = desktopCloudStatus?.connected ?? false;
+  const displayEmail =
+    desktopCloudStatus?.userEmail?.trim() || t("settings.general.loggedOut");
+  const accountActionBusy = accountConnecting || accountDisconnecting;
   const updateAction = (() => {
     switch (update.phase) {
       case "checking":
@@ -693,9 +682,91 @@ function _GeneralSettings() {
         return appVersion ? null : t("settings.updates.versionUnknown");
     }
   })();
-  const handleLogout = async () => {
-    await authClient.signOut();
-    window.location.href = "/";
+
+  useEffect(() => {
+    if (!accountConnecting) {
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const result = await refetchDesktopCloudStatus();
+        if (result.data?.connected) {
+          setAccountConnecting(false);
+          await syncDesktopCloudQueries(queryClient);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 2000);
+
+    return () => window.clearInterval(interval);
+  }, [accountConnecting, queryClient, refetchDesktopCloudStatus]);
+
+  const handleAccountLogin = async () => {
+    if (accountActionBusy) {
+      return;
+    }
+
+    track("welcome_option_click", { option: "nexu_account" });
+    setAccountConnecting(true);
+
+    try {
+      let { data } = await postApiInternalDesktopCloudConnect({
+        body: { source: "settings" },
+      });
+
+      if (data?.error === "Already connected. Disconnect first.") {
+        await syncDesktopCloudQueries(queryClient);
+        setAccountConnecting(false);
+        return;
+      }
+
+      if (data?.error) {
+        await postApiInternalDesktopCloudDisconnect().catch(() => {});
+        ({ data } = await postApiInternalDesktopCloudConnect({
+          body: { source: "settings" },
+        }));
+      }
+
+      if (data?.error) {
+        toast.error(data.error ?? t("welcome.connectFailed"));
+        setAccountConnecting(false);
+        return;
+      }
+
+      if (data?.browserUrl) {
+        await openExternalUrl(data.browserUrl);
+        toast.info(t("welcome.browserOpened"));
+        return;
+      }
+
+      const result = await refetchDesktopCloudStatus();
+      if (result.data?.connected) {
+        await syncDesktopCloudQueries(queryClient);
+        setAccountConnecting(false);
+        return;
+      }
+
+      setAccountConnecting(false);
+    } catch {
+      toast.error(t("welcome.cloudConnectError"));
+      setAccountConnecting(false);
+    }
+  };
+
+  const handleAccountLogout = async () => {
+    if (accountActionBusy) {
+      return;
+    }
+
+    setAccountDisconnecting(true);
+    try {
+      await postApiInternalDesktopCloudDisconnect().catch(() => {});
+      await syncDesktopCloudQueries(queryClient);
+    } finally {
+      setAccountDisconnecting(false);
+    }
   };
 
   return (
@@ -710,34 +781,32 @@ function _GeneralSettings() {
           </div>
         </div>
         <div className="flex items-center justify-between gap-4 px-5 py-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white text-[12px] font-semibold text-text-primary">
-              {profile?.image ? (
-                <img
-                  src={profile.image}
-                  alt={profile.name ?? profile.email ?? "User"}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initials
-              )}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[12px] font-medium text-text-primary">
+              {displayEmail}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[12px] font-medium text-text-primary">
-                {displayEmail}
-              </div>
-              <div className="mt-0.5 text-[11px] text-text-tertiary">
-                {t("settings.general.emailHint")}
-              </div>
+            <div className="mt-0.5 text-[11px] text-text-tertiary">
+              {cloudConnected
+                ? t("settings.general.emailHint")
+                : t("settings.general.loggedOutHint")}
             </div>
           </div>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => void handleLogout()}
+            disabled={accountActionBusy}
+            onClick={() =>
+              void (cloudConnected
+                ? handleAccountLogout()
+                : handleAccountLogin())
+            }
           >
-            {t("layout.signOut")}
+            {accountActionBusy
+              ? t("common.loading")
+              : cloudConnected
+                ? t("layout.signOut")
+                : t("settings.general.goLogin")}
           </Button>
         </div>
       </div>
@@ -1702,30 +1771,50 @@ export function ModelsPage() {
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeProvider) {
-                      setSelectedProviderId(activeProvider.id);
-                    }
+                <Select
+                  value={activeProvider?.id}
+                  onValueChange={(value) => {
+                    setSelectedProviderId(value);
+                    clearSetupParam();
                   }}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-3 py-1.5 text-[12px] font-medium text-text-primary"
                 >
-                  {activeProvider ? (
-                    <>
-                      <ProviderLogo
-                        provider={
-                          activeProvider.registryEntry?.id ?? activeProvider.id
-                        }
-                        size={14}
-                      />
-                      {activeProvider.name}
-                    </>
-                  ) : (
-                    t("models.selectProvider")
-                  )}
-                  <ChevronDown size={13} className="text-text-muted" />
-                </button>
+                  <SelectTrigger className="inline-flex h-auto w-[180px] items-center gap-2 rounded-lg border-border bg-surface-0 px-3 py-1.5 text-[12px] font-medium text-text-primary shadow-none hover:bg-surface-1">
+                    {activeProvider ? (
+                      <div className="flex min-w-0 items-center gap-2">
+                        <ProviderLogo
+                          provider={
+                            activeProvider.registryEntry?.id ??
+                            activeProvider.id
+                          }
+                          size={14}
+                        />
+                        <span className="truncate">{activeProvider.name}</span>
+                      </div>
+                    ) : (
+                      <span>{t("models.selectProvider")}</span>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    className="rounded-xl border-border bg-surface-0 text-text-primary shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
+                  >
+                    {sidebarItems.map((item) => (
+                      <SelectItem
+                        key={item.id}
+                        value={item.id}
+                        className="rounded-lg px-3 py-2 text-[12px] text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ProviderLogo
+                            provider={item.registryEntry?.id ?? item.id}
+                            size={14}
+                          />
+                          <span className="truncate">{item.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

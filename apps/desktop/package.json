@@ -126,6 +126,10 @@
       {
         "from": "build/icon.ico",
         "to": "tray-icon.ico"
+      },
+      {
+        "from": "build/tray-icon-mac.png",
+        "to": "tray-icon-mac.png"
       }
     ],
     "afterSign": "./scripts/notarize.cjs",

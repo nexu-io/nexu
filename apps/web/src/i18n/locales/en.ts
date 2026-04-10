@@ -443,6 +443,10 @@ const en = {
   "settings.general.email": "Email",
   "settings.general.emailHint":
     "Settings sync is on. Premium models available with your Nexu account.",
+  "settings.general.loggedOut": "Not signed in",
+  "settings.general.loggedOutHint":
+    "Sign in to sync settings and use premium models.",
+  "settings.general.goLogin": "Go to sign in",
   "settings.general.preferences": "Preferences",
   "settings.general.language": "Language",
   "settings.general.languageHint": "Choose your interface language",

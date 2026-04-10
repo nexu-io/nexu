@@ -16,10 +16,10 @@ import {
   isMacDesktopPlatform,
   isWindowsDesktopPlatform,
 } from "@/lib/desktop-platform";
-import { resetAnalytics } from "@/lib/tracking";
+import { logoutToWelcome } from "@/lib/logout";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   ChevronRight,
@@ -392,6 +392,7 @@ function WorkspaceLayoutInner() {
   } = useDesktopRewardsStatus();
   const update = useAutoUpdate();
   const [updateDismissed, setUpdateDismissed] = useState(false);
+  const queryClient = useQueryClient();
   const hasUpdate =
     update.phase === "available" ||
     update.phase === "downloading" ||
@@ -579,9 +580,7 @@ function WorkspaceLayoutInner() {
   const handleLogout = async () => {
     setShowLogoutConfirm(false);
     track("workspace_logout_click");
-    resetAnalytics();
-    await authClient.signOut();
-    window.location.href = "/";
+    await logoutToWelcome({ queryClient });
   };
 
   const userEmail = me?.email ?? session?.user?.email ?? "";
