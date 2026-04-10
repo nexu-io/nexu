@@ -123,7 +123,6 @@ function configurePackagedPaths(): void {
   const registryUserDataPath =
     process.platform === "win32" ? readWindowsRegistryUserDataRoot() : null;
   const runtimePlatform = resolveRuntimePlatform();
-  const defaultUserDataPath = app.getPath("userData");
   const packagedUserDataPath =
     runtimePlatform === "win"
       ? resolveWindowsPackagedUserDataPath({
@@ -171,7 +170,7 @@ function configurePackagedPaths(): void {
     process.stdout,
     runtimePlatform === "win"
       ? `[desktop:paths:win] appData=${appDataPath} defaultUserData=${packagedUserDataPath.defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} registryUserData=${registryUserDataPath ?? "<unset>"} resolvedUserData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`
-      : `[desktop:paths] appData=${appDataPath} defaultUserData=${defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} registryUserData=${registryUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
+      : `[desktop:paths] appData=${appDataPath} defaultUserData=${packagedUserDataPath.defaultUserDataPath} overrideUserData=${overrideUserDataPath ?? "<unset>"} registryUserData=${registryUserDataPath ?? "<unset>"} userData=${effectiveUserDataPath} sessionData=${sessionDataPath} logs=${logsPath} nexuHome=${nexuHomePath}\n`,
   );
 }
 

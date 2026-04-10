@@ -15,6 +15,7 @@ export function resolveManagedRuntimeRoots({
   const openclawRuntimeRoot = resolve(runtimeRoot, "openclaw");
 
   return {
+    userDataRoot: userDataPath,
     nexuHome: expandHomePath(runtimeConfig.paths.nexuHome),
     runtimeRoot,
     openclawRuntimeRoot,
@@ -39,6 +40,7 @@ export function resolveLaunchdRuntimeRoots({
     : resolve(nexuHome, "runtime", "openclaw");
 
   return {
+    userDataRoot: app.getPath("userData"),
     nexuHome,
     runtimeRoot: app.isPackaged
       ? resolve(app.getPath("userData"), "runtime")

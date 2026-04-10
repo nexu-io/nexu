@@ -227,6 +227,7 @@ export async function coldStartMacLaunchdResidency(
     runtimeConfig,
     runtimeRoots,
     isPackaged: app.isPackaged,
+    pendingUserDataMigration: null,
     log: logColdStart,
   });
 

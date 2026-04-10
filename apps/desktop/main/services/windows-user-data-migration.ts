@@ -8,6 +8,7 @@ import {
   rmSync,
 } from "node:fs";
 import { dirname, resolve } from "node:path";
+import type { PendingUserDataMigrationContext } from "../platforms/types";
 
 const WINDOWS_CONFIG_REGKEY = "HKCU\\Software\\Nexu\\Desktop";
 const USER_DATA_ROOT_VALUE = "UserDataRoot";
@@ -15,17 +16,18 @@ const PENDING_SOURCE_VALUE = "PendingUserDataMigrationSource";
 const PENDING_TARGET_VALUE = "PendingUserDataMigrationTarget";
 const PENDING_STRATEGY_VALUE = "PendingUserDataMigrationStrategy";
 
-type WindowsUserDataMigrationStrategy = "move" | "copy" | "noop";
-
-interface PendingWindowsUserDataMigration {
-  sourceDir: string;
-  targetDir: string;
-  strategy: WindowsUserDataMigrationStrategy;
+interface ExecuteWindowsUserDataMigrationOpts {
+  pending: PendingUserDataMigrationContext;
+  currentTargetDir: string;
+  log: (message: string) => void;
 }
 
-interface ExecuteWindowsUserDataMigrationOpts {
-  currentUserDataDir: string;
-  log: (message: string) => void;
+export interface ExecuteWindowsUserDataMigrationResult {
+  pendingConsumed: boolean;
+  migrated: boolean;
+  sourceDir: string;
+  targetDir: string;
+  strategy: PendingUserDataMigrationContext["strategy"];
 }
 
 function readRegistryValues(): Record<string, string> {
@@ -68,13 +70,16 @@ function clearPendingMigrationRegistryValues(): void {
   deleteRegistryValue(PENDING_STRATEGY_VALUE);
 }
 
-function readPendingMigration(): PendingWindowsUserDataMigration | null {
+export function readPendingWindowsUserDataMigration(): PendingUserDataMigrationContext | null {
   const values = readRegistryValues();
   const sourceDir = values[PENDING_SOURCE_VALUE];
   const targetDir = values[PENDING_TARGET_VALUE];
   const strategyValue = values[PENDING_STRATEGY_VALUE];
 
   if (!sourceDir || !targetDir || !strategyValue) {
+    if (sourceDir || targetDir || strategyValue) {
+      clearPendingMigrationRegistryValues();
+    }
     return null;
   }
 
@@ -83,6 +88,7 @@ function readPendingMigration(): PendingWindowsUserDataMigration | null {
     strategyValue !== "copy" &&
     strategyValue !== "noop"
   ) {
+    clearPendingMigrationRegistryValues();
     return null;
   }
 
@@ -153,16 +159,23 @@ function executeMoveMigration(sourceDir: string, targetDir: string): string {
   return "move strategy completed via copy fallback";
 }
 
-export function executePendingWindowsUserDataMigration(
-  opts: ExecuteWindowsUserDataMigrationOpts,
-): void {
-  const pending = readPendingMigration();
-  if (!pending) {
-    return;
-  }
+export function clearPendingWindowsUserDataMigration(): void {
+  clearPendingMigrationRegistryValues();
+}
 
-  const { currentUserDataDir, log } = opts;
-  const currentTargetDir = resolve(currentUserDataDir);
+export function executeWindowsUserDataMigration(
+  opts: ExecuteWindowsUserDataMigrationOpts,
+): ExecuteWindowsUserDataMigrationResult {
+  const { pending, log } = opts;
+  const currentTargetDir = resolve(opts.currentTargetDir);
+
+  const result: ExecuteWindowsUserDataMigrationResult = {
+    pendingConsumed: false,
+    migrated: false,
+    sourceDir: pending.sourceDir,
+    targetDir: pending.targetDir,
+    strategy: pending.strategy,
+  };
 
   try {
     if (pending.targetDir !== currentTargetDir) {
@@ -170,19 +183,22 @@ export function executePendingWindowsUserDataMigration(
         `pending migration target mismatch current=${currentTargetDir} pending=${pending.targetDir}; clearing`,
       );
       clearPendingMigrationRegistryValues();
-      return;
+      result.pendingConsumed = true;
+      return result;
     }
 
     if (pending.strategy === "noop") {
       log("pending migration strategy=noop; clearing");
       clearPendingMigrationRegistryValues();
-      return;
+      result.pendingConsumed = true;
+      return result;
     }
 
     if (pending.sourceDir === pending.targetDir) {
       log("pending migration source equals target; clearing");
       clearPendingMigrationRegistryValues();
-      return;
+      result.pendingConsumed = true;
+      return result;
     }
 
     if (!existsSync(pending.sourceDir) || isDirectoryEmpty(pending.sourceDir)) {
@@ -190,7 +206,8 @@ export function executePendingWindowsUserDataMigration(
         `pending migration source missing or empty: ${pending.sourceDir}; clearing`,
       );
       clearPendingMigrationRegistryValues();
-      return;
+      result.pendingConsumed = true;
+      return result;
     }
 
     if (
@@ -201,7 +218,8 @@ export function executePendingWindowsUserDataMigration(
         `pending migration skipped due to overlapping paths source=${pending.sourceDir} target=${pending.targetDir}`,
       );
       clearPendingMigrationRegistryValues();
-      return;
+      result.pendingConsumed = true;
+      return result;
     }
 
     ensureDir(pending.targetDir);
@@ -212,16 +230,32 @@ export function executePendingWindowsUserDataMigration(
         `copy strategy completed source=${pending.sourceDir} target=${pending.targetDir}`,
       );
       clearPendingMigrationRegistryValues();
-      return;
+      result.pendingConsumed = true;
+      result.migrated = true;
+      return result;
     }
 
-    const result = executeMoveMigration(pending.sourceDir, pending.targetDir);
-    log(`${result} source=${pending.sourceDir} target=${pending.targetDir}`);
+    const moveResult = executeMoveMigration(
+      pending.sourceDir,
+      pending.targetDir,
+    );
+    log(
+      `${moveResult} source=${pending.sourceDir} target=${pending.targetDir}`,
+    );
     clearPendingMigrationRegistryValues();
+    return {
+      ...result,
+      pendingConsumed: true,
+      migrated: true,
+      sourceDir: pending.sourceDir,
+      targetDir: pending.targetDir,
+      strategy: pending.strategy,
+    };
   } catch (error) {
     log(
       `pending migration failed source=${pending.sourceDir} target=${pending.targetDir} strategy=${pending.strategy} error=${error instanceof Error ? error.message : String(error)}`,
     );
+    return result;
   }
 }
 
