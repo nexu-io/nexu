@@ -31,4 +31,19 @@ describe("desktop runtime config", () => {
     expect(config.posthogApiKey).toBe("phc_test_key");
     expect(config.posthogHost).toBe("https://us.i.posthog.com");
   });
+
+  it("reads Langfuse env overrides", () => {
+    const config = getDesktopRuntimeConfig(
+      {
+        LANGFUSE_PUBLIC_KEY: "pk_test",
+        LANGFUSE_SECRET_KEY: "sk_test",
+        LANGFUSE_BASE_URL: "https://langfuse.example.com",
+      },
+      { useBuildConfig: false },
+    );
+
+    expect(config.langfusePublicKey).toBe("pk_test");
+    expect(config.langfuseSecretKey).toBe("sk_test");
+    expect(config.langfuseBaseUrl).toBe("https://langfuse.example.com");
+  });
 });

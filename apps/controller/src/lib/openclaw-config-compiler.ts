@@ -281,6 +281,7 @@ function compilePlugins(
   const platformPluginIds = [
     "nexu-runtime-model",
     "nexu-credit-guard",
+    "langfuse-tracer",
     "nexu-platform-bootstrap",
     ...(resolvedMiniMaxOauth ? ["minimax-portal-auth"] : []),
   ];
@@ -331,6 +332,9 @@ function compilePlugins(
           }
         : {}),
       "nexu-runtime-model": {
+        enabled: true,
+      },
+      "langfuse-tracer": {
         enabled: true,
       },
       "nexu-credit-guard": {

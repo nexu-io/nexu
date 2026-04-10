@@ -123,6 +123,9 @@ function createRuntimeConfig(): DesktopRuntimeConfig {
     runtimeMode: "internal",
     posthogApiKey: null,
     posthogHost: null,
+    langfusePublicKey: null,
+    langfuseSecretKey: null,
+    langfuseBaseUrl: null,
   };
 }
 
@@ -616,6 +619,46 @@ describe("desktop runtime manifests", () => {
         ALL_PROXY: "socks5://proxy.example.com:1080",
         NO_PROXY: "example.com,localhost,127.0.0.1,::1",
       });
+    });
+
+    it("propagates Langfuse env to controller and openclaw manifests", () => {
+      const originalLangfuse = {
+        publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+        secretKey: process.env.LANGFUSE_SECRET_KEY,
+        baseUrl: process.env.LANGFUSE_BASE_URL,
+      };
+      process.env.LANGFUSE_PUBLIC_KEY = "pk_test";
+      process.env.LANGFUSE_SECRET_KEY = "sk_test";
+      process.env.LANGFUSE_BASE_URL = "https://langfuse.example.com";
+
+      const manifests = createRuntimeUnitManifests(
+        "/repo/apps/desktop",
+        "/tmp/user-data",
+        false,
+        createRuntimeConfig(),
+      );
+
+      const controllerManifest = manifests.find(
+        (manifest) => manifest.id === "controller",
+      );
+      const openclawManifest = manifests.find(
+        (manifest) => manifest.id === "openclaw",
+      );
+
+      expect(controllerManifest?.env).toMatchObject({
+        LANGFUSE_PUBLIC_KEY: "pk_test",
+        LANGFUSE_SECRET_KEY: "sk_test",
+        LANGFUSE_BASE_URL: "https://langfuse.example.com",
+      });
+      expect(openclawManifest?.env).toMatchObject({
+        LANGFUSE_PUBLIC_KEY: "pk_test",
+        LANGFUSE_SECRET_KEY: "sk_test",
+        LANGFUSE_BASE_URL: "https://langfuse.example.com",
+      });
+
+      process.env.LANGFUSE_PUBLIC_KEY = originalLangfuse.publicKey;
+      process.env.LANGFUSE_SECRET_KEY = originalLangfuse.secretKey;
+      process.env.LANGFUSE_BASE_URL = originalLangfuse.baseUrl;
     });
 
     it("includes Electron executable for Windows managed controller manifests", () => {

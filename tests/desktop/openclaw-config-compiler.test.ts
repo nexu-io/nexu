@@ -92,8 +92,12 @@ describe("compileOpenClawConfig", () => {
     expect(compiled.plugins?.entries?.["openclaw-weixin"]).toEqual({
       enabled: true,
     });
+    expect(compiled.plugins?.entries?.["langfuse-tracer"]).toEqual({
+      enabled: true,
+    });
     // Prewarm allowlist: prevents first-connect SIGUSR1 + drain window.
     expect(compiled.plugins?.allow).toContain("openclaw-weixin");
+    expect(compiled.plugins?.allow).toContain("langfuse-tracer");
     expect(compiled.channels?.feishu?.enabled).toBe(true);
     expect(compiled.channels?.feishu?.accounts).toEqual({
       __nexu_internal_feishu_prewarm__: {

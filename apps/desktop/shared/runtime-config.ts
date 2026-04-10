@@ -212,6 +212,9 @@ export type DesktopRuntimeConfig = {
   sentryDsn: string | null;
   posthogApiKey: string | null;
   posthogHost: string | null;
+  langfusePublicKey: string | null;
+  langfuseSecretKey: string | null;
+  langfuseBaseUrl: string | null;
 };
 
 export function getDesktopRuntimeConfig(
@@ -323,5 +326,8 @@ export function getDesktopRuntimeConfig(
       null,
     posthogApiKey: env.POSTHOG_API_KEY ?? buildConfig.POSTHOG_API_KEY ?? null,
     posthogHost: env.POSTHOG_HOST ?? buildConfig.POSTHOG_HOST ?? null,
+    langfusePublicKey: env.LANGFUSE_PUBLIC_KEY ?? null,
+    langfuseSecretKey: env.LANGFUSE_SECRET_KEY ?? null,
+    langfuseBaseUrl: env.LANGFUSE_BASE_URL ?? null,
   };
 }

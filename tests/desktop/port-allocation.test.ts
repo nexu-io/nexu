@@ -52,6 +52,9 @@ function createRuntimeConfig(input?: {
     sentryDsn: null,
     posthogApiKey: null,
     posthogHost: null,
+    langfusePublicKey: null,
+    langfuseSecretKey: null,
+    langfuseBaseUrl: null,
   };
 }
 
