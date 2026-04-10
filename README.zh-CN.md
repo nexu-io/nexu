@@ -205,9 +205,20 @@ pnpm test
 
 ## 🤝 贡献
 
-对于那些想贡献代码、文档或修复问题的人，请先阅读我们的 [贡献指南](https://docs.nexu.io/zh/guide/first-pr)。如果你想了解贡献后可以获得什么奖励、以及我们会提供什么样的支持，也可以继续看 [贡献奖励与支持](https://docs.nexu.io/zh/guide/contributor-rewards)。
+欢迎贡献！**英文权威指南**在仓库根目录 [CONTRIBUTING.md](CONTRIBUTING.md)（GitHub 发起 PR 时会重点展示）。文档站会同步嵌入该文件：[docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing)。**中文指南：** [docs.nexu.io 参与贡献](https://docs.nexu.io/zh/guide/contributing) · [docs/zh/guide/contributing.md](docs/zh/guide/contributing.md)。
 
-> 我们正在持续寻找愿意认领 **Good First Issue** 的贡献者。如果你想从第一条 PR 开始，欢迎直接浏览 [Good First Issue 列表](https://github.com/nexu-io/nexu/labels/good-first-issue)。如果你想先和我们聊聊题目，也欢迎通过 **贡献者微信群**（链接待补）或 [Discord 社区](https://discord.gg/Q6AxCUuMNU) 联系我们。
+1. 🍴 Fork 本仓库
+2. 🌿 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 💾 提交改动（`git commit -m 'Add amazing feature'`）
+4. 📤 推送到分支（`git push origin feature/amazing-feature`）
+5. 🔀 提交 Pull Request
+
+### 规范
+
+- 遵循现有代码风格（Biome，可运行 `pnpm lint`）
+- 为新功能编写测试
+- 按需更新文档
+- 保持提交原子化且描述清晰
 
 ---
 
