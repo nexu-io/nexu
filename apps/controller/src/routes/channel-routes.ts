@@ -204,7 +204,7 @@ function logChannelConnectFailure(
   );
 
   void container.runtimeHealth
-    .probe()
+    .probe({ timeoutMs: 1500 })
     .then((runtimeHealth) => {
       logger.warn(
         {
