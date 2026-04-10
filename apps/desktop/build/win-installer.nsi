@@ -75,9 +75,11 @@ ShowUninstDetails show
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "$(Lang_FinishCreateDesktopShortcut)"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_DIRECTORY
-Page custom UserDataPageCreate UserDataPageLeave
-Page custom MigrationPageCreate MigrationPageLeave
+; --- Temporarily disabled: custom directory pages are kept but not shown ---
+; !insertmacro MUI_PAGE_DIRECTORY
+; Page custom UserDataPageCreate UserDataPageLeave
+; Page custom MigrationPageCreate MigrationPageLeave
+; --- End temporarily disabled ---
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM

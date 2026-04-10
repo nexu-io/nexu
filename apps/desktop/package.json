@@ -161,7 +161,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "include": "build/installer.nsh",
       "deleteAppDataOnUninstall": false,
       "artifactName": "nexu-setup-${version}-${arch}.${ext}"
