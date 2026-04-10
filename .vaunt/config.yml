@@ -1,0 +1,235 @@
+achievements:
+  # ── WELCOME ──────────────────────────────────────────────────────────────────
+
+  - name: Stargazer
+    body: >
+      You starred the Nexu repository. Thanks for the support — every star
+      helps the project grow.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2b50.png
+    trigger:
+      type: star
+
+  - name: First Report
+    body: >
+      Opened your first issue. Whether it's a bug, a feature idea, or an
+      improvement — you're helping shape Nexu.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4dd.png
+    trigger:
+      type: issue
+      count: 1
+
+  - name: Lift Off
+    body: >
+      First pull request merged into Nexu. You're officially a contributor.
+      Welcome aboard.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f680.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+
+  # ── BUG HUNTING ──────────────────────────────────────────────────────────────
+
+  - name: Bug Spotter
+    body: >
+      Reported a confirmed bug in Nexu. Good eyes — finding bugs is half the
+      battle.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f41b.png
+    trigger:
+      type: issue
+      count: 1
+      labels:
+        - bug
+
+  - name: Bug Crusher
+    body: >
+      Merged your first bug-fix PR. You didn't just spot it — you squashed it.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f527.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - bug
+
+  - name: Exterminator
+    body: >
+      Five bug-fix PRs merged. The codebase is measurably better because of you.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26a1.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 5
+      labels:
+        - bug
+
+  # ── FEATURE BUILDING ─────────────────────────────────────────────────────────
+
+  - name: Spark
+    body: >
+      Shipped your first enhancement to Nexu. You're not just using it —
+      you're making it better.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2728.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - enhancement
+
+  - name: Feature Architect
+    body: >
+      Five enhancement PRs merged. You're actively shaping what Nexu becomes.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4a1.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 5
+      labels:
+        - enhancement
+
+  # ── IMPROVEMENT ──────────────────────────────────────────────────────────────
+
+  - name: Polish Pro
+    body: >
+      Merged your first improvement PR. Refactoring, performance, DX — the
+      unglamorous work that makes a codebase solid.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f528.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - improvement
+
+  - name: Craftsmanship
+    body: >
+      Five improvement PRs merged. You care about the quality of the craft,
+      not just the feature count.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3c5.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 5
+      labels:
+        - improvement
+
+  # ── DOMAIN EXPERTS ───────────────────────────────────────────────────────────
+
+  - name: Desktop Wizard
+    body: >
+      Shipped a change to Nexu's Electron desktop layer. You understand the
+      packaged app, launchd services, or the Electron shell.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f5a5-fe0f.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - desktop
+
+  - name: Skill Crafter
+    body: >
+      Contributed to Nexu's OpenClaw skill ecosystem. Building skills is how
+      Nexu's AI agents gain superpowers.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f99e.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - skills
+
+  - name: Controller Hacker
+    body: >
+      Contributed to the Nexu controller — the local control plane that
+      compiles OpenClaw config and orchestrates the runtime.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699-fe0f.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - controller
+
+  # ── DOCUMENTATION ────────────────────────────────────────────────────────────
+
+  - name: Doc Writer
+    body: >
+      Merged a documentation PR. Great docs are how open-source projects
+      become genuinely useful to the community.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4d6.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - documentation
+
+  # ── ONBOARDING ───────────────────────────────────────────────────────────────
+
+  - name: Good First Step
+    body: >
+      Resolved a good-first-issue. Every expert was a beginner once — welcome
+      to the Nexu contributor community.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f331.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - good first issue
+
+  - name: Helper
+    body: >
+      Picked up and closed a help-wanted issue. You saw something that needed
+      doing and stepped up.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f91d.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 1
+      labels:
+        - help wanted
+
+  # ── CORE CONTRIBUTOR MILESTONES ──────────────────────────────────────────────
+
+  - name: Rising Star
+    body: >
+      Five pull requests merged. You're picking up momentum — the team
+      recognizes your name now.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f31f.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 5
+
+  - name: Regular
+    body: >
+      Ten pull requests merged. A familiar face in the codebase. You know
+      where things live and how they fit together.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f948.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 10
+
+  - name: Core Contributor
+    body: >
+      Twenty-five pull requests merged. Nexu wouldn't be the same codebase
+      without your work.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f947.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 25
+
+  - name: Nexu Legend
+    body: >
+      Fifty pull requests merged. You've shaped this project at a fundamental
+      level. Legendary status — earned, not given.
+    image: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3c6.png
+    trigger:
+      type: pull_request
+      merged: true
+      count: 50
