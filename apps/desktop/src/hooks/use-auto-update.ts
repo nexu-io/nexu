@@ -62,6 +62,7 @@ export function useAutoUpdate(options?: {
   experience?: DesktopUpdateExperience;
 }) {
   const experience = options?.experience ?? "normal";
+  const [pendingCheck, setPendingCheck] = useState(false);
   const [state, setState] = useState<UpdateState>({
     capability: null,
     phase: "idle",
@@ -200,8 +201,41 @@ export function useAutoUpdate(options?: {
     };
   }, [state.phase]);
 
+  useEffect(() => {
+    if (!pendingCheck || state.capability === null) {
+      return;
+    }
+
+    if (!state.capability.check) {
+      setPendingCheck(false);
+      setState((prev) => ({
+        ...prev,
+        phase: "idle",
+        userInitiated: false,
+      }));
+      return;
+    }
+
+    setPendingCheck(false);
+    void checkForUpdate().catch(() => {
+      // Errors are delivered via the update:error event
+    });
+  }, [pendingCheck, state.capability]);
+
   const check = useCallback(async () => {
-    if (!state.capability?.check) {
+    if (state.capability === null) {
+      setPendingCheck(true);
+      setState((prev) => ({
+        ...prev,
+        phase: "checking",
+        errorMessage: null,
+        dismissed: false,
+        userInitiated: true,
+      }));
+      return;
+    }
+
+    if (!state.capability.check) {
       setState((prev) => ({
         ...prev,
         phase: "idle",

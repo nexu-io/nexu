@@ -19,7 +19,10 @@ import {
   resolveMacUpdateFeedUrlForTests,
 } from "./mac-update-driver";
 import { UnsupportedUpdateDriver } from "./unsupported-update-driver";
-import type { PlatformUpdateDriver } from "./update-driver";
+import type {
+  PlatformUpdateDriver,
+  UpdateDriverEventHandlers,
+} from "./update-driver";
 import { WindowsUpdateDriver } from "./windows-update-driver";
 
 type DownloadMode = "idle" | "background" | "foreground";
@@ -117,6 +120,9 @@ export class UpdateManager {
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private lastProgressLogAt = 0;
   private lastProgressLogPercent: number | null = null;
+  private lastProgress:
+    | Parameters<UpdateDriverEventHandlers["onProgress"]>[0]
+    | null = null;
   private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -276,6 +282,7 @@ export class UpdateManager {
         this.send("update:up-to-date", { diagnostic });
       },
       onProgress: (progress) => {
+        this.lastProgress = progress;
         const now = Date.now();
         const percent = Math.round(progress.percent);
         const shouldLog =
@@ -456,6 +463,9 @@ export class UpdateManager {
 
     // Switch to foreground mode and remove rate limit
     this.downloadMode = "foreground";
+    if (this.lastProgress !== null) {
+      this.send("update:progress", this.lastProgress);
+    }
     if (
       this.platform === "win32" &&
       this.driver instanceof WindowsUpdateDriver
