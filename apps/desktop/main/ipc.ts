@@ -781,6 +781,13 @@ export function registerIpcHandlers(
           return { version: app.getVersion() };
         }
 
+        case "update:get-status": {
+          if (!updateManager) {
+            return { phase: "idle", version: null };
+          }
+          return updateManager.getStatus();
+        }
+
         case "update:set-channel": {
           const typedPayload =
             payload as HostInvokePayloadMap["update:set-channel"];

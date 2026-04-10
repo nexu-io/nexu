@@ -71,6 +71,8 @@ export function useAutoUpdate() {
     const host = (window as unknown as NexuWindow).nexuHost;
     if (!host) return;
     let cancelled = false;
+
+    // Query capability
     void host
       .invoke("update:get-capability", undefined)
       .then((result) => {
@@ -80,6 +82,28 @@ export function useAutoUpdate() {
         }
       })
       .catch(() => {});
+
+    // Query current update status (catches background downloads that
+    // completed before this component mounted)
+    void host
+      .invoke("update:get-status", undefined)
+      .then((result) => {
+        if (cancelled) return;
+        const status = result as {
+          phase: "idle" | "downloading" | "ready";
+          version: string | null;
+        };
+        if (status.phase === "ready" && status.version) {
+          setState((prev) => ({
+            ...prev,
+            phase: "ready",
+            version: status.version,
+            percent: 100,
+          }));
+        }
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };

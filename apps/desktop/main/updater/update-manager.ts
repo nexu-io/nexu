@@ -170,6 +170,22 @@ export class UpdateManager {
     return this.driver.capability;
   }
 
+  getStatus(): {
+    phase: "idle" | "downloading" | "ready";
+    version: string | null;
+  } {
+    if (this.downloadComplete) {
+      return { phase: "ready", version: this.pendingVersion };
+    }
+    if (
+      this.downloadMode === "background" ||
+      this.downloadMode === "foreground"
+    ) {
+      return { phase: "downloading", version: this.pendingVersion };
+    }
+    return { phase: "idle", version: null };
+  }
+
   private getDiagnostic(partial?: {
     remoteVersion?: string;
     remoteReleaseDate?: string;
