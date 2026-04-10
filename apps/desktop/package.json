@@ -32,6 +32,7 @@
     "@nexu/shared": "workspace:*",
     "@sentry/electron": "^7.10.0",
     "electron-updater": "^6.3.9",
+    "jszip": "^3.10.1",
     "pino": "^10.3.1",
     "sharp": "0.34.5",
     "yauzl": "^3.2.1"
@@ -109,6 +110,10 @@
       {
         "from": "node_modules/@img",
         "to": "bundled-node-modules/@img"
+      },
+      {
+        "from": "node_modules/jszip",
+        "to": "bundled-node-modules/jszip"
       },
       {
         "from": "build-config.json",
