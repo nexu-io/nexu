@@ -57,6 +57,23 @@ export class SessionService {
     return this.sessionsRuntime.getChatHistory(id, limit);
   }
 
+  async sendFeishuCard(params: {
+    botId: string;
+    card: Record<string, unknown>;
+    to: string;
+    receiveIdType?: "chat_id" | "open_id" | "user_id" | "union_id" | "email";
+  }): Promise<{ messageId: string }> {
+    return this.sessionsRuntime.sendFeishuCard(params);
+  }
+
+  async updateFeishuCard(params: {
+    botId: string;
+    messageId: string;
+    card: Record<string, unknown>;
+  }): Promise<{ ok: true }> {
+    return this.sessionsRuntime.updateFeishuCard(params);
+  }
+
   async getChatHistoryBySessionKey(
     botId: string,
     sessionKey: string,

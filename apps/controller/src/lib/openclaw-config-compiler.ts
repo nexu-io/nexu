@@ -333,6 +333,9 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
+      "nexu-feishu-card": {
+        enabled: true,
+      },
       "nexu-credit-guard": {
         enabled: true,
         config: {
