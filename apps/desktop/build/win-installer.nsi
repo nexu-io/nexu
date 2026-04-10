@@ -29,7 +29,6 @@ RequestExecutionLevel user
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 !include "nsDialogs.nsh"
-!include "WinMessages.nsh"
 !include "win-installer-lang.nsh"
 
 !define PRODUCT_PUBLISHER "Powerformer, Inc."
@@ -40,22 +39,12 @@ RequestExecutionLevel user
 !define NEXU_USER_DATA_VALUE "UserDataRoot"
 !define DEFAULT_USER_DATA_DIR_NAME "nexu-desktop"
 !define INSTALL_TOMBSTONE_PREFIX "nexu-desktop.old."
-!define USERDATA_TOMBSTONE_PREFIX "nexu-userdata.old."
 !define INSTALL_TOMBSTONE_MARKER ".nexu-installer-tombstone"
 
 Var UserDataDir
-Var OldUserDataDir
-Var OldUserDataDirIsNonEmpty
-Var PathCompareResult
 Var UserDataInputHandle
-Var MigrationStrategy
-Var MigrationMoveRadioHandle
-Var MigrationCopyRadioHandle
-Var MigrationNoopRadioHandle
 Var UninstallDeleteDataCheckboxHandle
 Var UninstallDeleteLocalDataSelected
-Var UninstallResolvedUserDataDir
-Var UninstallResolvedUserDataDirHandle
 
 Name "${PRODUCT_NAME}"
 OutFile "${OUTPUT_EXE}"
@@ -97,113 +86,6 @@ Function BrowseUserDataDir
   ${EndIf}
 FunctionEnd
 
-Function TrimTrailingDirectorySeparators
-  Push $1
-  Push $2
-
-trim_trailing_separators:
-  StrLen $1 $0
-  ${If} $1 <= 3
-    Goto trim_done
-  ${EndIf}
-
-  IntOp $2 $1 - 1
-  StrCpy $1 $0 1 $2
-  StrCmp $1 "\" trim_one_separator
-  StrCmp $1 "/" trim_one_separator
-  Goto trim_done
-
-trim_one_separator:
-  StrCpy $0 $0 $2
-  Goto trim_trailing_separators
-
-trim_done:
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function CollapseDuplicateDefaultUserDataSuffix
-  Push $1
-  Push $2
-  Push $3
-
-  ${GetFileName} "$0" $1
-  StrCpy $2 "${DEFAULT_USER_DATA_DIR_NAME}"
-  System::Call 'kernel32::lstrcmpi(t r1, t r2)i.r3'
-  IntCmp $3 0 maybe_collapse collapse_done collapse_done
-
-maybe_collapse:
-  ${GetParent} "$0" $2
-  ${GetFileName} "$2" $1
-  StrCpy $3 "${DEFAULT_USER_DATA_DIR_NAME}"
-  System::Call 'kernel32::lstrcmpi(t r1, t r3)i.r1'
-  IntCmp $1 0 do_collapse collapse_done collapse_done
-
-do_collapse:
-  StrCpy $0 "$2"
-
-collapse_done:
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function PathsEqualIgnoreCase
-  Push $2
-  Push $3
-
-  StrCpy $PathCompareResult "0"
-  StrCpy $2 "$0"
-  Call TrimTrailingDirectorySeparators
-  Call CollapseDuplicateDefaultUserDataSuffix
-  StrCpy $2 "$0"
-
-  StrCpy $0 "$1"
-  Call TrimTrailingDirectorySeparators
-  Call CollapseDuplicateDefaultUserDataSuffix
-  StrCpy $3 "$0"
-
-  StrCpy $0 "$2"
-  StrCpy $1 "$3"
-  System::Call 'kernel32::lstrcmpi(t r0, t r1)i.r2'
-  IntCmp $2 0 paths_equal paths_not_equal paths_not_equal
-
-paths_equal:
-  StrCpy $PathCompareResult "1"
-
-paths_not_equal:
-  Pop $3
-  Pop $2
-FunctionEnd
-
-Function NormalizeUserDataDir
-  Push $1
-  Push $2
-
-  StrCpy $0 "$UserDataDir"
-  Call TrimTrailingDirectorySeparators
-  Call CollapseDuplicateDefaultUserDataSuffix
-  ${GetFileName} "$0" $1
-
-  StrCpy $2 "${DEFAULT_USER_DATA_DIR_NAME}"
-  System::Call 'kernel32::lstrcmpi(t r1, t r2)i.r2'
-  IntCmp $2 0 normalization_done append_suffix append_suffix
-
-append_suffix:
-  StrCpy $0 "$0\${DEFAULT_USER_DATA_DIR_NAME}"
-  Goto normalization_done
-
-normalization_done:
-  StrCpy $UserDataDir "$0"
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function CleanupNexuConfigRegistryIfEmpty
-  DeleteRegKey /ifempty HKCU "${NEXU_CONFIG_REGKEY}"
-  DeleteRegKey /ifempty HKCU "Software\Nexu"
-FunctionEnd
-
 Function UserDataPageCreate
   !insertmacro MUI_HEADER_TEXT "$(Lang_AdvancedTitle)" "$(Lang_AdvancedSubtitle)"
 
@@ -235,142 +117,10 @@ Function UserDataPageLeave
     MessageBox MB_OK|MB_ICONEXCLAMATION "$(Lang_ErrorUserDataEmpty)"
     Abort
   ${EndIf}
-
-  Push "user-data raw-input=$UserDataDir"
-  Call LogInstallerEvent
-
-  Call NormalizeUserDataDir
-  ${NSD_SetText} $UserDataInputHandle "$UserDataDir"
-  Push "user-data normalized-target=$UserDataDir old=$OldUserDataDir"
-  Call LogInstallerEvent
-
-  StrCpy $0 "$UserDataDir"
-  StrCpy $1 "$OldUserDataDir"
-  Push "user-data compare-target=$0"
-  Call LogInstallerEvent
-  Push "user-data compare-old=$1"
-  Call LogInstallerEvent
-  Call PathsEqualIgnoreCase
-  Push "user-data path-compare equal=$PathCompareResult"
-  Call LogInstallerEvent
-  ${If} $PathCompareResult == "1"
-    Push "user-data no-op: normalized target equals current data dir"
-    Call LogInstallerEvent
-    Return
-  ${EndIf}
-
-  StrCpy $0 "$UserDataDir"
-  Call UpdateDirectoryNonEmptyState
-  ${If} $OldUserDataDirIsNonEmpty == "1"
-    Push "user-data quick-fail target-non-empty target=$UserDataDir"
-    Call LogInstallerEvent
-    MessageBox MB_OK|MB_ICONEXCLAMATION "$(Lang_ErrorUserDataTargetNonEmpty)"
-    Abort
-  ${EndIf}
-
-  Push "user-data quick-pass target-available target=$UserDataDir"
-  Call LogInstallerEvent
-FunctionEnd
-
-Function UpdateDirectoryNonEmptyState
-  Push $1
-  Push $2
-
-  StrCpy $OldUserDataDirIsNonEmpty "0"
-  IfFileExists "$0\*" 0 done
-  FindFirst $1 $2 "$0\*"
-loop:
-  IfErrors close
-  StrCmp $2 "" next
-  StrCmp $2 "." next
-  StrCmp $2 ".." next
-  StrCpy $OldUserDataDirIsNonEmpty "1"
-  Goto close
-next:
-  FindNext $1 $2
-  Goto loop
-close:
-  FindClose $1
-done:
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function MigrationPageCreate
-  StrCpy $0 "$UserDataDir"
-  StrCpy $1 "$OldUserDataDir"
-  Call PathsEqualIgnoreCase
-  ${If} $PathCompareResult == "1"
-    Push "migration-page abort reason=same-effective-path target=$UserDataDir old=$OldUserDataDir"
-    Call LogInstallerEvent
-    Abort
-  ${EndIf}
-
-  StrCpy $0 "$OldUserDataDir"
-  Call UpdateDirectoryNonEmptyState
-  ${If} $OldUserDataDirIsNonEmpty != "1"
-    Push "migration-page abort reason=old-dir-empty old=$OldUserDataDir"
-    Call LogInstallerEvent
-    Abort
-  ${EndIf}
-
-  Push "migration-page show target=$UserDataDir old=$OldUserDataDir"
-  Call LogInstallerEvent
-
-  !insertmacro MUI_HEADER_TEXT "$(Lang_MigrationTitle)" "$(Lang_MigrationSubtitle)"
-
-  nsDialogs::Create 1018
-  Pop $0
-  ${If} $0 == error
-    Abort
-  ${EndIf}
-
-  ${NSD_CreateLabel} 0 0 100% 18u "$(Lang_MigrationHelp)"
-  Pop $0
-
-  ${NSD_CreateLabel} 0 24u 100% 10u "$(Lang_MigrationOldDirLabel)"
-  Pop $0
-  ${NSD_CreateLabel} 0 34u 100% 12u "$OldUserDataDir"
-  Pop $0
-
-  ${NSD_CreateLabel} 0 50u 100% 10u "$(Lang_MigrationNewDirLabel)"
-  Pop $0
-  ${NSD_CreateLabel} 0 60u 100% 12u "$UserDataDir"
-  Pop $0
-
-  ${NSD_CreateRadioButton} 0 82u 100% 12u "$(Lang_MigrationMoveOption)"
-  Pop $MigrationMoveRadioHandle
-  ${NSD_Check} $MigrationMoveRadioHandle
-
-  ${NSD_CreateRadioButton} 0 98u 100% 12u "$(Lang_MigrationCopyOption)"
-  Pop $MigrationCopyRadioHandle
-
-  ${NSD_CreateRadioButton} 0 114u 100% 12u "$(Lang_MigrationNoopOption)"
-  Pop $MigrationNoopRadioHandle
-
-  nsDialogs::Show
-FunctionEnd
-
-Function MigrationPageLeave
-  ${NSD_GetState} $MigrationCopyRadioHandle $0
-  ${If} $0 == ${BST_CHECKED}
-    StrCpy $MigrationStrategy "copy"
-    Return
-  ${EndIf}
-
-  ${NSD_GetState} $MigrationNoopRadioHandle $0
-  ${If} $0 == ${BST_CHECKED}
-    StrCpy $MigrationStrategy "noop"
-    Return
-  ${EndIf}
-
-  StrCpy $MigrationStrategy "move"
 FunctionEnd
 
 Function un.UninstallOptionsPageCreate
   !insertmacro MUI_HEADER_TEXT "$(Lang_UninstallOptionsTitle)" "$(Lang_UninstallOptionsSubtitle)"
-
-  Call un.ResolveUserDataDir
 
   nsDialogs::Create 1018
   Pop $0
@@ -381,14 +131,7 @@ Function un.UninstallOptionsPageCreate
   ${NSD_CreateLabel} 0 0 100% 24u "$(Lang_UninstallOptionsHelp)"
   Pop $0
 
-  ${NSD_CreateLabel} 0 28u 100% 10u "$(Lang_UninstallDeleteLocalDataPathLabel)"
-  Pop $0
-
-  ${NSD_CreateText} 0 40u 100% 14u "$UninstallResolvedUserDataDir"
-  Pop $UninstallResolvedUserDataDirHandle
-  SendMessage $UninstallResolvedUserDataDirHandle ${EM_SETREADONLY} 1 0
-
-  ${NSD_CreateCheckbox} 0 60u 100% 12u "$(Lang_UninstallDeleteLocalDataCheckbox)"
+  ${NSD_CreateCheckbox} 0 34u 100% 12u "$(Lang_UninstallDeleteLocalDataCheckbox)"
   Pop $UninstallDeleteDataCheckboxHandle
 
   nsDialogs::Show
@@ -403,80 +146,19 @@ Function un.UninstallOptionsPageLeave
   ${EndIf}
 FunctionEnd
 
-Function un.ResolveUserDataDir
-  StrCpy $UninstallResolvedUserDataDir "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
-  ReadRegStr $0 HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
-  ${If} $0 != ""
-    StrCpy $UninstallResolvedUserDataDir "$0"
-  ${EndIf}
-
-  StrCpy $0 "$UninstallResolvedUserDataDir"
-  Call un.TrimTrailingDirectorySeparators
-  Call un.CollapseDuplicateDefaultUserDataSuffix
-  StrCpy $UninstallResolvedUserDataDir "$0"
-FunctionEnd
-
-Function un.TrimTrailingDirectorySeparators
-  Push $1
-  Push $2
-
-un_trim_trailing_separators:
-  StrLen $1 $0
-  ${If} $1 <= 3
-    Goto un_trim_done
-  ${EndIf}
-
-  IntOp $2 $1 - 1
-  StrCpy $1 $0 1 $2
-  StrCmp $1 "\" un_trim_one_separator
-  StrCmp $1 "/" un_trim_one_separator
-  Goto un_trim_done
-
-un_trim_one_separator:
-  StrCpy $0 $0 $2
-  Goto un_trim_trailing_separators
-
-un_trim_done:
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function un.CollapseDuplicateDefaultUserDataSuffix
-  Push $1
-  Push $2
-  Push $3
-
-  ${GetFileName} "$0" $1
-  StrCpy $2 "${DEFAULT_USER_DATA_DIR_NAME}"
-  System::Call 'kernel32::lstrcmpi(t r1, t r2)i.r3'
-  IntCmp $3 0 un_maybe_collapse un_collapse_done un_collapse_done
-
-un_maybe_collapse:
-  ${GetParent} "$0" $2
-  ${GetFileName} "$2" $1
-  StrCpy $3 "${DEFAULT_USER_DATA_DIR_NAME}"
-  System::Call 'kernel32::lstrcmpi(t r1, t r3)i.r1'
-  IntCmp $1 0 un_do_collapse un_collapse_done un_collapse_done
-
-un_do_collapse:
-  StrCpy $0 "$2"
-
-un_collapse_done:
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
-
 Function LogInstallerEvent
   Exch $0
   Push $1
+  Push $2
 
-  FileOpen $1 "${INSTALLER_LOG}" a
+  System::Call 'kernel32::GetTickCount() i .r1'
+  FileOpen $2 "${INSTALLER_LOG}" a
   IfErrors done
-  FileWrite $1 "$0$\r$\n"
-  FileClose $1
+  FileWrite $2 "$1ms | $0$\r$\n"
+  FileClose $2
 
 done:
+  Pop $2
   Pop $1
   Pop $0
 FunctionEnd
@@ -516,13 +198,16 @@ FunctionEnd
 Function un.LogInstallerEvent
   Exch $0
   Push $1
+  Push $2
 
-  FileOpen $1 "${INSTALLER_LOG}" a
+  System::Call 'kernel32::GetTickCount() i .r1'
+  FileOpen $2 "${INSTALLER_LOG}" a
   IfErrors done
-  FileWrite $1 "$0$\r$\n"
-  FileClose $1
+  FileWrite $2 "$1ms | $0$\r$\n"
+  FileClose $2
 
 done:
+  Pop $2
   Pop $1
   Pop $0
 FunctionEnd
@@ -549,20 +234,6 @@ Function QueueAsyncDelete
 done:
   Pop $3
   Pop $2
-  Pop $1
-  Pop $0
-FunctionEnd
-
-Function WriteTombstoneMarker
-  Exch $0
-  Push $1
-
-  FileOpen $1 "$0\${INSTALL_TOMBSTONE_MARKER}" w
-  IfErrors done
-  FileWrite $1 "nexu-custom-installer tombstone$\r$\n"
-  FileClose $1
-
-done:
   Pop $1
   Pop $0
 FunctionEnd
@@ -603,13 +274,8 @@ Function BuildInstallTombstonePath
   Push $7
   Push $8
   Push $9
-  Push $R0
-  Push $R1
 
   ${GetParent} "$INSTDIR" $1
-  GetTempFileName $R0
-  ${GetFileName} "$R0" $R1
-  Delete $R0
   System::Call '*(i2, i2, i2, i2, i2, i2, i2, i2) p.r2'
   System::Call 'kernel32::GetLocalTime(p r2)'
   System::Call '*$2(i2.r3, i2.r4, i2.r5, i2.r6, i2.r7, i2.r8, i2.r9, i2.r0)'
@@ -620,55 +286,9 @@ Function BuildInstallTombstonePath
   IntFmt $6 "%02d" $7
   IntFmt $7 "%02d" $8
   IntFmt $8 "%02d" $9
-  StrCpy $R1 $R1 6
-  StrCpy $0 "$1\${INSTALL_TOMBSTONE_PREFIX}$3$4$5-$6$7$8-$R1"
+  IntFmt $9 "%03d" $0
+  StrCpy $0 "$1\${INSTALL_TOMBSTONE_PREFIX}$3$4$5$6$7$8$9"
 
-  Pop $R1
-  Pop $R0
-  Pop $9
-  Pop $8
-  Pop $7
-  Pop $6
-  Pop $5
-  Pop $4
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function BuildUserDataTombstonePath
-  Exch $0
-  Push $1
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-  Push $6
-  Push $7
-  Push $8
-  Push $9
-  Push $R0
-  Push $R1
-
-  ${GetParent} "$0" $1
-  GetTempFileName $R0
-  ${GetFileName} "$R0" $R1
-  Delete $R0
-  System::Call '*(i2, i2, i2, i2, i2, i2, i2, i2) p.r2'
-  System::Call 'kernel32::GetLocalTime(p r2)'
-  System::Call '*$2(i2.r3, i2.r4, i2.r5, i2.r6, i2.r7, i2.r8, i2.r9, i2.r0)'
-  System::Free $2
-  IntFmt $3 "%04d" $3
-  IntFmt $4 "%02d" $4
-  IntFmt $5 "%02d" $5
-  IntFmt $6 "%02d" $7
-  IntFmt $7 "%02d" $8
-  IntFmt $8 "%02d" $9
-  StrCpy $R1 $R1 6
-  StrCpy $0 "$1\${USERDATA_TOMBSTONE_PREFIX}$3$4$5-$6$7$8-$R1"
-
-  Pop $R1
-  Pop $R0
   Pop $9
   Pop $8
   Pop $7
@@ -681,21 +301,6 @@ Function BuildUserDataTombstonePath
 FunctionEnd
 
 Function QueueInstallTombstoneCleanup
-  Exch $0
-  Push $1
-  Push $2
-
-  IfFileExists "$0\${INSTALL_TOMBSTONE_MARKER}" 0 done
-  Push "$0"
-  Call QueueAsyncDelete
-
-done:
-  Pop $2
-  Pop $1
-  Pop $0
-FunctionEnd
-
-Function QueueUserDataTombstoneCleanup
   Exch $0
   Push $1
   Push $2
@@ -740,35 +345,6 @@ done:
   Pop $0
 FunctionEnd
 
-Function QueueSiblingUserDataTombstoneCleanup
-  Exch $0
-  Push $1
-  Push $2
-  Push $3
-
-  FindFirst $1 $2 "$0\${USERDATA_TOMBSTONE_PREFIX}*"
-loop:
-  IfErrors done
-  StrCmp $2 "" next
-  StrCmp $2 "." next
-  StrCmp $2 ".." next
-  StrCpy $3 "$0\$2"
-  IfFileExists "$3\${INSTALL_TOMBSTONE_MARKER}" 0 next
-  Push "$3"
-  Call QueueAsyncDelete
-
-next:
-  FindNext $1 $2
-  Goto loop
-
-done:
-  FindClose $1
-  Pop $3
-  Pop $2
-  Pop $1
-  Pop $0
-FunctionEnd
-
 Function PrepareInstallDirectory
   Push $0
   Push $1
@@ -777,13 +353,6 @@ Function PrepareInstallDirectory
   Push "queueing cleanup for install tombstones"
   Call LogInstallerEvent
   Call QueueSiblingInstallTombstoneCleanup
-
-  StrCpy $0 "$OldUserDataDir"
-  ${GetParent} "$0" $0
-  Push "queueing cleanup for user-data tombstones"
-  Call LogInstallerEvent
-  Push "$0"
-  Call QueueSiblingUserDataTombstoneCleanup
 
   IfFileExists "$INSTDIR\*" has_existing_install done
 
@@ -799,8 +368,12 @@ move_existing_install:
   StrCpy $0 "$0"
   Rename "$INSTDIR" "$0"
   IfErrors rename_failed
-  Push "$0"
-  Call WriteTombstoneMarker
+  FileOpen $1 "$0\${INSTALL_TOMBSTONE_MARKER}" w
+  IfErrors tombstone_marker_done
+  FileWrite $1 "nexu-custom-installer tombstone$\r$\n"
+  FileClose $1
+
+tombstone_marker_done:
   Push "$0"
   Call QueueInstallTombstoneCleanup
   Goto done
@@ -821,22 +394,10 @@ Function .onInit
   Delete "${INSTALLER_LOG}"
   Push "installer init"
   Call LogInstallerEvent
-  ReadRegStr $OldUserDataDir HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
-  Push "installer init raw-reg-user-data=$OldUserDataDir"
-  Call LogInstallerEvent
-  ${If} $OldUserDataDir == ""
-    StrCpy $OldUserDataDir "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
-    Push "installer init fallback-default-user-data=$OldUserDataDir"
-    Call LogInstallerEvent
+  ReadRegStr $UserDataDir HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
+  ${If} $UserDataDir == ""
+    StrCpy $UserDataDir "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
   ${EndIf}
-  StrCpy $0 "$OldUserDataDir"
-  Call TrimTrailingDirectorySeparators
-  Call CollapseDuplicateDefaultUserDataSuffix
-  StrCpy $OldUserDataDir "$0"
-  Push "installer init normalized-old-user-data=$OldUserDataDir"
-  Call LogInstallerEvent
-  StrCpy $UserDataDir "$OldUserDataDir"
-  StrCpy $MigrationStrategy "move"
   nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq Nexu.exe" /NH'
   Pop $0
   Pop $1
@@ -917,37 +478,10 @@ Section "Install"
   WriteRegStr HKCU "${UNINSTALL_REGKEY}" "UninstallString" '"$INSTDIR\Uninstall Nexu.exe"'
   WriteRegStr HKCU "${UNINSTALL_REGKEY}" "DisplayIcon" "$INSTDIR\Nexu.exe"
   WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\Nexu.exe"
-  StrCpy $0 "$UserDataDir"
-  StrCpy $1 "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
-  Call PathsEqualIgnoreCase
-  ${If} $PathCompareResult == "1"
+  ${If} $UserDataDir == "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
     DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
-    Call CleanupNexuConfigRegistryIfEmpty
   ${Else}
     WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}" "$UserDataDir"
-  ${EndIf}
-  StrCpy $0 "$OldUserDataDir"
-  StrCpy $1 "$UserDataDir"
-  Call PathsEqualIgnoreCase
-  Push "install-section path-compare target=$UserDataDir old=$OldUserDataDir equal=$PathCompareResult"
-  Call LogInstallerEvent
-  ${If} $PathCompareResult != "1"
-    StrCpy $0 "$OldUserDataDir"
-    Call UpdateDirectoryNonEmptyState
-  ${EndIf}
-  ${If} $PathCompareResult != "1"
-  ${AndIf} $OldUserDataDirIsNonEmpty == "1"
-    Push "install-section write-pending source=$OldUserDataDir target=$UserDataDir strategy=$MigrationStrategy"
-    Call LogInstallerEvent
-    WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource" "$OldUserDataDir"
-    WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget" "$UserDataDir"
-    WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy" "$MigrationStrategy"
-  ${Else}
-    Push "install-section clear-pending target=$UserDataDir old=$OldUserDataDir"
-    Call LogInstallerEvent
-    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource"
-    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget"
-    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy"
   ${EndIf}
   DetailPrint "$(Lang_StatusInstallDone)"
   Push "install section done"
@@ -958,13 +492,7 @@ Section "Uninstall"
   DetailPrint "$(Lang_StatusUninstallStart)"
   Push "uninstall section start"
   Call un.LogInstallerEvent
-  Call un.ResolveUserDataDir
-  Push "uninstall section resolved-user-data=$UninstallResolvedUserDataDir delete-local-data=$UninstallDeleteLocalDataSelected"
-  Call un.LogInstallerEvent
-  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource"
-  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget"
-  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy"
-  Call un.CleanupNexuConfigRegistryIfEmpty
+  StrCpy $UninstallDeleteLocalDataSelected "0"
   Delete "$DESKTOP\Nexu.lnk"
   Delete "$SMPROGRAMS\Nexu\Nexu.lnk"
   Delete "$SMPROGRAMS\Nexu\Uninstall Nexu.lnk"
@@ -972,188 +500,26 @@ Section "Uninstall"
   DeleteRegKey HKCU "${UNINSTALL_REGKEY}"
   DeleteRegKey HKCU "${PRODUCT_DIR_REGKEY}"
   Delete "$INSTDIR\Uninstall Nexu.exe"
-  Call un.BuildInstallTombstonePath
-  StrCpy $0 "$0"
-  Rename "$INSTDIR" "$0"
-  IfErrors install_dir_rename_failed
-  Push "$0"
-  Call un.WriteTombstoneMarker
-  Push "$0"
-  Call un.QueueInstallTombstoneCleanup
-  Push "uninstall section renamed install dir to tombstone and queued delete"
-  Call un.LogInstallerEvent
-  Goto uninstall_done
-
-install_dir_rename_failed:
   Push "$INSTDIR"
   Call un.QueueAsyncDelete
-  Push "uninstall section failed to rename install dir; queued direct delete"
+  Push "uninstall section queued async delete"
   Call un.LogInstallerEvent
-
-uninstall_done:
-  ${If} $UninstallDeleteLocalDataSelected == "1"
-    Push "$UninstallResolvedUserDataDir"
-    Call un.BuildUserDataTombstonePath
-    StrCpy $1 "$0"
-    StrCpy $0 "$UninstallResolvedUserDataDir"
-    Rename "$0" "$1"
-    IfErrors userdata_rename_failed
-    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
-    Call un.CleanupNexuConfigRegistryIfEmpty
-    DetailPrint "$(Lang_StatusQueueDeleteData)"
-    Push "$1"
-    Call un.WriteTombstoneMarker
-    Push "$1"
-    Call un.QueueUserDataTombstoneCleanup
-    Push "renamed local data dir to tombstone and queued delete source=$0 tombstone=$1"
-    Call un.LogInstallerEvent
-    Goto uninstall_done_after_userdata
-
-userdata_rename_failed:
-    DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
-    Call un.CleanupNexuConfigRegistryIfEmpty
-    DetailPrint "$(Lang_StatusQueueDeleteData)"
-    Push "$0"
-    Call un.QueueAsyncDelete
-    Push "failed to rename local data dir; queued direct delete source=$0"
-    Call un.LogInstallerEvent
-  ${EndIf}
-
-uninstall_done_after_userdata:
 SectionEnd
 
-Function un.CleanupNexuConfigRegistryIfEmpty
-  DeleteRegKey /ifempty HKCU "${NEXU_CONFIG_REGKEY}"
-  DeleteRegKey /ifempty HKCU "Software\Nexu"
-FunctionEnd
-
-Function un.WriteTombstoneMarker
-  Exch $0
-  Push $1
-
-  FileOpen $1 "$0\${INSTALL_TOMBSTONE_MARKER}" w
-  IfErrors done
-  FileWrite $1 "nexu-custom-installer tombstone$\r$\n"
-  FileClose $1
-
-done:
-  Pop $1
-  Pop $0
-FunctionEnd
-
-Function un.BuildInstallTombstonePath
-  Push $1
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-  Push $6
-  Push $7
-  Push $8
-  Push $9
-  Push $R0
-  Push $R1
-
-  ${GetParent} "$INSTDIR" $1
-  GetTempFileName $R0
-  ${GetFileName} "$R0" $R1
-  Delete $R0
-  System::Call '*(i2, i2, i2, i2, i2, i2, i2, i2) p.r2'
-  System::Call 'kernel32::GetLocalTime(p r2)'
-  System::Call '*$2(i2.r3, i2.r4, i2.r5, i2.r6, i2.r7, i2.r8, i2.r9, i2.r0)'
-  System::Free $2
-  IntFmt $3 "%04d" $3
-  IntFmt $4 "%02d" $4
-  IntFmt $5 "%02d" $5
-  IntFmt $6 "%02d" $7
-  IntFmt $7 "%02d" $8
-  IntFmt $8 "%02d" $9
-  StrCpy $R1 $R1 6
-  StrCpy $0 "$1\${INSTALL_TOMBSTONE_PREFIX}$3$4$5-$6$7$8-$R1"
-
-  Pop $R1
-  Pop $R0
-  Pop $9
-  Pop $8
-  Pop $7
-  Pop $6
-  Pop $5
-  Pop $4
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function un.BuildUserDataTombstonePath
-  Exch $0
-  Push $1
-  Push $2
-  Push $3
-  Push $4
-  Push $5
-  Push $6
-  Push $7
-  Push $8
-  Push $9
-  Push $R0
-  Push $R1
-
-  ${GetParent} "$0" $1
-  GetTempFileName $R0
-  ${GetFileName} "$R0" $R1
-  Delete $R0
-  System::Call '*(i2, i2, i2, i2, i2, i2, i2, i2) p.r2'
-  System::Call 'kernel32::GetLocalTime(p r2)'
-  System::Call '*$2(i2.r3, i2.r4, i2.r5, i2.r6, i2.r7, i2.r8, i2.r9, i2.r0)'
-  System::Free $2
-  IntFmt $3 "%04d" $3
-  IntFmt $4 "%02d" $4
-  IntFmt $5 "%02d" $5
-  IntFmt $6 "%02d" $7
-  IntFmt $7 "%02d" $8
-  IntFmt $8 "%02d" $9
-  StrCpy $R1 $R1 6
-  StrCpy $0 "$1\${USERDATA_TOMBSTONE_PREFIX}$3$4$5-$6$7$8-$R1"
-
-  Pop $R1
-  Pop $R0
-  Pop $9
-  Pop $8
-  Pop $7
-  Pop $6
-  Pop $5
-  Pop $4
-  Pop $3
-  Pop $2
-  Pop $1
-FunctionEnd
-
-Function un.QueueInstallTombstoneCleanup
-  Exch $0
-  Push $1
-  Push $2
-
-  IfFileExists "$0\${INSTALL_TOMBSTONE_MARKER}" 0 done
+Section "un.$(Lang_UninstallDeleteLocalData)"
+  ${If} $UninstallDeleteLocalDataSelected != "1"
+    Goto done
+  ${EndIf}
+  StrCpy $0 "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
+  ReadRegStr $1 HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
+  ${If} $1 != ""
+    StrCpy $0 "$1"
+  ${EndIf}
+  DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
+  DetailPrint "$(Lang_StatusQueueDeleteData)"
   Push "$0"
   Call un.QueueAsyncDelete
-
+  Push "queued local data delete"
+  Call un.LogInstallerEvent
 done:
-  Pop $2
-  Pop $1
-  Pop $0
-FunctionEnd
-
-Function un.QueueUserDataTombstoneCleanup
-  Exch $0
-  Push $1
-  Push $2
-
-  IfFileExists "$0\${INSTALL_TOMBSTONE_MARKER}" 0 done
-  Push "$0"
-  Call un.QueueAsyncDelete
-
-done:
-  Pop $2
-  Pop $1
-  Pop $0
-FunctionEnd
+SectionEnd

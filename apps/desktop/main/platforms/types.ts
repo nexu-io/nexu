@@ -47,7 +47,6 @@ export type RuntimeResidencyMode = DesktopRuntimeResidency;
 export type PackagedArchiveFormat = "tar.gz" | "zip";
 
 export type DesktopRuntimeRoots = {
-  userDataRoot: string;
   nexuHome: string;
   runtimeRoot: string;
   openclawRuntimeRoot: string;
@@ -92,18 +91,11 @@ export type DesktopRuntimePortStrategy = {
   ) => Promise<DesktopPortAllocationResult>;
 };
 
-export type PendingUserDataMigrationContext = {
-  sourceDir: string;
-  targetDir: string;
-  strategy: "move" | "copy" | "noop";
-};
-
 export type RunStateMigrationArgs = {
   runtimeConfig: DesktopRuntimeConfig;
   runtimeRoots: DesktopRuntimeRoots;
   isPackaged: boolean;
   log: (message: string) => void;
-  pendingUserDataMigration: PendingUserDataMigrationContext | null;
 };
 
 export type DesktopRuntimeStateMigrationPolicy = {
