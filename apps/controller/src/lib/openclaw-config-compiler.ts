@@ -227,14 +227,20 @@ function compileAgentList(
   installedSkillSlugs?: readonly string[],
   workspaceSkillsByAgent?: ReadonlyMap<string, readonly string[]>,
 ): OpenClawConfig["agents"]["list"] {
-  const sharedSlugs = installedSkillSlugs ?? [];
+  const sharedSlugs = [...(installedSkillSlugs ?? [])].sort((left, right) =>
+    left.localeCompare(right),
+  );
 
   return config.bots
     .filter((bot) => bot.status === "active")
     .sort((left, right) => left.slug.localeCompare(right.slug))
     .map((bot, index) => {
-      const workspaceSlugs = workspaceSkillsByAgent?.get(bot.id) ?? [];
-      const merged = [...new Set([...sharedSlugs, ...workspaceSlugs])];
+      const workspaceSlugs = [
+        ...(workspaceSkillsByAgent?.get(bot.id) ?? []),
+      ].sort((left, right) => left.localeCompare(right));
+      const merged = Array.from(
+        new Set([...sharedSlugs, ...workspaceSlugs]),
+      ).sort((left, right) => left.localeCompare(right));
 
       return {
         id: bot.id,

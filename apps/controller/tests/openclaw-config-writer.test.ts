@@ -142,6 +142,41 @@ describe("OpenClawConfigWriter", () => {
     expect(JSON.parse(written)).toEqual(configB);
   });
 
+  it("skips write when config is semantically unchanged but object keys reorder", async () => {
+    const writer = new OpenClawConfigWriter(env);
+    const configA = makeConfig({
+      plugins: {
+        entries: {
+          zed: { enabled: true },
+          alpha: { enabled: true },
+        },
+        load: { paths: [] },
+      },
+    });
+    const configB = makeConfig({
+      plugins: {
+        load: { paths: [] },
+        entries: {
+          alpha: { enabled: true },
+          zed: { enabled: true },
+        },
+      },
+    });
+
+    await writer.write(configA);
+    const firstStat = await stat(env.openclawConfigPath);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    await writer.write(configB);
+    const secondStat = await stat(env.openclawConfigPath);
+
+    expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);
+    expect(JSON.parse(await readFile(env.openclawConfigPath, "utf8"))).toEqual(
+      configA,
+    );
+  });
+
   it("cold start with no existing file writes normally", async () => {
     // No file exists yet — writer should write without error.
     const writer = new OpenClawConfigWriter(env);
@@ -151,5 +186,38 @@ describe("OpenClawConfigWriter", () => {
 
     const written = await readFile(env.openclawConfigPath, "utf8");
     expect(JSON.parse(written)).toEqual(config);
+  });
+
+  it("new writer instance skips rewrite when existing file only differs by key order", async () => {
+    const configA = makeConfig({
+      plugins: {
+        entries: {
+          zed: { enabled: true },
+          alpha: { enabled: true },
+        },
+        load: { paths: [] },
+      },
+    });
+    const configB = makeConfig({
+      plugins: {
+        load: { paths: [] },
+        entries: {
+          alpha: { enabled: true },
+          zed: { enabled: true },
+        },
+      },
+    });
+
+    const writer1 = new OpenClawConfigWriter(env);
+    await writer1.write(configA);
+    const firstStat = await stat(env.openclawConfigPath);
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    const writer2 = new OpenClawConfigWriter(env);
+    await writer2.write(configB);
+    const secondStat = await stat(env.openclawConfigPath);
+
+    expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);
   });
 });
