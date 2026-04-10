@@ -744,7 +744,7 @@ export function registerIpcHandlers(
           if (!updateManager) {
             return { updateAvailable: false };
           }
-          return updateManager.checkNow();
+          return updateManager.checkNow({ userInitiated: true });
         }
 
         case "update:get-capability": {

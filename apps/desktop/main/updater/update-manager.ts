@@ -113,6 +113,7 @@ export class UpdateManager {
   private pendingReleaseNotes: string | undefined = undefined;
   private pendingActionUrl: string | undefined = undefined;
   private downloadComplete = false;
+  private userInitiatedCheck = false;
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private lastProgressLogAt = 0;
   private lastProgressLogPercent: number | null = null;
@@ -208,13 +209,15 @@ export class UpdateManager {
         });
         this.logCheck("update event: update available", diagnostic);
 
-        if (this.autoDownload) {
-          // Background auto-download: suppress UI, start downloading silently
+        // Always store pending info for later surfacing
+        this.pendingVersion = info.version;
+        this.pendingReleaseDate = info.releaseDate;
+        this.pendingReleaseNotes = info.releaseNotes;
+        this.pendingActionUrl = info.actionUrl;
+
+        if (this.autoDownload && !this.userInitiatedCheck) {
+          // Periodic check: suppress UI, start downloading silently
           this.downloadMode = "background";
-          this.pendingVersion = info.version;
-          this.pendingReleaseDate = info.releaseDate;
-          this.pendingReleaseNotes = info.releaseNotes;
-          this.pendingActionUrl = info.actionUrl;
           this.logCheck(
             "auto-download: starting background download",
             diagnostic,
@@ -226,6 +229,19 @@ export class UpdateManager {
             void this.driver.downloadUpdate();
           }
           return;
+        }
+
+        // User-initiated check: always send the event so the renderer
+        // can exit "checking" state. Background download still proceeds.
+        if (this.autoDownload) {
+          this.downloadMode = "background";
+          this.logCheck(
+            "auto-download: user-initiated check, sending available event and starting background download",
+            diagnostic,
+          );
+          if (this.platform === "win32") {
+            void this.driver.downloadUpdate();
+          }
         }
 
         this.send("update:available", {
@@ -289,14 +305,18 @@ export class UpdateManager {
         const diagnostic = this.getDiagnostic();
         this.logCheck(`update error: ${error.message}`, diagnostic);
 
-        if (this.downloadMode === "background") {
-          // Suppress error UI during background download
+        if (this.downloadMode === "background" && !this.userInitiatedCheck) {
+          // Suppress error UI during background-only download
           this.logCheck(
             "auto-download: background download failed, suppressing UI error",
             diagnostic,
           );
           this.downloadMode = "idle";
           return;
+        }
+
+        if (this.downloadMode === "background") {
+          this.downloadMode = "idle";
         }
 
         this.send("update:error", { message: error.message, diagnostic });
@@ -318,8 +338,11 @@ export class UpdateManager {
     }
   }
 
-  async checkNow(): Promise<{ updateAvailable: boolean }> {
+  async checkNow(options?: {
+    userInitiated?: boolean;
+  }): Promise<{ updateAvailable: boolean }> {
     const startedAt = Date.now();
+    this.userInitiatedCheck = options?.userInitiated ?? false;
     this.logCheck("update check start", this.getDiagnostic());
 
     // If background download already completed, surface it immediately
@@ -396,6 +419,7 @@ export class UpdateManager {
         return { updateAvailable: false };
       } finally {
         this.checkInProgress = null;
+        this.userInitiatedCheck = false;
       }
     })();
 
