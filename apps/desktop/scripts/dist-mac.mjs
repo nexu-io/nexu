@@ -652,12 +652,37 @@ async function ensureBuildConfig() {
           POSTHOG_HOST: merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST,
         }
       : {}),
+    ...((merged.LANGFUSE_PUBLIC_KEY ?? existingConfig.LANGFUSE_PUBLIC_KEY)
+      ? {
+          LANGFUSE_PUBLIC_KEY:
+            merged.LANGFUSE_PUBLIC_KEY ?? existingConfig.LANGFUSE_PUBLIC_KEY,
+        }
+      : {}),
+    ...((merged.LANGFUSE_SECRET_KEY ?? existingConfig.LANGFUSE_SECRET_KEY)
+      ? {
+          LANGFUSE_SECRET_KEY:
+            merged.LANGFUSE_SECRET_KEY ?? existingConfig.LANGFUSE_SECRET_KEY,
+        }
+      : {}),
+    ...((merged.LANGFUSE_BASE_URL ?? existingConfig.LANGFUSE_BASE_URL)
+      ? {
+          LANGFUSE_BASE_URL:
+            merged.LANGFUSE_BASE_URL ?? existingConfig.LANGFUSE_BASE_URL,
+        }
+      : {}),
   };
 
   await writeFile(configPath, JSON.stringify(config, null, 2));
+  const redactedConfig = {
+    ...config,
+    hasLangfusePublicKey: typeof config.LANGFUSE_PUBLIC_KEY === "string",
+    hasLangfuseSecretKey: typeof config.LANGFUSE_SECRET_KEY === "string",
+    LANGFUSE_PUBLIC_KEY: undefined,
+    LANGFUSE_SECRET_KEY: undefined,
+  };
   console.log(
     "[dist:mac] generated build-config.json from env:",
-    JSON.stringify(config),
+    JSON.stringify(redactedConfig),
   );
 }
 

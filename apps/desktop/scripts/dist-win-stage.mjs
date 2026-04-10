@@ -634,6 +634,9 @@ function redactBuildConfigForLog(config) {
     NEXU_DESKTOP_BUILD_TIME: config.NEXU_DESKTOP_BUILD_TIME,
     hasSentryDsn: typeof config.NEXU_DESKTOP_SENTRY_DSN === "string",
     hasUpdateFeedUrl: typeof config.NEXU_UPDATE_FEED_URL === "string",
+    hasLangfusePublicKey: typeof config.LANGFUSE_PUBLIC_KEY === "string",
+    hasLangfuseSecretKey: typeof config.LANGFUSE_SECRET_KEY === "string",
+    LANGFUSE_BASE_URL: config.LANGFUSE_BASE_URL,
   };
 }
 
@@ -839,6 +842,15 @@ async function ensureBuildConfig() {
           NEXU_DESKTOP_AUTO_UPDATE_ENABLED:
             merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
         }
+      : {}),
+    ...(merged.LANGFUSE_PUBLIC_KEY
+      ? { LANGFUSE_PUBLIC_KEY: merged.LANGFUSE_PUBLIC_KEY }
+      : {}),
+    ...(merged.LANGFUSE_SECRET_KEY
+      ? { LANGFUSE_SECRET_KEY: merged.LANGFUSE_SECRET_KEY }
+      : {}),
+    ...(merged.LANGFUSE_BASE_URL
+      ? { LANGFUSE_BASE_URL: merged.LANGFUSE_BASE_URL }
       : {}),
     NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
     ...((merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch)

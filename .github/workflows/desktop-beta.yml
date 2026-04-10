@@ -33,6 +33,9 @@ jobs:
     runs-on: windows-latest
     env:
       CHANNEL: beta
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

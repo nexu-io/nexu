@@ -51,6 +51,12 @@ on:
         required: false
       CLOUDFLARE_PURGE_API_TOKEN:
         required: false
+      LANGFUSE_PUBLIC_KEY:
+        required: false
+      LANGFUSE_SECRET_KEY:
+        required: false
+      LANGFUSE_BASE_URL:
+        required: false
 
 permissions:
   contents: write
@@ -66,6 +72,10 @@ jobs:
           - runner: macos-15-intel
             arch: x64
     runs-on: ${{ matrix.runner }}
+    env:
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
 
     steps:
       - name: Checkout
