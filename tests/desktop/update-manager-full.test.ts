@@ -172,6 +172,67 @@ describe("bindEvents", () => {
     );
   });
 
+  it("auto-download: user-initiated checks surface available state", async () => {
+    let resolveCheck!: (value: unknown) => void;
+    mockAutoUpdater.checkForUpdates.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
+
+    const { mgr, win } = await createManager(undefined, { autoDownload: true });
+    const handlers = extractHandlers();
+
+    const checkPromise = mgr.checkNow({ userInitiated: true });
+    handlers["update-available"]({
+      version: "1.0.0",
+      releaseDate: "2026-03-20",
+      releaseNotes: "Bug fixes",
+    });
+    resolveCheck({
+      updateInfo: { version: "1.0.0", releaseDate: "2026-03-20" },
+    });
+
+    await checkPromise;
+
+    expect(win.webContents.send).toHaveBeenCalledWith(
+      "update:available",
+      expect.objectContaining({
+        version: "1.0.0",
+        diagnostic: expect.objectContaining({ remoteVersion: "1.0.0" }),
+      }),
+    );
+  });
+
+  it("auto-download: background checks stay silent", async () => {
+    let resolveCheck!: (value: unknown) => void;
+    mockAutoUpdater.checkForUpdates.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
+
+    const { mgr, win } = await createManager(undefined, { autoDownload: true });
+    const handlers = extractHandlers();
+
+    const checkPromise = mgr.checkNow();
+    handlers["update-available"]({
+      version: "1.0.0",
+      releaseDate: "2026-03-20",
+      releaseNotes: "Bug fixes",
+    });
+    resolveCheck({
+      updateInfo: { version: "1.0.0", releaseDate: "2026-03-20" },
+    });
+
+    await checkPromise;
+
+    expect(win.webContents.send).not.toHaveBeenCalledWith(
+      "update:available",
+      expect.anything(),
+    );
+  });
+
   // -------------------------------------------------------------------------
   // checking-for-update
   // -------------------------------------------------------------------------
@@ -917,10 +978,10 @@ describe("constructor", () => {
     expect(mgr.getCapability()).toEqual({
       platform: "win32",
       check: true,
-      downloadMode: "external",
-      applyMode: "redirect",
-      applyLabel: "Download installer",
-      notes: expect.stringContaining("packaged installer"),
+      downloadMode: "in-app",
+      applyMode: "external-installer",
+      applyLabel: "Install",
+      notes: null,
     });
     expect(mockAutoUpdater.on).not.toHaveBeenCalled();
   });

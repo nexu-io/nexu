@@ -248,7 +248,10 @@ export function useAutoUpdate(options?: {
   }, [state.capability]);
 
   const install = useCallback(async () => {
-    if (state.capability?.applyMode !== "in-app") {
+    if (
+      state.capability?.applyMode !== "in-app" &&
+      state.capability?.applyMode !== "external-installer"
+    ) {
       return;
     }
 

@@ -31,11 +31,17 @@ export type UpdatePhase =
   | "ready"
   | "error";
 
+type UpdateCapability = {
+  downloadMode: "in-app" | "external" | "none";
+  applyMode: "in-app" | "redirect" | "external-installer" | "none";
+};
+
 export type UpdateState = {
   phase: UpdatePhase;
   version: string | null;
   percent: number;
   errorMessage: string | null;
+  capability: UpdateCapability | null;
 };
 
 export function restorePhaseAfterInstall(
@@ -58,7 +64,53 @@ export function useAutoUpdate() {
     version: null,
     percent: 0,
     errorMessage: null,
+    capability: null,
   });
+
+  useEffect(() => {
+    const host = (window as unknown as NexuWindow).nexuHost;
+    if (!host) return;
+    let cancelled = false;
+
+    // Query capability
+    void host
+      .invoke("update:get-capability", undefined)
+      .then((result) => {
+        if (!cancelled) {
+          const cap = result as UpdateCapability | null;
+          setState((prev) => ({ ...prev, capability: cap }));
+        }
+      })
+      .catch(() => {});
+
+    // Query current update status (catches background downloads that
+    // completed before this component mounted)
+    void host
+      .invoke("update:get-status", undefined)
+      .then((result) => {
+        if (cancelled) return;
+        const status = result as {
+          phase: "idle" | "downloading" | "ready";
+          version: string | null;
+        };
+        if (
+          (status.phase === "ready" || status.phase === "downloading") &&
+          status.version
+        ) {
+          setState((prev) => ({
+            ...prev,
+            phase: status.phase,
+            version: status.version,
+            percent: status.phase === "ready" ? 100 : prev.percent,
+          }));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const updater = (window as unknown as NexuWindow).nexuUpdater;
@@ -152,14 +204,24 @@ export function useAutoUpdate() {
   }, [bridge]);
 
   const download = useCallback(async () => {
-    // Immediately show downloading state before the IPC round-trip
+    if (state.capability?.downloadMode === "external") {
+      // External download opens the installer URL in the system browser.
+      // Don't show "downloading" state — the browser handles the download.
+      try {
+        await bridge?.invoke("update:download", undefined);
+      } catch {
+        /* errors via event */
+      }
+      return;
+    }
+    // In-app download: show downloading state before the IPC round-trip
     setState((prev) => ({ ...prev, phase: "downloading", percent: 0 }));
     try {
       await bridge?.invoke("update:download", undefined);
     } catch {
       /* errors via event */
     }
-  }, [bridge]);
+  }, [bridge, state.capability]);
 
   const install = useCallback(async () => {
     let previousPhase: Exclude<UpdatePhase, "installing"> = "ready";

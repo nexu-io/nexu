@@ -38,6 +38,7 @@ export const hostInvokeChannels = [
   "update:download",
   "update:install",
   "update:get-current-version",
+  "update:get-status",
   "update:set-channel",
   "update:set-source",
   "component:check",
@@ -156,6 +157,7 @@ export type HostInvokePayloadMap = {
   "update:download": undefined;
   "update:install": undefined;
   "update:get-current-version": undefined;
+  "update:get-status": undefined;
   "update:set-channel": { channel: UpdateChannelName };
   "update:set-source": { source: UpdateSource };
   "component:check": undefined;
@@ -451,6 +453,10 @@ export type HostInvokeResultMap = {
   "update:download": { ok: boolean };
   "update:install": undefined;
   "update:get-current-version": { version: string };
+  "update:get-status": {
+    phase: "idle" | "downloading" | "ready";
+    version: string | null;
+  };
   "update:set-channel": { ok: boolean };
   "update:set-source": { ok: boolean };
   "component:check": {

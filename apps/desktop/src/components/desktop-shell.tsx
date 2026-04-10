@@ -191,25 +191,27 @@ export function DesktopShell() {
         </div>
       </main>
 
-      <UpdateBanner
-        canCheckForUpdates={
-          updateExperience === "local-test-feed" &&
-          Boolean(update.capability?.check)
-        }
-        capability={update.capability}
-        currentVersion={runtimeConfig?.buildInfo.version ?? null}
-        dismissed={update.dismissed}
-        errorMessage={update.errorMessage}
-        experience={updateExperience}
-        onCheck={() => void update.check()}
-        onDismiss={update.dismiss}
-        onDownload={() => void update.download()}
-        onInstall={() => void update.install()}
-        percent={update.percent}
-        phase={update.phase}
-        releaseNotes={update.releaseNotes}
-        version={update.version}
-      />
+      {chromeMode !== "immersive" && (
+        <UpdateBanner
+          canCheckForUpdates={
+            updateExperience === "local-test-feed" &&
+            Boolean(update.capability?.check)
+          }
+          capability={update.capability}
+          currentVersion={runtimeConfig?.buildInfo.version ?? null}
+          dismissed={update.dismissed}
+          errorMessage={update.errorMessage}
+          experience={updateExperience}
+          onCheck={() => void update.check()}
+          onDismiss={update.dismiss}
+          onDownload={() => void update.download()}
+          onInstall={() => void update.install()}
+          percent={update.percent}
+          phase={update.phase}
+          releaseNotes={update.releaseNotes}
+          version={update.version}
+        />
+      )}
     </div>
   );
 }

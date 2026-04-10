@@ -298,7 +298,7 @@ function UpdateFloatCard({
             </span>
           </div>
         </div>
-        {!updating && phase !== "ready" && (
+        {!updating && (
           <button
             type="button"
             onClick={onDismiss}
@@ -334,6 +334,13 @@ function UpdateFloatCard({
             className="rounded-[6px] px-2.5 py-1 text-[11px] font-medium bg-[var(--color-accent)] text-white hover:opacity-85 transition-opacity"
           >
             {t("layout.update.install")}
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="rounded-[6px] px-2 py-1 text-[11px] font-medium text-text-muted hover:text-text-primary transition-colors"
+          >
+            {t("layout.update.later")}
           </button>
         </div>
       ) : (

@@ -27,7 +27,8 @@ export function shouldStartDesktopPeriodicUpdateChecks(input: {
   buildSource: DesktopBuildSource;
   updateFeed: string | null;
 }): boolean {
-  return resolveDesktopUpdateExperience(input) === "normal";
+  const experience = resolveDesktopUpdateExperience(input);
+  return experience === "normal" || experience === "local-test-feed";
 }
 
 export function getDesktopUpdateTestingGuideUrl(

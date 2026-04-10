@@ -1755,7 +1755,8 @@ app.whenReady().then(async () => {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
-        initialDelayMs: process.platform === "win32" ? 45_000 : 0,
+        autoDownload: true,
+        initialDelayMs: process.platform === "win32" ? 30_000 : 0,
         prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
           ? async (args: PrepareForUpdateInstallArgs) => {
               await runtimeLifecycle.prepareForUpdateInstall?.(args);
