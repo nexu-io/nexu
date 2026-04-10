@@ -1422,8 +1422,42 @@ export type PostApiV1ChannelsDiscordConnectErrors = {
     /**
      * Invalid credentials
      */
-    409: {
+    422: {
         message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Upstream network or proxy failure
+     */
+    502: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Local runtime sync failed
+     */
+    503: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Upstream timeout
+     */
+    504: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
     };
 };
 
@@ -1505,8 +1539,42 @@ export type PostApiV1ChannelsTelegramConnectErrors = {
     /**
      * Invalid credentials
      */
-    409: {
+    422: {
         message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Upstream network or proxy failure
+     */
+    502: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Local runtime sync failed
+     */
+    503: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Upstream timeout
+     */
+    504: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
     };
 };
 

@@ -1,3 +1,7 @@
+import {
+  formatChannelConnectErrorMessage,
+  isAlreadyConnectedError,
+} from "@/lib/channel-connect-errors";
 import { identify, track } from "@/lib/tracking";
 import { ExternalLink, Eye, EyeOff, FileText, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -216,11 +220,12 @@ export function ChannelConnectModal({
           channel: channelType,
           success: false,
         });
-        if (response?.status === 409) {
+        if (response?.status === 409 && isAlreadyConnectedError(error)) {
           toast.info(t("modal.channelConnected"));
         } else {
-          toast.error(error.message ?? t("modal.connectFailed"));
-          onClose();
+          toast.error(
+            formatChannelConnectErrorMessage(error, t("modal.connectFailed")),
+          );
           return;
         }
       } else {

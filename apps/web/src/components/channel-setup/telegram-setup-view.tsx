@@ -1,3 +1,4 @@
+import { formatChannelConnectErrorMessage } from "@/lib/channel-connect-errors";
 import { identify, track } from "@/lib/tracking";
 import { KeyRound, Loader2, MessageCircle } from "lucide-react";
 import { useState } from "react";
@@ -32,7 +33,12 @@ export function TelegramSetupView({
       });
 
       if (error || !data) {
-        toast.error(t("telegramSetup.connectFailed"));
+        toast.error(
+          formatChannelConnectErrorMessage(
+            error,
+            t("telegramSetup.connectFailed"),
+          ),
+        );
         return;
       }
 

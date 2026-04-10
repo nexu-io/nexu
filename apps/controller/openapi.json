@@ -4218,7 +4218,7 @@
               }
             }
           },
-          "409": {
+          "422": {
             "description": "Invalid credentials",
             "content": {
               "application/json": {
@@ -4227,10 +4227,192 @@
                   "properties": {
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
                     }
                   },
                   "required": [
-                    "message"
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream network or proxy failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local runtime sync failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Upstream timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
                   ]
                 }
               }
@@ -4468,7 +4650,7 @@
               }
             }
           },
-          "409": {
+          "422": {
             "description": "Invalid credentials",
             "content": {
               "application/json": {
@@ -4477,10 +4659,192 @@
                   "properties": {
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
                     }
                   },
                   "required": [
-                    "message"
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream network or proxy failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local runtime sync failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Upstream timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
                   ]
                 }
               }

@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { formatChannelConnectErrorMessage } from "@/lib/channel-connect-errors";
 import { identify, track } from "@/lib/tracking";
 import {
   ArrowLeft,
@@ -72,7 +73,12 @@ export function DiscordSetupView({
           channel: "discord",
           success: false,
         });
-        toast.error(error.message ?? t("discordSetup.connectFailed"));
+        toast.error(
+          formatChannelConnectErrorMessage(
+            error,
+            t("discordSetup.connectFailed"),
+          ),
+        );
         return;
       }
       track("workspace_channel_config_submit", {

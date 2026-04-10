@@ -13,6 +13,7 @@ export class RuntimeHealth {
     try {
       const response = await proxyFetch(
         new URL("/health", resolveOpenclawGatewayBaseUrl(this.env)),
+        { timeoutMs: 1500 },
       );
       return {
         ok: response.ok,
