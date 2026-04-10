@@ -65,3 +65,9 @@
 这类题通常范围更小、方向更聚焦，也更适合第一次贡献。
 
 直接去挑题：[Good First Issue 列表](https://github.com/nexu-io/nexu/labels/good-first-issue)
+
+## 加入贡献者交流群 💬
+
+一个人研究不如一群人一起聊。群里有维护者、有老贡献者，扫码进群，聊聊你想做的第一个贡献 👇
+
+<img src="/wechat-contributor-qr.png" width="200" alt="nexu 贡献者微信交流群" />
