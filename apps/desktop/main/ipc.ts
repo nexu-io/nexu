@@ -360,6 +360,10 @@ export function setUpdateManager(manager: UpdateManager | null): void {
   updateManager = manager;
 }
 
+export function getUpdateManager(): UpdateManager | null {
+  return updateManager;
+}
+
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
 }

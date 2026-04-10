@@ -99,6 +99,13 @@ export class MacUpdateDriver implements PlatformUpdateDriver {
   }
 
   bindEvents(handlers: UpdateDriverEventHandlers): void {
+    const progressListenerCount =
+      typeof autoUpdater.listenerCount === "function"
+        ? autoUpdater.listenerCount("download-progress")
+        : "unknown";
+    this.context.writeLog(
+      `mac-update-driver bindEvents: existing progress listeners=${progressListenerCount}`,
+    );
     autoUpdater.on("checking-for-update", handlers.onChecking);
     autoUpdater.on("update-available", (info) => {
       handlers.onAvailable({
@@ -115,6 +122,9 @@ export class MacUpdateDriver implements PlatformUpdateDriver {
       });
     });
     autoUpdater.on("download-progress", (progress) => {
+      this.context.writeLog(
+        `mac-update-driver download-progress: ${progress.percent.toFixed(2)}% transferred=${progress.transferred} total=${progress.total}`,
+      );
       handlers.onProgress({
         percent: progress.percent,
         bytesPerSecond: progress.bytesPerSecond,
@@ -145,6 +155,13 @@ export class MacUpdateDriver implements PlatformUpdateDriver {
   }
 
   async downloadUpdate(): Promise<{ ok: boolean }> {
+    const progressListenerCount =
+      typeof autoUpdater.listenerCount === "function"
+        ? autoUpdater.listenerCount("download-progress")
+        : "unknown";
+    this.context.writeLog(
+      `mac-update-driver downloadUpdate: progress listeners=${progressListenerCount}`,
+    );
     await autoUpdater.downloadUpdate();
     return { ok: true };
   }

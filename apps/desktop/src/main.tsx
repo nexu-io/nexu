@@ -30,7 +30,7 @@ import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
 import { resolveDesktopUpdateExperience } from "../shared/update-policy";
 import { DevelopSetBalanceDialog } from "./components/develop-set-balance-dialog";
 import { SurfaceFrame } from "./components/surface-frame";
-import { UpdateBanner } from "./components/update-banner";
+import { UpdateBadge, UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import { ensureDesktopControllerReady } from "./lib/controller-ready";
 import {
@@ -1248,7 +1248,14 @@ function DesktopShell() {
       <div className="window-drag-bar" />
       <aside className="desktop-sidebar">
         <div className="desktop-sidebar-brand">
-          <span className="desktop-shell-eyebrow">nexu desktop</span>
+          <div className="desktop-sidebar-brand-top">
+            <span className="desktop-shell-eyebrow">nexu desktop</span>
+            <UpdateBadge
+              dismissed={update.dismissed}
+              onUndismiss={update.undismiss}
+              phase={update.phase}
+            />
+          </div>
           <h1>Runtime Console Ready</h1>
           <p>
             One local shell for bootstrap health, web verification, and gateway

@@ -606,12 +606,6 @@ function sendHostDesktopCommand(command: HostDesktopCommand): void {
   mainWindow?.webContents.send("host:desktop-command", command);
 }
 
-function triggerUpdateCheck(): void {
-  mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:check-for-updates",
-  });
-}
-
 function showAboutDialog(): void {
   const version = app.getVersion();
   const detailLines = [
@@ -690,12 +684,6 @@ function installApplicationMenu(): void {
     helpSubmenu.push(
       { type: "separator" },
       {
-        id: "check-for-updates",
-        label: "Check for Updates…",
-        enabled: app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-        click: () => triggerUpdateCheck(),
-      },
-      {
         id: "about-nexu",
         label: `About Nexu (v${app.getVersion()})`,
         click: () => showAboutDialog(),
@@ -715,13 +703,6 @@ function installApplicationMenu(): void {
             role: "appMenu",
             submenu: [
               { role: "about" },
-              {
-                id: "check-for-updates",
-                label: "Check for Updates…",
-                enabled:
-                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-                click: () => triggerUpdateCheck(),
-              },
               { type: "separator" },
               { role: "services" },
               { type: "separator" },
