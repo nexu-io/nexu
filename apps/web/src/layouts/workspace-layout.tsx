@@ -671,7 +671,7 @@ function WorkspaceLayoutInner() {
           : undefined
       }
     >
-      {isDesktopClient && hasUpdate && !updateDismissed && (
+      {!isDesktopClient && hasUpdate && !updateDismissed && (
         <UpdateFloatCard
           phase={update.phase}
           version={update.version}
