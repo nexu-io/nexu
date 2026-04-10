@@ -316,6 +316,31 @@ function getProviderIdFromModelId(
   return provider || null;
 }
 
+export function getSettingsProviderSelectionIdForModel(
+  providerIds: string[],
+  models: Array<{ id: string; provider: string }>,
+  modelId: string,
+): string | null {
+  const providerId = getProviderIdFromModelId(models, modelId);
+  if (!providerId) {
+    return null;
+  }
+
+  const normalizedProviderId = normalizeProviderId(providerId) ?? providerId;
+  if (providerIds.includes(providerId)) {
+    return providerId;
+  }
+  if (providerIds.includes(normalizedProviderId)) {
+    return normalizedProviderId;
+  }
+
+  return (
+    providerIds.find((candidateId) =>
+      getProviderAliasCandidates(candidateId).includes(providerId),
+    ) ?? normalizedProviderId
+  );
+}
+
 type SettingsTab = "general" | "providers";
 
 function isSettingsTab(value: string | null): value is SettingsTab {
@@ -1841,7 +1866,8 @@ export function ModelsPage() {
                   currentModelId={currentModelId}
                   emptyLabel={t("models.noModelConfigured")}
                   onSelectModel={(modelId) => {
-                    const providerId = getProviderIdFromModelId(
+                    const providerId = getSettingsProviderSelectionIdForModel(
+                      sidebarItems.map((item) => item.id),
                       models,
                       modelId,
                     );

@@ -278,7 +278,7 @@ function compilePlugins(
   // config omits it, the next write creates a diff that triggers a
   // gateway restart, and the cycle repeats.
   const prewarmedChannelPluginIds = ["feishu", "openclaw-weixin"];
-  const analyticsEnabled = config.desktop.analyticsEnabled === true;
+  const analyticsEnabled = config.desktop.analyticsEnabled !== false;
   const platformPluginIds = [
     "nexu-runtime-model",
     "nexu-credit-guard",

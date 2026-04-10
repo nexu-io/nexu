@@ -636,7 +636,9 @@ export class NexuConfigStore {
         integrations: [],
         channels: [],
         templates: {},
-        desktop: {},
+        desktop: {
+          analyticsEnabled: true,
+        },
         secrets: {},
       }),
     );
@@ -2013,7 +2015,12 @@ export class NexuConfigStore {
   }
 
   async getDesktopAnalyticsEnabled(): Promise<boolean> {
-    return (await this.getStoredDesktopAnalyticsEnabled()) ?? true;
+    const storedValue = await this.getStoredDesktopAnalyticsEnabled();
+    if (storedValue !== null) {
+      return storedValue;
+    }
+
+    return this.setDesktopAnalyticsEnabled(true);
   }
 
   async setDesktopAnalyticsEnabled(enabled: boolean): Promise<boolean> {
