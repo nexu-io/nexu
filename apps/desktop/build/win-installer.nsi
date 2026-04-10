@@ -44,6 +44,7 @@ RequestExecutionLevel user
 Var UserDataDir
 Var OldUserDataDir
 Var OldUserDataDirIsNonEmpty
+Var PathCompareResult
 Var UserDataInputHandle
 Var MigrationStrategy
 Var MigrationMoveRadioHandle
@@ -90,51 +91,104 @@ Function BrowseUserDataDir
   ${EndIf}
 FunctionEnd
 
-Function NormalizeUserDataDir
+Function TrimTrailingDirectorySeparators
   Push $1
   Push $2
-  Push $3
-
-  StrCpy $0 "$UserDataDir"
 
 trim_trailing_separators:
   StrLen $1 $0
   ${If} $1 <= 3
-    Goto normalized_suffix_check
+    Goto trim_done
   ${EndIf}
 
   IntOp $2 $1 - 1
-  StrCpy $3 $0 1 $2
-  StrCmp $3 "\\" trim_one_separator
-  StrCmp $3 "/" trim_one_separator
-  Goto normalized_suffix_check
+  StrCpy $1 $0 1 $2
+  StrCmp $1 "\" trim_one_separator
+  StrCmp $1 "/" trim_one_separator
+  Goto trim_done
 
 trim_one_separator:
   StrCpy $0 $0 $2
   Goto trim_trailing_separators
 
-normalized_suffix_check:
-  StrLen $1 $0
-  ${If} $1 >= 13
-    IntOp $2 $1 - 13
-    StrCpy $3 $0 13 $2
-    StrCmp $3 "\\${DEFAULT_USER_DATA_DIR_NAME}" normalization_done
-    StrCmp $3 "/${DEFAULT_USER_DATA_DIR_NAME}" normalization_done
-  ${EndIf}
+trim_done:
+  Pop $2
+  Pop $1
+FunctionEnd
 
-  IntOp $2 $1 - 1
-  StrCpy $3 $0 1 $2
-  StrCmp $3 "\\" append_without_separator
-  StrCmp $3 "/" append_without_separator
-  StrCpy $0 "$0\\${DEFAULT_USER_DATA_DIR_NAME}"
+Function CollapseDuplicateDefaultUserDataSuffix
+  Push $1
+  Push $2
+  Push $3
+
+  ${GetFileName} "$0" $1
+  StrCpy $2 "${DEFAULT_USER_DATA_DIR_NAME}"
+  System::Call 'kernel32::lstrcmpi(t r1, t r2)i.r3'
+  IntCmp $3 0 maybe_collapse collapse_done collapse_done
+
+maybe_collapse:
+  ${GetParent} "$0" $2
+  ${GetFileName} "$2" $1
+  StrCpy $3 "${DEFAULT_USER_DATA_DIR_NAME}"
+  System::Call 'kernel32::lstrcmpi(t r1, t r3)i.r1'
+  IntCmp $1 0 do_collapse collapse_done collapse_done
+
+do_collapse:
+  StrCpy $0 "$2"
+
+collapse_done:
+  Pop $3
+  Pop $2
+  Pop $1
+FunctionEnd
+
+Function PathsEqualIgnoreCase
+  Push $2
+  Push $3
+
+  StrCpy $PathCompareResult "0"
+  StrCpy $2 "$0"
+  Call TrimTrailingDirectorySeparators
+  Call CollapseDuplicateDefaultUserDataSuffix
+  StrCpy $2 "$0"
+
+  StrCpy $0 "$1"
+  Call TrimTrailingDirectorySeparators
+  Call CollapseDuplicateDefaultUserDataSuffix
+  StrCpy $3 "$0"
+
+  StrCpy $0 "$2"
+  StrCpy $1 "$3"
+  System::Call 'kernel32::lstrcmpi(t r0, t r1)i.r2'
+  IntCmp $2 0 paths_equal paths_not_equal paths_not_equal
+
+paths_equal:
+  StrCpy $PathCompareResult "1"
+
+paths_not_equal:
+  Pop $3
+  Pop $2
+FunctionEnd
+
+Function NormalizeUserDataDir
+  Push $1
+  Push $2
+
+  StrCpy $0 "$UserDataDir"
+  Call TrimTrailingDirectorySeparators
+  Call CollapseDuplicateDefaultUserDataSuffix
+  ${GetFileName} "$0" $1
+
+  StrCpy $2 "${DEFAULT_USER_DATA_DIR_NAME}"
+  System::Call 'kernel32::lstrcmpi(t r1, t r2)i.r2'
+  IntCmp $2 0 normalization_done append_suffix append_suffix
+
+append_suffix:
+  StrCpy $0 "$0\${DEFAULT_USER_DATA_DIR_NAME}"
   Goto normalization_done
-
-append_without_separator:
-  StrCpy $0 "$0${DEFAULT_USER_DATA_DIR_NAME}"
 
 normalization_done:
   StrCpy $UserDataDir "$0"
-  Pop $3
   Pop $2
   Pop $1
 FunctionEnd
@@ -171,16 +225,40 @@ Function UserDataPageLeave
     Abort
   ${EndIf}
 
+  Push "user-data raw-input=$UserDataDir"
+  Call LogInstallerEvent
+
   Call NormalizeUserDataDir
   ${NSD_SetText} $UserDataInputHandle "$UserDataDir"
+  Push "user-data normalized-target=$UserDataDir old=$OldUserDataDir"
+  Call LogInstallerEvent
+
+  StrCpy $0 "$UserDataDir"
+  StrCpy $1 "$OldUserDataDir"
+  Push "user-data compare-target=$0"
+  Call LogInstallerEvent
+  Push "user-data compare-old=$1"
+  Call LogInstallerEvent
+  Call PathsEqualIgnoreCase
+  Push "user-data path-compare equal=$PathCompareResult"
+  Call LogInstallerEvent
+  ${If} $PathCompareResult == "1"
+    Push "user-data no-op: normalized target equals current data dir"
+    Call LogInstallerEvent
+    Return
+  ${EndIf}
 
   StrCpy $0 "$UserDataDir"
   Call UpdateDirectoryNonEmptyState
-  ${If} $UserDataDir != $OldUserDataDir
-  ${AndIf} $OldUserDataDirIsNonEmpty == "1"
+  ${If} $OldUserDataDirIsNonEmpty == "1"
+    Push "user-data quick-fail target-non-empty target=$UserDataDir"
+    Call LogInstallerEvent
     MessageBox MB_OK|MB_ICONEXCLAMATION "$(Lang_ErrorUserDataTargetNonEmpty)"
     Abort
   ${EndIf}
+
+  Push "user-data quick-pass target-available target=$UserDataDir"
+  Call LogInstallerEvent
 FunctionEnd
 
 Function UpdateDirectoryNonEmptyState
@@ -208,15 +286,25 @@ done:
 FunctionEnd
 
 Function MigrationPageCreate
-  ${If} $UserDataDir == $OldUserDataDir
+  StrCpy $0 "$UserDataDir"
+  StrCpy $1 "$OldUserDataDir"
+  Call PathsEqualIgnoreCase
+  ${If} $PathCompareResult == "1"
+    Push "migration-page abort reason=same-effective-path target=$UserDataDir old=$OldUserDataDir"
+    Call LogInstallerEvent
     Abort
   ${EndIf}
 
   StrCpy $0 "$OldUserDataDir"
   Call UpdateDirectoryNonEmptyState
   ${If} $OldUserDataDirIsNonEmpty != "1"
+    Push "migration-page abort reason=old-dir-empty old=$OldUserDataDir"
+    Call LogInstallerEvent
     Abort
   ${EndIf}
+
+  Push "migration-page show target=$UserDataDir old=$OldUserDataDir"
+  Call LogInstallerEvent
 
   !insertmacro MUI_HEADER_TEXT "$(Lang_MigrationTitle)" "$(Lang_MigrationSubtitle)"
 
@@ -298,16 +386,13 @@ FunctionEnd
 Function LogInstallerEvent
   Exch $0
   Push $1
-  Push $2
 
-  System::Call 'kernel32::GetTickCount() i .r1'
-  FileOpen $2 "${INSTALLER_LOG}" a
+  FileOpen $1 "${INSTALLER_LOG}" a
   IfErrors done
-  FileWrite $2 "$1ms | $0$\r$\n"
-  FileClose $2
+  FileWrite $1 "$0$\r$\n"
+  FileClose $1
 
 done:
-  Pop $2
   Pop $1
   Pop $0
 FunctionEnd
@@ -544,9 +629,19 @@ Function .onInit
   Push "installer init"
   Call LogInstallerEvent
   ReadRegStr $OldUserDataDir HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}"
+  Push "installer init raw-reg-user-data=$OldUserDataDir"
+  Call LogInstallerEvent
   ${If} $OldUserDataDir == ""
     StrCpy $OldUserDataDir "$APPDATA\${DEFAULT_USER_DATA_DIR_NAME}"
+    Push "installer init fallback-default-user-data=$OldUserDataDir"
+    Call LogInstallerEvent
   ${EndIf}
+  StrCpy $0 "$OldUserDataDir"
+  Call TrimTrailingDirectorySeparators
+  Call CollapseDuplicateDefaultUserDataSuffix
+  StrCpy $OldUserDataDir "$0"
+  Push "installer init normalized-old-user-data=$OldUserDataDir"
+  Call LogInstallerEvent
   StrCpy $UserDataDir "$OldUserDataDir"
   StrCpy $MigrationStrategy "move"
   nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq Nexu.exe" /NH'
@@ -635,13 +730,24 @@ Section "Install"
     WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "${NEXU_USER_DATA_VALUE}" "$UserDataDir"
   ${EndIf}
   StrCpy $0 "$OldUserDataDir"
-  Call UpdateDirectoryNonEmptyState
-  ${If} $UserDataDir != $OldUserDataDir
+  StrCpy $1 "$UserDataDir"
+  Call PathsEqualIgnoreCase
+  Push "install-section path-compare target=$UserDataDir old=$OldUserDataDir equal=$PathCompareResult"
+  Call LogInstallerEvent
+  ${If} $PathCompareResult != "1"
+    StrCpy $0 "$OldUserDataDir"
+    Call UpdateDirectoryNonEmptyState
+  ${EndIf}
+  ${If} $PathCompareResult != "1"
   ${AndIf} $OldUserDataDirIsNonEmpty == "1"
+    Push "install-section write-pending source=$OldUserDataDir target=$UserDataDir strategy=$MigrationStrategy"
+    Call LogInstallerEvent
     WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource" "$OldUserDataDir"
     WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget" "$UserDataDir"
     WriteRegStr HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy" "$MigrationStrategy"
   ${Else}
+    Push "install-section clear-pending target=$UserDataDir old=$OldUserDataDir"
+    Call LogInstallerEvent
     DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationSource"
     DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationTarget"
     DeleteRegValue HKCU "${NEXU_CONFIG_REGKEY}" "PendingUserDataMigrationStrategy"
