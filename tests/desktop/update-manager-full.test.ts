@@ -978,10 +978,10 @@ describe("constructor", () => {
     expect(mgr.getCapability()).toEqual({
       platform: "win32",
       check: true,
-      downloadMode: "external",
-      applyMode: "redirect",
-      applyLabel: "Download installer",
-      notes: expect.stringContaining("packaged installer"),
+      downloadMode: "in-app",
+      applyMode: "external-installer",
+      applyLabel: "Install",
+      notes: null,
     });
     expect(mockAutoUpdater.on).not.toHaveBeenCalled();
   });

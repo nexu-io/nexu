@@ -20,7 +20,9 @@ const PORT = Number(process.env.PORT ?? 8976);
 const FAKE_VERSION = process.env.MOCK_UPDATE_VERSION ?? "0.2.0";
 const FAKE_ZIP_SIZE = Number(process.env.MOCK_UPDATE_FAKE_SIZE ?? 5_000_000);
 const CHUNK_SIZE = Number(process.env.MOCK_UPDATE_CHUNK_SIZE ?? 50_000);
-const CHUNK_INTERVAL_MS = Number(process.env.MOCK_UPDATE_CHUNK_INTERVAL_MS ?? 100);
+const CHUNK_INTERVAL_MS = Number(
+  process.env.MOCK_UPDATE_CHUNK_INTERVAL_MS ?? 100,
+);
 const zipPath = process.env.MOCK_UPDATE_ZIP_PATH
   ? resolve(process.env.MOCK_UPDATE_ZIP_PATH)
   : null;
@@ -38,7 +40,10 @@ async function getZipMetadata() {
     };
   }
 
-  const [zipStat, zipBuffer] = await Promise.all([stat(zipPath), readFile(zipPath)]);
+  const [zipStat, zipBuffer] = await Promise.all([
+    stat(zipPath),
+    readFile(zipPath),
+  ]);
   return {
     zipPath,
     zipFileName: basename(zipPath),

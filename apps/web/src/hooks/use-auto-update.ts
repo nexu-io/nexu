@@ -93,12 +93,15 @@ export function useAutoUpdate() {
           phase: "idle" | "downloading" | "ready";
           version: string | null;
         };
-        if (status.phase === "ready" && status.version) {
+        if (
+          (status.phase === "ready" || status.phase === "downloading") &&
+          status.version
+        ) {
           setState((prev) => ({
             ...prev,
-            phase: "ready",
+            phase: status.phase,
             version: status.version,
-            percent: 100,
+            percent: status.phase === "ready" ? 100 : prev.percent,
           }));
         }
       })

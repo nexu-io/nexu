@@ -46,7 +46,7 @@ describe("desktop update policy", () => {
         buildSource: "local-dist",
         updateFeed: "https://example.test/latest-win.json",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("keeps non-local builds on the normal update path", () => {

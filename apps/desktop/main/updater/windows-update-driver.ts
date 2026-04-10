@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, statSync, unlinkSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { get as httpGet } from "node:http";
 import { get as httpsGet } from "node:https";
 import { join } from "node:path";
@@ -165,6 +171,7 @@ export class WindowsUpdateDriver implements PlatformUpdateDriver {
   private latestManifest: WindowsUpdateManifest | null = null;
   private downloadedInstallerPath: string | null = null;
   private abortController: AbortController | null = null;
+  private downloadPromise: Promise<{ ok: boolean }> | null = null;
   private rateLimitBps: number | null = DEFAULT_RATE_LIMIT_BPS;
 
   constructor(private readonly context: UpdateDriverContext) {}
@@ -244,16 +251,25 @@ export class WindowsUpdateDriver implements PlatformUpdateDriver {
       return { ok: false };
     }
 
+    if (this.downloadPromise) {
+      return this.downloadPromise;
+    }
+
     const installerUrl = manifest.installer.url;
     const expectedSize = manifest.installer.size ?? null;
     const expectedSha256 = manifest.installer.sha256 ?? null;
     const destPath = resolveInstallerPath(manifest.version);
 
-    // If already fully downloaded with correct size, skip
-    if (existsSync(destPath) && expectedSize !== null) {
+    // If already fully downloaded, verify checksum when available before reuse.
+    if (existsSync(destPath)) {
       try {
         const stat = statSync(destPath);
-        if (stat.size === expectedSize) {
+        const sizeMatches = expectedSize === null || stat.size === expectedSize;
+        const shaMatches =
+          expectedSha256 === null
+            ? true
+            : this.verifyFileSha256(destPath, expectedSha256);
+        if (sizeMatches && shaMatches) {
           this.downloadedInstallerPath = destPath;
           this.handlers?.onDownloaded({
             version: manifest.version,
@@ -276,7 +292,7 @@ export class WindowsUpdateDriver implements PlatformUpdateDriver {
     const ac = new AbortController();
     this.abortController = ac;
 
-    return new Promise<{ ok: boolean }>((resolve) => {
+    const downloadPromise = new Promise<{ ok: boolean }>((resolve) => {
       const getter = installerUrl.startsWith("https://") ? httpsGet : httpGet;
 
       const request = getter(installerUrl, (response) => {
@@ -344,6 +360,19 @@ export class WindowsUpdateDriver implements PlatformUpdateDriver {
         request.destroy();
       });
     });
+
+    this.downloadPromise = downloadPromise.finally(() => {
+      this.downloadPromise = null;
+    });
+
+    return this.downloadPromise;
+  }
+
+  private verifyFileSha256(filePath: string, expectedSha256: string): boolean {
+    const hash = createHash("sha256");
+    const fileBuffer = readFileSync(filePath);
+    hash.update(fileBuffer);
+    return hash.digest("hex").toLowerCase() === expectedSha256.toLowerCase();
   }
 
   private downloadWithStream(
