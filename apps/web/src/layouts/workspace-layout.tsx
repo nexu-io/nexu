@@ -658,7 +658,7 @@ function WorkspaceLayoutInner() {
   const desktopGlassTint = isWindowsDesktopClient
     ? "#ffffff"
     : "rgba(255, 255, 255, 0.08)";
-  const updateFloatWidth = Math.max(140, sidebarWidth - 20);
+  const updateFloatWidth = 288;
   const updateFloatLeft = 10;
   const updateFloatBottom = 52;
 
@@ -671,7 +671,7 @@ function WorkspaceLayoutInner() {
           : undefined
       }
     >
-      {isDesktopClient && hasUpdate && !updateDismissed && (
+      {!isDesktopClient && hasUpdate && !updateDismissed && (
         <UpdateFloatCard
           phase={update.phase}
           version={update.version}

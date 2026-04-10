@@ -457,33 +457,44 @@ async function validateWinUnpackedReuse(releaseRoot) {
   }
 }
 
-async function validatePackagedQqbotDependencies(releaseRoot) {
+const requiredBundledPluginArtifacts = [
+  {
+    pluginId: "openclaw-qqbot",
+    requiredPath: ["node_modules", "silk-wasm", "package.json"],
+    label: "silk-wasm",
+  },
+  {
+    pluginId: "dingtalk-connector",
+    requiredPath: ["node_modules", "dingtalk-stream", "package.json"],
+    label: "dingtalk-stream",
+  },
+];
+
+async function validatePackagedBundledPluginDependencies(releaseRoot) {
   const winUnpackedRoot = resolve(releaseRoot, "win-unpacked");
-  const qqbotPluginRoot = resolve(
-    winUnpackedRoot,
-    "resources",
-    "runtime",
-    "controller",
-    "plugins",
-    "openclaw-qqbot",
-  );
-  const silkWasmPackagePath = resolve(
-    qqbotPluginRoot,
-    "node_modules",
-    "silk-wasm",
-    "package.json",
-  );
 
-  if (!(await pathExists(qqbotPluginRoot))) {
-    throw new Error(
-      `[dist:win] packaged app is missing openclaw-qqbot: ${qqbotPluginRoot}`,
+  for (const artifact of requiredBundledPluginArtifacts) {
+    const pluginRoot = resolve(
+      winUnpackedRoot,
+      "resources",
+      "runtime",
+      "controller",
+      "plugins",
+      artifact.pluginId,
     );
-  }
+    const dependencyPath = resolve(pluginRoot, ...artifact.requiredPath);
 
-  if (!(await pathExists(silkWasmPackagePath))) {
-    throw new Error(
-      `[dist:win] packaged app is missing openclaw-qqbot dependency silk-wasm: ${silkWasmPackagePath}`,
-    );
+    if (!(await pathExists(pluginRoot))) {
+      throw new Error(
+        `[dist:win] packaged app is missing ${artifact.pluginId}: ${pluginRoot}`,
+      );
+    }
+
+    if (!(await pathExists(dependencyPath))) {
+      throw new Error(
+        `[dist:win] packaged app is missing ${artifact.pluginId} dependency ${artifact.label}: ${dependencyPath}`,
+      );
+    }
   }
 }
 
@@ -634,6 +645,9 @@ function redactBuildConfigForLog(config) {
     NEXU_DESKTOP_BUILD_TIME: config.NEXU_DESKTOP_BUILD_TIME,
     hasSentryDsn: typeof config.NEXU_DESKTOP_SENTRY_DSN === "string",
     hasUpdateFeedUrl: typeof config.NEXU_UPDATE_FEED_URL === "string",
+    hasLangfusePublicKey: typeof config.LANGFUSE_PUBLIC_KEY === "string",
+    hasLangfuseSecretKey: typeof config.LANGFUSE_SECRET_KEY === "string",
+    LANGFUSE_BASE_URL: config.LANGFUSE_BASE_URL,
   };
 }
 
@@ -839,6 +853,15 @@ async function ensureBuildConfig() {
           NEXU_DESKTOP_AUTO_UPDATE_ENABLED:
             merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
         }
+      : {}),
+    ...(merged.LANGFUSE_PUBLIC_KEY
+      ? { LANGFUSE_PUBLIC_KEY: merged.LANGFUSE_PUBLIC_KEY }
+      : {}),
+    ...(merged.LANGFUSE_SECRET_KEY
+      ? { LANGFUSE_SECRET_KEY: merged.LANGFUSE_SECRET_KEY }
+      : {}),
+    ...(merged.LANGFUSE_BASE_URL
+      ? { LANGFUSE_BASE_URL: merged.LANGFUSE_BASE_URL }
       : {}),
     NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
     ...((merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch)
@@ -1312,8 +1335,8 @@ async function main() {
     timings,
   );
   await timedStep(
-    "validate packaged qqbot dependencies",
-    async () => validatePackagedQqbotDependencies(releaseRoot),
+    "validate packaged bundled plugin dependencies",
+    async () => validatePackagedBundledPluginDependencies(releaseRoot),
     timings,
   );
 

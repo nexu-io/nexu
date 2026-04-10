@@ -59,6 +59,12 @@ export interface PlistEnv {
   posthogApiKey?: string;
   /** PostHog host for controller analytics */
   posthogHost?: string;
+  /** Langfuse public key for controller/openclaw tracing */
+  langfusePublicKey?: string;
+  /** Langfuse secret key for controller/openclaw tracing */
+  langfuseSecretKey?: string;
+  /** Langfuse base URL for controller/openclaw tracing */
+  langfuseBaseUrl?: string;
   /** Optional Node V8 coverage output directory */
   nodeV8Coverage?: string;
   /** Optional desktop E2E coverage mode switch */
@@ -219,6 +225,24 @@ function generateControllerPlist(label: string, env: PlistEnv): string {
         <key>POSTHOG_HOST</key>
         <string>${escapeXml(env.posthogHost)}</string>`
             : ""
+        }${
+          env.langfusePublicKey
+            ? `
+        <key>LANGFUSE_PUBLIC_KEY</key>
+        <string>${escapeXml(env.langfusePublicKey)}</string>`
+            : ""
+        }${
+          env.langfuseSecretKey
+            ? `
+        <key>LANGFUSE_SECRET_KEY</key>
+        <string>${escapeXml(env.langfuseSecretKey)}</string>`
+            : ""
+        }${
+          env.langfuseBaseUrl
+            ? `
+        <key>LANGFUSE_BASE_URL</key>
+        <string>${escapeXml(env.langfuseBaseUrl)}</string>`
+            : ""
         }
         <key>NODE_ENV</key>
         <string>${env.isDev ? "development" : "production"}</string>
@@ -300,6 +324,24 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
             ? `
         <key>OPENCLAW_GATEWAY_TOKEN</key>
         <string>${escapeXml(env.gatewayToken)}</string>`
+            : ""
+        }${
+          env.langfusePublicKey
+            ? `
+        <key>LANGFUSE_PUBLIC_KEY</key>
+        <string>${escapeXml(env.langfusePublicKey)}</string>`
+            : ""
+        }${
+          env.langfuseSecretKey
+            ? `
+        <key>LANGFUSE_SECRET_KEY</key>
+        <string>${escapeXml(env.langfuseSecretKey)}</string>`
+            : ""
+        }${
+          env.langfuseBaseUrl
+            ? `
+        <key>LANGFUSE_BASE_URL</key>
+        <string>${escapeXml(env.langfuseBaseUrl)}</string>`
             : ""
         }
         <key>HOME</key>

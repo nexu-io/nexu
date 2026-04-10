@@ -28,6 +28,9 @@ type BuildConfig = {
   NEXU_DESKTOP_UPDATE_CHANNEL?: UpdateChannelName;
   POSTHOG_API_KEY?: string;
   POSTHOG_HOST?: string;
+  LANGFUSE_PUBLIC_KEY?: string;
+  LANGFUSE_SECRET_KEY?: string;
+  LANGFUSE_BASE_URL?: string;
 };
 
 function readBuildConfigString(
@@ -90,6 +93,9 @@ function loadBuildConfig(resourcesPath?: string): BuildConfig {
       ),
       POSTHOG_API_KEY: readBuildConfigString(record, "POSTHOG_API_KEY"),
       POSTHOG_HOST: readBuildConfigString(record, "POSTHOG_HOST"),
+      LANGFUSE_PUBLIC_KEY: readBuildConfigString(record, "LANGFUSE_PUBLIC_KEY"),
+      LANGFUSE_SECRET_KEY: readBuildConfigString(record, "LANGFUSE_SECRET_KEY"),
+      LANGFUSE_BASE_URL: readBuildConfigString(record, "LANGFUSE_BASE_URL"),
     };
   } catch {
     return {};
@@ -212,6 +218,9 @@ export type DesktopRuntimeConfig = {
   sentryDsn: string | null;
   posthogApiKey: string | null;
   posthogHost: string | null;
+  langfusePublicKey: string | null;
+  langfuseSecretKey: string | null;
+  langfuseBaseUrl: string | null;
 };
 
 export function getDesktopRuntimeConfig(
@@ -323,5 +332,11 @@ export function getDesktopRuntimeConfig(
       null,
     posthogApiKey: env.POSTHOG_API_KEY ?? buildConfig.POSTHOG_API_KEY ?? null,
     posthogHost: env.POSTHOG_HOST ?? buildConfig.POSTHOG_HOST ?? null,
+    langfusePublicKey:
+      env.LANGFUSE_PUBLIC_KEY ?? buildConfig.LANGFUSE_PUBLIC_KEY ?? null,
+    langfuseSecretKey:
+      env.LANGFUSE_SECRET_KEY ?? buildConfig.LANGFUSE_SECRET_KEY ?? null,
+    langfuseBaseUrl:
+      env.LANGFUSE_BASE_URL ?? buildConfig.LANGFUSE_BASE_URL ?? null,
   };
 }

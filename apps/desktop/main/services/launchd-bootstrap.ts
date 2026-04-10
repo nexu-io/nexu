@@ -91,6 +91,12 @@ export interface LaunchdBootstrapEnv {
   posthogApiKey?: string;
   /** PostHog host for controller analytics */
   posthogHost?: string;
+  /** Langfuse public key for controller/openclaw tracing */
+  langfusePublicKey?: string;
+  /** Langfuse secret key for controller/openclaw tracing */
+  langfuseSecretKey?: string;
+  /** Langfuse base URL for controller/openclaw tracing */
+  langfuseBaseUrl?: string;
   /** Optional Node V8 coverage output directory */
   nodeV8Coverage?: string;
   /** Optional desktop E2E coverage mode switch */
@@ -618,6 +624,9 @@ export async function bootstrapWithLaunchd(
     proxyEnv: env.proxyEnv,
     posthogApiKey: env.posthogApiKey,
     posthogHost: env.posthogHost,
+    langfusePublicKey: env.langfusePublicKey,
+    langfuseSecretKey: env.langfuseSecretKey,
+    langfuseBaseUrl: env.langfuseBaseUrl,
     nodeV8Coverage: env.nodeV8Coverage,
     desktopE2ECoverage: env.desktopE2ECoverage,
     desktopE2ECoverageRunId: env.desktopE2ECoverageRunId,

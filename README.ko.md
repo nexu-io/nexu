@@ -272,7 +272,17 @@ GitHub을 커뮤니티 소통의 주요 플랫폼으로 사용합니다. 새 스
   </tr>
 </table>
 
+### Nexu 오픈소스 공동 창작 프로그램
+
+Nexu는 오픈소스 기여자를 모집하고 있습니다. 코드를 작성하고, 포인트를 획득하고, 리더보드에 이름을 올려보세요. 쉽게 시작하려면 먼저 [Good First Issue 기여자 가이드](https://docs.nexu.io/zh/guide/first-pr)를 확인해 주세요.
+
+[Good First Issue 목록](https://github.com/nexu-io/nexu/labels/good-first-issue)을 상시 관리하고 있으며, 범위가 명확하고 단일 기술 영역에 집중된 작업들과 AI Prompt 템플릿을 제공하여 빠르게 시작할 수 있습니다. 처음 기여하시는 분이나 `good-first-issue`를 맡으신 분에게는 최대한 가이드와 피드백을 드리겠습니다. 자세한 내용은 [기여자 보상 및 지원](https://docs.nexu.io/zh/guide/contributor-rewards)을 참고해 주세요.
+
 ### 기여자
+
+nexu를 더 좋게 만들어 주신 모든 기여자분들께 감사드립니다. 코드, 문서, 피드백, 창의적인 아이디어 등 모든 기여가 소중합니다.
+
+특히 [NickHood1984](https://github.com/NickHood1984) 님이 nexu에 PR을 제출하고 성공적으로 머지해 주셨습니다. 이런 하나하나의 진정한 기여를 소중히 여기며, 더 많은 분들의 참여를 환영합니다.
 
 <a href="https://github.com/nexu-io/nexu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=nexu-io/nexu" alt="Contributors" />

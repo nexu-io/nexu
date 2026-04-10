@@ -488,6 +488,7 @@ export type GetApiInternalDesktopPreferencesResponses = {
      */
     200: {
         locale: 'en' | 'zh-CN';
+        analyticsEnabled: boolean;
     };
 };
 
@@ -495,7 +496,8 @@ export type GetApiInternalDesktopPreferencesResponse = GetApiInternalDesktopPref
 
 export type PatchApiInternalDesktopPreferencesData = {
     body: {
-        locale: 'en' | 'zh-CN';
+        locale?: 'en' | 'zh-CN';
+        analyticsEnabled?: boolean;
     };
     path?: never;
     query?: never;
@@ -508,6 +510,7 @@ export type PatchApiInternalDesktopPreferencesResponses = {
      */
     200: {
         locale: 'en' | 'zh-CN';
+        analyticsEnabled: boolean;
     };
 };
 

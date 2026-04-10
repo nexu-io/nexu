@@ -56,6 +56,23 @@ function getPackageNodeModules(packageRoot) {
   }
 }
 
+function hasRealPackages(nodeModulesDir) {
+  try {
+    return listPackages(nodeModulesDir).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveDependencyNodeModules(packageRoot) {
+  const packageNodeModules = getPackageNodeModules(packageRoot);
+  if (packageNodeModules && hasRealPackages(packageNodeModules)) {
+    return packageNodeModules;
+  }
+
+  return getVirtualStoreNodeModules(packageRoot);
+}
+
 function listPackages(nodeModulesDir) {
   const result = [];
 
@@ -177,8 +194,7 @@ async function bundlePlugin({ id, npmName }) {
   await maybeFixPluginManifest(outputDir);
 
   const rootDependencyNodeModules =
-    getPackageNodeModules(sourcePackageRoot) ??
-    getVirtualStoreNodeModules(sourcePackageRoot);
+    resolveDependencyNodeModules(sourcePackageRoot);
   if (!rootDependencyNodeModules) {
     throw new Error(`Unable to resolve node_modules for ${npmName}`);
   }
@@ -255,4 +271,6 @@ async function main() {
   }
 }
 
-await main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await main();
+}

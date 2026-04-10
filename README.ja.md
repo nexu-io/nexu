@@ -272,7 +272,17 @@ A: WeChat 8.0.7 の OpenClaw プラグインに対応しています。接続を
   </tr>
 </table>
 
+### Nexu オープンソース共創プログラム
+
+Nexu はオープンソースコントリビューターを募集中です。コードを書いてポイントを獲得し、リーダーボードに名前を載せましょう。手軽に始めたい方は、まず [Good First Issue コントリビューターガイド](https://docs.nexu.io/zh/guide/first-pr) をご覧ください。
+
+[Good First Issue リスト](https://github.com/nexu-io/nexu/labels/good-first-issue) を常時メンテナンスしています。タスクはスコープが明確で、単一の技術領域に絞られており、AI Prompt テンプレートも用意しているので、すぐに取り組めます。初めてのコントリビューターや `good-first-issue` を担当する方には、できる限りガイダンスとフィードバックを提供します。詳細は [コントリビューター報酬＆サポート](https://docs.nexu.io/zh/guide/contributor-rewards) をご覧ください。
+
 ### コントリビューター
+
+nexu をより良くするために貢献してくださったすべての方に感謝します。コード、ドキュメント、フィードバック、アイデアなど、あらゆる貢献が大切です。
+
+特に [NickHood1984](https://github.com/NickHood1984) さんには、nexu に PR を提出しマージしていただきました。このような一つひとつの貢献を大切にしています。ぜひ多くの方のご参加をお待ちしています。
 
 <a href="https://github.com/nexu-io/nexu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=nexu-io/nexu" alt="Contributors" />

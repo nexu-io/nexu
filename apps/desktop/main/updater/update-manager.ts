@@ -19,7 +19,10 @@ import {
   resolveMacUpdateFeedUrlForTests,
 } from "./mac-update-driver";
 import { UnsupportedUpdateDriver } from "./unsupported-update-driver";
-import type { PlatformUpdateDriver } from "./update-driver";
+import type {
+  PlatformUpdateDriver,
+  UpdateDriverEventHandlers,
+} from "./update-driver";
 import { WindowsUpdateDriver } from "./windows-update-driver";
 
 type DownloadMode = "idle" | "background" | "foreground";
@@ -117,6 +120,9 @@ export class UpdateManager {
   private checkInProgress: Promise<{ updateAvailable: boolean }> | null = null;
   private lastProgressLogAt = 0;
   private lastProgressLogPercent: number | null = null;
+  private lastProgress:
+    | Parameters<UpdateDriverEventHandlers["onProgress"]>[0]
+    | null = null;
   private initialTimer: ReturnType<typeof setTimeout> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -173,17 +179,22 @@ export class UpdateManager {
   getStatus(): {
     phase: "idle" | "downloading" | "ready";
     version: string | null;
+    percent: number;
   } {
     if (this.downloadComplete) {
-      return { phase: "ready", version: this.pendingVersion };
+      return { phase: "ready", version: this.pendingVersion, percent: 100 };
     }
     if (
       this.downloadMode === "background" ||
       this.downloadMode === "foreground"
     ) {
-      return { phase: "downloading", version: this.pendingVersion };
+      return {
+        phase: "downloading",
+        version: this.pendingVersion,
+        percent: this.lastProgress?.percent ?? 0,
+      };
     }
-    return { phase: "idle", version: null };
+    return { phase: "idle", version: null, percent: 0 };
   }
 
   private getDiagnostic(partial?: {
@@ -276,8 +287,16 @@ export class UpdateManager {
         this.send("update:up-to-date", { diagnostic });
       },
       onProgress: (progress) => {
+        this.lastProgress = progress;
         const now = Date.now();
         const percent = Math.round(progress.percent);
+        this.logCheck(
+          `update progress raw: percent=${progress.percent.toFixed(2)} transferred=${progress.transferred} total=${progress.total} bps=${progress.bytesPerSecond}`,
+          this.getDiagnostic({
+            remoteVersion: this.pendingVersion ?? undefined,
+            remoteReleaseDate: this.pendingReleaseDate,
+          }),
+        );
         const shouldLog =
           this.lastProgressLogPercent === null ||
           Math.abs(percent - this.lastProgressLogPercent) >= 5 ||
@@ -343,11 +362,25 @@ export class UpdateManager {
   private send(channel: string, data: unknown): void {
     if (!this.win.isDestroyed()) {
       const all = webContents.getAllWebContents();
+      this.logCheck(
+        `update send: ${channel} to ${all.length} webContents`,
+        this.getDiagnostic(),
+      );
       // Send to the main renderer
       this.win.webContents.send(channel, data);
       // Also forward to any embedded webviews so the web app receives events
       for (const wc of all) {
         if (wc.id !== this.win.webContents.id && !wc.isDestroyed()) {
+          const webContentsType =
+            typeof wc.getType === "function" ? wc.getType() : "unknown";
+          const webContentsUrl =
+            typeof wc.getURL === "function"
+              ? sanitizeFeedUrl(wc.getURL())
+              : null;
+          this.logCheck(
+            `update send target: ${channel} wc=${wc.id} type=${webContentsType} url=${webContentsUrl}`,
+            this.getDiagnostic(),
+          );
           wc.send(channel, data);
         }
       }
@@ -456,6 +489,9 @@ export class UpdateManager {
 
     // Switch to foreground mode and remove rate limit
     this.downloadMode = "foreground";
+    if (this.lastProgress !== null) {
+      this.send("update:progress", this.lastProgress);
+    }
     if (
       this.platform === "win32" &&
       this.driver instanceof WindowsUpdateDriver

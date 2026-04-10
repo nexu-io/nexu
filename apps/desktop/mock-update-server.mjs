@@ -29,6 +29,30 @@ const zipPath = process.env.MOCK_UPDATE_ZIP_PATH
 
 const fakeSha512 = Buffer.alloc(64, 0xab).toString("base64");
 
+function streamBufferSlowly(options) {
+  const { req, res, totalSize, readChunk } = options;
+  let sent = 0;
+
+  const timer = setInterval(() => {
+    if (sent >= totalSize) {
+      clearInterval(timer);
+      res.end();
+      console.log(`  → Download complete (${sent} bytes)`);
+      return;
+    }
+
+    const remaining = totalSize - sent;
+    const toSend = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
+    const chunk = readChunk(sent, toSend);
+    res.write(chunk);
+    sent += chunk.length;
+  }, CHUNK_INTERVAL_MS);
+
+  req.on("close", () => {
+    clearInterval(timer);
+  });
+}
+
 async function getZipMetadata() {
   if (!zipPath) {
     return {
@@ -86,12 +110,37 @@ const server = createServer((req, res) => {
 
   if (pathname === `/${zipMeta.zipFileName}`) {
     if (zipMeta.mode === "real" && zipMeta.zipPath) {
-      console.log(`  → Streaming real ZIP ${zipMeta.zipPath}`);
+      console.log(`  → Streaming real ZIP slowly ${zipMeta.zipPath}`);
       res.writeHead(200, {
         "Content-Type": "application/zip",
         "Content-Length": String(zipMeta.zipSize),
       });
-      createReadStream(zipMeta.zipPath).pipe(res);
+
+      const stream = createReadStream(zipMeta.zipPath, {
+        highWaterMark: CHUNK_SIZE,
+      });
+      const chunks = [];
+      stream.on("data", (chunk) => {
+        chunks.push(chunk);
+      });
+      stream.on("end", () => {
+        const zipBuffer = Buffer.concat(chunks);
+        streamBufferSlowly({
+          req,
+          res,
+          totalSize: zipMeta.zipSize,
+          readChunk(offset, size) {
+            return zipBuffer.subarray(offset, offset + size);
+          },
+        });
+      });
+      stream.on("error", (error) => {
+        console.error("  → Failed to read real ZIP", error);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "text/plain" });
+        }
+        res.end("Failed to read ZIP");
+      });
       return;
     }
 
@@ -101,24 +150,14 @@ const server = createServer((req, res) => {
       "Content-Length": String(FAKE_ZIP_SIZE),
     });
 
-    let sent = 0;
     const chunk = Buffer.alloc(CHUNK_SIZE, 0x00);
-
-    const timer = setInterval(() => {
-      if (sent >= FAKE_ZIP_SIZE) {
-        clearInterval(timer);
-        res.end();
-        console.log(`  → Download complete (${sent} bytes)`);
-        return;
-      }
-      const remaining = FAKE_ZIP_SIZE - sent;
-      const toSend = remaining < CHUNK_SIZE ? remaining : CHUNK_SIZE;
-      res.write(toSend < CHUNK_SIZE ? chunk.subarray(0, toSend) : chunk);
-      sent += toSend;
-    }, CHUNK_INTERVAL_MS);
-
-    req.on("close", () => {
-      clearInterval(timer);
+    streamBufferSlowly({
+      req,
+      res,
+      totalSize: FAKE_ZIP_SIZE,
+      readChunk(_offset, size) {
+        return size < CHUNK_SIZE ? chunk.subarray(0, size) : chunk;
+      },
     });
     return;
   }

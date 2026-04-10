@@ -558,6 +558,7 @@ const nexuConfigObjectSchema = z.object({
       localProfile: z.unknown().optional(),
       cloud: z.unknown().optional(),
       locale: z.enum(["en", "zh-CN"]).optional(),
+      analyticsEnabled: z.boolean().optional(),
     })
     .catchall(z.unknown())
     .default({}),

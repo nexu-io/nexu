@@ -37,6 +37,9 @@ let persistentSuperProperties: Properties | null = null;
 let currentPersonPropertiesKey: string | null = null;
 let currentIdentifyKey: string | null = null;
 
+export const ANALYTICS_PREFERENCE_STORAGE_KEY =
+  "nexu_desktop_analytics_enabled";
+
 function buildPersonPropertiesKey(
   properties: Properties | undefined,
 ): string | null {
@@ -214,6 +217,18 @@ export function resetAnalytics(): void {
   if (persistentSuperProperties) {
     posthog.register(persistentSuperProperties);
   }
+}
+
+export function disableAnalytics(): void {
+  currentUserId = null;
+  currentPersonPropertiesKey = null;
+  currentIdentifyKey = null;
+
+  if (analyticsInitialized) {
+    posthog.reset();
+  }
+
+  analyticsInitialized = false;
 }
 
 export function normalizeAuthSource(

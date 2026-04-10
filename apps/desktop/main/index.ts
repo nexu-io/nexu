@@ -606,12 +606,6 @@ function sendHostDesktopCommand(command: HostDesktopCommand): void {
   mainWindow?.webContents.send("host:desktop-command", command);
 }
 
-function triggerUpdateCheck(): void {
-  mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:check-for-updates",
-  });
-}
-
 function showAboutDialog(): void {
   const version = app.getVersion();
   const detailLines = [
@@ -690,12 +684,6 @@ function installApplicationMenu(): void {
     helpSubmenu.push(
       { type: "separator" },
       {
-        id: "check-for-updates",
-        label: "Check for Updates…",
-        enabled: app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-        click: () => triggerUpdateCheck(),
-      },
-      {
         id: "about-nexu",
         label: `About Nexu (v${app.getVersion()})`,
         click: () => showAboutDialog(),
@@ -715,13 +703,6 @@ function installApplicationMenu(): void {
             role: "appMenu",
             submenu: [
               { role: "about" },
-              {
-                id: "check-for-updates",
-                label: "Check for Updates…",
-                enabled:
-                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-                click: () => triggerUpdateCheck(),
-              },
               { type: "separator" },
               { role: "services" },
               { type: "separator" },
@@ -968,6 +949,18 @@ async function runLaunchdColdStart(): Promise<void> {
       process.env.POSTHOG_API_KEY ?? runtimeConfig.posthogApiKey ?? undefined,
     posthogHost:
       process.env.POSTHOG_HOST ?? runtimeConfig.posthogHost ?? undefined,
+    langfusePublicKey:
+      process.env.LANGFUSE_PUBLIC_KEY ??
+      runtimeConfig.langfusePublicKey ??
+      undefined,
+    langfuseSecretKey:
+      process.env.LANGFUSE_SECRET_KEY ??
+      runtimeConfig.langfuseSecretKey ??
+      undefined,
+    langfuseBaseUrl:
+      process.env.LANGFUSE_BASE_URL ??
+      runtimeConfig.langfuseBaseUrl ??
+      undefined,
     log: (message: string) => logColdStart(message),
     nodeV8Coverage: process.env.NODE_V8_COVERAGE,
     desktopE2ECoverage: process.env.NEXU_DESKTOP_E2E_COVERAGE,
@@ -1112,6 +1105,15 @@ function updateSystemTrayMenu(): void {
   );
 }
 
+function showSystemTrayMenu(): void {
+  if (!systemTray) {
+    return;
+  }
+
+  updateSystemTrayMenu();
+  systemTray.popUpContextMenu();
+}
+
 function showMainWindowFromResidentEntry(): void {
   const preferences = getDesktopShellPreferences();
 
@@ -1134,6 +1136,14 @@ function showMainWindowFromResidentEntry(): void {
 function destroyResidentTray(): void {
   residentTray?.destroy();
   residentTray = null;
+}
+
+function showResidentTrayMenu(): void {
+  if (!residentTray) {
+    return;
+  }
+
+  residentTray.popUpContextMenu();
 }
 
 function ensureResidentTray(): void {
@@ -1185,7 +1195,10 @@ function ensureResidentTray(): void {
     ]),
   );
   tray.on("click", () => {
-    showMainWindowFromResidentEntry();
+    showResidentTrayMenu();
+  });
+  tray.on("right-click", () => {
+    showResidentTrayMenu();
   });
 }
 
@@ -1206,16 +1219,11 @@ async function ensureWindowsTray(): Promise<void> {
   updateSystemTrayMenu();
 
   systemTray.on("click", () => {
-    if (mainWindow?.isVisible()) {
-      hideMainWindowToBackground();
-      return;
-    }
-
-    showMainWindowFromResidentEntry();
+    showSystemTrayMenu();
   });
 
   systemTray.on("right-click", () => {
-    updateSystemTrayMenu();
+    showSystemTrayMenu();
   });
 }
 

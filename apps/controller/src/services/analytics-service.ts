@@ -176,6 +176,10 @@ export class AnalyticsService {
       return;
     }
 
+    if (!(await this.configStore.getDesktopAnalyticsEnabled())) {
+      return;
+    }
+
     const analyticsDistinctId = await this.resolveAnalyticsDistinctId();
     if (analyticsDistinctId.status === "error") {
       return;
@@ -679,6 +683,10 @@ export class AnalyticsService {
   ): Promise<void> {
     const captureUrl = this.getPosthogCaptureUrl();
     if (!captureUrl || !this.env.posthogApiKey) {
+      return;
+    }
+
+    if (!(await this.configStore.getDesktopAnalyticsEnabled())) {
       return;
     }
 

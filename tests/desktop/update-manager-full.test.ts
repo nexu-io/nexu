@@ -645,6 +645,33 @@ describe("downloadUpdate", () => {
     expect(mockAutoUpdater.downloadUpdate).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: true });
   });
+
+  it("surfaces cached progress immediately when switching from background to foreground", async () => {
+    mockAutoUpdater.downloadUpdate.mockResolvedValue(undefined);
+
+    const { mgr, win } = await createManager(undefined, { autoDownload: true });
+    const handlers = extractHandlers();
+
+    handlers["update-available"]({
+      version: "0.3.0",
+      releaseDate: "2026-04-10T00:00:00Z",
+    });
+    handlers["download-progress"]({
+      percent: 61,
+      bytesPerSecond: 1024,
+      transferred: 610,
+      total: 1000,
+    });
+
+    await mgr.downloadUpdate();
+
+    expect(win.webContents.send).toHaveBeenCalledWith("update:progress", {
+      percent: 61,
+      bytesPerSecond: 1024,
+      transferred: 610,
+      total: 1000,
+    });
+  });
 });
 
 // ===========================================================================

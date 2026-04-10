@@ -1,4 +1,5 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
+import { ModelPickerDropdown } from "@/components/model-picker-dropdown";
 import { ModelLogo, ProviderLogo } from "@/components/provider-logo";
 import { useAutoUpdate } from "@/hooks/use-auto-update";
 import {
@@ -7,12 +8,18 @@ import {
 } from "@/hooks/use-desktop-cloud-status";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { useLocale } from "@/hooks/use-locale";
+import { getAnalyticsAppMetadata } from "@/lib/analytics-app-metadata";
 import {
   openExternalUrl,
   openLocalFolderUrl,
   pathToFileUrl,
 } from "@/lib/desktop-links";
-import { track } from "@/lib/tracking";
+import {
+  ANALYTICS_PREFERENCE_STORAGE_KEY,
+  disableAnalytics,
+  initializeAnalytics,
+  track,
+} from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import {
   type ProviderRegistryEntryDto,
@@ -47,6 +54,7 @@ import { toast } from "sonner";
 import {
   deleteApiV1ModelProvidersMinimaxOauthLogin,
   getApiInternalDesktopDefaultModel,
+  getApiInternalDesktopPreferences,
   getApiInternalDesktopReady,
   getApiV1ModelProvidersByProviderIdOauthProviderStatus,
   getApiV1ModelProvidersByProviderIdOauthStatus,
@@ -54,6 +62,7 @@ import {
   getApiV1ModelProvidersMinimaxOauthStatus,
   getApiV1ModelProvidersRegistry,
   getApiV1Models,
+  patchApiInternalDesktopPreferences,
   postApiInternalDesktopCloudConnect,
   postApiInternalDesktopCloudDisconnect,
   postApiInternalDesktopCloudRefresh,
@@ -307,6 +316,31 @@ function getProviderIdFromModelId(
   return provider || null;
 }
 
+export function getSettingsProviderSelectionIdForModel(
+  providerIds: string[],
+  models: Array<{ id: string; provider: string }>,
+  modelId: string,
+): string | null {
+  const providerId = getProviderIdFromModelId(models, modelId);
+  if (!providerId) {
+    return null;
+  }
+
+  const normalizedProviderId = normalizeProviderId(providerId) ?? providerId;
+  if (providerIds.includes(providerId)) {
+    return providerId;
+  }
+  if (providerIds.includes(normalizedProviderId)) {
+    return normalizedProviderId;
+  }
+
+  return (
+    providerIds.find((candidateId) =>
+      getProviderAliasCandidates(candidateId).includes(providerId),
+    ) ?? normalizedProviderId
+  );
+}
+
 type SettingsTab = "general" | "providers";
 
 function isSettingsTab(value: string | null): value is SettingsTab {
@@ -538,7 +572,6 @@ function _GeneralSettings() {
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [accountConnecting, setAccountConnecting] = useState(false);
   const [accountDisconnecting, setAccountDisconnecting] = useState(false);
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [crashReportsEnabled, setCrashReportsEnabled] = useState(true);
   const hostBridge = getModelsHostInvokeBridge();
   const { data: desktopCloudStatus, refetch: refetchDesktopCloudStatus } =
@@ -577,6 +610,56 @@ function _GeneralSettings() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["desktop-shell-preferences"], data);
+    },
+    onError: () => {
+      toast.error(t("settings.desktop.updateFailed"));
+    },
+  });
+
+  const { data: desktopPreferences } = useQuery({
+    queryKey: ["desktop-preferences"],
+    queryFn: async () => {
+      const { data } = await getApiInternalDesktopPreferences();
+      return data;
+    },
+  });
+
+  const updateDesktopPreferences = useMutation({
+    mutationFn: async (input: { analyticsEnabled: boolean }) => {
+      const response = await patchApiInternalDesktopPreferences({
+        body: { analyticsEnabled: input.analyticsEnabled },
+      });
+      if (!response.data) {
+        throw new Error("Desktop preferences update returned no data.");
+      }
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["desktop-preferences"], data);
+      try {
+        localStorage.setItem(
+          ANALYTICS_PREFERENCE_STORAGE_KEY,
+          data.analyticsEnabled ? "1" : "0",
+        );
+      } catch {
+        // ignore local persistence failures
+      }
+
+      if (data.analyticsEnabled) {
+        const posthogApiKey = import.meta.env.VITE_POSTHOG_API_KEY;
+        if (posthogApiKey) {
+          const { appName, appVersion } = getAnalyticsAppMetadata();
+          initializeAnalytics({
+            apiKey: posthogApiKey,
+            apiHost: import.meta.env.VITE_POSTHOG_HOST,
+            environment: import.meta.env.MODE,
+            appName,
+            appVersion,
+          });
+        }
+      } else {
+        disableAnalytics();
+      }
     },
     onError: () => {
       toast.error(t("settings.desktop.updateFailed"));
@@ -943,8 +1026,13 @@ function _GeneralSettings() {
               </div>
             </div>
             <Switch
-              checked={analyticsEnabled}
-              onCheckedChange={setAnalyticsEnabled}
+              checked={desktopPreferences?.analyticsEnabled ?? true}
+              disabled={updateDesktopPreferences.isPending}
+              onCheckedChange={(checked) => {
+                void updateDesktopPreferences.mutateAsync({
+                  analyticsEnabled: checked,
+                });
+              }}
             />
           </div>
 
@@ -1771,50 +1859,28 @@ export function ModelsPage() {
                     </div>
                   </div>
                 </div>
-                <Select
-                  value={activeProvider?.id}
-                  onValueChange={(value) => {
-                    setSelectedProviderId(value);
+                <ModelPickerDropdown
+                  compact
+                  dropdownAlign="end"
+                  models={models}
+                  currentModelId={currentModelId}
+                  emptyLabel={t("models.noModelConfigured")}
+                  onSelectModel={(modelId) => {
+                    const providerId = getSettingsProviderSelectionIdForModel(
+                      sidebarItems.map((item) => item.id),
+                      models,
+                      modelId,
+                    );
+                    if (providerId) {
+                      setSelectedProviderId(providerId);
+                    }
                     clearSetupParam();
+                    updateModel.mutate(modelId);
                   }}
-                >
-                  <SelectTrigger className="inline-flex h-auto w-[180px] items-center gap-2 rounded-lg border-border bg-surface-0 px-3 py-1.5 text-[12px] font-medium text-text-primary shadow-none hover:bg-surface-1">
-                    {activeProvider ? (
-                      <div className="flex min-w-0 items-center gap-2">
-                        <ProviderLogo
-                          provider={
-                            activeProvider.registryEntry?.id ??
-                            activeProvider.id
-                          }
-                          size={14}
-                        />
-                        <span className="truncate">{activeProvider.name}</span>
-                      </div>
-                    ) : (
-                      <span>{t("models.selectProvider")}</span>
-                    )}
-                  </SelectTrigger>
-                  <SelectContent
-                    align="end"
-                    className="rounded-xl border-border bg-surface-0 text-text-primary shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
-                  >
-                    {sidebarItems.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={item.id}
-                        className="rounded-lg px-3 py-2 text-[12px] text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
-                      >
-                        <div className="flex min-w-0 items-center gap-2">
-                          <ProviderLogo
-                            provider={item.registryEntry?.id ?? item.id}
-                            size={14}
-                          />
-                          <span className="truncate">{item.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className="shrink-0"
+                  triggerClassName="min-w-[220px] justify-between"
+                  dropdownClassName="shadow-[0_12px_32px_rgba(0,0,0,0.12)]"
+                />
               </div>
             </div>
 

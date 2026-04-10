@@ -145,6 +145,7 @@ export class OpenClawSyncService {
           .getAllInstalled()
           .filter((r) => r.source !== "workspace")
           .map((r) => r.slug)
+          .sort((left, right) => left.localeCompare(right))
       : undefined;
 
     const workspaceMap = this.workspaceScanner

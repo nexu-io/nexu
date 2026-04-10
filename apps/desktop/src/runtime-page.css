@@ -46,6 +46,13 @@ body,
   gap: 6px;
 }
 
+.desktop-sidebar-brand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .desktop-sidebar-brand p {
   margin: 0;
   color: rgba(255, 255, 255, 0.58);
@@ -1259,10 +1266,10 @@ body,
    px-3 (12px) horizontal padding, logo h-6 (24px).
    Badge sits right-aligned in that row. */
 .update-badge {
-  position: fixed;
-  top: 60px;
-  left: 164px;
-  z-index: 9000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   padding: 2px 8px;
   border: 0;
   border-radius: 9999px;
@@ -1289,7 +1296,9 @@ body,
   bottom: 80px;
   left: 12px;
   z-index: 9000;
-  width: 220px;
+  width: fit-content;
+  min-width: 220px;
+  max-width: min(300px, calc(100vw - 24px));
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -1308,16 +1317,19 @@ body,
 /* Header — flex items-center justify-between mb-1.5 */
 .update-card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 6px;
+  gap: 8px;
 }
 
 /* Status — flex items-center gap-2 */
 .update-card-status {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
 /* Dot — relative flex h-2 w-2 shrink-0 */
@@ -1364,7 +1376,9 @@ body,
   font-size: 12px;
   font-weight: 500;
   color: #1c1f23;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 /* Close — text-text-muted hover:text-text-primary transition-colors -mr-1 */
@@ -1422,6 +1436,7 @@ body,
 /* Actions — flex items-center gap-2 pl-4 */
 .update-card-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding-left: 16px;
@@ -1433,6 +1448,7 @@ body,
   font-size: 11px;
   color: #787c80;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 /* Btn base */

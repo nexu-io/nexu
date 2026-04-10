@@ -31,37 +31,45 @@ const sidecarPackageJsonPath = resolve(sidecarRoot, "package.json");
 const diagnosticsEnabled =
   process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS === "1" ||
   process.env.NEXU_DESKTOP_DIST_DIAGNOSTICS?.toLowerCase() === "true";
-const qqbotPluginRelativeRoot = "openclaw-qqbot";
-const qqbotSilkWasmPackageRelativePath = join(
-  qqbotPluginRelativeRoot,
-  "node_modules",
-  "silk-wasm",
-  "package.json",
-);
+const requiredBundledPluginArtifacts = [
+  {
+    pluginId: "openclaw-qqbot",
+    requiredPath: join("node_modules", "silk-wasm", "package.json"),
+    label: "silk-wasm",
+  },
+  {
+    pluginId: "dingtalk-connector",
+    requiredPath: join("node_modules", "dingtalk-stream", "package.json"),
+    label: "dingtalk-stream",
+  },
+];
 
 function formatDurationMs(durationMs) {
   return `${(durationMs / 1000).toFixed(3)}s`;
 }
 
-async function ensureQqbotPluginDependencyTree(rootDir, label) {
-  const pluginDir = resolve(rootDir, qqbotPluginRelativeRoot);
-  const silkWasmPackagePath = resolve(
-    rootDir,
-    qqbotSilkWasmPackageRelativePath,
-  );
+async function ensureBundledPluginDependencyTree(rootDir, label) {
   const missing = [];
 
-  if (!(await pathExists(pluginDir))) {
-    missing.push(pluginDir);
-  }
-
-  if (!(await pathExists(silkWasmPackagePath))) {
-    missing.push(silkWasmPackagePath);
+  for (const artifact of requiredBundledPluginArtifacts) {
+    const pluginDir = resolve(rootDir, artifact.pluginId);
+    const requiredPath = resolve(
+      rootDir,
+      artifact.pluginId,
+      artifact.requiredPath,
+    );
+    if (!(await pathExists(pluginDir))) {
+      missing.push(pluginDir);
+      continue;
+    }
+    if (!(await pathExists(requiredPath))) {
+      missing.push(`${artifact.pluginId}:${artifact.label}:${requiredPath}`);
+    }
   }
 
   if (missing.length > 0) {
     throw new Error(
-      `[controller-sidecar] ${label} is missing bundled QQ plugin dependencies: ${missing.join(", ")}`,
+      `[controller-sidecar] ${label} is missing bundled plugin dependencies: ${missing.join(", ")}`,
     );
   }
 }
@@ -108,7 +116,7 @@ async function prepareControllerSidecar() {
   }
 
   if (await pathExists(controllerBundledPluginsRoot)) {
-    await ensureQqbotPluginDependencyTree(
+    await ensureBundledPluginDependencyTree(
       controllerBundledPluginsRoot,
       "controller bundled plugins",
     );
@@ -116,7 +124,7 @@ async function prepareControllerSidecar() {
       recursive: true,
       dereference: true,
     });
-    await ensureQqbotPluginDependencyTree(
+    await ensureBundledPluginDependencyTree(
       sidecarPluginsRoot,
       "controller sidecar plugins",
     );

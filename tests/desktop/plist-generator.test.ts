@@ -152,6 +152,26 @@ describe("generatePlist", () => {
     expect(plist).toContain("<string>https://us.i.posthog.com</string>");
   });
 
+  it("renders Langfuse env vars when configured", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+
+    const plist = generatePlist("controller", {
+      ...mockEnv,
+      langfusePublicKey: "pk_test",
+      langfuseSecretKey: "sk_test",
+      langfuseBaseUrl: "https://langfuse.example.com",
+    });
+
+    expect(plist).toContain("<key>LANGFUSE_PUBLIC_KEY</key>");
+    expect(plist).toContain("<string>pk_test</string>");
+    expect(plist).toContain("<key>LANGFUSE_SECRET_KEY</key>");
+    expect(plist).toContain("<string>sk_test</string>");
+    expect(plist).toContain("<key>LANGFUSE_BASE_URL</key>");
+    expect(plist).toContain("<string>https://langfuse.example.com</string>");
+  });
+
   // -----------------------------------------------------------------------
   // ProgramArguments ordering — controller
   // -----------------------------------------------------------------------

@@ -636,7 +636,9 @@ export class NexuConfigStore {
         integrations: [],
         channels: [],
         templates: {},
-        desktop: {},
+        desktop: {
+          analyticsEnabled: true,
+        },
         secrets: {},
       }),
     );
@@ -2003,6 +2005,34 @@ export class NexuConfigStore {
     }));
 
     return locale;
+  }
+
+  async getStoredDesktopAnalyticsEnabled(): Promise<boolean | null> {
+    const config = await this.getConfig();
+    return typeof config.desktop.analyticsEnabled === "boolean"
+      ? config.desktop.analyticsEnabled
+      : null;
+  }
+
+  async getDesktopAnalyticsEnabled(): Promise<boolean> {
+    const storedValue = await this.getStoredDesktopAnalyticsEnabled();
+    if (storedValue !== null) {
+      return storedValue;
+    }
+
+    return this.setDesktopAnalyticsEnabled(true);
+  }
+
+  async setDesktopAnalyticsEnabled(enabled: boolean): Promise<boolean> {
+    await this.store.update((config) => ({
+      ...config,
+      desktop: {
+        ...config.desktop,
+        analyticsEnabled: enabled,
+      },
+    }));
+
+    return enabled;
   }
 
   async refreshDesktopCloudModels() {

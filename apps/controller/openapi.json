@@ -1232,10 +1232,14 @@
                         "en",
                         "zh-CN"
                       ]
+                    },
+                    "analyticsEnabled": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "locale"
+                    "locale",
+                    "analyticsEnabled"
                   ]
                 }
               }
@@ -1260,11 +1264,11 @@
                       "en",
                       "zh-CN"
                     ]
+                  },
+                  "analyticsEnabled": {
+                    "type": "boolean"
                   }
-                },
-                "required": [
-                  "locale"
-                ]
+                }
               }
             }
           }
@@ -1284,10 +1288,14 @@
                         "en",
                         "zh-CN"
                       ]
+                    },
+                    "analyticsEnabled": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "locale"
+                    "locale",
+                    "analyticsEnabled"
                   ]
                 }
               }

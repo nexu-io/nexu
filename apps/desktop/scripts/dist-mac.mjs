@@ -472,7 +472,20 @@ async function stapleNotarizedAppBundles() {
   }
 }
 
-async function validatePackagedQqbotDependencies(releaseRoot) {
+const requiredBundledPluginArtifacts = [
+  {
+    pluginId: "openclaw-qqbot",
+    requiredPath: ["node_modules", "silk-wasm", "package.json"],
+    label: "silk-wasm",
+  },
+  {
+    pluginId: "dingtalk-connector",
+    requiredPath: ["node_modules", "dingtalk-stream", "package.json"],
+    label: "dingtalk-stream",
+  },
+];
+
+async function validatePackagedBundledPluginDependencies(releaseRoot) {
   const appBundleDirs = await readdir(releaseRoot, { withFileTypes: true });
   const packagedMacBundles = appBundleDirs.filter(
     (entry) =>
@@ -488,32 +501,29 @@ async function validatePackagedQqbotDependencies(releaseRoot) {
 
   for (const entry of packagedMacBundles) {
     const appRoot = resolve(releaseRoot, entry.name, "Nexu.app");
-    const qqbotPluginRoot = resolve(
-      appRoot,
-      "Contents",
-      "Resources",
-      "runtime",
-      "controller",
-      "plugins",
-      "openclaw-qqbot",
-    );
-    const silkWasmPackagePath = resolve(
-      qqbotPluginRoot,
-      "node_modules",
-      "silk-wasm",
-      "package.json",
-    );
-
-    if (!(await pathExists(qqbotPluginRoot))) {
-      throw new Error(
-        `[dist:mac] packaged app is missing openclaw-qqbot: ${qqbotPluginRoot}`,
+    for (const artifact of requiredBundledPluginArtifacts) {
+      const pluginRoot = resolve(
+        appRoot,
+        "Contents",
+        "Resources",
+        "runtime",
+        "controller",
+        "plugins",
+        artifact.pluginId,
       );
-    }
+      const dependencyPath = resolve(pluginRoot, ...artifact.requiredPath);
 
-    if (!(await pathExists(silkWasmPackagePath))) {
-      throw new Error(
-        `[dist:mac] packaged app is missing openclaw-qqbot dependency silk-wasm: ${silkWasmPackagePath}`,
-      );
+      if (!(await pathExists(pluginRoot))) {
+        throw new Error(
+          `[dist:mac] packaged app is missing ${artifact.pluginId}: ${pluginRoot}`,
+        );
+      }
+
+      if (!(await pathExists(dependencyPath))) {
+        throw new Error(
+          `[dist:mac] packaged app is missing ${artifact.pluginId} dependency ${artifact.label}: ${dependencyPath}`,
+        );
+      }
     }
   }
 }
@@ -652,12 +662,37 @@ async function ensureBuildConfig() {
           POSTHOG_HOST: merged.POSTHOG_HOST ?? existingConfig.POSTHOG_HOST,
         }
       : {}),
+    ...((merged.LANGFUSE_PUBLIC_KEY ?? existingConfig.LANGFUSE_PUBLIC_KEY)
+      ? {
+          LANGFUSE_PUBLIC_KEY:
+            merged.LANGFUSE_PUBLIC_KEY ?? existingConfig.LANGFUSE_PUBLIC_KEY,
+        }
+      : {}),
+    ...((merged.LANGFUSE_SECRET_KEY ?? existingConfig.LANGFUSE_SECRET_KEY)
+      ? {
+          LANGFUSE_SECRET_KEY:
+            merged.LANGFUSE_SECRET_KEY ?? existingConfig.LANGFUSE_SECRET_KEY,
+        }
+      : {}),
+    ...((merged.LANGFUSE_BASE_URL ?? existingConfig.LANGFUSE_BASE_URL)
+      ? {
+          LANGFUSE_BASE_URL:
+            merged.LANGFUSE_BASE_URL ?? existingConfig.LANGFUSE_BASE_URL,
+        }
+      : {}),
   };
 
   await writeFile(configPath, JSON.stringify(config, null, 2));
+  const redactedConfig = {
+    ...config,
+    hasLangfusePublicKey: typeof config.LANGFUSE_PUBLIC_KEY === "string",
+    hasLangfuseSecretKey: typeof config.LANGFUSE_SECRET_KEY === "string",
+    LANGFUSE_PUBLIC_KEY: undefined,
+    LANGFUSE_SECRET_KEY: undefined,
+  };
   console.log(
     "[dist:mac] generated build-config.json from env:",
-    JSON.stringify(config),
+    JSON.stringify(redactedConfig),
   );
 }
 
@@ -896,8 +931,8 @@ async function main() {
     timings,
   );
   await timedStep(
-    "validate packaged qqbot dependencies",
-    async () => validatePackagedQqbotDependencies(releaseRoot),
+    "validate packaged bundled plugin dependencies",
+    async () => validatePackagedBundledPluginDependencies(releaseRoot),
     timings,
   );
   await timedStep(

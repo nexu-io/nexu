@@ -94,6 +94,7 @@ describe("compileOpenClawConfig", () => {
     });
     // Prewarm allowlist: prevents first-connect SIGUSR1 + drain window.
     expect(compiled.plugins?.allow).toContain("openclaw-weixin");
+    expect(compiled.plugins?.allow).toContain("langfuse-tracer");
     expect(compiled.channels?.feishu?.enabled).toBe(true);
     expect(compiled.channels?.feishu?.accounts).toEqual({
       __nexu_internal_feishu_prewarm__: {
@@ -104,6 +105,30 @@ describe("compileOpenClawConfig", () => {
       },
     });
     expect(compiled.bindings).toEqual([]);
+  });
+
+  it("enables Langfuse tracer by default and disables it when analytics is explicitly off", () => {
+    const defaultCompiled = compileOpenClawConfig(
+      createBaseConfig(),
+      createEnv(),
+    );
+
+    expect(defaultCompiled.plugins?.allow).toContain("langfuse-tracer");
+    expect(defaultCompiled.plugins?.entries?.["langfuse-tracer"]).toEqual({
+      enabled: true,
+    });
+
+    const disabledConfig = createBaseConfig();
+    disabledConfig.desktop = {
+      analyticsEnabled: false,
+    };
+
+    const disabledCompiled = compileOpenClawConfig(disabledConfig, createEnv());
+
+    expect(disabledCompiled.plugins?.allow).not.toContain("langfuse-tracer");
+    expect(
+      disabledCompiled.plugins?.entries?.["langfuse-tracer"],
+    ).toBeUndefined();
   });
 
   it("uses the real Feishu account once connected and does not keep the prewarm account", () => {

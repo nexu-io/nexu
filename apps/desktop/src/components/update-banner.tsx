@@ -30,8 +30,7 @@ const i18n = {
     available: (version: string) => `v${version} available`,
     ready: (version: string) => `v${version} ready`,
     error: "Update failed",
-    checkingDetail:
-      "Contacting the update feed and comparing the latest release...",
+    checkingDetail: "This usually only takes a few seconds.",
     upToDateDetail: "This channel is already on the latest available version.",
     download: "Download",
     restart: "Restart",
@@ -60,7 +59,7 @@ const i18n = {
     available: (version: string) => `v${version} 可更新`,
     ready: (version: string) => `v${version} 已就绪`,
     error: "更新失败",
-    checkingDetail: "正在联系更新服务器并对比最新版本...",
+    checkingDetail: "通常只需要几秒。",
     upToDateDetail: "当前频道已是最新可用版本。",
     download: "下载",
     restart: "重启安装",
@@ -126,7 +125,11 @@ export function UpdateBanner({
     phase === "idle" && experience === "local-validation";
   const isLocalTestFeed = phase === "idle" && experience === "local-test-feed";
 
-  if ((phase === "idle" && experience === "normal") || dismissed) {
+  if (phase === "idle" && !isLocalValidation && !isLocalTestFeed) {
+    return null;
+  }
+
+  if (dismissed) {
     return null;
   }
 
@@ -140,7 +143,7 @@ export function UpdateBanner({
   const isAvailable = phase === "available";
   const isLocalInfo = isLocalValidation || isLocalTestFeed;
   const showsVersionDetails = (isAvailable || isReady) && Boolean(version);
-  const showsReleaseNotes = (isAvailable || isReady) && Boolean(releaseNotes);
+  const showsReleaseNotes = isAvailable && Boolean(releaseNotes);
   const downloadLabel =
     capability?.downloadMode === "external" ? t.manual : t.download;
   const applyLabel =

@@ -4,6 +4,10 @@
 
 感谢你为 nexu 花时间改进项目。本页说明如何参与 **代码**、**文档** 贡献，以及 **PR 与协作约定**。
 
+Nexu 开源共创招募中，欢迎一起来写代码、拿积分、上榜单。想低门槛开始，可以先看 [第一次提 PR 指南](/zh/guide/first-pr)。
+
+我们长期维护 [Good First Issue 列表](https://github.com/nexu-io/nexu/labels/good-first-issue)，题目边界清晰、方向聚焦，还配有 AI Prompt 模板，方便你更快上手。首次贡献者和 `good-first-issue` 认领者，我们也会尽量提供引导与反馈。更多说明见 [贡献奖励与支持](/zh/guide/contributor-rewards)。
+
 ## 社区准则
 
 - **行为准则：** 在 Issue、Discussion、PR 中请遵守仓库根目录的 [`CODE_OF_CONDUCT.md`](https://github.com/nexu-io/nexu/blob/main/CODE_OF_CONDUCT.md)。

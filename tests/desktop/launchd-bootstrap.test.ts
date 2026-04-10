@@ -427,6 +427,44 @@ describe("bootstrapWithLaunchd", () => {
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
   }, 15000);
 
+  it("passes Langfuse env through to generated plists", async () => {
+    const plistGenerator = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const generatePlistMock = plistGenerator.generatePlist as ReturnType<
+      typeof vi.fn
+    >;
+
+    const { bootstrapWithLaunchd } = await import(
+      "../../apps/desktop/main/services/launchd-bootstrap"
+    );
+
+    await bootstrapWithLaunchd(
+      makeBootstrapEnv({
+        langfusePublicKey: "pk_test",
+        langfuseSecretKey: "sk_test",
+        langfuseBaseUrl: "https://langfuse.example.com",
+      }) as never,
+    );
+
+    expect(generatePlistMock).toHaveBeenCalledWith(
+      "controller",
+      expect.objectContaining({
+        langfusePublicKey: "pk_test",
+        langfuseSecretKey: "sk_test",
+        langfuseBaseUrl: "https://langfuse.example.com",
+      }),
+    );
+    expect(generatePlistMock).toHaveBeenCalledWith(
+      "openclaw",
+      expect.objectContaining({
+        langfusePublicKey: "pk_test",
+        langfuseSecretKey: "sk_test",
+        langfuseBaseUrl: "https://langfuse.example.com",
+      }),
+    );
+  });
+
   it("tears down services on NEXU_HOME mismatch", async () => {
     const fsMock = await import("node:fs/promises");
     // runtime-ports.json exists with matching isDev

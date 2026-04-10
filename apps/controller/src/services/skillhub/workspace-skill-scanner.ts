@@ -34,7 +34,8 @@ export class WorkspaceSkillScanner {
     try {
       return readdirSync(dir, { withFileTypes: true })
         .filter((entry) => existsSync(join(dir, entry.name, "SKILL.md")))
-        .map((entry) => entry.name);
+        .map((entry) => entry.name)
+        .sort((left, right) => left.localeCompare(right));
     } catch {
       return [];
     }

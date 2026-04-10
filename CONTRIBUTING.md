@@ -4,6 +4,8 @@ This file is the **canonical English** contributing guide. The docs site embeds 
 
 Thank you for helping improve nexu. The sections below cover **code**, **documentation**, and **how we review changes**.
 
+If you want a lower-friction entry point, we are actively looking for **Good First Issue** contributors. Start with the [good-first-issue label](https://github.com/nexu-io/nexu/labels/good-first-issue) or the [Chinese first-PR guide](https://docs.nexu.io/zh/guide/first-pr).
+
 ## Community standards
 
 - **Code of conduct:** follow [`CODE_OF_CONDUCT.md`](https://github.com/nexu-io/nexu/blob/main/CODE_OF_CONDUCT.md) in all Issues, Discussions, and PRs.
