@@ -327,7 +327,7 @@ const zhSidebar = [
     text: "社区",
     items: [
       { text: "参与贡献", link: "/zh/guide/contributing" },
-      { text: "第一次提 PR", link: "/zh/guide/first-pr" },
+      { text: "Good First Issue 贡献者指南", link: "/zh/guide/first-pr" },
       { text: "贡献奖励与支持", link: "/zh/guide/contributor-rewards" },
       { text: "联系我们", link: "/zh/guide/contact" },
       { text: "给我们 Star", link: "/zh/guide/star" },
