@@ -320,7 +320,7 @@ export function compileChannelsConfig(params: {
             renderMode: "card",
             dmPolicy: "open",
             groupPolicy: "open",
-            requireMention: true,
+            requireMention: false,
             allowFrom: ["*"],
             accounts: feishuAccounts,
           },
