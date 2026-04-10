@@ -23,6 +23,7 @@ import {
   whatsappQrWaitResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
+import { logger } from "../lib/logger.js";
 import type { ControllerBindings } from "../types.js";
 
 const channelIdParamSchema = z.object({ channelId: z.string() });
@@ -128,6 +129,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_slack",
+        );
         return c.json(
           {
             message:
@@ -167,6 +172,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_discord",
+        );
         return c.json(
           {
             message:
@@ -206,6 +215,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_feishu",
+        );
         return c.json(
           {
             message:
@@ -246,6 +259,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_telegram",
+        );
         return c.json(
           {
             message:
@@ -287,6 +304,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_dingtalk",
+        );
         return c.json(
           {
             message:
@@ -373,6 +394,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_qqbot",
+        );
         return c.json(
           {
             message:
@@ -455,6 +480,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_wecom",
+        );
         return c.json(
           {
             message:
