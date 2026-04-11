@@ -197,6 +197,7 @@ const zhCN = {
   "home.minutesAgo": "{{count}} 分钟前活跃",
   "home.hoursAgo": "{{count}} 小时前活跃",
   "home.daysAgo": "{{count}} 天前活跃",
+  "home.chat": "对话",
   "home.feishu": "飞书",
   "home.channel.feishu": "飞书 / Feishu",
   "home.channel.slack": "Slack",
@@ -650,6 +651,13 @@ const zhCN = {
   "channels.openTelegramDesc":
     "打开你的 Bot 主页，发起私聊，或将它加入群组。群内只有在 @ 提及时才会回复。",
   "channels.openTelegramBot": "打开 Bot",
+  "channels.open": "打开",
+  "channels.openInDiscord": "在 Discord 中打开",
+  "channels.openInWhatsApp": "在 WhatsApp 中打开",
+  "channels.openInDingTalk": "在钉钉中打开",
+  "channels.openInWeCom": "在企微中打开",
+  "channels.openInQQ": "在 QQ 中打开",
+  "channels.openInWeChat": "在微信中打开",
   "channels.webhookUrl": "Webhook URL",
   "channels.credentials": "凭证",
   "channels.accountId": "账号 ID",
@@ -816,6 +824,7 @@ const zhCN = {
   "sessions.chat.replyLabel": "回复",
   "sessions.chat.toolActivity": "工具",
   "sessions.chat.toolCompleted": "已完成",
+  "sessions.openFolder": "打开文件夹",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "集成",

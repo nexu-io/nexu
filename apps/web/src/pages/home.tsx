@@ -1199,7 +1199,7 @@ export function HomePage() {
                           }}
                           className="inline-flex items-center gap-1 text-[12px] font-medium text-text-secondary hover:text-text-primary transition-colors ml-3 shrink-0 leading-none"
                         >
-                          Chat
+                          {t("home.chat")}
                           <ArrowUpRight size={12} className="-mt-px" />
                         </a>
                       )}
