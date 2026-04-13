@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --dir ./scripts/dev exec tsx ./src/index.ts",
+    "dev": "pnpm --dir ./tools/dev exec tsx ./src/index.ts",
     "build": "pnpm -r build",
     "check:esm-imports": "node scripts/check-esm-specifiers.mjs",
     "typecheck": "pnpm -r typecheck",

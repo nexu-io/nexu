@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file captures local guidance for the `scripts/dev` CLI surface.
+This file captures local guidance for the `tools/dev` CLI surface.
 
 ## CLI style
 
@@ -13,19 +13,19 @@ This file captures local guidance for the `scripts/dev` CLI surface.
 
 ## Architecture split
 
-- Keep the local-dev control plane centered in `scripts/dev/`; do not do a broad repo-wide `scripts/` migration.
+- Keep the local-dev control plane centered in `tools/dev/`.
 - Root `package.json` provides the single external entrypoint `pnpm dev ...` and should stay thin.
-- `scripts/dev/src/` is the assembly layer for service-level local-dev flows such as `web`, `controller`, and later `desktop`.
+- `tools/dev/src/` is the assembly layer for service-level local-dev flows such as `web`, `controller`, and later `desktop`.
 - Reusable script utilities belong in `packages/dev-utils/src/`.
 - `@nexu/dev-utils` should stay limited to repo-level atomic operations and helpers such as `commands`, `conditions`, `lock`, `process`, and path helpers.
-- Do not move service orchestration or lifecycle flows into `@nexu/dev-utils`; compose those in `scripts/dev/src/` from the atomic helpers.
-- Keep command behavior thin in `scripts/dev`, but keep service-specific assembly there rather than pushing it down into `@nexu/dev-utils`.
+- Do not move service orchestration or lifecycle flows into `@nexu/dev-utils`; compose those in `tools/dev/src/` from the atomic helpers.
+- Keep command behavior thin in `tools/dev`, but keep service-specific assembly there rather than pushing it down into `@nexu/dev-utils`.
 - Runtime outputs belong under `.tmp/dev/`.
 
 ## Command surface
 
 - Keep the command surface small and intentional.
-- Fresh-machine cold start is: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy scripts/dev/.env.example scripts/dev/.env` (Windows) or `cp scripts/dev/.env.example scripts/dev/.env` (POSIX).
+- Fresh-machine cold start is: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy tools/dev/.env.example tools/dev/.env` (Windows) or `cp tools/dev/.env.example tools/dev/.env` (POSIX).
 - Daily full-stack flow is: `pnpm dev start` -> work -> `pnpm dev restart` when you need a clean full restart -> `pnpm dev stop` when done.
 - Bare `pnpm dev start` runs the lightweight full local stack in dependency order: `openclaw` -> `controller` -> `web` -> `desktop`.
 - Bare `pnpm dev restart` restarts that stack by stopping in reverse order and starting again in dependency order.
@@ -33,7 +33,7 @@ This file captures local guidance for the `scripts/dev` CLI surface.
 - Explicit single-service control remains available: `pnpm dev start <desktop|openclaw|controller|web>`, `pnpm dev restart <service>`, `pnpm dev stop <service>`, `pnpm dev status <service>`, and `pnpm dev logs <service>`.
 - Do not reintroduce an `all` target or any other alias target name.
 - Validate behavior through the real command surface instead of temporary harness scripts.
-- Acceptance must be run from the repo root through `pnpm dev ...`, not by invoking `scripts/dev` internals directly.
+- Acceptance must be run from the repo root through `pnpm dev ...`, not by invoking `tools/dev` internals directly.
 - The focused acceptance chain is: `pnpm dev start` -> `pnpm dev status <service>` / `pnpm dev logs <service>` as needed -> `pnpm dev stop`.
 - For a quick full-stack snapshot, prefer bare `pnpm dev status`, which prints `openclaw`, `controller`, `web`, and `desktop` in order.
 - For human-friendly local logs, prefer pretty output during manual runs via an env override such as `NEXU_DEV_LOG_PRETTY=true pnpm dev start` (POSIX) or `$env:NEXU_DEV_LOG_PRETTY='true'; pnpm dev start` (PowerShell).
@@ -41,10 +41,10 @@ This file captures local guidance for the `scripts/dev` CLI surface.
 ## Runtime model
 
 - Root entrypoint stays `pnpm dev ...`.
-- The CLI executes through `pnpm --dir ./scripts/dev exec tsx ./src/index.ts`.
-- `scripts/dev` may use its own `tsconfig.json` features such as `paths`.
+- The CLI executes through `pnpm --dir ./tools/dev exec tsx ./src/index.ts`.
+- `tools/dev` may use its own `tsconfig.json` features such as `paths`.
 - `@nexu/dev-utils` is consumed from built `dist/` output at runtime; after editing `packages/dev-utils`, rebuild it with `pnpm --filter @nexu/dev-utils build` before validating `pnpm dev ...`.
-- `scripts/dev/.env.example` is the source-of-truth template for dev-only overrides. Only create `scripts/dev/.env` when you need local overrides for ports, URLs, state paths, config path, log dir, or the shared OpenClaw gateway token.
+- `tools/dev/.env.example` is the source-of-truth template for dev-only overrides. Only create `tools/dev/.env` when you need local overrides for ports, URLs, state paths, config path, log dir, or the shared OpenClaw gateway token.
 - Keep the repo-level pnpm build-script allowlist tight. Do not add Windows-only packaging tools such as `electron-winstaller` unless the team explicitly wants that behavior on every machine.
 - Logs should live under `.tmp/dev/logs/<run_id>/...`.
 - `pnpm dev logs <service>` should resolve the active session only, prepend a fixed metadata header, and tail at most 200 lines by default.

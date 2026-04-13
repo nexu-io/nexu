@@ -10,7 +10,7 @@ Nexu's OpenClaw runtime pipeline is currently split across multiple producers:
 - `openclaw-runtime-patches/` owns part of the patch set
 - `packages/dev-utils/src/openclaw-runtime-stage.ts` patches/stages runtime for dev
 - `apps/desktop/scripts/prepare-openclaw-sidecar.mjs` patches/stages runtime for desktop packaging
-- `scripts/dev/*`, `apps/controller/*`, `apps/desktop/*`, and tests directly reference legacy runtime paths and layouts
+- `tools/dev/*`, `apps/controller/*`, `apps/desktop/*`, and tests directly reference legacy runtime paths and layouts
 
 This means the repo does not have a single owner for:
 
@@ -96,7 +96,7 @@ Reason: tests already encode today's runtime contract. Leaving them behind would
 
 Representative existing couplings include:
 
-- `scripts/dev/src/shared/dev-runtime-config.ts`
+- `tools/dev/src/shared/dev-runtime-config.ts`
 - `apps/controller/src/runtime/openclaw-process.ts`
 - `apps/desktop/scripts/prepare-openclaw-sidecar.mjs`
 

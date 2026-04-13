@@ -342,7 +342,7 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  scripts/dev:
+  tools/dev:
     devDependencies:
       '@nexu/dev-utils':
         specifier: workspace:*

@@ -158,6 +158,8 @@ async function startTarget(
       logger.info("web started", webFact);
       return;
     }
+    default:
+      throw new Error(`unsupported start target: ${target}`);
   }
 }
 
@@ -183,6 +185,8 @@ async function stopTarget(target: DevTarget): Promise<void> {
       logger.info("web stopped", webFact);
       return;
     }
+    default:
+      throw new Error(`unsupported stop target: ${target}`);
   }
 }
 
@@ -211,6 +215,8 @@ async function restartTarget(
       logger.info("web restarted", webFact);
       return;
     }
+    default:
+      throw new Error(`unsupported restart target: ${target}`);
   }
 }
 
@@ -240,6 +246,8 @@ async function printStatus(target: DevTarget): Promise<void> {
       warnIfSnapshotIsStale(webSnapshot);
       return;
     }
+    default:
+      throw new Error(`unsupported status target: ${target}`);
   }
 }
 

@@ -78,19 +78,19 @@ This repo is desktop-first. Prefer the controller-first path and remove or ignor
 
 ## Desktop local development
 
-- Minimal cold-start setup on a fresh machine is: `pnpm install` -> `pnpm --filter @nexu/shared build` -> copy `scripts/dev/.env.example` to `scripts/dev/.env` only if you need dev-only overrides.
+- Minimal cold-start setup on a fresh machine is: `pnpm install` -> `pnpm --filter @nexu/shared build` -> copy `tools/dev/.env.example` to `tools/dev/.env` only if you need dev-only overrides.
 - Default daily flow is: `pnpm dev start` -> `pnpm dev status <service>` / `pnpm dev logs <service>` as needed -> `pnpm dev stop`.
 - Use `pnpm dev restart` for a clean full-stack recycle; use `pnpm dev restart <service>` only when you are intentionally touching one service.
 - Explicit single-service control remains available through `pnpm dev start <desktop|openclaw|controller|web>`, `pnpm dev stop <service>`, `pnpm dev restart <service>`, `pnpm dev status <service>`, and `pnpm dev logs <service>`.
 - Desktop dev inspect is available through `pnpm dev inspect screenshot`, `pnpm dev inspect eval "<expr>"`, `pnpm dev inspect dom`, and `pnpm dev inspect logs` for agent-friendly renderer inspection without exposing a public production API.
 - `pnpm dev` intentionally does not support `all`; the full local stack order remains `openclaw` -> `controller` -> `web` -> `desktop`.
 - `pnpm dev logs <service>` is session-scoped, prints a fixed header, and tails at most the last 200 lines from the active service session.
-- `scripts/dev/.env.example` is the source-of-truth template for dev-only overrides. Copy it to `scripts/dev/.env` only when you need to override ports, URLs, state paths, or the shared OpenClaw gateway token for local development.
+- `tools/dev/.env.example` is the source-of-truth template for dev-only overrides. Copy it to `tools/dev/.env` only when you need to override ports, URLs, state paths, or the shared OpenClaw gateway token for local development.
 - Keep the detailed startup optimization rules, cache invalidation behavior, and troubleshooting notes in `specs/guides/desktop-runtime-guide.md`; keep only the core workflow expectations here.
 - The repo also includes a local Slack reply smoke probe at `scripts/probe/slack-reply-probe.mjs` (`pnpm probe:slack prepare` / `pnpm probe:slack run`) for verifying the end-to-end Slack DM reply path after local runtime or OpenClaw changes.
 - The Slack smoke probe is not zero-setup: install Chrome Canary first, then manually log into Slack in the opened Canary window before running `pnpm probe:slack run`.
-- The desktop dev launcher is `scripts/dev/`; it is the unified source of truth for local dev orchestration, including platform-specific desktop launch preparation and runtime cleanup.
-- `pnpm dev` desktop launch is owned by `scripts/dev`, which starts the desktop Vite worker and Electron main process explicitly while routing platform-specific setup through `scripts/dev/src/shared/platform/desktop-dev-platform.*`. On macOS, the darwin helper patches the dev Electron binary's `LSUIElement` and refreshes Launch Services metadata before launch.
+- The desktop dev launcher is `tools/dev/`; it is the unified source of truth for local dev orchestration, including platform-specific desktop launch preparation and runtime cleanup.
+- `pnpm dev` desktop launch is owned by `tools/dev`, which starts the desktop Vite worker and Electron main process explicitly while routing platform-specific setup through `tools/dev/src/shared/platform/desktop-dev-platform.*`. On macOS, the darwin helper patches the dev Electron binary's `LSUIElement` and refreshes Launch Services metadata before launch.
 - `pnpm stop` behavior: sends SIGTERM first (triggers `gracefulShutdown` inside Electron → teardown launchd services → dispose orchestrator → kill orphans), waits up to 10 seconds for graceful exit, then SIGKILL as fallback. Also kills tsc watcher and web watcher background processes.
 - Treat `pnpm start` as the canonical cold-start entrypoint for the full local desktop runtime.
 - The active desktop runtime path is controller-first: desktop launches `controller + web + openclaw` and no longer starts local `api`, `gateway`, or `pglite` sidecars.
@@ -173,7 +173,7 @@ The desktop test suite includes real launchd integration tests that run on macOS
 - `scripts/launchd-lifecycle-e2e.sh` — shell-based e2e: bootstrap → verify → teardown → orphan cleanup → re-bootstrap
 - `scripts/desktop-stop-smoke.sh` — post-stop verification: no residual processes, free ports, no stale state
 - `tests/desktop/data-directory-runtime.test.ts` — verifies every plist env var value by calling real `generatePlist()`
-- `tests/desktop/dev-toolchain-invariants.test.ts` — guards against desktop dev-launch regressions (scripts/dev platform helpers remain the single desktop launch decision point, launchd manifests keep `ELECTRON_RUN_AS_NODE`, etc.)
+- `tests/desktop/dev-toolchain-invariants.test.ts` — guards against desktop dev-launch regressions (tools/dev platform helpers remain the single desktop launch decision point, launchd manifests keep `ELECTRON_RUN_AS_NODE`, etc.)
 
 ## Hard rules
 
@@ -242,7 +242,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | API coding patterns | `specs/references/api-patterns.md` |
 | Workspace templates | `specs/guides/workspace-templates.md` |
 | Local Slack smoke probe | `scripts/probe/README.md`, `scripts/probe/slack-reply-probe.mjs` |
-| Local dev CLI guidance | `scripts/dev/AGENTS.md` |
+| Local dev CLI guidance | `tools/dev/AGENTS.md` |
 | Frontend conventions | `specs/FRONTEND.md` |
 | Desktop runtime guide | `specs/guides/desktop-runtime-guide.md` |
 | Desktop update testing guide | `specs/guides/desktop-update-testing.md` |
@@ -262,7 +262,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | External runner extraction | `apps/desktop/main/services/launchd-bootstrap.ts` (`ensureExternalNodeRunner`, `resolveLaunchdPaths`) |
 | Desktop auto-updater | `apps/desktop/main/updater/update-manager.ts` (`checkCriticalPathsLocked`, `ensureNexuProcessesDead`) |
 | Entitlements (V8 JIT) | `apps/desktop/build/entitlements.mac.plist`, `apps/desktop/build/entitlements.mac.inherit.plist` |
-| Dev launch scripts | `scripts/dev-launchd.sh`, `scripts/dev/src/services/desktop.ts`, `scripts/dev/src/shared/platform/desktop-dev-platform.*` |
+| Dev launch scripts | `scripts/dev-launchd.sh`, `tools/dev/src/services/desktop.ts`, `tools/dev/src/shared/platform/desktop-dev-platform.*` |
 | Launchd stability tests | `tests/desktop/launchd-integration.test.ts`, `scripts/launchd-lifecycle-e2e.sh` |
 | Entitlements regression tests | `tests/desktop/entitlements-plist.test.ts` |
 | Stop smoke test | `scripts/desktop-stop-smoke.sh` |
@@ -343,7 +343,7 @@ This note should track:
 ## Local quick reference
 
 - Controller env path: `apps/controller/.env`
-- Fresh local-dev cold start: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy scripts/dev/.env.example scripts/dev/.env` (Windows) or `cp scripts/dev/.env.example scripts/dev/.env` (POSIX) -> `pnpm dev start`
+- Fresh local-dev cold start: `pnpm install` -> `pnpm --filter @nexu/shared build` -> optional `copy tools/dev/.env.example tools/dev/.env` (Windows) or `cp tools/dev/.env.example tools/dev/.env` (POSIX) -> `pnpm dev start`
 - Daily local-dev flow: `pnpm dev start` -> `pnpm dev logs <service>` / `pnpm dev status <service>` when needed -> `pnpm dev restart` for a clean recycle -> `pnpm dev stop`
 - Desktop inspect quick checks: `pnpm dev inspect screenshot`, `pnpm dev inspect eval "document.title"`, `pnpm dev inspect dom --max-html-length 1200`, `pnpm dev inspect logs --limit 20`
 - Desktop proxy env vars: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (desktop normalizes mixed-case inputs, always merges `localhost,127.0.0.1,::1` into `NO_PROXY`, and propagates uppercase values to child processes)
