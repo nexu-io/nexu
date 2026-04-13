@@ -91,11 +91,11 @@ Fork 仓库，开一个清晰的分支名，在 PR 描述里写清：
 
 合并后，就会进入致谢、积分和排行榜流程。
 
-## 加入贡献者交流群 💬
+## 加入 nexu 开发者飞书交流群 💬
 
 一个人研究不如一群人一起聊。群里有维护者、有老贡献者，扫码进群，聊聊你想做的第一个贡献 👇
 
-<img src="/wechat-contributor-qr.png" width="200" alt="nexu 贡献者微信交流群" />
+<img src="/feishu-contributor-qr.png" width="200" alt="nexu 开发者飞书交流群" />
 
 ## 常见问题
 

@@ -49,7 +49,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const userInteractedRef = useRef(false);
 
   useEffect(() => {
-    i18n.changeLanguage(locale);
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
   }, [locale]);
 
   useEffect(() => {
@@ -62,6 +62,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback((l: Locale) => {
     userInteractedRef.current = true;
+    void i18n.changeLanguage(l);
     setLocaleState(l);
     try {
       localStorage.setItem(STORAGE_KEY, l);
@@ -119,6 +120,7 @@ async function bootstrapLocale(
 
   if (storedLocale === "en" || storedLocale === "zh-CN") {
     const nextLocale = storedLocale === "zh-CN" ? "zh" : "en";
+    await i18n.changeLanguage(nextLocale);
     setLocaleState(nextLocale);
     try {
       localStorage.setItem(STORAGE_KEY, nextLocale);

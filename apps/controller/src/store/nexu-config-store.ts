@@ -612,7 +612,7 @@ export class NexuConfigStore {
   /** Callback fired when cloud state changes (connect/disconnect). */
   onCloudStateChanged?: (change: DesktopCloudStateChange) => Promise<void>;
 
-  constructor(env: ControllerEnv) {
+  constructor(private readonly env: ControllerEnv) {
     this.store = new LowDbStore<NexuConfig>(
       env.nexuConfigPath,
       nexuConfigSchema,
@@ -929,16 +929,41 @@ export class NexuConfigStore {
     if (existing.length > 0) {
       const firstBot = existing[0];
       if (firstBot) {
+        logger.info(
+          {
+            botId: firstBot.id,
+            slug: firstBot.slug,
+            workspacePath: path.join(
+              this.env.openclawStateDir,
+              "agents",
+              firstBot.id,
+            ),
+            existingBotCount: existing.length,
+            resolution: "reused_existing",
+          },
+          "default_bot_resolution",
+        );
         return firstBot;
       }
     }
 
     const config = await this.getConfig();
-    return this.createBot({
+    const bot = await this.createBot({
       name: "nexu Assistant",
       slug: "nexu-assistant",
       modelId: config.runtime.defaultModelId,
     });
+    logger.info(
+      {
+        botId: bot.id,
+        slug: bot.slug,
+        workspacePath: path.join(this.env.openclawStateDir, "agents", bot.id),
+        existingBotCount: existing.length,
+        resolution: "created_implicit_default",
+      },
+      "default_bot_resolution",
+    );
+    return bot;
   }
 
   async createBot(input: {
@@ -965,6 +990,16 @@ export class NexuConfigStore {
       ...config,
       bots: [...config.bots, bot],
     }));
+
+    logger.info(
+      {
+        botId: bot.id,
+        slug: bot.slug,
+        workspacePath: path.join(this.env.openclawStateDir, "agents", bot.id),
+        createdVia: "nexu_config_store.createBot",
+      },
+      "bot_created",
+    );
 
     return bot;
   }

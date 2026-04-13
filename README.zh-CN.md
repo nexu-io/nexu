@@ -5,7 +5,7 @@
 <h1 align="center">nexu</h1>
 
 <p align="center">
-  <strong>最简单的微信 & 飞书 OpenClaw 🦞 开源桌面客户端</strong>
+  <strong>让你的 AI Agent 直接运行在微信、飞书、Slack 等 IM 中的开源桌面客户端</strong>
 </p>
 
 <p align="center">
@@ -30,9 +30,7 @@
 
 > 🦞 **最丝滑接入微信 OpenClaw**：扫码即连，开箱即用。
 >
-> 🖥 **已支持平台**：macOS（Apple Silicon）· macOS（Intel）· Windows — [下载地址](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf)
->
-> 🎉 **内测福利**：内测期间，Gemini 等顶级模型 **免费使用**。[立即下载体验 →](https://nexu.io)
+> 🖥 **已支持平台**：macOS（Apple Silicon）· macOS（Intel）· Windows — [立即下载](https://nexu.io)
 
 ---
 
@@ -155,13 +153,11 @@ nexu 面向 **One Person Company** 与小团队，让一个人就能拥有一支
 
 ### 安装
 
-**推荐：直接下载客户端**
-
 | 平台 | 下载 |
 |------|------|
-| 🍎 macOS（Apple Silicon） | [官网](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
-| 🍎 macOS（Intel） | [下载](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf) |
-| 🪟 Windows | [下载](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf) |
+| 🍎 macOS（Apple Silicon） | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🍎 macOS（Intel） | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🪟 Windows | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
 
 ### 首次启动
 
@@ -181,7 +177,6 @@ nexu 面向 **One Person Company** 与小团队，让一个人就能拥有一支
 ```
 nexu/
 ├── apps/
-│   ├── api/              # 后端 API
 │   ├── web/              # Web 前端
 │   ├── desktop/          # 桌面客户端（Electron）
 │   └── controller/       # 控制器
@@ -194,10 +189,10 @@ nexu/
 ### 常用命令
 
 ```bash
-pnpm run dev             # 开发环境（热重载）
-pnpm run dev:desktop     # 桌面客户端
-pnpm run build           # 生产构建
-pnpm run lint
+pnpm dev start           # 启动完整本地开发栈（热重载）
+pnpm dev stop            # 停止本地开发栈
+pnpm build               # 生产构建
+pnpm lint
 pnpm test
 ```
 
@@ -205,7 +200,7 @@ pnpm test
 
 ## 🤝 贡献
 
-欢迎贡献！**英文权威指南**在仓库根目录 [CONTRIBUTING.md](CONTRIBUTING.md)（GitHub 发起 PR 时会重点展示）。文档站会同步嵌入该文件：[docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing)。**中文指南：** [docs.nexu.io 参与贡献](https://docs.nexu.io/zh/guide/contributing) · [docs/zh/guide/contributing.md](docs/zh/guide/contributing.md)。
+欢迎贡献！详细指南在仓库根目录 [CONTRIBUTING.md](CONTRIBUTING.md)，也可访问 [docs.nexu.io — 参与贡献](https://docs.nexu.io/zh/guide/contributing)。
 
 1. 🍴 Fork 本仓库
 2. 🌿 创建功能分支（`git checkout -b feature/amazing-feature`）
@@ -225,7 +220,7 @@ pnpm test
 ## ❓ FAQ
 
 **Q: nexu 免费吗？**
-A: 客户端完全免费且开源（MIT）。内置多款顶级模型供你使用，也可以选择自带 API Key。
+A: 客户端完全免费且开源（MIT）。内置多款顶级模型，也可以选择自带 API Key。
 
 **Q: 支持哪些操作系统？**
 A: 支持 macOS 12+（Apple Silicon & Intel）和 Windows 10+。
@@ -317,7 +312,7 @@ Nexu 开源共创招募中，欢迎一起来写代码、拿积分、上榜单。
 
 ## 📄 许可证
 
-nexu 基于 [MIT License](LICENSE) 开源——你可以自由使用、修改、分发。
+nexu 基于 [MIT License](LICENSE) 开源——你可以自由使用、修改、分发，包括商业用途。
 
 我们相信开源是 AI 基础设施的未来。欢迎 fork、贡献、或基于 nexu 构建你自己的产品。
 

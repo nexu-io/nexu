@@ -354,7 +354,11 @@ export class UpdateManager {
           this.downloadMode = "idle";
         }
 
-        this.send("update:error", { message: error.message, diagnostic });
+        this.send("update:error", {
+          message: error.message,
+          rawMessage: error.message,
+          diagnostic,
+        });
       },
     });
   }

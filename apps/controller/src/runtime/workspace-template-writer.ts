@@ -67,6 +67,16 @@ export class WorkspaceTemplateWriter {
         // silently destroy self-evolution state.
         if (await this.pathExists(targetPath)) {
           preservedCount += 1;
+          logger.debug(
+            {
+              botId,
+              workspaceDir,
+              sourcePath,
+              targetPath,
+              decision: "preserved",
+            },
+            "platform_template_file_decision",
+          );
           continue;
         }
 
@@ -76,6 +86,16 @@ export class WorkspaceTemplateWriter {
           errorOnExist: false,
         });
         seededCount += 1;
+        logger.debug(
+          {
+            botId,
+            workspaceDir,
+            sourcePath,
+            targetPath,
+            decision: "seeded",
+          },
+          "platform_template_file_decision",
+        );
       }
 
       logger.debug(

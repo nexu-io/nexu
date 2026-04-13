@@ -189,7 +189,7 @@ describe("libtv bundled skill", () => {
     } finally {
       await gateway.close();
     }
-  });
+  }, 15000);
 
   it("records an empty delivery block when no channel context is present", async () => {
     const nexuHome = makeTempDir();

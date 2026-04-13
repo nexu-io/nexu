@@ -147,6 +147,7 @@ const enSidebar = [
   {
     text: "Help",
     items: [
+      { text: "Windows Installation Guide", link: "/guide/windows-install" },
       { text: "Update Guide", link: "/guide/update" },
       { text: "Troubleshooting", link: "/guide/troubleshooting" },
     ],
@@ -205,6 +206,7 @@ const jaSidebar = [
   {
     text: "ヘルプ",
     items: [
+      { text: "Windows インストールガイド", link: "/ja/guide/windows-install" },
       { text: "アップデートガイド", link: "/ja/guide/update" },
       { text: "トラブルシューティング", link: "/ja/guide/troubleshooting" },
     ],
@@ -264,6 +266,7 @@ const koSidebar = [
   {
     text: "도움말",
     items: [
+      { text: "Windows 설치 가이드", link: "/ko/guide/windows-install" },
       { text: "업데이트 가이드", link: "/ko/guide/update" },
       { text: "문제 해결", link: "/ko/guide/troubleshooting" },
     ],
@@ -272,6 +275,8 @@ const koSidebar = [
     text: "커뮤니티",
     items: [
       { text: "기여하기", link: "/ko/guide/contributing" },
+      { text: "Good First Issue 기여자 가이드", link: "/ko/guide/first-pr" },
+      { text: "기여자 보상 및 지원", link: "/ko/guide/contributor-rewards" },
       { text: "문의하기", link: "/ko/guide/contact" },
       { text: "GitHub에서 Star 하기", link: "/ko/guide/star" },
       { text: "변경 로그", link: "https://github.com/nexu-io/nexu/releases" },
@@ -322,7 +327,7 @@ const zhSidebar = [
   {
     text: "帮助",
     items: [
-      { text: "Windows 内测使用指南", link: "/zh/guide/windows-beta" },
+      { text: "Windows 正式版安装指南", link: "/zh/guide/windows-install" },
       { text: "更新指南", link: "/zh/guide/update" },
       { text: "修复指南", link: "/zh/guide/troubleshooting" },
     ],

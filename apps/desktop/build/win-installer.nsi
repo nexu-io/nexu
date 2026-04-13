@@ -837,15 +837,35 @@ Function .onInit
   Call LogInstallerEvent
   StrCpy $UserDataDir "$OldUserDataDir"
   StrCpy $MigrationStrategy "move"
-  nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq Nexu.exe" /NH'
+check_app_running:
+  nsExec::ExecToStack '"$SYSDIR\tasklist.exe" /FI "IMAGENAME eq Nexu.exe" /FO CSV /NH'
   Pop $0
   Pop $1
-  StrCpy $2 $1 8
-  ${If} $0 == "0"
-  ${AndIf} $2 == "Nexu.exe"
-    MessageBox MB_OK|MB_ICONEXCLAMATION "$(Lang_ErrorAppRunning)"
+  ${If} $0 != "0"
+    Push "installer init app-running check failed exit=$0 output=$1"
+    Call LogInstallerEvent
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(Lang_ErrorAppRunningCheckFailedRetry)" IDRETRY app_running_retry
+    Push "installer init cancelled after app-running check failure"
+    Call LogInstallerEvent
     Abort
   ${EndIf}
+  StrCpy $2 $1 10
+  ${If} $2 == '"Nexu.exe"'
+    Push "installer init detected running Nexu instance"
+    Call LogInstallerEvent
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(Lang_ErrorAppRunningRetry)" IDRETRY app_running_retry
+    Push "installer init cancelled because Nexu is still running"
+    Call LogInstallerEvent
+    Abort
+  ${EndIf}
+  Push "installer init app-running check passed"
+  Call LogInstallerEvent
+  Goto on_init_done
+app_running_retry:
+  Push "installer init retry requested after running-app prompt"
+  Call LogInstallerEvent
+  Goto check_app_running
+on_init_done:
 FunctionEnd
 
 Section "Install"

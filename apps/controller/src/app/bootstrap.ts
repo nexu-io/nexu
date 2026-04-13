@@ -6,11 +6,16 @@ export async function bootstrapController(
 ): Promise<() => void> {
   logger.info(
     {
+      nexuHomeDir: container.env.nexuHomeDir,
       openclawOwnershipMode: container.env.openclawOwnershipMode,
       openclawBaseUrl: container.env.openclawBaseUrl,
       openclawConfigPath: container.env.openclawConfigPath,
       openclawStateDir: container.env.openclawStateDir,
+      openclawSkillsDir: container.env.openclawSkillsDir,
+      openclawWorkspaceTemplatesDir:
+        container.env.openclawWorkspaceTemplatesDir,
       openclawLogDir: container.env.openclawLogDir,
+      platformTemplatesDir: container.env.platformTemplatesDir ?? null,
     },
     "controller_bootstrap_runtime_contract",
   );

@@ -200,6 +200,7 @@ const en = {
   "home.minutesAgo": "Active {{count}} min ago",
   "home.hoursAgo": "Active {{count}} hr ago",
   "home.daysAgo": "Active {{count}} days ago",
+  "home.chat": "Chat",
   "home.feishu": "Feishu",
   "home.channel.feishu": "Feishu / Feishu",
   "home.channel.slack": "Slack",
@@ -688,6 +689,13 @@ const en = {
   "channels.openTelegramDesc":
     "Open your bot profile, start a direct chat, or add it to a group. Group replies work when the bot is mentioned.",
   "channels.openTelegramBot": "Open Bot",
+  "channels.open": "Open",
+  "channels.openInDiscord": "Open in Discord",
+  "channels.openInWhatsApp": "Open in WhatsApp",
+  "channels.openInDingTalk": "Open in DingTalk",
+  "channels.openInWeCom": "Open in WeCom",
+  "channels.openInQQ": "Open in QQ",
+  "channels.openInWeChat": "Open in WeChat",
   "channels.webhookUrl": "Webhook URL",
   "channels.credentials": "Credentials",
   "channels.accountId": "Account ID",
@@ -862,6 +870,7 @@ const en = {
   "sessions.chat.replyLabel": "Reply",
   "sessions.chat.toolActivity": "Tool",
   "sessions.chat.toolCompleted": "Completed",
+  "sessions.openFolder": "Open Folder",
 
   // ── Integrations Page ──
   "integrations.pageTitle": "Integrations",
