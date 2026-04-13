@@ -103,8 +103,9 @@ https://github.com/nexu-io/nexu/pull/834
 ## 本地测试注意事项
 
 ### Patch 会被还原
-- `pnpm start` 会 `pnpm build`，build 不影响 `openclaw-runtime/` 的 patch
-- `pnpm install` / `pnpm install --force` **会还原** `openclaw-runtime/node_modules/openclaw/dist/` 的所有 patch
+- 当前 patch source-of-truth 在 `packages/slimclaw/runtime-patches/`，不是顶层 `openclaw-runtime/`
+- `pnpm start` 会触发 build/prepare；源码 patch 文件不会被还原，但运行时产物会按 slimclaw 的 prepare/stage 流程重新生成
+- 如果你在 prepared runtime 产物里做临时手改（例如 `packages/slimclaw/.dist-runtime/openclaw/...` 或桌面 sidecar staging 目录），后续 `pnpm slimclaw:prepare`、桌面打包、或相关 prepare 流程会覆盖这些改动
 - 手动 patch 后用 `launchctl kickstart -k gui/$(id -u)/io.nexu.openclaw.dev` 只重启 OpenClaw（不触发 build/install）
 
 ### 需要 patch 的 bundle 文件
