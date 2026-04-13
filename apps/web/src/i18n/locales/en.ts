@@ -448,6 +448,9 @@ const en = {
   "settings.general.loggedOutHint":
     "Sign in to sync settings and use premium models.",
   "settings.general.goLogin": "Go to sign in",
+  "settings.general.logoutConfirmTitle": "Log out of your nexu account?",
+  "settings.general.logoutConfirmDescription":
+    "This will disconnect your current nexu account from this desktop workspace.",
   "settings.general.preferences": "Preferences",
   "settings.general.language": "Language",
   "settings.general.languageHint": "Choose your interface language",
@@ -582,6 +585,9 @@ const en = {
     "Sign in with your nexu account to access unlimited premium models like Claude Opus 4.6, GPT-5.4, and more — no API key needed.",
   "models.managed.waitingLogin": "Waiting for browser login...",
   "models.managed.loginButton": "Sign in to nexu",
+  "models.managed.logoutConfirmTitle": "Log out of nexu Official?",
+  "models.managed.logoutConfirmDescription":
+    "This will disconnect nexu Official from your current nexu account on this device.",
   "models.managed.availableModels": "Available models",
   "models.managed.refreshSucceeded": "Models refreshed",
   "models.managed.refreshFailed": "Could not refresh models",
