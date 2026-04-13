@@ -4,8 +4,7 @@ on:
   pull_request_target:
     types: [opened]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   notify:
@@ -20,7 +19,6 @@ jobs:
           URL: ${{ github.event.pull_request.html_url }}
           NUMBER: ${{ github.event.pull_request.number }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
-          BODY: ${{ github.event.pull_request.body }}
           LABELS_OR_CATEGORY: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
           REPO: ${{ github.repository }}
         run: |
@@ -30,9 +28,25 @@ jobs:
           const url = process.env.URL ?? "";
           const number = process.env.NUMBER ?? "";
           const author = process.env.AUTHOR ?? "";
-          const body = process.env.BODY ?? "";
           const labelsOrCategory = process.env.LABELS_OR_CATEGORY || "none";
           const repo = process.env.REPO ?? "";
+
+          function truncate(value, maxLength) {
+            return value.length > maxLength
+              ? `${value.slice(0, maxLength)}...`
+              : value;
+          }
+
+          function sanitizeText(value) {
+            return truncate(
+              value
+                .replace(/[\r\n\t]+/g, " ")
+                .replace(/[\\`*_{}\[\]()#+\-.!|<>~]/g, "\\$&")
+                .replace(/@/g, "＠")
+                .trim(),
+              200,
+            );
+          }
 
           if (!webhookUrl) {
             console.error("WEBHOOK_URL is required");
@@ -51,8 +65,22 @@ jobs:
             process.exit(0);
           }
 
-          const bodySnippet =
-            body.length > 200 ? `${body.slice(0, 200)}...` : body || "(no description)";
+          const safeTitle = sanitizeText(title) || "(untitled PR)";
+          const safeAuthor = sanitizeText(author);
+          const safeLabels = sanitizeText(labelsOrCategory) || "none";
+          const safeRepo = sanitizeText(repo) || "unknown repo";
+
+          let safeUrl = url;
+          try {
+            const parsedUrl = new URL(url);
+            if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "github.com") {
+              throw new Error("Only https://github.com URLs are allowed");
+            }
+            safeUrl = parsedUrl.toString();
+          } catch (error) {
+            console.error(`Invalid pull request URL: ${error}`);
+            process.exit(1);
+          }
 
           const payload = {
             msg_type: "interactive",
@@ -61,20 +89,19 @@ jobs:
               header: {
                 title: {
                   tag: "plain_text",
-                  content: `[${repo}] New Pull Request #${number}: ${title}`,
+                  content: `[${safeRepo}] New Pull Request #${number}: ${safeTitle}`,
                 },
                 template: "purple",
               },
               body: {
                 direction: "vertical",
                 elements: [
-                  { tag: "markdown", content: `**Author:** ${author}` },
-                  { tag: "markdown", content: `**Labels:** ${labelsOrCategory}` },
-                  { tag: "markdown", content: bodySnippet },
+                  { tag: "markdown", content: `**Author:** ${safeAuthor}` },
+                  { tag: "markdown", content: `**Labels:** ${safeLabels}` },
                   {
                     tag: "button",
                     text: { tag: "plain_text", content: "View Pull Request" },
-                    url,
+                    url: safeUrl,
                     type: "primary",
                   },
                 ],
