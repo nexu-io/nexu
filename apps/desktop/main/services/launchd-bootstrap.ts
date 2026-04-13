@@ -67,6 +67,8 @@ export interface LaunchdBootstrapEnv {
   userDataPath?: string;
   /** Build source identifier (e.g. "stable", "beta") — persisted for cross-build attach validation */
   buildSource?: string;
+  /** Packaged runtime identity path (usually process.resourcesPath) for test bundle isolation */
+  runtimeIdentityPath?: string;
 
   // --- Controller env vars (must match manifests.ts) ---
   /** Web UI URL for CORS/redirects */
@@ -147,6 +149,8 @@ interface RuntimePortsMetadata {
   userDataPath?: string;
   /** Build source identifier (e.g. "stable", "beta", "dev") — used to prevent cross-attach. */
   buildSource?: string;
+  /** Runtime identity path (usually process.resourcesPath) — used to prevent same-version test bundles cross-attaching. */
+  runtimeIdentityPath?: string;
 }
 
 /**
@@ -757,6 +761,11 @@ export async function bootstrapWithLaunchd(
           ],
           ["userDataPath", recovered.userDataPath, env.userDataPath],
           ["buildSource", recovered.buildSource, env.buildSource],
+          [
+            "runtimeIdentityPath",
+            recovered.runtimeIdentityPath,
+            env.runtimeIdentityPath,
+          ],
         ] as const
       ).some(
         ([, recoveredVal, envVal]) =>
@@ -766,7 +775,7 @@ export async function bootstrapWithLaunchd(
     if (versionMismatch || identityMismatch) {
       const reason = versionMismatch
         ? `App version changed (${recovered.appVersion} → ${env.appVersion})`
-        : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)";
+        : "Build identity mismatch (openclawStateDir, userDataPath, buildSource, or runtimeIdentityPath differ)";
       console.log(
         `[bootstrap] teardown: ${reason} (controller=${controllerRunning ? "running" : "stopped"} openclaw=${openclawRunning ? "running" : "stopped"})`,
       );
@@ -1206,6 +1215,7 @@ export async function bootstrapWithLaunchd(
     openclawStateDir: env.openclawStateDir,
     userDataPath: env.userDataPath,
     buildSource: env.buildSource,
+    runtimeIdentityPath: env.runtimeIdentityPath,
   });
 
   return {

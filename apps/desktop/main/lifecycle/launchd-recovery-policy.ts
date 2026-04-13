@@ -7,6 +7,7 @@ export interface LaunchdRecoveryEnvIdentity {
   openclawStateDir?: string;
   userDataPath?: string;
   buildSource?: string;
+  runtimeIdentityPath?: string;
 }
 
 export interface LaunchdRecoveredPorts {
@@ -94,6 +95,7 @@ export function decideLaunchdRecovery(args: {
         [recovered.openclawStateDir, env.openclawStateDir],
         [recovered.userDataPath, env.userDataPath],
         [recovered.buildSource, env.buildSource],
+        [recovered.runtimeIdentityPath, env.runtimeIdentityPath],
       ] as const
     ).some(
       ([recoveredVal, envVal]) =>
@@ -105,7 +107,7 @@ export function decideLaunchdRecovery(args: {
       action: "teardown-stale-services",
       reason: versionMismatch
         ? `App version changed (${recovered.appVersion} -> ${env.appVersion})`
-        : "Build identity mismatch (openclawStateDir, userDataPath, or buildSource differ)",
+        : "Build identity mismatch (openclawStateDir, userDataPath, buildSource, or runtimeIdentityPath differ)",
       deleteSession: true,
     };
   }

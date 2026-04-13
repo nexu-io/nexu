@@ -17,6 +17,7 @@ export interface LaunchdRuntimeSessionMetadata {
   openclawStateDir?: string;
   userDataPath?: string;
   buildSource?: string;
+  runtimeIdentityPath?: string;
 }
 
 export function getLaunchdRuntimeSessionPath(plistDir: string): string {
