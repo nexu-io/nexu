@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-runtime",
+  "name": "slimclaw-runtime-seed",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.6.2",

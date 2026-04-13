@@ -15,7 +15,7 @@ import {
   getOpenClawCommandSpec,
   requireArtifactBackedOpenClawRuntime,
   resolveControllerOpenClawRuntime,
-} from "../src/runtime/openclaw-runtime-resolution.js";
+} from "../src/runtime/slimclaw-runtime-resolution.js";
 
 function createEnv(overrides: Partial<ControllerEnv> = {}): ControllerEnv {
   return {

@@ -21,7 +21,7 @@ import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
-import { getOpenClawCommandSpec } from "../runtime/openclaw-runtime-resolution.js";
+import { getOpenClawCommandSpec } from "../runtime/slimclaw-runtime-resolution.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawAuthService } from "./openclaw-auth-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";

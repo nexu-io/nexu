@@ -12,7 +12,7 @@ const originalCacheInputs = [...cacheInputs];
 
 async function createRuntimeFixture() {
   const tempRoot = await mkdtemp(
-    path.join(tmpdir(), "openclaw-runtime-cache-"),
+    path.join(tmpdir(), "slimclaw-runtime-cache-"),
   );
   tempDirs.push(tempRoot);
 
@@ -40,7 +40,7 @@ afterEach(async () => {
   );
 });
 
-describe("openclaw-runtime postinstall cache fingerprint", () => {
+describe("slimclaw runtime postinstall cache fingerprint", () => {
   it("ignores docs-only changes outside cache inputs", async () => {
     const runtimeDir = await createRuntimeFixture();
     const before = await computeFingerprint(runtimeDir);

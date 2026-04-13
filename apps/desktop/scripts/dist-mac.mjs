@@ -109,11 +109,11 @@ async function ensureExistingRuntimeInstall() {
   await Promise.all([
     ensureExistingPath(
       resolve(runtimeRoot, "node_modules"),
-      "openclaw-runtime install",
+      "slimclaw runtime install",
     ),
     ensureExistingPath(
       resolve(runtimeRoot, ".postinstall-cache.json"),
-      "openclaw-runtime cache",
+      "slimclaw runtime cache",
     ),
   ]);
 }
@@ -635,7 +635,7 @@ async function main() {
 
   if (process.arch !== targetMacArch) {
     throw new Error(
-      `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead. For Intel validation, run pnpm dist:mac:unsigned:x64 on an Intel Mac after openclaw-runtime pruning removes clipboard natives and any optional DAVE binaries you intentionally disabled.`,
+      `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead. For Intel validation, run pnpm dist:mac:unsigned:x64 on an Intel Mac after the slimclaw-managed runtime packaging flow removes clipboard natives and any optional DAVE binaries you intentionally disabled.`,
     );
   }
 

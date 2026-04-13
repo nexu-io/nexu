@@ -27,7 +27,7 @@
 2. 清理 `apps/desktop/release` 与 `.dist-runtime`
 3. 构建 `@nexu/shared`
 4. 构建 `@nexu/controller`
-5. 安装 `openclaw-runtime`
+5. 准备 slimclaw-managed OpenClaw runtime
 6. 构建 `@nexu/web`
 7. 构建 `@nexu/desktop`
 8. 上传 sourcemaps

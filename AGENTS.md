@@ -10,7 +10,7 @@ Nexu is a desktop-first OpenClaw platform. Users create AI bots, connect them to
 - `apps/controller` — Single-user local control plane for Nexu config, OpenClaw sync, and runtime orchestration
 - `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
 - `apps/web` — React + Ant Design + Vite
-- `openclaw-runtime` — Repo-local packaged OpenClaw runtime for local dev and desktop packaging; replaces global `openclaw` CLI
+- `packages/slimclaw` — Repo-local Nexu-owned OpenClaw runtime contract, prepared runtime root, and staging/patch ownership for local dev and desktop packaging
 - `packages/shared` — Shared Zod schemas
 - `packages/dev-utils` — TS-first reusable utilities for local script tooling
 
@@ -211,7 +211,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 - Monorepo: `apps/controller` (Hono), `apps/web` (React), `apps/desktop` (Electron), `packages/shared` (Zod schemas), `nexu-skills/` (skill repo)
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/controller/src/lib/openclaw-config-compiler.ts` builds OpenClaw config from local controller state
-- Local runtime flow: `apps/controller` owns Nexu config/state, writes OpenClaw config/skills/templates, and manages `openclaw-runtime` directly; desktop wraps that controller-first stack with Electron + web sidecars
+- Local runtime flow: `apps/controller` owns Nexu config/state, writes OpenClaw config/skills/templates, and manages the slimclaw-backed OpenClaw runtime contract directly; desktop wraps that controller-first stack with Electron + web sidecars
 - Key data flows: local config compilation, desktop runtime boot, channel sync, file-based skill catalog
 
 ## Code style (quick reference)
@@ -342,7 +342,7 @@ This note should track:
 - Desktop proxy env vars: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` (desktop normalizes mixed-case inputs, always merges `localhost,127.0.0.1,::1` into `NO_PROXY`, and propagates uppercase values to child processes)
 - OpenClaw managed skills dir (expected default): `~/.openclaw/skills/`
 - Slack smoke probe setup: install Chrome Canary, set `PROBE_SLACK_URL`, run `pnpm probe:slack prepare`, then manually log into Slack in Canary before `pnpm probe:slack run`
-- `openclaw-runtime` is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
+- the slimclaw-managed prepared OpenClaw runtime is installed implicitly by `pnpm install`; local development should normally not use a global `openclaw` CLI
 - Full-stack startup order is `openclaw` -> `controller` -> `web` -> `desktop`; shutdown order is the reverse
 - Prefer `./openclaw-wrapper` over global `openclaw` in local development; it resolves the prepared runtime entry through slimclaw and executes that local OpenClaw CLI entry
 - When OpenClaw is started manually, set `RUNTIME_MANAGE_OPENCLAW_PROCESS=false` for `@nexu/controller` to avoid launching a second OpenClaw process

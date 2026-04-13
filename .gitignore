@@ -28,7 +28,6 @@ playwright-report/
 .worktrees/
 .ralph/
 *.p8
-openclaw-runtime/.postinstall-cache.json
 apps/desktop/release/
 apps/desktop/.dist-runtime/
 apps/controller/.dist-runtime/

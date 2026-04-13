@@ -168,7 +168,7 @@ describe("ELECTRON_RUN_AS_NODE coverage", () => {
       "apps/controller/src/runtime/openclaw-process.ts",
     );
     const runtimeResolution = readFile(
-      "apps/controller/src/runtime/openclaw-runtime-resolution.ts",
+      "apps/controller/src/runtime/slimclaw-runtime-resolution.ts",
     );
 
     expect(openclawProcess).toContain("getOpenClawCommandSpec");

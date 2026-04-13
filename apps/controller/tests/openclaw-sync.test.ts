@@ -7,9 +7,9 @@ import type { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.
 import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
-import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
-import { OpenClawRuntimePluginWriter } from "../src/runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
+import { OpenClawRuntimeModelWriter } from "../src/runtime/slimclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../src/runtime/slimclaw-runtime-plugin-writer.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";

@@ -12,9 +12,9 @@ import type { CreditGuardStateWriter } from "../runtime/credit-guard-state-write
 import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-store.js";
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
-import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
-import type { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import type { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
+import type { OpenClawRuntimeModelWriter } from "../runtime/slimclaw-runtime-model-writer.js";
+import type { OpenClawRuntimePluginWriter } from "../runtime/slimclaw-runtime-plugin-writer.js";
 import type { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
 import type { CompiledOpenClawStore } from "../store/compiled-openclaw-store.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";

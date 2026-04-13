@@ -14,7 +14,7 @@ import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import { resolveRuntimeManifestsRoots } from "../platforms/shared/runtime-roots";
 import { createAsyncArchiveSidecarMaterializer } from "../platforms/shared/sidecar-materializer";
-import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/openclaw-runtime-locator";
+import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/slimclaw-runtime-locator";
 import type { RuntimeUnitManifest } from "./types";
 
 function ensureDir(path: string): string {

@@ -255,9 +255,6 @@ export function normalizeRelativePath(filePath, repoRoot) {
   if (relativePath.includes("/node_modules/")) {
     return null;
   }
-  if (relativePath.startsWith("openclaw-runtime/")) {
-    return null;
-  }
   if (
     !/^(apps\/desktop\/(main|preload|src|shared)\/|apps\/controller\/src\/|apps\/web\/src\/)/.test(
       relativePath,

@@ -85,6 +85,33 @@ vi.mock("../../apps/desktop/shared/workspace-paths", () => ({
   getWorkspaceRoot: vi.fn(() => "/repo"),
 }));
 
+vi.mock("@nexu/slimclaw", () => ({
+  getSlimclawRuntimeRoot: vi.fn(() =>
+    path.join("/repo", "packages", "slimclaw", ".dist-runtime", "openclaw"),
+  ),
+  resolveSlimclawRuntimeArtifacts: vi.fn(() => ({
+    entryPath: path.join(
+      "/repo",
+      "packages",
+      "slimclaw",
+      ".dist-runtime",
+      "openclaw",
+      "node_modules",
+      "openclaw",
+      "openclaw.mjs",
+    ),
+    binPath: path.join(
+      "/repo",
+      "packages",
+      "slimclaw",
+      ".dist-runtime",
+      "openclaw",
+      "bin",
+      "openclaw",
+    ),
+  })),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -104,14 +131,25 @@ const repoControllerPattern = escapeRegexLiteral(
 const repoOpenclawPattern = escapeRegexLiteral(
   path.join(
     "/repo",
-    "openclaw-runtime",
+    "packages",
+    "slimclaw",
+    ".dist-runtime",
+    "openclaw",
     "node_modules",
     "openclaw",
     "openclaw.mjs",
   ),
 );
-const repoOpenclawGatewayPattern = escapeRegexLiteral(
-  path.join("/repo", "openclaw-runtime", "bin", "openclaw-gateway"),
+const repoOpenclawBinPattern = escapeRegexLiteral(
+  path.join(
+    "/repo",
+    "packages",
+    "slimclaw",
+    ".dist-runtime",
+    "openclaw",
+    "bin",
+    "openclaw",
+  ),
 );
 const packagedControllerPattern = escapeRegexLiteral(
   path.join(
@@ -124,8 +162,8 @@ const packagedControllerPattern = escapeRegexLiteral(
   ),
 );
 const packagedOpenclawPattern = "\\.nexu/(runtime/)?openclaw-sidecar";
-const packagedOpenclawGatewayPattern =
-  "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway";
+const packagedOpenclawBinPattern =
+  "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw(?:\\.cmd)?";
 
 function setupPgrepMock(matches: Record<string, number[]>): void {
   mockExecFile.mockImplementation(
@@ -248,7 +286,7 @@ describe("teardownLaunchdServices", () => {
     setupPgrepMock({
       [packagedControllerPattern]: [99901],
       [packagedOpenclawPattern]: [99902],
-      [packagedOpenclawGatewayPattern]: [99903],
+      [packagedOpenclawBinPattern]: [99903],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -301,9 +339,9 @@ describe("teardownLaunchdServices", () => {
     setupPgrepMock({
       [repoControllerPattern]: [10001],
       [repoOpenclawPattern]: [10002, 10003],
-      [repoOpenclawGatewayPattern]: [10004],
+      [repoOpenclawBinPattern]: [10004],
       [packagedOpenclawPattern]: [10005],
-      [packagedOpenclawGatewayPattern]: [10006],
+      [packagedOpenclawBinPattern]: [10006],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
@@ -544,9 +582,9 @@ describe("ensureNexuProcessesDead", () => {
     setupPgrepMock({
       [repoControllerPattern]: [11111],
       [repoOpenclawPattern]: [22222],
-      [repoOpenclawGatewayPattern]: [33333],
+      [repoOpenclawBinPattern]: [33333],
       [packagedOpenclawPattern]: [44444],
-      [packagedOpenclawGatewayPattern]: [55555],
+      [packagedOpenclawBinPattern]: [55555],
     });
 
     // After first round of kills, all processes die
@@ -566,9 +604,9 @@ describe("ensureNexuProcessesDead", () => {
             const matches: Record<string, string> = {
               [repoControllerPattern]: "11111",
               [repoOpenclawPattern]: "22222",
-              [repoOpenclawGatewayPattern]: "33333",
+              [repoOpenclawBinPattern]: "33333",
               [packagedOpenclawPattern]: "44444",
-              [packagedOpenclawGatewayPattern]: "55555",
+              [packagedOpenclawBinPattern]: "55555",
             };
             if (matches[pattern]) {
               callback(null, { stdout: matches[pattern], stderr: "" });
@@ -734,8 +772,8 @@ describe("ensureNexuProcessesDead", () => {
       [repoControllerPattern]: [55555],
       [repoOpenclawPattern]: [55555],
       [packagedOpenclawPattern]: [55555],
-      [repoOpenclawGatewayPattern]: [55555],
-      [packagedOpenclawGatewayPattern]: [55555],
+      [repoOpenclawBinPattern]: [55555],
+      [packagedOpenclawBinPattern]: [55555],
     });
 
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);

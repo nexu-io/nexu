@@ -7,7 +7,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
-import { getOpenClawCommandSpec } from "./openclaw-runtime-resolution.js";
+import { getOpenClawCommandSpec } from "./slimclaw-runtime-resolution.js";
 
 const MAX_CONSECUTIVE_RESTARTS = 10;
 const BASE_RESTART_DELAY_MS = 3000;

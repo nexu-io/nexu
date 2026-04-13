@@ -497,8 +497,8 @@ async function ensureExistingRuntimeInstall() {
   );
 
   await Promise.all([
-    ensureExistingPath(runtimeNodeModulesPath, "openclaw-runtime install"),
-    ensureExistingPath(runtimePostinstallCachePath, "openclaw-runtime cache"),
+    ensureExistingPath(runtimeNodeModulesPath, "slimclaw runtime install"),
+    ensureExistingPath(runtimePostinstallCachePath, "slimclaw runtime cache"),
   ]);
 }
 

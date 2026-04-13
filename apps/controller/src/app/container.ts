@@ -7,12 +7,12 @@ import { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-sto
 import { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../runtime/openclaw-process.js";
-import { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
-import { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
 import { RuntimeHealth } from "../runtime/runtime-health.js";
 import { SessionsRuntime } from "../runtime/sessions-runtime.js";
+import { OpenClawRuntimeModelWriter } from "../runtime/slimclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../runtime/slimclaw-runtime-plugin-writer.js";
 import {
   type ControllerRuntimeState,
   createRuntimeState,
