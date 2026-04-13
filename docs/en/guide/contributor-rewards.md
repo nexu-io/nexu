@@ -27,7 +27,7 @@ If you haven't started yet, check out:
 When your contribution is merged, it will be shown in these places:
 
 1. **GitHub README**: Contributor display with **daily, monthly, and all-time leaderboards**
-2. **Discord `#leaderboard` channel**: Bot auto-publishes leaderboard updates
+2. **Discord [Start your first Nexu PR](https://discord.gg/vMrySTJW8u)**: Bot auto-publishes leaderboard updates
 
 ## Current Points System
 
@@ -66,8 +66,8 @@ These tasks are typically smaller in scope, more focused, and more suitable for 
 
 Go pick one: [Good First Issue List](https://github.com/nexu-io/nexu/labels/good-first-issue)
 
-## Join the Contributor Group 💬
+## Join the nexu Discord Contributor Group 💬
 
-It's better to chat with a group than figure things out alone. The group includes maintainers and experienced contributors — scan the code to join and talk about your first contribution 👇
+It's better to chat with a group than figure things out alone. The group includes maintainers and experienced contributors — join us and talk about your first contribution 👇
 
-<img src="/wechat-contributor-qr.png" width="200" alt="nexu Contributor WeChat Group" />
+👉 [Join nexu Discord](https://discord.gg/vMrySTJW8u)

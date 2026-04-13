@@ -27,7 +27,7 @@
 貢献がマージされると、以下の場所に表示されます：
 
 1. **GitHub README**：コントリビューター表示、**日次・月次・累計リーダーボード** を同期表示
-2. **Discord `#leaderboard` チャンネル**：Bot がリーダーボードを自動発信
+2. **Discord [Start your first Nexu PR](https://discord.gg/vMrySTJW8u)**：Bot がリーダーボードを自動発信
 
 ## 現在のポイントルール
 
@@ -66,8 +66,8 @@
 
 タスクを選ぶ：[Good First Issue リスト](https://github.com/nexu-io/nexu/labels/good-first-issue)
 
-## コントリビューター交流グループに参加 💬
+## nexu Discord コントリビューターグループに参加 💬
 
-一人で調べるよりみんなで話す方が早い。グループにはメンテナーや経験豊富なコントリビューターがいます。スキャンして参加し、最初の貢献について話しましょう 👇
+一人で調べるよりみんなで話す方が早い。グループにはメンテナーや経験豊富なコントリビューターがいます。参加して、最初の貢献について話しましょう 👇
 
-<img src="/wechat-contributor-qr.png" width="200" alt="nexu コントリビューター WeChat グループ" />
+👉 [nexu Discord に参加](https://discord.gg/vMrySTJW8u)

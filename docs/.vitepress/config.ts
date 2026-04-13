@@ -275,6 +275,8 @@ const koSidebar = [
     text: "커뮤니티",
     items: [
       { text: "기여하기", link: "/ko/guide/contributing" },
+      { text: "Good First Issue 기여자 가이드", link: "/ko/guide/first-pr" },
+      { text: "기여자 보상 및 지원", link: "/ko/guide/contributor-rewards" },
       { text: "문의하기", link: "/ko/guide/contact" },
       { text: "GitHub에서 Star 하기", link: "/ko/guide/star" },
       { text: "변경 로그", link: "https://github.com/nexu-io/nexu/releases" },
