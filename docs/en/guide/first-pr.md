@@ -91,11 +91,11 @@ Fork the repo, create a descriptive branch name, and include in your PR descript
 
 After merge, you'll enter the appreciation and points tracking flow.
 
-## Join the Contributor Group 💬
+## Join the nexu Discord Contributor Group 💬
 
-It's better to chat with a group than figure things out alone. The group includes maintainers and experienced contributors — scan the code to join and talk about your first contribution 👇
+It's better to chat with a group than figure things out alone. The group includes maintainers and experienced contributors — join us and talk about your first contribution 👇
 
-<img src="/wechat-contributor-qr.png" width="200" alt="nexu Contributor WeChat Group" />
+👉 [Join nexu Discord](https://discord.gg/vMrySTJW8u)
 
 ## FAQ
 

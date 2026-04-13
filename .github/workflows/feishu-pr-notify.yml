@@ -1,39 +1,123 @@
 name: Feishu Pull Request Notification
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened]
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   notify:
     name: Notify Feishu
+    if: ${{ github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     steps:
-      - name: Create GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.NEXU_PAL_APP_ID }}
-          private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
-
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: scripts
-
       - name: Send Feishu notification
         env:
           WEBHOOK_URL: ${{ secrets.NOTIFY_PR_FEISHU_WEBHOOK }}
-          EVENT_TYPE: pull_request
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           TITLE: ${{ github.event.pull_request.title }}
           URL: ${{ github.event.pull_request.html_url }}
           NUMBER: ${{ github.event.pull_request.number }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
-          BODY: ${{ github.event.pull_request.body }}
           LABELS_OR_CATEGORY: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
           REPO: ${{ github.repository }}
-        run: node scripts/notify/feishu-notify.mjs
+        run: |
+          node <<'EOF'
+          const webhookUrl = process.env.WEBHOOK_URL;
+          const title = process.env.TITLE ?? "";
+          const url = process.env.URL ?? "";
+          const number = process.env.NUMBER ?? "";
+          const author = process.env.AUTHOR ?? "";
+          const labelsOrCategory = process.env.LABELS_OR_CATEGORY || "none";
+          const repo = process.env.REPO ?? "";
+
+          function truncate(value, maxLength) {
+            return value.length > maxLength
+              ? `${value.slice(0, maxLength)}...`
+              : value;
+          }
+
+          function sanitizeText(value) {
+            return truncate(
+              value
+                .replace(/[\r\n\t]+/g, " ")
+                .replace(/[\\`*_{}\[\]()#+\-.!|<>~]/g, "\\$&")
+                .replace(/@/g, "＠")
+                .trim(),
+              200,
+            );
+          }
+
+          if (!webhookUrl) {
+            console.error("WEBHOOK_URL is required");
+            process.exit(1);
+          }
+
+          if (!author) {
+            console.error("AUTHOR is required");
+            process.exit(1);
+          }
+
+          if (author === "sentry[bot]") {
+            console.log(
+              `Skipping Feishu notification for internal-equivalent author: ${author}`,
+            );
+            process.exit(0);
+          }
+
+          const safeTitle = sanitizeText(title) || "(untitled PR)";
+          const safeAuthor = sanitizeText(author);
+          const safeLabels = sanitizeText(labelsOrCategory) || "none";
+          const safeRepo = sanitizeText(repo) || "unknown repo";
+
+          let safeUrl = url;
+          try {
+            const parsedUrl = new URL(url);
+            if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "github.com") {
+              throw new Error("Only https://github.com URLs are allowed");
+            }
+            safeUrl = parsedUrl.toString();
+          } catch (error) {
+            console.error(`Invalid pull request URL: ${error}`);
+            process.exit(1);
+          }
+
+          const payload = {
+            msg_type: "interactive",
+            card: {
+              schema: "2.0",
+              header: {
+                title: {
+                  tag: "plain_text",
+                  content: `[${safeRepo}] New Pull Request #${number}: ${safeTitle}`,
+                },
+                template: "purple",
+              },
+              body: {
+                direction: "vertical",
+                elements: [
+                  { tag: "markdown", content: `**Author:** ${safeAuthor}` },
+                  { tag: "markdown", content: `**Labels:** ${safeLabels}` },
+                  {
+                    tag: "button",
+                    text: { tag: "plain_text", content: "View Pull Request" },
+                    url: safeUrl,
+                    type: "primary",
+                  },
+                ],
+              },
+            },
+          };
+
+          const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            console.error(`Webhook request failed (${response.status}): ${text}`);
+            process.exit(1);
+          }
+          EOF

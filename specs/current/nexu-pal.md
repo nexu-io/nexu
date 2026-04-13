@@ -11,7 +11,7 @@ GitHub issue/discussion automation around **nexu-pal** issue processing and Feis
 | `Feishu Issue Notification` | `issues: [opened]` | `scripts/notify/feishu-notify.mjs` |
 | `nexu-pal: needs-triage notify` | `issues: [labeled]` (when label is `needs-triage`) | `scripts/notify/feishu-triage-notify.mjs` |
 | `Feishu Discussion Notification` | `discussion: [created]` | `scripts/notify/feishu-notify.mjs` |
-| `Feishu Pull Request Notification` | `pull_request: [opened]` | `scripts/notify/feishu-notify.mjs` |
+| `Feishu Pull Request Notification` | `pull_request_target: [opened]` | inline workflow script |
 
 ## On issue opened
 
@@ -63,9 +63,9 @@ Four GitHub Actions send Feishu webhook notifications for GitHub content:
 1. **Issue notification** — On `issues: [opened]`, sends the existing issue card to the issue notification webhook (`NOTIFY_ISSUE_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member or `sentry[bot]`.
 2. **Needs-triage issue notification** — On `issues: [labeled]`, when the added label is `needs-triage`, sends a triage card to either the bug or non-bug webhook based on the issue's current labels. The workflow maps GitHub secrets to internal env vars `BUG_WEBHOOK` and `REQ_WEBHOOK`.
 3. **Discussion notification** — On `discussion: [created]`, sends the existing discussion card format using the discussion category in place of labels to the discussion notification webhook (`NOTIFY_DISCUSSION_ISSUE_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member or `sentry[bot]`.
-4. **Pull request notification** — On `pull_request: [opened]`, sends the existing card format using pull request labels to the pull-request notification webhook (`NOTIFY_PR_FEISHU_WEBHOOK`), but skips notifications when the author is a repository-owner organization member or `sentry[bot]`.
+4. **Pull request notification** — On `pull_request_target: [opened]`, sends the existing card format using pull request labels to the pull-request notification webhook (`NOTIFY_PR_FEISHU_WEBHOOK`) for fork PRs only. The workflow is metadata-only (no checkout / no PR code execution), and internal same-repo PRs are skipped at the job level.
 
-The issue/discussion/pull-request workflows run `node scripts/notify/feishu-notify.mjs`. The triage workflow runs `node scripts/notify/feishu-triage-notify.mjs`.
+The issue/discussion workflows run `node scripts/notify/feishu-notify.mjs`. The pull-request workflow uses an inline metadata-only script. The triage workflow runs `node scripts/notify/feishu-triage-notify.mjs`.
 
 ## Labels managed
 
@@ -83,7 +83,7 @@ The issue/discussion/pull-request workflows run `node scripts/notify/feishu-noti
 
 The three **nexu-pal** workflows create a short-lived token via `actions/create-github-app-token@v1` using secrets `NEXU_PAL_APP_ID` and `NEXU_PAL_PRIVATE_KEY_PEM`. All GitHub API calls and the first-interaction action use this App token.
 
-The issue / discussion / pull-request Feishu notification workflows also create a short-lived GitHub App token so they can reuse the org-membership check and suppress notifications for organization-member internal authors; they also suppress `sentry[bot]` as internal-equivalent automation. The `needs-triage` Feishu workflow continues to use GitHub Actions event data plus Feishu incoming-webhook secrets.
+The issue / discussion Feishu notification workflows create a short-lived GitHub App token so they can reuse the org-membership check and suppress notifications for organization-member internal authors; they also suppress `sentry[bot]` as internal-equivalent automation. The pull-request Feishu workflow instead runs on `pull_request_target` with a metadata-only inline script, avoids checkout, and is gated to fork PRs only so external contributions notify safely without notifying same-repo PRs. The `needs-triage` Feishu workflow continues to use GitHub Actions event data plus Feishu incoming-webhook secrets.
 
 ## Secrets
 
@@ -120,5 +120,5 @@ scripts/nexu-pal/
   lib/signals/duplicate-detector.mjs  # duplicate detector stub
 scripts/notify/
   feishu-triage-notify.mjs # route needs-triage issue notifications via BUG_WEBHOOK / REQ_WEBHOOK
-  feishu-notify.mjs        # issue / discussion / pull-request Feishu webhook card notification with org-member suppression
+  feishu-notify.mjs        # issue / discussion Feishu webhook card notification with org-member suppression
 ```

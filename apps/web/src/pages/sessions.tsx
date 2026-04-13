@@ -264,7 +264,7 @@ const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   badgeClass:
     "border-[rgba(107,114,128,0.14)] bg-[rgba(107,114,128,0.08)] text-[#6B7280]",
   label: "Web",
-  openLabel: "Open",
+  openLabel: "channels.open",
 };
 
 const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
@@ -272,55 +272,55 @@ const PLATFORM_CONFIG: Record<Platform, PlatformConfig> = {
     badgeClass:
       "border-[rgba(224,30,90,0.12)] bg-[rgba(224,30,90,0.06)] text-[#E01E5A]",
     label: "Slack",
-    openLabel: "Open in Slack",
+    openLabel: "channels.openInSlack",
   },
   discord: {
     badgeClass:
       "border-[rgba(88,101,242,0.14)] bg-[rgba(88,101,242,0.08)] text-[#5865F2]",
     label: "Discord",
-    openLabel: "Open in Discord",
+    openLabel: "channels.openInDiscord",
   },
   whatsapp: {
     badgeClass:
       "border-[rgba(37,211,102,0.14)] bg-[rgba(37,211,102,0.08)] text-[#25D366]",
     label: "WhatsApp",
-    openLabel: "Open in WhatsApp",
+    openLabel: "channels.openInWhatsApp",
   },
   telegram: {
     badgeClass:
       "border-[rgba(36,161,222,0.14)] bg-[rgba(36,161,222,0.08)] text-[#24A1DE]",
     label: "Telegram",
-    openLabel: "Open in Telegram",
+    openLabel: "channels.openInTelegram",
   },
   feishu: {
     badgeClass:
       "border-[rgba(51,112,255,0.14)] bg-[rgba(51,112,255,0.08)] text-[#3370FF]",
     label: "Feishu",
-    openLabel: "Open in Feishu",
+    openLabel: "channels.openInFeishu",
   },
   dingtalk: {
     badgeClass:
       "border-[rgba(44,44,44,0.14)] bg-[rgba(44,44,44,0.08)] text-[#2C2C2C]",
     label: "DingTalk",
-    openLabel: "Open in DingTalk",
+    openLabel: "channels.openInDingTalk",
   },
   wecom: {
     badgeClass:
       "border-[rgba(7,193,96,0.14)] bg-[rgba(7,193,96,0.08)] text-[#07C160]",
     label: "WeCom",
-    openLabel: "Open in WeCom",
+    openLabel: "channels.openInWeCom",
   },
   qqbot: {
     badgeClass:
       "border-[rgba(24,144,255,0.14)] bg-[rgba(24,144,255,0.08)] text-[#1890FF]",
     label: "QQ",
-    openLabel: "Open in QQ",
+    openLabel: "channels.openInQQ",
   },
   wechat: {
     badgeClass:
       "border-[rgba(141,200,27,0.14)] bg-[rgba(141,200,27,0.08)] text-[#8DC81B]",
     label: "WeChat",
-    openLabel: "Open in WeChat",
+    openLabel: "channels.openInWeChat",
   },
   web: DEFAULT_PLATFORM_CONFIG,
 };
@@ -751,7 +751,7 @@ export function SessionsPage() {
               )}
             >
               <FolderOpen className="size-[18px] text-text-secondary" />
-              <span>Open Folder</span>
+              <span>{t("sessions.openFolder")}</span>
             </button>
             {platform !== "web" &&
               platform !== "wechat" &&
@@ -773,7 +773,7 @@ export function SessionsPage() {
                   className={buttonClassName}
                 >
                   <PlatformIcon platform={platform} size={18} />
-                  <span>{platformCfg.openLabel}</span>
+                  <span>{t(platformCfg.openLabel)}</span>
                   <ArrowUpRight className="size-[16px] text-text-muted" />
                 </a>
               ) : (
@@ -783,7 +783,7 @@ export function SessionsPage() {
                   className={buttonClassName}
                 >
                   <PlatformIcon platform={platform} size={18} />
-                  <span>{platformCfg.openLabel}</span>
+                  <span>{t(platformCfg.openLabel)}</span>
                   <ArrowUpRight className="size-[16px] text-text-muted" />
                 </button>
               ))}
