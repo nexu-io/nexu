@@ -237,8 +237,9 @@ describe("bindEvents", () => {
   // checking-for-update
   // -------------------------------------------------------------------------
 
-  it("checking-for-update: calls logCheck and sends update:checking", async () => {
-    const { win } = await createManager();
+  it("checking-for-update: user-initiated checks send update:checking", async () => {
+    const { mgr, win } = await createManager();
+    (mgr as { userInitiatedCheck: boolean }).userInitiatedCheck = true;
     const handlers = extractHandlers();
 
     handlers["checking-for-update"]();
@@ -260,6 +261,18 @@ describe("bindEvents", () => {
         source: "r2",
         currentVersion: "0.2.0",
       }),
+    );
+  });
+
+  it("checking-for-update: background checks do not send update:checking", async () => {
+    const { win } = await createManager();
+    const handlers = extractHandlers();
+
+    handlers["checking-for-update"]();
+
+    expect(win.webContents.send).not.toHaveBeenCalledWith(
+      "update:checking",
+      expect.anything(),
     );
   });
 
