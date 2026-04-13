@@ -22,6 +22,11 @@ function toDocPath(link) {
     return path.join(docsDir, relative);
   }
 
+  if (link.startsWith("/ko/")) {
+    const relative = link === "/ko/" ? "ko/index.md" : `ko/${link.slice("/ko/".length)}.md`;
+    return path.join(docsDir, relative);
+  }
+
   if (link.startsWith("/guide/")) {
     return path.join(docsDir, "en", `${link.slice(1)}.md`);
   }
@@ -82,6 +87,7 @@ async function validateLocaleFiles() {
     path.join(docsDir, "en"),
     path.join(docsDir, "zh"),
     path.join(docsDir, "ja"),
+    path.join(docsDir, "ko"),
   ];
 
   const failures = [];

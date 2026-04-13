@@ -87,6 +87,10 @@ const hostBridge: HostBridge = {
     reportStartupProbe(payload);
   },
 
+  reportRendererDiagnosticsLog(payload) {
+    ipcRenderer.send("host:renderer-diagnostics-log", payload);
+  },
+
   onDesktopCommand(listener) {
     const wrapped = (
       _event: Electron.IpcRendererEvent,

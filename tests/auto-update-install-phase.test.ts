@@ -70,4 +70,18 @@ describe("web useAutoUpdate", () => {
       ).phase,
     ).toBe("error");
   });
+
+  it("restores downloading after install returns without quitting", () => {
+    expect(
+      restoreWebPhase(
+        {
+          phase: "installing",
+          version: "1.2.3",
+          percent: 100,
+          errorMessage: null,
+        },
+        "downloading",
+      ).phase,
+    ).toBe("downloading");
+  });
 });

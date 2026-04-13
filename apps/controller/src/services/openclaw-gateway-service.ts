@@ -12,6 +12,7 @@
 import { createHash } from "node:crypto";
 import type { OpenClawConfig } from "@nexu/shared";
 import { logger } from "../lib/logger.js";
+import { serializeOpenClawConfig } from "../lib/openclaw-config-serialization.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
 import type { ControllerRuntimeState } from "../runtime/state.js";
 
@@ -634,6 +635,8 @@ export class OpenClawGatewayService {
   }
 
   private configHash(config: OpenClawConfig): string {
-    return createHash("sha256").update(JSON.stringify(config)).digest("hex");
+    return createHash("sha256")
+      .update(serializeOpenClawConfig(config))
+      .digest("hex");
   }
 }

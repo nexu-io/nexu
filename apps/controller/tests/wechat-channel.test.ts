@@ -180,9 +180,10 @@ describe("WeChat connect/disconnect lifecycle", () => {
     expect(configStore.connectWechat).toHaveBeenCalledWith({
       accountId: "test-account",
     });
-    expect(syncService.writePlatformTemplatesForBot).toHaveBeenCalledWith(
-      "bot-1",
-    );
+    // Connecting a channel must NOT re-seed platform templates — re-seeding
+    // would clobber agent self-edits to AGENTS.md / IDENTITY.md / SOUL.md /
+    // ... on every connect. Seeding is owned exclusively by AgentService.createBot.
+    expect(syncService.writePlatformTemplatesForBot).not.toHaveBeenCalled();
     expect(syncService.syncAll).toHaveBeenCalledTimes(1);
     // Must NOT poll readiness — that blocks the connect modal and risks
     // a rollback that triggers additional config writes + restarts.

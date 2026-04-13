@@ -91,6 +91,18 @@ export function createMacLaunchdBootstrapEnv(args: {
       openclawSidecarRoot: paths.openclawCwd,
     }),
     proxyEnv: buildChildProcessProxyEnv(runtimeConfig.proxy),
+    langfusePublicKey:
+      process.env.LANGFUSE_PUBLIC_KEY ??
+      runtimeConfig.langfusePublicKey ??
+      undefined,
+    langfuseSecretKey:
+      process.env.LANGFUSE_SECRET_KEY ??
+      runtimeConfig.langfuseSecretKey ??
+      undefined,
+    langfuseBaseUrl:
+      process.env.LANGFUSE_BASE_URL ??
+      runtimeConfig.langfuseBaseUrl ??
+      undefined,
     openclawTmpDir: runtimeRoots.openclawTmpDir,
     nodePath: paths.nodePath,
     controllerEntryPath: paths.controllerEntryPath,

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   type DesktopRewardClaimProof,
+  creditRecordsResponseSchema,
   rewardRepeatModeSchema,
   rewardShareModeSchema,
 } from "@nexu/shared";
@@ -62,6 +63,7 @@ const cloudErrorResponseSchema = z.object({
 
 export type RewardStatusResponse = z.infer<typeof rewardStatusResponseSchema>;
 export type RewardClaimResponse = z.infer<typeof rewardClaimResponseSchema>;
+export type CreditRecordsResponse = z.infer<typeof creditRecordsResponseSchema>;
 
 export type CloudRewardErrorReason =
   | "auth_failed"
@@ -74,6 +76,7 @@ export type CloudRewardResult<T> =
 
 export type CloudRewardService = {
   getRewardsStatus(): Promise<CloudRewardResult<RewardStatusResponse>>;
+  getCreditRecords(): Promise<CloudRewardResult<CreditRecordsResponse>>;
   claimReward(
     taskId: string,
     proof?: DesktopRewardClaimProof,
@@ -153,6 +156,48 @@ export function createCloudRewardService(
             url: `${cloudUrl}/api/v1/rewards/status`,
           },
           "cloud_rewards_status_network_error",
+        );
+        return { ok: false, reason: "network_error" };
+      }
+    },
+
+    async getCreditRecords() {
+      try {
+        const res = await fetchWithAuth("/api/v1/credits/records");
+        if (res.status === 401 || res.status === 403) {
+          return {
+            ok: false,
+            reason: "auth_failed",
+            message: await readCloudErrorMessage(res),
+          };
+        }
+        if (!res.ok) {
+          logger.warn(
+            { status: res.status, url: `${cloudUrl}/api/v1/credits/records` },
+            "cloud_credit_records_http_error",
+          );
+          return { ok: false, reason: "network_error" };
+        }
+        const data: unknown = await res.json();
+        const parsed = creditRecordsResponseSchema.safeParse(data);
+        if (!parsed.success) {
+          logger.warn(
+            {
+              issues: parsed.error.issues.slice(0, 5),
+              url: `${cloudUrl}/api/v1/credits/records`,
+            },
+            "cloud_credit_records_parse_error",
+          );
+          return { ok: false, reason: "parse_error" };
+        }
+        return { ok: true, data: parsed.data };
+      } catch (error: unknown) {
+        logger.warn(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            url: `${cloudUrl}/api/v1/credits/records`,
+          },
+          "cloud_credit_records_network_error",
         );
         return { ok: false, reason: "network_error" };
       }

@@ -8,6 +8,13 @@ import {
   webContents,
 } from "electron";
 import {
+  type DesktopDevDiagnosticsLogLevel,
+  type DesktopDevDomSnapshotResult,
+  type DesktopDevEvalResult,
+  type DesktopDevEvalSerializableValue,
+  type DesktopDevRendererLogEntry,
+  type DesktopDevRendererLogSnapshot,
+  type DesktopDevScreenshotResult,
   type HostInvokePayloadMap,
   type HostInvokeResultMap,
   type StartupProbePayload,
@@ -18,6 +25,10 @@ import type { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
 import type { RuntimeOrchestrator } from "./runtime/daemon-supervisor";
 import {
+  getDesktopShellPreferences,
+  updateDesktopShellPreferences,
+} from "./services/desktop-shell-preferences";
+import {
   type QuitHandlerOptions,
   runTeardownAndExit,
 } from "./services/quit-handler";
@@ -25,6 +36,10 @@ import type { ComponentUpdater } from "./updater/component-updater";
 import type { UpdateManager } from "./updater/update-manager";
 
 const validChannels = new Set<string>(hostInvokeChannels);
+const desktopDevRendererLogBuffer: DesktopDevRendererLogEntry[] = [];
+const desktopDevRendererLogLimit = 200;
+const desktopDevTrackedContents = new Set<number>();
+let desktopDevRendererLogTrackingInitialized = false;
 
 let updateManager: UpdateManager | null = null;
 let componentUpdater: ComponentUpdater | null = null;
@@ -33,6 +48,238 @@ let quitFallback: (() => Promise<void>) | null = null;
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function assertDesktopDevDiagnosticsEnabled(): void {
+  if (app.isPackaged) {
+    throw new Error(
+      "Desktop dev diagnostics are only available in development mode.",
+    );
+  }
+}
+
+function nextDesktopDevLogId(): string {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function appendDesktopDevRendererLog(
+  entry: Omit<DesktopDevRendererLogEntry, "id" | "ts">,
+): void {
+  desktopDevRendererLogBuffer.push({
+    ...entry,
+    id: nextDesktopDevLogId(),
+    ts: new Date().toISOString(),
+  });
+
+  if (desktopDevRendererLogBuffer.length > desktopDevRendererLogLimit) {
+    desktopDevRendererLogBuffer.splice(
+      0,
+      desktopDevRendererLogBuffer.length - desktopDevRendererLogLimit,
+    );
+  }
+}
+
+function mapConsoleMessageLevel(level: number): DesktopDevDiagnosticsLogLevel {
+  switch (level) {
+    case 0:
+      return "info";
+    case 1:
+      return "warning";
+    case 2:
+      return "error";
+    case 3:
+      return "debug";
+    default:
+      return "info";
+  }
+}
+
+function trackDesktopDevRendererLogs(contents: Electron.WebContents): void {
+  if (desktopDevTrackedContents.has(contents.id)) {
+    return;
+  }
+
+  desktopDevTrackedContents.add(contents.id);
+
+  contents.on("console-message", (_event, level, message, line, sourceId) => {
+    appendDesktopDevRendererLog({
+      source: "console",
+      level: mapConsoleMessageLevel(level),
+      message,
+      url: contents.getURL() || null,
+      sourceId: sourceId || null,
+      line,
+    });
+  });
+
+  contents.once("destroyed", () => {
+    desktopDevTrackedContents.delete(contents.id);
+  });
+}
+
+function ensureDesktopDevRendererLogTracking(): void {
+  if (app.isPackaged || desktopDevRendererLogTrackingInitialized) {
+    return;
+  }
+
+  desktopDevRendererLogTrackingInitialized = true;
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    trackDesktopDevRendererLogs(window.webContents);
+  }
+
+  app.on("browser-window-created", (_event, window) => {
+    trackDesktopDevRendererLogs(window.webContents);
+  });
+}
+
+export async function captureDesktopDevScreenshot(
+  sender: Electron.WebContents,
+): Promise<DesktopDevScreenshotResult> {
+  const browserWindow = BrowserWindow.fromWebContents(sender);
+
+  if (!browserWindow) {
+    throw new Error("Could not resolve the active browser window.");
+  }
+
+  const image = await browserWindow.webContents.capturePage();
+  const size = image.getSize();
+  const scaleFactor = image.getScaleFactors()[0] ?? 1;
+
+  return {
+    mimeType: "image/png",
+    base64: image.toPNG().toString("base64"),
+    width: size.width,
+    height: size.height,
+    scaleFactor,
+  };
+}
+
+export async function evaluateDesktopDevScript(
+  sender: Electron.WebContents,
+  script: string,
+): Promise<DesktopDevEvalResult> {
+  return sender.executeJavaScript(
+    `(async () => {
+      const toSerializable = (value, depth = 0) => {
+        if (depth > 4) {
+          return "[max-depth]";
+        }
+        if (value === null) return null;
+        const valueType = typeof value;
+        if (valueType === "string" || valueType === "number" || valueType === "boolean") {
+          return value;
+        }
+        if (valueType === "undefined") {
+          return "[undefined]";
+        }
+        if (valueType === "bigint") {
+          return value.toString();
+        }
+        if (valueType === "function") {
+          return "[function " + (value.name || "anonymous") + "]";
+        }
+        if (Array.isArray(value)) {
+          return value.map((entry) => toSerializable(entry, depth + 1));
+        }
+        if (value instanceof Error) {
+          return {
+            name: value.name,
+            message: value.message,
+            stack: value.stack ?? null,
+          };
+        }
+        if (valueType === "object") {
+          const tag = Object.prototype.toString.call(value);
+          if (tag !== "[object Object]") {
+            return tag;
+          }
+          const result = {};
+          for (const [key, entry] of Object.entries(value)) {
+            result[key] = toSerializable(entry, depth + 1);
+          }
+          return result;
+        }
+        return String(value);
+      };
+
+      try {
+        const value = await Promise.resolve((0, eval)(${JSON.stringify(script)}));
+        return {
+          ok: true,
+          valueType:
+            value === null
+              ? "null"
+              : Array.isArray(value)
+                ? "array"
+                : typeof value,
+          value: toSerializable(value),
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          valueType: "error",
+          value: null,
+          error: {
+            name: error instanceof Error ? error.name : "Error",
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? (error.stack ?? undefined) : undefined,
+          },
+        };
+      }
+    })()`,
+  ) as Promise<{
+    ok: boolean;
+    valueType: string;
+    value: DesktopDevEvalSerializableValue;
+    error?: {
+      name: string;
+      message: string;
+      stack?: string;
+    };
+  }>;
+}
+
+export async function captureDesktopDevDomSnapshot(
+  sender: Electron.WebContents,
+  maxHtmlLength?: number,
+): Promise<DesktopDevDomSnapshotResult> {
+  const htmlLimit = Math.max(1000, Math.min(maxHtmlLength ?? 20000, 100000));
+
+  return sender.executeJavaScript(
+    `(async () => {
+      const html = document.documentElement?.outerHTML ?? "";
+      const htmlLimit = ${htmlLimit};
+      const htmlSummary = html.length > htmlLimit
+        ? html.slice(0, htmlLimit) + "\\n...[truncated " + (html.length - htmlLimit) + " chars]"
+        : html;
+
+      return {
+        title: document.title,
+        url: window.location.href,
+        readyState: document.readyState,
+        htmlLength: html.length,
+        htmlSummary,
+      };
+    })()`,
+  ) as Promise<DesktopDevDomSnapshotResult>;
+}
+
+export function getDesktopDevRendererLogSnapshot(
+  limitInput?: number,
+): DesktopDevRendererLogSnapshot {
+  assertDesktopDevDiagnosticsEnabled();
+  const requestedLimit = limitInput ?? desktopDevRendererLogLimit;
+  const limit = Math.max(
+    1,
+    Math.min(requestedLimit, desktopDevRendererLogLimit),
+  );
+  const startIndex = Math.max(desktopDevRendererLogBuffer.length - limit, 0);
+
+  return {
+    entries: desktopDevRendererLogBuffer.slice(startIndex),
+    truncated: startIndex > 0,
+  };
 }
 
 async function fetchControllerJson<T>(
@@ -113,6 +360,10 @@ export function setUpdateManager(manager: UpdateManager | null): void {
   updateManager = manager;
 }
 
+export function getUpdateManager(): UpdateManager | null {
+  return updateManager;
+}
+
 export function setComponentUpdater(updater: ComponentUpdater): void {
   componentUpdater = updater;
 }
@@ -139,6 +390,8 @@ export function registerIpcHandlers(
   diagnosticsReporter: DesktopDiagnosticsReporter | null,
   coldStartReady?: Promise<void>,
 ): void {
+  ensureDesktopDevRendererLogTracking();
+
   orchestrator.subscribe((runtimeEvent) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send("host:runtime-event", runtimeEvent);
@@ -425,6 +678,16 @@ export function registerIpcHandlers(
           );
         }
 
+        case "desktop:get-shell-preferences": {
+          return getDesktopShellPreferences();
+        }
+
+        case "desktop:update-shell-preferences": {
+          const typedPayload =
+            payload as HostInvokePayloadMap["desktop:update-shell-preferences"];
+          return updateDesktopShellPreferences(typedPayload);
+        }
+
         case "desktop:get-rewards-status": {
           return fetchControllerJson<
             HostInvokeResultMap["desktop:get-rewards-status"]
@@ -485,7 +748,7 @@ export function registerIpcHandlers(
           if (!updateManager) {
             return { updateAvailable: false };
           }
-          return updateManager.checkNow();
+          return updateManager.checkNow({ userInitiated: true });
         }
 
         case "update:get-capability": {
@@ -520,6 +783,13 @@ export function registerIpcHandlers(
 
         case "update:get-current-version": {
           return { version: app.getVersion() };
+        }
+
+        case "update:get-status": {
+          if (!updateManager) {
+            return { phase: "idle", version: null };
+          }
+          return updateManager.getStatus();
         }
 
         case "update:set-channel": {
@@ -614,5 +884,27 @@ export function registerIpcHandlers(
 
   ipcMain.on("host:startup-probe", (_event, payload: StartupProbePayload) => {
     diagnosticsReporter?.recordStartupProbe(payload);
+  });
+
+  ipcMain.on("host:renderer-diagnostics-log", (_event, payload: unknown) => {
+    if (app.isPackaged) {
+      return;
+    }
+
+    const typedPayload = payload as Omit<
+      DesktopDevRendererLogEntry,
+      "id" | "ts" | "source"
+    > & {
+      source: "page-error";
+    };
+
+    appendDesktopDevRendererLog({
+      source: "page-error",
+      level: typedPayload.level,
+      message: typedPayload.message,
+      url: typedPayload.url,
+      sourceId: typedPayload.sourceId,
+      line: typedPayload.line,
+    });
   });
 }

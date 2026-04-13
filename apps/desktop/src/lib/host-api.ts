@@ -40,6 +40,19 @@ export function reportStartupProbe(payload: StartupProbePayload): void {
   getHostBridge().reportStartupProbe(payload);
 }
 
+export function reportDesktopDevPageError(input: {
+  level: "error";
+  message: string;
+  url: string | null;
+  sourceId: string | null;
+  line: number | null;
+}): void {
+  getHostBridge().reportRendererDiagnosticsLog({
+    source: "page-error",
+    ...input,
+  });
+}
+
 export async function triggerMainProcessCrash(): Promise<void> {
   await getHostBridge().invoke("diagnostics:crash-main", undefined);
 }

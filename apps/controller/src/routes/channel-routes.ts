@@ -1,6 +1,7 @@
 import { type OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import {
   botQuotaResponseSchema,
+  channelConnectErrorSchema,
   channelListResponseSchema,
   channelResponseSchema,
   connectDingtalkSchema,
@@ -23,10 +24,223 @@ import {
   whatsappQrWaitResponseSchema,
 } from "@nexu/shared";
 import type { ControllerContainer } from "../app/container.js";
+import { isChannelConnectError } from "../lib/channel-connect-error.js";
+import { logger } from "../lib/logger.js";
+import {
+  readProxyFetchEnv,
+  redactProxyUrl,
+  shouldBypassProxy,
+} from "../lib/proxy-fetch.js";
 import type { ControllerBindings } from "../types.js";
 
 const channelIdParamSchema = z.object({ channelId: z.string() });
 const errorSchema = z.object({ message: z.string() });
+type ControllerLocale = "en" | "zh-CN";
+
+function getOpenclawOrigin(container: ControllerContainer): string | null {
+  try {
+    return new URL(container.env.openclawBaseUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+async function getControllerLocale(
+  container: ControllerContainer,
+): Promise<ControllerLocale> {
+  try {
+    return await container.configStore.getDesktopLocale();
+  } catch {
+    return "en";
+  }
+}
+
+function localizeChannelConnectMessage(
+  error: unknown,
+  locale: ControllerLocale,
+): string {
+  if (!isChannelConnectError(error)) {
+    return locale === "zh-CN"
+      ? "连接失败，请稍后重试。"
+      : "Connection failed. Please try again.";
+  }
+
+  if (locale === "zh-CN") {
+    switch (error.code) {
+      case "invalid_credentials":
+        return "凭证无效，请检查后重试。";
+      case "app_id_mismatch":
+        return "Application ID 与 Bot Token 不匹配，请检查后重试。";
+      case "timeout":
+        return "请求超时，请检查网络或代理设置后重试。";
+      case "network_error":
+      case "proxy_error":
+        return "网络请求失败，请检查网络或代理设置后重试。";
+      case "sync_failed":
+        return error.phase === "persist_config"
+          ? "凭证已校验，但本地保存配置失败，请稍后重试。"
+          : "凭证已校验，但本地运行时同步失败，请稍后重试。";
+      case "upstream_http_error":
+        return "上游服务返回异常，请稍后重试。";
+      case "already_connected":
+        return "渠道已连接，正在刷新...";
+    }
+  }
+
+  switch (error.code) {
+    case "invalid_credentials":
+      return "Credentials are invalid. Check them and try again.";
+    case "app_id_mismatch":
+      return "Application ID does not match the provided Bot Token.";
+    case "timeout":
+      return "The request timed out. Check your network or proxy settings and try again.";
+    case "network_error":
+    case "proxy_error":
+      return "The network request failed. Check your network or proxy settings and try again.";
+    case "sync_failed":
+      return error.phase === "persist_config"
+        ? "Credentials were verified, but saving the local channel config failed. Please try again."
+        : "Credentials were verified, but syncing the local runtime failed. Please try again.";
+    case "upstream_http_error":
+      return "The upstream service returned an error. Please try again later.";
+    case "already_connected":
+      return "Channel already connected, refreshing...";
+  }
+}
+
+function getChannelConnectErrorResponse(
+  requestId: string,
+  locale: ControllerLocale,
+  error: unknown,
+) {
+  if (isChannelConnectError(error)) {
+    return {
+      status: error.status,
+      body: {
+        message: localizeChannelConnectMessage(error, locale),
+        code: error.code,
+        requestId,
+        retryable: error.retryable,
+        phase: error.phase,
+      },
+      upstreamHost: error.upstreamHost,
+      upstreamStatus: error.upstreamStatus,
+    } as const;
+  }
+
+  return {
+    status: 502,
+    body: {
+      message: localizeChannelConnectMessage(error, locale),
+      code: "network_error",
+      requestId,
+      retryable: true,
+      phase: "verify_credentials",
+    },
+    upstreamHost: null,
+    upstreamStatus: null,
+  } as const;
+}
+
+function logChannelConnectFailure(
+  container: ControllerContainer,
+  input: {
+    requestId: string;
+    channel: "discord" | "telegram";
+    locale: ControllerLocale;
+    error: unknown;
+  },
+): {
+  status: 422 | 502 | 503 | 504;
+  body: z.infer<typeof channelConnectErrorSchema>;
+} {
+  const response = getChannelConnectErrorResponse(
+    input.requestId,
+    input.locale,
+    input.error,
+  );
+  const proxyEnv = readProxyFetchEnv();
+  const proxyTargetBypassed = response.upstreamHost
+    ? shouldBypassProxy(response.upstreamHost, proxyEnv.noProxy)
+    : null;
+
+  logger.error(
+    {
+      requestId: input.requestId,
+      channel: input.channel,
+      error:
+        input.error instanceof Error
+          ? input.error.message
+          : String(input.error),
+      errorCode: response.body.code,
+      errorPhase: response.body.phase,
+      retryable: response.body.retryable,
+      httpStatus: response.status,
+      upstreamHost: response.upstreamHost,
+      upstreamStatus: response.upstreamStatus,
+      proxy: {
+        httpProxyRedacted: redactProxyUrl(proxyEnv.httpProxy),
+        httpsProxyRedacted: redactProxyUrl(proxyEnv.httpsProxy),
+        allProxyRedacted: redactProxyUrl(proxyEnv.allProxy),
+        noProxy: proxyEnv.noProxy,
+        bypassedForUpstream: proxyTargetBypassed,
+      },
+      runtimeState: {
+        status: container.runtimeState.status,
+        configSyncStatus: container.runtimeState.configSyncStatus,
+        skillsSyncStatus: container.runtimeState.skillsSyncStatus,
+        templatesSyncStatus: container.runtimeState.templatesSyncStatus,
+        gatewayStatus: container.runtimeState.gatewayStatus,
+        lastGatewayProbeAt: container.runtimeState.lastGatewayProbeAt,
+        lastGatewayError: container.runtimeState.lastGatewayError,
+      },
+      runtimeEnv: {
+        manageOpenclawProcess: container.env.manageOpenclawProcess,
+        gatewayProbeEnabled: container.env.gatewayProbeEnabled,
+        openclawBaseUrl: getOpenclawOrigin(container),
+      },
+    },
+    "channel_connect_failure",
+  );
+
+  void container.runtimeHealth
+    .probe({ timeoutMs: 1500 })
+    .then((runtimeHealth) => {
+      logger.warn(
+        {
+          requestId: input.requestId,
+          channel: input.channel,
+          errorCode: response.body.code,
+          errorPhase: response.body.phase,
+          runtimeHealth,
+          process: {
+            nodeVersion: process.version,
+            platform: process.platform,
+            arch: process.arch,
+          },
+        },
+        "channel_connect_failure_context",
+      );
+    })
+    .catch((captureError: unknown) => {
+      logger.warn(
+        {
+          requestId: input.requestId,
+          channel: input.channel,
+          error:
+            captureError instanceof Error
+              ? captureError.message
+              : String(captureError),
+        },
+        "channel_connect_failure_context_failed",
+      );
+    });
+
+  return {
+    status: response.status,
+    body: response.body,
+  };
+}
 
 export function registerChannelRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -128,6 +342,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_slack",
+        );
         return c.json(
           {
             message:
@@ -154,9 +372,29 @@ export function registerChannelRoutes(
           content: { "application/json": { schema: channelResponseSchema } },
           description: "Connected discord channel",
         },
-        409: {
-          content: { "application/json": { schema: errorSchema } },
+        422: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
           description: "Invalid credentials",
+        },
+        502: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Upstream network or proxy failure",
+        },
+        503: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Local runtime sync failed",
+        },
+        504: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Upstream timeout",
         },
       },
     }),
@@ -167,13 +405,15 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
-        return c.json(
-          {
-            message:
-              error instanceof Error ? error.message : "Discord connect failed",
-          },
-          409,
-        );
+        const requestId = c.get("requestId");
+        const locale = await getControllerLocale(container);
+        const response = logChannelConnectFailure(container, {
+          requestId,
+          channel: "discord",
+          locale,
+          error,
+        });
+        return c.json(response.body, response.status);
       }
     },
   );
@@ -206,6 +446,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_feishu",
+        );
         return c.json(
           {
             message:
@@ -233,9 +477,29 @@ export function registerChannelRoutes(
           content: { "application/json": { schema: channelResponseSchema } },
           description: "Connected telegram channel",
         },
-        409: {
-          content: { "application/json": { schema: errorSchema } },
+        422: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
           description: "Invalid credentials",
+        },
+        502: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Upstream network or proxy failure",
+        },
+        503: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Local runtime sync failed",
+        },
+        504: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Upstream timeout",
         },
       },
     }),
@@ -246,15 +510,15 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
-        return c.json(
-          {
-            message:
-              error instanceof Error
-                ? error.message
-                : "Telegram connect failed",
-          },
-          409,
-        );
+        const requestId = c.get("requestId");
+        const locale = await getControllerLocale(container);
+        const response = logChannelConnectFailure(container, {
+          requestId,
+          channel: "telegram",
+          locale,
+          error,
+        });
+        return c.json(response.body, response.status);
       }
     },
   );
@@ -287,6 +551,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_dingtalk",
+        );
         return c.json(
           {
             message:
@@ -373,6 +641,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_qqbot",
+        );
         return c.json(
           {
             message:
@@ -455,6 +727,10 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "channel_connect_error_wecom",
+        );
         return c.json(
           {
             message:

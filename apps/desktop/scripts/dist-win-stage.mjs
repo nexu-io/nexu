@@ -461,6 +461,47 @@ async function validateWinUnpackedReuse(releaseRoot) {
   }
 }
 
+const requiredBundledPluginArtifacts = [
+  {
+    pluginId: "openclaw-qqbot",
+    requiredPath: ["node_modules", "silk-wasm", "package.json"],
+    label: "silk-wasm",
+  },
+  {
+    pluginId: "dingtalk-connector",
+    requiredPath: ["node_modules", "dingtalk-stream", "package.json"],
+    label: "dingtalk-stream",
+  },
+];
+
+async function validatePackagedBundledPluginDependencies(releaseRoot) {
+  const winUnpackedRoot = resolve(releaseRoot, "win-unpacked");
+
+  for (const artifact of requiredBundledPluginArtifacts) {
+    const pluginRoot = resolve(
+      winUnpackedRoot,
+      "resources",
+      "runtime",
+      "controller",
+      "plugins",
+      artifact.pluginId,
+    );
+    const dependencyPath = resolve(pluginRoot, ...artifact.requiredPath);
+
+    if (!(await pathExists(pluginRoot))) {
+      throw new Error(
+        `[dist:win] packaged app is missing ${artifact.pluginId}: ${pluginRoot}`,
+      );
+    }
+
+    if (!(await pathExists(dependencyPath))) {
+      throw new Error(
+        `[dist:win] packaged app is missing ${artifact.pluginId} dependency ${artifact.label}: ${dependencyPath}`,
+      );
+    }
+  }
+}
+
 async function ensureExistingBuildArtifacts() {
   await Promise.all([
     ensureExistingPath(
@@ -611,6 +652,9 @@ function redactBuildConfigForLog(config) {
     NEXU_DESKTOP_BUILD_TIME: config.NEXU_DESKTOP_BUILD_TIME,
     hasSentryDsn: typeof config.NEXU_DESKTOP_SENTRY_DSN === "string",
     hasUpdateFeedUrl: typeof config.NEXU_UPDATE_FEED_URL === "string",
+    hasLangfusePublicKey: typeof config.LANGFUSE_PUBLIC_KEY === "string",
+    hasLangfuseSecretKey: typeof config.LANGFUSE_SECRET_KEY === "string",
+    LANGFUSE_BASE_URL: config.LANGFUSE_BASE_URL,
   };
 }
 
@@ -816,6 +860,15 @@ async function ensureBuildConfig() {
           NEXU_DESKTOP_AUTO_UPDATE_ENABLED:
             merged.NEXU_DESKTOP_AUTO_UPDATE_ENABLED,
         }
+      : {}),
+    ...(merged.LANGFUSE_PUBLIC_KEY
+      ? { LANGFUSE_PUBLIC_KEY: merged.LANGFUSE_PUBLIC_KEY }
+      : {}),
+    ...(merged.LANGFUSE_SECRET_KEY
+      ? { LANGFUSE_SECRET_KEY: merged.LANGFUSE_SECRET_KEY }
+      : {}),
+    ...(merged.LANGFUSE_BASE_URL
+      ? { LANGFUSE_BASE_URL: merged.LANGFUSE_BASE_URL }
       : {}),
     NEXU_DESKTOP_BUILD_SOURCE: merged.NEXU_DESKTOP_BUILD_SOURCE ?? "local-dist",
     ...((merged.NEXU_DESKTOP_BUILD_BRANCH ?? gitBranch)
@@ -1286,6 +1339,11 @@ async function main() {
       });
       await writeWinUnpackedManifest(releaseRoot);
     },
+    timings,
+  );
+  await timedStep(
+    "validate packaged bundled plugin dependencies",
+    async () => validatePackagedBundledPluginDependencies(releaseRoot),
     timings,
   );
 

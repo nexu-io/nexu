@@ -115,6 +115,22 @@
         "from": "build-config.json",
         "to": "build-config.json",
         "filter": ["**/*"]
+      },
+      {
+        "from": "build/icon.png",
+        "to": "build/icon.png"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "build/icon.ico"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "tray-icon.ico"
+      },
+      {
+        "from": "build/tray-icon-mac.png",
+        "to": "tray-icon-mac.png"
       }
     ],
     "afterSign": "./scripts/notarize.cjs",
@@ -150,7 +166,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "include": "build/installer.nsh",
       "deleteAppDataOnUninstall": false,
       "artifactName": "nexu-setup-${version}-${arch}.${ext}"

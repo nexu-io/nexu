@@ -145,6 +145,7 @@ export class OpenClawSyncService {
           .getAllInstalled()
           .filter((r) => r.source !== "workspace")
           .map((r) => r.slug)
+          .sort((left, right) => left.localeCompare(right))
       : undefined;
 
     const workspaceMap = this.workspaceScanner
@@ -249,8 +250,14 @@ export class OpenClawSyncService {
   }
 
   /**
-   * Write platform templates to a specific bot's workspace.
-   * Called when creating a new bot to seed workspace with platform files.
+   * Seed platform templates into a specific bot's workspace.
+   *
+   * Should only be called once per bot, at creation time
+   * (`AgentService.createBot`). The underlying writer is strictly
+   * seed-if-missing — it never overwrites — so a duplicate call is a
+   * harmless no-op, but it is conceptually wrong: agents read/write these
+   * platform docs at runtime, and any caller that re-seeds is implicitly
+   * claiming the bot's workspace state should be reset.
    */
   async writePlatformTemplatesForBot(botId: string): Promise<void> {
     await this.templateWriter.write([{ id: botId, status: "active" }]);

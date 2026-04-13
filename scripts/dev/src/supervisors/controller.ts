@@ -77,7 +77,10 @@ async function waitForControllerPortPid(): Promise<number> {
         `controller dev server did not open port ${String(runtimeConfig.controllerPort)}`,
       ),
     {
-      attempts: 30,
+      // Windows cold-start (tsx loader + controller bootstrap) routinely
+      // takes ~15s; default 30 attempts × 500ms = 15s was firing right as
+      // the listener was about to bind. Give it 60s of headroom.
+      attempts: 120,
     },
   );
 }

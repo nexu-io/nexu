@@ -758,6 +758,33 @@ describe("NexuConfigStore", () => {
       },
     };
 
+    const creditRecordsResponse = {
+      appUserId: "user-1",
+      grants: [
+        {
+          id: "grant-1",
+          appUserId: "user-1",
+          amount: 120,
+          balance: 120,
+          source: "signup_bonus",
+          sourceId: null,
+          description: null,
+          expiresAt: "2099-04-01T00:00:00.000Z",
+          enabled: true,
+          idempotencyKey: "signup-1",
+          metadata: {},
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+      usageSummary: {
+        totalEntries: 0,
+        totalDueCredits: 0,
+        totalChargedCredits: 0,
+        totalCostUsd: "0",
+      },
+    };
+
     let fetchCalls = 0;
     let capturedBody: string | null = null;
     vi.stubGlobal(
@@ -769,18 +796,186 @@ describe("NexuConfigStore", () => {
           return new Response(null, { status: 204 });
         }
 
-        return new Response(JSON.stringify(statusResponse), { status: 200 });
+        if (fetchCalls === 2) {
+          return new Response(JSON.stringify(statusResponse), { status: 200 });
+        }
+
+        return new Response(JSON.stringify(creditRecordsResponse), {
+          status: 200,
+        });
       }),
     );
 
     try {
       const status = await store.setDesktopRewardBalance(4200);
-      expect(fetchCalls).toBe(2);
+      expect(fetchCalls).toBe(3);
       expect(JSON.parse(capturedBody ?? "{}")).toEqual({
         targetBalance: 4200,
         idempotencyKey: expect.stringContaining("desktop-set-balance-"),
       });
       expect(status.cloudBalance?.totalBalance).toBe(4200);
+      expect(status.cloudBalance?.giftedBalance).toBe(120);
+      expect(status.cloudBalance?.planBalance).toBe(4080);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("getDesktopRewardsStatus derives gifted balance from active credit grants", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              tasks: [],
+              progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+              cloudBalance: {
+                totalBalance: 300,
+                totalRecharged: 300,
+                totalConsumed: 0,
+                syncedAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            appUserId: "user-1",
+            grants: [
+              {
+                id: "signup-grant",
+                appUserId: "user-1",
+                amount: 300,
+                balance: 300,
+                source: "signup_bonus",
+                sourceId: null,
+                description: "signup",
+                expiresAt: "2099-04-01T00:00:00.000Z",
+                enabled: true,
+                idempotencyKey: "signup-1",
+                metadata: {},
+                createdAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            ],
+            usageSummary: {
+              totalEntries: 0,
+              totalDueCredits: 0,
+              totalChargedCredits: 0,
+              totalCostUsd: "0",
+            },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.cloudBalance?.totalBalance).toBe(300);
+      expect(status.cloudBalance?.giftedBalance).toBe(300);
+      expect(status.cloudBalance?.planBalance).toBe(0);
+      expect(status.progress.earnedCredits).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("falls back to plan-only balance when credit records cannot be loaded", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              tasks: [],
+              progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+              cloudBalance: {
+                totalBalance: 300,
+                totalRecharged: 300,
+                totalConsumed: 0,
+                syncedAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(JSON.stringify({ message: "Server Error" }), {
+          status: 500,
+        });
+      }),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.cloudBalance?.giftedBalance).toBe(0);
+      expect(status.cloudBalance?.planBalance).toBe(300);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -904,6 +1099,8 @@ describe("NexuConfigStore", () => {
     try {
       const status = await store.getDesktopRewardsStatus();
       expect(status.cloudBalance?.totalBalance).toBe(1);
+      expect(status.cloudBalance?.giftedBalance).toBe(0);
+      expect(status.cloudBalance?.planBalance).toBe(1);
       expect(status.tasks).toHaveLength(1);
       expect(status.tasks[0]?.id).toBe("daily_checkin");
       expect(status.progress.claimedCount).toBe(1);

@@ -3,8 +3,8 @@ import { createDefaultRuntimeExecutableResolver } from "../shared/runtime-execut
 import { resolveManagedRuntimeRoots } from "../shared/runtime-roots";
 import { createManagedShutdownCoordinator } from "../shared/shutdown-coordinator";
 import { createAsyncArchiveSidecarMaterializer } from "../shared/sidecar-materializer";
-import { createNoopStateMigrationPolicy } from "../shared/state-migration-policy";
 import type { DesktopPlatformCapabilities } from "../types";
+import { createWindowsStateMigrationPolicy } from "./state-migration-policy";
 
 export function createWindowsPlatformCapabilities(): DesktopPlatformCapabilities {
   return {
@@ -19,7 +19,7 @@ export function createWindowsPlatformCapabilities(): DesktopPlatformCapabilities
     sidecarMaterializer: createAsyncArchiveSidecarMaterializer(),
     runtimeExecutables: createDefaultRuntimeExecutableResolver(),
     portStrategy: createManagedPortStrategy(),
-    stateMigrationPolicy: createNoopStateMigrationPolicy(),
+    stateMigrationPolicy: createWindowsStateMigrationPolicy(),
     shutdownCoordinator: createManagedShutdownCoordinator(),
   };
 }

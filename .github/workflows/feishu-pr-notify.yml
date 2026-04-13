@@ -1,7 +1,7 @@
 name: Feishu Pull Request Notification
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened]
 
 permissions:
@@ -10,25 +10,12 @@ permissions:
 jobs:
   notify:
     name: Notify Feishu
+    if: ${{ github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-latest
     steps:
-      - name: Create GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.NEXU_PAL_APP_ID }}
-          private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
-
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: scripts
-
       - name: Send Feishu notification
         env:
           WEBHOOK_URL: ${{ secrets.NOTIFY_PR_FEISHU_WEBHOOK }}
-          EVENT_TYPE: pull_request
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           TITLE: ${{ github.event.pull_request.title }}
           URL: ${{ github.event.pull_request.html_url }}
           NUMBER: ${{ github.event.pull_request.number }}
@@ -36,4 +23,74 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           LABELS_OR_CATEGORY: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
           REPO: ${{ github.repository }}
-        run: node scripts/notify/feishu-notify.mjs
+        run: |
+          node <<'EOF'
+          const webhookUrl = process.env.WEBHOOK_URL;
+          const title = process.env.TITLE ?? "";
+          const url = process.env.URL ?? "";
+          const number = process.env.NUMBER ?? "";
+          const author = process.env.AUTHOR ?? "";
+          const body = process.env.BODY ?? "";
+          const labelsOrCategory = process.env.LABELS_OR_CATEGORY || "none";
+          const repo = process.env.REPO ?? "";
+
+          if (!webhookUrl) {
+            console.error("WEBHOOK_URL is required");
+            process.exit(1);
+          }
+
+          if (!author) {
+            console.error("AUTHOR is required");
+            process.exit(1);
+          }
+
+          if (author === "sentry[bot]") {
+            console.log(
+              `Skipping Feishu notification for internal-equivalent author: ${author}`,
+            );
+            process.exit(0);
+          }
+
+          const bodySnippet =
+            body.length > 200 ? `${body.slice(0, 200)}...` : body || "(no description)";
+
+          const payload = {
+            msg_type: "interactive",
+            card: {
+              schema: "2.0",
+              header: {
+                title: {
+                  tag: "plain_text",
+                  content: `[${repo}] New Pull Request #${number}: ${title}`,
+                },
+                template: "purple",
+              },
+              body: {
+                direction: "vertical",
+                elements: [
+                  { tag: "markdown", content: `**Author:** ${author}` },
+                  { tag: "markdown", content: `**Labels:** ${labelsOrCategory}` },
+                  { tag: "markdown", content: bodySnippet },
+                  {
+                    tag: "button",
+                    text: { tag: "plain_text", content: "View Pull Request" },
+                    url,
+                    type: "primary",
+                  },
+                ],
+              },
+            },
+          };
+
+          const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            console.error(`Webhook request failed (${response.status}): ${text}`);
+            process.exit(1);
+          }
+          EOF

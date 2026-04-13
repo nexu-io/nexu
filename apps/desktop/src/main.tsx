@@ -27,9 +27,10 @@ import type {
   RuntimeUnitState,
 } from "../shared/host";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import { resolveDesktopUpdateExperience } from "../shared/update-policy";
 import { DevelopSetBalanceDialog } from "./components/develop-set-balance-dialog";
 import { SurfaceFrame } from "./components/surface-frame";
-import { UpdateBanner } from "./components/update-banner";
+import { UpdateBadge, UpdateBanner } from "./components/update-banner";
 import { useAutoUpdate } from "./hooks/use-auto-update";
 import { ensureDesktopControllerReady } from "./lib/controller-ready";
 import {
@@ -43,6 +44,7 @@ import {
   notifySetupAnimationComplete,
   onDesktopCommand,
   onRuntimeEvent,
+  reportDesktopDevPageError,
   reportStartupProbe,
   showRuntimeLogFile,
   startUnit,
@@ -51,6 +53,7 @@ import {
   triggerRendererProcessCrash,
 } from "./lib/host-api";
 import { getDesktopOpenClawUrl } from "./lib/openclaw-surface";
+import { syncDesktopPostHogIdentity } from "./lib/posthog-identity";
 import { CloudProfilePage } from "./pages/cloud-profile-page";
 import "./runtime-page.css";
 
@@ -81,17 +84,7 @@ let rendererSentryInitialized = false;
 let posthogTelemetryInitialized = false;
 let rendererCommitReported = false;
 let currentPosthogUserId: string | null = null;
-let currentPosthogPersonPropertiesKey: string | null = null;
-
-function buildPostHogPersonPropertiesKey(input: {
-  email?: string | null;
-  name?: string | null;
-}): string {
-  return JSON.stringify([
-    ["email", input.email ?? null],
-    ["name", input.name ?? null],
-  ]);
-}
+let currentPosthogIdentifyKey: string | null = null;
 
 function sendRendererStartupProbe(
   stage: string,
@@ -118,6 +111,16 @@ window.addEventListener("error", (event) => {
       ? (event.error.stack ?? event.error.message)
       : event.message;
   sendRendererStartupProbe("renderer:window-error", "error", detail);
+
+  if (!window.nexuHost.bootstrap.isPackaged) {
+    reportDesktopDevPageError({
+      level: "error",
+      message: detail,
+      url: window.location.href,
+      sourceId: event.filename || null,
+      line: event.lineno || null,
+    });
+  }
 });
 
 window.addEventListener("unhandledrejection", (event) => {
@@ -125,6 +128,16 @@ window.addEventListener("unhandledrejection", (event) => {
   const detail =
     reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
   sendRendererStartupProbe("renderer:unhandled-rejection", "error", detail);
+
+  if (!window.nexuHost.bootstrap.isPackaged) {
+    reportDesktopDevPageError({
+      level: "error",
+      message: `Unhandled promise rejection: ${detail}`,
+      url: window.location.href,
+      sourceId: null,
+      line: null,
+    });
+  }
 });
 
 function initializeRendererSentry(dsn: string): void {
@@ -178,48 +191,18 @@ function syncPostHogIdentity(input: {
     return;
   }
 
-  const userId =
-    typeof input.userId === "string" && input.userId.trim().length > 0
-      ? input.userId
-      : null;
+  const nextState = syncDesktopPostHogIdentity(
+    posthog,
+    posthogSuperProperties,
+    {
+      currentUserId: currentPosthogUserId,
+      currentIdentifyKey: currentPosthogIdentifyKey,
+    },
+    input,
+  );
 
-  if (!userId) {
-    if (currentPosthogUserId === null) {
-      return;
-    }
-
-    posthog.reset();
-    posthog.register(posthogSuperProperties);
-    currentPosthogUserId = null;
-    currentPosthogPersonPropertiesKey = null;
-    return;
-  }
-
-  if (currentPosthogUserId && currentPosthogUserId !== userId) {
-    posthog.reset();
-    posthog.register(posthogSuperProperties);
-    currentPosthogPersonPropertiesKey = null;
-  }
-
-  if (currentPosthogUserId !== userId) {
-    posthog.identify(userId);
-    currentPosthogUserId = userId;
-  }
-
-  const nextPersonPropertiesKey = buildPostHogPersonPropertiesKey({
-    email: input.userEmail ?? null,
-    name: input.userName ?? null,
-  });
-
-  if (currentPosthogPersonPropertiesKey === nextPersonPropertiesKey) {
-    return;
-  }
-
-  posthog.setPersonProperties({
-    email: input.userEmail ?? null,
-    name: input.userName ?? null,
-  });
-  currentPosthogPersonPropertiesKey = nextPersonPropertiesKey;
+  currentPosthogUserId = nextState.currentUserId;
+  currentPosthogIdentifyKey = nextState.currentIdentifyKey;
 }
 
 function maskSentryDsn(dsn: string | null | undefined): string {
@@ -1095,7 +1078,17 @@ function DesktopShell() {
   const [runtimeConfig, setRuntimeConfig] =
     useState<DesktopRuntimeConfig | null>(null);
   const [runtimeState, setRuntimeState] = useState<RuntimeState | null>(null);
-  const update = useAutoUpdate();
+  const updateExperience = useMemo(
+    () =>
+      runtimeConfig
+        ? resolveDesktopUpdateExperience({
+            buildSource: runtimeConfig.buildInfo.source,
+            updateFeed: runtimeConfig.urls.updateFeed,
+          })
+        : "normal",
+    [runtimeConfig],
+  );
+  const update = useAutoUpdate({ experience: updateExperience });
 
   // Setup animation phases:
   // "playing" → main video (23s) plays once
@@ -1255,7 +1248,14 @@ function DesktopShell() {
       <div className="window-drag-bar" />
       <aside className="desktop-sidebar">
         <div className="desktop-sidebar-brand">
-          <span className="desktop-shell-eyebrow">nexu desktop</span>
+          <div className="desktop-sidebar-brand-top">
+            <span className="desktop-shell-eyebrow">nexu desktop</span>
+            <UpdateBadge
+              dismissed={update.dismissed}
+              onUndismiss={update.undismiss}
+              phase={update.phase}
+            />
+          </div>
           <h1>Runtime Console Ready</h1>
           <p>
             One local shell for bootstrap health, web verification, and gateway
@@ -1420,14 +1420,22 @@ function DesktopShell() {
       </main>
 
       <UpdateBanner
+        canCheckForUpdates={
+          updateExperience === "local-test-feed" &&
+          Boolean(update.capability?.check)
+        }
         capability={update.capability}
+        currentVersion={runtimeConfig?.buildInfo.version ?? null}
         dismissed={update.dismissed}
         errorMessage={update.errorMessage}
+        experience={updateExperience}
+        onCheck={() => void update.check()}
         onDismiss={update.dismiss}
         onDownload={() => void update.download()}
         onInstall={() => void update.install()}
         percent={update.percent}
         phase={update.phase}
+        releaseNotes={update.releaseNotes}
         version={update.version}
       />
 

@@ -44,6 +44,33 @@ const mockClaimResponse = {
   status: mockRewardStatusResponse,
 };
 
+const mockCreditRecordsResponse = {
+  appUserId: "user-1",
+  grants: [
+    {
+      id: "grant-1",
+      appUserId: "user-1",
+      amount: 300,
+      balance: 300,
+      source: "signup_bonus",
+      sourceId: null,
+      description: "signup bonus",
+      expiresAt: "2099-04-01T00:00:00.000Z",
+      enabled: true,
+      idempotencyKey: "signup-1",
+      metadata: {},
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    },
+  ],
+  usageSummary: {
+    totalEntries: 0,
+    totalDueCredits: 0,
+    totalChargedCredits: 0,
+    totalCostUsd: "0",
+  },
+};
+
 describe("createCloudRewardService", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -448,6 +475,97 @@ describe("createCloudRewardService", () => {
 
       expect(capturedMethod).toBe("POST");
       expect(JSON.parse(capturedBody)).toEqual({ taskId: "daily_checkin" });
+    });
+  });
+
+  describe("getCreditRecords", () => {
+    it("returns ok:true with parsed records on success", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify(mockCreditRecordsResponse), {
+              status: 200,
+            }),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditRecords();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      expect(result.data.grants).toHaveLength(1);
+      expect(result.data.grants[0]?.source).toBe("signup_bonus");
+    });
+
+    it("returns ok:false reason:auth_failed on 401", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify({ message: "Unauthorized" }), {
+              status: 401,
+            }),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditRecords();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("unreachable");
+      expect(result.reason).toBe("auth_failed");
+    });
+
+    it("returns ok:false reason:parse_error when response body does not match schema", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(JSON.stringify({ unexpected: "shape" }), {
+              status: 200,
+            }),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditRecords();
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("unreachable");
+      expect(result.reason).toBe("parse_error");
+    });
+
+    it("uses the credit records endpoint", async () => {
+      let capturedUrl = "";
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL) => {
+          capturedUrl = String(url);
+          return new Response(JSON.stringify(mockCreditRecordsResponse), {
+            status: 200,
+          });
+        }),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      await service.getCreditRecords();
+
+      expect(capturedUrl).toBe("https://nexu.io/api/v1/credits/records");
     });
   });
 

@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as Sentry from "@sentry/electron/main";
@@ -6,10 +7,12 @@ import {
   BrowserWindow,
   Menu,
   type MenuItemConstructorOptions,
+  Tray,
   app,
   crashReporter,
   dialog,
   globalShortcut,
+  nativeImage,
   nativeTheme,
   powerMonitor,
   powerSaveBlocker,
@@ -25,6 +28,10 @@ import type {
 import { buildChildProcessProxyEnv } from "../shared/proxy-config";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { getDesktopSentryBuildMetadata } from "../shared/sentry-build-metadata";
+import {
+  shouldEnableDesktopUpdateManager,
+  shouldStartDesktopPeriodicUpdateChecks,
+} from "../shared/update-policy";
 import { getDesktopAppRoot, getWorkspaceRoot } from "../shared/workspace-paths";
 import { DesktopDiagnosticsReporter } from "./desktop-diagnostics";
 import { exportDiagnostics } from "./diagnostics-export";
@@ -62,15 +69,23 @@ import {
   getDefaultPlistDir,
   getLogDir,
   installLaunchdQuitHandler,
+  runTeardownAndExit,
   teardownLaunchdServices,
 } from "./services";
+import {
+  type DesktopShellPreferences,
+  applyDesktopShellPreferencesOnStartup,
+  getDesktopShellPreferences,
+  setDesktopShellPreferencesRuntimeHandler,
+} from "./services/desktop-shell-preferences";
+import {
+  startDesktopDevInspectServer,
+  stopDesktopDevInspectServer,
+} from "./services/dev-inspect-server";
 import { isLaunchdBootstrapEnabled } from "./services/launchd-bootstrap";
 import { ProxyManager } from "./services/proxy-manager";
-import {
-  getLegacyNexuHomeStateDir,
-  migrateOpenclawState,
-} from "./services/state-migration";
 import { flushV8CoverageIfEnabled } from "./services/v8-coverage";
+import { readPendingWindowsUserDataMigration } from "./services/windows-user-data-migration";
 import { SleepGuard, type SleepGuardLogEntry } from "./sleep-guard";
 import { ComponentUpdater } from "./updater/component-updater";
 import { StartupHealthCheck } from "./updater/rollback";
@@ -104,12 +119,13 @@ const baseRuntimeConfig = getDesktopRuntimeConfig(process.env, {
   resourcesPath: app.isPackaged ? electronRoot : undefined,
   useBuildConfig: app.isPackaged,
 });
+const runtimePlatformAdapter =
+  getDesktopRuntimePlatformAdapter(baseRuntimeConfig);
 // In launchd mode, skip port probing — the bootstrap has its own port
 // recovery via runtime-ports.json and handles leftover processes gracefully.
 // Probing here would waste time and the results get overridden by attach anyway.
 const useLaunchdMode = isLaunchdBootstrapEnabled();
-const runtimeLifecycle =
-  getDesktopRuntimePlatformAdapter(baseRuntimeConfig).lifecycle;
+const runtimeLifecycle = runtimePlatformAdapter.lifecycle;
 const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
   ? {
       allocations: [] as PortAllocation[],
@@ -127,6 +143,38 @@ const { allocations: runtimePortAllocations, runtimeConfig } = useLaunchdMode
         throw error;
       },
     );
+
+const pendingUserDataMigration =
+  app.isPackaged && process.platform === "win32"
+    ? readPendingWindowsUserDataMigration()
+    : null;
+const runtimeRoots = runtimePlatformAdapter.capabilities.resolveRuntimeRoots({
+  app,
+  electronRoot,
+  runtimeConfig,
+});
+if (!useLaunchdMode) {
+  runtimePlatformAdapter.capabilities.stateMigrationPolicy.run({
+    runtimeConfig,
+    runtimeRoots,
+    isPackaged: app.isPackaged,
+    pendingUserDataMigration,
+    log: (message) => {
+      writeDesktopMainLog({
+        source: "state-migration",
+        stream: "system",
+        kind: "lifecycle",
+        message,
+        logFilePath: resolve(
+          app.getPath("userData"),
+          "logs",
+          "desktop-main.log",
+        ),
+      });
+    },
+  });
+}
+
 const needsSetupExtraction = checkOpenclawExtractionNeeded(
   electronRoot,
   app.getPath("userData"),
@@ -168,6 +216,15 @@ const embeddedWorkspaceTransparentCss = `
     background-color: transparent !important;
   }
 `;
+const desktopDevInspectHost =
+  process.env.NEXU_DESKTOP_DEV_INSPECT_HOST ?? "127.0.0.1";
+const desktopDevInspectPort = Number.parseInt(
+  process.env.NEXU_DESKTOP_DEV_INSPECT_PORT ?? "5181",
+  10,
+);
+const desktopDevInspectToken =
+  process.env.NEXU_DESKTOP_DEV_INSPECT_TOKEN ?? null;
+const desktopDevServerUrl = process.env.NEXU_DESKTOP_DEV_SERVER_URL ?? null;
 
 function readNativeCrashTestTitle(event: Sentry.Event): string | null {
   const taggedTitle =
@@ -277,7 +334,51 @@ if (sentryDsn) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let residentTray: Tray | null = null;
+let launchdQuitOptsForResidentEntry:
+  | Parameters<typeof installLaunchdQuitHandler>[0]
+  | null = null;
 let diagnosticsReporter: DesktopDiagnosticsReporter | null = null;
+let systemTray: Tray | null = null;
+let pendingMacResidentEntryPreferences: DesktopShellPreferences | null = null;
+
+function isZhLocale(): boolean {
+  return app.getLocale().toLowerCase().startsWith("zh");
+}
+
+function getWindowsTrayStrings(): {
+  show: string;
+  hide: string;
+  quit: string;
+} {
+  if (isZhLocale()) {
+    return {
+      show: "显示 Nexu",
+      hide: "隐藏 Nexu",
+      quit: "退出 Nexu",
+    };
+  }
+
+  return {
+    show: "Show Nexu",
+    hide: "Hide Nexu",
+    quit: "Quit Nexu",
+  };
+}
+
+function resolveWindowsTrayIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, "tray-icon.ico")
+    : resolve(getDesktopAppRoot(), "build", "icon.ico");
+}
+
+function isForceQuitInProgress(): boolean {
+  return Boolean((app as unknown as Record<string, unknown>).__nexuForceQuit);
+}
+
+function markForceQuitInProgress(): void {
+  (app as unknown as Record<string, unknown>).__nexuForceQuit = true;
+}
 
 /** True if this is the x86_64 build running under Rosetta 2 on Apple Silicon. */
 function isRunningUnderRosetta(): boolean {
@@ -505,12 +606,6 @@ function sendHostDesktopCommand(command: HostDesktopCommand): void {
   mainWindow?.webContents.send("host:desktop-command", command);
 }
 
-function triggerUpdateCheck(): void {
-  mainWindow?.webContents.send("host:desktop-command", {
-    type: "desktop:check-for-updates",
-  });
-}
-
 function showAboutDialog(): void {
   const version = app.getVersion();
   const detailLines = [
@@ -589,12 +684,6 @@ function installApplicationMenu(): void {
     helpSubmenu.push(
       { type: "separator" },
       {
-        id: "check-for-updates",
-        label: "Check for Updates…",
-        enabled: app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-        click: () => triggerUpdateCheck(),
-      },
-      {
         id: "about-nexu",
         label: `About Nexu (v${app.getVersion()})`,
         click: () => showAboutDialog(),
@@ -614,13 +703,6 @@ function installApplicationMenu(): void {
             role: "appMenu",
             submenu: [
               { role: "about" },
-              {
-                id: "check-for-updates",
-                label: "Check for Updates…",
-                enabled:
-                  app.isPackaged && runtimeConfig.updates.autoUpdateEnabled,
-                click: () => triggerUpdateCheck(),
-              },
               { type: "separator" },
               { role: "services" },
               { type: "separator" },
@@ -800,28 +882,22 @@ async function runLaunchdColdStart(): Promise<void> {
     /^~/,
     process.env.HOME ?? "",
   );
+  const runtimeRoots = runtimePlatformAdapter.capabilities.resolveRuntimeRoots({
+    app,
+    electronRoot,
+    runtimeConfig,
+  });
 
-  // In packaged mode, keep openclaw state under Electron userData (matches v0.1.5).
-  // In dev mode, derive from nexuHome for repo-local isolation.
-  const openclawRuntimeRoot = isDev
-    ? resolve(nexuHome, "runtime", "openclaw")
-    : resolve(app.getPath("userData"), "runtime", "openclaw");
-  const openclawStateDir = resolve(openclawRuntimeRoot, "state");
-  const openclawConfigPath = resolve(openclawStateDir, "openclaw.json");
+  const { openclawRuntimeRoot, openclawStateDir, openclawConfigPath } =
+    runtimeRoots;
 
-  // Migrate any state created under ~/.nexu during v0.1.6 back to userData path
-  if (!isDev) {
-    const legacyStateDir = getLegacyNexuHomeStateDir(
-      runtimeConfig.paths.nexuHome,
-    );
-    if (legacyStateDir !== openclawStateDir) {
-      migrateOpenclawState({
-        targetStateDir: openclawStateDir,
-        sourceStateDir: legacyStateDir,
-        log: (msg) => logColdStart(`state-migration: ${msg}`),
-      });
-    }
-  }
+  runtimePlatformAdapter.capabilities.stateMigrationPolicy.run({
+    runtimeConfig,
+    runtimeRoots,
+    isPackaged: app.isPackaged,
+    pendingUserDataMigration: null,
+    log: (message) => logColdStart(`state-migration: ${message}`),
+  });
 
   // In dev mode, serve web app from apps/web/dist
   // In packaged mode, serve from resources/web
@@ -873,6 +949,18 @@ async function runLaunchdColdStart(): Promise<void> {
       process.env.POSTHOG_API_KEY ?? runtimeConfig.posthogApiKey ?? undefined,
     posthogHost:
       process.env.POSTHOG_HOST ?? runtimeConfig.posthogHost ?? undefined,
+    langfusePublicKey:
+      process.env.LANGFUSE_PUBLIC_KEY ??
+      runtimeConfig.langfusePublicKey ??
+      undefined,
+    langfuseSecretKey:
+      process.env.LANGFUSE_SECRET_KEY ??
+      runtimeConfig.langfuseSecretKey ??
+      undefined,
+    langfuseBaseUrl:
+      process.env.LANGFUSE_BASE_URL ??
+      runtimeConfig.langfuseBaseUrl ??
+      undefined,
     log: (message: string) => logColdStart(message),
     nodeV8Coverage: process.env.NODE_V8_COVERAGE,
     desktopE2ECoverage: process.env.NEXU_DESKTOP_E2E_COVERAGE,
@@ -946,18 +1034,263 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
+function shouldUseResidentEntry(preferences: DesktopShellPreferences): boolean {
+  if (process.platform === "darwin") {
+    return true;
+  }
+
+  return !preferences.showInDock;
+}
+
+function resolveTrayIconPath(): string | null {
+  const candidate =
+    process.platform === "darwin"
+      ? app.isPackaged
+        ? join(process.resourcesPath, "tray-icon-mac.png")
+        : resolve(getDesktopAppRoot(), "build", "tray-icon-mac.png")
+      : resolve(
+          app.isPackaged ? process.resourcesPath : getDesktopAppRoot(),
+          "build",
+          process.platform === "win32" ? "icon.ico" : "icon.png",
+        );
+
+  return existsSync(candidate) ? candidate : null;
+}
+
+function hideMainWindowToBackground(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.hide();
+}
+
+function hideMainWindowToTray(): void {
+  hideMainWindowToBackground();
+}
+
+function updateSystemTrayMenu(): void {
+  if (!systemTray) {
+    return;
+  }
+
+  const trayStrings = getWindowsTrayStrings();
+
+  const isVisible = Boolean(
+    mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible(),
+  );
+
+  systemTray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: isVisible ? trayStrings.hide : trayStrings.show,
+        click: () => {
+          if (isVisible) {
+            hideMainWindowToBackground();
+            return;
+          }
+
+          showMainWindowFromResidentEntry();
+        },
+      },
+      { type: "separator" },
+      {
+        label: trayStrings.quit,
+        click: () => {
+          markForceQuitInProgress();
+          app.quit();
+        },
+      },
+    ]),
+  );
+}
+
+function showSystemTrayMenu(): void {
+  if (!systemTray) {
+    return;
+  }
+
+  updateSystemTrayMenu();
+  systemTray.popUpContextMenu();
+}
+
+function showMainWindowFromResidentEntry(): void {
+  const preferences = getDesktopShellPreferences();
+
+  if (process.platform === "darwin" && preferences.showInDock) {
+    void app.dock?.show();
+  }
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+    return;
+  }
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+
+  focusMainWindow();
+}
+
+function destroyResidentTray(): void {
+  residentTray?.destroy();
+  residentTray = null;
+}
+
+function showResidentTrayMenu(): void {
+  if (!residentTray) {
+    return;
+  }
+
+  residentTray.popUpContextMenu();
+}
+
+function ensureResidentTray(): void {
+  if (residentTray) {
+    return;
+  }
+
+  const trayIconPath = resolveTrayIconPath();
+  if (!trayIconPath) {
+    return;
+  }
+
+  let trayIcon = nativeImage.createFromPath(trayIconPath);
+  if (trayIcon.isEmpty()) {
+    return;
+  }
+
+  if (process.platform === "darwin") {
+    trayIcon = trayIcon.resize({ height: 18 });
+    trayIcon.setTemplateImage(true);
+  }
+
+  const tray = new Tray(trayIcon);
+  residentTray = tray;
+  tray.setToolTip("nexu");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Open nexu",
+        click: () => {
+          showMainWindowFromResidentEntry();
+        },
+      },
+      {
+        label: "Quit",
+        click: () => {
+          if (app.isPackaged && launchdQuitOptsForResidentEntry) {
+            void runTeardownAndExit(
+              launchdQuitOptsForResidentEntry,
+              "tray-quit",
+            );
+            return;
+          }
+
+          markForceQuitInProgress();
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on("click", () => {
+    showResidentTrayMenu();
+  });
+  tray.on("right-click", () => {
+    showResidentTrayMenu();
+  });
+}
+
+async function ensureWindowsTray(): Promise<void> {
+  if (process.platform !== "win32" || !app.isPackaged || systemTray) {
+    return;
+  }
+
+  const trayIconPath = resolveWindowsTrayIconPath();
+  const trayIcon = nativeImage.createFromPath(trayIconPath);
+
+  if (!trayIcon || trayIcon.isEmpty()) {
+    return;
+  }
+
+  systemTray = new Tray(trayIcon);
+  systemTray.setToolTip("Nexu");
+  updateSystemTrayMenu();
+
+  systemTray.on("click", () => {
+    showSystemTrayMenu();
+  });
+
+  systemTray.on("right-click", () => {
+    showSystemTrayMenu();
+  });
+}
+
+function applyResidentEntryPreferences(
+  preferences: DesktopShellPreferences,
+): void {
+  if (process.platform === "darwin") {
+    const window = mainWindow;
+    if (window && !window.isDestroyed() && window.isFullScreen()) {
+      pendingMacResidentEntryPreferences = preferences;
+      window.setFullScreen(false);
+      return;
+    }
+
+    pendingMacResidentEntryPreferences = null;
+    app.setActivationPolicy(preferences.showInDock ? "regular" : "accessory");
+    if (preferences.showInDock) {
+      void app.dock?.show();
+    } else {
+      app.dock?.hide();
+    }
+  }
+
+  if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setSkipTaskbar(!preferences.showInDock);
+  }
+
+  if (process.platform !== "win32" && shouldUseResidentEntry(preferences)) {
+    ensureResidentTray();
+  } else {
+    destroyResidentTray();
+  }
+}
+
+function shouldHideOnWindowClose(): boolean {
+  if (!app.isPackaged) {
+    return false;
+  }
+
+  if (process.platform === "darwin") {
+    return true;
+  }
+
+  if (process.platform === "win32") {
+    return systemTray !== null;
+  }
+
+  return shouldUseResidentEntry(getDesktopShellPreferences());
+}
 app.on("second-instance", () => {
   if (!mainWindow || mainWindow.isDestroyed()) {
     createMainWindow();
     return;
   }
 
+  showMainWindowFromResidentEntry();
   focusMainWindow();
+});
+
+app.on("before-quit", () => {
+  void stopDesktopDevInspectServer();
 });
 
 function createMainWindow(): BrowserWindow {
   logLaunchTimeline("main window creation requested");
   const isMacOS = process.platform === "darwin";
+  const shellPreferences = getDesktopShellPreferences();
   const window = new BrowserWindow({
     width: 1280,
     height: 720,
@@ -985,6 +1318,10 @@ function createMainWindow(): BrowserWindow {
       backgroundThrottling: false,
     },
   });
+
+  if (process.platform === "win32") {
+    window.setSkipTaskbar(!shellPreferences.showInDock);
+  }
 
   // Disable sandbox for webviews so preload scripts have access to Node.js APIs
   // (needed for contextBridge/ipcRenderer in ESM-built preloads)
@@ -1106,6 +1443,54 @@ function createMainWindow(): BrowserWindow {
     if (mainWindow === window) {
       mainWindow = null;
     }
+
+    updateSystemTrayMenu();
+  });
+
+  window.on("close", (event) => {
+    if (process.platform !== "win32" || !app.isPackaged) {
+      return;
+    }
+
+    if (!systemTray) {
+      return;
+    }
+
+    if (isForceQuitInProgress()) {
+      return;
+    }
+
+    event.preventDefault();
+    hideMainWindowToTray();
+  });
+
+  window.on("show", () => {
+    updateSystemTrayMenu();
+  });
+
+  window.on("hide", () => {
+    updateSystemTrayMenu();
+  });
+
+  window.on("leave-full-screen", () => {
+    if (mainWindow !== window || !pendingMacResidentEntryPreferences) {
+      return;
+    }
+
+    const pendingPreferences = pendingMacResidentEntryPreferences;
+    pendingMacResidentEntryPreferences = null;
+    applyResidentEntryPreferences(pendingPreferences);
+  });
+
+  window.on("close", (event) => {
+    if ((app as unknown as Record<string, unknown>).__nexuForceQuit) {
+      return;
+    }
+
+    if (!launchdResult && shouldHideOnWindowClose()) {
+      event.preventDefault();
+      hideMainWindowToBackground();
+    }
   });
 
   // During first install / post-update, show the window IMMEDIATELY with a
@@ -1120,14 +1505,28 @@ function createMainWindow(): BrowserWindow {
     focusMainWindow();
   }
 
-  void window.loadFile(resolve(__dirname, "../../dist/index.html"));
+  const desktopRendererEntryPath = resolve(__dirname, "../../dist/index.html");
+  const desktopRendererTarget =
+    !app.isPackaged && desktopDevServerUrl
+      ? desktopDevServerUrl
+      : desktopRendererEntryPath;
+
+  if (!app.isPackaged && desktopDevServerUrl) {
+    void window.loadURL(desktopDevServerUrl);
+  } else {
+    void window.loadFile(desktopRendererEntryPath);
+  }
   diagnosticsReporter?.recordStartupProbe({
     source: "main",
     stage: "main:window-load-dispatched",
     status: "ok",
-    detail: resolve(__dirname, "../../dist/index.html"),
+    detail: desktopRendererTarget,
   });
-  logLaunchTimeline("main window loadFile dispatched");
+  logLaunchTimeline(
+    !app.isPackaged && desktopDevServerUrl
+      ? "main window loadURL dispatched"
+      : "main window loadFile dispatched",
+  );
   mainWindow = window;
   return window;
 }
@@ -1284,6 +1683,32 @@ app.whenReady().then(async () => {
     status: "ok",
     detail: app.getVersion(),
   });
+  if (
+    !app.isPackaged &&
+    desktopDevInspectToken &&
+    Number.isInteger(desktopDevInspectPort) &&
+    desktopDevInspectPort > 0
+  ) {
+    try {
+      await startDesktopDevInspectServer({
+        host: desktopDevInspectHost,
+        port: desktopDevInspectPort,
+        token: desktopDevInspectToken,
+      });
+    } catch (error) {
+      writeDesktopMainLog({
+        source: "dev-inspect",
+        stream: "stderr",
+        kind: "app",
+        message: `desktop dev inspect server failed to start host=${desktopDevInspectHost} port=${desktopDevInspectPort} error=${error instanceof Error ? error.message : String(error)}`,
+        logFilePath: null,
+      });
+    }
+  }
+  setDesktopShellPreferencesRuntimeHandler((preferences) => {
+    applyResidentEntryPreferences(preferences);
+  });
+  applyDesktopShellPreferencesOnStartup();
   registerIpcHandlers(
     orchestrator,
     runtimeConfig,
@@ -1308,6 +1733,7 @@ app.whenReady().then(async () => {
     },
   });
   const win = createMainWindow();
+  await ensureWindowsTray();
   sleepGuard.start("desktop-runtime-active");
 
   void (async () => {
@@ -1380,13 +1806,23 @@ app.whenReady().then(async () => {
       };
       installLaunchdQuitHandler(quitOpts);
       setQuitHandlerOpts(quitOpts);
+      launchdQuitOptsForResidentEntry = quitOpts;
     }
 
-    if (app.isPackaged && runtimeConfig.updates.autoUpdateEnabled) {
+    const shouldEnableUpdates =
+      app.isPackaged &&
+      runtimeConfig.updates.autoUpdateEnabled &&
+      shouldEnableDesktopUpdateManager({
+        buildSource: runtimeConfig.buildInfo.source,
+        updateFeed: runtimeConfig.urls.updateFeed,
+      });
+
+    if (shouldEnableUpdates) {
       const updateMgr = new UpdateManager(win, orchestrator, {
         channel: runtimeConfig.updates.channel,
         feedUrl: runtimeConfig.urls.updateFeed,
-        initialDelayMs: process.platform === "win32" ? 45_000 : 0,
+        autoDownload: true,
+        initialDelayMs: process.platform === "win32" ? 30_000 : 0,
         prepareForUpdateInstall: runtimeLifecycle.prepareForUpdateInstall
           ? async (args: PrepareForUpdateInstallArgs) => {
               await runtimeLifecycle.prepareForUpdateInstall?.(args);
@@ -1401,7 +1837,15 @@ app.whenReady().then(async () => {
           : undefined,
       });
       setUpdateManager(updateMgr);
-      updateMgr.startPeriodicCheck();
+
+      if (
+        shouldStartDesktopPeriodicUpdateChecks({
+          buildSource: runtimeConfig.buildInfo.source,
+          updateFeed: runtimeConfig.urls.updateFeed,
+        })
+      ) {
+        updateMgr.startPeriodicCheck();
+      }
     } else {
       setUpdateManager(null);
     }
@@ -1426,6 +1870,9 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
+    if (shouldUseResidentEntry(getDesktopShellPreferences())) {
+      return;
+    }
     app.quit();
   }
 });
@@ -1462,6 +1909,7 @@ const beforeQuitHandler = (event: Electron.Event) => {
   // Legacy orchestrator mode: run unified shutdown, then quit.
   event.preventDefault();
   void gracefulShutdown("before-quit").finally(() => {
+    markForceQuitInProgress();
     // P1-2: Remove only this specific handler (not all before-quit listeners).
     app.removeListener("before-quit", beforeQuitHandler);
     app.quit();
@@ -1469,3 +1917,7 @@ const beforeQuitHandler = (event: Electron.Event) => {
 };
 
 app.on("before-quit", beforeQuitHandler);
+app.on("before-quit", () => {
+  systemTray?.destroy();
+  systemTray = null;
+});

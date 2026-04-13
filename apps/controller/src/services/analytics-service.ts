@@ -19,6 +19,7 @@ type InternalSkillSource = "curated" | "managed" | "custom";
 
 type AnalyticsState = {
   sessionStartSent: boolean;
+  firstConversationDistinctId: string | null;
   sentUserMessageIds: string[];
   sentSkillUseIds: string[];
 };
@@ -65,10 +66,16 @@ type ResolvedSkillInfo = {
   source: string | null;
 };
 
+type AnalyticsDistinctIdResolution =
+  | { status: "ready"; distinctId: string }
+  | { status: "missing" }
+  | { status: "error" };
+
 const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
 const EMPTY_ANALYTICS_STATE: AnalyticsState = {
   sessionStartSent: false,
+  firstConversationDistinctId: null,
   sentUserMessageIds: [],
   sentSkillUseIds: [],
 };
@@ -169,11 +176,45 @@ export class AnalyticsService {
       return;
     }
 
+    if (!(await this.configStore.getDesktopAnalyticsEnabled())) {
+      return;
+    }
+
+    const analyticsDistinctId = await this.resolveAnalyticsDistinctId();
+    if (analyticsDistinctId.status === "error") {
+      return;
+    }
+
+    const shouldSendAnalytics = analyticsDistinctId.status === "ready";
+    const currentDistinctId =
+      analyticsDistinctId.status === "ready"
+        ? analyticsDistinctId.distinctId
+        : null;
+    let stateChanged = false;
+
     await this.ensureStateLoaded();
-    const profile = await this.configStore.getLocalProfile();
+    if (
+      currentDistinctId &&
+      this.state.sessionStartSent &&
+      this.state.firstConversationDistinctId === null
+    ) {
+      this.state.sessionStartSent = false;
+      stateChanged = true;
+    }
+
+    if (
+      currentDistinctId &&
+      this.state.sessionStartSent &&
+      this.state.firstConversationDistinctId &&
+      this.state.firstConversationDistinctId !== currentDistinctId
+    ) {
+      this.state.sessionStartSent = false;
+      this.state.firstConversationDistinctId = null;
+      stateChanged = true;
+    }
+
     const sessions = await this.sessionsRuntime.listSessions();
     const skillLedger = await this.readSkillLedgerSources();
-    let stateChanged = false;
     let firstSessionCandidate: UserMessageCandidate | null = null;
 
     for (const session of sessions) {
@@ -214,16 +255,18 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendAnalyticsEvent(
-          profile.id,
-          "user_message_sent",
-          {
-            channel: userMessage.channel,
-            model_provider: userMessage.providerName,
-            state: userMessage.state,
-          },
-          userMessage.timestampMs,
-        );
+        if (shouldSendAnalytics) {
+          await this.sendAnalyticsEvent(
+            analyticsDistinctId.distinctId,
+            "user_message_sent",
+            {
+              channel: userMessage.channel,
+              model_provider: userMessage.providerName,
+              state: userMessage.state,
+            },
+            userMessage.timestampMs,
+          );
+        }
         this.sentUserMessageIds.add(userMessage.id);
         stateChanged = true;
       }
@@ -236,34 +279,39 @@ export class AnalyticsService {
           continue;
         }
 
-        await this.sendAnalyticsEvent(
-          profile.id,
-          "skill_use",
-          {
-            skill_name: skillUse.skillName,
-            skill_source: skillUse.skillSource,
-            channel: skillUse.channel,
-            model_provider: skillUse.providerName,
-          },
-          skillUse.timestampMs,
-        );
+        if (shouldSendAnalytics) {
+          await this.sendAnalyticsEvent(
+            analyticsDistinctId.distinctId,
+            "skill_use",
+            {
+              skill_name: skillUse.skillName,
+              skill_source: skillUse.skillSource,
+              channel: skillUse.channel,
+              model_provider: skillUse.providerName,
+            },
+            skillUse.timestampMs,
+          );
+        }
         this.sentSkillUseIds.add(skillUse.id);
         stateChanged = true;
       }
     }
 
     if (!this.state.sessionStartSent && firstSessionCandidate?.providerName) {
-      await this.sendAnalyticsEvent(
-        profile.id,
-        "nexu_first_conversation_start",
-        {
-          channel: firstSessionCandidate.channel,
-          model_provider: firstSessionCandidate.providerName,
-        },
-        firstSessionCandidate.timestampMs,
-      );
-      this.state.sessionStartSent = true;
-      stateChanged = true;
+      if (shouldSendAnalytics) {
+        await this.sendAnalyticsEvent(
+          analyticsDistinctId.distinctId,
+          "nexu_first_conversation_start",
+          {
+            channel: firstSessionCandidate.channel,
+            model_provider: firstSessionCandidate.providerName,
+          },
+          firstSessionCandidate.timestampMs,
+        );
+        this.state.firstConversationDistinctId = analyticsDistinctId.distinctId;
+        this.state.sessionStartSent = true;
+        stateChanged = true;
+      }
     }
 
     if (stateChanged) {
@@ -281,6 +329,10 @@ export class AnalyticsService {
       const parsed = JSON.parse(raw) as Partial<AnalyticsState>;
       this.state = {
         sessionStartSent: parsed.sessionStartSent === true,
+        firstConversationDistinctId:
+          typeof parsed.firstConversationDistinctId === "string"
+            ? parsed.firstConversationDistinctId
+            : null,
         sentUserMessageIds: Array.isArray(parsed.sentUserMessageIds)
           ? parsed.sentUserMessageIds.filter(
               (value): value is string => typeof value === "string",
@@ -600,6 +652,29 @@ export class AnalyticsService {
     return `${host.replace(/\/+$/, "")}/i/v0/e/`;
   }
 
+  private async resolveAnalyticsDistinctId(): Promise<AnalyticsDistinctIdResolution> {
+    try {
+      const cloudStatus = await this.configStore.getDesktopCloudStatus();
+      const userId =
+        typeof cloudStatus?.userId === "string"
+          ? cloudStatus.userId.trim()
+          : "";
+      if (!userId || userId === "desktop-local-user") {
+        return { status: "missing" };
+      }
+
+      return { status: "ready", distinctId: userId };
+    } catch (error) {
+      logger.warn(
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "failed_to_resolve_analytics_distinct_id",
+      );
+      return { status: "error" };
+    }
+  }
+
   private async sendAnalyticsEvent(
     distinctId: string,
     eventType: string,
@@ -608,6 +683,10 @@ export class AnalyticsService {
   ): Promise<void> {
     const captureUrl = this.getPosthogCaptureUrl();
     if (!captureUrl || !this.env.posthogApiKey) {
+      return;
+    }
+
+    if (!(await this.configStore.getDesktopAnalyticsEnabled())) {
       return;
     }
 

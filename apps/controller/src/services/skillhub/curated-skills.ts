@@ -1,6 +1,8 @@
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import type { SkillDb } from "./skill-db.js";
+
+const LIBTV_VIDEO_SLUG = "libtv-video";
 
 /**
  * Skills to install from ClawHub on first launch.
@@ -97,6 +99,67 @@ export function copyStaticSkills(params: {
   }
 
   return { copied, skipped };
+}
+
+/**
+ * Unconditionally install the latest bundled libtv-video into the state
+ * dir on every controller startup. If a previous copy exists, it is
+ * wiped and replaced; if not, a fresh copy is installed. The managed
+ * ledger record is upserted via `recordInstall`, which also flips any
+ * prior `uninstalled` status back to `installed` (intentional — see
+ * below).
+ *
+ * Why this exists: `copyStaticSkills` only copies a static skill on
+ * first install (both `destDir/SKILL.md` and `knownSlugs.has(slug)`
+ * guards skip thereafter), so bundled libtv-video updates never reach
+ * existing users on an app update. This function is how the libtv-video
+ * refactor (detached background waiter + direct Feishu delivery via
+ * `feishu_send_video.py`) ships to existing users on their next boot.
+ *
+ * Scope constraints:
+ *   - Only libtv-video. Other bundled static skills keep the existing
+ *     first-install-only semantics from `copyStaticSkills`.
+ *   - Only touches `<targetDir>/libtv-video/`. User-scoped copies under
+ *     `~/.agents/skills/libtv-video/` and per-agent workspace copies
+ *     under `<openclawStateDir>/agents/<agentId>/skills/libtv-video/`
+ *     are left alone — they represent explicit user choices under
+ *     different ledger sources.
+ *   - Only modifies the `source: "managed"` ledger record. Workspace /
+ *     user / custom records for the same slug are left untouched.
+ *   - Does NOT respect the managed record's uninstalled status —
+ *     libtv-video is treated as a core bundled capability that always
+ *     tracks the shipped version. `recordInstall` upserts any prior
+ *     `uninstalled` record back to `installed`.
+ *
+ * Why a dedicated function instead of reusing `copyStaticSkills`: its
+ * `knownSlugs.has(slug)` guard skips on any ledger source, so even if
+ * we removed the `managed` record beforehand, any stray workspace or
+ * user record for libtv-video would still cause a silent skip. This
+ * function bypasses that check deterministically.
+ */
+export function replaceLibtvVideoFromBundle(params: {
+  staticDir: string;
+  targetDir: string;
+  skillDb: SkillDb;
+}): {
+  installed: boolean;
+  reason: "bundle-missing" | "fresh-install" | "replaced";
+} {
+  const srcDir = resolve(params.staticDir, LIBTV_VIDEO_SLUG);
+  if (!existsSync(srcDir)) {
+    return { installed: false, reason: "bundle-missing" };
+  }
+
+  const destDir = resolve(params.targetDir, LIBTV_VIDEO_SLUG);
+  const existed = existsSync(destDir);
+  if (existed) {
+    rmSync(destDir, { recursive: true, force: true });
+  }
+  mkdirSync(destDir, { recursive: true });
+  cpSync(srcDir, destDir, { recursive: true });
+  params.skillDb.recordInstall(LIBTV_VIDEO_SLUG, "managed");
+
+  return { installed: true, reason: existed ? "replaced" : "fresh-install" };
 }
 
 export type CuratedInstallResult = {

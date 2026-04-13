@@ -5,7 +5,9 @@ import { resolveOpenclawGatewayBaseUrl } from "./openclaw-gateway-url.js";
 export class RuntimeHealth {
   constructor(private readonly env: ControllerEnv) {}
 
-  async probe(): Promise<{ ok: boolean; status: number | null }> {
+  async probe(options?: {
+    timeoutMs?: number;
+  }): Promise<{ ok: boolean; status: number | null }> {
     if (!this.env.gatewayProbeEnabled) {
       return { ok: true, status: null };
     }
@@ -13,6 +15,7 @@ export class RuntimeHealth {
     try {
       const response = await proxyFetch(
         new URL("/health", resolveOpenclawGatewayBaseUrl(this.env)),
+        options?.timeoutMs ? { timeoutMs: options.timeoutMs } : undefined,
       );
       return {
         ok: response.ok,

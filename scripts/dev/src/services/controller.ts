@@ -65,13 +65,18 @@ export async function getControllerPortPid(): Promise<number> {
   );
 }
 
-async function waitForControllerPortPid(): Promise<number> {
+async function waitForControllerPortPid(
+  supervisorPid?: number,
+): Promise<number> {
   return waitForListeningPortPid(
     getScriptsDevRuntimeConfig().controllerPort,
     "controller dev server",
     {
-      attempts: 30,
+      // Match supervisor headroom — Windows cold-start can take ~15s.
+      attempts: 120,
       delayMs: 500,
+      supervisorPid,
+      supervisorName: "controller supervisor",
     },
   );
 }
@@ -195,7 +200,7 @@ export async function startControllerDevProcess(options: {
     () => new Error("controller dev process did not expose a pid"),
   );
   const supervisorPid = processHandle.pid as number;
-  const workerPid = await waitForControllerPortPid();
+  const workerPid = await waitForControllerPortPid(supervisorPid);
 
   await writeDevLock(controllerDevLockPath, {
     pid: supervisorPid,

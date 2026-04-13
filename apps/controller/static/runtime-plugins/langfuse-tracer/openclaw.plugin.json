@@ -1,0 +1,11 @@
+{
+  "id": "langfuse-tracer",
+  "name": "Langfuse Tracer",
+  "description": "Temporarily forwards OpenClaw agent lifecycle events to Langfuse when LANGFUSE_* env vars are present.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

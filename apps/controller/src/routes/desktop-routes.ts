@@ -49,11 +49,21 @@ const fallbackEventsQuerySchema = z.object({
 
 const desktopPreferencesResponseSchema = z.object({
   locale: z.enum(["en", "zh-CN"]).nullable(),
+  analyticsEnabled: z.boolean(),
 });
 
-const desktopPreferencesUpdateSchema = z.object({
-  locale: z.enum(["en", "zh-CN"]),
-});
+const desktopPreferencesUpdateSchema = z
+  .object({
+    locale: z.enum(["en", "zh-CN"]).optional(),
+    analyticsEnabled: z.boolean().optional(),
+  })
+  .refine(
+    (value) =>
+      value.locale !== undefined || value.analyticsEnabled !== undefined,
+    {
+      message: "At least one desktop preference must be provided",
+    },
+  );
 
 export function registerDesktopRoutes(
   app: OpenAPIHono<ControllerBindings>,
@@ -222,6 +232,8 @@ export function registerDesktopRoutes(
       return c.json(
         {
           locale: await container.configStore.getStoredDesktopLocale(),
+          analyticsEnabled:
+            await container.configStore.getDesktopAnalyticsEnabled(),
         },
         200,
       );
@@ -252,9 +264,18 @@ export function registerDesktopRoutes(
     }),
     async (c) => {
       const body = c.req.valid("json");
-      const locale = await container.configStore.setDesktopLocale(body.locale);
+      const locale =
+        body.locale !== undefined
+          ? await container.configStore.setDesktopLocale(body.locale)
+          : await container.configStore.getStoredDesktopLocale();
+      const analyticsEnabled =
+        body.analyticsEnabled !== undefined
+          ? await container.configStore.setDesktopAnalyticsEnabled(
+              body.analyticsEnabled,
+            )
+          : await container.configStore.getDesktopAnalyticsEnabled();
       await container.openclawSyncService.syncAll();
-      return c.json({ locale }, 200);
+      return c.json({ locale, analyticsEnabled }, 200);
     },
   );
 

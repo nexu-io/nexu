@@ -35,6 +35,10 @@ let analyticsInitialized = false;
 let currentUserId: string | null = null;
 let persistentSuperProperties: Properties | null = null;
 let currentPersonPropertiesKey: string | null = null;
+let currentIdentifyKey: string | null = null;
+
+export const ANALYTICS_PREFERENCE_STORAGE_KEY =
+  "nexu_desktop_analytics_enabled";
 
 function buildPersonPropertiesKey(
   properties: Properties | undefined,
@@ -168,8 +172,21 @@ export function identify(properties: Record<string, unknown>): void {
   currentPersonPropertiesKey = nextPersonPropertiesKey;
 }
 
-export function setUserId(userId: string): void {
+export function identifyAuthenticatedUser(
+  userId: string,
+  properties?: Record<string, unknown>,
+): void {
   if (!analyticsInitialized || userId.trim().length === 0) {
+    return;
+  }
+
+  const normalizedProperties = normalizeProperties(properties);
+  const nextIdentifyKey = JSON.stringify([
+    userId,
+    buildPersonPropertiesKey(normalizedProperties),
+  ]);
+
+  if (currentIdentifyKey === nextIdentifyKey) {
     return;
   }
 
@@ -179,19 +196,18 @@ export function setUserId(userId: string): void {
       posthog.register(persistentSuperProperties);
     }
     currentPersonPropertiesKey = null;
+    currentIdentifyKey = null;
   }
 
-  if (currentUserId === userId) {
-    return;
-  }
-
-  posthog.identify(userId);
+  posthog.identify(userId, normalizedProperties);
   currentUserId = userId;
+  currentIdentifyKey = nextIdentifyKey;
 }
 
 export function resetAnalytics(): void {
   currentUserId = null;
   currentPersonPropertiesKey = null;
+  currentIdentifyKey = null;
 
   if (!analyticsInitialized) {
     return;
@@ -201,6 +217,18 @@ export function resetAnalytics(): void {
   if (persistentSuperProperties) {
     posthog.register(persistentSuperProperties);
   }
+}
+
+export function disableAnalytics(): void {
+  currentUserId = null;
+  currentPersonPropertiesKey = null;
+  currentIdentifyKey = null;
+
+  if (analyticsInitialized) {
+    posthog.reset();
+  }
+
+  analyticsInitialized = false;
 }
 
 export function normalizeAuthSource(

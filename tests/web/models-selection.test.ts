@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isModelSelected } from "#web/pages/models";
+import {
+  getSettingsProviderSelectionIdForModel,
+  isModelSelected,
+} from "#web/pages/models";
 
 describe("isModelSelected", () => {
   it("keeps legacy short default ids mapped to their full managed model ids only", () => {
@@ -19,5 +22,15 @@ describe("isModelSelected", () => {
 
   it("does not cross-match fully qualified ids from different providers", () => {
     expect(isModelSelected("openai/gpt-4.1", "ollama/gpt-4.1")).toBe(false);
+  });
+
+  it("normalizes aliased provider ids for the settings details pane", () => {
+    expect(
+      getSettingsProviderSelectionIdForModel(
+        ["kimi"],
+        [{ id: "moonshot/kimi-k2", provider: "moonshot", name: "Kimi K2" }],
+        "moonshot/kimi-k2",
+      ),
+    ).toBe("kimi");
   });
 });

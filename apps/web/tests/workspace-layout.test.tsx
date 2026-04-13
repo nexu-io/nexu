@@ -2,7 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkspaceLayout } from "../src/layouts/workspace-layout";
+import {
+  WorkspaceLayout,
+  getSidebarCreditBreakdown,
+} from "../src/layouts/workspace-layout";
 
 vi.mock("@/lib/api", () => ({}));
 
@@ -112,6 +115,8 @@ function renderWorkspaceLayout(
       totalBalance: number;
       totalRecharged: number;
       totalConsumed: number;
+      giftedBalance?: number;
+      planBalance?: number;
     } | null;
     tasks?: Array<Record<string, unknown>>;
   },
@@ -507,6 +512,50 @@ describe("WorkspaceLayout", () => {
     );
 
     expect(markup).toContain("0 layout.sidebar.balanceUnit");
+  });
+
+  it("derives the popup breakdown from current gifted and plan balances", () => {
+    expect(
+      getSidebarCreditBreakdown({
+        progress: {
+          claimedCount: 0,
+          totalCount: 0,
+          earnedCredits: 999,
+        },
+        cloudBalance: {
+          totalBalance: 300,
+          totalRecharged: 300,
+          totalConsumed: 0,
+          giftedBalance: 300,
+          planBalance: 0,
+        },
+      }),
+    ).toEqual({
+      totalBalance: 300,
+      giftedBalance: 300,
+      planBalance: 0,
+    });
+  });
+
+  it("falls back to plan-only popup breakdown when gifted balance is missing", () => {
+    expect(
+      getSidebarCreditBreakdown({
+        progress: {
+          claimedCount: 0,
+          totalCount: 0,
+          earnedCredits: 300,
+        },
+        cloudBalance: {
+          totalBalance: 300,
+          totalRecharged: 300,
+          totalConsumed: 0,
+        },
+      }),
+    ).toEqual({
+      totalBalance: 300,
+      giftedBalance: 0,
+      planBalance: 300,
+    });
   });
 
   it("prefers desktop cloud status over stale rewards state when the user has logged out", () => {

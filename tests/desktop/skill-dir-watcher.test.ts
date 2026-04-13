@@ -20,6 +20,10 @@ function removeSkill(skillsDir: string, slug: string): void {
   rmSync(resolve(skillsDir, slug), { recursive: true, force: true });
 }
 
+function touchWatchTrigger(skillsDir: string): void {
+  writeFileSync(resolve(skillsDir, ".watch-trigger"), String(Date.now()));
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -34,6 +38,8 @@ async function waitUntil(
     if (fn()) return;
     await wait(intervalMs);
   }
+
+  throw new Error("Timed out waiting for watcher state");
 }
 
 describe("SkillDirWatcher", () => {
@@ -165,6 +171,7 @@ describe("SkillDirWatcher", () => {
         watcher.start();
 
         writeSkill(skillsDir, "new-skill");
+        touchWatchTrigger(skillsDir);
 
         await waitUntil(() => db.isInstalled("new-skill", "managed"));
 
@@ -189,6 +196,7 @@ describe("SkillDirWatcher", () => {
         watcher.start();
 
         removeSkill(skillsDir, "doomed-skill");
+        touchWatchTrigger(skillsDir);
 
         await waitUntil(() => !db.isInstalled("doomed-skill", "managed"));
 

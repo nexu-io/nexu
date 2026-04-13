@@ -17,17 +17,18 @@ function getTaskUrl(taskId: (typeof rewardTasks)[number]["id"]): URL {
 
 describe("reward share templates", () => {
   it("uses the refreshed copy for X and WhatsApp", () => {
-    const expectedText = `${SHARE_COPY} GitHub: ${GITHUB_URL}`;
-
     const xUrl = getTaskUrl("x_share");
     expect(xUrl.origin).toBe("https://x.com");
     expect(xUrl.pathname).toBe("/intent/tweet");
-    expect(xUrl.searchParams.get("text")).toBe(expectedText);
+    expect(xUrl.searchParams.get("text")).toBe(SHARE_COPY);
+    expect(xUrl.searchParams.get("url")).toBe(GITHUB_URL);
 
     const whatsappUrl = getTaskUrl("whatsapp");
     expect(whatsappUrl.origin).toBe("https://wa.me");
     expect(whatsappUrl.pathname).toBe("/");
-    expect(whatsappUrl.searchParams.get("text")).toBe(expectedText);
+    expect(whatsappUrl.searchParams.get("text")).toBe(
+      `${SHARE_COPY} GitHub: ${GITHUB_URL}`,
+    );
   });
 
   it("uses the dev.to article as the standalone Reddit share link", () => {

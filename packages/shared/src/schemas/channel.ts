@@ -68,6 +68,32 @@ export const connectQqbotSchema = z.object({
   appSecret: z.string().min(1),
 });
 
+export const channelConnectErrorCodeSchema = z.enum([
+  "already_connected",
+  "app_id_mismatch",
+  "invalid_credentials",
+  "network_error",
+  "proxy_error",
+  "sync_failed",
+  "timeout",
+  "upstream_http_error",
+]);
+
+export const channelConnectPhaseSchema = z.enum([
+  "verify_credentials",
+  "verify_app",
+  "persist_config",
+  "sync_runtime",
+]);
+
+export const channelConnectErrorSchema = z.object({
+  message: z.string(),
+  code: channelConnectErrorCodeSchema,
+  requestId: z.string(),
+  retryable: z.boolean(),
+  phase: channelConnectPhaseSchema,
+});
+
 export const qqbotConnectivityResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
@@ -145,6 +171,11 @@ export type ConnectWechatInput = z.infer<typeof connectWechatSchema>;
 export type ConnectTelegramInput = z.infer<typeof connectTelegramSchema>;
 export type ConnectWhatsappInput = z.infer<typeof connectWhatsappSchema>;
 export type ConnectQqbotInput = z.infer<typeof connectQqbotSchema>;
+export type ChannelConnectErrorCode = z.infer<
+  typeof channelConnectErrorCodeSchema
+>;
+export type ChannelConnectPhase = z.infer<typeof channelConnectPhaseSchema>;
+export type ChannelConnectError = z.infer<typeof channelConnectErrorSchema>;
 export type WecomConnectivityResponse = z.infer<
   typeof wecomConnectivityResponseSchema
 >;

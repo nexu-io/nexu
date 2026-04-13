@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Toaster } from "sonner";
 import type { DesktopChromeMode, DesktopSurface } from "../../shared/host";
+import { resolveDesktopUpdateExperience } from "../../shared/update-policy";
 import { useAutoUpdate } from "../hooks/use-auto-update";
 import { useDesktopRuntimeConfig } from "../hooks/use-desktop-runtime-config";
 import { onDesktopCommand } from "../lib/host-api";
@@ -31,7 +32,17 @@ export function DesktopShell() {
   const webSurfaceVersion = 0;
   const { desktopOpenClawUrl, desktopWebUrl, runtimeConfig } =
     useDesktopRuntimeConfig();
-  const update = useAutoUpdate();
+  const updateExperience = useMemo(
+    () =>
+      runtimeConfig
+        ? resolveDesktopUpdateExperience({
+            buildSource: runtimeConfig.buildInfo.source,
+            updateFeed: runtimeConfig.urls.updateFeed,
+          })
+        : "normal",
+    [runtimeConfig],
+  );
+  const update = useAutoUpdate({ experience: updateExperience });
   const { check: checkForUpdates } = update;
 
   useEffect(() => {
@@ -180,17 +191,27 @@ export function DesktopShell() {
         </div>
       </main>
 
-      <UpdateBanner
-        capability={update.capability}
-        dismissed={update.dismissed}
-        errorMessage={update.errorMessage}
-        onDismiss={update.dismiss}
-        onDownload={() => void update.download()}
-        onInstall={() => void update.install()}
-        percent={update.percent}
-        phase={update.phase}
-        version={update.version}
-      />
+      {chromeMode !== "immersive" && (
+        <UpdateBanner
+          canCheckForUpdates={
+            updateExperience === "local-test-feed" &&
+            Boolean(update.capability?.check)
+          }
+          capability={update.capability}
+          currentVersion={runtimeConfig?.buildInfo.version ?? null}
+          dismissed={update.dismissed}
+          errorMessage={update.errorMessage}
+          experience={updateExperience}
+          onCheck={() => void update.check()}
+          onDismiss={update.dismiss}
+          onDownload={() => void update.download()}
+          onInstall={() => void update.install()}
+          percent={update.percent}
+          phase={update.phase}
+          releaseNotes={update.releaseNotes}
+          version={update.version}
+        />
+      )}
     </div>
   );
 }

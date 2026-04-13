@@ -31,6 +31,7 @@ export {
 export {
   installLaunchdQuitHandler,
   quitWithDecision,
+  runTeardownAndExit,
   type QuitHandlerOptions,
   type QuitDecision,
 } from "./quit-handler";

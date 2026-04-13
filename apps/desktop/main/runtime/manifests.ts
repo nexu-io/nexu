@@ -379,6 +379,17 @@ export function createRuntimeUnitManifests(
   );
   const skillNodePath = buildSkillNodePath(electronRoot, isPackaged);
   const proxyEnv = buildChildProcessProxyEnv(runtimeConfig.proxy);
+  const langfuseEnv = {
+    ...(process.env.LANGFUSE_PUBLIC_KEY
+      ? { LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY }
+      : {}),
+    ...(process.env.LANGFUSE_SECRET_KEY
+      ? { LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY }
+      : {}),
+    ...(process.env.LANGFUSE_BASE_URL
+      ? { LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL }
+      : {}),
+  };
   const openclawSkillsDir = getOpenclawSkillsDir(userDataPath);
   const openclawMdnsHostname = "openclaw";
   const skillhubStaticSkillsDir = isPackaged
@@ -458,6 +469,7 @@ export function createRuntimeUnitManifests(
       ...(runtimeConfig.posthogHost
         ? { POSTHOG_HOST: runtimeConfig.posthogHost }
         : {}),
+      ...langfuseEnv,
     },
   };
 
@@ -497,6 +509,7 @@ export function createRuntimeUnitManifests(
       OPENCLAW_MDNS_HOSTNAME: openclawMdnsHostname,
       ...(process.env.CI ? { OPENCLAW_DISABLE_BONJOUR: "1" } : {}),
       OPENCLAW_STATE_DIR: openclawStateDir,
+      ...langfuseEnv,
     },
   };
 

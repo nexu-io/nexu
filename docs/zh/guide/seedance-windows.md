@@ -12,7 +12,7 @@
 - 可以正常登录 `nexu` 账号
 - 已准备一个可用的 IM 渠道，用于和自己的 `nexu` 对话
 
-如果你还没有安装 Windows 内测版客户端，可以先看 [Windows 内测使用指南](/zh/guide/windows-beta)。
+如果你还没有安装 Windows 客户端，可以先看 [Windows 正式版安装指南](/zh/guide/windows-install)。
 
 ## 第一步：前往 GitHub 给 nexu 点 Star
 

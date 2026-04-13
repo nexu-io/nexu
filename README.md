@@ -5,7 +5,7 @@
 <h1 align="center">nexu</h1>
 
 <p align="center">
-  <strong>The simplest open-source OpenClaw 🦞 desktop client for WeChat & Feishu</strong>
+  <strong>The open-source desktop client that connects your AI Agent to WeChat, Feishu, Slack & more</strong>
 </p>
 
 <p align="center">
@@ -23,16 +23,14 @@
 </p>
 
 <p align="center">
-  English &nbsp;·&nbsp; <a href="README.zh-CN.md">简体中文</a> &nbsp;·&nbsp; <a href="README.ja.md">日本語</a>
+  English &nbsp;·&nbsp; <a href="README.zh-CN.md">简体中文</a> &nbsp;·&nbsp; <a href="README.ja.md">日本語</a> &nbsp;·&nbsp; <a href="README.ko.md">한국어</a>
 </p>
 
 ---
 
 > 🦞 **The smoothest way to connect OpenClaw to WeChat**: Scan, connect, and go.
 >
-> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Downloads](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf)
->
-> 🎉 **Beta Perk**: During the beta period, top-tier models like Gemini and more are **free to use**. [Download and try now →](https://nexu.io)
+> 🖥 **Supported platforms**: macOS (Apple Silicon) · macOS (Intel) · Windows — [Download](https://nexu.io)
 
 ---
 
@@ -87,7 +85,7 @@ Use Gemini and more directly via your nexu account. No extra config. Switch to y
 
 ### 🔐 OAuth login, no key needed
 
-MiniMax, OpenAI Codex, and GLM (Z.AI Coding Plan) support OAuth login—authorize with one click, no need to copy-paste API keys.
+MiniMax, OpenAI Codex, and GLM (Z.AI Coding Plan) support OAuth login — authorize with one click, no need to copy-paste API keys.
 
 ### 🔑 Bring your own API Key, no login
 
@@ -95,7 +93,7 @@ Prefer your own model providers? Add your API Key and use the client without cre
 
 ### 📱 IM-connected, mobile-ready
 
-Connect to WeChat, Feishu, Slack, or Discord and your AI agent is instantly available on your phone. No extra app—just open WeChat or your team chat and start talking to your agent on the go.
+Connect to WeChat, Feishu, Slack, or Discord and your AI agent is instantly available on your phone. No extra app — just open WeChat or your team chat and start talking to your agent on the go.
 
 ### 👥 Built for teams
 
@@ -105,43 +103,43 @@ Open-source at the core, with a desktop experience that actually runs. Compatibl
 
 ## Use cases
 
-nexu is built for **One Person Company** and small teams—one person, one AI team.
+nexu is built for **One Person Company** and small teams — one person, one AI team.
 
 ### 🛒 Solo e-commerce / cross-border trade
 
 > *"I used to spend the whole weekend writing listings in 3 languages. Now I tell my Agent the product specs in Feishu, and by the time I finish my coffee, the listings are ready for Amazon, Shopee, and TikTok Shop."*
 
-Product research, competitor pricing, listing optimization, multilingual marketing assets—compress a week's work into one afternoon.
+Product research, competitor pricing, listing optimization, multilingual marketing assets — compress a week's work into one afternoon.
 
 ### ✍️ Content creators / knowledge bloggers
 
-> *"Monday morning: I ask my Agent in Slack for this week's trending topics. By lunch, I have 5 draft posts across Xiaohongshu, WeChat, and Twitter—each in the right tone for the platform."*
+> *"Monday morning: I ask my Agent in Slack for this week's trending topics. By lunch, I have 5 draft posts across Xiaohongshu, WeChat, and Twitter — each in the right tone for the platform."*
 
-Trend tracking, topic generation, multi-platform content production, comment engagement—run a content matrix solo.
+Trend tracking, topic generation, multi-platform content production, comment engagement — run a content matrix solo.
 
 ### 💻 Indie developers
 
 > *"3 AM bug hunt? I paste the stack trace into Discord, my Agent traces it to a race condition, suggests a fix, and even drafts the PR description. Pair programming that never sleeps."*
 
-Code review, doc generation, bug analysis, repetitive task automation—your Agent is your pair-programming partner.
+Code review, doc generation, bug analysis, repetitive task automation — your Agent is your pair-programming partner.
 
 ### ⚖️ Legal / finance / consulting
 
-> *"A client sends a 40-page contract on Feishu. I forward it to my Agent—10 minutes later I get a risk summary, flagged clauses, and suggested revisions. What used to take half a day now takes a coffee break."*
+> *"A client sends a 40-page contract on Feishu. I forward it to my Agent — 10 minutes later I get a risk summary, flagged clauses, and suggested revisions. What used to take half a day now takes a coffee break."*
 
-Contract review, regulation lookup, report generation, client Q&A—turn domain expertise into Agent skills.
+Contract review, regulation lookup, report generation, client Q&A — turn domain expertise into Agent skills.
 
 ### 🏪 Local business / retail
 
 > *"Customers message me at midnight asking 'is this in stock?' My Agent in Feishu auto-replies with real-time inventory, handles returns, and even sends a promo coupon. I actually sleep now."*
 
-Inventory management, order follow-up, auto-reply to customer messages, marketing copy—let AI help run the shop.
+Inventory management, order follow-up, auto-reply to customer messages, marketing copy — let AI help run the shop.
 
 ### 🎨 Design / creative
 
-> *"I drop a rough brief in Slack: 'landing page for a pet food brand, playful vibe.' My Agent comes back with copy options, color palette suggestions, and reference images—all before the kickoff meeting."*
+> *"I drop a rough brief in Slack: 'landing page for a pet food brand, playful vibe.' My Agent comes back with copy options, color palette suggestions, and reference images — all before the kickoff meeting."*
 
-Requirement breakdown, asset search, copywriting, design annotation—free up creative time, cut repetitive work.
+Requirement breakdown, asset search, copywriting, design annotation — free up creative time, cut repetitive work.
 
 ---
 
@@ -155,13 +153,11 @@ Requirement breakdown, asset search, copywriting, design annotation—free up cr
 
 ### Installation
 
-**Pre-built client (recommended)**
-
 | Platform | Download |
 |----------|----------|
-| 🍎 macOS (Apple Silicon) | [Official site](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
-| 🍎 macOS (Intel) | [Download](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf) |
-| 🪟 Windows | [Download](https://powerformer.feishu.cn/wiki/IWQZwt1qSiExq7kfioWcI1qVnFf) |
+| 🍎 macOS (Apple Silicon) | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🍎 macOS (Intel) | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
+| 🪟 Windows | [nexu.io](https://nexu.io) · [Releases](https://github.com/nexu-io/nexu/releases) |
 
 ### First launch
 
@@ -181,7 +177,6 @@ Sign in with your nexu account for instant access to supported models, or add yo
 ```
 nexu/
 ├── apps/
-│   ├── api/              # Backend API
 │   ├── web/              # Web frontend
 │   ├── desktop/          # Desktop client (Electron)
 │   └── controller/       # Controller service
@@ -194,10 +189,10 @@ nexu/
 ### Commands
 
 ```bash
-pnpm run dev             # Dev stack with hot reload
-pnpm run dev:desktop     # Desktop client
-pnpm run build           # Production build
-pnpm run lint
+pnpm dev start           # Start full local stack with hot reload
+pnpm dev stop            # Stop local stack
+pnpm build               # Production build
+pnpm lint
 pnpm test
 ```
 
@@ -205,7 +200,13 @@ pnpm test
 
 ## 🤝 Contributing
 
-Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUTING.md) at the repo root (what GitHub shows when you open a PR). The same content is published at [docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing). **Chinese:** [docs.nexu.io (zh)](https://docs.nexu.io/zh/guide/contributing) · [docs/zh/guide/contributing.md](docs/zh/guide/contributing.md).
+Contributions are welcome! The full guide is in [CONTRIBUTING.md](CONTRIBUTING.md) at the repo root, and published at [docs.nexu.io — Contributing](https://docs.nexu.io/guide/contributing). **Chinese:** [docs.nexu.io (zh)](https://docs.nexu.io/zh/guide/contributing).
+
+For Chinese-speaking contributors, we recommend starting from these entry points:
+
+- **How to contribute**: [docs.nexu.io (zh) — Contributing](https://docs.nexu.io/zh/guide/contributing)
+- **Rewards and support**: [贡献奖励与支持](https://docs.nexu.io/zh/guide/contributor-rewards)
+- **Looking for a first PR?** We are actively looking for **Good First Issue** contributors: [First PR guide (zh)](https://docs.nexu.io/zh/guide/first-pr) · [good-first-issue list](https://github.com/nexu-io/nexu/labels/good-first-issue)
 
 1. 🍴 Fork this repo
 2. 🌿 Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -225,10 +226,10 @@ Contributions are welcome! The full English guide is [CONTRIBUTING.md](CONTRIBUT
 ## ❓ FAQ
 
 **Q: Is nexu free?**
-A: The client is completely free and open-source (MIT). Multiple top-tier models are built in for you to use, and you can also bring your own API Key.
+A: The client is completely free and open-source (MIT). Multiple top-tier models are built in, and you can also bring your own API Key.
 
 **Q: Which operating systems are supported?**
-A: macOS 12+ (Apple Silicon & Intel) and Windows 10+ are supported.
+A: macOS 12+ (Apple Silicon & Intel) and Windows 10+.
 
 **Q: Which IM platforms are supported?**
 A: WeChat, Feishu, Slack, and Discord are built in and work out of the box.
@@ -250,8 +251,8 @@ We use GitHub as the primary hub for community interaction. Before opening a new
 
 | Channel | When to use |
 |---------|-------------|
-| 💡 [**Discussions**](https://github.com/nexu-io/nexu/discussions) | Ask questions, propose ideas, share use cases, or just say hi. Browse the **Q&A** category for troubleshooting and **Ideas** for feature brainstorming. |
-| 🐛 [**Issues**](https://github.com/nexu-io/nexu/issues) | Report a bug or request a specific feature. Please use the provided issue templates — they help us triage faster. |
+| 💡 [**Discussions**](https://github.com/nexu-io/nexu/discussions) | Ask questions, propose ideas, share use cases, or just say hi. Browse **Q&A** for troubleshooting and **Ideas** for feature brainstorming. |
+| 🐛 [**Issues**](https://github.com/nexu-io/nexu/issues) | Report a bug or request a specific feature. Please use the provided issue templates. |
 | 📋 [**Roadmap & RFCs**](https://github.com/nexu-io/nexu/discussions/categories/rfc-roadmap) | Follow upcoming plans and join design discussions on proposed changes. |
 | 📧 [**support@nexu.ai**](mailto:support@nexu.ai) | For private inquiries, partnership, or anything not suited for a public thread. |
 
@@ -277,7 +278,17 @@ We use GitHub as the primary hub for community interaction. Before opening a new
   </tr>
 </table>
 
+### Nexu Open Source Co-creation
+
+Nexu is actively recruiting open-source contributors — write code, earn points, and get featured on the leaderboard. To get started with minimal friction, check out the [Good First Issue Contributor Guide](https://docs.nexu.io/zh/guide/first-pr).
+
+We maintain a [Good First Issue list](https://github.com/nexu-io/nexu/labels/good-first-issue) with clearly scoped tasks focused on a single area, plus AI Prompt templates to help you ramp up quickly. For first-time contributors and `good-first-issue` claimers, we do our best to provide guidance and feedback. See [Contributor Rewards & Support](https://docs.nexu.io/zh/guide/contributor-rewards) for more details.
+
 ### Contributors
+
+Thanks to everyone who has contributed to making nexu better — whether through code, documentation, feedback, or creative ideas, every contribution counts.
+
+Special thanks to [NickHood1984](https://github.com/NickHood1984) for submitting and successfully merging a PR into nexu. Every real contribution like this is truly valued, and we welcome more friends to join in.
 
 <a href="https://github.com/nexu-io/nexu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=nexu-io/nexu" />

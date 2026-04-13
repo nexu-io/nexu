@@ -7,7 +7,11 @@ import {
   type HostInvokeResultMap,
   type RuntimeEvent,
   type StartupProbePayload,
+  type UpdaterBridge,
+  type UpdaterEvent,
+  type UpdaterEventMap,
   hostInvokeChannels,
+  updaterEvents,
 } from "../shared/host";
 import { getDesktopRuntimeConfig } from "../shared/runtime-config";
 import { resolveWebviewPreloadUrl } from "./webview-preload-url";
@@ -55,6 +59,10 @@ const hostBridge: HostBridge = {
     reportStartupProbe(payload);
   },
 
+  reportRendererDiagnosticsLog(payload) {
+    ipcRenderer.send("host:renderer-diagnostics-log", payload);
+  },
+
   onDesktopCommand(listener) {
     const wrapped = (
       _event: Electron.IpcRendererEvent,
@@ -87,3 +95,31 @@ const hostBridge: HostBridge = {
 };
 
 contextBridge.exposeInMainWorld("nexuHost", hostBridge);
+
+const validUpdaterEvents = new Set<string>(updaterEvents);
+
+const updaterBridge: UpdaterBridge = {
+  onEvent<TEvent extends UpdaterEvent>(
+    event: TEvent,
+    callback: (data: UpdaterEventMap[TEvent]) => void,
+  ): () => void {
+    if (!validUpdaterEvents.has(event)) {
+      throw new Error(`Invalid updater event: ${event}`);
+    }
+
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: UpdaterEventMap[TEvent],
+    ) => {
+      callback(data);
+    };
+
+    ipcRenderer.on(event, handler);
+
+    return () => {
+      ipcRenderer.removeListener(event, handler);
+    };
+  },
+};
+
+contextBridge.exposeInMainWorld("nexuUpdater", updaterBridge);

@@ -44,8 +44,8 @@ const UNIVERSAL_SHARE_COPY =
   "The simplest desktop client for OpenClaw 🦞 — bridge your Agent to WeChat, Feishu, Slack & Discord and more in one click. Works with Claude Code, Codex & any LLM. BYOK, OAuth, local-first, and chat from your phone 24/7.";
 const UNIVERSAL_SHARE_TEXT = `${UNIVERSAL_SHARE_COPY} GitHub: ${GITHUB_URL}`;
 const X_SHARE_URL = `https://x.com/intent/tweet?text=${encodeURIComponent(
-  UNIVERSAL_SHARE_TEXT,
-)}`;
+  UNIVERSAL_SHARE_COPY,
+)}&url=${encodeURIComponent(GITHUB_URL)}`;
 const REDDIT_SHARE_URL = `https://www.reddit.com/submit?url=${encodeURIComponent(
   REDDIT_SHARE_TARGET_URL,
 )}&title=${encodeURIComponent(REDDIT_SHARE_TITLE)}&type=LINK`;
@@ -179,6 +179,8 @@ export const cloudCreditBalanceSchema = z
     totalBalance: z.number().int().nonnegative(),
     totalRecharged: z.number().int().nonnegative(),
     totalConsumed: z.number().int().nonnegative(),
+    giftedBalance: z.number().int().nonnegative().optional(),
+    planBalance: z.number().int().nonnegative().optional(),
   })
   .nullable();
 

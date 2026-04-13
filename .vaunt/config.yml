@@ -1,0 +1,217 @@
+version: 0.0.1
+achievements:
+  # ── WELCOME ──────────────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Stargazer
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2b50.png
+      description: Starred the Nexu repository. Thanks for the support — every star helps the project grow.
+      triggers:
+        - trigger:
+            actor: author
+            action: star
+            condition: starred = true
+
+  - achievement:
+      name: First Report
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4dd.png
+      description: Opened your first issue. Whether it's a bug, a feature idea, or an improvement — you're helping shape Nexu.
+      triggers:
+        - trigger:
+            actor: author
+            action: issue
+            condition: count() >= 1
+
+  - achievement:
+      name: Lift Off
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f680.png
+      description: First pull request merged into Nexu. You're officially a contributor. Welcome aboard.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & count() >= 1
+
+  # ── BUG HUNTING ──────────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Bug Spotter
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f41b.png
+      description: Reported a confirmed bug in Nexu. Good eyes — finding bugs is half the battle.
+      triggers:
+        - trigger:
+            actor: author
+            action: issue
+            condition: labels in ['bug'] & count() >= 1
+
+  - achievement:
+      name: Bug Crusher
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f527.png
+      description: Merged your first bug-fix PR. You didn't just spot it — you squashed it.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['bug'] & count() >= 1
+
+  - achievement:
+      name: Exterminator
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/26a1.png
+      description: Five bug-fix PRs merged. The codebase is measurably better because of you.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['bug'] & count() >= 5
+
+  # ── FEATURE BUILDING ─────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Spark
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2728.png
+      description: Shipped your first enhancement to Nexu. You're not just using it — you're making it better.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['enhancement'] & count() >= 1
+
+  - achievement:
+      name: Feature Architect
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4a1.png
+      description: Five enhancement PRs merged. You're actively shaping what Nexu becomes.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['enhancement'] & count() >= 5
+
+  # ── IMPROVEMENT ──────────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Polish Pro
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f528.png
+      description: Merged your first improvement PR. Refactoring, performance, DX — the unglamorous work that makes a codebase solid.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['improvement'] & count() >= 1
+
+  - achievement:
+      name: Craftsmanship
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3c5.png
+      description: Five improvement PRs merged. You care about the quality of the craft, not just the feature count.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['improvement'] & count() >= 5
+
+  # ── DOMAIN EXPERTS ───────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Desktop Wizard
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f5a5-fe0f.png
+      description: Shipped a change to Nexu's Electron desktop layer. You understand the packaged app, launchd services, or the Electron shell.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['desktop'] & count() >= 1
+
+  - achievement:
+      name: Skill Crafter
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f99e.png
+      description: Contributed to Nexu's OpenClaw skill ecosystem. Building skills is how Nexu's AI agents gain superpowers.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['skills'] & count() >= 1
+
+  - achievement:
+      name: Controller Hacker
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699-fe0f.png
+      description: Contributed to the Nexu controller — the local control plane that compiles OpenClaw config and orchestrates the runtime.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['controller'] & count() >= 1
+
+  # ── DOCUMENTATION ────────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Doc Writer
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4d6.png
+      description: Merged a documentation PR. Great docs are how open-source projects become genuinely useful to the community.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['documentation'] & count() >= 1
+
+  # ── ONBOARDING ───────────────────────────────────────────────────────────────
+
+  - achievement:
+      name: Good First Step
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f331.png
+      description: Resolved a good-first-issue. Every expert was a beginner once — welcome to the Nexu contributor community.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['good first issue'] & count() >= 1
+
+  - achievement:
+      name: Helper
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f91d.png
+      description: Picked up and closed a help-wanted issue. You saw something that needed doing and stepped up.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & labels in ['help wanted'] & count() >= 1
+
+  # ── CORE CONTRIBUTOR MILESTONES ──────────────────────────────────────────────
+
+  - achievement:
+      name: Rising Star
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f31f.png
+      description: Five pull requests merged. You're picking up momentum — the team recognizes your name now.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & count() >= 5
+
+  - achievement:
+      name: Regular
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f948.png
+      description: Ten pull requests merged. A familiar face in the codebase. You know where things live and how they fit together.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & count() >= 10
+
+  - achievement:
+      name: Core Contributor
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f947.png
+      description: Twenty-five pull requests merged. Nexu wouldn't be the same codebase without your work.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & count() >= 25
+
+  - achievement:
+      name: Nexu Legend
+      icon: https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f3c6.png
+      description: Fifty pull requests merged. You've shaped this project at a fundamental level. Legendary status — earned, not given.
+      triggers:
+        - trigger:
+            actor: author
+            action: pull_request
+            condition: merged = true & count() >= 50

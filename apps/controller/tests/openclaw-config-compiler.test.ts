@@ -194,6 +194,21 @@ describe("compileOpenClawConfig", () => {
     ]);
   });
 
+  it("prewarms openclaw-weixin in plugins.allow even with no connected wechat channel", () => {
+    // Regression: without this, first wechat connect changes plugins.allow
+    // -> SIGUSR1 -> ~11s drain -> GatewayDrainingError on inbound messages.
+    const result = compileOpenClawConfig(
+      createConfig({
+        channels: [],
+        secrets: {},
+      }),
+      createEnv(),
+    );
+
+    expect(result.plugins?.allow).toContain("openclaw-weixin");
+    expect(result.plugins?.entries?.["openclaw-weixin"]?.enabled).toBe(true);
+  });
+
   it("compiles qqbot channels and enables the canonical qq plugin id", () => {
     const now = new Date().toISOString();
     const result = compileOpenClawConfig(
@@ -370,11 +385,17 @@ describe("compileOpenClawConfig", () => {
   });
 
   it("does not remap openai models to OAuth providers without persisted OAuth state", () => {
+    const baseConfig = createConfig();
+    const baseBot = baseConfig.bots[0];
+    const baseProvider = baseConfig.providers?.[0];
+    if (!baseBot || !baseProvider) {
+      throw new Error("expected base config fixtures");
+    }
     const result = compileOpenClawConfig(
       createConfig({
         bots: [
           {
-            ...createConfig().bots[0],
+            ...baseBot,
             modelId: "openai/gpt-5.4",
           },
         ],
@@ -388,7 +409,7 @@ describe("compileOpenClawConfig", () => {
         },
         providers: [
           {
-            ...createConfig().providers[0],
+            ...baseProvider,
             apiKey: null,
             models: ["gpt-5.4"],
           },
@@ -607,12 +628,18 @@ describe("compileOpenClawConfig", () => {
   });
 
   it("ignores unsupported custom providers in compiled model config", () => {
+    const baseConfig = createConfig();
+    const baseProviders = baseConfig.providers ?? [];
+    const baseProvider = baseProviders[0];
+    if (!baseProvider) {
+      throw new Error("expected base config providers");
+    }
     const result = compileOpenClawConfig(
       createConfig({
         providers: [
-          ...createConfig().providers,
+          ...baseProviders,
           {
-            ...createConfig().providers[0],
+            ...baseProvider,
             id: "provider-3",
             providerId: "custom",
             displayName: "Custom",
@@ -970,6 +997,40 @@ describe("compileOpenClawConfig", () => {
       expect(botB?.skills).toEqual(["shared-skill"]);
     });
 
+    it("sorts merged skills deterministically regardless of input order", () => {
+      const baseConfig = createConfig();
+      const baseBot = baseConfig.bots[0];
+      if (!baseBot) {
+        throw new Error("expected base config bot");
+      }
+      const config = createConfig({
+        bots: [
+          {
+            ...baseBot,
+            id: "bot-a",
+            slug: "bot-a",
+          },
+        ],
+        channels: [],
+      });
+
+      const compiled = compileOpenClawConfig(
+        config,
+        createEnv(),
+        undefined,
+        ["zeta", "alpha", "shared-skill"],
+        new Map([["bot-a", ["workspace-z", "alpha", "workspace-a"]]]),
+      );
+
+      expect(compiled.agents.list[0]?.skills).toEqual([
+        "alpha",
+        "shared-skill",
+        "workspace-a",
+        "workspace-z",
+        "zeta",
+      ]);
+    });
+
     it("deduplicates when same slug in shared and workspace", () => {
       const config = createConfig();
       const wsMap = new Map<string, readonly string[]>([
@@ -1016,6 +1077,12 @@ describe("compileOpenClawConfig", () => {
   });
 
   it("remaps openai models to OAuth provider ids when persisted OAuth state is connected", () => {
+    const baseConfig = createConfig();
+    const baseBot = baseConfig.bots[0];
+    const baseProvider = baseConfig.providers?.[0];
+    if (!baseBot || !baseProvider) {
+      throw new Error("expected base config fixtures");
+    }
     const oauthState: OAuthConnectionState = {
       connectedProviderIds: ["openai"],
     };
@@ -1023,7 +1090,7 @@ describe("compileOpenClawConfig", () => {
       createConfig({
         bots: [
           {
-            ...createConfig().bots[0],
+            ...baseBot,
             modelId: "openai/gpt-5.4",
           },
         ],
@@ -1037,7 +1104,7 @@ describe("compileOpenClawConfig", () => {
         },
         providers: [
           {
-            ...createConfig().providers[0],
+            ...baseProvider,
             apiKey: null,
             models: ["gpt-5.4"],
           },

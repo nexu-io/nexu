@@ -124,7 +124,10 @@ export function BrandRail({
       </div>
 
       <div className="relative z-10 flex w-full flex-col justify-between px-10 pb-12 pt-8 xl:px-12 xl:py-12">
-        <FadeIn delay={80} className="flex items-center justify-between">
+        <FadeIn
+          delay={80}
+          className="relative z-30 flex items-center justify-between"
+        >
           <button
             type="button"
             onClick={onLogoClick}
@@ -135,7 +138,7 @@ export function BrandRail({
           {topRight ?? <div />}
         </FadeIn>
 
-        <div>
+        <div className="relative z-10">
           <FadeIn delay={220}>
             <h1
               className="max-w-[560px] text-[40px] leading-[0.96] tracking-tight text-white sm:text-[52px] lg:text-[64px]"
@@ -169,7 +172,7 @@ export function BrandRail({
           </div>
         </div>
 
-        <FadeIn delay={520}>
+        <FadeIn delay={520} className="mt-10 xl:mt-12">
           <a
             href={GITHUB_URL}
             target="_blank"

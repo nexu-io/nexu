@@ -46,6 +46,33 @@ function getVirtualStoreNodeModules(realPkgPath) {
   return null;
 }
 
+function getPackageNodeModules(packageRoot) {
+  const candidate = path.join(packageRoot, "node_modules");
+  try {
+    readdirSync(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
+function hasRealPackages(nodeModulesDir) {
+  try {
+    return listPackages(nodeModulesDir).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveDependencyNodeModules(packageRoot) {
+  const packageNodeModules = getPackageNodeModules(packageRoot);
+  if (packageNodeModules && hasRealPackages(packageNodeModules)) {
+    return packageNodeModules;
+  }
+
+  return getVirtualStoreNodeModules(packageRoot);
+}
+
 function listPackages(nodeModulesDir) {
   const result = [];
 
@@ -166,8 +193,9 @@ async function bundlePlugin({ id, npmName }) {
   });
   await maybeFixPluginManifest(outputDir);
 
-  const rootVirtualNodeModules = getVirtualStoreNodeModules(sourcePackageRoot);
-  if (!rootVirtualNodeModules) {
+  const rootDependencyNodeModules =
+    resolveDependencyNodeModules(sourcePackageRoot);
+  if (!rootDependencyNodeModules) {
     throw new Error(`Unable to resolve node_modules for ${npmName}`);
   }
 
@@ -178,7 +206,9 @@ async function bundlePlugin({ id, npmName }) {
     ...Object.keys(packageJson.peerDependencies ?? {}),
   ]);
   const collected = new Map();
-  const queue = [{ nodeModulesDir: rootVirtualNodeModules, skipPkg: npmName }];
+  const queue = [
+    { nodeModulesDir: rootDependencyNodeModules, skipPkg: npmName },
+  ];
 
   while (queue.length > 0) {
     const { nodeModulesDir, skipPkg } = queue.shift();
@@ -241,4 +271,6 @@ async function main() {
   }
 }
 
-await main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await main();
+}

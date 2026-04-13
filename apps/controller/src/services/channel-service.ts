@@ -25,6 +25,7 @@ import type {
   ConnectWecomInput,
 } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
+import { ChannelConnectError } from "../lib/channel-connect-error.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
@@ -60,6 +61,8 @@ const DINGTALK_PLUGIN_ID = "dingtalk-connector";
 const WECOM_PLUGIN_ID = "wecom";
 const LEGACY_WECOM_PLUGIN_ID = "wecom-openclaw-plugin";
 const QQBOT_PLUGIN_ID = "openclaw-qqbot";
+const DISCORD_API_ORIGIN = "https://discord.com";
+const TELEGRAM_API_ORIGIN = "https://api.telegram.org";
 
 type ActiveWechatLogin = {
   sessionKey: string;
@@ -692,6 +695,23 @@ export class ChannelService {
     return this.configStore.getChannel(channelId);
   }
 
+  private getWorkspacePath(botId: string): string {
+    return path.join(this.env.openclawStateDir, "agents", botId);
+  }
+
+  private logChannelConnectSuccess(channel: ChannelResponse): void {
+    logger.info(
+      {
+        channelType: channel.channelType,
+        channelId: channel.id,
+        accountId: channel.accountId,
+        botId: channel.botId,
+        workspacePath: this.getWorkspacePath(channel.botId),
+      },
+      "channel_connect_workspace_binding",
+    );
+  }
+
   async getBotQuota(): Promise<BotQuotaResponse> {
     const base: BotQuotaResponse = {
       available: true,
@@ -718,6 +738,7 @@ export class ChannelService {
   }
 
   async connectSlack(input: ConnectSlackInput) {
+    logger.info({}, "slack_connect_start");
     const authResp = await proxyFetch("https://slack.com/api/auth.test", {
       headers: { Authorization: `Bearer ${input.botToken}` },
       timeoutMs: 5000,
@@ -731,6 +752,10 @@ export class ChannelService {
       error?: string;
     };
     if (!authData.ok || !authData.team_id) {
+      logger.error(
+        { slackError: authData.error },
+        "slack_connect_verify_failed",
+      );
       throw new Error(
         `Invalid Slack bot token: ${authData.error ?? "auth.test failed"}`,
       );
@@ -763,54 +788,135 @@ export class ChannelService {
       appId,
       botUserId: authData.user_id ?? null,
     });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
+    logger.info(
+      { channelId: channel.id, teamName: authData.team },
+      "slack_connect_success",
+    );
     return channel;
   }
 
   async connectDiscord(input: ConnectDiscordInput) {
-    const userResp = await proxyFetch("https://discord.com/api/v10/users/@me", {
-      headers: { Authorization: `Bot ${input.botToken}` },
-      timeoutMs: 5000,
-    });
+    logger.info({ appId: input.appId }, "discord_connect_start");
+    let userResp: Response;
+    try {
+      userResp = await proxyFetch("https://discord.com/api/v10/users/@me", {
+        headers: { Authorization: `Bot ${input.botToken}` },
+        timeoutMs: 5000,
+      });
+    } catch (error) {
+      throw this.toUpstreamConnectError(error, {
+        channel: "discord",
+        phase: "verify_credentials",
+        upstreamHost: DISCORD_API_ORIGIN,
+      });
+    }
+
     if (!userResp.ok) {
-      throw new Error(
+      logger.error(
+        { appId: input.appId, status: userResp.status },
+        "discord_connect_verify_failed",
+      );
+      throw new ChannelConnectError(
         userResp.status === 401
-          ? "Invalid Discord bot token"
-          : `Discord API error (${userResp.status})`,
+          ? {
+              message: "Invalid Discord bot token",
+              code: "invalid_credentials",
+              status: 422,
+              retryable: false,
+              phase: "verify_credentials",
+              upstreamHost: DISCORD_API_ORIGIN,
+              upstreamStatus: userResp.status,
+            }
+          : {
+              message: `Discord API error (${userResp.status})`,
+              code: "upstream_http_error",
+              status: 502,
+              retryable: userResp.status >= 500,
+              phase: "verify_credentials",
+              upstreamHost: DISCORD_API_ORIGIN,
+              upstreamStatus: userResp.status,
+            },
       );
     }
 
     const userData = (await userResp.json()) as { id?: string };
 
-    const appResp = await proxyFetch(
-      "https://discord.com/api/v10/applications/@me",
-      {
-        headers: { Authorization: `Bot ${input.botToken}` },
-        timeoutMs: 5000,
-      },
-    );
-    if (appResp.ok) {
-      const appData = (await appResp.json()) as { id: string };
-      if (appData.id !== input.appId) {
-        throw new Error(
-          `Application ID mismatch: token belongs to ${appData.id}, but ${input.appId} was provided`,
-        );
-      }
+    let appResp: Response;
+    try {
+      appResp = await proxyFetch(
+        "https://discord.com/api/v10/applications/@me",
+        {
+          headers: { Authorization: `Bot ${input.botToken}` },
+          timeoutMs: 5000,
+        },
+      );
+    } catch (error) {
+      throw this.toUpstreamConnectError(error, {
+        channel: "discord",
+        phase: "verify_app",
+        upstreamHost: DISCORD_API_ORIGIN,
+      });
     }
 
-    const channel = await this.configStore.connectDiscord({
-      ...input,
-      botUserId: userData.id ?? null,
-    });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
-    await this.syncService.syncAll();
+    if (!appResp.ok) {
+      logger.error(
+        { appId: input.appId, status: appResp.status },
+        "discord_connect_app_verify_failed",
+      );
+      throw new ChannelConnectError({
+        message: `Discord API error (${appResp.status})`,
+        code: "upstream_http_error",
+        status: 502,
+        retryable: appResp.status >= 500,
+        phase: "verify_app",
+        upstreamHost: DISCORD_API_ORIGIN,
+        upstreamStatus: appResp.status,
+      });
+    }
+
+    const appData = (await appResp.json()) as { id: string };
+    if (appData.id !== input.appId) {
+      logger.error(
+        { expected: input.appId, actual: appData.id },
+        "discord_connect_app_id_mismatch",
+      );
+      throw new ChannelConnectError({
+        message: `Application ID mismatch: token belongs to ${appData.id}, but ${input.appId} was provided`,
+        code: "app_id_mismatch",
+        status: 422,
+        retryable: false,
+        phase: "verify_app",
+        upstreamHost: DISCORD_API_ORIGIN,
+        upstreamStatus: 200,
+      });
+    }
+
+    let channel: ChannelResponse;
+    try {
+      channel = await this.configStore.connectDiscord({
+        ...input,
+        botUserId: userData.id ?? null,
+      });
+    } catch (error) {
+      throw this.toPersistConnectError(error, "discord");
+    }
+    try {
+      await this.syncService.syncAll();
+    } catch (error) {
+      throw this.toSyncConnectError(error, "discord");
+    }
+    this.logChannelConnectSuccess(channel);
+    logger.info(
+      { channelId: channel.id, botUserId: userData.id },
+      "discord_connect_success",
+    );
     return channel;
   }
 
   async connectWechat(accountId: string) {
     const channel = await this.configStore.connectWechat({ accountId });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     logger.info(
       {
         accountId,
@@ -820,6 +926,7 @@ export class ChannelService {
       "wechat_connect_sync_all",
     );
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info(
       {
         accountId,
@@ -934,40 +1041,97 @@ export class ChannelService {
   }
 
   async connectTelegram(input: ConnectTelegramInput) {
-    const response = await proxyFetch(
-      `https://api.telegram.org/bot${encodeURIComponent(input.botToken)}/getMe`,
-      {
-        timeoutMs: 5000,
-      },
-    );
+    logger.info({}, "telegram_connect_start");
+    let response: Response;
+    try {
+      response = await proxyFetch(
+        `https://api.telegram.org/bot${encodeURIComponent(input.botToken)}/getMe`,
+        {
+          timeoutMs: 5000,
+        },
+      );
+    } catch (error) {
+      throw this.toUpstreamConnectError(error, {
+        channel: "telegram",
+        phase: "verify_credentials",
+        upstreamHost: TELEGRAM_API_ORIGIN,
+      });
+    }
+
     if (!response.ok) {
-      throw new Error(
+      logger.error(
+        { status: response.status },
+        "telegram_connect_verify_failed",
+      );
+      throw new ChannelConnectError(
         response.status === 401
-          ? "Invalid Telegram bot token"
-          : `Telegram API error (${response.status})`,
+          ? {
+              message: "Invalid Telegram bot token",
+              code: "invalid_credentials",
+              status: 422,
+              retryable: false,
+              phase: "verify_credentials",
+              upstreamHost: TELEGRAM_API_ORIGIN,
+              upstreamStatus: response.status,
+            }
+          : {
+              message: `Telegram API error (${response.status})`,
+              code: "upstream_http_error",
+              status: 502,
+              retryable: response.status >= 500,
+              phase: "verify_credentials",
+              upstreamHost: TELEGRAM_API_ORIGIN,
+              upstreamStatus: response.status,
+            },
       );
     }
 
     const payload = (await response.json()) as TelegramGetMeResponse;
     if (!payload.ok || !payload.result?.id) {
-      throw new Error(payload.description ?? "Invalid Telegram bot token");
+      logger.error(
+        { description: payload.description },
+        "telegram_connect_payload_invalid",
+      );
+      throw new ChannelConnectError({
+        message: payload.description ?? "Invalid Telegram bot token",
+        code: "invalid_credentials",
+        status: 422,
+        retryable: false,
+        phase: "verify_credentials",
+        upstreamHost: TELEGRAM_API_ORIGIN,
+        upstreamStatus: 200,
+      });
     }
 
-    const channel = await this.configStore.connectTelegram({
-      botToken: input.botToken,
-      telegramBotId: String(payload.result.id),
-      botUsername: payload.result.username ?? null,
-      displayName:
-        payload.result.username?.trim() ||
-        payload.result.first_name?.trim() ||
-        null,
-    });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
-    await this.syncService.syncAll();
+    let channel: ChannelResponse;
+    try {
+      channel = await this.configStore.connectTelegram({
+        botToken: input.botToken,
+        telegramBotId: String(payload.result.id),
+        botUsername: payload.result.username ?? null,
+        displayName:
+          payload.result.username?.trim() ||
+          payload.result.first_name?.trim() ||
+          null,
+      });
+    } catch (error) {
+      throw this.toPersistConnectError(error, "telegram");
+    }
+    try {
+      await this.syncService.syncAll();
+    } catch (error) {
+      throw this.toSyncConnectError(error, "telegram");
+    }
+    this.logChannelConnectSuccess(channel);
+    logger.info(
+      { channelId: channel.id, botUsername: payload.result.username },
+      "telegram_connect_success",
+    );
     return channel;
   }
 
   async connectQqbot(input: ConnectQqbotInput) {
+    logger.info({}, "qqbot_connect_start");
     this.ensureQqbotPluginInstalled();
     const { appId, appSecret } = await this.verifyQqbotCredentials(input);
 
@@ -975,12 +1139,14 @@ export class ChannelService {
       appId,
       appSecret,
     });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
+    logger.info({ channelId: channel.id, appId }, "qqbot_connect_success");
     return channel;
   }
 
   async connectDingtalk(input: ConnectDingtalkInput) {
+    logger.info({}, "dingtalk_connect_start");
     this.ensureDingtalkPluginInstalled();
     const { clientId, clientSecret } =
       await this.verifyDingtalkCredentials(input);
@@ -989,8 +1155,12 @@ export class ChannelService {
       clientId,
       clientSecret,
     });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
+    logger.info(
+      { channelId: channel.id, clientId },
+      "dingtalk_connect_success",
+    );
     return channel;
   }
 
@@ -1013,6 +1183,7 @@ export class ChannelService {
   }
 
   async connectWecom(input: ConnectWecomInput) {
+    logger.info({}, "wecom_connect_start");
     this.ensureWecomPluginInstalled();
     const { botId, secret } = this.verifyWecomCredentials(input);
 
@@ -1020,8 +1191,9 @@ export class ChannelService {
       botId,
       secret,
     });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
+    logger.info({ channelId: channel.id, botId }, "wecom_connect_success");
     return channel;
   }
 
@@ -1233,7 +1405,6 @@ export class ChannelService {
       accountId,
       authDir: login.authDir,
     });
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
     await this.restartOpenClawForWhatsappLifecycle("whatsapp-connect");
     const readiness = await this.waitForWhatsappReady(
@@ -1253,11 +1424,13 @@ export class ChannelService {
           "WhatsApp linked, but the runtime failed to start the listener.",
       );
     }
+    this.logChannelConnectSuccess(channel);
     await resetActiveWhatsappLogin(accountId);
     return channel;
   }
 
   async connectFeishu(input: ConnectFeishuInput) {
+    logger.info({ appId: input.appId }, "feishu_connect_start");
     const response = await proxyFetch(
       "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
       {
@@ -1272,14 +1445,27 @@ export class ChannelService {
     );
     const payload = (await response.json()) as { code?: number; msg?: string };
     if (!response.ok || payload.code !== 0) {
+      logger.error(
+        {
+          appId: input.appId,
+          status: response.status,
+          code: payload.code,
+          feishuMsg: payload.msg,
+        },
+        "feishu_connect_verify_failed",
+      );
       throw new Error(
         `Invalid Feishu credentials: ${payload.msg ?? `HTTP ${response.status}`}`,
       );
     }
 
     const channel = await this.configStore.connectFeishu(input);
-    await this.syncService.writePlatformTemplatesForBot(channel.botId);
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
+    logger.info(
+      { channelId: channel.id, appId: input.appId },
+      "feishu_connect_success",
+    );
     return channel;
   }
 
@@ -1293,6 +1479,10 @@ export class ChannelService {
         ? this.configStore.getChannel.bind(this.configStore)
         : null;
     const channel = getChannel ? await getChannel(channelId) : null;
+    logger.info(
+      { channelId, channelType: channel?.channelType ?? "unknown" },
+      "channel_disconnect_start",
+    );
     const removed = await this.configStore.disconnectChannel(channelId);
     if (removed) {
       // syncAll triggers the authoritative index writer which removes
@@ -1303,6 +1493,12 @@ export class ChannelService {
       if (channel?.channelType === "whatsapp") {
         await this.restartOpenClawForWhatsappLifecycle("whatsapp-disconnect");
       }
+      logger.info(
+        { channelId, channelType: channel?.channelType ?? "unknown" },
+        "channel_disconnect_success",
+      );
+    } else {
+      logger.warn({ channelId }, "channel_disconnect_not_found");
     }
     return removed;
   }
@@ -1414,6 +1610,83 @@ export class ChannelService {
     if (!pluginDir) {
       throw new Error(`QQ plugin not installed: ${QQBOT_PLUGIN_ID}`);
     }
+  }
+
+  private toUpstreamConnectError(
+    error: unknown,
+    input: {
+      channel: "discord" | "telegram";
+      phase: "verify_credentials" | "verify_app";
+      upstreamHost: string;
+    },
+  ): ChannelConnectError {
+    if (error instanceof ChannelConnectError) {
+      return error;
+    }
+
+    if (error instanceof Error && error.name === "TimeoutError") {
+      return new ChannelConnectError({
+        message: `${input.channel === "discord" ? "Discord" : "Telegram"} request timed out after 5000ms`,
+        code: "timeout",
+        status: 504,
+        retryable: true,
+        phase: input.phase,
+        upstreamHost: input.upstreamHost,
+      });
+    }
+
+    return new ChannelConnectError({
+      message: `${input.channel === "discord" ? "Discord" : "Telegram"} network request failed`,
+      code: "network_error",
+      status: 502,
+      retryable: true,
+      phase: input.phase,
+      upstreamHost: input.upstreamHost,
+    });
+  }
+
+  private toSyncConnectError(
+    error: unknown,
+    channel: "discord" | "telegram",
+  ): ChannelConnectError {
+    if (error instanceof ChannelConnectError) {
+      return error;
+    }
+
+    const message =
+      error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : "Runtime sync failed";
+
+    return new ChannelConnectError({
+      message: `${channel === "discord" ? "Discord" : "Telegram"} credentials were saved, but runtime sync failed: ${message}`,
+      code: "sync_failed",
+      status: 503,
+      retryable: true,
+      phase: "sync_runtime",
+    });
+  }
+
+  private toPersistConnectError(
+    error: unknown,
+    channel: "discord" | "telegram",
+  ): ChannelConnectError {
+    if (error instanceof ChannelConnectError) {
+      return error;
+    }
+
+    const message =
+      error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : "Local config persistence failed";
+
+    return new ChannelConnectError({
+      message: `${channel === "discord" ? "Discord" : "Telegram"} credentials were verified, but saving local channel config failed: ${message}`,
+      code: "sync_failed",
+      status: 503,
+      retryable: true,
+      phase: "persist_config",
+    });
   }
 
   private ensureDingtalkPluginInstalled(): void {

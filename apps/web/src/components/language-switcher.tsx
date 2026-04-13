@@ -38,7 +38,7 @@ export function LanguageSwitcher({ variant = "light", size = "sm" }: Props) {
 
   const options: Array<{ value: Locale; label: string }> = [
     { value: "en", label: "English" },
-    { value: "zh", label: "简体中文" },
+    { value: "zh", label: "中文" },
   ];
 
   const currentLabel =
@@ -73,7 +73,10 @@ export function LanguageSwitcher({ variant = "light", size = "sm" }: Props) {
   }[variant];
 
   return (
-    <div ref={rootRef} className="relative inline-flex">
+    <div
+      ref={rootRef}
+      className="relative z-50 inline-flex pointer-events-auto"
+    >
       <button
         type="button"
         aria-haspopup="menu"
@@ -97,7 +100,7 @@ export function LanguageSwitcher({ variant = "light", size = "sm" }: Props) {
       {open && (
         <div
           role="menu"
-          className={`absolute right-0 top-[calc(100%+12px)] min-w-full overflow-hidden rounded-[24px] p-2 ${colors.menu}`}
+          className={`absolute right-0 top-[calc(100%+12px)] z-50 min-w-full overflow-hidden rounded-[24px] p-2 pointer-events-auto ${colors.menu}`}
         >
           {options.map((option) => (
             <button

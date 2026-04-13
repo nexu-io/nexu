@@ -270,7 +270,6 @@ describe("SkillDirWatcher workspace reconciliation", () => {
         debounceMs: 50,
       });
 
-      const syncSpy = vi.spyOn(watcher as never, "syncNow");
       watcher.start();
 
       writeWorkspaceFile(
@@ -278,12 +277,31 @@ describe("SkillDirWatcher workspace reconciliation", () => {
         "touch to trigger watcher",
       );
 
-      await waitUntil(() => syncSpy.mock.calls.length > 0);
-      expect(syncSpy).toHaveBeenCalled();
-      expect(db.getInstalledByAgent("bot-1").map((s) => s.slug)).toContain(
-        "agent-tool",
+      await waitUntil(() =>
+        db
+          .getInstalledByAgent("bot-1")
+          .some((skill) => skill.slug === "agent-tool"),
       );
       watcher.stop();
     },
   );
+
+  it("normalizes workspace paths from the agents/<bot>/skills segment", () => {
+    const watcher = new SkillDirWatcher({
+      skillsDir,
+      skillDb: db,
+      openclawStateDir: stateDir,
+      botIds: ["bot-1"],
+    });
+
+    const normalized = (
+      watcher as unknown as {
+        normalizeWorkspaceWatchPath: (filePath: string) => string;
+      }
+    ).normalizeWorkspaceWatchPath(
+      "/tmp/agents/cache/agents/bot-1/skills/agent-tool/README.md",
+    );
+
+    expect(normalized).toBe("agents/bot-1/skills/agent-tool/README.md");
+  });
 });
