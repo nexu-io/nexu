@@ -768,6 +768,7 @@ export type UpdaterEventMap = {
   "update:downloaded": { version: string };
   "update:error": {
     message: string;
+    rawMessage?: string;
     diagnostic?: UpdateCheckDiagnostic;
   };
 };

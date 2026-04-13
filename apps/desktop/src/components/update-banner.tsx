@@ -49,6 +49,7 @@ const i18n = {
     localTestFeedDetail:
       "This local validation build has a test update feed configured. Before testing, adjust the environment variables according to the repository documentation.",
     checkNow: "Check for updates",
+    retry: "Retry",
   },
   zh: {
     badge: "更新",
@@ -78,6 +79,7 @@ const i18n = {
     localTestFeedDetail:
       "当前版本为本地验收构建，已配置测试更新源。请按照仓库内的文档说明调整环境变量后测试。",
     checkNow: "检查更新",
+    retry: "重试",
   },
 };
 
@@ -327,6 +329,15 @@ export function UpdateBanner({
             {errorMessage ?? t.unknownError}
           </div>
           <div className="update-card-actions">
+            {capability?.check && (
+              <button
+                className="update-card-btn update-card-btn--primary"
+                onClick={onCheck}
+                type="button"
+              >
+                {t.retry}
+              </button>
+            )}
             <button
               className="update-card-btn update-card-btn--ghost"
               onClick={onDismiss}
