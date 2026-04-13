@@ -19,7 +19,7 @@ import {
   createControllerInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
-import { getScriptsDevLogger } from "../shared/logger.js";
+import { logger as rootLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   controllerDevLockPath,
@@ -27,6 +27,11 @@ import {
   getControllerDevLogPath,
 } from "../shared/paths.js";
 import { createDevMarkerArgs } from "../shared/trace.js";
+
+const logger = rootLogger.child({
+  component: "controller-service",
+  service: "controller",
+});
 
 export type ControllerDevSnapshot = {
   service: "controller";
@@ -211,9 +216,7 @@ export async function startControllerDevProcess(options: {
   const sessionId = options.sessionId;
   const logFilePath = getControllerDevLogPath(runId);
   const commandSpec = createControllerCommand(sessionId);
-  const logger = getScriptsDevLogger({
-    component: "controller-service",
-    service: "controller",
+  const runLogger = logger.child({
     runId,
     sessionId,
   });
@@ -235,7 +238,7 @@ export async function startControllerDevProcess(options: {
       NEXU_DEV_ROLE: "supervisor",
     },
     logFilePath,
-    logger,
+    logger: runLogger,
   });
 
   try {

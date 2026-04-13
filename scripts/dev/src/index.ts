@@ -32,15 +32,12 @@ import {
   startWebDevProcess,
   stopWebDevProcess,
 } from "./services/web.js";
-import { getScriptsDevLogger } from "./shared/logger.js";
+import { logger as rootLogger } from "./shared/logger.js";
 import { defaultLogTailLineCount } from "./shared/logs.js";
 import { createDevSessionId } from "./shared/trace.js";
 
 const cli = cac("scripts-dev");
-
-function getCliLogger() {
-  return getScriptsDevLogger({ component: "cli" });
-}
+const logger = rootLogger.child({ component: "cli" });
 
 const devTargets = ["desktop", "openclaw", "controller", "web"] as const;
 
@@ -57,7 +54,7 @@ function warnIfSnapshotIsStale(snapshot: SnapshotLike): void {
     return;
   }
 
-  getCliLogger().warn(`${snapshot.service} is stale`, {
+  logger.warn(`${snapshot.service} is stale`, {
     service: snapshot.service,
     staleReason: snapshot.staleReason ?? "unknown stale reason",
   });
@@ -77,14 +74,12 @@ async function runDefaultStartStage(
   target: DevTarget,
   sessionId: string,
 ): Promise<void> {
-  const logger = getCliLogger();
   logger.info("starting service", { target, sessionId });
   await startTarget(target, sessionId);
   logger.info("startup stage complete", { target, sessionId });
 }
 
 async function runDefaultStopStage(target: DevTarget): Promise<void> {
-  const logger = getCliLogger();
   logger.info("stopping service", { target });
   await stopTarget(target);
   logger.info("stop stage complete", { target });
@@ -118,7 +113,7 @@ async function stopDefaultStack(): Promise<void> {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("is not running")) {
-        getCliLogger().info(`${target} already stopped`, { target });
+        logger.info(`${target} already stopped`, { target });
         continue;
       }
 
@@ -142,126 +137,114 @@ async function startTarget(
   target: DevTarget,
   sessionId: string,
 ): Promise<void> {
-  if (target === "desktop") {
-    const desktopFact = await startDesktopDevProcess({ sessionId });
-    getCliLogger().info("desktop started", desktopFact);
-    return;
+  switch (target) {
+    case "desktop": {
+      const desktopFact = await startDesktopDevProcess({ sessionId });
+      logger.info("desktop started", desktopFact);
+      return;
+    }
+    case "openclaw": {
+      const openclawFact = await startOpenclawDevProcess({ sessionId });
+      logger.info("openclaw started", openclawFact);
+      return;
+    }
+    case "controller": {
+      const controllerFact = await startControllerDevProcess({ sessionId });
+      logger.info("controller started", controllerFact);
+      return;
+    }
+    case "web": {
+      const webFact = await startWebDevProcess({ sessionId });
+      logger.info("web started", webFact);
+      return;
+    }
   }
-
-  if (target === "openclaw") {
-    const openclawFact = await startOpenclawDevProcess({ sessionId });
-    getCliLogger().info("openclaw started", openclawFact);
-    return;
-  }
-
-  if (target === "controller") {
-    const controllerFact = await startControllerDevProcess({ sessionId });
-    getCliLogger().info("controller started", controllerFact);
-    return;
-  }
-
-  if (target === "web") {
-    const webFact = await startWebDevProcess({ sessionId });
-    getCliLogger().info("web started", webFact);
-    return;
-  }
-
-  throw new Error(`unsupported start target: ${target}`);
 }
 
 async function stopTarget(target: DevTarget): Promise<void> {
-  if (target === "desktop") {
-    const desktopFact = await stopDesktopDevProcess();
-    getCliLogger().info("desktop stopped", desktopFact);
-    return;
+  switch (target) {
+    case "desktop": {
+      const desktopFact = await stopDesktopDevProcess();
+      logger.info("desktop stopped", desktopFact);
+      return;
+    }
+    case "openclaw": {
+      const openclawFact = await stopOpenclawDevProcess();
+      logger.info("openclaw stopped", openclawFact);
+      return;
+    }
+    case "controller": {
+      const controllerFact = await stopControllerDevProcess();
+      logger.info("controller stopped", controllerFact);
+      return;
+    }
+    case "web": {
+      const webFact = await stopWebDevProcess();
+      logger.info("web stopped", webFact);
+      return;
+    }
   }
-
-  if (target === "openclaw") {
-    const openclawFact = await stopOpenclawDevProcess();
-    getCliLogger().info("openclaw stopped", openclawFact);
-    return;
-  }
-
-  if (target === "controller") {
-    const controllerFact = await stopControllerDevProcess();
-    getCliLogger().info("controller stopped", controllerFact);
-    return;
-  }
-
-  if (target === "web") {
-    const webFact = await stopWebDevProcess();
-    getCliLogger().info("web stopped", webFact);
-    return;
-  }
-
-  throw new Error(`unsupported stop target: ${target}`);
 }
 
 async function restartTarget(
   target: DevTarget,
   sessionId: string,
 ): Promise<void> {
-  if (target === "desktop") {
-    const desktopFact = await restartDesktopDevProcess({ sessionId });
-    getCliLogger().info("desktop restarted", desktopFact);
-    return;
+  switch (target) {
+    case "desktop": {
+      const desktopFact = await restartDesktopDevProcess({ sessionId });
+      logger.info("desktop restarted", desktopFact);
+      return;
+    }
+    case "openclaw": {
+      const openclawFact = await restartOpenclawDevProcess({ sessionId });
+      logger.info("openclaw restarted", openclawFact);
+      return;
+    }
+    case "controller": {
+      const controllerFact = await restartControllerDevProcess({ sessionId });
+      logger.info("controller restarted", controllerFact);
+      return;
+    }
+    case "web": {
+      const webFact = await restartWebDevProcess({ sessionId });
+      logger.info("web restarted", webFact);
+      return;
+    }
   }
-
-  if (target === "openclaw") {
-    const openclawFact = await restartOpenclawDevProcess({ sessionId });
-    getCliLogger().info("openclaw restarted", openclawFact);
-    return;
-  }
-
-  if (target === "controller") {
-    const controllerFact = await restartControllerDevProcess({ sessionId });
-    getCliLogger().info("controller restarted", controllerFact);
-    return;
-  }
-
-  if (target === "web") {
-    const webFact = await restartWebDevProcess({ sessionId });
-    getCliLogger().info("web restarted", webFact);
-    return;
-  }
-
-  throw new Error(`unsupported restart target: ${target}`);
 }
 
 async function printStatus(target: DevTarget): Promise<void> {
-  if (target === "desktop") {
-    const desktopSnapshot = await getCurrentDesktopDevSnapshot();
-    getCliLogger().info("desktop status", desktopSnapshot);
-    warnIfSnapshotIsStale(desktopSnapshot);
-    return;
+  switch (target) {
+    case "desktop": {
+      const desktopSnapshot = await getCurrentDesktopDevSnapshot();
+      logger.info("desktop status", desktopSnapshot);
+      warnIfSnapshotIsStale(desktopSnapshot);
+      return;
+    }
+    case "openclaw": {
+      const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
+      logger.info("openclaw status", openclawSnapshot);
+      warnIfSnapshotIsStale(openclawSnapshot);
+      return;
+    }
+    case "controller": {
+      const controllerSnapshot = await getCurrentControllerDevSnapshot();
+      logger.info("controller status", controllerSnapshot);
+      warnIfSnapshotIsStale(controllerSnapshot);
+      return;
+    }
+    case "web": {
+      const webSnapshot = await getCurrentWebDevSnapshot();
+      logger.info("web status", webSnapshot);
+      warnIfSnapshotIsStale(webSnapshot);
+      return;
+    }
   }
-
-  if (target === "openclaw") {
-    const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
-    getCliLogger().info("openclaw status", openclawSnapshot);
-    warnIfSnapshotIsStale(openclawSnapshot);
-    return;
-  }
-
-  if (target === "controller") {
-    const controllerSnapshot = await getCurrentControllerDevSnapshot();
-    getCliLogger().info("controller status", controllerSnapshot);
-    warnIfSnapshotIsStale(controllerSnapshot);
-    return;
-  }
-
-  if (target === "web") {
-    const webSnapshot = await getCurrentWebDevSnapshot();
-    getCliLogger().info("web status", webSnapshot);
-    warnIfSnapshotIsStale(webSnapshot);
-    return;
-  }
-
-  throw new Error(`unsupported status target: ${target}`);
 }
 
 function printLogHeader(logFilePath: string, totalLineCount: number): void {
-  getCliLogger().info("showing current session log tail", {
+  logger.info("showing current session log tail", {
     totalLines: totalLineCount,
     maxLines: defaultLogTailLineCount,
     logFilePath,

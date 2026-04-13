@@ -21,7 +21,7 @@ import {
   createOpenclawInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
-import { getScriptsDevLogger } from "../shared/logger.js";
+import { logger as rootLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getOpenclawDevLogPath,
@@ -30,6 +30,11 @@ import {
   openclawSupervisorPath,
 } from "../shared/paths.js";
 import { createDevMarkerArgs } from "../shared/trace.js";
+
+const logger = rootLogger.child({
+  component: "openclaw-service",
+  service: "openclaw",
+});
 
 export type OpenclawDevSnapshot = {
   service: "openclaw";
@@ -45,10 +50,7 @@ export type OpenclawDevSnapshot = {
 };
 
 function logOpenclawTiming(stage: string, startedAt: number): void {
-  getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
-  }).debug("openclaw timing", {
+  logger.debug("openclaw timing", {
     stage,
     elapsedMs: Date.now() - startedAt,
   });
@@ -82,10 +84,6 @@ export async function getOpenclawPortPid(): Promise<number> {
 }
 
 async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
-  const logger = getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
-  });
   const port = getScriptsDevRuntimeConfig().openclawPort;
   const attempts = 120;
   const delayMs = 500;
@@ -122,10 +120,6 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
 }
 
 async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
-  const logger = getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
-  });
   const runtimeConfig = getScriptsDevRuntimeConfig();
   const healthUrl = `${runtimeConfig.openclawBaseUrl}/health`;
   const attempts = 20;
@@ -205,10 +199,6 @@ async function waitForOpenclawCurrentLock(options: {
 }
 
 async function prepareOpenclawEntryPath(): Promise<string> {
-  const logger = getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
-  });
   const stage = await prepareSlimclawRuntimeStage({
     targetStageRoot: getOpenclawRuntimeStageRootPath(),
     log: (message) => logger.info(message),
@@ -246,9 +236,7 @@ export async function startOpenclawDevProcess(options: {
   const logFilePath = getOpenclawDevLogPath(runId);
   const commandSpec = createOpenclawCommand(sessionId);
   const runtimeConfig = getScriptsDevRuntimeConfig();
-  const logger = getScriptsDevLogger({
-    component: "openclaw-service",
-    service: "openclaw",
+  const runLogger = logger.child({
     runId,
     sessionId,
   });
@@ -279,7 +267,7 @@ export async function startOpenclawDevProcess(options: {
       NEXU_DEV_ROLE: "supervisor",
     },
     logFilePath,
-    logger,
+    logger: runLogger,
   });
 
   logOpenclawTiming("spawn-hidden-process-returned", startedAt);

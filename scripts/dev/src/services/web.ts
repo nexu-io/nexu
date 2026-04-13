@@ -21,7 +21,7 @@ import {
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
 import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
-import { getScriptsDevLogger } from "../shared/logger.js";
+import { logger as rootLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   getWebDevLogPath,
@@ -29,6 +29,11 @@ import {
   webSupervisorPath,
 } from "../shared/paths.js";
 import { createDevMarkerArgs } from "../shared/trace.js";
+
+const logger = rootLogger.child({
+  component: "web-service",
+  service: "web",
+});
 
 export type WebDevSnapshot = {
   service: "web";
@@ -119,9 +124,7 @@ export async function startWebDevProcess(options: {
   const sessionId = options.sessionId;
   const logFilePath = getWebDevLogPath(runId);
   const commandSpec = createWebCommand(sessionId);
-  const logger = getScriptsDevLogger({
-    component: "web-service",
-    service: "web",
+  const runLogger = logger.child({
     runId,
     sessionId,
   });
@@ -144,7 +147,7 @@ export async function startWebDevProcess(options: {
       NEXU_DEV_ROLE: "supervisor",
     },
     logFilePath,
-    logger,
+    logger: runLogger,
   });
 
   try {

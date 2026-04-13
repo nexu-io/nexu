@@ -23,7 +23,7 @@ import {
   createDesktopInjectedEnv,
   getScriptsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
-import { getScriptsDevLogger } from "../shared/logger.js";
+import { logger as rootLogger } from "../shared/logger.js";
 import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
 import {
   desktopDevLockPath,
@@ -37,6 +37,11 @@ import {
 } from "../shared/platform/desktop-dev-platform.js";
 import { getCurrentControllerDevSnapshot } from "./controller.js";
 import { getCurrentWebDevSnapshot } from "./web.js";
+
+const logger = rootLogger.child({
+  component: "desktop-service",
+  service: "desktop",
+});
 
 export type DesktopDevSnapshot = {
   service: "desktop";
@@ -497,9 +502,7 @@ export async function startDesktopDevProcess(options: {
   const logFilePath = getDesktopDevLogPath(runId);
   const desktopLaunch = createDesktopLaunchEnv();
   const desktopViteCommand = createDesktopViteCommand();
-  const logger = getScriptsDevLogger({
-    component: "desktop-service",
-    service: "desktop",
+  const runLogger = logger.child({
     runId,
     sessionId,
   });
@@ -524,7 +527,7 @@ export async function startDesktopDevProcess(options: {
       NEXU_DEV_ROLE: "worker",
     },
     logFilePath,
-    logger,
+    logger: runLogger,
   });
 
   try {
