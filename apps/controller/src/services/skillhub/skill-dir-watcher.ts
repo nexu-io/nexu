@@ -17,6 +17,7 @@ export class SkillDirWatcher {
   private readonly db: SkillDb;
   private readonly log: SkillDirWatcherLogFn;
   private readonly debounceMs: number;
+  private readonly pollIntervalMs: number;
   private readonly isSlugInFlight: (slug: string) => boolean;
   private readonly userSkillsDir: string | null;
   private readonly openclawStateDir: string | null;
@@ -27,12 +28,14 @@ export class SkillDirWatcher {
   private workspaceWatcher: FSWatcher | null = null;
   private workspaceSkillWatchers = new Map<string, FSWatcher>();
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(opts: {
     skillsDir: string;
     skillDb: SkillDb;
     log?: SkillDirWatcherLogFn;
     debounceMs?: number;
+    pollIntervalMs?: number;
     /** Returns true if the slug is currently being installed by the queue. */
     isSlugInFlight?: (slug: string) => boolean;
     /** User-level skills directory (~/.agents/skills/). */
@@ -48,6 +51,8 @@ export class SkillDirWatcher {
     this.db = opts.skillDb;
     this.log = opts.log ?? defaultLog;
     this.debounceMs = opts.debounceMs ?? 500;
+    this.pollIntervalMs =
+      opts.pollIntervalMs ?? Math.max(this.debounceMs * 4, 1000);
     this.isSlugInFlight = opts.isSlugInFlight ?? (() => false);
     this.userSkillsDir = opts.userSkillsDir ?? null;
     this.openclawStateDir = opts.openclawStateDir ?? null;
@@ -233,7 +238,10 @@ export class SkillDirWatcher {
       return;
     }
 
-    this.sharedWatcher = watch(this.skillsDir, { recursive: true }, () => {
+    // Only the first-level slug directories matter here. Non-recursive watching
+    // is more reliable for newly created skill directories than relying on
+    // recursive child propagation across platforms.
+    this.sharedWatcher = watch(this.skillsDir, () => {
       this.scheduleSync();
     });
 
@@ -247,7 +255,7 @@ export class SkillDirWatcher {
     this.log("info", `Watching skills directory: ${this.skillsDir}`);
 
     if (this.userSkillsDir && existsSync(this.userSkillsDir)) {
-      this.userWatcher = watch(this.userSkillsDir, { recursive: true }, () => {
+      this.userWatcher = watch(this.userSkillsDir, () => {
         this.scheduleSync();
       });
 
@@ -290,6 +298,15 @@ export class SkillDirWatcher {
         `Watching workspace skill directories under: ${this.openclawStateDir}`,
       );
     }
+
+    // Some platforms occasionally miss new nested directory events from fs.watch.
+    // Keep a low-frequency reconciliation loop as a safety net so the ledger
+    // eventually reflects disk state even when no watcher callback fires.
+    this.pollTimer = setInterval(() => {
+      if (this.syncNow()) {
+        this.onChange();
+      }
+    }, this.pollIntervalMs);
   }
 
   private shouldProcessWorkspaceEvent(
@@ -307,6 +324,11 @@ export class SkillDirWatcher {
     if (this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
+    }
+
+    if (this.pollTimer !== null) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
 
     if (this.sharedWatcher !== null) {
@@ -381,7 +403,7 @@ export class SkillDirWatcher {
 
     let watcher: FSWatcher;
     try {
-      watcher = watch(wsSkillsDir, { recursive: true }, () => {
+      watcher = watch(wsSkillsDir, () => {
         this.scheduleSync();
       });
     } catch (err) {

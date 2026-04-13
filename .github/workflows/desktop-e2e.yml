@@ -63,6 +63,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      run_desktop_e2e: ${{ steps.plan.outputs.run_desktop_e2e }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select desktop e2e plan
+        id: plan
+        run: node scripts/ci/test-plan.mjs
+
   validate-inputs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -79,12 +94,13 @@ jobs:
   # --------------------------------------------------------------------------
   build:
     needs: [validate-inputs]
-    if: always() && (needs.validate-inputs.result == 'success' || needs.validate-inputs.result == 'skipped') && (github.event_name != 'workflow_dispatch' || github.event.inputs.source == 'build') && (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event_name == 'push')
+    needs: [plan, validate-inputs]
+    if: always() && (needs.validate-inputs.result == 'success' || needs.validate-inputs.result == 'skipped') && (github.event_name != 'workflow_dispatch' || github.event.inputs.source == 'build') && (github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && needs.plan.outputs.run_desktop_e2e == 'true'))
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 30
     env:
       E2E_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || 'model' }}
-      E2E_COVERAGE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.coverage == 'true') || github.event_name == 'pull_request' || github.event_name == 'push' }}
+      E2E_COVERAGE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.coverage == 'true') || github.event_name == 'push' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -146,15 +162,15 @@ jobs:
   # E2E test
   # --------------------------------------------------------------------------
   e2e:
-    needs: [validate-inputs, build]
-    if: always() && (needs.validate-inputs.result == 'success' || needs.validate-inputs.result == 'skipped') && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    needs: [plan, validate-inputs, build]
+    if: always() && (needs.validate-inputs.result == 'success' || needs.validate-inputs.result == 'skipped') && (needs.build.result == 'success' || needs.build.result == 'skipped') && (github.event_name != 'pull_request' || needs.plan.outputs.run_desktop_e2e == 'true')
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 30
     env:
       E2E_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode || 'model' }}
       E2E_SOURCE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.source || (github.event_name == 'schedule' && 'download' || 'build') }}
       E2E_CHANNEL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.channel || 'nightly' }}
-      E2E_COVERAGE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.coverage == 'true') || github.event_name == 'pull_request' || github.event_name == 'push' }}
+      E2E_COVERAGE: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.coverage == 'true') || github.event_name == 'push' }}
     defaults:
       run:
         working-directory: e2e/desktop
