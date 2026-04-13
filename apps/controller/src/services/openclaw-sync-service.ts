@@ -347,6 +347,12 @@ export class OpenClawSyncService {
     // changes are treated as kind "none" and require a full restart.
     // Gate on skill-list diff to avoid unnecessary restarts during
     // normal model/channel/provider updates.
+    //
+    // NOTE: This only gates on allowlist diffs (skill added/removed).
+    // Skill file content changes (SKILL.md edits, ClawHub updates) with
+    // an unchanged allowlist do NOT trigger a gateway restart — and that
+    // is correct. OpenClaw's chokidar watcher handles file-level changes
+    // natively via snapshotVersion bump. Do NOT add restart to that path.
     if (configPushed) {
       const prevSkills = this.lastSkillAllowlist;
       const nextSkills = this.extractSkillAllowlist(compiled);
