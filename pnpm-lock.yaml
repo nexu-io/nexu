@@ -249,7 +249,7 @@ importers:
         specifier: ^14.1.1
         version: 14.1.1
       posthog-js:
-        specifier: ^1.364.6
+        specifier: ^1.365.1
         version: 1.365.1
       qrcode.react:
         specifier: ^4.2.0
@@ -3463,6 +3463,7 @@ packages:
   basic-ftp@5.2.0:
     resolution: {integrity: sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==}
     engines: {node: '>=10.0.0'}
+    deprecated: Security vulnerability fixed in 5.2.1, please upgrade
 
   better-auth@1.4.19:
     resolution: {integrity: sha512-3RlZJcA0+NH25wYD85vpIGwW9oSTuEmLIaGbT8zg41w/Pa2hVWHKedjoUHHJtnzkBXzDb+CShkLnSw7IThDdqQ==}

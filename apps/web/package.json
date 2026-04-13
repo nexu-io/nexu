@@ -31,7 +31,7 @@
     "i18next": "^25.8.18",
     "lucide-react": "^0.474.0",
     "markdown-it": "^14.1.1",
-    "posthog-js": "^1.364.6",
+    "posthog-js": "^1.365.1",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

@@ -96,6 +96,7 @@ export async function createContainer(): Promise<ControllerContainer> {
   const runtimeHealth = new RuntimeHealth(env);
   const runtimeState = createRuntimeState();
   const openclawProcess = new OpenClawProcessManager(env);
+  watchTrigger.setProcessManager(openclawProcess);
   const wsClient = new OpenClawWsClient(env);
   const gatewayService = new OpenClawGatewayService(wsClient, runtimeState);
   const channelFallbackService = new ChannelFallbackService(

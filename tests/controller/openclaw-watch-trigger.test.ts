@@ -1,8 +1,9 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerEnv } from "../../apps/controller/src/app/env.js";
+import type { OpenClawProcessManager } from "../../apps/controller/src/runtime/openclaw-process.js";
 import { OpenClawWatchTrigger } from "../../apps/controller/src/runtime/openclaw-watch-trigger.js";
 
 describe("OpenClawWatchTrigger", () => {
@@ -66,7 +67,13 @@ describe("OpenClawWatchTrigger", () => {
       runtimeSyncIntervalMs: 2000,
       runtimeHealthIntervalMs: 5000,
       defaultModelId: "anthropic/claude-sonnet-4",
-      amplitudeApiKey: undefined,
+      creditGuardStatePath: path.join(
+        rootDir,
+        ".openclaw",
+        "nexu-credit-guard-state.json",
+      ),
+      posthogApiKey: undefined,
+      posthogHost: undefined,
     };
   });
 
@@ -128,5 +135,57 @@ describe("OpenClawWatchTrigger", () => {
     const markerPath = path.join(env.openclawSkillsDir, ".controller-nudge");
     const markerContent = await readFile(markerPath, "utf8");
     expect(markerContent).toBe("");
+  });
+
+  describe("restartGateway (via nudgeSkillsWatcher)", () => {
+    it("restarts via orchestrator mode when manageOpenclawProcess is true", async () => {
+      env.manageOpenclawProcess = true;
+      const mockProcess = {
+        stop: vi.fn().mockResolvedValue(undefined),
+        enableAutoRestart: vi.fn(),
+        start: vi.fn(),
+      } as unknown as OpenClawProcessManager;
+
+      const trigger = new OpenClawWatchTrigger(env);
+      trigger.setProcessManager(mockProcess);
+
+      await mkdir(env.openclawSkillsDir, { recursive: true });
+      await trigger.nudgeSkillsWatcher("test-orchestrator");
+
+      expect(mockProcess.stop).toHaveBeenCalledOnce();
+      expect(mockProcess.enableAutoRestart).toHaveBeenCalledOnce();
+      expect(mockProcess.start).toHaveBeenCalledOnce();
+    });
+
+    it("skips restart when no process manager and no launchd label", async () => {
+      env.manageOpenclawProcess = false;
+      env.openclawLaunchdLabel = null;
+
+      const trigger = new OpenClawWatchTrigger(env);
+      await mkdir(env.openclawSkillsDir, { recursive: true });
+
+      // Should not throw — logs a warning and returns false
+      await trigger.nudgeSkillsWatcher("test-no-restart");
+
+      const markerPath = path.join(env.openclawSkillsDir, ".controller-nudge");
+      const markerContent = await readFile(markerPath, "utf8");
+      expect(markerContent).toBe("");
+    });
+
+    it("does not restart when manageOpenclawProcess is true but no process manager set", async () => {
+      env.manageOpenclawProcess = true;
+      // Don't call setProcessManager — openclawProcess is null
+
+      const trigger = new OpenClawWatchTrigger(env);
+      await mkdir(env.openclawSkillsDir, { recursive: true });
+
+      // Should fall through to launchd check (null) then skip
+      await trigger.nudgeSkillsWatcher("test-no-pm");
+
+      // Marker should still be written (nudge completes even without restart)
+      const markerPath = path.join(env.openclawSkillsDir, ".controller-nudge");
+      const markerContent = await readFile(markerPath, "utf8");
+      expect(markerContent).toBe("");
+    });
   });
 });
