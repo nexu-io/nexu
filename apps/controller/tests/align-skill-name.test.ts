@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CatalogManager } from "../src/services/skillhub/catalog-manager.js";
-import { alignSkillName } from "../src/services/skillhub/curated-skills.js";
+import {
+  alignSkillName,
+  stripRequiresBins,
+} from "../src/services/skillhub/curated-skills.js";
 import { SkillDb } from "../src/services/skillhub/skill-db.js";
 
 describe("alignSkillName", () => {
@@ -190,5 +193,117 @@ describe("CatalogManager.getCatalog() display name with catalog-name", () => {
     const result = catalog.getCatalog();
     const skill = result.installedSkills.find((s) => s.slug === "bare-skill");
     expect(skill?.name).toBe("bare-skill");
+  });
+});
+
+describe("stripRequiresBins", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(path.join(tmpdir(), "nexu-strip-requires-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("strips requires.bins from JSON-in-YAML metadata", () => {
+    const skillDir = path.join(tmpDir, "libtv-video");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      path.join(skillDir, "SKILL.md"),
+      '---\nname: libtv-video\nmetadata:\n  {\n    "openclaw":\n      {\n        "emoji": "🎬",\n        "requires": { "bins": ["python3"] },\n      },\n  }\n---\n# LibTV\n',
+    );
+
+    stripRequiresBins(tmpDir, "libtv-video");
+
+    const content = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+    expect(content).not.toContain("requires");
+    expect(content).not.toContain("python3");
+    expect(content).toContain("emoji");
+    expect(content).toContain("# LibTV");
+  });
+
+  it("strips requires.anyBins from JSON-in-YAML metadata", () => {
+    const skillDir = path.join(tmpDir, "coding-agent");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      path.join(skillDir, "SKILL.md"),
+      '---\nname: coding-agent\nmetadata:\n  {\n    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex"] } },\n  }\n---\n# Agent\n',
+    );
+
+    stripRequiresBins(tmpDir, "coding-agent");
+
+    const content = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+    expect(content).not.toContain("requires");
+    expect(content).not.toContain("claude");
+    expect(content).toContain("emoji");
+  });
+
+  it("strips requires from standard YAML metadata", () => {
+    const skillDir = path.join(tmpDir, "my-skill");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      path.join(skillDir, "SKILL.md"),
+      "---\nname: my-skill\nmetadata:\n  openclaw:\n    emoji: test\n    requires:\n      bins:\n        - node\n        - npm\n---\n# My Skill\n",
+    );
+
+    stripRequiresBins(tmpDir, "my-skill");
+
+    const content = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+    expect(content).not.toContain("requires");
+    expect(content).not.toContain("node");
+    expect(content).toContain("emoji: test");
+    expect(content).toContain("# My Skill");
+  });
+
+  it("handles CRLF line endings", () => {
+    const skillDir = path.join(tmpDir, "crlf-skill");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      path.join(skillDir, "SKILL.md"),
+      '---\r\nname: crlf-skill\r\nmetadata:\r\n  {\r\n    "openclaw":\r\n      {\r\n        "requires": { "bins": ["python3"] },\r\n      },\r\n  }\r\n---\r\n# CRLF\r\n',
+    );
+
+    stripRequiresBins(tmpDir, "crlf-skill");
+
+    const content = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+    expect(content).not.toContain("requires");
+    expect(content).not.toContain("python3");
+  });
+
+  it("leaves file unchanged when no requires present", () => {
+    const skillDir = path.join(tmpDir, "clean-skill");
+    mkdirSync(skillDir, { recursive: true });
+    const original =
+      '---\nname: clean-skill\nmetadata:\n  {\n    "openclaw": { "emoji": "✅" },\n  }\n---\n# Clean\n';
+    writeFileSync(path.join(skillDir, "SKILL.md"), original);
+
+    stripRequiresBins(tmpDir, "clean-skill");
+
+    const content = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+    expect(content).toBe(original);
+  });
+
+  it("silently skips when SKILL.md does not exist", () => {
+    stripRequiresBins(tmpDir, "nonexistent");
+  });
+
+  it("preserves skill body and scripts references", () => {
+    const skillDir = path.join(tmpDir, "full-skill");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      path.join(skillDir, "SKILL.md"),
+      '---\nname: full-skill\ndescription: A full skill\nmetadata:\n  {\n    "openclaw":\n      {\n        "emoji": "🔧",\n        "requires": { "bins": ["ffmpeg"] },\n      },\n  }\n---\n# Full Skill\n\n## Requirements\n\n- ffmpeg required\n\n## Usage\n\n```bash\nffmpeg -i input.mp4 output.webm\n```\n',
+    );
+
+    stripRequiresBins(tmpDir, "full-skill");
+
+    const content = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+    expect(content).not.toContain('"requires"');
+    expect(content).toContain("description: A full skill");
+    expect(content).toContain("# Full Skill");
+    expect(content).toContain("## Requirements");
+    expect(content).toContain("ffmpeg -i input.mp4 output.webm");
   });
 });

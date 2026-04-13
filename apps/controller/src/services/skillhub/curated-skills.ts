@@ -234,3 +234,39 @@ export function alignSkillName(skillsDir: string, slug: string): void {
     // best-effort
   }
 }
+
+/**
+ * Remove `requires.bins` / `requires.anyBins` from a skill's SKILL.md
+ * frontmatter so OpenClaw's eligibility filter does not drop it when
+ * the required binary is missing from the system.
+ *
+ * The agent will still see the skill, attempt to run it, and guide the
+ * user to install the missing dependency based on the skill's body
+ * instructions.
+ *
+ * Handles both JSON-in-YAML and standard YAML metadata formats.
+ * Best-effort: silently skips on any error.
+ */
+export function stripRequiresBins(skillsDir: string, slug: string): void {
+  const skillMdPath = resolve(skillsDir, slug, "SKILL.md");
+  if (!existsSync(skillMdPath)) return;
+
+  try {
+    const content = readFileSync(skillMdPath, "utf8").replace(/\r\n/g, "\n");
+    if (!content.includes("requires")) return;
+
+    // JSON-in-YAML: "requires": { "bins": [...] }, or "requires": { "anyBins": [...] },
+    // Remove the entire "requires": { ... }, block (with optional trailing comma)
+    let patched = content.replace(/\s*"requires"\s*:\s*\{[^}]*\}\s*,?/g, "");
+
+    // Standard YAML: requires:\n  bins:\n    - x\n    - y
+    // Remove the requires block and all its indented children
+    patched = patched.replace(/^[ \t]*requires:\s*\n(?:[ \t]+.*\n)*/gm, "");
+
+    if (patched !== content) {
+      writeFileSync(skillMdPath, patched, "utf8");
+    }
+  } catch {
+    // best-effort
+  }
+}
