@@ -27,7 +27,7 @@
 如果你的贡献被合入，后续会展示在这些位置：
 
 1. **GitHub README**：展示贡献者，并同步呈现 **日榜、月榜和历史累计榜单**
-2. **Discord `#leaderboard` 频道**：Bot 自动发布排行榜动态
+2. **Discord [Start your first Nexu PR](https://discord.gg/vMrySTJW8u)**：Bot 自动发布排行榜动态
 
 ## 当前积分规则
 
@@ -65,3 +65,9 @@
 这类题通常范围更小、方向更聚焦，也更适合第一次贡献。
 
 直接去挑题：[Good First Issue 列表](https://github.com/nexu-io/nexu/labels/good-first-issue)
+
+## 加入 nexu 贡献者飞书交流群 💬
+
+一个人研究不如一群人一起聊。群里有维护者、有老贡献者，扫码进群，聊聊你想做的第一个贡献 👇
+
+<img src="/feishu-contributor-qr.png" width="200" alt="nexu 贡献者飞书交流群" />
