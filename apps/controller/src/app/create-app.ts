@@ -59,11 +59,13 @@ export function createApp(container: ControllerContainer) {
   });
 
   app.get("/health", async (c) => {
-    const runtime = await container.runtimeHealth.probe();
+    const controlPlane = await container.controlPlaneHealth.probe({
+      timeoutMs: 1500,
+    });
     return c.json(
       {
         status: container.runtimeState.status,
-        runtime,
+        controlPlane,
         sync: {
           config: container.runtimeState.configSyncStatus,
           skills: container.runtimeState.skillsSyncStatus,

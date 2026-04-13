@@ -178,6 +178,41 @@ export class OpenClawGatewayService {
     this.lastPushedConfigHash = this.configHash(config);
   }
 
+  async getGatewayHealthSnapshot(opts?: {
+    timeoutMs?: number;
+    probe?: boolean;
+  }): Promise<unknown> {
+    return this.wsClient.request(
+      "health",
+      {
+        probe: opts?.probe ?? false,
+      },
+      {
+        timeoutMs: opts?.timeoutMs ?? 1000,
+      },
+    );
+  }
+
+  async getGatewayStatusSummary(opts?: {
+    timeoutMs?: number;
+  }): Promise<unknown> {
+    return this.wsClient.request("status", undefined, {
+      timeoutMs: opts?.timeoutMs ?? 1000,
+    });
+  }
+
+  async getGatewayConfigSnapshot(opts?: {
+    timeoutMs?: number;
+  }): Promise<unknown> {
+    return this.wsClient.request(
+      "config.get",
+      {},
+      {
+        timeoutMs: opts?.timeoutMs ?? 1000,
+      },
+    );
+  }
+
   /**
    * Query the runtime status snapshot of all channels.
    * When probe=true, real-time probes are triggered (e.g. Feishu bot-info validation).

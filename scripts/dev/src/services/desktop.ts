@@ -43,6 +43,8 @@ export type DesktopDevSnapshot = {
   status: "running" | "stopped" | "stale";
   pid?: number;
   workerPid?: number;
+  inspectPid?: number;
+  staleReason?: string;
   launchId?: string;
   runId?: string;
   sessionId?: string;
@@ -207,11 +209,24 @@ function spawnWindowsDetachedDesktopProcess(options: {
   };
 }
 
+function shouldRetryDesktopElectronLaunch(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("desktop inspect server did not open port") ||
+    error.message.includes(
+      "desktop electron main process exited before opening port",
+    )
+  );
+}
+
 async function waitForDesktopShutdown(options?: {
   previousPid?: number;
   launchId?: string;
 }): Promise<void> {
-  const desktopDevPort = getScriptsDevRuntimeConfig().desktopDevPort;
+  const runtimeConfig = getScriptsDevRuntimeConfig();
 
   await waitFor(
     async () => {
@@ -225,9 +240,21 @@ async function waitForDesktopShutdown(options?: {
       }
 
       try {
-        await getListeningPortPid(desktopDevPort, "desktop dev server");
+        await getListeningPortPid(
+          runtimeConfig.desktopDevPort,
+          "desktop dev server",
+        );
       } catch {
-        return;
+        try {
+          await getListeningPortPid(
+            runtimeConfig.desktopInspectPort,
+            "desktop inspect server",
+          );
+        } catch {
+          return;
+        }
+
+        throw new Error("desktop inspect server is still shutting down");
       }
 
       throw new Error("desktop dev server is still shutting down");
@@ -263,6 +290,28 @@ async function cleanupStaleDesktopDevServer(): Promise<void> {
       return terminateDesktopPid(vitePid, true);
     });
   } catch {}
+}
+
+async function getDesktopInspectPortPid(): Promise<number> {
+  return getListeningPortPid(
+    getScriptsDevRuntimeConfig().desktopInspectPort,
+    "desktop inspect server",
+  );
+}
+
+async function waitForDesktopInspectPortPid(
+  supervisorPid?: number,
+): Promise<number> {
+  return waitForListeningPortPid(
+    getScriptsDevRuntimeConfig().desktopInspectPort,
+    "desktop inspect server",
+    {
+      attempts: 40,
+      delayMs: 250,
+      supervisorPid,
+      supervisorName: "desktop electron main process",
+    },
+  );
 }
 
 async function waitForDesktopBuildOutputs(startedAt: number): Promise<void> {
@@ -303,6 +352,14 @@ async function getDesktopInspectSession(): Promise<{
 }> {
   const snapshot = await getCurrentDesktopDevSnapshot();
 
+  if (snapshot.status === "stale") {
+    throw new Error(
+      snapshot.staleReason
+        ? `desktop inspect is unavailable because desktop is stale: ${snapshot.staleReason}; restart it with \`pnpm dev restart desktop\``
+        : "desktop inspect is unavailable because desktop is stale; restart it with `pnpm dev restart desktop`",
+    );
+  }
+
   ensure(snapshot.status === "running").orThrow(
     () =>
       new Error(
@@ -317,7 +374,7 @@ async function getDesktopInspectSession(): Promise<{
   );
 
   return {
-    inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
+    inspectUrl: snapshot.inspectUrl,
     token,
   };
 }
@@ -424,6 +481,10 @@ export async function startDesktopDevProcess(options: {
 
   const existingSnapshot = await getCurrentDesktopDevSnapshot();
 
+  if (existingSnapshot.status === "stale") {
+    await stopDesktopDevProcess();
+  }
+
   ensure(existingSnapshot.status !== "running").orThrow(
     () =>
       new Error(
@@ -501,69 +562,138 @@ export async function startDesktopDevProcess(options: {
     },
   });
 
-  const desktopMainPid =
-    process.platform === "win32"
-      ? (() => {
-          const handle = spawnWindowsDetachedDesktopProcess({
-            command: electronLaunchSpec.command,
-            args: electronLaunchSpec.args,
-            cwd: electronLaunchSpec.cwd,
-            env: electronLaunchSpec.env,
-          });
-          handle.dispose();
-          return handle.pid;
-        })()
-      : await (async () => {
-          const electronHandle = await spawnHiddenProcess({
-            command: electronLaunchSpec.command,
-            args: electronLaunchSpec.args,
-            cwd: electronLaunchSpec.cwd,
-            env: electronLaunchSpec.env,
-            logFilePath,
-            logger,
-          });
+  let desktopMainPid: number | undefined;
 
-          electronHandle.dispose();
+  try {
+    const launchDesktopElectron = async (): Promise<{
+      desktopMainPid: number;
+      inspectPid: number;
+    }> => {
+      let launchedDesktopMainPid: number | undefined;
 
-          return waitFor(
-            async () => {
-              const pid = await findDesktopDevMainPid(desktopLaunch.launchId);
-              if (!pid) {
-                throw new Error(
-                  "desktop electron main process was not detected yet",
+      try {
+        launchedDesktopMainPid =
+          process.platform === "win32"
+            ? (() => {
+                const handle = spawnWindowsDetachedDesktopProcess({
+                  command: electronLaunchSpec.command,
+                  args: electronLaunchSpec.args,
+                  cwd: electronLaunchSpec.cwd,
+                  env: electronLaunchSpec.env,
+                });
+                handle.dispose();
+                return handle.pid;
+              })()
+            : await (async () => {
+                const electronHandle = await spawnHiddenProcess({
+                  command: electronLaunchSpec.command,
+                  args: electronLaunchSpec.args,
+                  cwd: electronLaunchSpec.cwd,
+                  env: electronLaunchSpec.env,
+                  logFilePath,
+                  logger,
+                });
+
+                electronHandle.dispose();
+
+                return waitFor(
+                  async () => {
+                    const pid = await findDesktopDevMainPid(
+                      desktopLaunch.launchId,
+                    );
+                    if (!pid) {
+                      throw new Error(
+                        "desktop electron main process was not detected yet",
+                      );
+                    }
+
+                    return pid;
+                  },
+                  () =>
+                    new Error(
+                      "desktop electron main process did not start in time",
+                    ),
+                  {
+                    attempts: 40,
+                    delayMs: 250,
+                  },
                 );
-              }
+              })();
 
-              return pid;
-            },
-            () =>
-              new Error("desktop electron main process did not start in time"),
-            {
-              attempts: 40,
-              delayMs: 250,
-            },
-          );
-        })();
+        const inspectPid = await waitForDesktopInspectPortPid(
+          launchedDesktopMainPid,
+        );
 
-  await writeDevLock(desktopDevLockPath, {
-    pid: desktopMainPid,
-    workerPid: viteHandle.pid,
-    runId,
-    sessionId,
-    launchId: desktopLaunch.launchId,
-  });
+        return {
+          desktopMainPid: launchedDesktopMainPid,
+          inspectPid,
+        };
+      } catch (error) {
+        if (launchedDesktopMainPid) {
+          await terminateDesktopDevProcesses(launchedDesktopMainPid, {
+            force: true,
+            launchId: desktopLaunch.launchId,
+          }).catch(() => undefined);
 
-  return {
-    service: "desktop",
-    status: "running",
-    pid: desktopMainPid,
-    workerPid: viteHandle.pid,
-    launchId: desktopLaunch.launchId,
-    runId,
-    sessionId,
-    logFilePath,
-    inspectUrl: runtimeConfig.desktopInspectUrl,
-  };
+          await waitForDesktopShutdown({
+            previousPid: launchedDesktopMainPid,
+            launchId: desktopLaunch.launchId,
+          }).catch(() => undefined);
+        }
+
+        throw error;
+      }
+    };
+
+    let inspectPid: number;
+
+    try {
+      ({ desktopMainPid, inspectPid } = await launchDesktopElectron());
+    } catch (error) {
+      if (!shouldRetryDesktopElectronLaunch(error)) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      ({ desktopMainPid, inspectPid } = await launchDesktopElectron());
+    }
+
+    await writeDevLock(desktopDevLockPath, {
+      pid: desktopMainPid,
+      workerPid: viteHandle.pid,
+      runId,
+      sessionId,
+      launchId: desktopLaunch.launchId,
+    });
+
+    return {
+      service: "desktop",
+      status: "running",
+      pid: desktopMainPid,
+      workerPid: viteHandle.pid,
+      inspectPid,
+      launchId: desktopLaunch.launchId,
+      runId,
+      sessionId,
+      logFilePath,
+      inspectUrl: runtimeConfig.desktopInspectUrl,
+    };
+  } catch (error) {
+    await removeDevLock(desktopDevLockPath).catch(() => undefined);
+
+    if (desktopMainPid) {
+      await terminateDesktopDevProcesses(desktopMainPid, {
+        force: true,
+        launchId: desktopLaunch.launchId,
+      }).catch(() => undefined);
+    }
+
+    if (viteHandle.pid && isProcessRunning(viteHandle.pid)) {
+      await terminateDesktopPid(viteHandle.pid, true);
+    }
+
+    throw error;
+  }
 }
 
 export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
@@ -641,22 +771,67 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
   try {
     const lock = await readDevLock(desktopDevLockPath);
     const logFilePath = getDesktopDevLogPath(lock.runId);
+    const runtimeConfig = getScriptsDevRuntimeConfig();
+
+    const buildSnapshot = async (
+      desktopMainPid: number,
+    ): Promise<DesktopDevSnapshot> => {
+      let inspectPid: number | undefined;
+
+      try {
+        await getListeningPortPid(
+          runtimeConfig.desktopDevPort,
+          "desktop dev server",
+        );
+      } catch {
+        return {
+          service: "desktop",
+          status: "stale",
+          pid: desktopMainPid,
+          workerPid: lock.workerPid,
+          staleReason: "desktop dev server is not listening",
+          launchId: lock.launchId,
+          runId: lock.runId,
+          sessionId: lock.sessionId,
+          logFilePath,
+        };
+      }
+
+      try {
+        inspectPid = await getDesktopInspectPortPid();
+      } catch {
+        return {
+          service: "desktop",
+          status: "stale",
+          pid: desktopMainPid,
+          workerPid: lock.workerPid,
+          launchId: lock.launchId,
+          staleReason: "desktop inspect server is not listening",
+          runId: lock.runId,
+          sessionId: lock.sessionId,
+          logFilePath,
+        };
+      }
+
+      return {
+        service: "desktop",
+        status: "running",
+        pid: desktopMainPid,
+        workerPid: lock.workerPid,
+        inspectPid,
+        launchId: lock.launchId,
+        runId: lock.runId,
+        sessionId: lock.sessionId,
+        logFilePath,
+        inspectUrl: runtimeConfig.desktopInspectUrl,
+      };
+    };
 
     if (!isProcessRunning(lock.pid)) {
       const desktopMainPid = await findDesktopDevMainPid(lock.launchId);
 
       if (desktopMainPid) {
-        return {
-          service: "desktop",
-          status: "running",
-          pid: desktopMainPid,
-          workerPid: lock.workerPid,
-          launchId: lock.launchId,
-          runId: lock.runId,
-          sessionId: lock.sessionId,
-          logFilePath,
-          inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
-        };
+        return buildSnapshot(desktopMainPid);
       }
 
       return {
@@ -665,24 +840,14 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
         pid: lock.pid,
         workerPid: lock.workerPid,
         launchId: lock.launchId,
+        staleReason: "desktop main pid is not running",
         runId: lock.runId,
         sessionId: lock.sessionId,
         logFilePath,
-        inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
       };
     }
 
-    return {
-      service: "desktop",
-      status: "running",
-      pid: lock.pid,
-      workerPid: lock.workerPid,
-      launchId: lock.launchId,
-      runId: lock.runId,
-      sessionId: lock.sessionId,
-      logFilePath,
-      inspectUrl: getScriptsDevRuntimeConfig().desktopInspectUrl,
-    };
+    return buildSnapshot(lock.pid);
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return {

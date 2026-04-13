@@ -47,6 +47,33 @@ function getCliLogger() {
   return getScriptsDevLogger({ component: "cli" });
 }
 
+type SnapshotLike = {
+  service: string;
+  status: "running" | "stopped" | "stale";
+  staleReason?: string;
+};
+
+function warnIfSnapshotIsStale(snapshot: SnapshotLike): void {
+  if (snapshot.status !== "stale") {
+    return;
+  }
+
+  getCliLogger().warn(`${snapshot.service} is stale`, {
+    service: snapshot.service,
+    staleReason: snapshot.staleReason ?? "unknown stale reason",
+  });
+}
+
+function getNoActiveLogMessage(snapshot: SnapshotLike): string {
+  if (snapshot.status === "stale") {
+    return snapshot.staleReason
+      ? `${snapshot.service} is stale (${snapshot.staleReason}); active session logs may reflect the failed run`
+      : `${snapshot.service} is stale; active session logs may reflect the failed run`;
+  }
+
+  return `${snapshot.service} is not running; no active session log is available`;
+}
+
 async function runDefaultStartStage(
   target: DevTarget,
   sessionId: string,
@@ -240,24 +267,28 @@ async function printStatus(target: DevTarget): Promise<void> {
   if (target === "desktop") {
     const desktopSnapshot = await getCurrentDesktopDevSnapshot();
     getCliLogger().info("desktop status", desktopSnapshot);
+    warnIfSnapshotIsStale(desktopSnapshot);
     return;
   }
 
   if (target === "openclaw") {
     const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
     getCliLogger().info("openclaw status", openclawSnapshot);
+    warnIfSnapshotIsStale(openclawSnapshot);
     return;
   }
 
   if (target === "controller") {
     const controllerSnapshot = await getCurrentControllerDevSnapshot();
     getCliLogger().info("controller status", controllerSnapshot);
+    warnIfSnapshotIsStale(controllerSnapshot);
     return;
   }
 
   if (target === "web") {
     const webSnapshot = await getCurrentWebDevSnapshot();
     getCliLogger().info("web status", webSnapshot);
+    warnIfSnapshotIsStale(webSnapshot);
     return;
   }
 
@@ -356,10 +387,10 @@ cli
       const snapshot = await getCurrentDesktopDevSnapshot();
 
       if (snapshot.status === "stopped") {
-        throw new Error(
-          "desktop is not running; no active session log is available",
-        );
+        throw new Error(getNoActiveLogMessage(snapshot));
       }
+
+      warnIfSnapshotIsStale(snapshot);
 
       const content = await readDesktopDevLog();
       printLogHeader(content.logFilePath, content.totalLineCount);
@@ -371,10 +402,10 @@ cli
       const snapshot = await getCurrentOpenclawDevSnapshot();
 
       if (snapshot.status === "stopped") {
-        throw new Error(
-          "openclaw is not running; no active session log is available",
-        );
+        throw new Error(getNoActiveLogMessage(snapshot));
       }
+
+      warnIfSnapshotIsStale(snapshot);
 
       const content = await readOpenclawDevLog();
       printLogHeader(content.logFilePath, content.totalLineCount);
@@ -386,10 +417,10 @@ cli
       const snapshot = await getCurrentControllerDevSnapshot();
 
       if (snapshot.status === "stopped") {
-        throw new Error(
-          "controller is not running; no active session log is available",
-        );
+        throw new Error(getNoActiveLogMessage(snapshot));
       }
+
+      warnIfSnapshotIsStale(snapshot);
 
       const content = await readControllerDevLog();
       printLogHeader(content.logFilePath, content.totalLineCount);
@@ -400,8 +431,10 @@ cli
     const snapshot = await getCurrentWebDevSnapshot();
 
     if (snapshot.status === "stopped") {
-      throw new Error("web is not running; no active session log is available");
+      throw new Error(getNoActiveLogMessage(snapshot));
     }
+
+    warnIfSnapshotIsStale(snapshot);
 
     const content = await readWebDevLog();
     printLogHeader(content.logFilePath, content.totalLineCount);

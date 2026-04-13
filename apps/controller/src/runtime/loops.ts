@@ -2,9 +2,9 @@ import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import type { AnalyticsService } from "../services/analytics-service.js";
 import type { OpenClawSyncService } from "../services/openclaw-sync-service.js";
+import type { ControlPlaneHealthService } from "./control-plane-health.js";
 import type { OpenClawProcessManager } from "./openclaw-process.js";
 import type { OpenClawWsClient } from "./openclaw-ws-client.js";
-import type { RuntimeHealth } from "./runtime-health.js";
 import {
   type ControllerRuntimeState,
   recomputeRuntimeStatus,
@@ -55,7 +55,7 @@ export function startSyncLoop(params: {
 export function startHealthLoop(params: {
   env: ControllerEnv;
   state: ControllerRuntimeState;
-  runtimeHealth: RuntimeHealth;
+  controlPlaneHealth: ControlPlaneHealthService;
   processManager?: OpenClawProcessManager;
   wsClient?: OpenClawWsClient;
 }): () => void {
@@ -64,33 +64,27 @@ export function startHealthLoop(params: {
   const run = async () => {
     while (!stopped) {
       const prevGateway = params.state.gatewayStatus;
-      const checkedAt = new Date().toISOString();
-      const result = await params.runtimeHealth.probe();
-      params.state.lastGatewayProbeAt = checkedAt;
-      if (result.ok) {
+      const result = await params.controlPlaneHealth.probe();
+      params.state.lastGatewayProbeAt = result.checkedAt;
+      if (result.phase === "ready") {
         params.state.gatewayStatus = "active";
         params.state.lastGatewayError = null;
-        // Gateway just became reachable — nudge WS client to connect now
-        // instead of waiting for the backoff timer.
         if (prevGateway !== "active") {
           params.wsClient?.retryNow();
         }
-      } else if (result.status !== null) {
-        // Gateway responded but with an error status code
+      } else if (result.phase === "degraded") {
         params.state.gatewayStatus = "degraded";
-        params.state.lastGatewayError = `http_${result.status}`;
+        params.state.lastGatewayError =
+          result.lastError ?? "control_plane_degraded";
       } else {
-        // Gateway unreachable — use bootPhase + process check to decide status.
-        // During boot, gateway not responding is expected ("starting").
-        // After boot, check if process is alive to distinguish starting vs dead.
-        const stillBooting = params.state.bootPhase === "booting";
-        const processAlive = params.processManager?.isAlive() ?? false;
-        if (stillBooting || processAlive) {
+        if (result.phase === "connecting") {
           params.state.gatewayStatus = "starting";
-          params.state.lastGatewayError = "gateway_starting";
+          params.state.lastGatewayError =
+            result.lastError ?? "control_plane_connecting";
         } else {
           params.state.gatewayStatus = "unhealthy";
-          params.state.lastGatewayError = "gateway_unreachable";
+          params.state.lastGatewayError =
+            result.lastError ?? "control_plane_disconnected";
           params.processManager?.restartForHealth();
         }
       }

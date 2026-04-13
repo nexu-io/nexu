@@ -1041,20 +1041,29 @@
                     "workspacePath": {
                       "type": "string"
                     },
-                    "runtime": {
+                    "controlPlane": {
                       "type": "object",
                       "properties": {
                         "ok": {
                           "type": "boolean"
                         },
-                        "status": {
-                          "type": "number",
-                          "nullable": true
+                        "phase": {
+                          "type": "string",
+                          "enum": [
+                            "disconnected",
+                            "connecting",
+                            "ready",
+                            "degraded"
+                          ]
+                        },
+                        "wsConnected": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "ok",
-                        "status"
+                        "phase",
+                        "wsConnected"
                       ]
                     },
                     "status": {
@@ -1070,7 +1079,7 @@
                   "required": [
                     "ready",
                     "workspacePath",
-                    "runtime",
+                    "controlPlane",
                     "status"
                   ]
                 }

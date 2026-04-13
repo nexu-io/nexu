@@ -33,6 +33,7 @@ export type ControllerDevSnapshot = {
   status: "running" | "stopped" | "stale";
   pid?: number;
   workerPid?: number;
+  staleReason?: string;
   runId?: string;
   sessionId?: string;
   logFilePath?: string;
@@ -78,6 +79,55 @@ async function waitForControllerPortPid(
       supervisorPid,
       supervisorName: "controller supervisor",
     },
+  );
+}
+
+async function getControllerHealthStatus(): Promise<boolean> {
+  const runtimeConfig = getScriptsDevRuntimeConfig();
+
+  try {
+    const response = await fetch(`${runtimeConfig.controllerUrl}/health`, {
+      signal: AbortSignal.timeout(1500),
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const payload = (await response.json()) as {
+      controlPlane?: { ok?: boolean };
+    };
+
+    return payload.controlPlane?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForControllerHealth(supervisorPid: number): Promise<void> {
+  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const healthUrl = `${runtimeConfig.controllerUrl}/health`;
+
+  for (let index = 0; index < 40; index += 1) {
+    if (await getControllerHealthStatus()) {
+      return;
+    }
+
+    try {
+      process.kill(supervisorPid, 0);
+    } catch {
+      throw new Error(
+        "controller supervisor exited before controller health passed",
+      );
+    }
+
+    if (index < 39) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  throw new Error(
+    `controller health endpoint did not become ready at ${healthUrl}`,
   );
 }
 
@@ -200,23 +250,31 @@ export async function startControllerDevProcess(options: {
     () => new Error("controller dev process did not expose a pid"),
   );
   const supervisorPid = processHandle.pid as number;
-  const workerPid = await waitForControllerPortPid(supervisorPid);
+  try {
+    const workerPid = await waitForControllerPortPid(supervisorPid);
+    await waitForControllerHealth(supervisorPid);
 
-  await writeDevLock(controllerDevLockPath, {
-    pid: supervisorPid,
-    runId,
-    sessionId,
-  });
+    await writeDevLock(controllerDevLockPath, {
+      pid: supervisorPid,
+      runId,
+      sessionId,
+    });
 
-  return {
-    service: "controller",
-    status: "running",
-    pid: supervisorPid,
-    workerPid,
-    runId,
-    sessionId,
-    logFilePath,
-  };
+    return {
+      service: "controller",
+      status: "running",
+      pid: supervisorPid,
+      workerPid,
+      runId,
+      sessionId,
+      logFilePath,
+    };
+  } catch (error) {
+    await removeDevLock(controllerDevLockPath).catch(() => undefined);
+    await terminateProcess(supervisorPid).catch(() => undefined);
+
+    throw error;
+  }
 }
 
 export async function stopControllerDevProcess(): Promise<ControllerDevSnapshot> {
@@ -226,7 +284,7 @@ export async function stopControllerDevProcess(): Promise<ControllerDevSnapshot>
     () => new Error("controller dev process is not running"),
   );
 
-  if (snapshot.status === "running" && snapshot.pid) {
+  if (snapshot.pid) {
     await terminateProcess(snapshot.pid);
   }
 
@@ -264,6 +322,7 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
         service: "controller",
         status: "stale",
         pid: lock.pid,
+        staleReason: "supervisor pid is not running",
         runId: lock.runId,
         sessionId: lock.sessionId,
         logFilePath,
@@ -275,6 +334,31 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
     try {
       workerPid = await getControllerPortPid();
     } catch {}
+
+    if (!workerPid) {
+      return {
+        service: "controller",
+        status: "stale",
+        pid: lock.pid,
+        staleReason: "controller port is not listening",
+        runId: lock.runId,
+        sessionId: lock.sessionId,
+        logFilePath,
+      };
+    }
+
+    if (!(await getControllerHealthStatus())) {
+      return {
+        service: "controller",
+        status: "stale",
+        pid: lock.pid,
+        workerPid,
+        staleReason: "controller health is not ready",
+        runId: lock.runId,
+        sessionId: lock.sessionId,
+        logFilePath,
+      };
+    }
 
     return {
       service: "controller",

@@ -35,6 +35,7 @@ export type WebDevSnapshot = {
   status: "running" | "stopped" | "stale";
   pid?: number;
   listenerPid?: number;
+  staleReason?: string;
   runId?: string;
   sessionId?: string;
   logFilePath?: string;
@@ -180,7 +181,7 @@ export async function stopWebDevProcess(): Promise<WebDevSnapshot> {
     () => new Error("web dev process is not running"),
   );
 
-  if (snapshot.status === "running" && snapshot.pid) {
+  if (snapshot.pid) {
     await terminateProcess(snapshot.pid);
   }
 
@@ -218,6 +219,7 @@ export async function getCurrentWebDevSnapshot(): Promise<WebDevSnapshot> {
         service: "web",
         status: "stale",
         pid: lock.pid,
+        staleReason: "supervisor pid is not running",
         runId: lock.runId,
         sessionId: lock.sessionId,
         logFilePath,
@@ -229,6 +231,18 @@ export async function getCurrentWebDevSnapshot(): Promise<WebDevSnapshot> {
     try {
       listenerPid = await getWebPortPid();
     } catch {}
+
+    if (!listenerPid) {
+      return {
+        service: "web",
+        status: "stale",
+        pid: lock.pid,
+        staleReason: "web listener is not running",
+        runId: lock.runId,
+        sessionId: lock.sessionId,
+        logFilePath,
+      };
+    }
 
     return {
       service: "web",

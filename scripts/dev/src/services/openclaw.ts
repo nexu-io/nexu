@@ -38,6 +38,7 @@ export type OpenclawDevSnapshot = {
   supervisorPid?: number;
   workerPid?: number;
   listenerPid?: number;
+  staleReason?: string;
   runId?: string;
   sessionId?: string;
   logFilePath?: string;
@@ -403,7 +404,9 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       listenerPid = await getOpenclawPortPid();
     } catch {}
 
-    if ((await getOpenclawHealthStatus()) || listenerPid) {
+    const healthOk = await getOpenclawHealthStatus();
+
+    if (listenerPid && healthOk) {
       return {
         service: "openclaw",
         status: "running",
@@ -424,6 +427,9 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       supervisorPid,
       workerPid,
       listenerPid,
+      staleReason: listenerPid
+        ? "openclaw health endpoint is not ready"
+        : "openclaw listener is not running",
       runId: lock.runId,
       sessionId: lock.sessionId,
       logFilePath,
