@@ -125,10 +125,12 @@ describe("compileOpenClawConfig", () => {
 
     const disabledCompiled = compileOpenClawConfig(disabledConfig, createEnv());
 
-    expect(disabledCompiled.plugins?.allow).not.toContain("langfuse-tracer");
-    expect(
-      disabledCompiled.plugins?.entries?.["langfuse-tracer"],
-    ).toBeUndefined();
+    // langfuse-tracer is always in plugins.allow to avoid gateway restarts;
+    // only the entries.enabled flag toggles it.
+    expect(disabledCompiled.plugins?.allow).toContain("langfuse-tracer");
+    expect(disabledCompiled.plugins?.entries?.["langfuse-tracer"]).toEqual({
+      enabled: false,
+    });
   });
 
   it("uses the real Feishu account once connected and does not keep the prewarm account", () => {

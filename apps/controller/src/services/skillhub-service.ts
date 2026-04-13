@@ -75,6 +75,8 @@ export class SkillhubService {
       },
       onComplete: (slug, source) => {
         skillDb.recordInstall(slug, source);
+      },
+      onIdle: () => {
         options?.onSyncNeeded?.();
       },
       onCancelled: async (slug) => {

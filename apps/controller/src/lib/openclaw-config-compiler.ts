@@ -289,7 +289,10 @@ function compilePlugins(
     "nexu-runtime-model",
     "nexu-credit-guard",
     "nexu-platform-bootstrap",
-    ...(analyticsEnabled ? ["langfuse-tracer"] : []),
+    // Always allow langfuse-tracer so analytics preference changes only
+    // toggle its `enabled` flag (hot-reload) instead of mutating
+    // plugins.allow which triggers a full gateway restart (~11s).
+    "langfuse-tracer",
     ...(resolvedMiniMaxOauth ? ["minimax-portal-auth"] : []),
   ];
 
@@ -341,13 +344,9 @@ function compilePlugins(
       "nexu-runtime-model": {
         enabled: true,
       },
-      ...(analyticsEnabled
-        ? {
-            "langfuse-tracer": {
-              enabled: true,
-            },
-          }
-        : {}),
+      "langfuse-tracer": {
+        enabled: analyticsEnabled,
+      },
       "nexu-credit-guard": {
         enabled: true,
         config: {

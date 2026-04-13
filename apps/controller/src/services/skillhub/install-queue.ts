@@ -61,6 +61,7 @@ export class InstallQueue {
   private readonly executor: InstallExecutor;
   private readonly onComplete: InstallCompleteCallback | null;
   private readonly onCancelled: InstallCancelledCallback | null;
+  private readonly onIdle: (() => void) | null;
   private readonly log: LogFn;
   private readonly maxConcurrency: number;
   private readonly maxRetries: number;
@@ -74,11 +75,17 @@ export class InstallQueue {
   private pauseTimer: ReturnType<typeof setTimeout> | null = null;
   private pausedUntil = 0;
   private disposed = false;
+  /** Tracks whether any item completed since the queue was last idle. */
+  private hadCompletionSinceIdle = false;
 
   constructor(opts: {
     executor: InstallExecutor;
     onComplete?: InstallCompleteCallback;
     onCancelled?: InstallCancelledCallback;
+    /** Fired when the queue becomes idle (no active or pending items)
+     *  after at least one item completed since the last idle state.
+     *  Use this instead of onComplete to batch sync triggers. */
+    onIdle?: () => void;
     log?: LogFn;
     maxConcurrency?: number;
     maxRetries?: number;
@@ -87,6 +94,7 @@ export class InstallQueue {
     this.executor = opts.executor;
     this.onComplete = opts.onComplete ?? null;
     this.onCancelled = opts.onCancelled ?? null;
+    this.onIdle = opts.onIdle ?? null;
     this.log = opts.log ?? (() => {});
     this.maxConcurrency = opts.maxConcurrency ?? 2;
     this.maxRetries = opts.maxRetries ?? 5;
@@ -211,6 +219,23 @@ export class InstallQueue {
       item.status = "downloading";
       this.execute(item);
     }
+
+    // Fire onIdle when the queue is fully drained and at least one item
+    // completed since the last idle state. This batches sync triggers:
+    // e.g. 10 skill installs → 1 onIdle instead of 10 onComplete calls.
+    if (
+      this.active.size === 0 &&
+      this.pending.length === 0 &&
+      this.hadCompletionSinceIdle
+    ) {
+      this.hadCompletionSinceIdle = false;
+      try {
+        this.onIdle?.();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.log("error", `onIdle callback failed: ${msg}`);
+      }
+    }
   }
 
   private execute(item: MutableQueueItem): void {
@@ -238,6 +263,7 @@ export class InstallQueue {
         } else {
           this.active.delete(item.slug);
           item.status = "done";
+          this.hadCompletionSinceIdle = true;
           // Record in DB only on successful, non-cancelled completion
           try {
             this.onComplete?.(item.slug, item.source);
