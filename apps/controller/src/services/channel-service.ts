@@ -728,6 +728,23 @@ export class ChannelService {
     return this.configStore.getChannel(channelId);
   }
 
+  private getWorkspacePath(botId: string): string {
+    return path.join(this.env.openclawStateDir, "agents", botId);
+  }
+
+  private logChannelConnectSuccess(channel: ChannelResponse): void {
+    logger.info(
+      {
+        channelType: channel.channelType,
+        channelId: channel.id,
+        accountId: channel.accountId,
+        botId: channel.botId,
+        workspacePath: this.getWorkspacePath(channel.botId),
+      },
+      "channel_connect_workspace_binding",
+    );
+  }
+
   async getBotQuota(): Promise<BotQuotaResponse> {
     const base: BotQuotaResponse = {
       available: true,
@@ -805,6 +822,7 @@ export class ChannelService {
       botUserId: authData.user_id ?? null,
     });
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info(
       { channelId: channel.id, teamName: authData.team },
       "slack_connect_success",
@@ -922,6 +940,7 @@ export class ChannelService {
     } catch (error) {
       throw this.toSyncConnectError(error, "discord");
     }
+    this.logChannelConnectSuccess(channel);
     logger.info(
       { channelId: channel.id, botUserId: userData.id },
       "discord_connect_success",
@@ -940,6 +959,7 @@ export class ChannelService {
       "wechat_connect_sync_all",
     );
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info(
       {
         accountId,
@@ -1135,6 +1155,7 @@ export class ChannelService {
     } catch (error) {
       throw this.toSyncConnectError(error, "telegram");
     }
+    this.logChannelConnectSuccess(channel);
     logger.info(
       { channelId: channel.id, botUsername: payload.result.username },
       "telegram_connect_success",
@@ -1152,6 +1173,7 @@ export class ChannelService {
       appSecret,
     });
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info({ channelId: channel.id, appId }, "qqbot_connect_success");
     return channel;
   }
@@ -1167,6 +1189,7 @@ export class ChannelService {
       clientSecret,
     });
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info(
       { channelId: channel.id, clientId },
       "dingtalk_connect_success",
@@ -1202,6 +1225,7 @@ export class ChannelService {
       secret,
     });
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info({ channelId: channel.id, botId }, "wecom_connect_success");
     return channel;
   }
@@ -1433,6 +1457,7 @@ export class ChannelService {
           "WhatsApp linked, but the runtime failed to start the listener.",
       );
     }
+    this.logChannelConnectSuccess(channel);
     await resetActiveWhatsappLogin(accountId);
     return channel;
   }
@@ -1469,6 +1494,7 @@ export class ChannelService {
 
     const channel = await this.configStore.connectFeishu(input);
     await this.syncService.syncAll();
+    this.logChannelConnectSuccess(channel);
     logger.info(
       { channelId: channel.id, appId: input.appId },
       "feishu_connect_success",
