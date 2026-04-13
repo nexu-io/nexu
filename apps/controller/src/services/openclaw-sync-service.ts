@@ -318,15 +318,23 @@ export class OpenClawSyncService {
       config.models.providers,
     );
     this.gatewayService.noteConfigWritten(compiled);
-    const runtimeModelRef = resolvePrimaryModelRef(
-      compiled.agents.defaults?.model,
-      config,
-      compiled,
-      this.env,
-      oauthState,
-    );
+    const hasAnyProvider =
+      Object.keys(compiled.models?.providers ?? {}).length > 0;
+    const runtimeModelRef = hasAnyProvider
+      ? resolvePrimaryModelRef(
+          compiled.agents.defaults?.model,
+          config,
+          compiled,
+          this.env,
+          oauthState,
+        )
+      : null;
     logger.info({ seq, runtimeModelRef }, "doSync: resolved runtime model");
-    await this.runtimeModelWriter.write(runtimeModelRef);
+    if (runtimeModelRef) {
+      await this.runtimeModelWriter.write(runtimeModelRef);
+    } else {
+      await this.runtimeModelWriter.clear();
+    }
     // Write locale state for the credit-guard patch in OpenClaw runtime.
     // Match the controller's own locale default: unset → "en" (not "zh-CN").
     const locale =

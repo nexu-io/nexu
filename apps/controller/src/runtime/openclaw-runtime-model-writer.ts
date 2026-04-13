@@ -58,4 +58,21 @@ export class OpenClawRuntimeModelWriter {
   async writeFallback(): Promise<void> {
     await this.write(RUNTIME_MODEL_FALLBACK);
   }
+
+  /**
+   * Remove the runtime-model state file so OpenClaw has no model override.
+   * Called when all model providers are removed (e.g. link account logout).
+   */
+  async clear(): Promise<void> {
+    const { unlink } = await import("node:fs/promises");
+    try {
+      await unlink(this.env.openclawRuntimeModelStatePath);
+      logger.info(
+        { path: this.env.openclawRuntimeModelStatePath },
+        "runtime_model_cleared",
+      );
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
+  }
 }
