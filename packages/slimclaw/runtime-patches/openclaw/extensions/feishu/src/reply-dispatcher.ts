@@ -259,173 +259,94 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         }
         void typingCallbacks.onReplyStart?.();
       },
-      deliver: async (payload: ReplyPayload, info) => {
-        const text = payload.text ?? "";
-        const mediaList =
-          payload.mediaUrls && payload.mediaUrls.length > 0
-            ? payload.mediaUrls
-            : payload.mediaUrl
-              ? [payload.mediaUrl]
-              : [];
-        const hasText = Boolean(text.trim());
-        const hasMedia = mediaList.length > 0;
-        const skipTextForExtraFinal =
-          info?.kind === "final" && hasText && hasDeliveredTextFinal;
-        const shouldDeliverText = hasText && !skipTextForExtraFinal;
-
-        if (!shouldDeliverText && !hasMedia) {
-          if (skipTextForExtraFinal) {
-            runtimeLog(`suppress extra final text len=${text.length}`);
-          }
+      onPartialText: (text) => {
+        if (!streamingEnabled) {
           return;
         }
-
-        if (shouldDeliverText) {
-          const useCard = renderMode === "card" || (renderMode === "auto" && shouldUseCard(text));
-
-          if (info?.kind === "block") {
-            // Drop internal block chunks unless we can safely consume them as
-            // streaming-card fallback content.
-            if (!(streamingEnabled && useCard)) {
-              return;
-            }
-            startStreaming();
-            if (streamingStartPromise) {
-              await streamingStartPromise;
-            }
-          }
-
-          if (info?.kind === "final" && streamingEnabled && useCard) {
-            startStreaming();
-            if (streamingStartPromise) {
-              await streamingStartPromise;
-            }
-          }
-
-          if (streaming?.isActive()) {
-            if (info?.kind === "block") {
-              // Some runtimes emit block payloads without onPartial/final callbacks.
-              // Mirror block text into streamText so onIdle close still sends content.
-              queueStreamingUpdate(text, { mode: "delta" });
-            }
-            if (info?.kind === "final") {
-              streamText = mergeStreamingText(streamText, text);
-              await closeStreaming();
-              hasDeliveredTextFinal = true;
-            }
-            // Send media even when streaming handled the text
-            if (hasMedia) {
-              for (const mediaUrl of mediaList) {
-                await sendMediaFeishu({
-                  cfg,
-                  to: chatId,
-                  mediaUrl,
-                  replyToMessageId: sendReplyToMessageId,
-                  replyInThread: effectiveReplyInThread,
-                  accountId,
-                });
-              }
-            }
-            return;
-          }
-
-          let first = true;
-          if (useCard) {
-            for (const chunk of core.channel.text.chunkTextWithMode(
-              text,
-              textChunkLimit,
-              chunkMode,
-            )) {
-              await sendMarkdownCardFeishu({
-                cfg,
-                to: chatId,
-                text: chunk,
-                replyToMessageId: sendReplyToMessageId,
-                replyInThread: effectiveReplyInThread,
-                mentions: first ? mentionTargets : undefined,
-                accountId,
-              });
-              first = false;
-            }
-            if (info?.kind === "final") {
-              hasDeliveredTextFinal = true;
-            }
-          } else {
-            const converted = core.channel.text.convertMarkdownTables(text, tableMode);
-            for (const chunk of core.channel.text.chunkTextWithMode(
-              converted,
-              textChunkLimit,
-              chunkMode,
-            )) {
-              await sendMessageFeishu({
-                cfg,
-                to: chatId,
-                text: chunk,
-                replyToMessageId: sendReplyToMessageId,
-                replyInThread: effectiveReplyInThread,
-                mentions: first ? mentionTargets : undefined,
-                accountId,
-              });
-              first = false;
-            }
-            if (info?.kind === "final") {
-              hasDeliveredTextFinal = true;
-            }
-          }
+        queueStreamingUpdate(text, { dedupeWithLastPartial: true, mode: "snapshot" });
+      },
+      onPartialTextDelta: (delta) => {
+        if (!streamingEnabled) {
+          return;
         }
-
-        if (hasMedia) {
-          for (const mediaUrl of mediaList) {
-            await sendMediaFeishu({
-              cfg,
-              to: chatId,
-              mediaUrl,
-              replyToMessageId: sendReplyToMessageId,
-              replyInThread: effectiveReplyInThread,
-              accountId,
-            });
-          }
-        }
+        queueStreamingUpdate(delta, { mode: "delta" });
       },
-      onError: async (error, info) => {
-        params.runtime.error?.(
-          `feishu[${account.accountId}] ${info.kind} reply failed: ${String(error)}`,
-        );
-        emitReplyOutcome({
-          status: "failed",
-          reasonCode: `${info.kind}_reply_failed`,
-          error: error instanceof Error ? error.message : String(error),
-        });
+      onReplyCommitted: async (payloads) => {
+        hasDeliveredTextFinal ||= payloads.some((payload) => Boolean(payload.text?.trim()));
         await closeStreaming();
-        typingCallbacks.onIdle?.();
+        await typingCallbacks.onReplyCommitted?.(payloads);
       },
-      onIdle: async () => {
+      onReplyIdle: async () => {
         await closeStreaming();
-        typingCallbacks.onIdle?.();
+        await typingCallbacks.onReplyIdle?.();
       },
-      onCleanup: () => {
-        typingCallbacks.onCleanup?.();
+      onReplyError: async () => {
+        await closeStreaming();
+        await typingCallbacks.onReplyError?.();
       },
     });
 
+  const sendReply = async (payload: ReplyPayload) => {
+    if (payload.text?.trim()) {
+      runtimeLog(`sending text reply (${payload.text.length} chars)`);
+    }
+    if (payload.file) {
+      runtimeLog(`sending file reply (${payload.file.path})`);
+    }
+    if (payload.image) {
+      runtimeLog(`sending image reply (${payload.image.path})`);
+    }
+
+    const client = createFeishuClient(account);
+
+    if (payload.file) {
+      await sendMediaFeishu(client, {
+        chatId,
+        filePath: payload.file.path,
+        fileName: payload.file.filename,
+        receiveIdType: resolveReceiveIdType(chatId),
+        replyToMessageId: sendReplyToMessageId,
+        replyInThread: effectiveReplyInThread,
+        rootId,
+      });
+      return;
+    }
+
+    const text = payload.text ?? "";
+    const shouldUseMarkdownCard = renderMode !== "raw" && shouldUseCard(text);
+    if (shouldUseMarkdownCard) {
+      await sendMarkdownCardFeishu(client, {
+        chatId,
+        text,
+        mentionTargets,
+        receiveIdType: resolveReceiveIdType(chatId),
+        replyToMessageId: sendReplyToMessageId,
+        replyInThread: effectiveReplyInThread,
+        rootId,
+      });
+      return;
+    }
+
+    await sendMessageFeishu(client, {
+      chatId,
+      text,
+      mentionTargets,
+      receiveIdType: resolveReceiveIdType(chatId),
+      replyToMessageId: sendReplyToMessageId,
+      replyInThread: effectiveReplyInThread,
+      rootId,
+      textChunkLimit,
+      chunkMode,
+      tableMode,
+    });
+  };
+
   return {
+    sendReply,
+    emitReplyOutcome,
     dispatcher,
-    replyOptions: {
-      ...replyOptions,
-      onModelSelected: prefixContext.onModelSelected,
-      disableBlockStreaming: true,
-      onPartialReply: streamingEnabled
-        ? (payload: ReplyPayload) => {
-          if (!payload.text) {
-            return;
-          }
-            queueStreamingUpdate(payload.text, {
-              dedupeWithLastPartial: true,
-              mode: "snapshot",
-            });
-          }
-        : undefined,
-    },
+    replyOptions,
     markDispatchIdle,
+    hasDeliveredTextFinal: () => hasDeliveredTextFinal,
   };
 }

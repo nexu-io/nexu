@@ -1,7 +1,7 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { exists } from "../packages/slimclaw/utils.mjs";
+import { exists } from "../utils.mjs";
 
 const runtimeDir = path.dirname(fileURLToPath(import.meta.url));
 const nodeModulesDir = path.join(runtimeDir, "node_modules");

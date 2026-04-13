@@ -72,7 +72,12 @@ function getDefaultWorkspaceRoot(): string {
 export function getSlimclawRuntimeRoot(
   workspaceRoot = getDefaultWorkspaceRoot(),
 ): string {
-  return path.resolve(workspaceRoot, "openclaw-runtime");
+  const slimclawPackageRoot = path.resolve(
+    workspaceRoot,
+    "packages",
+    "slimclaw",
+  );
+  return path.resolve(slimclawPackageRoot, ".dist-runtime", "openclaw");
 }
 
 export function getSlimclawDescriptorPath(
@@ -89,7 +94,7 @@ export function getSlimclawDescriptorPath(
 export function getSlimclawRuntimePatchesRoot(
   workspaceRoot = getDefaultWorkspaceRoot(),
 ): string {
-  return path.join(workspaceRoot, "openclaw-runtime-patches");
+  return path.join(workspaceRoot, "packages", "slimclaw", "runtime-patches");
 }
 
 function readJsonFile<T>(filePath: string): T | null {
@@ -134,7 +139,10 @@ function buildDescriptor(runtimeRoot: string): SlimclawRuntimeDescriptor {
     relativeTo: "runtimeRoot",
     paths: {
       entryPath: path.join("node_modules", "openclaw", "openclaw.mjs"),
-      binPath: path.join("bin", "openclaw"),
+      binPath: path.join(
+        "bin",
+        process.platform === "win32" ? "openclaw.cmd" : "openclaw",
+      ),
       builtinExtensionsDir: path.join("node_modules", "openclaw", "extensions"),
     },
   };
@@ -157,6 +165,10 @@ function assertRequiredRuntimePaths(
   );
 }
 
+function getSlimclawRuntimeBinFileName(): string {
+  return process.platform === "win32" ? "openclaw.cmd" : "openclaw";
+}
+
 export function resolveSlimclawRuntimeArtifacts(
   runtimeRoot: string,
   options: ResolveSlimclawRuntimeArtifactsOptions = {},
@@ -167,7 +179,11 @@ export function resolveSlimclawRuntimeArtifacts(
     "openclaw",
     "openclaw.mjs",
   );
-  const binPath = path.join(runtimeRoot, "bin", "openclaw");
+  const binPath = path.join(
+    runtimeRoot,
+    "bin",
+    getSlimclawRuntimeBinFileName(),
+  );
   const builtinExtensionsDir = path.join(
     runtimeRoot,
     "node_modules",

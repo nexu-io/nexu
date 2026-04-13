@@ -1,114 +1,44 @@
-# OpenClaw Runtime
+# OpenClaw Runtime (legacy residue)
 
-`openclaw-runtime/` 是一个 minimal 的 openclaw 目录，用来替代全局安装的 openclaw。
+`openclaw-runtime/` 不再是 Nexu repo 中的 canonical runtime root，也不再是安装/裁剪/patch 的 source of truth。
 
-## 安装
+当前 authoritative runtime owner 已经迁移到：
 
-在根目录 `pnpm install` 的时候会自动安装。
+- prepared runtime root：`packages/slimclaw/.dist-runtime/openclaw`
+- install seed source：`packages/slimclaw/runtime-seed/`
+- physical patch source：`packages/slimclaw/runtime-patches/`
 
-或者你可以手动运行：
+## 日常使用
+
+手动准备 runtime：
 
 ```bash
 pnpm slimclaw:prepare
 ```
 
-## For 本地开发
-
-固定使用这个目录里的 openclaw 启动 Gateway：
+本地运行 OpenClaw CLI：
 
 ```bash
 OPENCLAW_STATE_DIR="$PWD/.openclaw" \
 ./openclaw-wrapper gateway run ...
 ```
 
-`./openclaw-wrapper` 是仓库根目录下的 wrapper 脚本，行为上等价于执行本地 runtime 里的 `openclaw` CLI，但不需要每次手写完整的入口路径。
+`./openclaw-wrapper` 会通过 slimclaw 解析当前 prepared runtime 的入口路径，不需要直接依赖 `openclaw-runtime/`。
 
-## For 桌面端应用
+## 这个目录现在是什么
 
-打包阶段，使用这个目录里的 openclaw 打包到桌面端安装包中。
+这个目录现在只应被视为 legacy residue / 历史兼容痕迹。
 
-对于桌面端应用，使用稳定的启动基线是：
+- 不要再把这里当作 runtime 安装根目录
+- 不要再把这里当作 patch source
+- 不要再通过 `npm --prefix ./openclaw-runtime ...` 维护 runtime
 
-- 一份明确的 Node runtime（可以是 Electron 自带，或者独立 Node runtime）
-- 一个外置的 `openclaw` 目录
-- 一个明确的入口脚本 `openclaw.mjs`
+如果需要调整 runtime 依赖、裁剪规则或 patch：
 
-## 为什么入口选择 openclaw.mjs
+- install seed：改 `packages/slimclaw/runtime-seed/`
+- prune policy：改 `packages/slimclaw/prune-runtime-paths.mjs`
+- patch files：改 `packages/slimclaw/runtime-patches/`
 
-`./openclaw-wrapper` 最终会通过 slimclaw 解析当前 prepared runtime 的 `openclaw.mjs` 入口，它是 `openclaw` 包内的 CLI 入口脚本。
+## 后续方向
 
-它负责：
-
-- 检查 Node 版本
-- 初始化一些启动期行为（例如 warning filter / compile cache）
-- 加载真正的 `dist/entry.(m)js`
-
-因此它适合作为 runtime 的直接入口。
-
-相比之下：
-
-- `npm exec openclaw -- ...` 更适合开发时临时调用
-- `node_modules/.bin/openclaw` 本质上是包管理器生成的 shim
-- `node openclaw.mjs ...` 更接近最终产品中的真实调用方式
-
-## 依赖管理
-
-- `install:full`：安装完整依赖，保留 peer / optional 依赖，作为对照基线。
-- `install:pruned`：先安装运行时最小依赖，再执行 pruning；在 Windows 上会额外省略 optional 依赖，避免已知的原生安装问题。
-
-```bash
-# 安装完整依赖
-npm --prefix ./openclaw-runtime run install:full
-# 安装裁剪后的依赖
-npm --prefix ./openclaw-runtime run install:pruned
-# 清理依赖
-npm --prefix ./openclaw-runtime run clean
-```
-
-## 依赖裁剪循环
-
-定义一个最小循环，用来安全地裁剪 `openclaw-runtime/` 的依赖。
-
-### 1. 确定删除策略
-
-先修改 `packages/slimclaw/prune-runtime-paths.mjs`，加入本轮准备删除的路径。
-
-### 2. 重新安装并裁剪
-
-```bash
-npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:pruned
-```
-
-### 3. 重启服务
-
-使用 PM2 重启下面两个进程：
-
-- 终端 3：OpenClaw Gateway 运行时
-- 终端 4：Nexu Gateway 服务
-
-重启后，需要观察 OpenClaw 和 Nexu Gateway 是否正常运行。
-
-### 4. 运行冒烟测试
-
-当前最小冒烟测试是：
-
-1. 在 Slack 中向测试 bot 发送 `hello`
-2. 观察 OpenClaw 是否正常回复
-
-后续需要建立完善的 smoke test suite，覆盖完整的运行时行为。
-
-### 推荐节奏
-
-- 每轮只新增一小批裁剪规则
-- 每轮都执行完整的 clean -> install:pruned -> restart -> smoke test
-- 一旦失败，先回到完整安装基线进行对照
-
-如果某轮裁剪后行为异常，先回到完整安装基线：
-
-```bash
-npm --prefix ./openclaw-runtime run clean && npm --prefix ./openclaw-runtime run install:full
-```
-
-然后重新启动终端 3 和终端 4，再重复同样的 Slack `hello` 冒烟测试。
-
-如果完整安装恢复正常，就可以基本确认问题来自本轮 pruning 规则。
+该目录预计会在后续 legacy cleanup 中进一步收缩或删除；在那之前，新增逻辑不应再依赖这里的内容。

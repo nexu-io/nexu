@@ -15,7 +15,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockSlimclawRuntimeRoot = "/repo/.tmp/slimclaw/dev-runtime";
+const mockSlimclawRuntimeRoot =
+  "/repo/packages/slimclaw/.dist-runtime/openclaw";
 
 function buildRuntimeArtifacts(runtimeRoot: string) {
   return {
@@ -150,6 +151,7 @@ vi.mock("../../apps/desktop/shared/workspace-paths", () => ({
 }));
 
 vi.mock("@nexu/slimclaw", () => ({
+  getSlimclawRuntimeRoot: vi.fn(() => mockSlimclawRuntimeRoot),
   resolveSlimclawRuntimePaths: vi.fn(() => ({
     runtimeRoot: mockSlimclawRuntimeRoot,
     descriptorPath: "/repo/.tmp/slimclaw/runtime-descriptor.json",

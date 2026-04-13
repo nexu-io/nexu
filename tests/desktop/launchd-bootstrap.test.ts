@@ -11,7 +11,8 @@ function normalizePath(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
-const mockSlimclawRuntimeRoot = "/repo/.tmp/slimclaw/dev-runtime";
+const mockSlimclawRuntimeRoot =
+  "/repo/packages/slimclaw/.dist-runtime/openclaw";
 
 function buildRuntimeArtifacts(runtimeRoot: string) {
   return {
@@ -125,6 +126,7 @@ vi.mock("../../apps/desktop/shared/workspace-paths", () => ({
 }));
 
 vi.mock("@nexu/slimclaw", () => ({
+  getSlimclawRuntimeRoot: vi.fn(() => mockSlimclawRuntimeRoot),
   resolveSlimclawRuntimePaths: vi.fn(() => ({
     runtimeRoot: mockSlimclawRuntimeRoot,
     descriptorPath: "/repo/.tmp/slimclaw/runtime-descriptor.json",
@@ -343,16 +345,16 @@ describe("resolveLaunchdPaths", () => {
       "apps/controller/dist/index.js",
     );
     expect(normalizePath(paths.openclawPath)).toContain(
-      ".tmp/slimclaw/dev-runtime/node_modules/openclaw/openclaw.mjs",
+      "packages/slimclaw/.dist-runtime/openclaw/node_modules/openclaw/openclaw.mjs",
     );
     expect(normalizePath(paths.openclawBinPath)).toContain(
-      ".tmp/slimclaw/dev-runtime/bin/openclaw",
+      "packages/slimclaw/.dist-runtime/openclaw/bin/openclaw",
     );
     expect(normalizePath(paths.openclawExtensionsDir)).toContain(
-      ".tmp/slimclaw/dev-runtime/node_modules/openclaw/extensions",
+      "packages/slimclaw/.dist-runtime/openclaw/node_modules/openclaw/extensions",
     );
     expect(normalizePath(paths.openclawCwd)).toContain(
-      ".tmp/slimclaw/dev-runtime",
+      "packages/slimclaw/.dist-runtime/openclaw",
     );
     expect(normalizePath(paths.controllerCwd)).toContain("apps/controller");
   });

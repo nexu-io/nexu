@@ -7,8 +7,7 @@ import { pruneRuntimeAt } from "./prune-runtime.mjs";
 import { exists } from "./utils.mjs";
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(packageRoot, "..", "..");
-const runtimeDir = path.resolve(repoRoot, "openclaw-runtime");
+const runtimeDir = path.resolve(packageRoot, ".dist-runtime", "openclaw");
 const nodeModulesDir = path.join(runtimeDir, "node_modules");
 const cacheFilePath = path.join(runtimeDir, ".postinstall-cache.json");
 const criticalRuntimeFiles = [
@@ -61,22 +60,22 @@ export async function prepareSlimclawOwnedRuntimeInstall() {
     hasCompleteRuntime &&
     cachedFingerprint === fingerprint
   ) {
-    console.log("openclaw-runtime unchanged, skipping install:pruned.");
+    console.log("slimclaw runtime unchanged, skipping install:pruned.");
     return;
   }
 
   if (!hasNodeModules) {
     console.log(
-      "openclaw-runtime node_modules missing, running install:pruned.",
+      "slimclaw runtime node_modules missing, running install:pruned.",
     );
   } else if (!hasCompleteRuntime) {
     console.log(
-      "openclaw-runtime critical files missing, running install:pruned.",
+      "slimclaw runtime critical files missing, running install:pruned.",
     );
   } else if (cachedFingerprint === null) {
-    console.log("openclaw-runtime cache missing, running install:pruned.");
+    console.log("slimclaw runtime cache missing, running install:pruned.");
   } else {
-    console.log("openclaw-runtime inputs changed, running install:pruned.");
+    console.log("slimclaw runtime inputs changed, running install:pruned.");
   }
 
   await installRuntimeAt(runtimeDir, "pruned");
@@ -95,7 +94,7 @@ export async function prepareSlimclawOwnedRuntimeInstall() {
     "utf8",
   );
 
-  console.log("openclaw-runtime cache updated.");
+  console.log("slimclaw runtime cache updated.");
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

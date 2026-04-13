@@ -5,10 +5,9 @@ import { pruneTargets } from "./prune-runtime-paths.mjs";
 import { exists } from "./utils.mjs";
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(packageRoot, "..", "..");
 
 function resolveDefaultRuntimeDir() {
-  return path.resolve(repoRoot, "openclaw-runtime");
+  return path.resolve(packageRoot, ".dist-runtime", "openclaw");
 }
 
 export async function pruneRuntimeAt(runtimeDir, options = {}) {

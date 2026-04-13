@@ -16,6 +16,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import {
+  getSlimclawRuntimeRoot,
   resolveSlimclawRuntimeArtifacts,
   resolveSlimclawRuntimePaths,
 } from "@nexu/slimclaw";
@@ -1317,6 +1318,13 @@ function escapeRegexLiteral(value: string): string {
 
 function getNexuProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
+  const slimclawRuntimeRoot = getSlimclawRuntimeRoot(repoRoot);
+  const slimclawArtifacts = resolveSlimclawRuntimeArtifacts(
+    slimclawRuntimeRoot,
+    {
+      requirePrepared: false,
+    },
+  );
   const nexuHome = path.join(os.homedir(), ".nexu");
   const patterns = new Set<string>([
     escapeRegexLiteral(
@@ -1326,15 +1334,7 @@ function getNexuProcessPatterns(): string[] {
     escapeRegexLiteral(
       path.join(repoRoot, "apps", "controller", "dist", "index.js"),
     ),
-    escapeRegexLiteral(
-      path.join(
-        repoRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
-    ),
+    escapeRegexLiteral(slimclawArtifacts.entryPath),
     ...getNexuOpenclawProcessPatterns(),
   ]);
 
@@ -1357,21 +1357,18 @@ function getNexuProcessPatterns(): string[] {
 
 function getNexuOpenclawProcessPatterns(): string[] {
   const repoRoot = getWorkspaceRoot();
+  const slimclawRuntimeRoot = getSlimclawRuntimeRoot(repoRoot);
+  const slimclawArtifacts = resolveSlimclawRuntimeArtifacts(
+    slimclawRuntimeRoot,
+    {
+      requirePrepared: false,
+    },
+  );
   const patterns = new Set<string>([
     "\\.nexu/(runtime/)?openclaw-sidecar",
-    "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw-gateway",
-    escapeRegexLiteral(
-      path.join(
-        repoRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      ),
-    ),
-    escapeRegexLiteral(
-      path.join(repoRoot, "openclaw-runtime", "bin", "openclaw-gateway"),
-    ),
+    "\\.nexu/(runtime/)?openclaw-sidecar/.*/openclaw(?:\\.cmd)?",
+    escapeRegexLiteral(slimclawArtifacts.entryPath),
+    escapeRegexLiteral(slimclawArtifacts.binPath),
   ]);
 
   if (process.resourcesPath) {
@@ -1394,7 +1391,18 @@ function getNexuOpenclawProcessPatterns(): string[] {
           "runtime",
           "openclaw",
           "bin",
-          "openclaw-gateway",
+          "openclaw",
+        ),
+      ),
+    );
+    patterns.add(
+      escapeRegexLiteral(
+        path.join(
+          process.resourcesPath,
+          "runtime",
+          "openclaw",
+          "bin",
+          "openclaw.cmd",
         ),
       ),
     );

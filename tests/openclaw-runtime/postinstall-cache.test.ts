@@ -8,19 +8,25 @@ import {
 } from "../../packages/slimclaw/postinstall-cache.mjs";
 
 const tempDirs = [] as string[];
+const originalCacheInputs = [...cacheInputs];
 
 async function createRuntimeFixture() {
-  const runtimeDir = await mkdtemp(
+  const tempRoot = await mkdtemp(
     path.join(tmpdir(), "openclaw-runtime-cache-"),
   );
-  tempDirs.push(runtimeDir);
+  tempDirs.push(tempRoot);
 
-  for (const relativePath of cacheInputs) {
-    const absolutePath = path.join(runtimeDir, relativePath);
+  const rewrittenCacheInputs = originalCacheInputs.map((inputPath) =>
+    path.join(tempRoot, path.basename(inputPath)),
+  );
+  cacheInputs.splice(0, cacheInputs.length, ...rewrittenCacheInputs);
+
+  for (const absolutePath of cacheInputs) {
     await mkdir(path.dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, `${relativePath}\n`, "utf8");
+    await writeFile(absolutePath, `${absolutePath}\n`, "utf8");
   }
 
+  const runtimeDir = path.join(tempRoot, "runtime-root");
   await mkdir(path.join(runtimeDir, "node_modules"), { recursive: true });
   await writeFile(path.join(runtimeDir, "README.md"), "docs v1\n", "utf8");
 
@@ -28,6 +34,7 @@ async function createRuntimeFixture() {
 }
 
 afterEach(async () => {
+  cacheInputs.splice(0, cacheInputs.length, ...originalCacheInputs);
   await Promise.all(
     tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
   );
@@ -49,13 +56,9 @@ describe("openclaw-runtime postinstall cache fingerprint", () => {
     const before = await computeFingerprint(runtimeDir);
 
     await writeFile(
-      path.join(
-        runtimeDir,
-        "..",
-        "packages",
-        "slimclaw",
-        "prune-runtime-paths.mjs",
-      ),
+      cacheInputs.find((filePath) =>
+        filePath.endsWith("prune-runtime-paths.mjs"),
+      ) ?? cacheInputs[0],
       "export const pruneTargets = ['node_modules/foo'];\n",
       "utf8",
     );
@@ -69,13 +72,9 @@ describe("openclaw-runtime postinstall cache fingerprint", () => {
     const before = await computeFingerprint(runtimeDir);
 
     await rm(
-      path.join(
-        runtimeDir,
-        "..",
-        "packages",
-        "slimclaw",
-        "postinstall-cache.mjs",
-      ),
+      cacheInputs.find((filePath) =>
+        filePath.endsWith("postinstall-cache.mjs"),
+      ) ?? cacheInputs[0],
       { force: true },
     );
 

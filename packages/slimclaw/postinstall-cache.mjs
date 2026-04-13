@@ -1,23 +1,28 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { exists } from "./utils.mjs";
 
+const packageRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(packageRoot, "..", "..");
+const runtimeSeedRoot = path.resolve(packageRoot, "runtime-seed");
+
 export const cacheInputs = [
-  "package.json",
-  "package-lock.json",
-  "../packages/slimclaw/prepare-runtime.mjs",
-  "clean-node-modules.mjs",
-  "install-runtime.mjs",
-  "../packages/slimclaw/postinstall-cache.mjs",
-  "../packages/slimclaw/prune-runtime.mjs",
-  "../packages/slimclaw/prune-runtime-paths.mjs",
-  "../packages/slimclaw/utils.mjs",
+  path.join(runtimeSeedRoot, "package.json"),
+  path.join(runtimeSeedRoot, "package-lock.json"),
+  path.join(runtimeSeedRoot, "clean-node-modules.mjs"),
+  path.join(packageRoot, "prepare-runtime.mjs"),
+  path.join(packageRoot, "install-runtime.mjs"),
+  path.join(packageRoot, "postinstall-cache.mjs"),
+  path.join(packageRoot, "prune-runtime.mjs"),
+  path.join(packageRoot, "prune-runtime-paths.mjs"),
+  path.join(packageRoot, "utils.mjs"),
 ];
 
 export const cacheEnvInputs = ["NEXU_OPENCLAW_PRUNE_DAVEY"];
 
-export async function computeFingerprint(runtimeDir) {
+export async function computeFingerprint(_runtimeDir) {
   const hash = createHash("sha256");
   hash.update(process.platform);
   hash.update("\0");
@@ -34,12 +39,11 @@ export async function computeFingerprint(runtimeDir) {
   }
 
   for (const relativePath of cacheInputs) {
-    const absolutePath = path.join(runtimeDir, relativePath);
-    hash.update(relativePath);
+    hash.update(path.relative(repoRoot, relativePath));
     hash.update("\0");
 
-    if (await exists(absolutePath)) {
-      hash.update(await readFile(absolutePath));
+    if (await exists(relativePath)) {
+      hash.update(await readFile(relativePath));
     } else {
       hash.update("<missing>");
     }
