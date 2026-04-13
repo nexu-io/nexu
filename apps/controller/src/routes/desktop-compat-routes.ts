@@ -301,8 +301,12 @@ export function registerDesktopCompatRoutes(
         },
       },
     }),
-    async (c) =>
-      c.json(await container.desktopLocalService.disconnectCloud(), 200),
+    async (c) => {
+      const result = await container.desktopLocalService.disconnectCloud();
+      await container.modelProviderService.ensureValidDefaultModel();
+      const { configPushed } = await container.openclawSyncService.syncAll();
+      return c.json({ ...result, configPushed }, 200);
+    },
   );
 
   app.openapi(

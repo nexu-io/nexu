@@ -2688,6 +2688,12 @@ export class NexuConfigStore {
     const previousCloud = readDesktopCloud(await this.getConfig());
     this.abortDesktopCloudPolling();
 
+    const config = await this.getConfig();
+    const currentModelId = config.runtime.defaultModelId;
+    const wasCloudModel =
+      resolveManagedCloudModel(currentModelId, previousCloud.models ?? []) !==
+      null;
+
     await this.setDesktopCloudState({
       connected: false,
       polling: false,
@@ -2699,6 +2705,11 @@ export class NexuConfigStore {
       apiKey: null,
       models: [],
     });
+
+    if (wasCloudModel) {
+      await this.setDefaultModel("");
+    }
+
     await this.onCloudStateChanged?.({
       hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
       hasCloudInventory: false,

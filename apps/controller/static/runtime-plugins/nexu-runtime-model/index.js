@@ -44,7 +44,7 @@ const plugin = {
   register(api) {
     api.on("before_model_resolve", async () => {
       const state = loadState();
-      if (!state) {
+      if (!state || !state.selectedModelRef) {
         return;
       }
       const slashIndex = state.selectedModelRef.indexOf("/");
@@ -63,7 +63,7 @@ const plugin = {
 
     api.on("before_prompt_build", async () => {
       const state = loadState();
-      if (!state?.promptNotice) {
+      if (!state?.selectedModelRef || !state?.promptNotice) {
         return;
       }
       return {
