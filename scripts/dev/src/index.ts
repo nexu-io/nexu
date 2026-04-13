@@ -1,11 +1,6 @@
 import { cac } from "cac";
 
 import {
-  type DevTarget,
-  isSupportedDevCommand,
-  isSupportedDevTarget,
-} from "./commands.js";
-import {
   getCurrentControllerDevSnapshot,
   readControllerDevLog,
   restartControllerDevProcess,
@@ -46,6 +41,10 @@ const cli = cac("scripts-dev");
 function getCliLogger() {
   return getScriptsDevLogger({ component: "cli" });
 }
+
+const devTargets = ["desktop", "openclaw", "controller", "web"] as const;
+
+type DevTarget = (typeof devTargets)[number];
 
 type SnapshotLike = {
   service: string;
@@ -98,7 +97,7 @@ function readTargetOrThrow(target: string | undefined): DevTarget {
     );
   }
 
-  if (!isSupportedDevTarget(target)) {
+  if (!(devTargets as readonly string[]).includes(target)) {
     throw new Error(`unsupported target: ${target}`);
   }
 
@@ -156,23 +155,6 @@ async function startTarget(
   }
 
   if (target === "controller") {
-    const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
-
-    if (openclawSnapshot.status !== "running") {
-      getCliLogger().info(
-        "openclaw is not running; starting openclaw for controller",
-        {
-          target,
-          openclawStatus: openclawSnapshot.status,
-        },
-      );
-
-      const openclawFact = await startOpenclawDevProcess({
-        sessionId: createDevSessionId(),
-      });
-      getCliLogger().info("openclaw started", openclawFact);
-    }
-
     const controllerFact = await startControllerDevProcess({ sessionId });
     getCliLogger().info("controller started", controllerFact);
     return;
@@ -232,23 +214,6 @@ async function restartTarget(
   }
 
   if (target === "controller") {
-    const openclawSnapshot = await getCurrentOpenclawDevSnapshot();
-
-    if (openclawSnapshot.status !== "running") {
-      getCliLogger().info(
-        "openclaw is not running; starting openclaw for controller restart",
-        {
-          target,
-          openclawStatus: openclawSnapshot.status,
-        },
-      );
-
-      const openclawFact = await startOpenclawDevProcess({
-        sessionId: createDevSessionId(),
-      });
-      getCliLogger().info("openclaw started", openclawFact);
-    }
-
     const controllerFact = await restartControllerDevProcess({ sessionId });
     getCliLogger().info("controller restarted", controllerFact);
     return;
@@ -371,19 +336,11 @@ cli
   });
 
 cli
-  .command("logs [target]", "Print the local dev logs")
-  .action(async (target?: string) => {
-    if (!target) {
-      throw new Error(
-        "log target is required; run `pnpm dev status` to choose a service, then use `pnpm dev logs <desktop|openclaw|controller|web>`",
-      );
-    }
+  .command("logs <target>", "Print the local dev logs")
+  .action(async (target: string) => {
+    const resolvedTarget = readTargetOrThrow(target);
 
-    if (!isSupportedDevTarget(target)) {
-      throw new Error(`unsupported log target: ${target}`);
-    }
-
-    if (target === "desktop") {
+    if (resolvedTarget === "desktop") {
       const snapshot = await getCurrentDesktopDevSnapshot();
 
       if (snapshot.status === "stopped") {
@@ -398,7 +355,7 @@ cli
       return;
     }
 
-    if (target === "openclaw") {
+    if (resolvedTarget === "openclaw") {
       const snapshot = await getCurrentOpenclawDevSnapshot();
 
       if (snapshot.status === "stopped") {
@@ -413,7 +370,7 @@ cli
       return;
     }
 
-    if (target !== "web") {
+    if (resolvedTarget === "controller") {
       const snapshot = await getCurrentControllerDevSnapshot();
 
       if (snapshot.status === "stopped") {
@@ -442,73 +399,42 @@ cli
   });
 
 cli
-  .command("inspect <kind> [input]", "Inspect the desktop dev renderer")
-  .option("--limit <number>", "Limit renderer log entries")
-  .option("--max-html-length <number>", "Cap returned DOM HTML length")
+  .command("inspect screenshot", "Capture a desktop dev screenshot")
   .option("--out <path>", "Write screenshot PNG to this path")
-  .action(
-    async (
-      kind: string,
-      input?: string,
-      options?: {
-        limit?: string | number;
-        maxHtmlLength?: string | number;
-        out?: string;
-      },
-    ) => {
-      if (kind === "screenshot") {
-        const result = await captureDesktopDevInspectScreenshot({
-          outputPath: options?.out,
-        });
-        process.stdout.write(`${result.outputPath}\n`);
-        return;
-      }
+  .action(async (options?: { out?: string }) => {
+    const result = await captureDesktopDevInspectScreenshot({
+      outputPath: options?.out,
+    });
+    process.stdout.write(`${result.outputPath}\n`);
+  });
 
-      if (kind === "eval") {
-        if (!input) {
-          throw new Error(
-            'eval script is required; use `pnpm dev inspect eval "document.title"`',
-          );
-        }
+cli
+  .command("inspect eval <input>", "Evaluate a desktop dev renderer script")
+  .action(async (input: string) => {
+    const result = await evaluateDesktopDevInspectScript(input);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  });
 
-        const result = await evaluateDesktopDevInspectScript(input);
-        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-        return;
-      }
+cli
+  .command("inspect dom", "Dump the desktop dev renderer DOM summary")
+  .option("--max-html-length <number>", "Cap returned DOM HTML length")
+  .action(async (options?: { maxHtmlLength?: string | number }) => {
+    const result = await getDesktopDevInspectDomSnapshot({
+      maxHtmlLength: readOptionalPositiveNumber(options?.maxHtmlLength),
+    });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  });
 
-      if (kind === "dom") {
-        const result = await getDesktopDevInspectDomSnapshot({
-          maxHtmlLength: readOptionalPositiveNumber(options?.maxHtmlLength),
-        });
-        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-        return;
-      }
-
-      if (kind === "logs") {
-        const result = await getDesktopDevInspectRendererLogs({
-          limit: readOptionalPositiveNumber(options?.limit),
-        });
-        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-        return;
-      }
-
-      throw new Error(
-        `unsupported inspect target: ${kind}; use screenshot, eval, dom, or logs`,
-      );
-    },
-  );
-
-cli.command("help", "Show the CLI help output").action(() => {
-  cli.outputHelp();
-});
+cli
+  .command("inspect logs", "Show buffered desktop dev renderer logs")
+  .option("--limit <number>", "Limit renderer log entries")
+  .action(async (options?: { limit?: string | number }) => {
+    const result = await getDesktopDevInspectRendererLogs({
+      limit: readOptionalPositiveNumber(options?.limit),
+    });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  });
 
 cli.help();
-
-const fallbackCommand = process.argv[2];
-
-if (fallbackCommand && !isSupportedDevCommand(fallbackCommand)) {
-  getCliLogger().error("unknown command", { command: fallbackCommand });
-  process.exit(1);
-}
 
 cli.parse();
