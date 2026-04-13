@@ -424,6 +424,9 @@ const zhCN = {
   "settings.general.loggedOut": "未登录",
   "settings.general.loggedOutHint": "登录后可同步设置并使用高级模型",
   "settings.general.goLogin": "去登录",
+  "settings.general.logoutConfirmTitle": "确认退出当前 nexu 账号？",
+  "settings.general.logoutConfirmDescription":
+    "退出后，当前桌面工作区将断开与你的 nexu 账号连接。",
   "settings.general.preferences": "偏好",
   "settings.general.language": "语言",
   "settings.general.languageHint": "选择界面显示语言",
@@ -549,6 +552,9 @@ const zhCN = {
     "登录 nexu 账号后，即可无限使用 Claude Opus 4.6、GPT-5.4 等高级模型，无需 API Key。",
   "models.managed.waitingLogin": "等待浏览器登录...",
   "models.managed.loginButton": "登录 nexu 账号",
+  "models.managed.logoutConfirmTitle": "确认退出 nexu Official？",
+  "models.managed.logoutConfirmDescription":
+    "退出后，此设备上的 nexu Official 将断开当前 nexu 账号连接。",
   "models.managed.availableModels": "可用模型",
   "models.managed.refreshSucceeded": "模型已刷新",
   "models.managed.refreshFailed": "刷新模型失败",

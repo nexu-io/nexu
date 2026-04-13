@@ -79,6 +79,14 @@ import type {
   PutApiV1ModelProvidersConfigData,
 } from "../../lib/api/types.gen";
 import { Button } from "../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { PageHeader } from "../components/ui/page-header";
 import {
   Select,
@@ -138,6 +146,53 @@ type MiniMaxDesktopOauthStatus = {
   region?: "global" | "cn" | null;
   error?: string | null;
 };
+
+type LogoutConfirmDialogProps = {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+};
+
+function LogoutConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+  pending,
+  onOpenChange,
+  onConfirm,
+}: LogoutConfirmDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader className="border-b-0 pb-2">
+          <DialogTitle className="text-[16px]">{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="border-t-0 pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
+            {cancelLabel}
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm}>
+            {pending && <Loader2 className="animate-spin" />}
+            {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 type MiniMaxDesktopOauthStartResult = MiniMaxDesktopOauthStatus & {
   started: boolean;
@@ -572,6 +627,8 @@ function _GeneralSettings() {
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [accountConnecting, setAccountConnecting] = useState(false);
   const [accountDisconnecting, setAccountDisconnecting] = useState(false);
+  const [showAccountLogoutConfirm, setShowAccountLogoutConfirm] =
+    useState(false);
   const [crashReportsEnabled, setCrashReportsEnabled] = useState(true);
   const hostBridge = getModelsHostInvokeBridge();
   const { data: desktopCloudStatus, refetch: refetchDesktopCloudStatus } =
@@ -847,6 +904,7 @@ function _GeneralSettings() {
     try {
       await postApiInternalDesktopCloudDisconnect().catch(() => {});
       await syncDesktopCloudQueries(queryClient);
+      setShowAccountLogoutConfirm(false);
     } finally {
       setAccountDisconnecting(false);
     }
@@ -881,7 +939,7 @@ function _GeneralSettings() {
             disabled={accountActionBusy}
             onClick={() =>
               void (cloudConnected
-                ? handleAccountLogout()
+                ? setShowAccountLogoutConfirm(true)
                 : handleAccountLogin())
             }
           >
@@ -893,6 +951,17 @@ function _GeneralSettings() {
           </Button>
         </div>
       </div>
+
+      <LogoutConfirmDialog
+        open={showAccountLogoutConfirm}
+        onOpenChange={setShowAccountLogoutConfirm}
+        pending={accountDisconnecting}
+        title={t("settings.general.logoutConfirmTitle")}
+        description={t("settings.general.logoutConfirmDescription")}
+        confirmLabel={t("layout.signOut")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void handleAccountLogout()}
+      />
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface-1">
         <div className="border-b border-border px-5 py-4">
@@ -2123,6 +2192,7 @@ function ManagedProviderDetail({
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [cloudDisconnecting, setCloudDisconnecting] = useState(false);
+  const [showCloudLogoutConfirm, setShowCloudLogoutConfirm] = useState(false);
   const queryClient = useQueryClient();
   const { data: desktopCloudStatus, refetch: refetchDesktopCloudStatus } =
     useDesktopCloudStatus();
@@ -2210,6 +2280,20 @@ function ManagedProviderDetail({
     setLoginError(null);
   };
 
+  const handleCloudLogout = async () => {
+    if (cloudDisconnecting) {
+      return;
+    }
+    setCloudDisconnecting(true);
+    try {
+      await postApiInternalDesktopCloudDisconnect().catch(() => {});
+      await syncDesktopCloudQueries(queryClient);
+      setShowCloudLogoutConfirm(false);
+    } finally {
+      setCloudDisconnecting(false);
+    }
+  };
+
   const cloudToggleBusy = loginBusy || cloudDisconnecting;
 
   return (
@@ -2241,14 +2325,7 @@ function ManagedProviderDetail({
             }
             onClick={async () => {
               if (cloudConnected) {
-                if (cloudDisconnecting) return;
-                setCloudDisconnecting(true);
-                try {
-                  await postApiInternalDesktopCloudDisconnect().catch(() => {});
-                  await syncDesktopCloudQueries(queryClient);
-                } finally {
-                  setCloudDisconnecting(false);
-                }
+                setShowCloudLogoutConfirm(true);
               }
             }}
             className="inline-flex items-center gap-1.5 text-[11px] font-medium shrink-0 rounded-lg border border-border px-2.5 py-1 transition-colors cursor-pointer text-text-secondary hover:text-text-primary hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60"
@@ -2264,6 +2341,17 @@ function ManagedProviderDetail({
           </button>
         )}
       </div>
+
+      <LogoutConfirmDialog
+        open={showCloudLogoutConfirm}
+        onOpenChange={setShowCloudLogoutConfirm}
+        pending={cloudDisconnecting}
+        title={t("models.managed.logoutConfirmTitle")}
+        description={t("models.managed.logoutConfirmDescription")}
+        confirmLabel={t("models.managed.connected")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void handleCloudLogout()}
+      />
 
       {/* Login prompt */}
       {!cloudConnected && (
