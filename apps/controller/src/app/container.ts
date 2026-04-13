@@ -156,7 +156,7 @@ export async function createContainer(): Promise<ControllerContainer> {
   // auto-switching the default model during startup or first-channel connect.
   configStore.onCloudStateChanged = async (change) => {
     await openclawSyncService.syncAll();
-    if (!change.hadCloudInventory && change.hasCloudInventory) {
+    if (change.hadCloudInventory !== change.hasCloudInventory) {
       await openclawProcess.stop();
       openclawProcess.enableAutoRestart();
       openclawProcess.start();

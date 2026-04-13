@@ -1085,28 +1085,6 @@ function WorkspaceLayoutInner() {
                                 {sidebarCreditBreakdown.giftedBalance}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="flex items-center gap-1 text-[11px] text-text-muted">
-                                {t("layout.sidebar.balancePopup.recharged")}
-                                <span className="group relative inline-flex cursor-default items-center">
-                                  <Info
-                                    size={10}
-                                    className="text-text-muted/60"
-                                  />
-                                  <span
-                                    role="tooltip"
-                                    className="pointer-events-none absolute bottom-full left-0 z-[10000] mb-1.5 w-52 rounded-md bg-neutral-800 px-2.5 py-1.5 text-left text-[11px] font-normal leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
-                                  >
-                                    {t(
-                                      "layout.sidebar.balancePopup.rechargedTooltip",
-                                    )}
-                                  </span>
-                                </span>
-                              </span>
-                              <span className="tabular-nums text-[11px] font-medium text-text-secondary">
-                                {sidebarCreditBreakdown.planBalance}
-                              </span>
-                            </div>
                           </div>
                           <button
                             type="button"
