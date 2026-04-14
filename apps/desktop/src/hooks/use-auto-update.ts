@@ -375,13 +375,6 @@ export function useAutoUpdate(options?: {
   }, [state.capability]);
 
   const install = useCallback(async () => {
-    if (
-      state.capability?.applyMode !== "in-app" &&
-      state.capability?.applyMode !== "external-installer"
-    ) {
-      return;
-    }
-
     let previousPhase: Exclude<UpdatePhase, "installing"> = "ready";
 
     setState((prev) => {
@@ -394,7 +387,7 @@ export function useAutoUpdate(options?: {
     } catch {
       // Errors are delivered via the update:error event
     }
-  }, [state.capability]);
+  }, []);
 
   const dismiss = useCallback(() => {
     setState((prev) => ({

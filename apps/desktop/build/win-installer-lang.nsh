@@ -49,6 +49,12 @@ LangString Lang_MigrationNoopOption 2052 "不迁移旧数据"
 LangString Lang_ErrorAppRunning 1033 "Nexu is currently running. Please quit the app before continuing the installation."
 LangString Lang_ErrorAppRunning 2052 "Nexu 当前正在运行。请先退出应用后再继续安装。"
 
+LangString Lang_ErrorAppRunningRetry 1033 "Nexu is currently running.$\r$\n$\r$\nPlease quit Nexu manually before continuing the installation.$\r$\n$\r$\nAfter Nexu has fully exited, click Retry to continue, or Cancel to exit the installer."
+LangString Lang_ErrorAppRunningRetry 2052 "Nexu 当前正在运行。$\r$\n$\r$\n请先手动退出 Nexu，然后再继续安装。$\r$\n$\r$\n确认 Nexu 已完全退出后，点击“重试”继续安装，或点击“取消”退出安装程序。"
+
+LangString Lang_ErrorAppRunningCheckFailedRetry 1033 "Nexu installer could not verify whether Nexu is still running.$\r$\n$\r$\nPlease make sure Nexu is fully closed, then click Retry to check again, or Cancel to exit the installer."
+LangString Lang_ErrorAppRunningCheckFailedRetry 2052 "安装程序暂时无法确认 Nexu 是否仍在运行。$\r$\n$\r$\n请先确认 Nexu 已完全退出，然后点击“重试”再次检查，或点击“取消”退出安装程序。"
+
 LangString Lang_ErrorExtractFailed 1033 "Failed to extract Nexu payload (7za exit code $0)."
 LangString Lang_ErrorExtractFailed 2052 "解压 Nexu 安装内容失败（7za 退出码 $0）。"
 

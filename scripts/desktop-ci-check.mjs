@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import { access, cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const repoRoot = process.cwd();
@@ -103,6 +104,66 @@ function getReadinessUrls(mode, portConfig) {
   };
 }
 
+function getRuntimePortsCandidatePaths(mode) {
+  if (mode !== "dist") {
+    return [];
+  }
+
+  return compactPaths([
+    process.env.NEXU_RUNTIME_PORTS_PATH
+      ? resolve(process.env.NEXU_RUNTIME_PORTS_PATH)
+      : null,
+    resolve(homedir(), "Library", "LaunchAgents", "runtime-ports.json"),
+  ]);
+}
+
+function isRuntimePortsMetadata(value) {
+  return (
+    isRecord(value) &&
+    (typeof value.controllerPort === "number" ||
+      value.controllerPort == null) &&
+    (typeof value.webPort === "number" || value.webPort == null) &&
+    (typeof value.openclawPort === "number" || value.openclawPort == null)
+  );
+}
+
+async function readRuntimePortsMetadata(paths) {
+  const result = await readFirstExistingJson(paths);
+  const metadata = isRuntimePortsMetadata(result.content)
+    ? result.content
+    : null;
+
+  return {
+    filePath: result.filePath,
+    metadata,
+  };
+}
+
+async function resolvePortConfig(context) {
+  if (context.mode !== "dist") {
+    return {
+      portConfig: context.portConfig,
+      runtimePorts: null,
+    };
+  }
+
+  const runtimePorts = await readRuntimePortsMetadata(
+    context.runtimePortsFiles,
+  );
+
+  return {
+    portConfig: {
+      controllerPort:
+        runtimePorts.metadata?.controllerPort ??
+        context.portConfig.controllerPort,
+      webPort: runtimePorts.metadata?.webPort ?? context.portConfig.webPort,
+      openclawPort:
+        runtimePorts.metadata?.openclawPort ?? context.portConfig.openclawPort,
+    },
+    runtimePorts,
+  };
+}
+
 function safeUrlOrigin(url) {
   try {
     return new URL(url).origin;
@@ -161,6 +222,7 @@ function createCheckContext(mode) {
         { source: desktopLogsDir, target: "electron-logs" },
       ],
       portConfig,
+      runtimePortsFiles: [],
     };
   }
 
@@ -251,6 +313,7 @@ function createCheckContext(mode) {
         : []),
     ],
     portConfig,
+    runtimePortsFiles: getRuntimePortsCandidatePaths(mode),
   };
 }
 
@@ -527,25 +590,34 @@ function buildMissingCheckSummary(missingChecks) {
 }
 
 async function collectProbeResults(context) {
+  const { portConfig, runtimePorts } = await resolvePortConfig(context);
+  const readinessUrls = getReadinessUrls(context.mode, portConfig);
   const portResults = await Promise.all(
-    context.ports.map(async ({ unit, port }) => ({
-      unit,
-      port,
-      listening: await isPortListening(port),
-    })),
+    context.ports.map(async ({ unit }) => {
+      const port =
+        portConfig[`${unit}Port`] ?? context.portConfig[`${unit}Port`];
+      return {
+        unit,
+        port,
+        listening: await isPortListening(port),
+      };
+    }),
   );
 
   const [apiReady, webReady, webSurface, openclawHealth] = await Promise.all([
-    fetchText(context.readinessUrls.api),
-    fetchText(context.readinessUrls.web),
-    fetchText(context.readinessUrls.webSurface),
-    fetchText(context.readinessUrls.openclawHealth),
+    fetchText(readinessUrls.api),
+    fetchText(readinessUrls.web),
+    fetchText(readinessUrls.webSurface),
+    fetchText(readinessUrls.openclawHealth),
   ]);
 
   const browserControlListening = await isPortListening(18791);
   const appProcessResults = await collectAppProcessResults(context);
 
   return {
+    portConfig,
+    readinessUrls,
+    runtimePorts,
     portResults,
     apiReady,
     webReady,
@@ -566,6 +638,29 @@ function getDiagnosticsUnit(diagnostics, unitId) {
     (unit) => isRuntimeUnitState(unit) && unit.id === unitId,
   );
   return isRuntimeUnitState(match) ? match : null;
+}
+
+function getExpectedUnitPort(unitId, portConfig) {
+  switch (unitId) {
+    case "controller":
+      return portConfig.controllerPort;
+    case "openclaw":
+      return portConfig.openclawPort;
+    case "web":
+      return portConfig.webPort;
+    default:
+      return null;
+  }
+}
+
+function diagnosticsUnitUsesExpectedPort(unit, unitId, portConfig) {
+  const expectedPort = getExpectedUnitPort(unitId, portConfig);
+
+  if (typeof expectedPort !== "number") {
+    return true;
+  }
+
+  return unit.port == null || unit.port === expectedPort;
 }
 
 // Locate the diagnostics entry for the embedded "web surface" webview that
@@ -630,7 +725,7 @@ function getLatestWebSurfaceWebview(diagnostics, webOrigin) {
   });
 }
 
-function diagnosticsChecksPassed(diagnostics, webOrigin) {
+function diagnosticsChecksPassed(diagnostics, webOrigin, portConfig) {
   if (!isRecord(diagnostics)) {
     return false;
   }
@@ -638,7 +733,13 @@ function diagnosticsChecksPassed(diagnostics, webOrigin) {
   const webSurfaceWebview = getLatestWebSurfaceWebview(diagnostics, webOrigin);
   const requiredUnitsRunning = requiredDiagnosticsUnitIds.every((unitId) => {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
-    return unit?.phase === "running" && unit.lastError === null;
+    if (!unit) {
+      return false;
+    }
+    if (!diagnosticsUnitUsesExpectedPort(unit, unitId, portConfig)) {
+      return true;
+    }
+    return unit.phase === "running" && unit.lastError === null;
   });
 
   return (
@@ -662,7 +763,7 @@ function probesPassed(results, diagnostics, webOrigin) {
     (!isBrowserControlRequired() || results.browserControlListening) &&
     results.appProcessResults.mainProcess.alive &&
     (results.appProcessResults.tmuxSession?.alive ?? true) &&
-    diagnosticsChecksPassed(diagnostics, webOrigin)
+    diagnosticsChecksPassed(diagnostics, webOrigin, results.portConfig)
   );
 }
 
@@ -705,7 +806,7 @@ function collectDiagnosticsIssues(diagnostics, count) {
     .slice(-count);
 }
 
-function collectDiagnosticsFailures(diagnostics, webOrigin) {
+function collectDiagnosticsFailures(diagnostics, webOrigin, portConfig) {
   if (!isRecord(diagnostics)) {
     return ["diagnostics file is unavailable"];
   }
@@ -730,6 +831,10 @@ function collectDiagnosticsFailures(diagnostics, webOrigin) {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
     if (!unit) {
       failures.push(`${unitId} runtime unit is missing from diagnostics`);
+      continue;
+    }
+
+    if (!diagnosticsUnitUsesExpectedPort(unit, unitId, portConfig)) {
       continue;
     }
 
@@ -1058,7 +1163,6 @@ async function captureLogs(context, captureDir) {
 
 async function verifyRuntime(context) {
   const maxHealthAttempts = maxHealthAttemptsByMode[context.mode];
-  const webOrigin = context.readinessUrls.webOrigin;
 
   if (context.statusCommand) {
     await runCommand(context.statusCommand[0], context.statusCommand[1]);
@@ -1073,7 +1177,13 @@ async function verifyRuntime(context) {
     );
     const diagnostics = diagnosticsResult.content;
 
-    if (probesPassed(probeResults, diagnostics, webOrigin)) {
+    if (
+      probesPassed(
+        probeResults,
+        diagnostics,
+        probeResults.readinessUrls.webOrigin,
+      )
+    ) {
       break;
     }
 
@@ -1142,7 +1252,11 @@ async function verifyRuntime(context) {
     );
   }
 
-  for (const detail of collectDiagnosticsFailures(diagnostics, webOrigin)) {
+  for (const detail of collectDiagnosticsFailures(
+    diagnostics,
+    probeResults.readinessUrls.webOrigin,
+    probeResults.portConfig,
+  )) {
     addMissing("diagnostics", detail);
   }
 
