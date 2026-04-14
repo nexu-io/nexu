@@ -1,7 +1,7 @@
 import type { OpenClawGatewayService } from "../services/openclaw-gateway-service.js";
 import type { OpenClawProcessManager } from "./openclaw-process.js";
 import type { OpenClawWsClient } from "./openclaw-ws-client.js";
-import type { ControllerRuntimeState } from "./state.js";
+import { type ControllerRuntimeState, isBootPhasePreReady } from "./state.js";
 
 export type ControlPlaneHealthPhase =
   | "disconnected"
@@ -50,7 +50,7 @@ export class ControlPlaneHealthService {
     if (!wsConnected) {
       const processAlive = this.processManager?.isAlive() ?? false;
       const phase: ControlPlaneHealthPhase =
-        this.runtimeState.bootPhase === "booting" || processAlive
+        isBootPhasePreReady(this.runtimeState.bootPhase) || processAlive
           ? "connecting"
           : "disconnected";
 

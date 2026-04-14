@@ -274,7 +274,19 @@ async function probeControllerReady(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.ok) {
-      return { ok: true, probeUrl: readyUrl, status: response.status };
+      const payload = (await response.json().catch(() => null)) as {
+        ready?: boolean;
+        coreReady?: boolean;
+      } | null;
+      if (payload?.coreReady === true || payload?.ready === true) {
+        return { ok: true, probeUrl: readyUrl, status: response.status };
+      }
+      return {
+        ok: false,
+        probeUrl: readyUrl,
+        reason: "probe_status",
+        status: response.status,
+      };
     }
     if (response.status !== 404) {
       return {

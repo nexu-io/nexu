@@ -225,6 +225,14 @@ function makeRuntimePorts(overrides?: Record<string, unknown>) {
   });
 }
 
+function createReadyFetchResponse(ready = true) {
+  return {
+    status: ready ? 200 : 503,
+    ok: ready,
+    json: async () => ({ ready }),
+  };
+}
+
 function mockRunningService(env?: Record<string, string>): {
   label: string;
   plistPath: string;
@@ -288,7 +296,7 @@ describe("Launchd Startup Scenarios", () => {
     // Controller readiness probe succeeds
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 200, ok: true }),
+      vi.fn().mockResolvedValue(createReadyFetchResponse()),
     );
   });
 
@@ -340,7 +348,7 @@ describe("Launchd Startup Scenarios", () => {
     // Health probes: controller HTTP ok, openclaw port listening
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 200, ok: true }),
+      vi.fn().mockResolvedValue(createReadyFetchResponse()),
     );
 
     const { bootstrapWithLaunchd } = await import(
@@ -372,15 +380,17 @@ describe("Launchd Startup Scenarios", () => {
       mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
     );
 
-    // Controller health probe FAILS
+    // Controller readiness probe fails on attach, then succeeds after recovery
+    let readyAttempt = 0;
     vi.stubGlobal(
       "fetch",
       vi.fn((input: string | URL) => {
         const url = String(input);
-        if (url.includes("/health")) {
-          return Promise.reject(new Error("ECONNREFUSED"));
+        if (url.includes("/api/internal/desktop/ready")) {
+          readyAttempt++;
+          return Promise.resolve(createReadyFetchResponse(readyAttempt >= 2));
         }
-        return Promise.resolve({ status: 200, ok: true });
+        return Promise.resolve(createReadyFetchResponse());
       }),
     );
 
@@ -1655,10 +1665,23 @@ describe("Launchd Startup Scenarios", () => {
         if (url.includes("/api/internal/desktop/ready")) {
           readyAttempts++;
           if (readyAttempts < 3) {
-            return Promise.resolve({ ok: false, status: 503 });
+            return Promise.resolve({
+              ok: false,
+              status: 503,
+              json: async () => ({ ready: false }),
+            });
           }
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ ready: true }),
+          });
         }
-        return Promise.resolve({ ok: true, status: 200 });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ready: true }),
+        });
       }),
     );
 

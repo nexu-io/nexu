@@ -1038,6 +1038,23 @@
                     "ready": {
                       "type": "boolean"
                     },
+                    "coreReady": {
+                      "type": "boolean"
+                    },
+                    "degraded": {
+                      "type": "boolean"
+                    },
+                    "bootPhase": {
+                      "type": "string",
+                      "enum": [
+                        "preparing",
+                        "starting-managed-runtime",
+                        "attaching-external-runtime",
+                        "reconciling-runtime",
+                        "stabilizing-runtime",
+                        "ready"
+                      ]
+                    },
                     "workspacePath": {
                       "type": "string"
                     },
@@ -1078,6 +1095,9 @@
                   },
                   "required": [
                     "ready",
+                    "coreReady",
+                    "degraded",
+                    "bootPhase",
                     "workspacePath",
                     "controlPlane",
                     "status"

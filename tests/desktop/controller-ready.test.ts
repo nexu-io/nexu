@@ -8,6 +8,13 @@ function createReadyResponse(ready: boolean) {
   };
 }
 
+function createCoreReadyResponse(coreReady: boolean) {
+  return {
+    ok: true,
+    json: async () => ({ coreReady, ready: false }),
+  };
+}
+
 describe("ensureDesktopControllerReady", () => {
   it("returns immediately when the controller is already ready", async () => {
     const fetchImpl = vi.fn(async () => createReadyResponse(true));
@@ -24,6 +31,20 @@ describe("ensureDesktopControllerReady", () => {
 
     expect(ready).toBe(true);
     expect(startController).not.toHaveBeenCalled();
+  });
+
+  it("accepts coreReady for degraded-but-usable controller startup", async () => {
+    const fetchImpl = vi.fn(async () => createCoreReadyResponse(true));
+
+    const ready = await ensureDesktopControllerReady({
+      readyUrl: "http://127.0.0.1:50810/api/internal/desktop/ready",
+      fetchImpl,
+      attemptTimeoutMs: 0,
+      pollIntervalMs: 0,
+      requestTimeoutMs: 10,
+    });
+
+    expect(ready).toBe(true);
   });
 
   it("restarts the controller once after the first polling window times out", async () => {

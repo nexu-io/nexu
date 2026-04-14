@@ -48,6 +48,11 @@ export type ControllerDevSnapshot = {
   logFilePath?: string;
 };
 
+type ControllerReadyStatus = {
+  ready: boolean;
+  bootPhase?: string;
+};
+
 function createControllerCommand(sessionId: string): {
   command: string;
   args: string[];
@@ -91,26 +96,38 @@ async function waitForControllerPortPid(
   );
 }
 
-async function getControllerHealthStatus(): Promise<boolean> {
+async function getControllerReadyStatus(): Promise<ControllerReadyStatus> {
   const runtimeConfig = getToolsDevRuntimeConfig();
 
   try {
-    const response = await fetch(`${runtimeConfig.controllerUrl}/health`, {
-      signal: AbortSignal.timeout(1500),
-    });
+    const response = await fetch(
+      `${runtimeConfig.controllerUrl}/api/internal/desktop/ready`,
+      {
+        signal: AbortSignal.timeout(1500),
+      },
+    );
 
     if (!response.ok) {
-      return false;
+      return { ready: false };
     }
 
     const payload = (await response.json()) as {
-      controlPlane?: { ok?: boolean };
+      ready?: boolean;
+      coreReady?: boolean;
+      bootPhase?: string;
     };
 
-    return payload.controlPlane?.ok === true;
+    return {
+      ready: payload.coreReady === true || payload.ready === true,
+      bootPhase: payload.bootPhase,
+    };
   } catch {
-    return false;
+    return { ready: false };
   }
+}
+
+async function getControllerHealthStatus(): Promise<boolean> {
+  return (await getControllerReadyStatus()).ready;
 }
 
 async function getStableControllerHealthStatus(): Promise<boolean> {
@@ -129,7 +146,7 @@ async function getStableControllerHealthStatus(): Promise<boolean> {
 
 async function waitForControllerHealth(supervisorPid: number): Promise<void> {
   const runtimeConfig = getToolsDevRuntimeConfig();
-  const healthUrl = `${runtimeConfig.controllerUrl}/health`;
+  const readyUrl = `${runtimeConfig.controllerUrl}/api/internal/desktop/ready`;
 
   for (let index = 0; index < 40; index += 1) {
     if (await getControllerHealthStatus()) {
@@ -140,7 +157,7 @@ async function waitForControllerHealth(supervisorPid: number): Promise<void> {
       process.kill(supervisorPid, 0);
     } catch {
       throw new Error(
-        "controller supervisor exited before controller health passed",
+        "controller supervisor exited before controller readiness passed",
       );
     }
 
@@ -150,7 +167,7 @@ async function waitForControllerHealth(supervisorPid: number): Promise<void> {
   }
 
   throw new Error(
-    `controller health endpoint did not become ready at ${healthUrl}`,
+    `controller readiness endpoint did not become ready at ${readyUrl}`,
   );
 }
 
@@ -369,12 +386,15 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
     }
 
     if (!(await getStableControllerHealthStatus())) {
+      const readyStatus = await getControllerReadyStatus();
       return {
         service: "controller",
         status: "stale",
         pid: lock.pid,
         workerPid,
-        staleReason: "controller health is not ready",
+        staleReason: readyStatus.bootPhase
+          ? `controller readiness is not ready (bootPhase=${readyStatus.bootPhase})`
+          : "controller readiness is not ready",
         runId: lock.runId,
         sessionId: lock.sessionId,
         logFilePath,

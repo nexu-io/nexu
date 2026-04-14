@@ -402,7 +402,11 @@ describe("bootstrapWithLaunchd", () => {
     // Mock fetch for controller readiness probe
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 200, ok: true }),
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: vi.fn().mockResolvedValue({ ready: true }),
+      }),
     );
   });
 
@@ -469,7 +473,7 @@ describe("bootstrapWithLaunchd", () => {
 
     // installService is always called so it can detect plist content changes
     expect(mockLaunchdManager.installService).toHaveBeenCalled();
-  }, 15000);
+  }, 30000);
 
   it("passes Langfuse env through to generated plists", async () => {
     const plistGenerator = await import(

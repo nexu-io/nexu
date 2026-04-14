@@ -163,11 +163,11 @@ async function waitForOpenclawReady(
   logFilePath?: string,
 ): Promise<void> {
   const runtimeConfig = getToolsDevRuntimeConfig();
-  const readyUrl = `${runtimeConfig.openclawBaseUrl}/ready`;
+  const healthUrl = `${runtimeConfig.openclawBaseUrl}/health`;
   const attempts = 20;
   const delayMs = 500;
   const waitStartedAt = Date.now();
-  let lastFailureReason = "unknown readiness probe failure";
+  let lastFailureReason = "unknown health probe failure";
 
   for (let index = 0; index < attempts; index += 1) {
     const readyProbe = await getOpenclawReadyStatus();
@@ -179,17 +179,15 @@ async function waitForOpenclawReady(
     lastFailureReason = readyProbe.reason;
 
     if (!isProcessRunning(supervisorPid)) {
-      throw new Error(
-        "openclaw supervisor exited before readiness check passed",
-      );
+      throw new Error("openclaw supervisor exited before health check passed");
     }
 
     if ((index + 1) % 4 === 0) {
       const latestLogHint = await readLatestOpenclawLogHint(logFilePath);
 
-      logger.info("waiting for openclaw readiness endpoint", {
+      logger.info("waiting for openclaw health endpoint", {
         supervisorPid,
-        readyUrl,
+        readyUrl: healthUrl,
         lastFailureReason,
         elapsedMs: Date.now() - waitStartedAt,
         latestLogHint,
@@ -202,11 +200,11 @@ async function waitForOpenclawReady(
   }
 
   if (!isProcessRunning(supervisorPid)) {
-    throw new Error("openclaw supervisor exited before readiness check passed");
+    throw new Error("openclaw supervisor exited before health check passed");
   }
 
   throw new Error(
-    `openclaw readiness endpoint did not become ready at ${readyUrl} (${lastFailureReason})`,
+    `openclaw health endpoint did not become ready at ${healthUrl} (${lastFailureReason})`,
   );
 }
 
@@ -218,7 +216,7 @@ async function getOpenclawReadyStatus(): Promise<OpenclawReadyProbeResult> {
   const runtimeConfig = getToolsDevRuntimeConfig();
 
   try {
-    const response = await fetch(`${runtimeConfig.openclawBaseUrl}/ready`, {
+    const response = await fetch(`${runtimeConfig.openclawBaseUrl}/health`, {
       signal: AbortSignal.timeout(1000),
     });
 
@@ -270,7 +268,7 @@ async function getStableOpenclawReadyStatus(): Promise<OpenclawReadyProbeResult>
 
   return {
     ok: false,
-    reason: "TimeoutError: readiness probe timed out after 3 attempts",
+    reason: "TimeoutError: health probe timed out after 3 attempts",
   };
 }
 
@@ -414,9 +412,9 @@ export async function startOpenclawDevProcess(options: {
   }
 
   logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);
-  logger.info("waiting for openclaw readiness", {
+  logger.info("waiting for openclaw health", {
     supervisorPid,
-    readyUrl: `${runtimeConfig.openclawBaseUrl}/ready`,
+    readyUrl: `${runtimeConfig.openclawBaseUrl}/health`,
   });
 
   try {
@@ -536,7 +534,7 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       workerPid,
       listenerPid,
       staleReason: listenerPid
-        ? `openclaw readiness endpoint is not ready (${readyProbe.reason})`
+        ? `openclaw health endpoint is not ready (${readyProbe.reason})`
         : "openclaw listener is not running",
       runId: lock.runId,
       sessionId: lock.sessionId,
@@ -551,7 +549,7 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
 
         if (!readyProbe.ok) {
           throw new Error(
-            `openclaw readiness endpoint is not ready (${readyProbe.reason})`,
+            `openclaw health endpoint is not ready (${readyProbe.reason})`,
           );
         }
 
