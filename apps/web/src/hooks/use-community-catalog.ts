@@ -21,16 +21,22 @@ export type SkillUninstallInput = {
 const CATALOG_QUERY_KEY = ["skillhub", "catalog"] as const;
 const DETAIL_QUERY_KEY = ["skillhub", "detail"] as const;
 
-/** Active queue statuses that warrant faster polling. */
-const ACTIVE_QUEUE_STATUSES = new Set([
+/**
+ * Queue statuses that should keep the catalog polling. Includes `failed` so
+ * the UI eventually drops stale failure cards once the backend cleanup window
+ * (cleanupDelayMs) evicts them — without this, a failed card can stay on
+ * screen indefinitely until the user triggers another action.
+ */
+const POLLING_QUEUE_STATUSES = new Set([
   "queued",
   "downloading",
   "installing-deps",
+  "failed",
 ]);
 
-function hasActiveQueueItems(data: SkillhubCatalogData | undefined): boolean {
+function hasPollingQueueItems(data: SkillhubCatalogData | undefined): boolean {
   if (!data?.queue?.length) return false;
-  return data.queue.some((item) => ACTIVE_QUEUE_STATUSES.has(item.status));
+  return data.queue.some((item) => POLLING_QUEUE_STATUSES.has(item.status));
 }
 
 export function useCommunitySkills(opts?: { refetchInterval?: number }) {
@@ -46,7 +52,7 @@ export function useCommunitySkills(opts?: { refetchInterval?: number }) {
       opts?.refetchInterval ??
       ((q) => {
         const data = q.state.data as SkillhubCatalogData | undefined;
-        return hasActiveQueueItems(data) ? 3_000 : false;
+        return hasPollingQueueItems(data) ? 3_000 : false;
       }),
   });
 

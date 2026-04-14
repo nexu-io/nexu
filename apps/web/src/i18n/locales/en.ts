@@ -770,6 +770,7 @@ const en = {
   "skills.retryInstall": "Retry",
   "skills.cancelInstall": "Cancel",
   "skills.cancelling": "Cancelling…",
+  "skills.cancelFailed": "Failed to cancel: {{error}}",
   "skills.import": "Import",
   "skills.importSkill": "Import Skill",
   "skills.importSkillDesc":

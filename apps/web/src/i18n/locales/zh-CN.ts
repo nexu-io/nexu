@@ -726,6 +726,7 @@ const zhCN = {
   "skills.retryInstall": "重试",
   "skills.cancelInstall": "取消",
   "skills.cancelling": "取消中…",
+  "skills.cancelFailed": "取消失败：{{error}}",
   "skills.import": "导入",
   "skills.importSkill": "导入技能",
   "skills.importSkillDesc": "从 zip 文件或 GitHub 仓库添加自定义技能",

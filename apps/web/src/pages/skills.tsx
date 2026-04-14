@@ -43,6 +43,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 
 const PAGE_SIZE = 50;
 type UninstallableSkillSource = Exclude<SkillSource, "curated">;
@@ -155,6 +156,12 @@ function SkillCard({
     setPendingAction("cancel");
     try {
       await cancelMutation.mutateAsync(skill.slug);
+    } catch (err) {
+      // Surface the rejection so the click flow doesn't end in an unhandled
+      // promise (noisy in error telemetry) and the user gets a real signal
+      // when cancel itself fails — common in flaky/offline networks.
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(t("skills.cancelFailed", { error: message }));
     } finally {
       setPendingAction(null);
     }
