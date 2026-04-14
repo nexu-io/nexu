@@ -314,6 +314,22 @@ function emitLog(log: StageLog | undefined, message: string): void {
   log?.(message);
 }
 
+function createStageTimer(log: StageLog | undefined): {
+  mark: (message: string) => void;
+  elapsedMs: () => number;
+} {
+  const startedAt = Date.now();
+
+  return {
+    mark(message: string): void {
+      emitLog(log, `${message} (${Date.now() - startedAt}ms)`);
+    },
+    elapsedMs(): number {
+      return Date.now() - startedAt;
+    },
+  };
+}
+
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
     await readFile(targetPath);
@@ -926,10 +942,18 @@ async function readStageManifest(
 export async function prepareSlimclawRuntimeStageInternal(
   options: PrepareSlimclawRuntimeStageInternalOptions,
 ): Promise<PrepareSlimclawRuntimeStageResult> {
+  const stageTimer = createStageTimer(options.log);
+
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] computing runtime stage fingerprint for ${options.targetStageRoot}`,
+  );
   const fingerprint = await computeSlimclawRuntimeStageFingerprint({
     sourceOpenclawRoot: options.sourceOpenclawRoot,
     patchRoot: options.patchRoot,
   });
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] computed runtime stage fingerprint for ${options.targetStageRoot}`,
+  );
   const existingManifest = await readStageManifest(options.targetStageRoot);
   const existingOpenclawRoot = resolve(options.targetStageRoot, "openclaw");
 
@@ -958,11 +982,20 @@ export async function prepareSlimclawRuntimeStageInternal(
   );
   const stagedOpenclawRoot = resolve(stageRoot, "openclaw");
 
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] copying runtime into candidate stage at ${stageRoot}`,
+  );
   await cp(options.sourceOpenclawRoot, stagedOpenclawRoot, {
     recursive: true,
     dereference: true,
   });
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] copied runtime into candidate stage at ${stageRoot}`,
+  );
 
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] applying overlay and compatibility patches inside ${stageRoot}`,
+  );
   const overlayFiles = await readOverlayFiles(options.patchRoot, options.log);
   const bridgePatchedFiles = await patchReplyOutcomeBridge(
     stagedOpenclawRoot,
@@ -977,6 +1010,9 @@ export async function prepareSlimclawRuntimeStageInternal(
       "utf8",
     );
   }
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] applied ${patchedFiles.size} patched file(s) inside ${stageRoot}`,
+  );
 
   const manifest: StageManifest = {
     fingerprint,
@@ -989,12 +1025,15 @@ export async function prepareSlimclawRuntimeStageInternal(
     "utf8",
   );
 
+  stageTimer.mark(
+    `[slimclaw-runtime-stage] switching staged runtime into place at ${options.targetStageRoot}`,
+  );
   await rm(options.targetStageRoot, { recursive: true, force: true });
   await rename(stageRoot, options.targetStageRoot);
 
   emitLog(
     options.log,
-    `[slimclaw-runtime-stage] staged OpenClaw package with ${patchedFiles.size} patched file(s) at ${options.targetStageRoot}`,
+    `[slimclaw-runtime-stage] staged OpenClaw package with ${patchedFiles.size} patched file(s) at ${options.targetStageRoot} (${stageTimer.elapsedMs()}ms)`,
   );
 
   return {

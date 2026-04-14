@@ -55,6 +55,33 @@ export type OpenclawDevSnapshot = {
 
 type OpenclawReadyProbeResult = { ok: true } | { ok: false; reason: string };
 
+async function readLatestOpenclawLogHint(
+  logFilePath: string | undefined,
+): Promise<string | undefined> {
+  if (!logFilePath) {
+    return undefined;
+  }
+
+  try {
+    const logTail = await readLogTailFromFile(logFilePath, 20);
+    const lines = logTail.content
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const latestLine = lines.at(-1);
+
+    if (!latestLine) {
+      return undefined;
+    }
+
+    return latestLine.length > 220
+      ? `${latestLine.slice(0, 217)}...`
+      : latestLine;
+  } catch {
+    return undefined;
+  }
+}
+
 function logOpenclawTiming(stage: string, startedAt: number): void {
   logger.debug("openclaw timing", {
     stage,
@@ -89,7 +116,10 @@ export async function getOpenclawPortPid(): Promise<number> {
   );
 }
 
-async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
+async function waitForOpenclawPortPid(
+  supervisorPid: number,
+  logFilePath?: string,
+): Promise<number> {
   const port = getToolsDevRuntimeConfig().openclawPort;
   const attempts = 120;
   const delayMs = 500;
@@ -106,10 +136,13 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
     }
 
     if ((index + 1) % heartbeatEveryAttempts === 0) {
+      const latestLogHint = await readLatestOpenclawLogHint(logFilePath);
+
       logger.info("waiting for openclaw gateway port", {
         supervisorPid,
         port,
         elapsedMs: Date.now() - waitStartedAt,
+        latestLogHint,
       });
     }
 
@@ -125,7 +158,10 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
   throw new Error(`openclaw gateway did not open port ${port}`);
 }
 
-async function waitForOpenclawReady(supervisorPid: number): Promise<void> {
+async function waitForOpenclawReady(
+  supervisorPid: number,
+  logFilePath?: string,
+): Promise<void> {
   const runtimeConfig = getToolsDevRuntimeConfig();
   const readyUrl = `${runtimeConfig.openclawBaseUrl}/ready`;
   const attempts = 20;
@@ -149,11 +185,14 @@ async function waitForOpenclawReady(supervisorPid: number): Promise<void> {
     }
 
     if ((index + 1) % 4 === 0) {
+      const latestLogHint = await readLatestOpenclawLogHint(logFilePath);
+
       logger.info("waiting for openclaw readiness endpoint", {
         supervisorPid,
         readyUrl,
         lastFailureReason,
         elapsedMs: Date.now() - waitStartedAt,
+        latestLogHint,
       });
     }
 
@@ -263,6 +302,10 @@ async function waitForOpenclawCurrentLock(options: {
 }
 
 async function prepareOpenclawEntryPath(): Promise<string> {
+  logger.info("preparing staged openclaw runtime", {
+    targetStageRoot: getOpenclawRuntimeStageRootPath(),
+  });
+
   const stage = await prepareSlimclawRuntimeStage({
     targetStageRoot: getOpenclawRuntimeStageRootPath(),
     log: (message) => logger.info(message),
@@ -314,6 +357,10 @@ export async function startOpenclawDevProcess(options: {
   const openclawEntryPath = await prepareOpenclawEntryPath();
 
   logOpenclawTiming("filesystem-ready", startedAt);
+  logger.info("starting openclaw supervisor", {
+    sessionId,
+    logFilePath,
+  });
 
   const processHandle = await spawnHiddenProcess({
     command: commandSpec.command,
@@ -352,8 +399,13 @@ export async function startOpenclawDevProcess(options: {
   logOpenclawTiming(`supervisor-pid=${supervisorPid}`, startedAt);
   let listenerPid: number;
 
+  logger.info("waiting for openclaw gateway listener", {
+    supervisorPid,
+    port: runtimeConfig.openclawPort,
+  });
+
   try {
-    listenerPid = await waitForOpenclawPortPid(supervisorPid);
+    listenerPid = await waitForOpenclawPortPid(supervisorPid, logFilePath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -362,9 +414,13 @@ export async function startOpenclawDevProcess(options: {
   }
 
   logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);
+  logger.info("waiting for openclaw readiness", {
+    supervisorPid,
+    readyUrl: `${runtimeConfig.openclawBaseUrl}/ready`,
+  });
 
   try {
-    await waitForOpenclawReady(supervisorPid);
+    await waitForOpenclawReady(supervisorPid, logFilePath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
