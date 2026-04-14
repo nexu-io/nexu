@@ -1,9 +1,8 @@
 import path from "node:path";
-import { resolveSlimclawRuntimePaths } from "@nexu/slimclaw";
 import type { ControllerEnv } from "../app/env.js";
 
 export type ArtifactBackedOpenClawRuntimeResolution = {
-  mode: "explicit-env" | "slimclaw-managed";
+  mode: "explicit-env";
   binPath: string;
   entryPath: string;
   builtinExtensionsDir: string;
@@ -88,14 +87,9 @@ export function resolveControllerOpenClawRuntime(
     };
   }
 
-  const runtimePaths = resolveSlimclawRuntimePaths({ requirePrepared: true });
-  return {
-    mode: "slimclaw-managed",
-    binPath: runtimePaths.binPath,
-    entryPath: runtimePaths.entryPath,
-    builtinExtensionsDir: runtimePaths.builtinExtensionsDir,
-    packageDir: path.dirname(runtimePaths.builtinExtensionsDir),
-  };
+  throw new Error(
+    "Controller-managed OpenClaw requires OPENCLAW_BIN and OPENCLAW_EXTENSIONS_DIR from the launcher.",
+  );
 }
 
 export function getOpenClawCommandSpec(

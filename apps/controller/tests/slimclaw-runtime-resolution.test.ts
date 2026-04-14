@@ -1,15 +1,7 @@
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-const mockSlimclawRuntimeRoot = "/workspace/.tmp/slimclaw/dev-runtime";
 import type { ControllerEnv } from "../src/app/env.js";
-const { resolveSlimclawRuntimePathsMock } = vi.hoisted(() => ({
-  resolveSlimclawRuntimePathsMock: vi.fn(),
-}));
-
-vi.mock("@nexu/slimclaw", () => ({
-  resolveSlimclawRuntimePaths: resolveSlimclawRuntimePathsMock,
-}));
 
 import {
   getOpenClawCommandSpec,
@@ -64,15 +56,11 @@ function createEnv(overrides: Partial<ControllerEnv> = {}): ControllerEnv {
 }
 
 describe("openclaw runtime resolution", () => {
-  beforeEach(() => {
-    resolveSlimclawRuntimePathsMock.mockReset();
-  });
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("prefers explicit artifact env without consulting slimclaw", () => {
+  it("uses explicit artifact env for managed controller runtime", () => {
     const env = createEnv({
       manageOpenclawProcess: true,
       openclawOwnershipMode: "internal",
@@ -89,76 +77,23 @@ describe("openclaw runtime resolution", () => {
       builtinExtensionsDir: "/runtime/node_modules/openclaw/extensions",
       packageDir: "/runtime/node_modules/openclaw",
     });
-    expect(resolveSlimclawRuntimePathsMock).not.toHaveBeenCalled();
   });
 
-  it("uses slimclaw paths for managed controller runtime", () => {
-    resolveSlimclawRuntimePathsMock.mockReturnValue({
-      runtimeRoot: mockSlimclawRuntimeRoot,
-      entryPath: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/openclaw.mjs`,
-      binPath: `${mockSlimclawRuntimeRoot}/bin/openclaw`,
-      builtinExtensionsDir: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/extensions`,
-      descriptorPath: "/workspace/.tmp/slimclaw/runtime-descriptor.json",
-      descriptor: {
-        version: 1,
-        fingerprint: "abc",
-        preparedAt: new Date(0).toISOString(),
-        openclawVersion: "1.0.0",
-        relativeTo: "runtimeRoot",
-        paths: {
-          entryPath: "node_modules/openclaw/openclaw.mjs",
-          binPath: "bin/openclaw",
-          builtinExtensionsDir: "node_modules/openclaw/extensions",
-        },
-      },
-    });
-
+  it("requires launcher-provided runtime paths for managed controller runtime", () => {
     const env = createEnv({
       manageOpenclawProcess: true,
       openclawOwnershipMode: "internal",
     });
 
-    const runtime = resolveControllerOpenClawRuntime(env);
-    const spec = getOpenClawCommandSpec(env);
-
-    expect(runtime).toMatchObject({
-      mode: "slimclaw-managed",
-      binPath: `${mockSlimclawRuntimeRoot}/bin/openclaw`,
-      entryPath: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/openclaw.mjs`,
-      builtinExtensionsDir: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/extensions`,
-      packageDir: `${mockSlimclawRuntimeRoot}/node_modules/openclaw`,
-    });
-    expect(resolveSlimclawRuntimePathsMock).toHaveBeenCalledWith({
-      requirePrepared: true,
-    });
-    expect(spec).toMatchObject({
-      command: `${mockSlimclawRuntimeRoot}/bin/openclaw`,
-      argsPrefix: [],
-      extraEnv: {},
-    });
+    expect(() => resolveControllerOpenClawRuntime(env)).toThrow(
+      /OPENCLAW_BIN and OPENCLAW_EXTENSIONS_DIR from the launcher/,
+    );
+    expect(() => getOpenClawCommandSpec(env)).toThrow(
+      /OPENCLAW_BIN and OPENCLAW_EXTENSIONS_DIR from the launcher/,
+    );
   });
 
-  it("returns external bin only mode without mixing in slimclaw paths", () => {
-    resolveSlimclawRuntimePathsMock.mockReturnValue({
-      runtimeRoot: mockSlimclawRuntimeRoot,
-      entryPath: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/openclaw.mjs`,
-      binPath: `${mockSlimclawRuntimeRoot}/bin/openclaw`,
-      builtinExtensionsDir: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/extensions`,
-      descriptorPath: "/workspace/.tmp/slimclaw/runtime-descriptor.json",
-      descriptor: {
-        version: 1,
-        fingerprint: "abc",
-        preparedAt: new Date(0).toISOString(),
-        openclawVersion: "1.0.0",
-        relativeTo: "runtimeRoot",
-        paths: {
-          entryPath: "node_modules/openclaw/openclaw.mjs",
-          binPath: "bin/openclaw",
-          builtinExtensionsDir: "node_modules/openclaw/extensions",
-        },
-      },
-    });
-
+  it("returns external bin only mode when controller does not manage openclaw", () => {
     const env = createEnv({
       openclawBin: "/usr/local/bin/openclaw",
     });
@@ -172,7 +107,6 @@ describe("openclaw runtime resolution", () => {
       builtinExtensionsDir: null,
       packageDir: null,
     });
-    expect(resolveSlimclawRuntimePathsMock).not.toHaveBeenCalled();
     expect(() => requireArtifactBackedOpenClawRuntime(env)).toThrow(
       /artifact-backed OpenClaw runtime/,
     );
