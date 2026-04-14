@@ -51,6 +51,7 @@ export type ControllerDevSnapshot = {
 type ControllerReadyStatus = {
   ready: boolean;
   bootPhase?: string;
+  coreReady?: boolean;
 };
 
 function createControllerCommand(sessionId: string): {
@@ -120,6 +121,7 @@ async function getControllerReadyStatus(): Promise<ControllerReadyStatus> {
     return {
       ready: payload.coreReady === true || payload.ready === true,
       bootPhase: payload.bootPhase,
+      coreReady: payload.coreReady,
     };
   } catch {
     return { ready: false };
@@ -147,9 +149,13 @@ async function getStableControllerHealthStatus(): Promise<boolean> {
 async function waitForControllerHealth(supervisorPid: number): Promise<void> {
   const runtimeConfig = getToolsDevRuntimeConfig();
   const readyUrl = `${runtimeConfig.controllerUrl}/api/internal/desktop/ready`;
+  let lastReadyStatus: ControllerReadyStatus | null = null;
 
-  for (let index = 0; index < 40; index += 1) {
-    if (await getControllerHealthStatus()) {
+  for (let index = 0; index < 120; index += 1) {
+    const readyStatus = await getControllerReadyStatus();
+    lastReadyStatus = readyStatus;
+
+    if (readyStatus.ready) {
       return;
     }
 
@@ -166,8 +172,12 @@ async function waitForControllerHealth(supervisorPid: number): Promise<void> {
     }
   }
 
+  const diagnosticSuffix = lastReadyStatus
+    ? ` (last bootPhase=${lastReadyStatus.bootPhase ?? "unknown"}, coreReady=${String(lastReadyStatus.coreReady ?? false)}, ready=${String(lastReadyStatus.ready)})`
+    : "";
+
   throw new Error(
-    `controller readiness endpoint did not become ready at ${readyUrl}`,
+    `controller readiness endpoint did not become ready at ${readyUrl}${diagnosticSuffix}`,
   );
 }
 
