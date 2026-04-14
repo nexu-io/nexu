@@ -189,6 +189,7 @@ cat > "$PLIST_DIR/$OPENCLAW_LABEL.plist" <<OPLIST
         <string>$OPENCLAW_ENTRY</string>
         <string>gateway</string>
         <string>run</string>
+        <string>--allow-unconfigured</string>
         <string>--port</string>
         <string>$OPENCLAW_PORT</string>
         <string>--auth</string>
