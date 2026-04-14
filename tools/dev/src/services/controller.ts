@@ -113,6 +113,20 @@ async function getControllerHealthStatus(): Promise<boolean> {
   }
 }
 
+async function getStableControllerHealthStatus(): Promise<boolean> {
+  for (let index = 0; index < 3; index += 1) {
+    if (await getControllerHealthStatus()) {
+      return true;
+    }
+
+    if (index < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  return false;
+}
+
 async function waitForControllerHealth(supervisorPid: number): Promise<void> {
   const runtimeConfig = getToolsDevRuntimeConfig();
   const healthUrl = `${runtimeConfig.controllerUrl}/health`;
@@ -354,7 +368,7 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
       };
     }
 
-    if (!(await getControllerHealthStatus())) {
+    if (!(await getStableControllerHealthStatus())) {
       return {
         service: "controller",
         status: "stale",

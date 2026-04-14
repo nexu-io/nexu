@@ -358,7 +358,20 @@ cli
     }
 
     const resolvedTarget = readTargetOrThrow(target);
-    await stopTarget(resolvedTarget);
+
+    try {
+      await stopTarget(resolvedTarget);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("is not running")) {
+        logger.info(`${resolvedTarget} already stopped`, {
+          target: resolvedTarget,
+        });
+        return;
+      }
+
+      throw error;
+    }
   });
 
 cli
