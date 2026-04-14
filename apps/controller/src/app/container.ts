@@ -90,12 +90,15 @@ export async function createContainer(): Promise<ControllerContainer> {
   const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
   const creditGuardStateWriter = new CreditGuardStateWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
-  const watchTrigger = new OpenClawWatchTrigger(env);
   const gatewayClient = new GatewayClient(env);
   const sessionsRuntime = new SessionsRuntime(env);
   const runtimeHealth = new RuntimeHealth(env);
   const runtimeState = createRuntimeState();
+  // Construct openclawProcess before watchTrigger so the watch trigger can
+  // delegate gateway restarts to OpenClawProcessManager.restart() instead of
+  // re-implementing the dev-vs-launchd branching inline.
   const openclawProcess = new OpenClawProcessManager(env);
+  const watchTrigger = new OpenClawWatchTrigger(env, openclawProcess);
   const wsClient = new OpenClawWsClient(env);
   const gatewayService = new OpenClawGatewayService(wsClient, runtimeState);
   const channelFallbackService = new ChannelFallbackService(

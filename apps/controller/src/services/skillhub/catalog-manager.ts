@@ -241,11 +241,12 @@ export class CatalogManager {
       .map((r) => {
         const skillMdDir = this.resolveSkillMdDir(r);
         const skillMdPath = resolve(skillMdDir, "SKILL.md");
-        const { name, description } = this.parseFrontmatter(skillMdPath);
+        const { name, catalogName, description } =
+          this.parseFrontmatter(skillMdPath);
         return {
           slug: r.slug,
           source: r.source,
-          name: name || r.slug,
+          name: catalogName || name || r.slug,
           description: description || "",
           installedAt: r.installedAt,
           agentId: r.agentId ?? null,
@@ -735,14 +736,18 @@ export class CatalogManager {
 
   private parseFrontmatter(filePath: string): {
     name: string;
+    catalogName: string;
     description: string;
   } {
     try {
-      const content = readFileSync(filePath, "utf8");
+      const content = readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
       const match = content.match(/^---\n([\s\S]*?)\n---/);
-      if (!match?.[1]) return { name: "", description: "" };
+      if (!match?.[1]) return { name: "", catalogName: "", description: "" };
       const frontmatter = match[1];
       const nameMatch = frontmatter.match(/^name:\s*['"]?(.+?)['"]?\s*$/m);
+      const catalogNameMatch = frontmatter.match(
+        /^catalog-name:\s*['"]?(.+?)['"]?\s*$/m,
+      );
 
       // Match description: single line, or multiline block after | or >
       let description = "";
@@ -768,10 +773,11 @@ export class CatalogManager {
 
       return {
         name: nameMatch?.[1]?.trim() ?? "",
+        catalogName: catalogNameMatch?.[1]?.trim() ?? "",
         description,
       };
     } catch {
-      return { name: "", description: "" };
+      return { name: "", catalogName: "", description: "" };
     }
   }
 

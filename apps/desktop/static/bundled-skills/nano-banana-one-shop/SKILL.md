@@ -1,20 +1,20 @@
 ---
-name: Nano Banana One Shop
+name: nano-banana-one-shop
+catalog-name: Nano Banana One Shop
 description: All-in-one image generation with Gemini models. Supports Nano Banana (3.1 Flash), Nano Banana Pro (3 Pro), and Nano Banana 2 (2.5 Flash). Triggers on "generate image", "image generation", "nano banana", "edit image".
 homepage: https://ai.google.dev/
 metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "🍌",
-        "requires": { "bins": ["node"] },
-      },
-  }
+  openclaw:
+    emoji: "🍌"
 ---
 
 # Nano Banana One Shop
 
 All-in-one image generation and editing using the full Nano Banana model family. Pick the right model for the job.
+
+## Prerequisites
+
+- **Node.js** (v18+): Before running any command, verify with `which node`. If missing, tell the user to install Node.js (e.g. via `brew install node` or https://nodejs.org).
 
 ## Models
 

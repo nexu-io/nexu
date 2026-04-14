@@ -1,5 +1,6 @@
 ---
 name: deep-research
+catalog-name: Deep Research
 description: |
   深度调研方法论（8步法）：将模糊主题转化为高质量调研报告。
   触发词：/deep-research、深度调研、帮我调研、调研一下、对比分析

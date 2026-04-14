@@ -1,4 +1,11 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import type { SkillDb } from "./skill-db.js";
 
@@ -53,7 +60,6 @@ export const STATIC_SKILL_SLUGS: readonly string[] = [
   "deep-research",
   "research-to-diagram",
   "qiaomu-mondo-poster-design",
-  "medeo-video",
 ] as const;
 
 /**
@@ -193,4 +199,74 @@ export function resolveCuratedSkillsToInstall(params: {
   }
 
   return { toInstall, toSkip };
+}
+
+/**
+ * Ensure the SKILL.md `name:` field matches the directory slug.
+ *
+ * OpenClaw's skill filter compares `entry.skill.name` (from SKILL.md
+ * frontmatter) against the agent's allowlist, which uses directory slugs.
+ * ClawHub packages sometimes ship mismatched names (e.g. `find-skills`
+ * instead of `find-skill`). This patches the `name:` line in-place after
+ * install so filtering works correctly.
+ *
+ * Best-effort: silently skips on any error.
+ */
+export function alignSkillName(skillsDir: string, slug: string): void {
+  const skillMdPath = resolve(skillsDir, slug, "SKILL.md");
+  if (!existsSync(skillMdPath)) return;
+
+  try {
+    const content = readFileSync(skillMdPath, "utf8").replace(/\r\n/g, "\n");
+    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!frontmatterMatch) return;
+
+    const frontmatter = frontmatterMatch[1] ?? "";
+    const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+    if (!nameMatch) return;
+
+    const currentName = (nameMatch[1] ?? "").trim();
+    if (currentName === slug) return;
+
+    const patched = content.replace(`name: ${nameMatch[1]}`, `name: ${slug}`);
+    writeFileSync(skillMdPath, patched, "utf8");
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Remove `requires.bins` / `requires.anyBins` from a skill's SKILL.md
+ * frontmatter so OpenClaw's eligibility filter does not drop it when
+ * the required binary is missing from the system.
+ *
+ * The agent will still see the skill, attempt to run it, and guide the
+ * user to install the missing dependency based on the skill's body
+ * instructions.
+ *
+ * Handles both JSON-in-YAML and standard YAML metadata formats.
+ * Best-effort: silently skips on any error.
+ */
+export function stripRequiresBins(skillsDir: string, slug: string): void {
+  const skillMdPath = resolve(skillsDir, slug, "SKILL.md");
+  if (!existsSync(skillMdPath)) return;
+
+  try {
+    const content = readFileSync(skillMdPath, "utf8").replace(/\r\n/g, "\n");
+    if (!content.includes("requires")) return;
+
+    // JSON-in-YAML: "requires": { "bins": [...] }, or "requires": { "anyBins": [...] },
+    // Remove the entire "requires": { ... }, block (with optional trailing comma)
+    let patched = content.replace(/\s*"requires"\s*:\s*\{[^}]*\}\s*,?/g, "");
+
+    // Standard YAML: requires:\n  bins:\n    - x\n    - y
+    // Remove the requires block and all its indented children
+    patched = patched.replace(/^[ \t]*requires:\s*\n(?:[ \t]+.*\n)*/gm, "");
+
+    if (patched !== content) {
+      writeFileSync(skillMdPath, patched, "utf8");
+    }
+  } catch {
+    // best-effort
+  }
 }

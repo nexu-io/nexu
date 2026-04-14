@@ -249,7 +249,7 @@ importers:
         specifier: ^14.1.1
         version: 14.1.1
       posthog-js:
-        specifier: ^1.364.6
+        specifier: ^1.365.1
         version: 1.365.1
       qrcode.react:
         specifier: ^4.2.0

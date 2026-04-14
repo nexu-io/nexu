@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { selectPreferredModel } from "@nexu/shared";
 import type { OpenClawConfig } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
@@ -119,6 +117,8 @@ export class OpenClawSyncService {
   private static readonly DEBOUNCE_MS = 100;
   private static readonly SETTLING_MS = 3000;
   private syncCounter = 0;
+  /** Tracks the last-known skill allowlist to detect skill-specific changes. */
+  private lastSkillAllowlist: ReadonlySet<string> = new Set();
 
   constructor(
     private readonly env: ControllerEnv,
@@ -384,41 +384,51 @@ export class OpenClawSyncService {
       await this.watchTrigger.touchConfig();
     }
 
-    // 4. Nudge OpenClaw's skills chokidar watcher so it bumps snapshotVersion.
-    // Without this, existing sessions keep using a stale skills snapshot
-    // even after the allowlist changes, because OpenClaw's config-reload
-    // treats agents/skills changes as kind "none" (no hot-reload action).
+    // 4. Nudge OpenClaw's skills watcher + restart gateway ONLY when the
+    // agent skill allowlist actually changed. OpenClaw hot-reloads model,
+    // channel, and plugin changes just fine — only agents.list skill
+    // changes are treated as kind "none" and require a full restart.
+    // Gate on skill-list diff to avoid unnecessary restarts during
+    // normal model/channel/provider updates.
+    //
+    // NOTE: This only gates on allowlist diffs (skill added/removed).
+    // Skill file content changes (SKILL.md edits, ClawHub updates) with
+    // an unchanged allowlist do NOT trigger a gateway restart — and that
+    // is correct. OpenClaw's chokidar watcher handles file-level changes
+    // natively via snapshotVersion bump. Do NOT add restart to that path.
     if (configPushed) {
-      await this.touchAnySkillMarker();
+      const prevSkills = this.lastSkillAllowlist;
+      const nextSkills = this.extractSkillAllowlist(compiled);
+      if (!this.skillAllowlistEqual(prevSkills, nextSkills)) {
+        await this.watchTrigger.nudgeSkillsWatcher("config-pushed");
+      }
     }
+    this.lastSkillAllowlist = this.extractSkillAllowlist(compiled);
 
     logger.info({ seq, configPushed }, "doSync: complete");
     return { configPushed };
   }
 
-  /**
-   * Touch one SKILL.md to trigger OpenClaw's skills chokidar watcher.
-   * Best-effort: silently ignored if no skills exist on disk yet.
-   */
-  private async touchAnySkillMarker(): Promise<void> {
-    try {
-      const entries = await import("node:fs/promises").then((fs) =>
-        fs.readdir(this.env.openclawSkillsDir, { withFileTypes: true }),
-      );
-      const first = entries.find(
-        (e) =>
-          e.isDirectory() &&
-          existsSync(resolve(this.env.openclawSkillsDir, e.name, "SKILL.md")),
-      );
-      if (first) {
-        await this.watchTrigger.touchSkill(first.name);
-        logger.info(
-          { slug: first.name },
-          "doSync: touched SKILL.md to bump snapshot version",
-        );
+  private extractSkillAllowlist(
+    compiled: ReturnType<typeof compileOpenClawConfig>,
+  ): ReadonlySet<string> {
+    const skills = new Set<string>();
+    for (const agent of compiled.agents.list ?? []) {
+      for (const skill of agent.skills ?? []) {
+        skills.add(skill);
       }
-    } catch {
-      // best-effort
     }
+    return skills;
+  }
+
+  private skillAllowlistEqual(
+    a: ReadonlySet<string>,
+    b: ReadonlySet<string>,
+  ): boolean {
+    if (a.size !== b.size) return false;
+    for (const skill of a) {
+      if (!b.has(skill)) return false;
+    }
+    return true;
   }
 }

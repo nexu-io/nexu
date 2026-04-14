@@ -1,15 +1,11 @@
 ---
-name: LibTV - Image&Video（Seedance 2.0）
-description: Seedance 2.0 video & image generation via LibTV Gateway - AI text-to-video, image-to-video, video continuation, style transfer, and text-to-image using Seedance 2.0 model. Also supports Kling 3.0, Wan 2.6, Midjourney, Seedream 5.0. Trigger phrases: "seedance", "generate video", "make a video", "generate image", "make an image", "draw", "libtv", "liblib".
+name: libtv-video
+catalog-name: "LibTV - Image&Video（Seedance 2.0）"
+description: "Seedance 2.0 video & image generation via LibTV Gateway - AI text-to-video, image-to-video, video continuation, style transfer, and text-to-image using Seedance 2.0 model. Also supports Kling 3.0, Wan 2.6, Midjourney, Seedream 5.0. Trigger phrases: seedance, generate video, make a video, generate image, make an image, draw, libtv, liblib."
 homepage: https://www.liblib.tv/
 metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "🎬",
-        "requires": { "bins": ["python3"] },
-      },
-  }
+  openclaw:
+    emoji: "🎬"
 ---
 
 # LibTV - Image & Video Generation (Seedance 2.0)
