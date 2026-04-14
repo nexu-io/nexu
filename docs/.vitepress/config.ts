@@ -147,6 +147,7 @@ const enSidebar = [
   {
     text: "Help",
     items: [
+      { text: "Supported Registration Domains", link: "/guide/registration-email-domains" },
       { text: "Windows Installation Guide", link: "/guide/windows-install" },
       { text: "Update Guide", link: "/guide/update" },
       { text: "Troubleshooting", link: "/guide/troubleshooting" },
@@ -206,6 +207,7 @@ const jaSidebar = [
   {
     text: "ヘルプ",
     items: [
+      { text: "登録対応メールドメイン", link: "/ja/guide/registration-email-domains" },
       { text: "Windows インストールガイド", link: "/ja/guide/windows-install" },
       { text: "アップデートガイド", link: "/ja/guide/update" },
       { text: "トラブルシューティング", link: "/ja/guide/troubleshooting" },
@@ -266,6 +268,7 @@ const koSidebar = [
   {
     text: "도움말",
     items: [
+      { text: "회원가입 지원 이메일 도메인", link: "/ko/guide/registration-email-domains" },
       { text: "Windows 설치 가이드", link: "/ko/guide/windows-install" },
       { text: "업데이트 가이드", link: "/ko/guide/update" },
       { text: "문제 해결", link: "/ko/guide/troubleshooting" },
@@ -327,6 +330,7 @@ const zhSidebar = [
   {
     text: "帮助",
     items: [
+      { text: "注册支持的邮箱域名", link: "/zh/guide/registration-email-domains" },
       { text: "Windows 正式版安装指南", link: "/zh/guide/windows-install" },
       { text: "更新指南", link: "/zh/guide/update" },
       { text: "修复指南", link: "/zh/guide/troubleshooting" },
