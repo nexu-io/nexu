@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { selectPreferredModel } from "@nexu/shared";
+import type { OpenClawConfig } from "@nexu/shared";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import {
@@ -281,13 +282,39 @@ export class OpenClawSyncService {
         )
       : undefined;
 
-    const compiled = compileOpenClawConfig(
+    const rawCompiled = compileOpenClawConfig(
       config,
       this.env,
       oauthState,
       installedSlugs,
       workspaceMap,
     );
+
+    const hasAnyProvider =
+      Object.keys(rawCompiled.models?.providers ?? {}).length > 0;
+
+    // When no model provider is configured (e.g. after link logout with no
+    // BYOK keys), strip the model from agents so OpenClaw cannot fall back
+    // to its built-in registry with the bare model name. This normalization
+    // must happen BEFORE shouldPushConfig() — otherwise the pre-normalized
+    // hash we diff against diverges from the post-normalized hash we store
+    // via noteConfigWritten(), which would mark every subsequent no-provider
+    // sync as changed and trigger spurious touchAnySkillMarker() runs.
+    // Rebuild immutably (no in-place mutation of the compiled object).
+    const compiled: OpenClawConfig = hasAnyProvider
+      ? rawCompiled
+      : {
+          ...rawCompiled,
+          agents: {
+            ...rawCompiled.agents,
+            defaults: rawCompiled.agents.defaults
+              ? { ...rawCompiled.agents.defaults, model: undefined }
+              : rawCompiled.agents.defaults,
+            list: (rawCompiled.agents.list ?? []).map((agent) =>
+              agent.model ? { ...agent, model: undefined } : agent,
+            ),
+          },
+        };
 
     logger.info(
       {
@@ -313,26 +340,6 @@ export class OpenClawSyncService {
     }
 
     // 2. Always write files once (persistence + watcher hot-reload path).
-    const hasAnyProvider =
-      Object.keys(compiled.models?.providers ?? {}).length > 0;
-
-    // When no model provider is configured (e.g. after link logout with no
-    // BYOK keys), strip the model from agents so OpenClaw cannot fall back
-    // to its built-in registry with the bare model name.  This is a
-    // hot-reload-safe change (agents.list → dynamic reads, no gateway restart).
-    if (!hasAnyProvider) {
-      if (compiled.agents.defaults?.model) {
-        compiled.agents.defaults = {
-          ...compiled.agents.defaults,
-          model: undefined,
-        };
-      }
-      for (const agent of compiled.agents.list ?? []) {
-        if (agent.model) {
-          agent.model = undefined;
-        }
-      }
-    }
 
     await this.configWriter.write(compiled);
     await this.authProfilesWriter.writeForAgents(
@@ -359,6 +366,11 @@ export class OpenClawSyncService {
     if (runtimeModelRef) {
       await this.runtimeModelWriter.write(runtimeModelRef);
     } else {
+      // TODO(alche): This writes `noModelMessage` into the runtime-model state
+      // file, but the downstream OpenClaw/runtime consumer still primarily acts
+      // on non-empty `selectedModelRef` / `promptNotice`. Wire that reader path
+      // to surface `noModelMessage` explicitly so users see this guidance
+      // instead of falling through to a generic runtime/provider error.
       await this.runtimeModelWriter.writeNoModelState(
         resolveNoModelConfiguredMessage(locale),
       );
