@@ -89,7 +89,8 @@ export function compileChannelBindings(
 export function compileChannelsConfig(params: {
   channels: ChannelResponse[];
   secrets: Record<string, string>;
-  controllerBaseUrl: string;
+  gatewayBaseUrl: string;
+  gatewayToken?: string;
 }): OpenClawConfig["channels"] {
   const slackAccounts: Record<string, SlackAccountConfig> = {};
   const discordAccounts: Record<string, DiscordAccountConfig> = {};
@@ -180,8 +181,8 @@ export function compileChannelsConfig(params: {
         enabled: true,
         clientId: secret("clientId") || channel.appId || "",
         clientSecret: secret("clientSecret"),
-        enableMediaUpload: false,
-        gatewayBaseUrl: params.controllerBaseUrl,
+        gatewayBaseUrl: params.gatewayBaseUrl,
+        ...(params.gatewayToken ? { gatewayToken: params.gatewayToken } : {}),
         dmPolicy: "open",
         allowFrom: ["*"],
         groupPolicy: "open",

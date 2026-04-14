@@ -425,6 +425,67 @@ describe("SessionsRuntime", () => {
     expect(session?.title).toBe("WeChat ClawBot");
   });
 
+  it("infers dingtalk channel and sender name from the sessions index openai-user context", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "nexu-sessions-runtime-"));
+    const runtime = new SessionsRuntime(
+      createEnv({
+        openclawStateDir: rootDir,
+        openclawConfigPath: path.join(rootDir, "openclaw.json"),
+        openclawSkillsDir: path.join(rootDir, "skills"),
+        openclawWorkspaceTemplatesDir: path.join(
+          rootDir,
+          "workspace-templates",
+        ),
+      }),
+    );
+
+    const sessionsDir = path.join(rootDir, "agents", "main", "sessions");
+    await mkdir(sessionsDir, { recursive: true });
+    const sessionKey = "2c3d5c06-2b91-4dd1-a8d2-b4e707645ff8";
+    const sessionPath = path.join(sessionsDir, `${sessionKey}.jsonl`);
+
+    await writeFile(
+      sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "msg-dingtalk-1",
+        timestamp: "2026-04-14T10:00:10.543Z",
+        message: {
+          role: "user",
+          timestamp: 1776160810538,
+          content: [{ type: "text", text: "你好" }],
+        },
+      })}\n`,
+      "utf8",
+    );
+    await writeFile(
+      sessionPath.replace(/\.jsonl$/, ".meta.json"),
+      `${JSON.stringify({ title: sessionKey }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(
+      path.join(sessionsDir, "sessions.json"),
+      `${JSON.stringify(
+        {
+          'agent:main:openai-user:{"channel":"dingtalk-connector","accountid":"__default__","chattype":"direct","peerid":"dingtalk-user-123","sendername":"Test User"}':
+            {
+              sessionId: sessionKey,
+              updatedAt: 1776161129268,
+            },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const sessions = await runtime.listSessions();
+    const session = sessions.find((item) => item.sessionKey === sessionKey);
+
+    expect(session?.channelType).toBe("dingtalk");
+    expect(session?.title).toBe("Test User · dingtalk");
+  });
+
   it("uses the WeChat ClawBot fallback even when an opaque @im.wechat sender id is present", async () => {
     // The iLink wechat protocol does not expose nicknames; inbound messages
     // only carry an opaque `<id>@im.wechat` sender id. Don't leak the raw

@@ -370,9 +370,18 @@ describe("compileOpenClawConfig", () => {
       enabled: true,
       clientId: "ding-client-id",
       clientSecret: "ding-client-secret",
+      gatewayBaseUrl: "http://127.0.0.1:18789",
+      gatewayToken: "token-123",
       dmPolicy: "open",
       groupPolicy: "open",
     });
+    expect(
+      (
+        result.gateway as {
+          http?: { endpoints?: { chatCompletions?: { enabled?: boolean } } };
+        }
+      ).http?.endpoints?.chatCompletions?.enabled,
+    ).toBe(true);
     expect(result.bindings).toContainEqual({
       agentId: "bot-1",
       match: {
