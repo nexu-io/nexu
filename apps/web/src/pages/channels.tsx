@@ -10,6 +10,10 @@ import { WhatsappSetupView } from "@/components/channel-setup/whatsapp-setup-vie
 import { useBotQuota } from "@/hooks/use-bot-quota";
 import { useCountdown } from "@/hooks/use-countdown";
 import { getChannelChatUrl } from "@/lib/channel-links";
+import {
+  type ChannelLiveStatus,
+  getChannelStatusLabel,
+} from "@/lib/channel-live-status";
 import { track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -341,7 +345,18 @@ function ConfiguredView({
   const liveStatus = liveStatusData
     ? (liveEntry?.status ?? "connecting")
     : "connecting";
-  const liveError = liveEntry?.lastError ?? null;
+  const liveStatusLabel = getChannelStatusLabel(
+    liveStatus as ChannelLiveStatus,
+    {
+      connected: t("channels.statusConnected", {
+        platform: PLATFORM_LABELS[platform],
+      }),
+      connecting: `${PLATFORM_LABELS[platform]} ${t("channels.statusConnecting")}`,
+      disconnected: `${PLATFORM_LABELS[platform]} ${t("channels.statusError")}`,
+      error: `${PLATFORM_LABELS[platform]} ${t("channels.statusError")}`,
+      restarting: `${PLATFORM_LABELS[platform]} ${t("channels.statusConnecting")}`,
+    },
+  );
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
@@ -455,30 +470,20 @@ function ConfiguredView({
           </div>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-text-primary">
-              {liveStatus === "error" || liveStatus === "disconnected"
-                ? `${PLATFORM_LABELS[platform]} ${t("channels.statusError")}`
-                : liveStatus === "connecting" || liveStatus === "restarting"
-                  ? `${PLATFORM_LABELS[platform]} ${t("channels.statusConnecting")}`
-                  : t("channels.statusConnected", {
-                      platform: PLATFORM_LABELS[platform],
-                    })}
+              {liveStatusLabel}
             </div>
             <div className="text-[11px] text-text-muted mt-0.5">
-              {liveError ? (
-                <span className="text-red-400">{liveError}</span>
-              ) : (
-                <>
-                  {channel.teamName ?? channel.accountId}
-                  {channel.createdAt &&
-                    ` \u00B7 ${t("channels.configuredDate", { date: new Date(channel.createdAt).toLocaleDateString() })}`}
-                  {liveStatus === "connected" && (
-                    <>
-                      {" \u00B7 "}
-                      {t("channels.connectionActive")}
-                    </>
-                  )}
-                </>
-              )}
+              <>
+                {channel.teamName ?? channel.accountId}
+                {channel.createdAt &&
+                  ` \u00B7 ${t("channels.configuredDate", { date: new Date(channel.createdAt).toLocaleDateString() })}`}
+                {liveStatus === "connected" && (
+                  <>
+                    {" \u00B7 "}
+                    {t("channels.connectionActive")}
+                  </>
+                )}
+              </>
             </div>
           </div>
           <button

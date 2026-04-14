@@ -29,6 +29,10 @@ import {
 import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
+import {
+  type ChannelLiveStatus,
+  getChannelStatusLabel,
+} from "@/lib/channel-live-status";
 import { normalizeChannel, track } from "@/lib/tracking";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Cable, X } from "lucide-react";
@@ -51,13 +55,6 @@ import {
   getApiV1ChannelsLiveStatus,
   getApiV1Sessions,
 } from "../../lib/api/sdk.gen";
-
-type ChannelLiveStatus =
-  | "connected"
-  | "connecting"
-  | "disconnected"
-  | "error"
-  | "restarting";
 
 type ChannelLiveStatusEntry = {
   channelType: string;
@@ -276,7 +273,6 @@ function getChannelOptions(t: (key: string) => string) {
 function getChannelStatusMeta(
   status: ChannelLiveStatus | undefined,
   t: (key: string) => string,
-  lastError?: string | null,
 ): { colorClass: string; pulse: boolean; label: string } {
   switch (status) {
     case "connected":
@@ -295,24 +291,37 @@ function getChannelStatusMeta(
       return {
         colorClass: "bg-[var(--color-warning)]",
         pulse: true,
-        label: t("home.channel.restarting"),
+        label: getChannelStatusLabel(status, {
+          connected: t("home.connected"),
+          connecting: t("home.channelConnecting"),
+          disconnected: t("home.channel.disconnected"),
+          error: t("home.channel.error"),
+          restarting: t("home.channel.restarting"),
+        }),
       };
-    case "error": {
-      const errorKey = lastError ? `home.channel.errorDetail.${lastError}` : "";
-      const hasDetail = lastError && t(errorKey) !== errorKey;
+    case "error":
       return {
-        colorClass: hasDetail
-          ? "bg-[var(--color-warning)]"
-          : "bg-[var(--color-danger)]",
+        colorClass: "bg-[var(--color-danger)]",
         pulse: false,
-        label: hasDetail ? t(errorKey) : t("home.channel.error"),
+        label: getChannelStatusLabel(status, {
+          connected: t("home.connected"),
+          connecting: t("home.channelConnecting"),
+          disconnected: t("home.channel.disconnected"),
+          error: t("home.channel.error"),
+          restarting: t("home.channel.restarting"),
+        }),
       };
-    }
     default:
       return {
         colorClass: "bg-text-muted/40",
         pulse: false,
-        label: t("home.channel.disconnected"),
+        label: getChannelStatusLabel(status, {
+          connected: t("home.connected"),
+          connecting: t("home.channelConnecting"),
+          disconnected: t("home.channel.disconnected"),
+          error: t("home.channel.error"),
+          restarting: t("home.channel.restarting"),
+        }),
       };
   }
 }
@@ -668,7 +677,7 @@ export function HomePage() {
       return;
     }
     if (pending.status === "error") {
-      toast.error(pending.lastError ?? t("home.channel.error"), {
+      toast.error(t("home.channel.error"), {
         id: toastId,
       });
       connectingToastIdRef.current = null;
@@ -1076,11 +1085,7 @@ export function HomePage() {
                     (!statusEntry || statusEntry.status === "disconnected")
                       ? "connecting"
                       : statusEntry?.status;
-                  const statusMeta = getChannelStatusMeta(
-                    effectiveStatus,
-                    t,
-                    statusEntry?.lastError,
-                  );
+                  const statusMeta = getChannelStatusMeta(effectiveStatus, t);
                   const isConnectedLive = effectiveStatus === "connected";
                   const channelChatUrl = connectedChannel
                     ? getChannelChatUrl(
@@ -1131,7 +1136,7 @@ export function HomePage() {
                           {ch.name}
                         </span>
                         <span
-                          title={statusEntry?.lastError ?? statusMeta.label}
+                          title={statusMeta.label}
                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusMeta.colorClass} ${statusMeta.pulse ? "animate-pulse" : ""}`}
                         />
                       </div>
