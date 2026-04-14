@@ -4,9 +4,9 @@ import { dirname, join, resolve } from "node:path";
 import { devTmpPath, repoRootPath } from "@nexu/dev-utils";
 import { resolveSlimclawRuntimePaths } from "@nexu/slimclaw";
 
-import { controllerWorkingDirectoryPath, scriptsDevPath } from "./paths.js";
+import { controllerWorkingDirectoryPath, toolsDevPath } from "./paths.js";
 
-type ScriptsDevRuntimeConfig = {
+type ToolsDevRuntimeConfig = {
   devLogLevel: string;
   devLogPretty: boolean;
   controllerPort: number;
@@ -30,9 +30,9 @@ type ScriptsDevRuntimeConfig = {
   openclawGatewayToken: string;
 };
 
-const scriptsDevEnvPath = join(scriptsDevPath, ".env");
+const toolsDevEnvPath = join(toolsDevPath, ".env");
 
-let cachedConfig: ScriptsDevRuntimeConfig | null = null;
+let cachedConfig: ToolsDevRuntimeConfig | null = null;
 const slimclawRuntimePaths = resolveSlimclawRuntimePaths({
   workspaceRoot: repoRootPath,
   requirePrepared: false,
@@ -100,12 +100,12 @@ function resolvePath(value: string | undefined, fallback: string): string {
   return resolve(repoRootPath, value);
 }
 
-export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
+export function getToolsDevRuntimeConfig(): ToolsDevRuntimeConfig {
   if (cachedConfig) {
     return cachedConfig;
   }
 
-  const fileEnv = parseEnvFile(scriptsDevEnvPath);
+  const fileEnv = parseEnvFile(toolsDevEnvPath);
   const mergedEnv = {
     ...fileEnv,
     ...process.env,
@@ -182,7 +182,7 @@ export function getScriptsDevRuntimeConfig(): ScriptsDevRuntimeConfig {
 }
 
 export function createControllerInjectedEnv(): NodeJS.ProcessEnv {
-  const config = getScriptsDevRuntimeConfig();
+  const config = getToolsDevRuntimeConfig();
 
   return {
     PORT: String(config.controllerPort),
@@ -208,7 +208,7 @@ export function createControllerInjectedEnv(): NodeJS.ProcessEnv {
 }
 
 export function createWebInjectedEnv(): NodeJS.ProcessEnv {
-  const config = getScriptsDevRuntimeConfig();
+  const config = getToolsDevRuntimeConfig();
 
   return {
     WEB_HOST: "127.0.0.1",
@@ -219,7 +219,7 @@ export function createWebInjectedEnv(): NodeJS.ProcessEnv {
 }
 
 export function createOpenclawInjectedEnv(): NodeJS.ProcessEnv {
-  const config = getScriptsDevRuntimeConfig();
+  const config = getToolsDevRuntimeConfig();
 
   return {
     OPENCLAW_STATE_DIR: config.openclawStateDir,
@@ -230,7 +230,7 @@ export function createOpenclawInjectedEnv(): NodeJS.ProcessEnv {
 }
 
 export function createDesktopInjectedEnv(): NodeJS.ProcessEnv {
-  const config = getScriptsDevRuntimeConfig();
+  const config = getToolsDevRuntimeConfig();
 
   return {
     VITE_DESKTOP_PLATFORM: process.platform,
@@ -252,12 +252,12 @@ export function createDesktopInjectedEnv(): NodeJS.ProcessEnv {
   };
 }
 
-export function getScriptsDevEnvPath(): string {
-  return scriptsDevEnvPath;
+export function getToolsDevEnvPath(): string {
+  return toolsDevEnvPath;
 }
 
 export function getOpenclawWorkingDirectoryPath(): string {
-  return dirname(getScriptsDevRuntimeConfig().openclawConfigPath);
+  return dirname(getToolsDevRuntimeConfig().openclawConfigPath);
 }
 
 export function getControllerWorkingDirectoryPath(): string {

@@ -12,7 +12,7 @@ import {
 } from "@nexu/dev-utils";
 
 import { getControllerPortPid } from "../services/controller.js";
-import { getScriptsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
+import { getToolsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
 import {
   controllerDevLockPath,
   controllerSourceDirectoryPath,
@@ -38,7 +38,7 @@ if (!sessionId) {
 
 const controllerRunId = runId;
 const controllerSessionId = sessionId;
-const runtimeConfig = getScriptsDevRuntimeConfig();
+const runtimeConfig = getToolsDevRuntimeConfig();
 
 function createControllerWorkerCommand(): { command: string; args: string[] } {
   const { loaderUrl, preflightPath } = resolveTsxPaths();

@@ -68,7 +68,7 @@ https://github.com/nexu-io/nexu/pull/834
 - **修复**：`scripts/dev-launchd.sh` 加 `NEXU_WORKSPACE_ROOT="$REPO_ROOT"`
 
 ### 13. Controller supervisor debounce
-- **问题**：`scripts/dev/src/supervisors/controller.ts` 的 chokidar watcher 没有 debounce/锁，文件变化连续触发多个并发 restart
+- **问题**：`tools/dev/src/supervisors/controller.ts` 的 chokidar watcher 没有 debounce/锁，文件变化连续触发多个并发 restart
 - **修复**：500ms debounce + `restartPending` 锁
 
 ## 待解决
@@ -212,6 +212,6 @@ curl -X PUT http://localhost:50800/api/internal/desktop/default-model \
 | `apps/controller/src/app/env.ts` | creditGuardStatePath |
 | `apps/controller/src/routes/desktop-routes.ts` | locale 切换触发 sync |
 | `scripts/dev-launchd.sh` | NEXU_WORKSPACE_ROOT fix |
-| `scripts/dev/src/supervisors/controller.ts` | supervisor debounce |
+| `tools/dev/src/supervisors/controller.ts` | supervisor debounce |
 | `specs/references/openclaw-error-handling-internals.md` | 技术调研文档 |
 | `AGENTS.md` | 链接了调研文档 |

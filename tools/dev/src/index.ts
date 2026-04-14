@@ -36,7 +36,7 @@ import { logger as rootLogger } from "./shared/logger.js";
 import { defaultLogTailLineCount } from "./shared/logs.js";
 import { createDevSessionId } from "./shared/trace.js";
 
-const cli = cac("scripts-dev");
+const cli = cac("dev");
 const logger = rootLogger.child({ component: "cli" });
 
 const devTargets = ["desktop", "openclaw", "controller", "web"] as const;
@@ -48,6 +48,45 @@ type SnapshotLike = {
   status: "running" | "stopped" | "stale";
   staleReason?: string;
 };
+
+function readDevCommandTimeoutMs(
+  action: "start" | "restart",
+  isStack: boolean,
+): number {
+  const envKey = isStack
+    ? `NEXU_DEV_${action.toUpperCase()}_STACK_TIMEOUT_MS`
+    : `NEXU_DEV_${action.toUpperCase()}_TIMEOUT_MS`;
+  const fallback = isStack ? 180000 : 45000;
+  const rawValue = process.env[envKey];
+  const parsed = Number.parseInt(rawValue ?? "", 10);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function runWithCommandTimeout<T>(
+  action: "start" | "restart",
+  scope: string,
+  isStack: boolean,
+  run: () => Promise<T>,
+): Promise<T> {
+  const timeoutMs = readDevCommandTimeoutMs(action, isStack);
+  const timeoutHandle = setTimeout(() => {
+    logger.error(`${action} timed out`, {
+      action,
+      scope,
+      timeoutMs,
+    });
+    process.exit(1);
+  }, timeoutMs);
+
+  timeoutHandle.unref();
+
+  try {
+    return await run();
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
 
 function warnIfSnapshotIsStale(snapshot: SnapshotLike): void {
   if (snapshot.status !== "stale") {
@@ -280,26 +319,34 @@ cli
   .command("start [target]", "Start one local dev service")
   .action(async (target?: string) => {
     if (!target) {
-      await startDefaultStack();
+      await runWithCommandTimeout("start", "stack", true, () =>
+        startDefaultStack(),
+      );
       return;
     }
 
     const resolvedTarget = readTargetOrThrow(target);
     const sessionId = createDevSessionId();
-    await startTarget(resolvedTarget, sessionId);
+    await runWithCommandTimeout("start", resolvedTarget, false, () =>
+      startTarget(resolvedTarget, sessionId),
+    );
   });
 
 cli
   .command("restart [target]", "Restart one local dev service")
   .action(async (target?: string) => {
     if (!target) {
-      await restartDefaultStack();
+      await runWithCommandTimeout("restart", "stack", true, () =>
+        restartDefaultStack(),
+      );
       return;
     }
 
     const resolvedTarget = readTargetOrThrow(target);
     const sessionId = createDevSessionId();
-    await restartTarget(resolvedTarget, sessionId);
+    await runWithCommandTimeout("restart", resolvedTarget, false, () =>
+      restartTarget(resolvedTarget, sessionId),
+    );
   });
 
 cli
@@ -334,14 +381,16 @@ cli
     if (resolvedTarget === "desktop") {
       const snapshot = await getCurrentDesktopDevSnapshot();
 
-      if (snapshot.status === "stopped") {
-        throw new Error(getNoActiveLogMessage(snapshot));
-      }
-
       warnIfSnapshotIsStale(snapshot);
 
       const content = await readDesktopDevLog();
       printLogHeader(content.logFilePath, content.totalLineCount);
+      if (snapshot.status === "stopped") {
+        logger.warn(getNoActiveLogMessage(snapshot), {
+          service: snapshot.service,
+          logFilePath: content.logFilePath,
+        });
+      }
       process.stdout.write(content.content);
       return;
     }
@@ -349,14 +398,16 @@ cli
     if (resolvedTarget === "openclaw") {
       const snapshot = await getCurrentOpenclawDevSnapshot();
 
-      if (snapshot.status === "stopped") {
-        throw new Error(getNoActiveLogMessage(snapshot));
-      }
-
       warnIfSnapshotIsStale(snapshot);
 
       const content = await readOpenclawDevLog();
       printLogHeader(content.logFilePath, content.totalLineCount);
+      if (snapshot.status === "stopped") {
+        logger.warn(getNoActiveLogMessage(snapshot), {
+          service: snapshot.service,
+          logFilePath: content.logFilePath,
+        });
+      }
       process.stdout.write(content.content);
       return;
     }
@@ -364,28 +415,32 @@ cli
     if (resolvedTarget === "controller") {
       const snapshot = await getCurrentControllerDevSnapshot();
 
-      if (snapshot.status === "stopped") {
-        throw new Error(getNoActiveLogMessage(snapshot));
-      }
-
       warnIfSnapshotIsStale(snapshot);
 
       const content = await readControllerDevLog();
       printLogHeader(content.logFilePath, content.totalLineCount);
+      if (snapshot.status === "stopped") {
+        logger.warn(getNoActiveLogMessage(snapshot), {
+          service: snapshot.service,
+          logFilePath: content.logFilePath,
+        });
+      }
       process.stdout.write(content.content);
       return;
     }
 
     const snapshot = await getCurrentWebDevSnapshot();
 
-    if (snapshot.status === "stopped") {
-      throw new Error(getNoActiveLogMessage(snapshot));
-    }
-
     warnIfSnapshotIsStale(snapshot);
 
     const content = await readWebDevLog();
     printLogHeader(content.logFilePath, content.totalLineCount);
+    if (snapshot.status === "stopped") {
+      logger.warn(getNoActiveLogMessage(snapshot), {
+        service: snapshot.service,
+        logFilePath: content.logFilePath,
+      });
+    }
     process.stdout.write(content.content);
   });
 

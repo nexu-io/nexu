@@ -1,4 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+
+import { devLogsPath } from "@nexu/dev-utils";
 
 export const defaultLogTailLineCount = 200;
 
@@ -41,4 +44,29 @@ export async function readLogTailFromFile(
     logFilePath,
     totalLineCount: lines.length,
   };
+}
+
+export async function readLatestNamedLogTail(
+  logFileName: string,
+  maxLines = defaultLogTailLineCount,
+): Promise<DevLogTail | null> {
+  const entries = await readdir(devLogsPath, { withFileTypes: true }).catch(
+    () => [],
+  );
+
+  const runDirectories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left));
+
+  for (const runDirectory of runDirectories) {
+    const logFilePath = join(devLogsPath, runDirectory, logFileName);
+
+    try {
+      await access(logFilePath);
+      return await readLogTailFromFile(logFilePath, maxLines);
+    } catch {}
+  }
+
+  return null;
 }

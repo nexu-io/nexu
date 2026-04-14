@@ -19,10 +19,14 @@ import { prepareSlimclawRuntimeStage } from "@nexu/slimclaw";
 
 import {
   createOpenclawInjectedEnv,
-  getScriptsDevRuntimeConfig,
+  getToolsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
 import { logger as rootLogger } from "../shared/logger.js";
-import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
+import {
+  type DevLogTail,
+  readLatestNamedLogTail,
+  readLogTailFromFile,
+} from "../shared/logs.js";
 import {
   getOpenclawDevLogPath,
   getOpenclawRuntimeStageRootPath,
@@ -48,6 +52,8 @@ export type OpenclawDevSnapshot = {
   sessionId?: string;
   logFilePath?: string;
 };
+
+type OpenclawReadyProbeResult = { ok: true } | { ok: false; reason: string };
 
 function logOpenclawTiming(stage: string, startedAt: number): void {
   logger.debug("openclaw timing", {
@@ -78,13 +84,13 @@ function createOpenclawCommand(sessionId: string): {
 
 export async function getOpenclawPortPid(): Promise<number> {
   return getListeningPortPid(
-    getScriptsDevRuntimeConfig().openclawPort,
+    getToolsDevRuntimeConfig().openclawPort,
     "openclaw gateway",
   );
 }
 
 async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
-  const port = getScriptsDevRuntimeConfig().openclawPort;
+  const port = getToolsDevRuntimeConfig().openclawPort;
   const attempts = 120;
   const delayMs = 500;
   const heartbeatEveryAttempts = 4;
@@ -119,26 +125,34 @@ async function waitForOpenclawPortPid(supervisorPid: number): Promise<number> {
   throw new Error(`openclaw gateway did not open port ${port}`);
 }
 
-async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
-  const healthUrl = `${runtimeConfig.openclawBaseUrl}/health`;
+async function waitForOpenclawReady(supervisorPid: number): Promise<void> {
+  const runtimeConfig = getToolsDevRuntimeConfig();
+  const readyUrl = `${runtimeConfig.openclawBaseUrl}/ready`;
   const attempts = 20;
   const delayMs = 500;
   const waitStartedAt = Date.now();
+  let lastFailureReason = "unknown readiness probe failure";
 
   for (let index = 0; index < attempts; index += 1) {
-    if (await getOpenclawHealthStatus()) {
+    const readyProbe = await getOpenclawReadyStatus();
+
+    if (readyProbe.ok) {
       return;
     }
 
+    lastFailureReason = readyProbe.reason;
+
     if (!isProcessRunning(supervisorPid)) {
-      throw new Error("openclaw supervisor exited before health check passed");
+      throw new Error(
+        "openclaw supervisor exited before readiness check passed",
+      );
     }
 
     if ((index + 1) % 4 === 0) {
-      logger.info("waiting for openclaw health endpoint", {
+      logger.info("waiting for openclaw readiness endpoint", {
         supervisorPid,
-        healthUrl,
+        readyUrl,
+        lastFailureReason,
         elapsedMs: Date.now() - waitStartedAt,
       });
     }
@@ -149,26 +163,76 @@ async function waitForOpenclawHealth(supervisorPid: number): Promise<void> {
   }
 
   if (!isProcessRunning(supervisorPid)) {
-    throw new Error("openclaw supervisor exited before health check passed");
+    throw new Error("openclaw supervisor exited before readiness check passed");
   }
 
   throw new Error(
-    `openclaw health endpoint did not become ready at ${healthUrl}`,
+    `openclaw readiness endpoint did not become ready at ${readyUrl} (${lastFailureReason})`,
   );
 }
 
-async function getOpenclawHealthStatus(): Promise<boolean> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getOpenclawReadyStatus(): Promise<OpenclawReadyProbeResult> {
+  const runtimeConfig = getToolsDevRuntimeConfig();
 
   try {
-    const response = await fetch(`${runtimeConfig.openclawBaseUrl}/health`, {
+    const response = await fetch(`${runtimeConfig.openclawBaseUrl}/ready`, {
       signal: AbortSignal.timeout(1000),
     });
 
-    return response.ok;
-  } catch {
-    return false;
+    if (response.ok) {
+      return { ok: true };
+    }
+
+    const body = await response.text().catch(() => "");
+
+    return {
+      ok: false,
+      reason: body
+        ? `http ${response.status}: ${body}`
+        : `http ${response.status}`,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      return {
+        ok: false,
+        reason: `${error.name}: ${error.message}`,
+      };
+    }
+
+    return {
+      ok: false,
+      reason: String(error),
+    };
   }
+}
+
+async function getStableOpenclawReadyStatus(): Promise<OpenclawReadyProbeResult> {
+  const attempts = 3;
+
+  for (let index = 0; index < attempts; index += 1) {
+    const result = await getOpenclawReadyStatus();
+
+    if (result.ok) {
+      return result;
+    }
+
+    if (!result.reason.includes("TimeoutError")) {
+      return result;
+    }
+
+    if (index < attempts - 1) {
+      await sleep(200);
+    }
+  }
+
+  return {
+    ok: false,
+    reason: "TimeoutError: readiness probe timed out after 3 attempts",
+  };
 }
 
 async function waitForOpenclawCurrentLock(options: {
@@ -235,7 +299,7 @@ export async function startOpenclawDevProcess(options: {
   const sessionId = options.sessionId;
   const logFilePath = getOpenclawDevLogPath(runId);
   const commandSpec = createOpenclawCommand(sessionId);
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
   const runLogger = logger.child({
     runId,
     sessionId,
@@ -300,7 +364,7 @@ export async function startOpenclawDevProcess(options: {
   logOpenclawTiming(`listener-pid=${listenerPid}`, startedAt);
 
   try {
-    await waitForOpenclawHealth(supervisorPid);
+    await waitForOpenclawReady(supervisorPid);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -308,7 +372,7 @@ export async function startOpenclawDevProcess(options: {
     );
   }
 
-  logOpenclawTiming("health-ready", startedAt);
+  logOpenclawTiming("ready", startedAt);
 
   const recordedLock = await waitForOpenclawCurrentLock({
     runId,
@@ -392,9 +456,9 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       listenerPid = await getOpenclawPortPid();
     } catch {}
 
-    const healthOk = await getOpenclawHealthStatus();
+    const readyProbe = await getStableOpenclawReadyStatus();
 
-    if (listenerPid && healthOk) {
+    if (listenerPid && readyProbe.ok) {
       return {
         service: "openclaw",
         status: "running",
@@ -416,7 +480,7 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       workerPid,
       listenerPid,
       staleReason: listenerPid
-        ? "openclaw health endpoint is not ready"
+        ? `openclaw readiness endpoint is not ready (${readyProbe.reason})`
         : "openclaw listener is not running",
       runId: lock.runId,
       sessionId: lock.sessionId,
@@ -427,8 +491,12 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
       try {
         const listenerPid = await getOpenclawPortPid();
 
-        if (!(await getOpenclawHealthStatus())) {
-          throw new Error("openclaw health endpoint is not ready");
+        const readyProbe = await getStableOpenclawReadyStatus();
+
+        if (!readyProbe.ok) {
+          throw new Error(
+            `openclaw readiness endpoint is not ready (${readyProbe.reason})`,
+          );
         }
 
         return {
@@ -452,9 +520,15 @@ export async function getCurrentOpenclawDevSnapshot(): Promise<OpenclawDevSnapsh
 export async function readOpenclawDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentOpenclawDevSnapshot();
 
-  ensure(Boolean(snapshot.logFilePath)).orThrow(
+  if (snapshot.logFilePath) {
+    return readLogTailFromFile(snapshot.logFilePath);
+  }
+
+  const latestLog = await readLatestNamedLogTail("openclaw.log");
+
+  ensure(Boolean(latestLog)).orThrow(
     () => new Error("openclaw dev log is unavailable"),
   );
 
-  return readLogTailFromFile(snapshot.logFilePath as string);
+  return latestLog as DevLogTail;
 }

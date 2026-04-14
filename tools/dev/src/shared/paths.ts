@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { devLogsPath, devTmpPath, repoRootPath } from "@nexu/dev-utils";
 import { getSlimclawRuntimeRoot } from "@nexu/slimclaw";
 
-export const scriptsDevPath = join(repoRootPath, "scripts", "dev");
-export const scriptsDevSourcePath = join(scriptsDevPath, "src");
+export const toolsDevPath = join(repoRootPath, "tools", "dev");
+export const toolsDevSourcePath = join(toolsDevPath, "src");
 
 export const controllerWorkingDirectoryPath = join(
   repoRootPath,
@@ -20,22 +20,22 @@ export const webWorkingDirectoryPath = join(repoRootPath, "apps", "web");
 export const openclawWorkingDirectoryPath = repoRootPath;
 
 export const controllerSupervisorPath = join(
-  scriptsDevSourcePath,
+  toolsDevSourcePath,
   "supervisors",
   "controller.ts",
 );
 export const webSupervisorPath = join(
-  scriptsDevSourcePath,
+  toolsDevSourcePath,
   "supervisors",
   "web.ts",
 );
 export const openclawSupervisorPath = join(
-  scriptsDevSourcePath,
+  toolsDevSourcePath,
   "supervisors",
   "openclaw.ts",
 );
 export const desktopSupervisorPath = join(
-  scriptsDevSourcePath,
+  toolsDevSourcePath,
   "supervisors",
   "desktop.ts",
 );

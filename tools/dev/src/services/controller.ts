@@ -17,10 +17,14 @@ import { ensure } from "@nexu/shared";
 
 import {
   createControllerInjectedEnv,
-  getScriptsDevRuntimeConfig,
+  getToolsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
 import { logger as rootLogger } from "../shared/logger.js";
-import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
+import {
+  type DevLogTail,
+  readLatestNamedLogTail,
+  readLogTailFromFile,
+} from "../shared/logs.js";
 import {
   controllerDevLockPath,
   controllerSupervisorPath,
@@ -66,7 +70,7 @@ function createControllerCommand(sessionId: string): {
 
 export async function getControllerPortPid(): Promise<number> {
   return getListeningPortPid(
-    getScriptsDevRuntimeConfig().controllerPort,
+    getToolsDevRuntimeConfig().controllerPort,
     "controller dev server",
   );
 }
@@ -75,7 +79,7 @@ async function waitForControllerPortPid(
   supervisorPid?: number,
 ): Promise<number> {
   return waitForListeningPortPid(
-    getScriptsDevRuntimeConfig().controllerPort,
+    getToolsDevRuntimeConfig().controllerPort,
     "controller dev server",
     {
       // Match supervisor headroom — Windows cold-start can take ~15s.
@@ -88,7 +92,7 @@ async function waitForControllerPortPid(
 }
 
 async function getControllerHealthStatus(): Promise<boolean> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
 
   try {
     const response = await fetch(`${runtimeConfig.controllerUrl}/health`, {
@@ -110,7 +114,7 @@ async function getControllerHealthStatus(): Promise<boolean> {
 }
 
 async function waitForControllerHealth(supervisorPid: number): Promise<void> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
   const healthUrl = `${runtimeConfig.controllerUrl}/health`;
 
   for (let index = 0; index < 40; index += 1) {
@@ -159,7 +163,7 @@ async function cleanupStaleControllerPort(): Promise<void> {
 }
 
 async function ensureOpenclawReadyForController(): Promise<void> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
   const healthUrl = `${runtimeConfig.openclawBaseUrl}/health`;
 
   await waitForListeningPortPid(
@@ -387,9 +391,15 @@ export async function getCurrentControllerDevSnapshot(): Promise<ControllerDevSn
 export async function readControllerDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentControllerDevSnapshot();
 
-  ensure(Boolean(snapshot.logFilePath)).orThrow(
+  if (snapshot.logFilePath) {
+    return readLogTailFromFile(snapshot.logFilePath);
+  }
+
+  const latestLog = await readLatestNamedLogTail("controller.log");
+
+  ensure(Boolean(latestLog)).orThrow(
     () => new Error("controller dev log is unavailable"),
   );
 
-  return readLogTailFromFile(snapshot.logFilePath as string);
+  return latestLog as DevLogTail;
 }

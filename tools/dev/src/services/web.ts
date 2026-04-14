@@ -18,11 +18,15 @@ import { ensure } from "@nexu/shared";
 
 import {
   createWebInjectedEnv,
-  getScriptsDevRuntimeConfig,
+  getToolsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
 import { createDesktopInjectedEnv } from "../shared/dev-runtime-config.js";
 import { logger as rootLogger } from "../shared/logger.js";
-import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
+import {
+  type DevLogTail,
+  readLatestNamedLogTail,
+  readLogTailFromFile,
+} from "../shared/logs.js";
 import {
   getWebDevLogPath,
   webDevLockPath,
@@ -68,14 +72,14 @@ function createWebCommand(sessionId: string): {
 
 async function getWebPortPid(): Promise<number> {
   return getListeningPortPid(
-    getScriptsDevRuntimeConfig().webPort,
+    getToolsDevRuntimeConfig().webPort,
     "web dev server",
   );
 }
 
 async function waitForWebPortPid(): Promise<number> {
   return waitForListeningPortPid(
-    getScriptsDevRuntimeConfig().webPort,
+    getToolsDevRuntimeConfig().webPort,
     "web dev server",
     {
       attempts: 20,
@@ -271,9 +275,15 @@ export async function getCurrentWebDevSnapshot(): Promise<WebDevSnapshot> {
 export async function readWebDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentWebDevSnapshot();
 
-  ensure(Boolean(snapshot.logFilePath)).orThrow(
+  if (snapshot.logFilePath) {
+    return readLogTailFromFile(snapshot.logFilePath);
+  }
+
+  const latestLog = await readLatestNamedLogTail("web.log");
+
+  ensure(Boolean(latestLog)).orThrow(
     () => new Error("web dev log is unavailable"),
   );
 
-  return readLogTailFromFile(snapshot.logFilePath as string);
+  return latestLog as DevLogTail;
 }

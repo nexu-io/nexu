@@ -21,10 +21,14 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import {
   createDesktopInjectedEnv,
-  getScriptsDevRuntimeConfig,
+  getToolsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
 import { logger as rootLogger } from "../shared/logger.js";
-import { type DevLogTail, readLogTailFromFile } from "../shared/logs.js";
+import {
+  type DevLogTail,
+  readLatestNamedLogTail,
+  readLogTailFromFile,
+} from "../shared/logs.js";
 import {
   desktopDevLockPath,
   desktopWorkingDirectoryPath,
@@ -154,7 +158,7 @@ function createDesktopViteCommand(): {
   command: string;
   args: string[];
 } {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
 
   return {
     command: process.execPath,
@@ -231,7 +235,7 @@ async function waitForDesktopShutdown(options?: {
   previousPid?: number;
   launchId?: string;
 }): Promise<void> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
 
   await waitFor(
     async () => {
@@ -273,7 +277,7 @@ async function waitForDesktopShutdown(options?: {
 }
 
 async function cleanupStaleDesktopDevServer(): Promise<void> {
-  const desktopDevPort = getScriptsDevRuntimeConfig().desktopDevPort;
+  const desktopDevPort = getToolsDevRuntimeConfig().desktopDevPort;
 
   try {
     const vitePid = await getListeningPortPid(
@@ -299,7 +303,7 @@ async function cleanupStaleDesktopDevServer(): Promise<void> {
 
 async function getDesktopInspectPortPid(): Promise<number> {
   return getListeningPortPid(
-    getScriptsDevRuntimeConfig().desktopInspectPort,
+    getToolsDevRuntimeConfig().desktopInspectPort,
     "desktop inspect server",
   );
 }
@@ -308,7 +312,7 @@ async function waitForDesktopInspectPortPid(
   supervisorPid?: number,
 ): Promise<number> {
   return waitForListeningPortPid(
-    getScriptsDevRuntimeConfig().desktopInspectPort,
+    getToolsDevRuntimeConfig().desktopInspectPort,
     "desktop inspect server",
     {
       attempts: 40,
@@ -481,7 +485,7 @@ export async function getDesktopDevInspectRendererLogs(options?: {
 export async function startDesktopDevProcess(options: {
   sessionId: string;
 }): Promise<DesktopDevSnapshot> {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
   await ensureDesktopDependenciesReady();
 
   const existingSnapshot = await getCurrentDesktopDevSnapshot();
@@ -716,7 +720,7 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
 
   try {
     const desktopVitePid = await getListeningPortPid(
-      getScriptsDevRuntimeConfig().desktopDevPort,
+      getToolsDevRuntimeConfig().desktopDevPort,
       "desktop dev server",
     );
     if (isProcessRunning(desktopVitePid)) {
@@ -741,7 +745,7 @@ export async function stopDesktopDevProcess(): Promise<DesktopDevSnapshot> {
 
     try {
       const desktopVitePid = await getListeningPortPid(
-        getScriptsDevRuntimeConfig().desktopDevPort,
+        getToolsDevRuntimeConfig().desktopDevPort,
         "desktop dev server",
       );
       await terminateDesktopPid(desktopVitePid, true);
@@ -774,7 +778,7 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
   try {
     const lock = await readDevLock(desktopDevLockPath);
     const logFilePath = getDesktopDevLogPath(lock.runId);
-    const runtimeConfig = getScriptsDevRuntimeConfig();
+    const runtimeConfig = getToolsDevRuntimeConfig();
 
     const buildSnapshot = async (
       desktopMainPid: number,
@@ -866,9 +870,15 @@ export async function getCurrentDesktopDevSnapshot(): Promise<DesktopDevSnapshot
 export async function readDesktopDevLog(): Promise<DevLogTail> {
   const snapshot = await getCurrentDesktopDevSnapshot();
 
-  ensure(Boolean(snapshot.logFilePath)).orThrow(
+  if (snapshot.logFilePath) {
+    return readLogTailFromFile(snapshot.logFilePath);
+  }
+
+  const latestLog = await readLatestNamedLogTail("desktop.log");
+
+  ensure(Boolean(latestLog)).orThrow(
     () => new Error("desktop dev log is unavailable"),
   );
 
-  return readLogTailFromFile(snapshot.logFilePath as string);
+  return latestLog as DevLogTail;
 }

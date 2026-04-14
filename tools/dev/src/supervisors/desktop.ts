@@ -9,7 +9,7 @@ import {
   writeDevLock,
 } from "@nexu/dev-utils";
 
-import { getScriptsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
+import { getToolsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
 import {
   desktopDevLockPath,
   desktopWorkingDirectoryPath,
@@ -31,7 +31,7 @@ const desktopRunId = runId;
 const desktopSessionId = sessionId;
 
 function createDesktopWorkerCommand(): { command: string; args: string[] } {
-  const runtimeConfig = getScriptsDevRuntimeConfig();
+  const runtimeConfig = getToolsDevRuntimeConfig();
 
   return {
     command: process.execPath,

@@ -9,7 +9,7 @@ import {
   writeDevLock,
 } from "@nexu/dev-utils";
 
-import { getScriptsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
+import { getToolsDevRuntimeConfig } from "../shared/dev-runtime-config.js";
 import { webDevLockPath, webWorkingDirectoryPath } from "../shared/paths.js";
 import { createDevTraceEnv } from "../shared/trace.js";
 
@@ -26,7 +26,7 @@ if (!sessionId) {
 
 const webRunId = runId;
 const webSessionId = sessionId;
-const runtimeConfig = getScriptsDevRuntimeConfig();
+const runtimeConfig = getToolsDevRuntimeConfig();
 
 function createWebWorkerCommand(): { command: string; args: string[] } {
   return {

@@ -11,7 +11,7 @@ import {
 import {
   createOpenclawInjectedEnv,
   getOpenclawWorkingDirectoryPath,
-  getScriptsDevRuntimeConfig,
+  getToolsDevRuntimeConfig,
 } from "../shared/dev-runtime-config.js";
 import { openclawDevLockPath } from "../shared/paths.js";
 import { createDevTraceEnv } from "../shared/trace.js";
@@ -29,7 +29,7 @@ if (!sessionId) {
 
 const openclawRunId = runId;
 const openclawSessionId = sessionId;
-const runtimeConfig = getScriptsDevRuntimeConfig();
+const runtimeConfig = getToolsDevRuntimeConfig();
 
 function createOpenclawWorkerCommand(): { command: string; args: string[] } {
   return {
