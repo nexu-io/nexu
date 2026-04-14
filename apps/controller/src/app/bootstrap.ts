@@ -10,24 +10,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForControlPlaneReady(
+async function waitForGatewayConnection(
   container: ControllerContainer,
   timeoutMs: number,
 ): Promise<void> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const result = await container.controlPlaneHealth.probe({
-      timeoutMs: 1500,
-    });
-    if (result.ok) {
+    if (container.wsClient.isConnected()) {
       return;
     }
 
     await sleep(CONTROL_PLANE_POLL_INTERVAL_MS);
   }
 
-  throw new Error("controller bootstrap timed out waiting for control plane");
+  throw new Error(
+    "controller bootstrap timed out waiting for gateway connection",
+  );
 }
 
 async function waitForStableControlPlane(
@@ -131,7 +130,7 @@ export async function bootstrapController(
 
     container.runtimeState.bootPhase = "attaching-external-runtime";
     container.wsClient.connect();
-    await waitForControlPlaneReady(
+    await waitForGatewayConnection(
       container,
       INITIAL_CONTROL_PLANE_READY_TIMEOUT_MS,
     );

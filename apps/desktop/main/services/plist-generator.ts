@@ -298,7 +298,8 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
         <string>gateway</string>
         <string>run</string>
         <string>--port</string>
-        <string>${env.openclawPort}</string>${authArgs}
+        <string>${env.openclawPort}</string>
+        <string>--allow-unconfigured</string>${authArgs}
     </array>
 
     <key>WorkingDirectory</key>

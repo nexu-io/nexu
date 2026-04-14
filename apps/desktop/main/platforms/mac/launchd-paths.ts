@@ -114,6 +114,8 @@ export async function ensureExternalNodeRunner(
     binaryName,
   );
 
+  await fs.mkdir(path.dirname(stagingRoot), { recursive: true });
+
   try {
     await execFileAsync("cp", ["-Rc", appBundlePath, stagingRoot]);
   } catch {
@@ -178,6 +180,8 @@ async function ensureExternalControllerSidecar(
     "runtime",
     "controller",
   );
+
+  await fs.mkdir(path.dirname(stagingRoot), { recursive: true });
 
   try {
     await execFileAsync("cp", ["-Rc", srcControllerDir, stagingRoot]);

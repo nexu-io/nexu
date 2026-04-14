@@ -420,7 +420,7 @@ export function createRuntimeUnitManifests(
     args: [controllerEntryPath],
     cwd: controllerRoot,
     port: runtimeConfig.ports.controller,
-    startupTimeoutMs: 15_000,
+    startupTimeoutMs: 30_000,
     autoStart: false,
     logFilePath: path.resolve(logsDir, "controller.log"),
     dependents: ["web"],

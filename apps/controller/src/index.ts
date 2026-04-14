@@ -7,7 +7,6 @@ import { flushV8CoverageIfEnabled } from "./lib/v8-coverage.js";
 
 async function main(): Promise<void> {
   const container = await createContainer();
-  const stopBackgroundLoops = await bootstrapController(container);
   const app = createApp(container);
   const server = serve(
     {
@@ -22,6 +21,8 @@ async function main(): Promise<void> {
       );
     },
   );
+
+  let stopBackgroundLoops = () => {};
 
   let shuttingDown = false;
 
@@ -66,6 +67,24 @@ async function main(): Promise<void> {
       process.exit(0);
     }
   };
+
+  try {
+    stopBackgroundLoops = await bootstrapController(container);
+  } catch (error) {
+    try {
+      await closeServer();
+    } catch {
+      // Best-effort cleanup on bootstrap failure.
+    }
+
+    try {
+      await container.openclawProcess.stop();
+    } catch {
+      // Best-effort cleanup on bootstrap failure.
+    }
+
+    throw error;
+  }
 
   process.on("SIGINT", () => {
     void shutdown();

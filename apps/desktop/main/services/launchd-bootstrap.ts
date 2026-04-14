@@ -188,7 +188,7 @@ async function ensureLogDir(nexuHome?: string): Promise<string> {
  */
 async function waitForControllerReadiness(
   port: number,
-  timeoutMs = 15000,
+  timeoutMs = 30_000,
 ): Promise<void> {
   const startedAt = Date.now();
   let attempt = 0;
@@ -274,19 +274,7 @@ async function probeControllerReady(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        ready?: boolean;
-        coreReady?: boolean;
-      } | null;
-      if (payload?.coreReady === true || payload?.ready === true) {
-        return { ok: true, probeUrl: readyUrl, status: response.status };
-      }
-      return {
-        ok: false,
-        probeUrl: readyUrl,
-        reason: "probe_status",
-        status: response.status,
-      };
+      return { ok: true, probeUrl: readyUrl, status: response.status };
     }
     if (response.status !== 404) {
       return {
@@ -1012,7 +1000,7 @@ export async function bootstrapWithLaunchd(
       launchd,
       label: labels.controller,
       port: effectivePorts.controllerPort,
-      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 15000,
+      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 30_000,
       probeTimeoutMs: 3000,
     });
 
@@ -1049,7 +1037,7 @@ export async function bootstrapWithLaunchd(
       launchd,
       label: labels.controller,
       port: retryPort,
-      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 15000,
+      timeoutMs: env.controllerStartupValidationTimeoutMs ?? 30_000,
       probeTimeoutMs: 3000,
     });
     if (retryValidation.ok) {
