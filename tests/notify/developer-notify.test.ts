@@ -99,6 +99,28 @@ describe("developer-notify", () => {
     ).resolves.toBe(false);
   });
 
+  it("times out stalled membership lookups", async () => {
+    const abortError = new Error("aborted");
+    abortError.name = "AbortError";
+    const fetchMock = vi.fn().mockRejectedValue(abortError);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      checkOrganizationMembership({
+        token: "token",
+        org: "nexu-io",
+        username: "octocat",
+      }),
+    ).rejects.toThrow("GitHub membership lookup timed out after 30000ms");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/orgs/nexu-io/members/octocat",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
   it("skips issue notification for internal authors", async () => {
     const fetchMock = vi
       .fn()

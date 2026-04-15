@@ -5,6 +5,18 @@ const GOOD_FIRST_ISSUE_URL =
   "https://github.com/nexu-io/nexu/labels/good-first-issue";
 const WEBHOOK_TIMEOUT_MS = 30_000;
 
+function createTimeoutSignal(timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    signal: controller.signal,
+    clear() {
+      clearTimeout(timeoutId);
+    },
+  };
+}
+
 export function truncateText(value, maxLength) {
   const characters = Array.from(value);
   if (characters.length <= maxLength) {
@@ -37,18 +49,35 @@ export function isInternalEquivalentAuthor(author) {
 }
 
 export async function checkOrganizationMembership({ token, org, username }) {
-  const response = await fetch(
-    `https://api.github.com/orgs/${encodeURIComponent(org)}/members/${encodeURIComponent(username)}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "nexu-developer-notify",
+  const { signal, clear } = createTimeoutSignal(WEBHOOK_TIMEOUT_MS);
+
+  let response;
+
+  try {
+    response = await fetch(
+      `https://api.github.com/orgs/${encodeURIComponent(org)}/members/${encodeURIComponent(username)}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "User-Agent": "nexu-developer-notify",
+        },
+        redirect: "manual",
+        signal,
       },
-      redirect: "manual",
-    },
-  );
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `GitHub membership lookup timed out after ${WEBHOOK_TIMEOUT_MS}ms`,
+      );
+    }
+
+    throw error;
+  } finally {
+    clear();
+  }
 
   if (response.status === 204) {
     return true;
