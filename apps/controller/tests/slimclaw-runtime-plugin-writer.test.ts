@@ -155,6 +155,40 @@ describe("OpenClawRuntimePluginWriter", () => {
     });
   });
 
+  it("treats builtin openclaw-weixin as the source of truth and removes stale copied state extension", async () => {
+    env = {
+      ...env,
+      openclawBuiltinExtensionsDir: path.join(rootDir, "builtin-extensions"),
+    } as ControllerEnv;
+
+    const runtimePluginDir = path.join(
+      env.runtimePluginTemplatesDir,
+      "openclaw-weixin",
+    );
+    const builtinPluginDir = path.join(
+      env.openclawBuiltinExtensionsDir,
+      "openclaw-weixin",
+    );
+    const staleTargetDir = path.join(
+      env.openclawExtensionsDir,
+      "openclaw-weixin",
+    );
+
+    await mkdir(runtimePluginDir, { recursive: true });
+    await mkdir(builtinPluginDir, { recursive: true });
+    await mkdir(staleTargetDir, { recursive: true });
+    await writeFile(path.join(runtimePluginDir, "index.ts"), "export {}\n");
+    await writeFile(path.join(builtinPluginDir, "index.js"), "export {}\n");
+    await writeFile(path.join(staleTargetDir, "stale.txt"), "stale\n");
+
+    const writer = new OpenClawRuntimePluginWriter(env);
+    await writer.ensurePlugins();
+
+    await expect(access(staleTargetDir)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("prefers bundled qqbot over the legacy runtime plugin source", async () => {
     const bundledPluginDir = path.join(
       env.bundledRuntimePluginsDir,

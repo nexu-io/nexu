@@ -13,7 +13,8 @@ import { basename, dirname, relative, resolve } from "node:path";
 
 const OPENCLAW_PACKAGE_PATCH_DIRNAME = "openclaw";
 const STAGE_MANIFEST_FILENAME = "manifest.json";
-const STAGE_PATCH_VERSION = "2026-04-09-slimclaw-runtime-stage-v1";
+const STAGE_PATCH_VERSION =
+  "2026-04-15-slimclaw-runtime-stage-v6-builtin-weixin-artifact";
 const REPLY_OUTCOME_HELPER_SEARCH = `
 const sessionKey = ctx.SessionKey;
 	const startTime = diagnosticsEnabled ? Date.now() : 0;
@@ -164,6 +165,32 @@ const STOP_FOLLOWUP_ON_EMPTY_SEARCH =
   "if (payloadArray.length === 0) return finalizeWithFollowup(void 0, queueKey, runFollowupTurn);";
 const STOP_FOLLOWUP_ON_EMPTY_REPLACEMENT =
   "if (payloadArray.length === 0) return;";
+const PLUGIN_MODULE_LOAD_SEARCH = [
+  "\t\tlet mod = null;",
+  "\t\ttry {",
+  "\t\t\tmod = getJiti()(safeSource);",
+  "\t\t} catch (err) {",
+].join("\n");
+const PLUGIN_MODULE_LOAD_REPLACEMENT = [
+  "\t\tconst nexuPluginLoadStartedAt = Date.now();",
+  "\t\tlet mod = null;",
+  "\t\ttry {",
+  "\t\t\tmod = getJiti()(safeSource);",
+  '\t\t\tlogger.info("[openclaw:plugin-timing] " + JSON.stringify({ phase: "load", pluginId: record.id, origin: candidate.origin, source: record.source, elapsedMs: Date.now() - nexuPluginLoadStartedAt }));',
+  "\t\t} catch (err) {",
+].join("\n");
+const PLUGIN_REGISTER_SEARCH = [
+  "\t\ttry {",
+  "\t\t\tconst result = register(api);",
+  '\t\t\tif (result && typeof result.then === "function") registry.diagnostics.push({',
+].join("\n");
+const PLUGIN_REGISTER_REPLACEMENT = [
+  "\t\ttry {",
+  "\t\t\tconst nexuPluginRegisterStartedAt = Date.now();",
+  "\t\t\tconst result = register(api);",
+  '\t\t\tlogger.info("[openclaw:plugin-timing] " + JSON.stringify({ phase: "register", pluginId: record.id, origin: candidate.origin, source: record.source, elapsedMs: Date.now() - nexuPluginRegisterStartedAt }));',
+  '\t\t\tif (result && typeof result.then === "function") registry.diagnostics.push({',
+].join("\n");
 const LOCALE_READER_LINES = [
   'const _nexuLocale = (() => { try { const _fs = require("node:fs"); const _path = require("node:path"); const _stateDir = process.env.OPENCLAW_STATE_DIR; if (!_stateDir) return "zh-CN"; const _fp = _path.join(_stateDir, "nexu-credit-guard-state.json"); const _mt = _fs.statSync(_fp).mtimeMs; if (globalThis.__nexuCgMt === _mt) return globalThis.__nexuCgLocale || "zh-CN"; const _d = JSON.parse(_fs.readFileSync(_fp, "utf8")); globalThis.__nexuCgMt = _mt; globalThis.__nexuCgLocale = _d.locale || "zh-CN"; return globalThis.__nexuCgLocale; } catch { return globalThis.__nexuCgLocale || "zh-CN"; } })();',
 ] as const;
@@ -355,6 +382,10 @@ async function collectFiles(rootPath: string): Promise<string[]> {
   for (const entry of [...entries].sort((left, right) =>
     left.name.localeCompare(right.name),
   )) {
+    if (entry.name === "node_modules") {
+      continue;
+    }
+
     const entryPath = resolve(rootPath, entry.name);
     if (entry.isDirectory()) {
       files.push(...(await collectFiles(entryPath)));
@@ -711,6 +742,28 @@ async function patchReplyOutcomeBridge(
         );
       }
 
+      if (
+        source.includes(PLUGIN_MODULE_LOAD_SEARCH) &&
+        !source.includes("[openclaw:plugin-timing]")
+      ) {
+        source = applyExactReplacement(
+          source,
+          PLUGIN_MODULE_LOAD_SEARCH,
+          PLUGIN_MODULE_LOAD_REPLACEMENT,
+          `${bundleName}: plugin module load timing`,
+        );
+        source = applyExactReplacement(
+          source,
+          PLUGIN_REGISTER_SEARCH,
+          PLUGIN_REGISTER_REPLACEMENT,
+          `${bundleName}: plugin register timing`,
+        );
+        emitLog(
+          log,
+          `[slimclaw-runtime-stage] patched plugin load/register timing in ${bundleName}`,
+        );
+      }
+
       if (source.includes(EMPTY_PAYLOADS_FALLBACK_SEARCH)) {
         source = applyExactReplacement(
           source,
@@ -774,6 +827,44 @@ async function patchReplyOutcomeBridge(
     CORE_DIST_REPLY_BUNDLE_PATTERNS,
     "core dist reply",
   );
+
+  const allDistEntries = await readdir(resolve(openclawPackageRoot, "dist"));
+  for (const fileName of allDistEntries.sort((left, right) =>
+    left.localeCompare(right),
+  )) {
+    if (!fileName.endsWith(".js")) {
+      continue;
+    }
+
+    const filePath = resolve(openclawPackageRoot, "dist", fileName);
+    let source = patchedFiles.get(relative(openclawPackageRoot, filePath));
+    if (!source) {
+      source = await readFile(filePath, "utf8");
+    }
+
+    if (
+      source.includes(PLUGIN_MODULE_LOAD_SEARCH) &&
+      !source.includes("[openclaw:plugin-timing]")
+    ) {
+      source = applyExactReplacement(
+        source,
+        PLUGIN_MODULE_LOAD_SEARCH,
+        PLUGIN_MODULE_LOAD_REPLACEMENT,
+        `${fileName}: plugin module load timing`,
+      );
+      source = applyExactReplacement(
+        source,
+        PLUGIN_REGISTER_SEARCH,
+        PLUGIN_REGISTER_REPLACEMENT,
+        `${fileName}: plugin register timing`,
+      );
+      patchedFiles.set(relative(openclawPackageRoot, filePath), source);
+      emitLog(
+        log,
+        `[slimclaw-runtime-stage] patched plugin load/register timing in ${fileName}`,
+      );
+    }
+  }
 
   const patchHelperBundleGroup = async (bundleDir: string, label: string) => {
     const entries = await readdir(bundleDir);
@@ -864,6 +955,30 @@ async function collectFingerprintFiles(
       files.push({
         label: `source:${relative(sourceOpenclawRoot, sourceFilePath)}`,
         path: sourceFilePath,
+      });
+    }
+  }
+
+  const extensionRoots = [
+    resolve(sourceOpenclawRoot, "extensions", "feishu"),
+    resolve(sourceOpenclawRoot, "extensions", "openclaw-weixin"),
+  ];
+  for (const extensionRoot of extensionRoots) {
+    if (!(await directoryExists(extensionRoot))) {
+      continue;
+    }
+
+    const extensionFiles = (await collectFiles(extensionRoot)).filter(
+      (filePath) =>
+        filePath.endsWith(".ts") ||
+        filePath.endsWith(".js") ||
+        filePath.endsWith(".json"),
+    );
+
+    for (const filePath of extensionFiles) {
+      files.push({
+        label: `source:${relative(sourceOpenclawRoot, filePath)}`,
+        path: filePath,
       });
     }
   }

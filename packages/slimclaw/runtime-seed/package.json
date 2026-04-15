@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.59.0",
-    "openclaw": "2026.3.7"
+    "openclaw": "2026.3.7",
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^4.3.6"
   },
   "optionalDependencies": {
     "@snazzah/davey-darwin-arm64": "^0.1.10"

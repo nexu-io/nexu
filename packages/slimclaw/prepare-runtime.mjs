@@ -3,6 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { installRuntimeAt } from "./install-runtime.mjs";
 import { computeFingerprint } from "./postinstall-cache.mjs";
+import {
+  precompileFeishuPlugin,
+  prepareBuiltinWeixinPlugin,
+} from "./prepare-hot-plugins.mjs";
 import { pruneRuntimeAt } from "./prune-runtime.mjs";
 import { exists } from "./utils.mjs";
 
@@ -131,6 +135,22 @@ export async function prepareSlimclawOwnedRuntimeInstall() {
     timings,
   );
   await timedStep("prune", async () => pruneRuntimeAt(runtimeDir), timings);
+  const weixinResult = await timedStep(
+    "prepare-builtin-weixin-plugin",
+    async () => prepareBuiltinWeixinPlugin(runtimeDir),
+    timings,
+  );
+  console.log(
+    `[slimclaw:prepare][timing] prepared plugin=${weixinResult.pluginId} files=${weixinResult.transpiledCount}`,
+  );
+  const hotPluginResult = await timedStep(
+    "precompile-hot-plugins",
+    async () => precompileFeishuPlugin(runtimeDir),
+    timings,
+  );
+  console.log(
+    `[slimclaw:prepare][timing] precompiled plugin=${hotPluginResult.pluginId} files=${hotPluginResult.transpiledCount}`,
+  );
 
   await timedStep(
     "write-cache",

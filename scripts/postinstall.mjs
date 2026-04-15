@@ -1,9 +1,7 @@
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const repoRoot = process.cwd();
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 function createCommandSpec(command, args) {
   if (
@@ -26,15 +24,6 @@ function isTruthy(value) {
 
   const normalizedValue = value.trim().toLowerCase();
   return normalizedValue === "1" || normalizedValue === "true";
-}
-
-async function pathExists(targetPath) {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function run(command, args) {
@@ -62,38 +51,6 @@ async function run(command, args) {
   });
 }
 
-async function installWeixinRuntimePlugin() {
-  const pluginRoot = resolve(
-    repoRoot,
-    "apps/controller/static/runtime-plugins/openclaw-weixin",
-  );
-  const pluginLockfilePath = resolve(pluginRoot, "package-lock.json");
-
-  if (await pathExists(pluginLockfilePath)) {
-    await run(npmCommand, [
-      "--prefix",
-      "./apps/controller/static/runtime-plugins/openclaw-weixin",
-      "ci",
-      "--omit=dev",
-      "--ignore-scripts",
-      "--no-audit",
-      "--no-fund",
-    ]);
-    return;
-  }
-
-  await run(npmCommand, [
-    "--prefix",
-    "./apps/controller/static/runtime-plugins/openclaw-weixin",
-    "install",
-    "--production",
-    "--ignore-scripts",
-    "--prefer-offline",
-    "--no-audit",
-    "--no-fund",
-  ]);
-}
-
 async function buildDevUtils() {
   await run(process.execPath, [
     resolve(repoRoot, "node_modules", "typescript", "bin", "tsc"),
@@ -115,6 +72,5 @@ if (isTruthy(process.env.NEXU_SKIP_RUNTIME_POSTINSTALL)) {
   process.exit(0);
 }
 
-await installWeixinRuntimePlugin();
 await buildDevUtils();
 await buildSlimclaw();
