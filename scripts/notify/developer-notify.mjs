@@ -128,7 +128,7 @@ function createRewardCopy() {
   return [
     "只需 3 步💥，1️⃣选任务 2️⃣ 认领 3️⃣ 提交",
     "🎁 即可同时获得以下奖励🎉 （详情请看群公告）",
-    "1️⃣ 500—2000 积分奖励 = 价值 20 美金 nexu 使用额度",
+    "1️⃣ 最高价值 20 美金的 nexu 使用额度积分奖励",
     "2️⃣ GitHub README 公开致谢",
     "3️⃣ Github 社区徽章。",
   ].join("\n");
@@ -193,7 +193,7 @@ export function buildDeveloperIssuePayload({
       header: {
         title: {
           tag: "plain_text",
-          content: "新手友好 Issue 刚新增 1 条，等你来领取🎉，做贡献领积分奖励💰",
+          content: "刚新增 1 条 issue 等你来领取🎉，做贡献领积分奖励💰",
         },
         template: "blue",
       },
