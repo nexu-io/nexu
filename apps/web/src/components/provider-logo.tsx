@@ -1,6 +1,12 @@
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 
+import {
+  getDisplayModelId,
+  getModelIconSrc,
+  resolveModelIconKey,
+} from "./model-icon-resolver";
+
 const PROVIDER_ICON_ALIASES: Record<string, string> = {
   anthropic: "anthropic",
   "amazon-bedrock": "bedrock",
@@ -82,98 +88,6 @@ function getProviderIconSrc(provider: string): string | null {
   }
 
   return `/model-provider-icons/${provider}.svg`;
-}
-
-function getDisplayModelId(model: string): string {
-  const normalized = model.trim();
-
-  if (!normalized) {
-    return normalized;
-  }
-
-  if (!normalized.includes("/")) {
-    return normalized;
-  }
-
-  return normalized.slice(normalized.lastIndexOf("/") + 1);
-}
-
-const LOCAL_MODEL_ICON_KEYS = new Set([
-  "alibaba",
-  "alibabacloud",
-  "baichuan",
-  "baiducloud",
-  "chatglm",
-  "claude",
-  "claudecode",
-  "deepseek",
-  "doubao",
-  "gemini",
-  "glmv",
-  "grok",
-  "kimi",
-  "minimax",
-  "mistral",
-  "moonshot",
-  "ollama",
-  "openai",
-  "qwen",
-  "volcengine",
-  "xai",
-  "zhipu",
-]);
-
-function getModelIconSrc(modelKey: string): string | null {
-  if (!LOCAL_MODEL_ICON_KEYS.has(modelKey)) {
-    return null;
-  }
-
-  return `/model-icons/${modelKey}.svg`;
-}
-
-function resolveModelIconKey(model: string, provider?: string): string | null {
-  const displayModelId = getDisplayModelId(model).toLowerCase();
-  const normalizedProvider = provider?.trim().toLowerCase() ?? "";
-  const lookupText = [displayModelId, normalizedProvider]
-    .filter(Boolean)
-    .join(" ");
-
-  if (!lookupText) {
-    return null;
-  }
-
-  const rules: Array<{ key: string; patterns: string[] }> = [
-    { key: "claudecode", patterns: ["claude-code", "claudecode"] },
-    { key: "claude", patterns: ["claude"] },
-    { key: "gemini", patterns: ["gemini"] },
-    { key: "qwen", patterns: ["qwen", "tongyi"] },
-    { key: "kimi", patterns: ["kimi"] },
-    { key: "deepseek", patterns: ["deepseek"] },
-    { key: "doubao", patterns: ["doubao"] },
-    { key: "glmv", patterns: ["glmv"] },
-    { key: "chatglm", patterns: ["chatglm", "glm-4", "glm4", "glm"] },
-    { key: "grok", patterns: ["grok"] },
-    { key: "baichuan", patterns: ["baichuan"] },
-    { key: "mistral", patterns: ["mistral", "mixtral"] },
-    { key: "minimax", patterns: ["minimax", "abab"] },
-    { key: "openai", patterns: ["openai", "gpt", "o1", "o3", "o4"] },
-    { key: "ollama", patterns: ["ollama"] },
-    { key: "moonshot", patterns: ["moonshot"] },
-    { key: "zhipu", patterns: ["zhipu", "bigmodel"] },
-    { key: "volcengine", patterns: ["volcengine"] },
-    { key: "alibabacloud", patterns: ["alibabacloud"] },
-    { key: "alibaba", patterns: ["alibaba"] },
-    { key: "baiducloud", patterns: ["baiducloud", "qianfan"] },
-    { key: "xai", patterns: ["xai"] },
-  ];
-
-  for (const rule of rules) {
-    if (rule.patterns.some((pattern) => lookupText.includes(pattern))) {
-      return rule.key;
-    }
-  }
-
-  return null;
 }
 
 function FallbackProviderMark({
@@ -288,7 +202,7 @@ export function ModelLogo({
   size?: number;
 }) {
   const displayModelId = getDisplayModelId(model);
-  const modelIconKey = resolveModelIconKey(model, provider);
+  const modelIconKey = resolveModelIconKey(model);
 
   if (!displayModelId) {
     return provider ? (
