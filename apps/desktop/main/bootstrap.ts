@@ -132,6 +132,7 @@ function configurePackagedPaths(): void {
         })
       : resolveNonWindowsPackagedUserDataPath({
           appDataPath,
+          overrideUserDataPath,
         });
   const effectiveUserDataPath = packagedUserDataPath.resolvedUserDataPath;
 

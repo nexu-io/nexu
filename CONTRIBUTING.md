@@ -31,7 +31,7 @@ If you want a lower-friction entry point, we are actively looking for **Good Fir
 - **Git**
 - **Node.js** 24+ (LTS recommended; enforced via `package.json` `engines`)
 - **pnpm** 10.26+ (repo pins `pnpm@10.26.0` via `packageManager`)
-- **npm** 11+ (required for `openclaw-runtime` maintenance flows)
+- **npm** 11+ (required for repo-local OpenClaw runtime maintenance flows)
 
 ### Clone and install
 
@@ -54,7 +54,7 @@ nexu/
 │   ├── desktop/          # Electron desktop shell
 │   └── controller/       # Hono backend + OpenClaw orchestration
 ├── packages/shared/      # Shared Zod schemas
-├── openclaw-runtime/     # Repo-local packaged OpenClaw runtime
+├── packages/slimclaw/    # Repo-local OpenClaw runtime contract + prepared runtime ownership
 ├── scripts/              # Dev/CI scripts (launchd, probes, e2e)
 ├── tests/                # Vitest test suites
 ├── docs/                 # VitePress documentation site

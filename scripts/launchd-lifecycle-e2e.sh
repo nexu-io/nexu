@@ -34,6 +34,10 @@ OPENCLAW_LABEL="io.nexu.openclaw.e2e"
 
 NODE_PATH="$(command -v node)"
 CONTROLLER_ENTRY="$REPO_ROOT/apps/controller/dist/index.js"
+SLIMCLAW_RUNTIME_ROOT="$REPO_ROOT/packages/slimclaw/.dist-runtime/openclaw"
+OPENCLAW_ENTRY="$SLIMCLAW_RUNTIME_ROOT/node_modules/openclaw/openclaw.mjs"
+OPENCLAW_BIN="$SLIMCLAW_RUNTIME_ROOT/bin/openclaw"
+OPENCLAW_EXTENSIONS_DIR="$SLIMCLAW_RUNTIME_ROOT/node_modules/openclaw/extensions"
 
 # Use high ports to avoid conflicts
 CONTROLLER_PORT=51800
@@ -156,14 +160,89 @@ if [ ! -f "$CONTROLLER_ENTRY" ]; then
   pnpm build
 fi
 
+if [ ! -f "$OPENCLAW_ENTRY" ] || [ ! -f "$OPENCLAW_BIN" ] || [ ! -d "$OPENCLAW_EXTENSIONS_DIR" ]; then
+  echo "Prepared slimclaw runtime is missing. Run pnpm slimclaw:prepare first." >&2
+  exit 1
+fi
+
 mkdir -p "$PLIST_DIR" "$LOG_DIR" "$STATE_DIR" "$STATE_DIR/skills" "$STATE_DIR/tmp"
 
 # ---------------------------------------------------------------------------
-# Generate plists (controller only — openclaw requires full config)
-# We test with controller only since it's a simpler, self-contained service.
+# Generate plists for both openclaw + controller.
+# Controller external bootstrap now depends on a live OpenClaw control plane
+# before it starts serving HTTP, so this e2e must launch OpenClaw first.
 # ---------------------------------------------------------------------------
 
 echo "--- Phase 1: Bootstrap ---"
+
+cat > "$PLIST_DIR/$OPENCLAW_LABEL.plist" <<OPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$OPENCLAW_LABEL</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>$NODE_PATH</string>
+        <string>$OPENCLAW_ENTRY</string>
+        <string>gateway</string>
+        <string>run</string>
+        <string>--allow-unconfigured</string>
+        <string>--port</string>
+        <string>$OPENCLAW_PORT</string>
+        <string>--auth</string>
+        <string>none</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>$SLIMCLAW_RUNTIME_ROOT</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ELECTRON_RUN_AS_NODE</key>
+        <string>1</string>
+        <key>OPENCLAW_CONFIG</key>
+        <string>$STATE_DIR/openclaw.json</string>
+        <key>OPENCLAW_CONFIG_PATH</key>
+        <string>$STATE_DIR/openclaw.json</string>
+        <key>OPENCLAW_STATE_DIR</key>
+        <string>$STATE_DIR</string>
+        <key>OPENCLAW_LAUNCHD_LABEL</key>
+        <string>$OPENCLAW_LABEL</string>
+        <key>OPENCLAW_SERVICE_MARKER</key>
+        <string>launchd</string>
+        <key>OPENCLAW_IMAGE_BACKEND</key>
+        <string>sips</string>
+        <key>HOME</key>
+        <string>$HOME</string>
+        <key>PATH</key>
+        <string>$PATH</string>
+        <key>NODE_PATH</key>
+        <string>$SLIMCLAW_RUNTIME_ROOT/node_modules</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>$LOG_DIR/openclaw-e2e.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>$LOG_DIR/openclaw-e2e.error.log</string>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+OPLIST
 
 cat > "$PLIST_DIR/$CONTROLLER_LABEL.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -198,6 +277,10 @@ cat > "$PLIST_DIR/$CONTROLLER_LABEL.plist" <<PLIST
         <string>$STATE_DIR/openclaw.json</string>
         <key>OPENCLAW_GATEWAY_PORT</key>
         <string>$OPENCLAW_PORT</string>
+        <key>OPENCLAW_BIN</key>
+        <string>$OPENCLAW_BIN</string>
+        <key>OPENCLAW_EXTENSIONS_DIR</key>
+        <string>$OPENCLAW_EXTENSIONS_DIR</string>
         <key>RUNTIME_MANAGE_OPENCLAW_PROCESS</key>
         <string>false</string>
         <key>RUNTIME_GATEWAY_PROBE_ENABLED</key>
@@ -227,7 +310,31 @@ cat > "$PLIST_DIR/$CONTROLLER_LABEL.plist" <<PLIST
 </plist>
 PLIST
 
-# Bootstrap
+# Bootstrap OpenClaw first so controller external attach can complete
+launchctl bootstrap "$DOMAIN" "$PLIST_DIR/$OPENCLAW_LABEL.plist"
+check "openclaw service registered" is_label_registered "$OPENCLAW_LABEL"
+
+launchctl kickstart "$DOMAIN/$OPENCLAW_LABEL"
+sleep 2
+
+OPENCLAW_PID="$(get_service_pid "$OPENCLAW_LABEL")"
+if [ -n "$OPENCLAW_PID" ] && is_pid_alive "$OPENCLAW_PID"; then
+  pass "openclaw process running (pid=$OPENCLAW_PID)"
+else
+  fail "openclaw process not running (pid=${OPENCLAW_PID:-none})"
+fi
+
+if wait_for_port "$OPENCLAW_PORT" 20; then
+  pass "openclaw port $OPENCLAW_PORT listening"
+else
+  fail "openclaw port $OPENCLAW_PORT not listening after 20s"
+  echo "  --- openclaw stdout ---"
+  tail -20 "$LOG_DIR/openclaw-e2e.log" 2>/dev/null || echo "  (no log)"
+  echo "  --- openclaw stderr ---"
+  tail -20 "$LOG_DIR/openclaw-e2e.error.log" 2>/dev/null || echo "  (no log)"
+fi
+
+# Bootstrap controller after OpenClaw is live
 launchctl bootstrap "$DOMAIN" "$PLIST_DIR/$CONTROLLER_LABEL.plist"
 check "controller service registered" is_label_registered "$CONTROLLER_LABEL"
 

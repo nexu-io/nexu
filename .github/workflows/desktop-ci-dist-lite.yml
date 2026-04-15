@@ -7,8 +7,7 @@ on:
       - "apps/controller/**"
       - "apps/web/**"
       - "packages/shared/**"
-      - "openclaw-runtime/**"
-      - "openclaw-runtime-patches/**"
+      - "packages/slimclaw/**"
       - "scripts/desktop-check-dist.sh"
       - "scripts/desktop-verify-extracted-runner.sh"
       - "scripts/desktop-ci-check.mjs"
@@ -28,8 +27,7 @@ on:
       - "apps/controller/**"
       - "apps/web/**"
       - "packages/shared/**"
-      - "openclaw-runtime/**"
-      - "openclaw-runtime-patches/**"
+      - "packages/slimclaw/**"
       - "scripts/desktop-check-dist.sh"
       - "scripts/desktop-verify-extracted-runner.sh"
       - "scripts/desktop-ci-check.mjs"
@@ -80,7 +78,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('packages/slimclaw/runtime-seed/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
           restore-keys: |
             desktop-npm-cache-${{ runner.os }}-arm64-
             desktop-npm-cache-${{ runner.os }}-

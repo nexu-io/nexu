@@ -3,5 +3,7 @@
 set -euo pipefail
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+node_bin="${NODE_BIN:-node}"
+entry_path="$($node_bin "$script_dir/scripts/resolve-slimclaw-openclaw-entry.mjs")"
 
-exec node "$script_dir/openclaw-runtime/node_modules/openclaw/openclaw.mjs" "$@"
+exec "$node_bin" "$entry_path" "$@"

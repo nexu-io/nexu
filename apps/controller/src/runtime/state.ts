@@ -1,9 +1,19 @@
 export type RuntimeStatus = "active" | "starting" | "degraded" | "unhealthy";
 
-export type BootPhase = "booting" | "ready";
+export type BootPhase =
+  | "preparing"
+  | "starting-managed-runtime"
+  | "attaching-external-runtime"
+  | "reconciling-runtime"
+  | "stabilizing-runtime"
+  | "ready";
+
+export function isBootPhasePreReady(bootPhase: BootPhase): boolean {
+  return bootPhase !== "ready";
+}
 
 export interface ControllerRuntimeState {
-  /** Global boot phase — "booting" until bootstrap completes, then "ready". */
+  /** Global bootstrap phase — pre-ready states represent controlled startup. */
   bootPhase: BootPhase;
   status: RuntimeStatus;
   configSyncStatus: RuntimeStatus;
@@ -19,7 +29,7 @@ export interface ControllerRuntimeState {
 
 export function createRuntimeState(): ControllerRuntimeState {
   return {
-    bootPhase: "booting",
+    bootPhase: "preparing",
     status: "starting",
     configSyncStatus: "active",
     skillsSyncStatus: "active",

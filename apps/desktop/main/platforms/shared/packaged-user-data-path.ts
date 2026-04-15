@@ -1,7 +1,8 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export interface ResolveNonWindowsPackagedUserDataPathInput {
   appDataPath: string;
+  overrideUserDataPath?: string | null;
 }
 
 export interface ResolveNonWindowsPackagedUserDataPathResult {
@@ -12,10 +13,13 @@ export interface ResolveNonWindowsPackagedUserDataPathResult {
 export function resolveNonWindowsPackagedUserDataPath(
   input: ResolveNonWindowsPackagedUserDataPathInput,
 ): ResolveNonWindowsPackagedUserDataPathResult {
-  const resolvedUserDataPath = join(input.appDataPath, "@nexu", "desktop");
+  const defaultUserDataPath = join(input.appDataPath, "@nexu", "desktop");
+  const resolvedUserDataPath = input.overrideUserDataPath
+    ? resolve(input.overrideUserDataPath)
+    : defaultUserDataPath;
 
   return {
-    defaultUserDataPath: resolvedUserDataPath,
+    defaultUserDataPath,
     resolvedUserDataPath,
   };
 }

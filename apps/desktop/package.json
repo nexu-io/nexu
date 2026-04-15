@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@nexu/shared": "workspace:*",
+    "@nexu/slimclaw": "workspace:*",
     "@sentry/electron": "^7.10.0",
     "electron-updater": "^6.3.9",
     "pino": "^10.3.1",

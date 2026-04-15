@@ -1,9 +1,70 @@
 import { logger } from "../lib/logger.js";
 import type { ControllerContainer } from "./container.js";
 
+const INITIAL_CONTROL_PLANE_READY_TIMEOUT_MS = 30_000;
+const STABLE_CONTROL_PLANE_TIMEOUT_MS = 45_000;
+const MANAGED_STABLE_CONTROL_PLANE_TIMEOUT_MS = 90_000;
+const STABLE_CONTROL_PLANE_WINDOW_MS = 4_000;
+const CONTROL_PLANE_POLL_INTERVAL_MS = 500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForGatewayConnection(
+  container: ControllerContainer,
+  timeoutMs: number,
+): Promise<void> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (container.wsClient.isConnected()) {
+      return;
+    }
+
+    await sleep(CONTROL_PLANE_POLL_INTERVAL_MS);
+  }
+
+  throw new Error(
+    "controller bootstrap timed out waiting for gateway connection",
+  );
+}
+
+async function waitForStableControlPlane(
+  container: ControllerContainer,
+  timeoutMs: number,
+  stableWindowMs: number,
+): Promise<void> {
+  const startedAt = Date.now();
+  let stableSince: number | null = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const result = await container.controlPlaneHealth.probe({
+      timeoutMs: 1500,
+    });
+
+    if (result.ok) {
+      stableSince ??= Date.now();
+      if (Date.now() - stableSince >= stableWindowMs) {
+        return;
+      }
+    } else {
+      stableSince = null;
+    }
+
+    await sleep(CONTROL_PLANE_POLL_INTERVAL_MS);
+  }
+
+  throw new Error(
+    "controller bootstrap timed out waiting for a stable control plane",
+  );
+}
+
 export async function bootstrapController(
   container: ControllerContainer,
 ): Promise<() => void> {
+  container.runtimeState.bootPhase = "preparing";
+
   logger.info(
     {
       nexuHomeDir: container.env.nexuHomeDir,
@@ -39,28 +100,7 @@ export async function bootstrapController(
   // invisible to the running agent until a restart.
   container.skillhubService.bootstrap();
 
-  // Write config files BEFORE starting OpenClaw so it boots with the
-  // correct configuration, avoiding a SIGUSR1 restart cycle on first connect.
-  // Use syncAllImmediate() to bypass debounce — must complete before start().
-  // This also seeds the push hash via noteConfigWritten(), so the onConnected
-  // syncAll() sees no change and skips the redundant config.apply RPC.
-  await container.openclawSyncService.syncAllImmediate();
-
-  // Enter settling mode: all syncAll() calls during the next 3s are
-  // deferred and flushed once at the end, preventing multiple config.apply
-  // restarts from async setup (cloud connect, model selection, bot creation).
-  container.openclawSyncService.beginSettling();
-
-  if (container.openclawProcess.managesProcess()) {
-    container.openclawProcess.enableAutoRestart();
-    container.openclawProcess.start();
-  } else {
-    logger.info({}, "controller_bootstrap_attaching_external_openclaw");
-  }
   container.channelFallbackService.start();
-
-  // Start WS client — connects to OpenClaw gateway
-  container.wsClient.connect();
 
   container.wsClient.onGatewayShutdown(({ restartExpectedMs }) => {
     if (restartExpectedMs !== null) {
@@ -68,13 +108,50 @@ export async function bootstrapController(
     }
   });
 
-  // When WS handshake completes, push current config (skipped if unchanged)
-  // and mark boot as complete so health loop treats future gateway-unreachable
-  // as "unhealthy" instead of "starting".
-  container.wsClient.onConnected(() => {
-    container.runtimeState.bootPhase = "ready";
-    void container.openclawSyncService.syncAll().catch(() => {});
-  });
+  if (container.openclawProcess.managesProcess()) {
+    // Managed bootstrap: seed config before runtime start so the first attach
+    // happens against the desired config instead of triggering a restart.
+    await container.openclawSyncService.syncAllImmediate();
+    container.openclawSyncService.beginSettling();
+
+    container.runtimeState.bootPhase = "starting-managed-runtime";
+    container.openclawProcess.enableAutoRestart();
+    container.openclawProcess.start();
+    container.wsClient.connect();
+
+    container.runtimeState.bootPhase = "stabilizing-runtime";
+    await waitForStableControlPlane(
+      container,
+      MANAGED_STABLE_CONTROL_PLANE_TIMEOUT_MS,
+      STABLE_CONTROL_PLANE_WINDOW_MS,
+    );
+  } else {
+    // External bootstrap is attach + reconcile, not pre-start seeding.
+    logger.info({}, "controller_bootstrap_attaching_external_openclaw");
+
+    container.runtimeState.bootPhase = "attaching-external-runtime";
+    container.wsClient.connect();
+    await waitForGatewayConnection(
+      container,
+      INITIAL_CONTROL_PLANE_READY_TIMEOUT_MS,
+    );
+
+    container.runtimeState.bootPhase = "reconciling-runtime";
+    const { configChanged } =
+      await container.openclawSyncService.syncAllImmediate();
+    container.openclawSyncService.beginSettling();
+
+    container.runtimeState.bootPhase = "stabilizing-runtime";
+    await waitForStableControlPlane(
+      container,
+      configChanged
+        ? STABLE_CONTROL_PLANE_TIMEOUT_MS
+        : INITIAL_CONTROL_PLANE_READY_TIMEOUT_MS,
+      configChanged ? STABLE_CONTROL_PLANE_WINDOW_MS : 1_000,
+    );
+  }
+
+  container.runtimeState.bootPhase = "ready";
 
   return container.startBackgroundLoops();
 }

@@ -29,7 +29,6 @@ OPENCLAW_PORT="${OPENCLAW_PORT:-18789}"
 # Paths
 NODE_BIN="${NODE_BIN:-$(which node)}"
 CONTROLLER_ENTRY="$REPO_ROOT/apps/controller/dist/index.js"
-OPENCLAW_PATH="$REPO_ROOT/openclaw-runtime/node_modules/openclaw/openclaw.mjs"
 # Dev state dirs — repo-scoped, isolated from packaged app's ~/.nexu/
 OPENCLAW_STATE_DIR="$DEV_NEXU_HOME/runtime/openclaw/state"
 OPENCLAW_CONFIG="$OPENCLAW_STATE_DIR/openclaw.json"
@@ -53,7 +52,7 @@ full_cleanup() {
 
   sleep 1
 
-  # 3. Kill any remaining orphan processes (including current scripts/dev
+  # 3. Kill any remaining orphan processes (including current tools/dev
   #    supervisors and older direct launch patterns)
   pkill -9 -f -- "--nexu-dev-service=openclaw" 2>/dev/null || true
   pkill -9 -f -- "--nexu-dev-service=controller" 2>/dev/null || true
@@ -239,9 +238,9 @@ start_services() {
   WEB_WATCH_PID=$!
 
   # Start Electron desktop with launchd mode (blocks until quit).
-  # scripts/dev owns the desktop dev-launch compatibility path now; launchd mode
+  # tools/dev owns the desktop dev-launch compatibility path now; launchd mode
   # keeps the direct Electron launch here because the app boot path is already
-  # launchd-specific and does not reuse the scripts/dev desktop worker model.
+  # launchd-specific and does not reuse the tools/dev desktop worker model.
   echo "Starting Electron desktop (launchd mode)..."
   echo ""
   cd "$REPO_ROOT"

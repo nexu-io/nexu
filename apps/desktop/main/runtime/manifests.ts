@@ -14,7 +14,7 @@ import type { DesktopRuntimeConfig } from "../../shared/runtime-config";
 import { getWorkspaceRoot } from "../../shared/workspace-paths";
 import { resolveRuntimeManifestsRoots } from "../platforms/shared/runtime-roots";
 import { createAsyncArchiveSidecarMaterializer } from "../platforms/shared/sidecar-materializer";
-import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/openclaw-runtime-locator";
+import { resolveWindowsPackagedOpenclawSidecarRoot } from "../platforms/win/slimclaw-runtime-locator";
 import type { RuntimeUnitManifest } from "./types";
 
 function ensureDir(path: string): string {
@@ -420,7 +420,7 @@ export function createRuntimeUnitManifests(
     args: [controllerEntryPath],
     cwd: controllerRoot,
     port: runtimeConfig.ports.controller,
-    startupTimeoutMs: 15_000,
+    startupTimeoutMs: 30_000,
     autoStart: false,
     logFilePath: path.resolve(logsDir, "controller.log"),
     dependents: ["web"],

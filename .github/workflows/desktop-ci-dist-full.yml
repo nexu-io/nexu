@@ -4,8 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/desktop/**"
-      - "openclaw-runtime/**"
-      - "openclaw-runtime-patches/**"
+      - "packages/slimclaw/**"
       - "pnpm-lock.yaml"
       - "scripts/desktop-check-dist.sh"
       - "scripts/desktop-verify-extracted-runner.sh"
@@ -17,8 +16,7 @@ on:
       - main
     paths:
       - "apps/desktop/**"
-      - "openclaw-runtime/**"
-      - "openclaw-runtime-patches/**"
+      - "packages/slimclaw/**"
       - "pnpm-lock.yaml"
       - "scripts/desktop-check-dist.sh"
       - "scripts/desktop-verify-extracted-runner.sh"
@@ -72,7 +70,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          key: desktop-npm-cache-${{ runner.os }}-arm64-${{ hashFiles('packages/slimclaw/runtime-seed/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
           restore-keys: |
             desktop-npm-cache-${{ runner.os }}-arm64-
             desktop-npm-cache-${{ runner.os }}-
@@ -153,7 +151,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('packages/slimclaw/runtime-seed/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
           restore-keys: |
             desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-
             desktop-npm-cache-${{ runner.os }}-
@@ -330,7 +328,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~\AppData\Local\npm-cache
-          key: desktop-npm-cache-${{ runner.os }}-x64-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          key: desktop-npm-cache-${{ runner.os }}-x64-${{ hashFiles('packages/slimclaw/runtime-seed/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
           restore-keys: |
             desktop-npm-cache-${{ runner.os }}-x64-
             desktop-npm-cache-${{ runner.os }}-

@@ -57,7 +57,7 @@ export function createDevLogger(
   return wrapPinoLogger(
     pino(
       {
-        name: "scripts-dev",
+        name: "tools-dev",
         level: options.level ?? "info",
         base: options.bindings ?? undefined,
         timestamp: pino.stdTimeFunctions.isoTime,
