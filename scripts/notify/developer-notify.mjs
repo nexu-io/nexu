@@ -124,6 +124,16 @@ function createButtonColumns(actions) {
   };
 }
 
+function createRewardCopy() {
+  return [
+    "只需 3 步💥，1️⃣选任务 2️⃣ 认领 3️⃣ 提交",
+    "🎁 即可同时获得以下奖励🎉 （详情请看群公告）",
+    "1️⃣ 500—2000 积分奖励 = 价值 20 美金 nexu 使用额度",
+    "2️⃣ GitHub README 公开致谢",
+    "3️⃣ Github 社区徽章。",
+  ].join("\n");
+}
+
 export function buildDeveloperPrPayload({ author, labels, prUrl }) {
   const safeAuthor = sanitizeText(author, 80);
   const safeLabels = sanitizeText(labels || "none", 120) || "none";
@@ -149,12 +159,14 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
           createButtonColumns([createButton("查看贡献 PR", prUrl, "primary")]),
           {
             tag: "markdown",
-            content:
-              "Nexu 准备好一批对新手友好任务的 Good First Issue 👇\n只需 3 步💥，选任务 — 认领 —— 提交，即可获得 GitHub README 公开致谢 + 积分奖励 + Github 社区徽章🎉。（详情请看群公告）",
+            content: [
+              "Nexu 准备好一批对新手友好任务的 Good First Issue 👇",
+              createRewardCopy(),
+            ].join("\n"),
           },
           createButtonColumns([
-            createButton("立即贡献", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
+            createButton("立即贡献", GOOD_FIRST_ISSUE_URL),
           ]),
         ],
       },
@@ -197,8 +209,7 @@ export function buildDeveloperIssuePayload({
           ]),
           {
             tag: "markdown",
-            content:
-              "只需 3 步💥，选任务 — 认领 —— 提交，即可获得 GitHub README 公开致谢 + 积分奖励 + Github 社区徽章🎉。（详情请阅览群公告）",
+            content: createRewardCopy(),
           },
           createButtonColumns([
             createButton("领取新手友好 issue", GOOD_FIRST_ISSUE_URL),

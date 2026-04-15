@@ -64,7 +64,11 @@ describe("developer-notify", () => {
       payload.card.body.elements[3].columns.map(
         (column) => column.elements[0].text.content,
       ),
-    ).toEqual(["立即贡献", "贡献者指南"]);
+    ).toEqual(["贡献者指南", "立即贡献"]);
+    expect(payload.card.body.elements[2]).toMatchObject({
+      tag: "markdown",
+      content: expect.stringContaining("只需 3 步💥，1️⃣选任务 2️⃣ 认领 3️⃣ 提交"),
+    });
   });
 
   it("builds the developer issue payload with three actions", () => {
@@ -78,7 +82,19 @@ describe("developer-notify", () => {
       payload.card.body.elements[1].columns.map(
         (column) => column.elements[0].text.content,
       ),
-    ).toEqual(["查看 issue", "领取新手友好 issue", "贡献者指南"]);
+    ).toEqual(["查看 issue"]);
+    expect(payload.card.body.elements[3]).toMatchObject({ tag: "column_set" });
+    expect(
+      payload.card.body.elements[3].columns.map(
+        (column) => column.elements[0].text.content,
+      ),
+    ).toEqual(["领取新手友好 issue", "贡献者指南"]);
+    expect(payload.card.body.elements[2]).toMatchObject({
+      tag: "markdown",
+      content: expect.stringContaining(
+        "1️⃣ 500—2000 积分奖励 = 价值 20 美金 nexu 使用额度",
+      ),
+    });
   });
 
   it("treats sentry bot as internal-equivalent", () => {
