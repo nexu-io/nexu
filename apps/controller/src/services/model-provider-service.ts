@@ -362,7 +362,24 @@ type ResolvedProviderRuntimeInput = {
   runtimePolicy: NonNullable<ReturnType<typeof getProviderRuntimePolicy>>;
   apiKey: string;
   resolvedBaseUrl: string | null;
+  extraHeaders: Record<string, string> | undefined;
 };
+
+function getProviderHeaderValues(
+  headers: Record<string, unknown> | undefined,
+): Record<string, string> | undefined {
+  if (!headers) {
+    return undefined;
+  }
+
+  const resolvedEntries = Object.entries(headers).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+
+  return resolvedEntries.length > 0
+    ? Object.fromEntries(resolvedEntries)
+    : undefined;
+}
 
 async function consumeResponseBody(response: Response): Promise<void> {
   try {
@@ -737,6 +754,9 @@ export class ModelProviderService {
     }
 
     const storedProvider = await this.configStore.getProvider(providerKey);
+    const providerConfig = (
+      await this.configStore.getModelProviderConfigDocument()
+    ).providers[providerKey];
     const runtimePolicy = getProviderRuntimePolicy(providerId);
     if (!runtimePolicy) {
       return { error: "Unsupported provider" };
@@ -759,6 +779,7 @@ export class ModelProviderService {
       runtimePolicy,
       apiKey,
       resolvedBaseUrl,
+      extraHeaders: getProviderHeaderValues(providerConfig?.headers),
     };
   }
 
@@ -958,14 +979,12 @@ export class ModelProviderService {
       return { ok: false, error: resolvedInput.error };
     }
 
-    const { providerId, runtimePolicy, apiKey, resolvedBaseUrl } =
+    const { providerId, runtimePolicy, apiKey, resolvedBaseUrl, extraHeaders } =
       resolvedInput;
     const modelId = input.modelId.trim();
     if (modelId.length === 0) {
       return { ok: false, error: "Model ID required" };
     }
-
-    const extraHeaders = undefined;
 
     try {
       if (providerId === "ollama") {

@@ -400,6 +400,60 @@ describe("ModelProviderService", () => {
     }
   });
 
+  it("includes stored provider headers in model test requests", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    await store.setModelProviderConfigDocument({
+      ...(await store.getModelProviderConfigDocument()),
+      providers: {
+        ...(await store.getModelProviderConfigDocument()).providers,
+        google: {
+          enabled: true,
+          displayName: "Google",
+          auth: "api-key",
+          apiKey: "google-test-key",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+          headers: {
+            "x-test-header": "tenant-123",
+          },
+          models: [],
+        },
+      },
+    });
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe(
+        "https://generativelanguage.googleapis.com/v1beta/openai/models/gemini-2.5-pro:generateContent",
+      );
+      expect(init?.headers).toEqual({
+        "Content-Type": "application/json",
+        "x-goog-api-key": "google-test-key",
+        "x-test-header": "tenant-123",
+      });
+
+      return new Response(JSON.stringify({ candidates: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.testProviderModel("google", {
+        modelId: "gemini-2.5-pro",
+      });
+
+      expect(result).toEqual({ ok: true });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("keeps bearer verification for non-Google providers", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);
