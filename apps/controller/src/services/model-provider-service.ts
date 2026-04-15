@@ -240,7 +240,9 @@ function buildGoogleModelsUrl(
   }
 
   const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
-  const versionedBaseUrl = /\/(v1|v1beta|v1alpha)$/i.test(normalizedBaseUrl)
+  const versionedBaseUrl = /\/(v1|v1beta|v1alpha)(?:\/|$)/i.test(
+    normalizedBaseUrl,
+  )
     ? normalizedBaseUrl
     : `${normalizedBaseUrl}/v1beta`;
 

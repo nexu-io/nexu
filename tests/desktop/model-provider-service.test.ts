@@ -357,6 +357,49 @@ describe("ModelProviderService", () => {
     }
   });
 
+  it("preserves custom Google base paths that already include a version segment", async () => {
+    const env = createEnv(tempDir);
+    const store = new NexuConfigStore(env);
+    const service = createService(store, env);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      expect(String(input)).toBe(
+        "https://generativelanguage.googleapis.com/v1beta/openai/models",
+      );
+      expect(init?.headers).toEqual({
+        "x-goog-api-key": "google-test-key",
+      });
+
+      return new Response(
+        JSON.stringify({
+          models: [{ name: "models/gemini-2.5-pro" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+
+    try {
+      const result = await service.verifyProvider("google", {
+        apiKey: "google-test-key",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+      });
+
+      expect(result).toEqual({
+        valid: true,
+        models: ["gemini-2.5-pro"],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("keeps bearer verification for non-Google providers", async () => {
     const env = createEnv(tempDir);
     const store = new NexuConfigStore(env);
