@@ -5,6 +5,256 @@ import type {
 } from "./provider-types.js";
 
 const bundledProviderModelsById = {
+  anthropic: [
+    {
+      id: "claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
+    },
+    {
+      id: "claude-haiku-4-5",
+      name: "Claude Haiku 4.5",
+    },
+    {
+      id: "claude-opus-4-6",
+      name: "Claude Opus 4.6",
+    },
+  ],
+  openai: [
+    {
+      id: "gpt-5.4",
+      name: "GPT 5.4",
+    },
+    {
+      id: "gpt-5.4",
+      name: "GPT 5.4",
+    },
+    {
+      id: "gpt-4o",
+      name: "GPT-4o",
+    },
+  ],
+  google: [
+    {
+      id: "gemini-2.5-flash",
+      name: "Gemini 2.5 Flash",
+    },
+    {
+      id: "gemini-2.5-pro",
+      name: "Gemini 2.5 Pro",
+    },
+    {
+      id: "gemini-3-pro-preview",
+      name: "Gemini 3 Pro Preview",
+    },
+  ],
+  ollama: [
+    {
+      id: "llama3.2",
+      name: "llama3.2",
+    },
+    {
+      id: "qwen3:8b",
+      name: "qwen3:8b",
+    },
+    {
+      id: "gemma3:4b",
+      name: "gemma3:4b",
+    },
+  ],
+  siliconflow: [
+    {
+      id: "deepseek-ai/DeepSeek-V3.2",
+      name: "DeepSeek V3.2",
+    },
+    {
+      id: "Qwen/Qwen3-8B",
+      name: "Qwen3 8B",
+    },
+  ],
+  ppio: [
+    {
+      id: "deepseek/deepseek-v3.2",
+      name: "DeepSeek V3.2",
+    },
+    {
+      id: "minimax/minimax-m2.7",
+      name: "MiniMax M2.7",
+    },
+    {
+      id: "qwen/qwen3-235b-a22b-instruct-2507",
+      name: "Qwen3 235B A22B Instruct",
+    },
+  ],
+  nvidia: [
+    {
+      id: "moonshotai/kimi-k2.5",
+      name: "Kimi K2.5",
+    },
+    {
+      id: "minimaxai/minimax-m2.7",
+      name: "MiniMax M2.7",
+    },
+  ],
+  stepfun: [
+    {
+      id: "step-1-flash",
+      name: "Step 1 Flash",
+    },
+    {
+      id: "step-1-8k",
+      name: "Step 1 8K",
+    },
+  ],
+  "amazon-bedrock": [
+    {
+      id: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+      name: "Claude 3.5 Sonnet v2",
+    },
+    {
+      id: "amazon.nova-pro-v1:0",
+      name: "Amazon Nova Pro",
+    },
+    {
+      id: "meta.llama3-1-70b-instruct-v1:0",
+      name: "Llama 3.1 70B Instruct",
+    },
+  ],
+  deepseek: [
+    {
+      id: "deepseek-chat",
+      name: "DeepSeek Chat",
+    },
+    {
+      id: "deepseek-reasoner",
+      name: "DeepSeek Reasoner",
+    },
+  ],
+  openrouter: [
+    {
+      id: "google/gemini-2.5-flash-preview-09-2025",
+      name: "Google: Gemini 2.5 Flash Preview",
+    },
+    {
+      id: "deepseek/deepseek-chat",
+      name: "DeepSeek: V3",
+    },
+    {
+      id: "qwen/qwen-2.5-7b-instruct",
+      name: "Qwen 2.5 7B Instruct",
+    },
+  ],
+  mistral: [
+    {
+      id: "mistral-large-latest",
+      name: "Mistral Large",
+    },
+    {
+      id: "mistral-small-latest",
+      name: "Mistral Small",
+    },
+    {
+      id: "codestral-latest",
+      name: "Codestral",
+    },
+  ],
+  xai: [
+    {
+      id: "grok-4",
+      name: "Grok 4",
+    },
+    {
+      id: "grok-3",
+      name: "Grok 3",
+    },
+    {
+      id: "grok-3-mini",
+      name: "Grok 3 Mini",
+    },
+  ],
+  together: [
+    {
+      id: "meta-llama/llama-3.2-11b-vision-instruct",
+      name: "Llama 3.2 11B Vision",
+    },
+    {
+      id: "meta-llama/llama-3.2-90b-vision-instruct",
+      name: "Llama 3.2 90B Vision",
+    },
+    {
+      id: "google/gemma-2-27b-it",
+      name: "Gemma 2 27B Instruct",
+    },
+  ],
+  huggingface: [
+    {
+      id: "meta-llama/Llama-3.1-8B-Instruct",
+      name: "Llama 3.1 8B Instruct",
+    },
+    {
+      id: "Qwen/Qwen2.5-7B-Instruct",
+      name: "Qwen 2.5 7B Instruct",
+    },
+    {
+      id: "mistralai/Mistral-7B-Instruct-v0.3",
+      name: "Mistral 7B Instruct",
+    },
+  ],
+  qwen: [
+    {
+      id: "qwen3-max",
+      name: "Qwen3 Max",
+    },
+    {
+      id: "qwen3.5-plus",
+      name: "Qwen3.5 Plus",
+    },
+    {
+      id: "qwen3.5-flash",
+      name: "Qwen3.5 Flash",
+    },
+  ],
+  volcengine: [
+    {
+      id: "doubao-seed-1-8-251228",
+      name: "Doubao Seed 1.8",
+    },
+    {
+      id: "doubao-1-5-pro-32k-250115",
+      name: "Doubao 1.5 Pro 32K",
+    },
+    {
+      id: "deepseek-v3.2",
+      name: "DeepSeek V3.2",
+    },
+  ],
+  qianfan: [
+    {
+      id: "deepseek-r1",
+      name: "DeepSeek R1",
+    },
+    {
+      id: "deepseek-v3",
+      name: "DeepSeek V3",
+    },
+    {
+      id: "ernie-4.0-8k-latest",
+      name: "ERNIE 4.0",
+    },
+  ],
+  vllm: [
+    {
+      id: "meta-llama/Llama-3.1-8B-Instruct",
+      name: "Llama 3.1 8B Instruct",
+    },
+    {
+      id: "Qwen/Qwen2.5-7B-Instruct",
+      name: "Qwen 2.5 7B Instruct",
+    },
+    {
+      id: "deepseek-r1-distill-qwen-7b",
+      name: "DeepSeek R1 Distill Qwen 7B",
+    },
+  ],
   xiaomi: [
     {
       id: "mimo-v2-flash",
@@ -17,6 +267,48 @@ const bundledProviderModelsById = {
     {
       id: "mimo-v2-omni",
       name: "Xiaomi MiMo V2 Omni",
+    },
+  ],
+  minimax: [
+    {
+      id: "MiniMax-M2.7",
+      name: "MiniMax M2.7",
+    },
+    {
+      id: "MiniMax-M2.7",
+      name: "MiniMax M2.7",
+    },
+    {
+      id: "MiniMax-M2.7-highspeed",
+      name: "MiniMax M2.7 Highspeed",
+    },
+  ],
+  kimi: [
+    {
+      id: "kimi-k2.5",
+      name: "Kimi K2.5",
+    },
+    {
+      id: "kimi-k2-0905-Preview",
+      name: "Kimi K2 Preview",
+    },
+    {
+      id: "kimi-k2-thinking",
+      name: "Kimi K2 Thinking",
+    },
+  ],
+  glm: [
+    {
+      id: "glm-5",
+      name: "GLM-5",
+    },
+    {
+      id: "glm-4.7",
+      name: "GLM-4.7",
+    },
+    {
+      id: "glm-4.5-flash",
+      name: "GLM-4.5 Flash",
     },
   ],
 } as const;

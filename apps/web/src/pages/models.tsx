@@ -25,6 +25,7 @@ import {
   type ProviderRegistryEntryDto,
   buildCustomProviderKey,
   customProviderTemplateIds,
+  getBundledProviderModelIds,
   getProviderAliasCandidates,
   normalizeProviderId,
   parseCustomProviderKey,
@@ -2828,7 +2829,8 @@ function ByokProviderDetail({
   const [verifiedModels, setVerifiedModels] = useState<string[] | null>(null);
   const [configuredModelIds, setConfiguredModelIds] = useState<string[]>(
     normalizeModelIdList(
-      providerConfig?.models?.map((model) => model.id) ?? [],
+      providerConfig?.models?.map((model) => model.id) ??
+        getBundledProviderModelIds(providerId),
     ),
   );
   const [addModelOpen, setAddModelOpen] = useState(false);
@@ -3040,7 +3042,8 @@ function ByokProviderDetail({
     setVerifiedModels(null);
     setConfiguredModelIds(
       normalizeModelIdList(
-        providerConfig?.models?.map((model) => model.id) ?? [],
+        providerConfig?.models?.map((model) => model.id) ??
+          getBundledProviderModelIds(providerId),
       ),
     );
     setAddModelOpen(false);
@@ -3051,7 +3054,7 @@ function ByokProviderDetail({
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
-  }, [provider, providerConfig]);
+  }, [provider, providerConfig, providerId]);
 
   useEffect(() => {
     if (!isMiniMax) {
@@ -4154,41 +4157,43 @@ function ByokProviderDetail({
                     {modelId}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  disabled={isTesting || !canRefreshModels}
-                  title={
-                    testState === "error"
-                      ? testError
-                      : t("models.byok.testModel")
-                  }
-                  onClick={() => {
-                    if (isTesting || !canRefreshModels) {
-                      return;
+                {isProviderConfigured && (
+                  <button
+                    type="button"
+                    disabled={isTesting || !canRefreshModels}
+                    title={
+                      testState === "error"
+                        ? testError
+                        : t("models.byok.testModel")
                     }
-                    void handleTestModel(modelId);
-                  }}
-                  className={cn(
-                    "rounded p-1 transition-all",
-                    testButtonForcedVisible
-                      ? "pointer-events-auto opacity-100"
-                      : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100",
-                    testState === "loading" && "cursor-wait text-text-muted",
-                    (testState === "success" || testState === "error") &&
-                      "hidden",
-                    !testState &&
-                      (!canRefreshModels
-                        ? "text-text-muted/40"
-                        : "text-text-muted hover:bg-surface-3 hover:text-text-primary"),
-                  )}
-                  aria-label={t("models.byok.testModel")}
-                >
-                  {testState === "loading" ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <Zap size={12} />
-                  )}
-                </button>
+                    onClick={() => {
+                      if (isTesting || !canRefreshModels) {
+                        return;
+                      }
+                      void handleTestModel(modelId);
+                    }}
+                    className={cn(
+                      "rounded p-1 transition-all",
+                      testButtonForcedVisible
+                        ? "pointer-events-auto opacity-100"
+                        : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100",
+                      testState === "loading" && "cursor-wait text-text-muted",
+                      (testState === "success" || testState === "error") &&
+                        "hidden",
+                      !testState &&
+                        (!canRefreshModels
+                          ? "text-text-muted/40"
+                          : "text-text-muted hover:bg-surface-3 hover:text-text-primary"),
+                    )}
+                    aria-label={t("models.byok.testModel")}
+                  >
+                    {testState === "loading" ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Zap size={12} />
+                    )}
+                  </button>
+                )}
                 {(testState === "success" || testState === "error") && (
                   <span
                     className={cn(
@@ -4203,16 +4208,18 @@ function ByokProviderDetail({
                       : t("models.byok.testUnavailable")}
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    removeModelId(modelId);
-                  }}
-                  className="pointer-events-none rounded p-1 text-text-muted opacity-0 transition-all hover:bg-surface-3 hover:text-text-primary group-hover:pointer-events-auto group-hover:opacity-100"
-                  aria-label={t("models.byok.removeModel")}
-                >
-                  <X size={12} />
-                </button>
+                {isProviderConfigured && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      removeModelId(modelId);
+                    }}
+                    className="pointer-events-none rounded p-1 text-text-muted opacity-0 transition-all hover:bg-surface-3 hover:text-text-primary group-hover:pointer-events-auto group-hover:opacity-100"
+                    aria-label={t("models.byok.removeModel")}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
                 {isSelected && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-secondary shrink-0">
                     <Check size={12} />

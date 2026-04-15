@@ -22,6 +22,7 @@ import {
   type cloudProfileSchema,
   type connectIntegrationResponseSchema,
   type connectIntegrationSchema,
+  getBundledProviderModelIds,
   getDefaultProviderBaseUrls,
   getProviderRuntimePolicy,
   type integrationResponseSchema,
@@ -424,24 +425,26 @@ function buildProviderConfig(
   const existingMetadata = getProviderMetadata(existing) ?? {};
   const authMode =
     input.authMode ?? (existing?.auth === "oauth" ? "oauth" : "apiKey");
-  const nextModels =
+  const seededModelIds =
     input.modelsJson === undefined
-      ? (existing?.models ?? [])
-      : parseModelsJson(input.modelsJson).map((modelId) => ({
-          id: modelId,
-          name: modelId,
-          reasoning: false,
-          input: ["text"] as Array<"text" | "image">,
-          cost: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-          },
-          contextWindow: 0,
-          maxTokens: 0,
-          ...(runtimePolicy?.apiKind ? { api: runtimePolicy.apiKind } : {}),
-        }));
+      ? (existing?.models.map((model) => model.id) ??
+        getBundledProviderModelIds(providerId))
+      : parseModelsJson(input.modelsJson);
+  const nextModels = seededModelIds.map((modelId) => ({
+    id: modelId,
+    name: modelId,
+    reasoning: false,
+    input: ["text"] as Array<"text" | "image">,
+    cost: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+    contextWindow: 0,
+    maxTokens: 0,
+    ...(runtimePolicy?.apiKind ? { api: runtimePolicy.apiKind } : {}),
+  }));
   const nextOauthRegion =
     authMode === "apiKey" ? null : (existing?.oauthRegion ?? null);
   const nextMetadata: Record<string, unknown> = {
@@ -1612,6 +1615,11 @@ export class NexuConfigStore {
     await this.store.update((config) => {
       const existing = config.models.providers[providerId];
       const existingMetadata = getProviderMetadata(existing) ?? {};
+      const modelIds =
+        input.models.length > 0
+          ? input.models
+          : (existing?.models.map((model) => model.id) ??
+            getBundledProviderModelIds(providerId));
       const nextProvider: ModelProviderConfig = {
         ...(existing?.providerTemplateId
           ? {
@@ -1630,7 +1638,7 @@ export class NexuConfigStore {
         ...(existing?.api ? { api: existing.api } : {}),
         oauthRegion: input.oauthRegion,
         oauthProfileRef: input.oauthCredential.provider,
-        models: input.models.map((modelId) => ({
+        models: modelIds.map((modelId) => ({
           id: modelId,
           name: modelId,
           reasoning: false,
