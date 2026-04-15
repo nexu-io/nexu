@@ -215,7 +215,7 @@ describe("controller plist env var parity with manifests", () => {
     expect(openclawPlist).toContain("<string>parity-test-token</string>");
   });
 
-  it("dev mode sets NODE_ENV=development and adds --auth none to openclaw", async () => {
+  it("dev mode sets NODE_ENV=development and uses token auth when gateway token exists", async () => {
     const { generatePlist } = await import(
       "../../apps/desktop/main/services/plist-generator"
     );
@@ -229,7 +229,7 @@ describe("controller plist env var parity with manifests", () => {
       "<key>NODE_ENV</key>\n        <string>development</string>",
     );
     expect(openclawPlist).toContain("<string>--auth</string>");
-    expect(openclawPlist).toContain("<string>none</string>");
+    expect(openclawPlist).toContain("<string>token</string>");
   });
 
   it("prod mode sets NODE_ENV=production and no --auth none", async () => {

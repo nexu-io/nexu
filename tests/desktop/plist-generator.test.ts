@@ -223,11 +223,45 @@ describe("generatePlist", () => {
     ]);
   });
 
-  it("openclaw dev mode inserts --auth none after gateway run", async () => {
+  it("openclaw dev mode inserts --auth token when gateway token is set", async () => {
     const { generatePlist } = await import(
       "../../apps/desktop/main/services/plist-generator"
     );
-    const plist = generatePlist("openclaw", { ...mockEnv, isDev: true });
+    const plist = generatePlist("openclaw", {
+      ...mockEnv,
+      isDev: true,
+      gatewayToken: "dev-gateway-token",
+    });
+
+    const argsMatch = plist.match(
+      /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,
+    );
+    expect(argsMatch).not.toBeNull();
+    const argsBlock = argsMatch?.[1] ?? "";
+    const strings = [...argsBlock.matchAll(/<string>([^<]*)<\/string>/g)].map(
+      (m) => m[1],
+    );
+    expect(strings).toEqual([
+      "/usr/local/bin/node",
+      "/app/openclaw/openclaw.mjs",
+      "gateway",
+      "run",
+      "--port",
+      String(mockEnv.openclawPort),
+      "--auth",
+      "token",
+    ]);
+  });
+
+  it("openclaw dev mode inserts --auth none when gateway token is absent", async () => {
+    const { generatePlist } = await import(
+      "../../apps/desktop/main/services/plist-generator"
+    );
+    const plist = generatePlist("openclaw", {
+      ...mockEnv,
+      isDev: true,
+      gatewayToken: undefined,
+    });
 
     const argsMatch = plist.match(
       /<key>ProgramArguments<\/key>\s*<array>([\s\S]*?)<\/array>/,

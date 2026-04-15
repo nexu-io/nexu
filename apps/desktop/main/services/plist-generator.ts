@@ -277,9 +277,12 @@ function generateOpenclawPlist(label: string, env: PlistEnv): string {
   const errorPath = path.join(env.logDir, "openclaw.error.log");
   const controllerLabel = SERVICE_LABELS.controller(env.isDev);
 
-  // In dev mode, use --auth none to simplify local development
   const authArgs = env.isDev
-    ? `
+    ? env.gatewayToken
+      ? `
+        <string>--auth</string>
+        <string>token</string>`
+      : `
         <string>--auth</string>
         <string>none</string>`
     : "";

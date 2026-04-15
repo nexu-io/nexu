@@ -70,7 +70,7 @@ export function createMacLaunchdBootstrapEnv(args: {
     webRoot: runtimeRoots.webRoot,
     plistDir: undefined,
     nexuHome: runtimeRoots.nexuHome,
-    gatewayToken: app.isPackaged ? runtimeConfig.tokens.gateway : undefined,
+    gatewayToken: runtimeConfig.tokens.gateway,
     openclawConfigPath: runtimeRoots.openclawConfigPath,
     openclawStateDir: runtimeRoots.openclawStateDir,
     webUrl: runtimeConfig.urls.web,
