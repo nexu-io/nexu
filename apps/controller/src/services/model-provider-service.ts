@@ -13,6 +13,8 @@ import {
   listProviderRegistryEntries,
   parseCustomProviderKey,
   selectPreferredModel,
+  type testProviderModelBodySchema,
+  type testProviderModelResponseSchema,
   type verifyProviderBodySchema,
   type verifyProviderResponseSchema,
 } from "@nexu/shared";
@@ -45,6 +47,10 @@ export interface MiniMaxOauthStatus {
 }
 
 type DefaultModelValidity = "valid" | "invalid" | "unknown";
+type TestProviderModelBody = z.infer<typeof testProviderModelBodySchema>;
+type TestProviderModelResponse = z.infer<
+  typeof testProviderModelResponseSchema
+>;
 type VerifyProviderBody = z.infer<typeof verifyProviderBodySchema>;
 type VerifyProviderResponse = z.infer<typeof verifyProviderResponseSchema>;
 type MiniMaxRegion = "global" | "cn";
@@ -267,6 +273,103 @@ function getMiniMaxBaseUrl(region: MiniMaxRegion): string {
   return region === "cn"
     ? MINI_MAX_API_BASE_URL_CN
     : MINI_MAX_API_BASE_URL_GLOBAL;
+}
+
+function buildAnthropicMessagesUrls(
+  baseUrl: string | null | undefined,
+): string[] {
+  if (!baseUrl || baseUrl.trim().length === 0) {
+    return [];
+  }
+
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const candidateBaseUrls = [normalizedBaseUrl];
+
+  if (!/\/v\d+(?:alpha|beta)?$/i.test(normalizedBaseUrl)) {
+    candidateBaseUrls.push(`${normalizedBaseUrl}/v1`);
+  }
+
+  return [...new Set(candidateBaseUrls)]
+    .map((candidateBaseUrl) => buildProviderUrl(candidateBaseUrl, "/messages"))
+    .filter((url): url is string => typeof url === "string" && url.length > 0);
+}
+
+function buildGoogleGenerateContentUrl(
+  baseUrl: string | null | undefined,
+  modelId: string,
+): string | null {
+  if (!baseUrl || baseUrl.trim().length === 0) {
+    return null;
+  }
+
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const versionedBaseUrl = /\/(v1|v1beta|v1alpha)(?:\/|$)/i.test(
+    normalizedBaseUrl,
+  )
+    ? normalizedBaseUrl
+    : `${normalizedBaseUrl}/v1beta`;
+  const normalizedModelId = modelId.startsWith("models/")
+    ? modelId
+    : `models/${modelId}`;
+
+  return buildProviderUrl(
+    versionedBaseUrl,
+    `/${normalizedModelId}:generateContent`,
+  );
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  try {
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as Record<string, unknown>;
+      const directMessage =
+        typeof payload.message === "string" ? payload.message : null;
+      if (directMessage && directMessage.trim().length > 0) {
+        return directMessage.trim();
+      }
+
+      const errorValue = payload.error;
+      if (typeof errorValue === "string" && errorValue.trim().length > 0) {
+        return errorValue.trim();
+      }
+      if (
+        errorValue &&
+        typeof errorValue === "object" &&
+        "message" in errorValue &&
+        typeof errorValue.message === "string" &&
+        errorValue.message.trim().length > 0
+      ) {
+        return errorValue.message.trim();
+      }
+    }
+
+    const text = (await response.text()).trim();
+    if (text.length > 0) {
+      return text;
+    }
+  } catch {
+    // ignore body parse errors and fall back to HTTP status
+  }
+
+  return `HTTP ${response.status}`;
+}
+
+type ResolvedProviderRuntimeInput = {
+  providerId: string;
+  storedProvider: Awaited<ReturnType<NexuConfigStore["getProvider"]>>;
+  runtimePolicy: NonNullable<ReturnType<typeof getProviderRuntimePolicy>>;
+  apiKey: string;
+  resolvedBaseUrl: string | null;
+};
+
+async function consumeResponseBody(response: Response): Promise<void> {
+  try {
+    await response.arrayBuffer();
+  } catch {
+    // ignore body consumption failures for lightweight test probes
+  }
 }
 
 function getMiniMaxOauthHost(region: MiniMaxRegion): string {
@@ -606,23 +709,37 @@ export class ModelProviderService {
     return this.verifyProviderKey(instanceKey, input);
   }
 
-  private async verifyProviderKey(
+  async testProviderModel(
+    providerId: string,
+    input: TestProviderModelBody,
+  ): Promise<TestProviderModelResponse> {
+    return this.testProviderModelWithKey(providerId, input);
+  }
+
+  async testProviderInstanceModel(
+    instanceKey: string,
+    input: TestProviderModelBody,
+  ): Promise<TestProviderModelResponse> {
+    return this.testProviderModelWithKey(instanceKey, input);
+  }
+
+  private async resolveProviderRuntimeInput(
     providerKey: string,
     input: VerifyProviderBody,
-  ): Promise<VerifyProviderResponse> {
+  ): Promise<ResolvedProviderRuntimeInput | { error: string }> {
     const customProvider = parseCustomProviderKey(providerKey);
     const providerId = customProvider?.templateId ?? providerKey;
     if (
       !isSupportedByokProviderId(providerId) &&
       !isCustomProviderTemplate(providerId)
     ) {
-      return { valid: false, error: "Unsupported provider" };
+      return { error: "Unsupported provider" };
     }
 
     const storedProvider = await this.configStore.getProvider(providerKey);
     const runtimePolicy = getProviderRuntimePolicy(providerId);
     if (!runtimePolicy) {
-      return { valid: false, error: "Unsupported provider" };
+      return { error: "Unsupported provider" };
     }
 
     const apiKey =
@@ -635,6 +752,30 @@ export class ModelProviderService {
         : (getDefaultProviderBaseUrls(providerId)[0] ?? null);
     const resolvedBaseUrl =
       input.baseUrl ?? storedProvider?.baseUrl ?? defaultBaseUrl;
+
+    return {
+      providerId,
+      storedProvider: storedProvider ?? null,
+      runtimePolicy,
+      apiKey,
+      resolvedBaseUrl,
+    };
+  }
+
+  private async verifyProviderKey(
+    providerKey: string,
+    input: VerifyProviderBody,
+  ): Promise<VerifyProviderResponse> {
+    const resolvedInput = await this.resolveProviderRuntimeInput(
+      providerKey,
+      input,
+    );
+    if ("error" in resolvedInput) {
+      return { valid: false, error: resolvedInput.error };
+    }
+
+    const { providerId, runtimePolicy, apiKey, resolvedBaseUrl } =
+      resolvedInput;
 
     const verifyUrls =
       runtimePolicy.apiKind === "google-generative-ai"
@@ -800,6 +941,172 @@ export class ModelProviderService {
     } catch (error) {
       return {
         valid: false,
+        error: error instanceof Error ? error.message : "Request failed",
+      };
+    }
+  }
+
+  private async testProviderModelWithKey(
+    providerKey: string,
+    input: TestProviderModelBody,
+  ): Promise<TestProviderModelResponse> {
+    const resolvedInput = await this.resolveProviderRuntimeInput(
+      providerKey,
+      input,
+    );
+    if ("error" in resolvedInput) {
+      return { ok: false, error: resolvedInput.error };
+    }
+
+    const { providerId, runtimePolicy, apiKey, resolvedBaseUrl } =
+      resolvedInput;
+    const modelId = input.modelId.trim();
+    if (modelId.length === 0) {
+      return { ok: false, error: "Model ID required" };
+    }
+
+    const extraHeaders = undefined;
+
+    try {
+      if (providerId === "ollama") {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          ...(extraHeaders ?? {}),
+        };
+        if (apiKey && apiKey !== OLLAMA_DUMMY_API_KEY) {
+          headers.Authorization = `Bearer ${apiKey}`;
+        }
+
+        const response = await proxyFetch(
+          buildProviderUrl(resolvedBaseUrl, "/api/chat") ?? "",
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{ role: "user", content: "Reply with OK." }],
+              stream: false,
+            }),
+            timeoutMs: 15000,
+          },
+        );
+
+        if (!response.ok) {
+          return { ok: false, error: await readErrorMessage(response) };
+        }
+
+        await consumeResponseBody(response);
+        return { ok: true };
+      }
+
+      if (!apiKey) {
+        return { ok: false, error: "API key required" };
+      }
+
+      if (runtimePolicy.apiKind === "google-generative-ai") {
+        const url = buildGoogleGenerateContentUrl(resolvedBaseUrl, modelId);
+        if (!url) {
+          return { ok: false, error: "Unknown provider and no baseUrl given" };
+        }
+
+        const response = await proxyFetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+            ...(extraHeaders ?? {}),
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: "Reply with OK." }],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 1,
+              temperature: 0,
+            },
+          }),
+          timeoutMs: 15000,
+        });
+
+        if (!response.ok) {
+          return { ok: false, error: await readErrorMessage(response) };
+        }
+
+        await consumeResponseBody(response);
+        return { ok: true };
+      }
+
+      if (runtimePolicy.apiKind === "anthropic-messages") {
+        const urls = buildAnthropicMessagesUrls(resolvedBaseUrl);
+        if (urls.length === 0) {
+          return { ok: false, error: "Unknown provider and no baseUrl given" };
+        }
+
+        let lastError = "Request failed";
+        for (const url of urls) {
+          const response = await proxyFetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+              ...(extraHeaders ?? {}),
+            },
+            body: JSON.stringify({
+              model: modelId,
+              max_tokens: 1,
+              messages: [{ role: "user", content: "Reply with OK." }],
+            }),
+            timeoutMs: 15000,
+          });
+
+          if (response.ok) {
+            await consumeResponseBody(response);
+            return { ok: true };
+          }
+
+          lastError = await readErrorMessage(response);
+          if (response.status !== 404) {
+            return { ok: false, error: lastError };
+          }
+        }
+
+        return { ok: false, error: lastError };
+      }
+
+      const url = buildProviderUrl(resolvedBaseUrl, "/chat/completions");
+      if (!url) {
+        return { ok: false, error: "Unknown provider and no baseUrl given" };
+      }
+
+      const response = await proxyFetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          ...(extraHeaders ?? {}),
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: "user", content: "Reply with OK." }],
+          max_tokens: 1,
+          stream: false,
+        }),
+        timeoutMs: 15000,
+      });
+
+      if (!response.ok) {
+        return { ok: false, error: await readErrorMessage(response) };
+      }
+
+      await consumeResponseBody(response);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
         error: error instanceof Error ? error.message : "Request failed",
       };
     }

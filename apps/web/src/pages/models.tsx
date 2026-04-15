@@ -47,6 +47,7 @@ import {
   Trash2,
   User,
   X,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -69,7 +70,9 @@ import {
   postApiInternalDesktopCloudRefresh,
   postApiV1ModelProvidersByProviderIdOauthDisconnect,
   postApiV1ModelProvidersByProviderIdOauthStart,
+  postApiV1ModelProvidersByProviderIdTestModel,
   postApiV1ModelProvidersByProviderIdValidate,
+  postApiV1ModelProvidersInstancesTestModel,
   postApiV1ModelProvidersInstancesValidate,
   postApiV1ModelProvidersMinimaxOauthLogin,
   putApiInternalDesktopDefaultModel,
@@ -493,6 +496,30 @@ async function verifyApiKey(
         body: { apiKey, baseUrl },
       });
   if (error || !data) throw new Error("Verify request failed");
+  return data;
+}
+
+async function testProviderModelAvailability(
+  providerKey: string,
+  providerId: ByokProviderId,
+  modelId: string,
+  apiKey?: string,
+  baseUrl?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const customProvider = parseCustomProviderKey(providerKey);
+  const { data, error } = customProvider
+    ? await postApiV1ModelProvidersInstancesTestModel({
+        body: { instanceKey: providerKey, modelId, apiKey, baseUrl },
+      })
+    : await postApiV1ModelProvidersByProviderIdTestModel({
+        path: { providerId },
+        body: { modelId, apiKey, baseUrl },
+      });
+
+  if (error || !data) {
+    throw new Error("Model test request failed");
+  }
+
   return data;
 }
 
@@ -2807,6 +2834,15 @@ function ByokProviderDetail({
   const [addModelOpen, setAddModelOpen] = useState(false);
   const [addModelQuery, setAddModelQuery] = useState("");
   const [didAutoDiscoverModels, setDidAutoDiscoverModels] = useState(false);
+  const [modelTestStates, setModelTestStates] = useState<
+    Record<string, "loading" | "success" | "error">
+  >({});
+  const [modelTestErrors, setModelTestErrors] = useState<
+    Record<string, string>
+  >({});
+  const modelTestTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   // ── OAuth state (OpenAI only) ──────────────────────────
   const isOAuthProvider = providerId === "openai";
@@ -3010,6 +3046,8 @@ function ByokProviderDetail({
     setAddModelOpen(false);
     setAddModelQuery("");
     setDidAutoDiscoverModels(false);
+    setModelTestStates({});
+    setModelTestErrors({});
     setOauthPending(false);
     setCodingPlanKey("");
     setCodingPlanRegion("global");
@@ -3027,6 +3065,15 @@ function ByokProviderDetail({
 
     setVerifiedModels(storedModelIds.length > 0 ? storedModelIds : null);
   }, [authMode, isMiniMax, storedModelIds]);
+
+  useEffect(() => {
+    return () => {
+      for (const timer of modelTestTimersRef.current.values()) {
+        clearTimeout(timer);
+      }
+      modelTestTimersRef.current.clear();
+    };
+  }, []);
 
   const getModelListUnsupportedMessage = useCallback(
     (error?: string) => {
@@ -3196,6 +3243,8 @@ function ByokProviderDetail({
       setAddModelOpen(false);
       setAddModelQuery("");
       setDidAutoDiscoverModels(false);
+      setModelTestStates({});
+      setModelTestErrors({});
     },
   });
 
@@ -3378,6 +3427,95 @@ function ByokProviderDetail({
       previous.filter((candidate) => candidate.trim().toLowerCase() !== target),
     );
   }, []);
+
+  const scheduleModelTestStateReset = useCallback(
+    (modelId: string, delayMs: number) => {
+      const existingTimer = modelTestTimersRef.current.get(modelId);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      const timer = setTimeout(() => {
+        setModelTestStates((previous) => {
+          const next = { ...previous };
+          delete next[modelId];
+          return next;
+        });
+        setModelTestErrors((previous) => {
+          const next = { ...previous };
+          delete next[modelId];
+          return next;
+        });
+        modelTestTimersRef.current.delete(modelId);
+      }, delayMs);
+
+      modelTestTimersRef.current.set(modelId, timer);
+    },
+    [],
+  );
+
+  const handleTestModel = useCallback(
+    async (modelId: string) => {
+      setModelTestStates((previous) => ({ ...previous, [modelId]: "loading" }));
+      setModelTestErrors((previous) => {
+        const next = { ...previous };
+        delete next[modelId];
+        return next;
+      });
+
+      try {
+        const result = await testProviderModelAvailability(
+          providerKey,
+          providerId,
+          modelId,
+          validationApiKey,
+          baseUrl || undefined,
+        );
+
+        if (result.ok) {
+          setModelTestStates((previous) => ({
+            ...previous,
+            [modelId]: "success",
+          }));
+          scheduleModelTestStateReset(modelId, 3000);
+          return;
+        }
+
+        const errorMessage = result.error ?? t("models.byok.keyInvalidUnknown");
+        setModelTestStates((previous) => ({ ...previous, [modelId]: "error" }));
+        setModelTestErrors((previous) => ({
+          ...previous,
+          [modelId]: errorMessage,
+        }));
+        toast.error(
+          t("models.byok.testFailed", { modelId, error: errorMessage }),
+        );
+        scheduleModelTestStateReset(modelId, 3000);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : t("models.byok.keyInvalidUnknown");
+        setModelTestStates((previous) => ({ ...previous, [modelId]: "error" }));
+        setModelTestErrors((previous) => ({
+          ...previous,
+          [modelId]: errorMessage,
+        }));
+        toast.error(
+          t("models.byok.testFailed", { modelId, error: errorMessage }),
+        );
+        scheduleModelTestStateReset(modelId, 3000);
+      }
+    },
+    [
+      baseUrl,
+      providerId,
+      providerKey,
+      scheduleModelTestStateReset,
+      t,
+      validationApiKey,
+    ],
+  );
 
   return (
     <div>
@@ -3970,6 +4108,13 @@ function ByokProviderDetail({
               modelId,
               currentModelId,
             );
+            const testState = modelTestStates[modelId];
+            const testError = modelTestErrors[modelId];
+            const isTesting = testState === "loading";
+            const testButtonForcedVisible =
+              testState === "loading" ||
+              testState === "success" ||
+              testState === "error";
             return (
               <div
                 key={modelId}
@@ -4009,6 +4154,55 @@ function ByokProviderDetail({
                     {modelId}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  disabled={isTesting || !canRefreshModels}
+                  title={
+                    testState === "error"
+                      ? testError
+                      : t("models.byok.testModel")
+                  }
+                  onClick={() => {
+                    if (isTesting || !canRefreshModels) {
+                      return;
+                    }
+                    void handleTestModel(modelId);
+                  }}
+                  className={cn(
+                    "rounded p-1 transition-all",
+                    testButtonForcedVisible
+                      ? "pointer-events-auto opacity-100"
+                      : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100",
+                    testState === "loading" && "cursor-wait text-text-muted",
+                    (testState === "success" || testState === "error") &&
+                      "hidden",
+                    !testState &&
+                      (!canRefreshModels
+                        ? "text-text-muted/40"
+                        : "text-text-muted hover:bg-surface-3 hover:text-text-primary"),
+                  )}
+                  aria-label={t("models.byok.testModel")}
+                >
+                  {testState === "loading" ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Zap size={12} />
+                  )}
+                </button>
+                {(testState === "success" || testState === "error") && (
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium shrink-0",
+                      testState === "success"
+                        ? "text-emerald-600"
+                        : "text-red-500",
+                    )}
+                  >
+                    {testState === "success"
+                      ? t("models.byok.testAvailable")
+                      : t("models.byok.testUnavailable")}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => {

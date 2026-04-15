@@ -44,6 +44,15 @@ export const validateProviderInstanceBodySchema =
     instanceKey: z.string().min(1),
   });
 
+export const testProviderModelBodySchema = verifyProviderBodySchema.extend({
+  modelId: z.string().min(1),
+});
+
+export const testProviderInstanceModelBodySchema =
+  testProviderModelBodySchema.extend({
+    instanceKey: z.string().min(1),
+  });
+
 export const refreshModelsResponseSchema = z.object({
   models: z.array(z.string()),
   error: z.string().optional(),
@@ -52,6 +61,11 @@ export const refreshModelsResponseSchema = z.object({
 export const verifyProviderResponseSchema = z.object({
   valid: z.boolean(),
   models: z.array(z.string()).optional(),
+  error: z.string().optional(),
+});
+
+export const testProviderModelResponseSchema = z.object({
+  ok: z.boolean(),
   error: z.string().optional(),
 });
 

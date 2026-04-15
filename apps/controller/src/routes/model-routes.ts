@@ -13,6 +13,9 @@ import {
   quotaFallbackResponseSchema,
   restoreManagedBodySchema,
   supportedByokProviderIds,
+  testProviderInstanceModelBodySchema,
+  testProviderModelBodySchema,
+  testProviderModelResponseSchema,
   validateProviderInstanceBodySchema,
   verifyProviderBodySchema,
   verifyProviderResponseSchema,
@@ -181,6 +184,41 @@ export function registerModelRoutes(
   app.openapi(
     createRoute({
       method: "post",
+      path: "/api/v1/model-providers/instances/test-model",
+      tags: ["Model Providers"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: testProviderInstanceModelBodySchema,
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: testProviderModelResponseSchema },
+          },
+          description: "Test a model against a provider instance",
+        },
+      },
+    }),
+    async (c) => {
+      const { instanceKey, ...input } = c.req.valid("json");
+      return c.json(
+        await container.modelProviderService.testProviderInstanceModel(
+          instanceKey,
+          input,
+        ),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/api/v1/model-providers/{providerId}/validate",
       tags: ["Model Providers"],
       request: {
@@ -202,6 +240,40 @@ export function registerModelRoutes(
       const { providerId } = c.req.valid("param");
       return c.json(
         await container.modelProviderService.verifyProvider(
+          providerId,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/model-providers/{providerId}/test-model",
+      tags: ["Model Providers"],
+      request: {
+        params: verifyProviderIdParamSchema,
+        body: {
+          content: {
+            "application/json": { schema: testProviderModelBodySchema },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": { schema: testProviderModelResponseSchema },
+          },
+          description: "Test a model against provider credentials",
+        },
+      },
+    }),
+    async (c) => {
+      const { providerId } = c.req.valid("param");
+      return c.json(
+        await container.modelProviderService.testProviderModel(
           providerId,
           c.req.valid("json"),
         ),

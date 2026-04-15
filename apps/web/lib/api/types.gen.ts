@@ -2783,6 +2783,30 @@ export type PostApiV1ModelProvidersInstancesValidateResponses = {
 
 export type PostApiV1ModelProvidersInstancesValidateResponse = PostApiV1ModelProvidersInstancesValidateResponses[keyof PostApiV1ModelProvidersInstancesValidateResponses];
 
+export type PostApiV1ModelProvidersInstancesTestModelData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+        modelId: string;
+        instanceKey: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/model-providers/instances/test-model';
+};
+
+export type PostApiV1ModelProvidersInstancesTestModelResponses = {
+    /**
+     * Test a model against a provider instance
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersInstancesTestModelResponse = PostApiV1ModelProvidersInstancesTestModelResponses[keyof PostApiV1ModelProvidersInstancesTestModelResponses];
+
 export type PostApiV1ModelProvidersByProviderIdValidateData = {
     body?: {
         apiKey?: string;
@@ -2807,6 +2831,31 @@ export type PostApiV1ModelProvidersByProviderIdValidateResponses = {
 };
 
 export type PostApiV1ModelProvidersByProviderIdValidateResponse = PostApiV1ModelProvidersByProviderIdValidateResponses[keyof PostApiV1ModelProvidersByProviderIdValidateResponses];
+
+export type PostApiV1ModelProvidersByProviderIdTestModelData = {
+    body?: {
+        apiKey?: string;
+        baseUrl?: string;
+        modelId: string;
+    };
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/model-providers/{providerId}/test-model';
+};
+
+export type PostApiV1ModelProvidersByProviderIdTestModelResponses = {
+    /**
+     * Test a model against provider credentials
+     */
+    200: {
+        ok: boolean;
+        error?: string;
+    };
+};
+
+export type PostApiV1ModelProvidersByProviderIdTestModelResponse = PostApiV1ModelProvidersByProviderIdTestModelResponses[keyof PostApiV1ModelProvidersByProviderIdTestModelResponses];
 
 export type GetApiV1ModelProvidersMinimaxOauthStatusData = {
     body?: never;

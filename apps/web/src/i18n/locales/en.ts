@@ -619,6 +619,10 @@ const en = {
   "models.byok.searchEmpty": "No matching models",
   "models.byok.addCustomModelHint": 'Add "{{modelId}}" as custom model',
   "models.byok.addModel": "Add",
+  "models.byok.testModel": "Test model",
+  "models.byok.testAvailable": "Available",
+  "models.byok.testUnavailable": "Unavailable",
+  "models.byok.testFailed": "Test failed for {{modelId}}: {{error}}",
   "models.byok.removeModel": "Remove model",
   "models.byok.refreshSuccess": "Model list refreshed: {{count}} models",
   "models.byok.refreshFailed":
