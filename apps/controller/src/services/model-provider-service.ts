@@ -213,6 +213,21 @@ function buildProviderUrl(
   return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
+function buildGoogleModelsUrl(
+  baseUrl: string | null | undefined,
+): string | null {
+  if (!baseUrl || baseUrl.trim().length === 0) {
+    return null;
+  }
+
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const versionedBaseUrl = /\/(v1|v1beta|v1alpha)$/i.test(normalizedBaseUrl)
+    ? normalizedBaseUrl
+    : `${normalizedBaseUrl}/v1beta`;
+
+  return buildProviderUrl(versionedBaseUrl, "/models");
+}
+
 function normalizeGoogleModelId(name: string | undefined): string {
   if (typeof name !== "string") {
     return "";
@@ -715,7 +730,10 @@ export class ModelProviderService {
     const resolvedBaseUrl =
       input.baseUrl ?? storedProvider?.baseUrl ?? defaultBaseUrl;
 
-    const verifyUrl = buildProviderUrl(resolvedBaseUrl, "/models") ?? "";
+    const verifyUrl =
+      runtimePolicy.apiKind === "google-generative-ai"
+        ? (buildGoogleModelsUrl(resolvedBaseUrl) ?? "")
+        : (buildProviderUrl(resolvedBaseUrl, "/models") ?? "");
     if (verifyUrl.length === 0) {
       return { valid: false, error: "Unknown provider and no baseUrl given" };
     }

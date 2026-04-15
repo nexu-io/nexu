@@ -322,7 +322,7 @@ describe("ModelProviderService", () => {
       init?: RequestInit,
     ) => {
       expect(String(input)).toBe(
-        "https://generativelanguage.googleapis.com/models",
+        "https://generativelanguage.googleapis.com/v1beta/models",
       );
       expect(init?.headers).toEqual({
         "x-goog-api-key": "google-test-key",

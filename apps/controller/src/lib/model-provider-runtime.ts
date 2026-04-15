@@ -95,6 +95,13 @@ function resolveDefaultBaseUrls(
   return getDefaultProviderBaseUrls(providerId);
 }
 
+function normalizeGoogleNativeBaseUrl(baseUrl: string): string {
+  return (
+    normalizeProviderBaseUrl(baseUrl)?.replace(/\/(v1|v1beta|v1alpha)$/i, "") ??
+    baseUrl
+  );
+}
+
 function isProviderProxied(input: {
   providerId: string;
   baseUrl: string;
@@ -110,6 +117,20 @@ function isProviderProxied(input: {
       .map((value) => normalizeProviderBaseUrl(value))
       .filter((value): value is string => value !== null),
   );
+
+  if (input.providerId === "google") {
+    const normalizedGoogleBaseUrl = normalizeGoogleNativeBaseUrl(input.baseUrl);
+    const normalizedGoogleDefaultBaseUrls = new Set(
+      [...normalizedDefaultBaseUrls].map((value) =>
+        normalizeGoogleNativeBaseUrl(value),
+      ),
+    );
+
+    return (
+      normalizedGoogleDefaultBaseUrls.size > 0 &&
+      !normalizedGoogleDefaultBaseUrls.has(normalizedGoogleBaseUrl)
+    );
+  }
 
   return (
     normalizedDefaultBaseUrls.size > 0 &&

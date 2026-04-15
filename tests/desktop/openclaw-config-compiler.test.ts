@@ -392,4 +392,59 @@ describe("compileOpenClawConfig", () => {
       ],
     });
   });
+
+  it("treats Google v1beta endpoints as native Gemini providers", () => {
+    const config = createBaseConfig();
+    config.runtime.defaultModelId = "google/gemini-2.5-flash";
+    config.bots[0] = {
+      ...config.bots[0],
+      modelId: "google/gemini-2.5-flash",
+    };
+    config.models = {
+      mode: "merge",
+      providers: {
+        google: {
+          enabled: true,
+          displayName: "Google AI Studio",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          auth: "api-key",
+          api: "google-generative-ai",
+          apiKey: "AIza-test",
+          models: [
+            {
+              id: "gemini-2.5-flash",
+              name: "gemini-2.5-flash",
+              api: "google-generative-ai",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    };
+
+    const compiled = compileOpenClawConfig(config, createEnv());
+
+    expect(compiled.models?.providers?.gemini?.baseUrl).toBe(
+      "https://generativelanguage.googleapis.com/v1beta",
+    );
+    expect(compiled.models?.providers?.byok_gemini).toBeUndefined();
+    expect(compiled.models?.providers?.gemini?.models[0]?.id).toBe(
+      "gemini-2.5-flash",
+    );
+    expect(compiled.agents?.list[0]?.model?.primary).toBe(
+      "gemini/gemini-2.5-flash",
+    );
+    expect(resolveModelId(config, createEnv(), "google/gemini-2.5-flash")).toBe(
+      "gemini/gemini-2.5-flash",
+    );
+  });
 });

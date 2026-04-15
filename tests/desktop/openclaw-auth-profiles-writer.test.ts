@@ -377,4 +377,73 @@ describe("OpenClawAuthProfilesWriter", () => {
       key: "link-key",
     });
   });
+
+  it("drops stale byok_gemini api-key profiles when google is canonical", async () => {
+    const env = createEnv(tempDir);
+    const store = new OpenClawAuthProfilesStore(env);
+    const writer = new OpenClawAuthProfilesWriter(store);
+    const workspace = resolve(env.openclawStateDir, "agents", "bot_1");
+    const authProfilesPath = resolve(workspace, "agent", "auth-profiles.json");
+
+    await store.updateAuthProfiles(authProfilesPath, async () => ({
+      version: 1,
+      profiles: {
+        "byok_gemini:default": {
+          type: "api_key",
+          provider: "byok_gemini",
+          key: "old-google-key",
+        },
+      },
+    }));
+
+    await writer.writeForAgents(
+      {
+        agents: {
+          list: [
+            {
+              id: "bot_1",
+              name: "Bot One",
+              workspace,
+            },
+          ],
+        },
+      } as never,
+      {
+        google: {
+          enabled: true,
+          auth: "api-key",
+          api: "google-generative-ai",
+          apiKey: "canonical-google-key",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          models: [
+            {
+              id: "gemini-2.5-flash",
+              name: "gemini-2.5-flash",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    );
+
+    const parsed = JSON.parse(readFileSync(authProfilesPath, "utf8")) as {
+      profiles: Record<string, { type: string; provider: string; key: string }>;
+    };
+
+    expect(parsed.profiles["google:default"]).toEqual({
+      type: "api_key",
+      provider: "google",
+      key: "canonical-google-key",
+    });
+    expect(parsed.profiles["byok_gemini:default"]).toBeUndefined();
+  });
 });
