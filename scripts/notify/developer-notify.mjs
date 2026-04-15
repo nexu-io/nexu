@@ -3,6 +3,7 @@
 const CONTRIBUTOR_GUIDE_URL = "https://docs.nexu.io/zh/guide/first-pr";
 const GOOD_FIRST_ISSUE_URL =
   "https://github.com/nexu-io/nexu/labels/good-first-issue";
+const ALL_ISSUES_URL = "https://github.com/nexu-io/nexu/issues";
 const WEBHOOK_TIMEOUT_MS = 30_000;
 
 function createTimeoutSignal(timeoutMs) {
@@ -126,11 +127,12 @@ function createButtonColumns(actions) {
 
 function createRewardCopy() {
   return [
-    "只需 3 步💥，1️⃣选任务 2️⃣ 认领 3️⃣ 提交",
-    "🎁 即可同时获得以下奖励🎉 （详情请看群公告）",
-    "1️⃣ 最高价值 20 美金的 nexu 使用额度积分奖励",
-    "2️⃣ GitHub README 公开致谢",
-    "3️⃣ Github 社区徽章。",
+    "只需 3 步💥：❶ 选任务 ❷ 认领 ❸ 提交 PR",
+    "",
+    "🎁 合并后即可获得以下奖励：",
+    "✅ 最高 2000 积分，可兑换价值 $20 的 nexu 使用额度",
+    "✅ GitHub README 贡献者公开致谢",
+    "✅ GitHub 社区徽章",
   ].join("\n");
 }
 
@@ -145,7 +147,7 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
       header: {
         title: {
           tag: "plain_text",
-          content: "🎉 又新增 1 位贡献者给 Nexu 提 PR 啦～ 立即派出奖励💰！",
+          content: "🎉 又有新贡献者给 Nexu 提 PR 啦！你也来试试？",
         },
         template: "purple",
       },
@@ -160,13 +162,14 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
           {
             tag: "markdown",
             content: [
-              "Nexu 准备好一批对新手友好任务的 Good First Issue 👇",
+              "Nexu 还有一批新手友好任务等你认领 👇 提交后 24 小时内审核回复",
               createRewardCopy(),
             ].join("\n"),
           },
           createButtonColumns([
+            createButton("领取任务", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
-            createButton("立即贡献", GOOD_FIRST_ISSUE_URL),
+            createButton("查看全部 Issue", ALL_ISSUES_URL),
           ]),
         ],
       },
@@ -202,7 +205,7 @@ export function buildDeveloperIssuePayload({
         elements: [
           {
             tag: "markdown",
-            content: `**标题：** ${safeTitle}\n**Author:** ${safeAuthor}\n**Labels:** ${safeLabels}\n**Bug description:** ${safeBody}`,
+            content: `**标题：** ${safeTitle}\n**提交者：** ${safeAuthor}\n**标签：** ${safeLabels}\n**描述：** ${safeBody}`,
           },
           createButtonColumns([
             createButton("查看 issue", issueUrl, "primary"),
@@ -212,8 +215,9 @@ export function buildDeveloperIssuePayload({
             content: createRewardCopy(),
           },
           createButtonColumns([
-            createButton("领取新手友好 issue", GOOD_FIRST_ISSUE_URL),
+            createButton("领取新手友好 Issue", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
+            createButton("查看全部 Issue", ALL_ISSUES_URL),
           ]),
         ],
       },
