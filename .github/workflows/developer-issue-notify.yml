@@ -33,6 +33,7 @@ jobs:
           URL: ${{ github.event.issue.html_url }}
           NUMBER: ${{ github.event.issue.number }}
           AUTHOR: ${{ github.event.issue.user.login }}
+          BODY: ${{ github.event.issue.body }}
           LABELS_OR_CATEGORY: ${{ join(github.event.issue.labels.*.name, ', ') }}
           REPO: ${{ github.repository }}
         run: node scripts/notify/developer-notify.mjs

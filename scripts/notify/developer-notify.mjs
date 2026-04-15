@@ -162,7 +162,18 @@ export function buildDeveloperPrPayload({ author, labels, prUrl }) {
   };
 }
 
-export function buildDeveloperIssuePayload({ issueUrl }) {
+export function buildDeveloperIssuePayload({
+  title,
+  author,
+  labels,
+  body,
+  issueUrl,
+}) {
+  const safeTitle = sanitizeText(title || "(no title)", 120) || "(no title)";
+  const safeAuthor = sanitizeText(author || "unknown", 80) || "unknown";
+  const safeLabels = sanitizeText(labels || "none", 120) || "none";
+  const safeBody = sanitizeText(body || "No description provided.", 240);
+
   return {
     msg_type: "interactive",
     card: {
@@ -179,11 +190,17 @@ export function buildDeveloperIssuePayload({ issueUrl }) {
         elements: [
           {
             tag: "markdown",
+            content: `**标题：** ${safeTitle}\n**Author:** ${safeAuthor}\n**Labels:** ${safeLabels}\n**Bug description:** ${safeBody}`,
+          },
+          createButtonColumns([
+            createButton("查看 issue", issueUrl, "primary"),
+          ]),
+          {
+            tag: "markdown",
             content:
               "只需 3 步💥，选任务 — 认领 —— 提交，即可获得 GitHub README 公开致谢 + 积分奖励 + Github 社区徽章🎉。（详情请阅览群公告）",
           },
           createButtonColumns([
-            createButton("查看 issue", issueUrl, "primary"),
             createButton("领取新手友好 issue", GOOD_FIRST_ISSUE_URL),
             createButton("贡献者指南", CONTRIBUTOR_GUIDE_URL),
           ]),
@@ -240,7 +257,9 @@ export async function sendWebhook(webhookUrl, payload) {
 export async function runFromEnv(env = process.env) {
   const webhookUrl = env.WEBHOOK_URL;
   const eventKind = env.EVENT_KIND ?? "issue";
+  const title = env.TITLE ?? "";
   const author = env.AUTHOR ?? "";
+  const body = env.BODY ?? "";
   const labels = env.LABELS_OR_CATEGORY || "none";
   const url = env.URL ?? "";
   const githubToken = env.GITHUB_TOKEN;
@@ -279,7 +298,13 @@ export async function runFromEnv(env = process.env) {
       return { skipped: true, reason: "internal-author" };
     }
 
-    const payload = buildDeveloperIssuePayload({ issueUrl: safeUrl });
+    const payload = buildDeveloperIssuePayload({
+      title,
+      author,
+      labels,
+      body,
+      issueUrl: safeUrl,
+    });
     await sendWebhook(webhookUrl, payload);
     return { skipped: false, eventKind };
   }
