@@ -29,6 +29,24 @@ function getPrunedInstallArgs() {
   return ["--omit=peer", "--no-audit", "--no-fund"];
 }
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
+async function timedStep(stepName, fn, timings) {
+  const startedAt = performance.now();
+  console.log(`[slimclaw:install][timing] start ${stepName}`);
+  try {
+    return await fn();
+  } finally {
+    const durationMs = performance.now() - startedAt;
+    timings.push({ stepName, durationMs });
+    console.log(
+      `[slimclaw:install][timing] done ${stepName} duration=${formatDurationMs(durationMs)}`,
+    );
+  }
+}
+
 async function ensureRuntimeBinWrappers(runtimeDir) {
   const binDir = path.join(runtimeDir, "bin");
   await mkdir(binDir, { recursive: true });
@@ -142,27 +160,77 @@ async function run(command, args, cwd) {
 
 export async function installRuntimeAt(runtimeDir, mode = "pruned") {
   const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  await syncRuntimeSeedManifests(runtimeDir);
+  const timings = [];
+  const totalStartedAt = performance.now();
+  let attemptedCi = false;
+  let ciSucceeded = false;
+  let fellBackToInstall = false;
+  await timedStep(
+    "sync-runtime-seed-manifests",
+    async () => syncRuntimeSeedManifests(runtimeDir),
+    timings,
+  );
   const lockfilePath = path.join(runtimeDir, "package-lock.json");
+  const usedLockfile = await exists(lockfilePath);
 
   if (mode === "full") {
-    await run(
-      npmCommand,
-      ["install", "--no-audit", "--no-fund", "--prefer-offline"],
-      runtimeDir,
+    await timedStep(
+      "npm-install",
+      async () =>
+        run(
+          npmCommand,
+          ["install", "--no-audit", "--no-fund", "--prefer-offline"],
+          runtimeDir,
+        ),
+      timings,
     );
-    await ensureRuntimeBinWrappers(runtimeDir);
+    await timedStep(
+      "ensure-runtime-bin-wrappers",
+      async () => ensureRuntimeBinWrappers(runtimeDir),
+      timings,
+    );
+    const totalDurationMs = performance.now() - totalStartedAt;
+    console.log("[slimclaw:install][timing] summary");
+    for (const timing of timings) {
+      console.log(
+        `[slimclaw:install][timing] ${timing.stepName}=${formatDurationMs(timing.durationMs)}`,
+      );
+    }
+    console.log(
+      `[slimclaw:install][timing] total=${formatDurationMs(totalDurationMs)} mode=${mode} usedLockfile=${usedLockfile} attemptedCi=${attemptedCi} ciSucceeded=${ciSucceeded} fellBackToInstall=${fellBackToInstall}`,
+    );
     return;
   }
 
   const installArgs = getPrunedInstallArgs();
 
-  if (await exists(lockfilePath)) {
+  if (usedLockfile) {
+    attemptedCi = true;
     try {
-      await run(npmCommand, ["ci", ...installArgs], runtimeDir);
-      await ensureRuntimeBinWrappers(runtimeDir);
+      await timedStep(
+        "npm-ci",
+        async () => run(npmCommand, ["ci", ...installArgs], runtimeDir),
+        timings,
+      );
+      ciSucceeded = true;
+      await timedStep(
+        "ensure-runtime-bin-wrappers",
+        async () => ensureRuntimeBinWrappers(runtimeDir),
+        timings,
+      );
+      const totalDurationMs = performance.now() - totalStartedAt;
+      console.log("[slimclaw:install][timing] summary");
+      for (const timing of timings) {
+        console.log(
+          `[slimclaw:install][timing] ${timing.stepName}=${formatDurationMs(timing.durationMs)}`,
+        );
+      }
+      console.log(
+        `[slimclaw:install][timing] total=${formatDurationMs(totalDurationMs)} mode=${mode} usedLockfile=${usedLockfile} attemptedCi=${attemptedCi} ciSucceeded=${ciSucceeded} fellBackToInstall=${fellBackToInstall}`,
+      );
       return;
     } catch (error) {
+      fellBackToInstall = true;
       console.warn(
         "slimclaw runtime npm ci failed, falling back to npm install --prefer-offline.",
       );
@@ -170,13 +238,33 @@ export async function installRuntimeAt(runtimeDir, mode = "pruned") {
     }
   }
 
-  await run(
-    npmCommand,
-    ["install", ...installArgs, "--prefer-offline"],
-    runtimeDir,
+  await timedStep(
+    "npm-install",
+    async () =>
+      run(
+        npmCommand,
+        ["install", ...installArgs, "--prefer-offline"],
+        runtimeDir,
+      ),
+    timings,
   );
 
-  await ensureRuntimeBinWrappers(runtimeDir);
+  await timedStep(
+    "ensure-runtime-bin-wrappers",
+    async () => ensureRuntimeBinWrappers(runtimeDir),
+    timings,
+  );
+
+  const totalDurationMs = performance.now() - totalStartedAt;
+  console.log("[slimclaw:install][timing] summary");
+  for (const timing of timings) {
+    console.log(
+      `[slimclaw:install][timing] ${timing.stepName}=${formatDurationMs(timing.durationMs)}`,
+    );
+  }
+  console.log(
+    `[slimclaw:install][timing] total=${formatDurationMs(totalDurationMs)} mode=${mode} usedLockfile=${usedLockfile} attemptedCi=${attemptedCi} ciSucceeded=${ciSucceeded} fellBackToInstall=${fellBackToInstall}`,
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

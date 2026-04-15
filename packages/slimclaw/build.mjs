@@ -7,6 +7,24 @@ const packageRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(packageRoot, "..", "..");
 const require = createRequire(import.meta.url);
 
+function formatDurationMs(durationMs) {
+  return `${(durationMs / 1000).toFixed(3)}s`;
+}
+
+async function timedStep(stepName, fn, timings) {
+  const startedAt = performance.now();
+  console.log(`[slimclaw:build][timing] start ${stepName}`);
+  try {
+    return await fn();
+  } finally {
+    const durationMs = performance.now() - startedAt;
+    timings.push({ stepName, durationMs });
+    console.log(
+      `[slimclaw:build][timing] done ${stepName} duration=${formatDurationMs(durationMs)}`,
+    );
+  }
+}
+
 function createCommandSpec(command, args) {
   if (
     process.platform === "win32" &&
@@ -63,5 +81,23 @@ async function buildSlimclaw() {
   );
 }
 
-await prepareOpenclawRuntime();
-await buildSlimclaw();
+const totalStartedAt = performance.now();
+const timings = [];
+
+await timedStep(
+  "prepare-runtime",
+  async () => prepareOpenclawRuntime(),
+  timings,
+);
+await timedStep("tsc", async () => buildSlimclaw(), timings);
+
+const totalDurationMs = performance.now() - totalStartedAt;
+console.log("[slimclaw:build][timing] summary");
+for (const timing of timings) {
+  console.log(
+    `[slimclaw:build][timing] ${timing.stepName}=${formatDurationMs(timing.durationMs)}`,
+  );
+}
+console.log(
+  `[slimclaw:build][timing] total=${formatDurationMs(totalDurationMs)}`,
+);
