@@ -167,7 +167,7 @@ async function waitForControllerHealth(supervisorPid: number): Promise<void> {
       );
     }
 
-    if (index < 39) {
+    if (index < 119) {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }

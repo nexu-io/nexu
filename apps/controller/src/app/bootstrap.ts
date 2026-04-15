@@ -3,6 +3,7 @@ import type { ControllerContainer } from "./container.js";
 
 const INITIAL_CONTROL_PLANE_READY_TIMEOUT_MS = 30_000;
 const STABLE_CONTROL_PLANE_TIMEOUT_MS = 45_000;
+const MANAGED_STABLE_CONTROL_PLANE_TIMEOUT_MS = 90_000;
 const STABLE_CONTROL_PLANE_WINDOW_MS = 4_000;
 const CONTROL_PLANE_POLL_INTERVAL_MS = 500;
 
@@ -121,7 +122,7 @@ export async function bootstrapController(
     container.runtimeState.bootPhase = "stabilizing-runtime";
     await waitForStableControlPlane(
       container,
-      STABLE_CONTROL_PLANE_TIMEOUT_MS,
+      MANAGED_STABLE_CONTROL_PLANE_TIMEOUT_MS,
       STABLE_CONTROL_PLANE_WINDOW_MS,
     );
   } else {
