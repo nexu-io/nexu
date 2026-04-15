@@ -193,7 +193,7 @@ export function buildDeveloperIssuePayload({
       header: {
         title: {
           tag: "plain_text",
-          content: "一批新手友好 Issue 等你领取，做贡献领积分奖励💰🎉",
+          content: "刚新增 1 条 issue 等你来领取🎉，做贡献领积分奖励💰",
         },
         template: "blue",
       },
