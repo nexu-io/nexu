@@ -2101,6 +2101,10 @@ export class NexuConfigStore {
         ...config.runtime,
         defaultModelId: modelId,
       },
+      desktop: {
+        ...config.desktop,
+        selectedModelId: null,
+      },
       bots: config.bots.map((bot) => ({
         ...bot,
         modelId,

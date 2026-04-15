@@ -42,6 +42,11 @@ describe("NexuConfigStore", () => {
         ".openclaw",
         "nexu-runtime-model.json",
       ),
+      creditGuardStatePath: path.join(
+        rootDir,
+        ".openclaw",
+        "nexu-credit-guard-state.json",
+      ),
       skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
       skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
       analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
@@ -502,6 +507,41 @@ describe("NexuConfigStore", () => {
     expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-pro");
     expect(config).not.toHaveProperty("providers");
     expect(config.schemaVersion).toBe(2);
+  });
+
+  it("clears legacy desktop selectedModelId when switching default model", async () => {
+    const store = new NexuConfigStore(env);
+    await store.createBot({
+      name: "Assistant",
+      slug: "assistant",
+      modelId: "anthropic/claude-sonnet-4",
+    });
+
+    const initialConfig = await store.getConfig();
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          ...initialConfig,
+          desktop: {
+            ...initialConfig.desktop,
+            selectedModelId: "openai/gpt-4o",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const reloadedStore = new NexuConfigStore(env);
+    await reloadedStore.setDefaultModel("google/gemini-2.5-flash");
+    const config = await reloadedStore.getConfig();
+
+    expect(config.runtime.defaultModelId).toBe("google/gemini-2.5-flash");
+    expect(config.bots[0]?.modelId).toBe("google/gemini-2.5-flash");
+    expect(config.desktop.selectedModelId).toBeNull();
   });
 
   it("preserves slash-qualified model ids for custom anthropic providers", async () => {
