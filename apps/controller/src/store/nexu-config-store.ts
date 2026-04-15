@@ -38,7 +38,10 @@ import {
 import type { z } from "zod";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
-import { resolveManagedCloudModel } from "../lib/managed-models.js";
+import {
+  isManagedCloudModelId,
+  resolveManagedCloudModel,
+} from "../lib/managed-models.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import {
   type CloudRewardService,
@@ -2685,7 +2688,8 @@ export class NexuConfigStore {
   }
 
   async disconnectDesktopCloud() {
-    const previousCloud = readDesktopCloud(await this.getConfig());
+    const previousConfig = await this.getConfig();
+    const previousCloud = readDesktopCloud(previousConfig);
     this.abortDesktopCloudPolling();
 
     await this.setDesktopCloudState({
@@ -2699,6 +2703,41 @@ export class NexuConfigStore {
       apiKey: null,
       models: [],
     });
+    // Strip every managed-cloud (link/*) reference from the persisted config:
+    // the runtime default AND per-bot overrides. Only clearing the global
+    // default leaves bots that were explicitly set to a Link model still
+    // pointing at an unavailable link/* id, which later compiles into the
+    // agent runtime and surfaces as "Unknown model"/"no provider" errors.
+    // BYOK/OAuth selections are untouched so user-configured non-Link bots
+    // keep working.
+    const previousCloudModels = previousCloud.models;
+    const defaultWasManaged = isManagedCloudModelId(
+      previousConfig.runtime.defaultModelId,
+      previousCloudModels,
+    );
+    const botsHaveManaged = previousConfig.bots.some((bot) =>
+      isManagedCloudModelId(bot.modelId, previousCloudModels),
+    );
+    if (defaultWasManaged || botsHaveManaged) {
+      const updatedAt = now();
+      await this.store.update((config) => ({
+        ...config,
+        runtime: {
+          ...config.runtime,
+          defaultModelId: isManagedCloudModelId(
+            config.runtime.defaultModelId,
+            previousCloudModels,
+          )
+            ? ""
+            : config.runtime.defaultModelId,
+        },
+        bots: config.bots.map((bot) =>
+          isManagedCloudModelId(bot.modelId, previousCloudModels)
+            ? { ...bot, modelId: "", updatedAt }
+            : bot,
+        ),
+      }));
+    }
     await this.onCloudStateChanged?.({
       hadCloudInventory: (previousCloud.models?.length ?? 0) > 0,
       hasCloudInventory: false,

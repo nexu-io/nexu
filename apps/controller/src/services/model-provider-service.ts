@@ -424,6 +424,7 @@ export class ModelProviderService {
     const next = await this.configStore.setModelProviderConfigDocument(config);
     await this.ensureValidDefaultModel();
     await this.openclawSyncService.syncAll();
+    await this.restartRuntime("model_provider_config_changed");
     return next;
   }
 
@@ -449,6 +450,7 @@ export class ModelProviderService {
     if (changed) {
       await this.ensureValidDefaultModel();
       await this.openclawSyncService.syncAll();
+      await this.restartRuntime("nexu_official_models_refreshed");
       logger.info(
         {
           provider: NEXU_OFFICIAL_PROVIDER_ID,
@@ -487,7 +489,11 @@ export class ModelProviderService {
   }
 
   async deleteProvider(providerId: string) {
-    return this.configStore.deleteProvider(providerId);
+    const result = await this.configStore.deleteProvider(providerId);
+    await this.ensureValidDefaultModel();
+    await this.openclawSyncService.syncAll();
+    await this.restartRuntime("provider_deleted");
+    return result;
   }
 
   async getInventoryStatus(): Promise<ModelInventoryStatus> {
@@ -1127,17 +1133,13 @@ export class ModelProviderService {
     });
   }
 
-  private async restartRuntime(): Promise<void> {
-    if (!this.openclawProcess.managesProcess()) {
-      logger.info(
-        {},
-        "model_provider_runtime_restart_skipped_external_openclaw",
-      );
-      return;
-    }
-
-    await this.openclawProcess.stop();
-    this.openclawProcess.enableAutoRestart();
-    this.openclawProcess.start();
+  private async restartRuntime(reason = "provider_changed"): Promise<void> {
+    // Provider-level changes are not hot-reload-safe: OpenClaw caches its
+    // provider/model registry once at boot. Without a restart, deleting or
+    // disabling a provider leaves stale entries resident and the runtime
+    // keeps trying to resolve against removed providers (e.g. "No API key
+    // for openai-codex" after the user disabled all BYOK providers).
+    // `restart()` handles both dev-managed and launchd-managed modes.
+    await this.openclawProcess.restart(reason);
   }
 }

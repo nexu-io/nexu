@@ -2,8 +2,10 @@ import { existsSync } from "node:fs";
 import type { ControllerEnv } from "../app/env.js";
 import { CatalogManager } from "./skillhub/catalog-manager.js";
 import {
+  alignSkillName,
   copyStaticSkills,
   replaceLibtvVideoFromBundle,
+  stripRequiresBins,
 } from "./skillhub/curated-skills.js";
 import { InstallQueue } from "./skillhub/install-queue.js";
 import { SkillDb } from "./skillhub/skill-db.js";
@@ -72,6 +74,8 @@ export class SkillhubService {
     const installQueue = new InstallQueue({
       executor: async (slug) => {
         await catalogManager.executeInstall(slug);
+        alignSkillName(env.openclawSkillsDir, slug);
+        stripRequiresBins(env.openclawSkillsDir, slug);
       },
       onComplete: (slug, source) => {
         skillDb.recordInstall(slug, source);

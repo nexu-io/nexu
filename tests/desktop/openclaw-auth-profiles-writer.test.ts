@@ -291,4 +291,90 @@ describe("OpenClawAuthProfilesWriter", () => {
       expires: 1_900_000_000_000,
     });
   });
+
+  it("merges compiled link credentials even when provider-source entries already exist", async () => {
+    const env = createEnv(tempDir);
+    const writer = new OpenClawAuthProfilesWriter(
+      new OpenClawAuthProfilesStore(env),
+    );
+
+    await writer.writeForAgents(
+      {
+        agents: {
+          list: [
+            {
+              id: "bot_1",
+              name: "Bot One",
+              workspace: resolve(env.openclawStateDir, "agents", "bot_1"),
+            },
+          ],
+        },
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              baseUrl: "https://api.openai.com/v1",
+              apiKey: "openai-key",
+              api: "openai-responses",
+              models: [{ id: "gpt-5.4", name: "gpt-5.4" }],
+            },
+            link: {
+              baseUrl: "https://link.nexu.io/v1",
+              apiKey: "link-key",
+              api: "openai-completions",
+              models: [{ id: "gemini-2.5-flash", name: "gemini-2.5-flash" }],
+            },
+          },
+        },
+      } as never,
+      {
+        openai: {
+          enabled: true,
+          auth: "api-key",
+          api: "openai-responses",
+          apiKey: "openai-key",
+          baseUrl: "https://api.openai.com/v1",
+          models: [
+            {
+              id: "gpt-5.4",
+              name: "gpt-5.4",
+              reasoning: false,
+              input: ["text"],
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              },
+              contextWindow: 0,
+              maxTokens: 0,
+            },
+          ],
+        },
+      },
+    );
+
+    const authProfilesPath = resolve(
+      env.openclawStateDir,
+      "agents",
+      "bot_1",
+      "agent",
+      "auth-profiles.json",
+    );
+    const parsed = JSON.parse(readFileSync(authProfilesPath, "utf8")) as {
+      version: number;
+      profiles: Record<string, { type: string; provider: string; key: string }>;
+    };
+
+    expect(parsed.profiles["openai:default"]).toEqual({
+      type: "api_key",
+      provider: "openai",
+      key: "openai-key",
+    });
+    expect(parsed.profiles["link:default"]).toEqual({
+      type: "api_key",
+      provider: "link",
+      key: "link-key",
+    });
+  });
 });

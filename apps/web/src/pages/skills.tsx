@@ -1,6 +1,7 @@
 import { GitHubStarCta } from "@/components/github-star-cta";
 import ImportSkillModal from "@/components/skills/import-skill-modal";
 import {
+  useCancelInstall,
   useCommunitySkills,
   useInstallSkill,
   useRefreshCatalog,
@@ -24,14 +25,17 @@ import { cn } from "@/lib/utils";
 import type {
   InstalledSkill,
   MinimalSkill,
+  QueueErrorCode,
   SkillSource,
 } from "@/types/desktop";
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Compass,
   Loader2,
   Plus,
+  RotateCcw,
   Search,
   Settings2,
   Zap,
@@ -73,6 +77,8 @@ function SkillCard({
   skill,
   isInstalled,
   queueStatus,
+  queueErrorCode,
+  queueErrorMessage,
   categoryLabel,
   skillSource,
   detailTo,
@@ -88,6 +94,8 @@ function SkillCard({
     | "done"
     | "failed"
     | null;
+  queueErrorCode?: QueueErrorCode | null;
+  queueErrorMessage?: string | null;
   categoryLabel?: string;
   skillSource: "builtin" | "explore" | "custom";
   detailTo: string;
@@ -97,14 +105,24 @@ function SkillCard({
   const { t } = useTranslation();
   const installMutation = useInstallSkill();
   const uninstallMutation = useUninstallSkill();
+  const cancelMutation = useCancelInstall();
   const [pendingAction, setPendingAction] = useState<
-    "install" | "uninstall" | null
+    "install" | "uninstall" | "cancel" | null
   >(null);
 
   const isQueueActive =
     queueStatus === "queued" ||
     queueStatus === "downloading" ||
     queueStatus === "installing-deps";
+  const isFailed = queueStatus === "failed";
+  const canRetry = isFailed && queueErrorCode !== "skill_not_found";
+  const failedMessage = isFailed
+    ? queueErrorCode === "skill_not_found"
+      ? t("skills.skillNotAvailable")
+      : queueErrorCode === "rate_limit"
+        ? t("skills.installRateLimited")
+        : t("skills.installFailedGeneric")
+    : null;
   const isMutating = pendingAction !== null;
 
   async function handleInstall() {
@@ -129,6 +147,21 @@ function SkillCard({
         skill_source: skillSource,
         success: false,
       });
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function handleCancel() {
+    setPendingAction("cancel");
+    try {
+      await cancelMutation.mutateAsync(skill.slug);
+    } catch (err) {
+      // Surface the rejection so the click flow doesn't end in an unhandled
+      // promise (noisy in error telemetry) and the user gets a real signal
+      // when cancel itself fails — common in flaky/offline networks.
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(t("skills.cancelFailed", { error: message }));
     } finally {
       setPendingAction(null);
     }
@@ -186,6 +219,23 @@ function SkillCard({
         {skill.description}
       </p>
 
+      {/* Failure notice — visible only when the queue reports a terminal failure. */}
+      {isFailed && failedMessage && (
+        <div className="mb-3 flex items-start gap-1.5 rounded-md border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-2 py-1.5 text-[11px] leading-[1.4] text-[var(--color-danger)]">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          <span className="min-w-0 flex-1">
+            {failedMessage}
+            {/* Surface the raw underlying error for unclassified failures so users
+                aren't left guessing what went wrong (network, permissions, etc.). */}
+            {queueErrorCode === "unknown" && queueErrorMessage && (
+              <span className="mt-0.5 block break-words font-mono text-[10px] opacity-75">
+                {queueErrorMessage}
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
       {/* Footer */}
       <div
         className="mt-auto flex items-center justify-between"
@@ -206,6 +256,38 @@ function SkillCard({
             <Loader2 size={12} className="animate-spin" />
             {t("skills.installingAction")}
           </span>
+        ) : isFailed ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCancel();
+              }}
+              disabled={isMutating}
+              className="text-[12px] font-medium text-text-muted hover:text-text-primary transition-colors"
+            >
+              {pendingAction === "cancel"
+                ? t("skills.cancelling")
+                : t("skills.cancelInstall")}
+            </button>
+            {canRetry && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleInstall();
+                }}
+                disabled={isMutating}
+                className="inline-flex items-center gap-1.5 rounded-[8px] px-[14px] py-[5px] text-[12px] font-medium border border-[var(--color-danger)]/40 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/5 transition-colors"
+              >
+                <RotateCcw size={12} />
+                {t("skills.retryInstall")}
+              </button>
+            )}
+          </div>
         ) : isInstalled ? (
           <button
             type="button"
@@ -244,7 +326,8 @@ function SkillCard({
       <div
         className={cn(
           "card flex flex-col p-4 cursor-default",
-          isInstalled && !pendingAction ? "" : "",
+          isFailed &&
+            "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/[0.02]",
         )}
       >
         {cardContent}
@@ -259,7 +342,8 @@ function SkillCard({
       draggable={false}
       className={cn(
         "card flex flex-col p-4",
-        isInstalled && !pendingAction ? "" : "",
+        isFailed &&
+          "border-[var(--color-danger)]/40 bg-[var(--color-danger)]/[0.02]",
       )}
     >
       {cardContent}
@@ -351,15 +435,19 @@ export function SkillsPage() {
   );
   const installedSkills: InstalledSkill[] = data?.installedSkills ?? [];
 
-  // Queue items actively downloading that aren't already installed
+  // Queue items that should appear in the Yours tab: active installs
+  // (queued/downloading/installing-deps) plus terminal failures so the user
+  // has a retry surface. Installed and silently "done" items are excluded —
+  // those are already represented by `installedSkills`.
   const activeQueueItems = useMemo(() => {
-    const activeStatuses = new Set([
+    const visibleStatuses = new Set([
       "queued",
       "downloading",
       "installing-deps",
+      "failed",
     ]);
     return (data?.queue ?? []).filter(
-      (qi) => activeStatuses.has(qi.status) && !installedSlugs.has(qi.slug),
+      (qi) => visibleStatuses.has(qi.status) && !installedSlugs.has(qi.slug),
     );
   }, [data?.queue, installedSlugs]);
   const queueBySlug = useMemo(() => {
@@ -369,6 +457,24 @@ export function SkillsPage() {
     >();
     for (const item of data?.queue ?? []) {
       map.set(item.slug, item.status);
+    }
+    return map;
+  }, [data?.queue]);
+  const queueErrorBySlug = useMemo(() => {
+    const map = new Map<string, QueueErrorCode>();
+    for (const item of data?.queue ?? []) {
+      if (item.status === "failed" && item.errorCode) {
+        map.set(item.slug, item.errorCode);
+      }
+    }
+    return map;
+  }, [data?.queue]);
+  const queueErrorMessageBySlug = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of data?.queue ?? []) {
+      if (item.status === "failed" && item.error) {
+        map.set(item.slug, item.error);
+      }
     }
     return map;
   }, [data?.queue]);
@@ -383,21 +489,6 @@ export function SkillsPage() {
     () => getUnavailableSkillDetailSlugs(allSkills, activeQueueItems),
     [allSkills, activeQueueItems],
   );
-
-  // Show toast for "skill not found" errors
-  const shownErrorSlugs = useRef(new Set<string>());
-  useEffect(() => {
-    for (const item of data?.queue ?? []) {
-      if (
-        item.status === "failed" &&
-        item.errorCode === "skill_not_found" &&
-        !shownErrorSlugs.current.has(item.slug)
-      ) {
-        shownErrorSlugs.current.add(item.slug);
-        toast.error(t("skills.skillNotFound", { slug: item.slug }));
-      }
-    }
-  }, [data?.queue, t]);
 
   // Compute top tags
   const topTags = useMemo(() => {
@@ -909,6 +1000,10 @@ export function SkillsPage() {
                     skill={skill}
                     isInstalled={installedSlugs.has(skill.slug)}
                     queueStatus={queueBySlug.get(skill.slug)}
+                    queueErrorCode={queueErrorBySlug.get(skill.slug) ?? null}
+                    queueErrorMessage={
+                      queueErrorMessageBySlug.get(skill.slug) ?? null
+                    }
                     detailTo={createSkillDetailPath(
                       skill.slug,
                       location.search,

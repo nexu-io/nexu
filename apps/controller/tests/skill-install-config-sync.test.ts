@@ -198,6 +198,26 @@ describe("skill install → config sync integration", () => {
     expect(compiled.agents.list[0].skills).toEqual(["taobao-native"]);
   });
 
+  it("user-installed skills are included in compiled agent config", () => {
+    skillDb.recordInstall("obsidian", "user");
+    skillDb.recordInstall("playwright-skill", "user");
+
+    const slugs = skillDb.getAllInstalled().map((r) => r.slug);
+    expect(slugs).toEqual(["obsidian", "playwright-skill"]);
+
+    const compiled = compileOpenClawConfig(
+      createConfig(),
+      createEnv(),
+      undefined,
+      slugs,
+    );
+
+    expect(compiled.agents.list[0].skills).toEqual([
+      "obsidian",
+      "playwright-skill",
+    ]);
+  });
+
   it("multiple agents all receive the same skills", () => {
     const now = new Date().toISOString();
     skillDb.recordInstall("calendar", "managed");

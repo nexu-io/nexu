@@ -70,6 +70,17 @@ async function writeAuthProfiles(
   );
 }
 
+async function writeSharedAuthProfiles(
+  stateDir: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  await writeFile(
+    path.join(stateDir, "auth-profiles.json"),
+    JSON.stringify(data, null, 2),
+    "utf8",
+  );
+}
+
 async function readAuthProfilesFile(
   agentDir: string,
 ): Promise<Record<string, unknown>> {
@@ -154,6 +165,26 @@ describe("OpenClawAuthService", () => {
       expect(status.connected).toBe(false);
     });
 
+    it("returns connected:true from the shared auth profiles fallback", async () => {
+      await writeSharedAuthProfiles(stateDir, {
+        version: 1,
+        profiles: {
+          "openai-codex:default": {
+            type: "oauth",
+            provider: "openai-codex",
+            access: "test-access-token",
+            refresh: "test-refresh-token",
+            expires: Date.now() + 3_600_000,
+            accountId: "test-account",
+          },
+        },
+      });
+
+      const status = await service.getProviderOAuthStatus("openai");
+      expect(status.connected).toBe(true);
+      expect(status.provider).toBe("openai-codex");
+    });
+
     it("returns connected:false when no profile exists", async () => {
       const agentDir = await setupAgentDir(stateDir);
       await writeAuthProfiles(agentDir, {
@@ -219,6 +250,32 @@ describe("OpenClawAuthService", () => {
     it("returns false when no agent directory exists", async () => {
       const result = await service.disconnectOAuth("openai");
       expect(result).toBe(false);
+    });
+
+    it("disconnects the shared auth profiles fallback", async () => {
+      await writeSharedAuthProfiles(stateDir, {
+        version: 1,
+        profiles: {
+          "openai-codex:default": {
+            type: "oauth",
+            provider: "openai-codex",
+            access: "test-token",
+            refresh: "test-refresh",
+            expires: Date.now() + 3_600_000,
+            accountId: "test-account",
+          },
+        },
+      });
+
+      const result = await service.disconnectOAuth("openai");
+      expect(result).toBe(true);
+
+      const sharedProfiles = JSON.parse(
+        await readFile(path.join(stateDir, "auth-profiles.json"), "utf8"),
+      ) as { profiles: Record<string, unknown> };
+      expect(sharedProfiles.profiles).not.toHaveProperty(
+        "openai-codex:default",
+      );
     });
 
     it("removes the openai-codex:default profile", async () => {

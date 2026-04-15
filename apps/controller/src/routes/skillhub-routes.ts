@@ -233,6 +233,42 @@ export function registerSkillhubRoutes(
     },
   );
 
+  // POST /api/v1/skillhub/cancel
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/api/v1/skillhub/cancel",
+      tags: ["SkillHub"],
+      request: {
+        body: {
+          content: {
+            "application/json": {
+              schema: z.object({ slug: skillhubSlugSchema }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          content: {
+            "application/json": {
+              schema: z.object({
+                ok: z.boolean(),
+                cancelled: z.boolean(),
+              }),
+            },
+          },
+          description: "Cancel or dismiss a queued / failed install",
+        },
+      },
+    }),
+    async (c) => {
+      const { slug } = c.req.valid("json");
+      const cancelled = container.skillhubService.cancelInstall(slug);
+      return c.json({ ok: true, cancelled }, 200);
+    },
+  );
+
   // POST /api/v1/skillhub/refresh
   app.openapi(
     createRoute({

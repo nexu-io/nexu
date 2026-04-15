@@ -3592,6 +3592,27 @@ export type PostApiV1SkillhubUninstallResponses = {
 
 export type PostApiV1SkillhubUninstallResponse = PostApiV1SkillhubUninstallResponses[keyof PostApiV1SkillhubUninstallResponses];
 
+export type PostApiV1SkillhubCancelData = {
+    body?: {
+        slug: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/skillhub/cancel';
+};
+
+export type PostApiV1SkillhubCancelResponses = {
+    /**
+     * Cancel or dismiss a queued / failed install
+     */
+    200: {
+        ok: boolean;
+        cancelled: boolean;
+    };
+};
+
+export type PostApiV1SkillhubCancelResponse = PostApiV1SkillhubCancelResponses[keyof PostApiV1SkillhubCancelResponses];
+
 export type PostApiV1SkillhubRefreshData = {
     body?: never;
     path?: never;

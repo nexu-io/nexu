@@ -370,9 +370,18 @@ describe("compileOpenClawConfig", () => {
       enabled: true,
       clientId: "ding-client-id",
       clientSecret: "ding-client-secret",
+      gatewayBaseUrl: "http://127.0.0.1:18789",
+      gatewayToken: "token-123",
       dmPolicy: "open",
       groupPolicy: "open",
     });
+    expect(
+      (
+        result.gateway as {
+          http?: { endpoints?: { chatCompletions?: { enabled?: boolean } } };
+        }
+      ).http?.endpoints?.chatCompletions?.enabled,
+    ).toBe(true);
     expect(result.bindings).toContainEqual({
       agentId: "bot-1",
       match: {
@@ -1121,5 +1130,50 @@ describe("compileOpenClawConfig", () => {
     expect(result.agents.list[0]?.model).toEqual({
       primary: "openai-codex/gpt-5.4",
     });
+  });
+
+  it("omits empty apiKey fields for oauth-backed providers in compiled models config", () => {
+    const result = compileOpenClawConfig(
+      createConfig({
+        providers: [],
+        models: {
+          mode: "merge",
+          providers: {
+            openai: {
+              enabled: true,
+              auth: "oauth",
+              api: "openai-completions",
+              apiKey: null,
+              oauthProfileRef: "openai-codex",
+              baseUrl: "https://api.openai.com/v1",
+              models: [
+                {
+                  id: "gpt-5.4",
+                  name: "GPT-5.4",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: {
+                    input: 0,
+                    output: 0,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                  },
+                  contextWindow: 0,
+                  maxTokens: 0,
+                },
+              ],
+            },
+          },
+        },
+        desktop: {
+          selectedModelId: null,
+        },
+      }),
+      createEnv(),
+    );
+
+    expect(result.models?.providers.openai).toBeDefined();
+    expect(result.models?.providers.openai).not.toHaveProperty("apiKey");
+    expect(result.models?.providers.openai?.models[0]?.id).toBe("gpt-5.4");
   });
 });

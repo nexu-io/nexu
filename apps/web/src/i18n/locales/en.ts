@@ -761,6 +761,16 @@ const en = {
   "skills.installQueued": "Skill queued for installation",
   "skills.skillNotFound":
     '"{{slug}}" is not available on ClawHub. It may have been removed or renamed.',
+  "skills.skillNotAvailable":
+    "This skill is not available on ClawHub. It may have been removed or renamed.",
+  "skills.installRateLimited":
+    "ClawHub is rate-limiting requests. Please wait a moment and retry.",
+  "skills.installFailedGeneric":
+    "Installation failed. Please retry in a moment.",
+  "skills.retryInstall": "Retry",
+  "skills.cancelInstall": "Cancel",
+  "skills.cancelling": "Cancelling…",
+  "skills.cancelFailed": "Failed to cancel: {{error}}",
   "skills.import": "Import",
   "skills.importSkill": "Import Skill",
   "skills.importSkillDesc":

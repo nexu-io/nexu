@@ -517,6 +517,60 @@ async function findFreePort(preferred: number): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// User shell PATH resolution — fix $PATH for GUI-launched Electron apps
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the user's real login-shell PATH.
+ *
+ * GUI-launched Electron apps on macOS inherit a minimal PATH
+ * (`/usr/bin:/bin:/usr/sbin:/sbin`) because launchd does not source the
+ * user's shell profile. This means Homebrew, NVM, pyenv, etc. binaries
+ * are invisible to child processes — including OpenClaw, which uses
+ * `hasBinary()` to filter skills by `metadata.openclaw.requires.bins`.
+ *
+ * Windows GUI apps already inherit the full user PATH from the registry,
+ * so this is a no-op on win32.
+ *
+ * Falls back to `process.env.PATH` on any error (timeout, missing shell).
+ */
+async function resolveUserShellPath(): Promise<string> {
+  const fallback = process.env.PATH ?? "";
+
+  if (process.platform === "win32") {
+    return fallback;
+  }
+
+  // Print PATH on a single tagged line so we can find it reliably even
+  // if shell init files (.zshrc, .bashrc) emit debug output around it.
+  // We search stdout for the one line starting with the tag prefix and
+  // strip it — all other lines are ignored.
+  const tag = `__NEXU_PATH_${Date.now()}__`;
+  try {
+    const shell = process.env.SHELL || "/bin/zsh";
+    const { stdout } = await execFileAsync(
+      shell,
+      ["-ilc", `printf '${tag}%s\\n' "$PATH"`],
+      {
+        timeout: 5000,
+        env: {
+          PATH: "/usr/bin:/bin",
+          HOME: os.homedir(),
+          USER: os.userInfo().username,
+          SHELL: shell,
+        },
+      },
+    );
+
+    const line = stdout.split("\n").find((l) => l.startsWith(tag));
+    const resolved = line ? line.slice(tag.length).trim() : "";
+    return resolved || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stale plist cleanup — detect plists from a different app installation
 // ---------------------------------------------------------------------------
 
@@ -600,7 +654,7 @@ export async function bootstrapWithLaunchd(
   // Build a plistEnv with default ports for comparison. If existing plists
   // differ from what we'd generate now, they're from a different version or
   // installation and should be cleaned up.
-  const systemPath = process.env.PATH;
+  const systemPath = await resolveUserShellPath();
   const nodeModulesPath = path.dirname(path.dirname(env.openclawPath));
   const cleanupPlistEnv: PlistEnv = {
     isDev: env.isDev,

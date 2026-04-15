@@ -98,7 +98,7 @@ export class InstallQueue {
     this.log = opts.log ?? (() => {});
     this.maxConcurrency = opts.maxConcurrency ?? 2;
     this.maxRetries = opts.maxRetries ?? 5;
-    this.cleanupDelayMs = opts.cleanupDelayMs ?? 30000;
+    this.cleanupDelayMs = opts.cleanupDelayMs ?? 60000;
   }
 
   enqueue(slug: string, source: SkillSource): QueueItem {
@@ -106,6 +106,16 @@ export class InstallQueue {
     const existing = this.findItem(slug);
     if (existing) {
       return this.toReadonly(existing);
+    }
+
+    // Clear any prior failed entry so a retry produces a single queued row.
+    // Without this, getQueue() would surface both the stale failed item and
+    // the new queued one, confusing the UI state.
+    const failedIdx = this.completed.findIndex(
+      (i) => i.slug === slug && i.status === "failed",
+    );
+    if (failedIdx !== -1) {
+      this.completed.splice(failedIdx, 1);
     }
 
     const item: MutableQueueItem = {
@@ -134,8 +144,10 @@ export class InstallQueue {
   }
 
   /**
-   * Cancel a queued or active install. If pending, removes immediately.
-   * If active, marks it so the executor completion handler skips the DB record.
+   * Cancel a queued, active, or terminally-failed install. Pending items are
+   * removed immediately; active items are marked so the executor skips the DB
+   * record on completion; failed items in `completed` are evicted so the UI
+   * card disappears (user-initiated dismiss).
    * Returns true if the slug was found and cancelled.
    */
   cancel(slug: string): boolean {
@@ -155,6 +167,16 @@ export class InstallQueue {
     if (this.active.has(slug)) {
       this.cancelled.add(slug);
       this.log("info", `queue: cancelling active ${slug}`);
+      return true;
+    }
+
+    // Evict a terminally-failed entry so its card disappears from the UI.
+    const failedIdx = this.completed.findIndex(
+      (i) => i.slug === slug && i.status === "failed",
+    );
+    if (failedIdx !== -1) {
+      this.completed.splice(failedIdx, 1);
+      this.log("info", `queue: dismissed failed ${slug}`);
       return true;
     }
 

@@ -193,6 +193,7 @@ The desktop test suite includes real launchd integration tests that run on macOS
 - Windows packaging split: use `pnpm dist:win` for the full installer/release path and keep it close to CI semantics. Use `pnpm dist:win:local` for local Windows validation when you need fast iteration; it is intentionally dir-only and reuse-first, so it is not a substitute for the full release build.
 - Controller sidecar packaging: every dependency in `apps/controller/package.json` is recursively deep-copied into the desktop distributable via `prepare-controller-sidecar` → `copyRuntimeDependencyClosure`. **Never add heavy transitive-dependency packages (e.g. `npm`, `yarn`) to the controller.** If the controller needs to shell out to a CLI tool, use PATH-based `execFile("npm", ...)` instead of bundling it as a dependency. Each MB added to controller deps adds ~1 MB to the final DMG/ZIP.
 - Native Node.js addons (e.g. `better-sqlite3`) must live in the controller, NOT in the desktop Electron main process. Electron's built-in Node.js has a different ABI version (NODE_MODULE_VERSION) from system Node.js, requiring `electron-rebuild` to recompile native modules. The controller runs as a regular Node.js process (`ELECTRON_RUN_AS_NODE=1`), so native addons work without recompilation.
+- **OpenClaw provider/model registry is not hot-reload-safe.** Any code path that mutates `models.providers` in `openclaw.json` (cloud login/logout, BYOK add/delete/bulk-update, OAuth connect/disconnect) MUST call `openclawProcess.restart(reason)` after `syncAll()`. OpenClaw builds its registry once at boot; writing the file is not enough. In packaged desktop OpenClaw is supervised by launchd, so `openclawProcess.stop()/start()` is a silent no-op — `restart()` routes through `launchctl kickstart -k` automatically. Always smoke-test provider-lifecycle changes in the packaged build, not just `pnpm dev`. See `specs/design-docs/2026-04-14-openclaw-registry-cache-invalidation.md`.
 
 ## Observability conventions
 
@@ -237,6 +238,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 | System design | `specs/designs/openclaw-multi-tenant.md` |
 | OpenClaw internals | `specs/designs/openclaw-architecture-internals.md` |
 | OpenClaw error handling & compaction | `specs/references/openclaw-error-handling-internals.md` |
+| OpenClaw registry cache invalidation (restart-on-provider-change) | `specs/design-docs/2026-04-14-openclaw-registry-cache-invalidation.md` |
 | Engineering principles | `specs/design-docs/core-beliefs.md` |
 | Config schema & pitfalls | `specs/references/openclaw-config-schema.md` |
 | API coding patterns | `specs/references/api-patterns.md` |

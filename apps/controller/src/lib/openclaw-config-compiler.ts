@@ -120,9 +120,15 @@ function compileModelsConfig(
       continue;
     }
 
+    // Keep apiKey when it's a non-empty string or a secret-ref object; only
+    // drop it when null/undefined or an empty string. Emitting apiKey:""
+    // caused OpenClaw to reject the provider (and caused relogin to fail
+    // with "Unknown model: link/...").
+    const hasUsableApiKey =
+      apiKey !== null && !(typeof apiKey === "string" && apiKey.length === 0);
     providers[descriptor.runtimeKey] = {
       baseUrl: descriptor.provider.baseUrl,
-      apiKey: apiKey ?? "",
+      ...(hasUsableApiKey ? { apiKey } : {}),
       api: descriptor.apiKind,
       ...(descriptor.authHeader ? { authHeader: true } : {}),
       ...(descriptor.defaultHeaders
@@ -410,6 +416,13 @@ export function compileOpenClawConfig(
         allowedOrigins: [env.webUrl],
         dangerouslyAllowHostHeaderOriginFallback: true,
       },
+      http: {
+        endpoints: {
+          chatCompletions: {
+            enabled: true,
+          },
+        },
+      },
       tools: {
         allow: ["cron"],
       },
@@ -502,7 +515,8 @@ export function compileOpenClawConfig(
     channels: compileChannelsConfig({
       channels: config.channels,
       secrets: config.secrets,
-      controllerBaseUrl: `http://127.0.0.1:${env.port}`,
+      gatewayBaseUrl: `http://127.0.0.1:${env.openclawGatewayPort}`,
+      gatewayToken: env.openclawGatewayToken,
     }),
     bindings: compileChannelBindings(config.bots, config.channels),
     plugins: compilePlugins(config, env),

@@ -1157,6 +1157,74 @@ describe("NexuConfigStore", () => {
     expect(status.viewer.usingManagedModel).toBe(true);
   });
 
+  it("clears a link-selected default model when desktop cloud disconnects", async () => {
+    await mkdir(path.dirname(env.nexuConfigPath), { recursive: true });
+    await writeFile(
+      env.nexuConfigPath,
+      JSON.stringify(
+        {
+          $schema: "https://nexu.io/config.json",
+          schemaVersion: 2,
+          app: {},
+          bots: [
+            {
+              id: "bot-1",
+              name: "Assistant",
+              slug: "assistant",
+              poolId: null,
+              modelId: "link/gemini-3-flash-preview",
+              status: "active",
+              systemPrompt: null,
+              createdAt: "2026-04-01T00:00:00.000Z",
+              updatedAt: "2026-04-01T00:00:00.000Z",
+            },
+          ],
+          runtime: {
+            gateway: {
+              port: env.openclawGatewayPort,
+              bind: "loopback",
+              authMode: "none",
+            },
+            defaultModelId: "link/gemini-3-flash-preview",
+          },
+          models: {
+            mode: "merge",
+            providers: {},
+          },
+          integrations: [],
+          channels: [],
+          templates: {},
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [
+                { id: "gemini-3-flash-preview", name: "Gemini 3 Flash" },
+              ],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    await store.disconnectDesktopCloud();
+
+    const config = await store.getConfig();
+    expect(config.runtime.defaultModelId).toBe("");
+    expect(config.bots[0]?.modelId).toBe("");
+  });
+
   it("backfills missing desktop cloud userId from /api/v1/me during bootstrap", async () => {
     const store = new NexuConfigStore(env);
 

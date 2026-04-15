@@ -439,7 +439,7 @@ const modelEntrySchema = z.object({
 const modelProviderSchema = z
   .object({
     baseUrl: z.string(),
-    apiKey: z.union([z.string(), providerSecretRefSchema]),
+    apiKey: z.union([z.string(), providerSecretRefSchema]).optional(),
     api: z.string(),
     models: z.array(modelEntrySchema),
   })

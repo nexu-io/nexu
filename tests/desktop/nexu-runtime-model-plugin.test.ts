@@ -13,13 +13,15 @@ const stateModulePath = path.resolve(
   "../../apps/controller/static/nexu-runtime-model.json",
 );
 
-async function writeState(selectedModelRef: string) {
+async function writeState(selectedModelRef: string, promptNotice?: string) {
   await writeFile(
     stateModulePath,
     `${JSON.stringify(
       {
         selectedModelRef,
-        promptNotice: `Authoritative runtime model for this turn: ${selectedModelRef}.`,
+        promptNotice:
+          promptNotice ??
+          `Authoritative runtime model for this turn: ${selectedModelRef}.`,
       },
       null,
       2,
@@ -83,5 +85,32 @@ describe("nexu-runtime-model plugin", () => {
       providerOverride: "byok_openai",
       modelOverride: "openai/gpt-4.1",
     });
+  });
+
+  it("ignores empty runtime-model state", async () => {
+    const { default: plugin } = await import(
+      `${pluginModulePath}?t=${Date.now()}`
+    );
+
+    await writeState("", "");
+    let beforeModelResolveHandler:
+      | (() => Promise<Record<string, string> | undefined>)
+      | undefined;
+    let beforePromptBuildHandler:
+      | (() => Promise<Record<string, string> | undefined>)
+      | undefined;
+    plugin.register({
+      on(event, handler) {
+        if (event === "before_model_resolve") {
+          beforeModelResolveHandler = handler;
+        }
+        if (event === "before_prompt_build") {
+          beforePromptBuildHandler = handler;
+        }
+      },
+    });
+
+    await expect(beforeModelResolveHandler?.()).resolves.toBeUndefined();
+    await expect(beforePromptBuildHandler?.()).resolves.toBeUndefined();
   });
 });

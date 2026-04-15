@@ -719,6 +719,14 @@ const zhCN = {
   "skills.installQueued": "技能已加入安装队列",
   "skills.skillNotFound":
     '"{{slug}}" 在 ClawHub 上不可用，可能已被移除或重命名。',
+  "skills.skillNotAvailable":
+    "该技能在 ClawHub 上不可用，可能已被移除或重命名。",
+  "skills.installRateLimited": "ClawHub 正在限流，请稍后重试。",
+  "skills.installFailedGeneric": "安装失败，请稍后重试。",
+  "skills.retryInstall": "重试",
+  "skills.cancelInstall": "取消",
+  "skills.cancelling": "取消中…",
+  "skills.cancelFailed": "取消失败：{{error}}",
   "skills.import": "导入",
   "skills.importSkill": "导入技能",
   "skills.importSkillDesc": "从 zip 文件或 GitHub 仓库添加自定义技能",

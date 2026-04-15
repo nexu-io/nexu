@@ -1,13 +1,21 @@
-import { type ChildProcess, execSync, spawn } from "node:child_process";
+import {
+  type ChildProcess,
+  execFile,
+  execSync,
+  spawn,
+} from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import net from "node:net";
-import { tmpdir } from "node:os";
+import os, { tmpdir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { promisify } from "node:util";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import { getOpenClawCommandSpec } from "./slimclaw-runtime-resolution.js";
+
+const execFileAsync = promisify(execFile);
 
 const MAX_CONSECUTIVE_RESTARTS = 10;
 const BASE_RESTART_DELAY_MS = 3000;
@@ -193,6 +201,47 @@ export class OpenClawProcessManager {
       "restarting unhealthy openclaw process",
     );
     this.child.kill("SIGKILL");
+  }
+
+  /**
+   * Restart the gateway regardless of whether the controller manages the
+   * process directly (dev / local-dev) or an external supervisor owns it
+   * (packaged desktop via launchd). Returns once the restart has been
+   * initiated — callers that need readiness should probe separately.
+   */
+  async restart(reason: string): Promise<void> {
+    logger.info({ reason }, "openclaw_restart_requested");
+
+    if (this.env.manageOpenclawProcess) {
+      await this.stop();
+      this.enableAutoRestart();
+      this.start();
+      return;
+    }
+
+    if (this.env.openclawLaunchdLabel) {
+      const domain = `gui/${os.userInfo().uid}/${this.env.openclawLaunchdLabel}`;
+      try {
+        await execFileAsync("launchctl", ["kickstart", "-k", domain]);
+        logger.info({ reason, domain }, "openclaw_restart_launchd_kickstarted");
+      } catch (err) {
+        logger.error(
+          { reason, domain, err },
+          "openclaw_restart_launchd_failed",
+        );
+        throw err;
+      }
+      return;
+    }
+
+    logger.warn(
+      {
+        reason,
+        manageOpenclawProcess: this.env.manageOpenclawProcess,
+        hasLaunchdLabel: false,
+      },
+      "openclaw_restart_skipped_no_supervisor",
+    );
   }
 
   async stop(): Promise<void> {
