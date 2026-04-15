@@ -27,7 +27,7 @@ const DEPS_INSTALL_FAILED_PREFIX = /^DEPS_INSTALL_FAILED:/;
 const RETRY_IN_PATTERN = /retry in (\d+)s/i;
 const RESET_IN_PATTERN = /reset in (\d+)s/i;
 
-function classifyError(message: string): QueueErrorCode {
+export function classifyError(message: string): QueueErrorCode {
   if (RATE_LIMIT_PREFIX.test(message)) return "rate_limit";
   if (SKILL_NOT_FOUND_PREFIX.test(message)) return "skill_not_found";
   if (NPM_MISSING_PREFIX.test(message)) return "npm_missing";

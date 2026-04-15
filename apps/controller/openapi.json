@@ -10833,6 +10833,16 @@
                     },
                     "error": {
                       "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "skill_not_found",
+                        "rate_limit",
+                        "npm_missing",
+                        "deps_install_failed",
+                        "unknown"
+                      ]
                     }
                   },
                   "required": [
@@ -10843,25 +10853,34 @@
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Import rejected or failed",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
+                      "type": "boolean"
+                    },
+                    "slug": {
+                      "type": "string"
                     },
                     "error": {
                       "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "skill_not_found",
+                        "rate_limit",
+                        "npm_missing",
+                        "deps_install_failed",
+                        "unknown"
+                      ]
                     }
                   },
                   "required": [
-                    "ok",
-                    "error"
+                    "ok"
                   ]
                 }
               }

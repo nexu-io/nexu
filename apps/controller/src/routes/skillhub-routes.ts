@@ -123,6 +123,15 @@ const skillhubImportResultSchema = z.object({
   ok: z.boolean(),
   slug: z.string().optional(),
   error: z.string().optional(),
+  errorCode: z
+    .enum([
+      "skill_not_found",
+      "rate_limit",
+      "npm_missing",
+      "deps_install_failed",
+      "unknown",
+    ])
+    .optional(),
 });
 
 export function registerSkillhubRoutes(
@@ -424,14 +433,9 @@ export function registerSkillhubRoutes(
         },
         400: {
           content: {
-            "application/json": {
-              schema: z.object({
-                ok: z.literal(false),
-                error: z.string(),
-              }),
-            },
+            "application/json": { schema: skillhubImportResultSchema },
           },
-          description: "Bad request",
+          description: "Import rejected or failed",
         },
       },
     }),
@@ -466,10 +470,14 @@ export function registerSkillhubRoutes(
       const result =
         await container.skillhubService.catalog.importSkillZip(buffer);
 
-      if (result.ok) {
-        await container.openclawSyncService.syncAll();
+      if (!result.ok) {
+        // Dependency-install failures, path-safety violations, etc.
+        // Structured payload (error + errorCode) lets the UI render
+        // retryable vs unrecoverable states without a generic 500.
+        return c.json(result, 400);
       }
 
+      await container.openclawSyncService.syncAll();
       return c.json(result, 200);
     },
   );

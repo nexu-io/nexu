@@ -3687,11 +3687,13 @@ export type PostApiV1SkillhubImportData = {
 
 export type PostApiV1SkillhubImportErrors = {
     /**
-     * Bad request
+     * Import rejected or failed
      */
     400: {
-        ok: false;
-        error: string;
+        ok: boolean;
+        slug?: string;
+        error?: string;
+        errorCode?: 'skill_not_found' | 'rate_limit' | 'npm_missing' | 'deps_install_failed' | 'unknown';
     };
 };
 
@@ -3705,6 +3707,7 @@ export type PostApiV1SkillhubImportResponses = {
         ok: boolean;
         slug?: string;
         error?: string;
+        errorCode?: 'skill_not_found' | 'rate_limit' | 'npm_missing' | 'deps_install_failed' | 'unknown';
     };
 };
 
