@@ -13,7 +13,7 @@ import {
   patchApiInternalDesktopPreferences,
 } from "../../lib/api/sdk.gen";
 
-export type Locale = "en" | "zh";
+export type Locale = "en" | "zh" | "zh-TW";
 
 interface LocaleCtx {
   locale: Locale;
@@ -26,12 +26,15 @@ const STORAGE_KEY = "nexu_locale";
 function detectDefault(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "zh") return stored;
+    if (stored === "en" || stored === "zh" || stored === "zh-TW")
+      return stored;
   } catch {
     /* ignore */
   }
   const lang = navigator.language || "";
-  return lang.startsWith("zh") ? "zh" : "en";
+  if (lang === "zh-TW" || lang === "zh-HK") return "zh-TW";
+  if (lang.startsWith("zh")) return "zh";
+  return "en";
 }
 
 const LocaleContext = createContext<LocaleCtx>({
@@ -49,7 +52,12 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const userInteractedRef = useRef(false);
 
   useEffect(() => {
-    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+    const langMap: Record<Locale, string> = {
+      en: "en",
+      zh: "zh-CN",
+      "zh-TW": "zh-TW",
+    };
+    document.documentElement.lang = langMap[locale];
   }, [locale]);
 
   useEffect(() => {
@@ -92,9 +100,14 @@ export function useLocale() {
 }
 
 async function syncDesktopLocale(locale: Locale): Promise<void> {
+  const apiLocaleMap: Record<Locale, string> = {
+    en: "en",
+    zh: "zh-CN",
+    "zh-TW": "zh-TW",
+  };
   await patchApiInternalDesktopPreferences({
     body: {
-      locale: locale === "zh" ? "zh-CN" : "en",
+      locale: apiLocaleMap[locale],
     },
   }).catch(() => {
     // Best-effort sync only; local UI language should still work offline.
@@ -118,8 +131,17 @@ async function bootstrapLocale(
     return;
   }
 
-  if (storedLocale === "en" || storedLocale === "zh-CN") {
-    const nextLocale = storedLocale === "zh-CN" ? "zh" : "en";
+  if (
+    storedLocale === "en" ||
+    storedLocale === "zh-CN" ||
+    storedLocale === "zh-TW"
+  ) {
+    const nextLocale: Locale =
+      storedLocale === "zh-CN"
+        ? "zh"
+        : storedLocale === "zh-TW"
+          ? "zh-TW"
+          : "en";
     await i18n.changeLanguage(nextLocale);
     setLocaleState(nextLocale);
     try {
