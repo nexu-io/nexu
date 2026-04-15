@@ -92,7 +92,7 @@ export class OpenClawConfigWriter {
 
   constructor(private readonly env: ControllerEnv) {}
 
-  async write(config: OpenClawConfig): Promise<void> {
+  async write(config: OpenClawConfig): Promise<boolean> {
     await mkdir(path.dirname(this.env.openclawConfigPath), { recursive: true });
     const content = serializeOpenClawConfig(config);
 
@@ -126,7 +126,7 @@ export class OpenClawConfigWriter {
         { path: this.env.openclawConfigPath },
         "openclaw_config_write_skipped_unchanged",
       );
-      return;
+      return false;
     }
 
     const writeStartedAt = Date.now();
@@ -157,5 +157,7 @@ export class OpenClawConfigWriter {
       },
       "openclaw_config_write_complete",
     );
+
+    return true;
   }
 }

@@ -423,10 +423,14 @@ export type GetApiInternalDesktopReadyResponses = {
      */
     200: {
         ready: boolean;
+        coreReady: boolean;
+        degraded: boolean;
+        bootPhase: 'preparing' | 'starting-managed-runtime' | 'attaching-external-runtime' | 'reconciling-runtime' | 'stabilizing-runtime' | 'ready';
         workspacePath: string;
-        runtime: {
+        controlPlane: {
             ok: boolean;
-            status: number;
+            phase: 'disconnected' | 'connecting' | 'ready' | 'degraded';
+            wsConnected: boolean;
         };
         status: 'active' | 'starting' | 'degraded' | 'unhealthy';
     };

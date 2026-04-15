@@ -203,16 +203,16 @@ function logChannelConnectFailure(
     "channel_connect_failure",
   );
 
-  void container.runtimeHealth
+  void container.controlPlaneHealth
     .probe({ timeoutMs: 1500 })
-    .then((runtimeHealth) => {
+    .then((controlPlaneHealth) => {
       logger.warn(
         {
           requestId: input.requestId,
           channel: input.channel,
           errorCode: response.body.code,
           errorPhase: response.body.phase,
-          runtimeHealth,
+          controlPlaneHealth,
           process: {
             nodeVersion: process.version,
             platform: process.platform,

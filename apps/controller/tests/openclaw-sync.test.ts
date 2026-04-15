@@ -4,14 +4,15 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ControllerEnv } from "../src/app/env.js";
 import type { compileOpenClawConfig } from "../src/lib/openclaw-config-compiler.js";
+import { CreditGuardStateWriter } from "../src/runtime/credit-guard-state-writer.js";
 import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
-import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
-import { OpenClawRuntimePluginWriter } from "../src/runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
+import { OpenClawRuntimeModelWriter } from "../src/runtime/slimclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../src/runtime/slimclaw-runtime-plugin-writer.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
-import { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
+import type { OpenClawGatewayService } from "../src/services/openclaw-gateway-service.js";
 import { OpenClawSyncService } from "../src/services/openclaw-sync-service.js";
 import { SkillDb } from "../src/services/skillhub/skill-db.js";
 import { CompiledOpenClawStore } from "../src/store/compiled-openclaw-store.js";
@@ -56,6 +57,11 @@ describe("OpenClawSyncService", () => {
         ".openclaw",
         "nexu-runtime-model.json",
       ),
+      creditGuardStatePath: path.join(
+        rootDir,
+        ".openclaw",
+        "nexu-credit-guard-state.json",
+      ),
       skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
       skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
       analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
@@ -98,12 +104,14 @@ describe("OpenClawSyncService", () => {
       authProfilesStore,
       new OpenClawRuntimePluginWriter(env),
       new OpenClawRuntimeModelWriter(env),
+      new CreditGuardStateWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
-      new OpenClawGatewayService({
+      {
         isConnected: () => false,
-        pushConfig: async () => false,
-      } as never),
+        shouldPushConfig: async () => false,
+        noteConfigWritten: () => {},
+      } as unknown as OpenClawGatewayService,
     );
 
     await configStore.createBot({ name: "Assistant", slug: "assistant" });
@@ -159,12 +167,14 @@ describe("OpenClawSyncService", () => {
       authProfilesStore,
       new OpenClawRuntimePluginWriter(env),
       new OpenClawRuntimeModelWriter(env),
+      new CreditGuardStateWriter(env),
       new WorkspaceTemplateWriter(env),
       new OpenClawWatchTrigger(env),
-      new OpenClawGatewayService({
+      {
         isConnected: () => false,
-        pushConfig: async () => false,
-      } as never),
+        shouldPushConfig: async () => false,
+        noteConfigWritten: () => {},
+      } as unknown as OpenClawGatewayService,
       skillDb,
     );
 

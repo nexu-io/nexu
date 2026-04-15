@@ -626,7 +626,7 @@ describe("RuntimeOrchestrator", () => {
   it("refreshDelegatedUnits detects and loses processes via pgrep", async () => {
     const { execFileSync } = await import("node:child_process");
     vi.mocked(execFileSync).mockImplementation((cmd: string) => {
-      if (cmd === "pgrep") return "7777 openclaw-runtime\n";
+      if (cmd === "pgrep") return "7777 slimclaw-runtime\n";
       return "";
     });
 

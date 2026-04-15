@@ -4,17 +4,18 @@ import {
   execSync,
   spawn,
 } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import net from "node:net";
 import os, { tmpdir } from "node:os";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { promisify } from "node:util";
 import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
+import { getOpenClawCommandSpec } from "./slimclaw-runtime-resolution.js";
+
+const execFileAsync = promisify(execFile);
 
 const MAX_CONSECUTIVE_RESTARTS = 10;
 const BASE_RESTART_DELAY_MS = 3000;
@@ -26,38 +27,6 @@ const RESTART_WINDOW_MS = 120_000;
 const CONTROLLED_RESTART_GRACE_MS = 45_000;
 const CONTROLLED_RESTART_PROBE_INTERVAL_MS = 500;
 const NEXU_EVENT_MARKER = "NEXU_EVENT ";
-
-function findWorkspaceRoot(startDir: string): string | null {
-  let currentDir = path.resolve(startDir);
-
-  for (let index = 0; index < 10; index += 1) {
-    if (existsSync(path.join(currentDir, "pnpm-workspace.yaml"))) {
-      return currentDir;
-    }
-
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-
-  return null;
-}
-
-function resolveOpenclawEntryFromBin(binPath: string): string | null {
-  const resolvedBinPath = path.resolve(binPath.trim());
-  if (resolvedBinPath.endsWith(".mjs") && existsSync(resolvedBinPath)) {
-    return resolvedBinPath;
-  }
-
-  const entry = path.resolve(
-    path.dirname(resolvedBinPath),
-    "..",
-    "node_modules/openclaw/openclaw.mjs",
-  );
-  return existsSync(entry) ? entry : null;
-}
 
 export interface OpenClawRuntimeEvent {
   event: string;
@@ -135,63 +104,15 @@ export class OpenClawProcessManager {
 
     this.killOrphanedOpenClawProcesses();
 
-    // Prefer Electron's Node (v22+) over system node to satisfy OpenClaw's
-    // minimum version requirement. The shell launcher tries system `node`
-    // first, which may be too old.
-    const electronExec = process.env.OPENCLAW_ELECTRON_EXECUTABLE;
-    let cmd: string;
-    let args: string[];
-    let extraEnv: Record<string, string> = {};
-
-    if (electronExec) {
-      const openclawEntryFromBin = resolveOpenclawEntryFromBin(
-        this.env.openclawBin,
-      );
-      if (openclawEntryFromBin) {
-        cmd = electronExec;
-        args = [openclawEntryFromBin, "gateway", "run"];
-        extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
-      } else {
-        const workspaceRoot =
-          process.env.NEXU_WORKSPACE_ROOT?.trim() ||
-          findWorkspaceRoot(process.cwd());
-        const runtimeEntryPath = workspaceRoot
-          ? path.join(
-              workspaceRoot,
-              "openclaw-runtime",
-              "node_modules",
-              "openclaw",
-              "openclaw.mjs",
-            )
-          : null;
-
-        if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
-          cmd = electronExec;
-          args = [runtimeEntryPath, "gateway", "run"];
-          extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
-        } else {
-          // Resolve the openclaw entry point relative to the bin script
-          const entry = resolveOpenclawEntryFromBin(this.env.openclawBin);
-          if (!entry) {
-            throw new Error(
-              "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
-            );
-          }
-          cmd = electronExec;
-          args = [entry, "gateway", "run"];
-          extraEnv = { ELECTRON_RUN_AS_NODE: "1" };
-        }
-      }
-    } else {
-      cmd = this.env.openclawBin;
-      args = ["gateway", "run"];
-    }
+    const spec = getOpenClawCommandSpec(this.env);
+    const cmd = spec.command;
+    const args = [...spec.argsPrefix, "gateway", "run"];
 
     const child = spawn(cmd, args, {
       cwd: path.resolve(this.env.openclawStateDir),
       env: {
         ...process.env,
-        ...extraEnv,
+        ...spec.extraEnv,
         OPENCLAW_LOG_LEVEL: "info",
         // Explicitly pass config path so OpenClaw's file watcher monitors the correct file
         OPENCLAW_CONFIG_PATH: this.env.openclawConfigPath,

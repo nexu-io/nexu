@@ -1,4 +1,5 @@
 import { logger } from "../lib/logger.js";
+import { ControlPlaneHealthService } from "../runtime/control-plane-health.js";
 import { CreditGuardStateWriter } from "../runtime/credit-guard-state-writer.js";
 import { GatewayClient } from "../runtime/gateway-client.js";
 import { startHealthLoop } from "../runtime/loops.js";
@@ -7,12 +8,11 @@ import { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-sto
 import { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../runtime/openclaw-process.js";
-import { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
-import { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
 import { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
-import { RuntimeHealth } from "../runtime/runtime-health.js";
 import { SessionsRuntime } from "../runtime/sessions-runtime.js";
+import { OpenClawRuntimeModelWriter } from "../runtime/slimclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../runtime/slimclaw-runtime-plugin-writer.js";
 import {
   type ControllerRuntimeState,
   createRuntimeState,
@@ -46,7 +46,7 @@ export interface ControllerContainer {
   env: ControllerEnv;
   configStore: NexuConfigStore;
   gatewayClient: GatewayClient;
-  runtimeHealth: RuntimeHealth;
+  controlPlaneHealth: ControlPlaneHealthService;
   openclawProcess: OpenClawProcessManager;
   agentService: AgentService;
   channelService: ChannelService;
@@ -92,7 +92,6 @@ export async function createContainer(): Promise<ControllerContainer> {
   const templateWriter = new WorkspaceTemplateWriter(env);
   const gatewayClient = new GatewayClient(env);
   const sessionsRuntime = new SessionsRuntime(env);
-  const runtimeHealth = new RuntimeHealth(env);
   const runtimeState = createRuntimeState();
   // Construct openclawProcess before watchTrigger so the watch trigger can
   // delegate gateway restarts to OpenClawProcessManager.restart() instead of
@@ -101,6 +100,12 @@ export async function createContainer(): Promise<ControllerContainer> {
   const watchTrigger = new OpenClawWatchTrigger(env, openclawProcess);
   const wsClient = new OpenClawWsClient(env);
   const gatewayService = new OpenClawGatewayService(wsClient, runtimeState);
+  const controlPlaneHealth = new ControlPlaneHealthService(
+    gatewayService,
+    wsClient,
+    runtimeState,
+    openclawProcess,
+  );
   const channelFallbackService = new ChannelFallbackService(
     openclawProcess,
     gatewayService,
@@ -174,7 +179,7 @@ export async function createContainer(): Promise<ControllerContainer> {
   return {
     env,
     gatewayClient,
-    runtimeHealth,
+    controlPlaneHealth,
     openclawProcess,
     agentService: new AgentService(configStore, openclawSyncService),
     channelService: new ChannelService(
@@ -183,7 +188,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       openclawSyncService,
       gatewayService,
       openclawProcess,
-      runtimeHealth,
+      controlPlaneHealth,
       wsClient,
       quotaFallbackService,
     ),
@@ -219,7 +224,7 @@ export async function createContainer(): Promise<ControllerContainer> {
       const stopHealthLoop = startHealthLoop({
         env,
         state: runtimeState,
-        runtimeHealth,
+        controlPlaneHealth,
         processManager: openclawProcess,
         wsClient,
       });

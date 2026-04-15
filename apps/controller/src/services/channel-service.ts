@@ -28,9 +28,10 @@ import type { ControllerEnv } from "../app/env.js";
 import { ChannelConnectError } from "../lib/channel-connect-error.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
+import type { ControlPlaneHealthService } from "../runtime/control-plane-health.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
-import type { RuntimeHealth } from "../runtime/runtime-health.js";
+import { requireArtifactBackedOpenClawRuntime } from "../runtime/slimclaw-runtime-resolution.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawGatewayService } from "./openclaw-gateway-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
@@ -533,46 +534,12 @@ async function restartWhatsappLoginSocket(
 }
 
 function resolveOpenClawPackageDir(env: ControllerEnv): string {
-  const candidates = [
-    env.openclawBuiltinExtensionsDir
-      ? path.dirname(env.openclawBuiltinExtensionsDir)
-      : null,
-    path.join(
-      process.cwd(),
-      "..",
-      "..",
-      ".tmp",
-      "sidecars",
-      "openclaw",
-      "node_modules",
-      "openclaw",
-    ),
-    path.join(
-      env.openclawStateDir,
-      "..",
-      "..",
-      "..",
-      "..",
-      "sidecars",
-      "openclaw",
-      "node_modules",
-      "openclaw",
-    ),
-    path.join(
-      process.cwd(),
-      "..",
-      "..",
-      "openclaw-runtime",
-      "node_modules",
-      "openclaw",
-    ),
-  ].filter((value): value is string => Boolean(value));
-
-  for (const candidate of candidates) {
-    if (existsSync(path.join(candidate, "package.json"))) {
-      return path.resolve(candidate);
-    }
+  const runtime = requireArtifactBackedOpenClawRuntime(env);
+  const packageJsonPath = path.join(runtime.packageDir, "package.json");
+  if (existsSync(packageJsonPath)) {
+    return path.resolve(runtime.packageDir);
   }
+
   throw new Error("OpenClaw package root not found for WhatsApp login");
 }
 
@@ -715,7 +682,7 @@ export class ChannelService {
     private readonly syncService: OpenClawSyncService,
     private readonly gatewayService: OpenClawGatewayService,
     private readonly openclawProcess: OpenClawProcessManager,
-    private readonly runtimeHealth: RuntimeHealth,
+    private readonly controlPlaneHealth: ControlPlaneHealthService,
     private readonly wsClient: OpenClawWsClient,
     private readonly quotaFallbackService?: QuotaFallbackService,
   ) {}
@@ -1608,8 +1575,10 @@ export class ChannelService {
 
     const deadline = Date.now() + WHATSAPP_RUNTIME_RESTART_TIMEOUT_MS;
     while (Date.now() < deadline) {
-      const health = await this.runtimeHealth.probe();
-      if (health.ok && this.gatewayService.isConnected()) {
+      const controlPlane = await this.controlPlaneHealth.probe({
+        timeoutMs: 1500,
+      });
+      if (controlPlane.ok) {
         logger.info({ reason }, "whatsapp_runtime_restart_ready");
         return;
       }

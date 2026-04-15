@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isAlreadyRunningStartError } from "../../scripts/dev/src/shared/default-start";
+import { isAlreadyRunningStartError } from "../../tools/dev/src/shared/default-start";
 
 describe("isAlreadyRunningStartError", () => {
   it("matches the standard already-running message for the same target", () => {

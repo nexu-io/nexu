@@ -117,7 +117,7 @@ pnpm dev start openclaw
 pnpm dev start controller
 pnpm dev start web
 pnpm dev start desktop
-  └─ scripts/dev desktop service
+  └─ tools/dev desktop service
        ├─ ensure desktop build artifacts
        ├─ launch Electron directly
        └─ attach desktop to external runtime targets

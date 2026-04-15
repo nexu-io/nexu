@@ -37,8 +37,8 @@ created: '2026-03-30'
 
 ## Research
 
-### Existing System
-- Root install uses `openclaw-runtime:install` → `npm --prefix ./openclaw-runtime run install:cached` (`package.json:17`).
+### Existing System (at investigation time)
+- Root install entered through the repo-level runtime install flow for `openclaw-runtime`, which drove the cached install/prune path under that package.
 - Cached runtime install runs a normal npm install/ci and then always executes `node ./prune-runtime.mjs` when inputs changed (`openclaw-runtime/postinstall.mjs:94-96`).
 - Pruning targets are defined centrally in `openclaw-runtime/prune-runtime-paths.mjs`.
 - Desktop packaging copies `openclaw-runtime/node_modules` into the sidecar, excluding only `openclaw` while staging a patched copy of that package (`apps/desktop/scripts/prepare-openclaw-sidecar.mjs:787-796`).
@@ -60,7 +60,7 @@ created: '2026-03-30'
    - Post-fix validation status:
      - Local validation succeeded: the agent opened `https://nettee.io/`, clicked the “全部文章 (26) →” entry, and correctly reported the resulting destination `https://nettee.io/zh/blog`, confirming Playwright-backed interaction now works in the local runtime.
 
-### Key Findings
+### Key Findings (from the investigation-time implementation)
 - `openclaw-runtime/prune-runtime-paths.mjs:23-31` explicitly prunes `node_modules/pdfjs-dist`, and the file comment already warns this may break PDF parsing / attachment ingestion paths.
 - OpenClaw's PDF fallback explicitly depends on `pdfjs-dist` (`openclaw-runtime/node_modules/openclaw/docs/tools/pdf.md:83`).
 - Built OpenClaw bundles throw the exact missing-dependency error seen in #425 when `pdfjs-dist` cannot be imported.

@@ -1,0 +1,13 @@
+{
+  "name": "@nexu/tools-dev",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "devDependencies": {
+    "@nexu/dev-utils": "workspace:*",
+    "@nexu/slimclaw": "workspace:*",
+    "cac": "^6.7.14",
+    "chokidar": "^4.0.3",
+    "typescript": "^5.7.3"
+  }
+}

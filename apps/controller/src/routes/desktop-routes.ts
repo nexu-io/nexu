@@ -6,10 +6,21 @@ import type { ControllerBindings } from "../types.js";
 
 const desktopReadyResponseSchema = z.object({
   ready: z.boolean(),
+  coreReady: z.boolean(),
+  degraded: z.boolean(),
+  bootPhase: z.enum([
+    "preparing",
+    "starting-managed-runtime",
+    "attaching-external-runtime",
+    "reconciling-runtime",
+    "stabilizing-runtime",
+    "ready",
+  ]),
   workspacePath: z.string(),
-  runtime: z.object({
+  controlPlane: z.object({
     ok: z.boolean(),
-    status: z.number().nullable(),
+    phase: z.enum(["disconnected", "connecting", "ready", "degraded"]),
+    wsConnected: z.boolean(),
   }),
   status: z.enum(["active", "starting", "degraded", "unhealthy"]),
 });
@@ -159,7 +170,12 @@ export function registerDesktopRoutes(
       },
     }),
     async (c) => {
-      const runtime = await container.runtimeHealth.probe();
+      const controlPlane = await container.controlPlaneHealth.probe({
+        timeoutMs: 1500,
+      });
+      const coreReady =
+        container.runtimeState.bootPhase === "ready" && controlPlane.ok;
+      const degraded = coreReady && container.runtimeState.status !== "active";
       const bots = await container.configStore.listBots();
       const preferredBot =
         bots.find((bot) => bot.status === "active") ??
@@ -168,7 +184,10 @@ export function registerDesktopRoutes(
 
       return c.json(
         {
-          ready: true,
+          ready: coreReady && !degraded,
+          coreReady,
+          degraded,
+          bootPhase: container.runtimeState.bootPhase,
           workspacePath: preferredBot
             ? path.join(
                 container.env.openclawStateDir,
@@ -176,7 +195,11 @@ export function registerDesktopRoutes(
                 preferredBot.id,
               )
             : path.join(container.env.openclawStateDir, "agents"),
-          runtime,
+          controlPlane: {
+            ok: controlPlane.ok,
+            phase: controlPlane.phase,
+            wsConnected: controlPlane.wsConnected,
+          },
           status: container.runtimeState.status,
         },
         200,

@@ -13,6 +13,7 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSlimclawRuntimeRoot } from "@nexu/slimclaw";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -113,14 +114,15 @@ async function ensureExistingBuildArtifacts() {
 }
 
 async function ensureExistingRuntimeInstall() {
+  const runtimeRoot = getSlimclawRuntimeRoot(repoRoot);
   await Promise.all([
     ensureExistingPath(
-      resolve(repoRoot, "openclaw-runtime/node_modules"),
-      "openclaw-runtime install",
+      resolve(runtimeRoot, "node_modules"),
+      "slimclaw runtime install",
     ),
     ensureExistingPath(
-      resolve(repoRoot, "openclaw-runtime/.postinstall-cache.json"),
-      "openclaw-runtime cache",
+      resolve(runtimeRoot, ".postinstall-cache.json"),
+      "slimclaw runtime cache",
     ),
   ]);
 }
@@ -723,7 +725,7 @@ async function main() {
 
   if (process.arch !== targetMacArch) {
     throw new Error(
-      `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead. For Intel validation, run pnpm dist:mac:unsigned:x64 on an Intel Mac after openclaw-runtime pruning removes clipboard natives and any optional DAVE binaries you intentionally disabled.`,
+      `[dist:mac] Cross-arch mac packaging is not supported yet: host=${process.arch}, target=${targetMacArch}. Runtime sidecars embed host-native binaries, so build on a matching macOS host instead. For Intel validation, run pnpm dist:mac:unsigned:x64 on an Intel Mac after the slimclaw-managed runtime packaging flow removes clipboard natives and any optional DAVE binaries you intentionally disabled.`,
     );
   }
 
@@ -803,14 +805,14 @@ async function main() {
     timings,
   );
   await timedStep(
-    "install openclaw-runtime",
+    "prepare slimclaw runtime",
     async () => {
       if (shouldReuseExistingRuntimeInstall) {
         await ensureExistingRuntimeInstall();
-        console.log("[dist:mac] reusing existing openclaw-runtime install");
+        console.log("[dist:mac] reusing existing slimclaw runtime install");
         return;
       }
-      await run("pnpm", ["--dir", repoRoot, "openclaw-runtime:install"], {
+      await run("pnpm", ["--dir", repoRoot, "slimclaw:prepare"], {
         env,
       });
     },

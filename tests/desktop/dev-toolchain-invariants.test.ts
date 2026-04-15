@@ -7,7 +7,7 @@
  *
  * Launch path safety:
  *  1. pnpm start (dev-launchd.sh) still launches Electron explicitly
- *  2. pnpm dev desktop launch is centralized in scripts/dev platform helpers
+ *  2. pnpm dev desktop launch is centralized in tools/dev platform helpers
  *  3. mac desktop helper patches LSUIElement and flushes LS cache
  *  4. desktop platform helpers export NEXU_WORKSPACE_ROOT / runtime roots
  *
@@ -41,12 +41,12 @@ function readFile(relativePath: string): string {
 
 describe("Launch path safety", () => {
   const devLaunchdSh = readFile("scripts/dev-launchd.sh");
-  const desktopService = readFile("scripts/dev/src/services/desktop.ts");
+  const desktopService = readFile("tools/dev/src/services/desktop.ts");
   const desktopPlatform = readFile(
-    "scripts/dev/src/shared/platform/desktop-dev-platform.ts",
+    "tools/dev/src/shared/platform/desktop-dev-platform.ts",
   );
   const darwinDesktopPlatform = readFile(
-    "scripts/dev/src/shared/platform/desktop-dev-platform.darwin.ts",
+    "tools/dev/src/shared/platform/desktop-dev-platform.darwin.ts",
   );
 
   // -----------------------------------------------------------------------
@@ -65,7 +65,7 @@ describe("Launch path safety", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 2. pnpm dev desktop launch is centralized in scripts/dev helpers
+  // 2. pnpm dev desktop launch is centralized in tools/dev helpers
   // -----------------------------------------------------------------------
   it("desktop service delegates launch decisions to platform helpers", () => {
     expect(desktopService).toContain("createDesktopElectronLaunchSpec");
@@ -161,16 +161,19 @@ describe("ELECTRON_RUN_AS_NODE coverage", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 8. openclaw-process.ts sets ELECTRON_RUN_AS_NODE
+  // 8. controller runtime command resolution preserves ELECTRON_RUN_AS_NODE
   // -----------------------------------------------------------------------
-  it("openclaw-process.ts sets ELECTRON_RUN_AS_NODE when using Electron executable", () => {
+  it("controller runtime command resolution sets ELECTRON_RUN_AS_NODE when using Electron executable", () => {
     const openclawProcess = readFile(
       "apps/controller/src/runtime/openclaw-process.ts",
     );
+    const runtimeResolution = readFile(
+      "apps/controller/src/runtime/slimclaw-runtime-resolution.ts",
+    );
 
-    expect(openclawProcess).toContain("ELECTRON_RUN_AS_NODE");
-    // Must be conditionally set when electronExec is used
-    expect(openclawProcess).toContain("OPENCLAW_ELECTRON_EXECUTABLE");
+    expect(openclawProcess).toContain("getOpenClawCommandSpec");
+    expect(runtimeResolution).toContain("ELECTRON_RUN_AS_NODE");
+    expect(runtimeResolution).toContain("OPENCLAW_ELECTRON_EXECUTABLE");
   });
 
   // -----------------------------------------------------------------------
@@ -197,7 +200,7 @@ describe("ELECTRON_RUN_AS_NODE coverage", () => {
 
 describe("Shutdown safety", () => {
   const devLaunchdSh = readFile("scripts/dev-launchd.sh");
-  const desktopService = readFile("scripts/dev/src/services/desktop.ts");
+  const desktopService = readFile("tools/dev/src/services/desktop.ts");
   const quitHandler = readFile("apps/desktop/main/services/quit-handler.ts");
   const updateManager = readFile("apps/desktop/main/updater/update-manager.ts");
 
@@ -287,14 +290,14 @@ describe("Shutdown safety", () => {
   // -----------------------------------------------------------------------
   // 16. desktop service is an explicit composite of Vite + Electron
   // -----------------------------------------------------------------------
-  it("scripts/dev desktop service tracks both workerPid and electron pid", () => {
+  it("tools/dev desktop service tracks both workerPid and electron pid", () => {
     expect(desktopService).toContain("workerPid");
     expect(desktopService).toContain("createDesktopViteCommand");
     expect(desktopService).toContain("createDesktopElectronLaunchSpec");
   });
 
   // -----------------------------------------------------------------------
-  // 17. desktop vite implicit Electron startup is disabled under scripts/dev
+  // 17. desktop vite implicit Electron startup is disabled under tools/dev
   // -----------------------------------------------------------------------
   it("vite config supports disabling implicit Electron startup", () => {
     const viteConfig = readFile("apps/desktop/vite.config.ts");

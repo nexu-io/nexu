@@ -39,8 +39,14 @@ function buildTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
   return AbortSignal.timeout(timeoutMs);
 }
 
-function isReadyPayload(value: unknown): value is { ready?: boolean } {
-  return typeof value === "object" && value !== null && "ready" in value;
+function isReadyPayload(
+  value: unknown,
+): value is { ready?: boolean; coreReady?: boolean } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    ("ready" in value || "coreReady" in value)
+  );
 }
 
 async function probeControllerReady(
@@ -57,7 +63,10 @@ async function probeControllerReady(
     }
 
     const payload = await response.json();
-    return isReadyPayload(payload) && payload.ready === true;
+    return (
+      isReadyPayload(payload) &&
+      (payload.coreReady === true || payload.ready === true)
+    );
   } catch {
     return false;
   }

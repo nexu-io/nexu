@@ -1038,23 +1038,49 @@
                     "ready": {
                       "type": "boolean"
                     },
+                    "coreReady": {
+                      "type": "boolean"
+                    },
+                    "degraded": {
+                      "type": "boolean"
+                    },
+                    "bootPhase": {
+                      "type": "string",
+                      "enum": [
+                        "preparing",
+                        "starting-managed-runtime",
+                        "attaching-external-runtime",
+                        "reconciling-runtime",
+                        "stabilizing-runtime",
+                        "ready"
+                      ]
+                    },
                     "workspacePath": {
                       "type": "string"
                     },
-                    "runtime": {
+                    "controlPlane": {
                       "type": "object",
                       "properties": {
                         "ok": {
                           "type": "boolean"
                         },
-                        "status": {
-                          "type": "number",
-                          "nullable": true
+                        "phase": {
+                          "type": "string",
+                          "enum": [
+                            "disconnected",
+                            "connecting",
+                            "ready",
+                            "degraded"
+                          ]
+                        },
+                        "wsConnected": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "ok",
-                        "status"
+                        "phase",
+                        "wsConnected"
                       ]
                     },
                     "status": {
@@ -1069,8 +1095,11 @@
                   },
                   "required": [
                     "ready",
+                    "coreReady",
+                    "degraded",
+                    "bootPhase",
                     "workspacePath",
-                    "runtime",
+                    "controlPlane",
                     "status"
                   ]
                 }
