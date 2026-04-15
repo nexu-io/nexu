@@ -771,6 +771,13 @@ const en = {
   "skills.cancelInstall": "Cancel",
   "skills.cancelling": "Cancelling…",
   "skills.cancelFailed": "Failed to cancel: {{error}}",
+  "skills.installNpmMissing":
+    "npm is required to install this skill. Please install Node.js from https://nodejs.org/ and restart Nexu.",
+  "skills.installDepsFailed":
+    'Failed to install dependencies for "{{slug}}". Check the controller logs for details.',
+  "skills.installFailed": 'Failed to install "{{slug}}": {{error}}',
+  "skills.installRequestFailed": "Could not start the install: {{error}}",
+  "skills.uninstallRequestFailed": "Could not uninstall the skill: {{error}}",
   "skills.import": "Import",
   "skills.importSkill": "Import Skill",
   "skills.importSkillDesc":

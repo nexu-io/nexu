@@ -727,6 +727,13 @@ const zhCN = {
   "skills.cancelInstall": "取消",
   "skills.cancelling": "取消中…",
   "skills.cancelFailed": "取消失败：{{error}}",
+  "skills.installNpmMissing":
+    "安装该技能需要 npm。请先从 https://nodejs.org/ 安装 Node.js 并重启 Nexu。",
+  "skills.installDepsFailed":
+    '"{{slug}}" 的依赖安装失败，请查看控制器日志了解详情。',
+  "skills.installFailed": '"{{slug}}" 安装失败：{{error}}',
+  "skills.installRequestFailed": "无法启动安装：{{error}}",
+  "skills.uninstallRequestFailed": "无法卸载该技能：{{error}}",
   "skills.import": "导入",
   "skills.importSkill": "导入技能",
   "skills.importSkillDesc": "从 zip 文件或 GitHub 仓库添加自定义技能",

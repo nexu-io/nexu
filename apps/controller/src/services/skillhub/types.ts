@@ -40,7 +40,12 @@ export type QueueItemStatus =
   | "done"
   | "failed";
 
-export type QueueErrorCode = "skill_not_found" | "rate_limit" | "unknown";
+export type QueueErrorCode =
+  | "skill_not_found"
+  | "rate_limit"
+  | "npm_missing"
+  | "deps_install_failed"
+  | "unknown";
 
 export type QueueItem = {
   readonly slug: string;

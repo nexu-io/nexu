@@ -115,13 +115,22 @@ function SkillCard({
     queueStatus === "downloading" ||
     queueStatus === "installing-deps";
   const isFailed = queueStatus === "failed";
-  const canRetry = isFailed && queueErrorCode !== "skill_not_found";
+  // Retry is suppressed for terminal errors that the user must resolve
+  // outside the app (skill removed, or npm not installed).
+  const canRetry =
+    isFailed &&
+    queueErrorCode !== "skill_not_found" &&
+    queueErrorCode !== "npm_missing";
   const failedMessage = isFailed
     ? queueErrorCode === "skill_not_found"
       ? t("skills.skillNotAvailable")
       : queueErrorCode === "rate_limit"
         ? t("skills.installRateLimited")
-        : t("skills.installFailedGeneric")
+        : queueErrorCode === "npm_missing"
+          ? t("skills.installNpmMissing")
+          : queueErrorCode === "deps_install_failed"
+            ? t("skills.installDepsFailed", { slug: skill.slug })
+            : t("skills.installFailedGeneric")
     : null;
   const isMutating = pendingAction !== null;
 
@@ -140,7 +149,9 @@ function SkillCard({
         name: skill.name,
         skill_source: skillSource,
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(t("skills.installRequestFailed", { error: message }));
       track("workspace_skill_install", {
         skill_name: skill.name,
         skill_type: skillType,
@@ -186,7 +197,9 @@ function SkillCard({
         name: skill.name,
         skill_source: skillSource,
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(t("skills.uninstallRequestFailed", { error: message }));
       track("workspace_skill_uninstall", {
         skill_name: skill.name,
         skill_source: skillSource,

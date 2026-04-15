@@ -3529,7 +3529,7 @@ export type GetApiV1SkillhubCatalogResponses = {
             status: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
             position: number;
             error: string;
-            errorCode: 'skill_not_found' | 'rate_limit' | 'unknown';
+            errorCode: 'skill_not_found' | 'rate_limit' | 'npm_missing' | 'deps_install_failed' | 'unknown';
             retries: number;
             enqueuedAt: string;
         }>;

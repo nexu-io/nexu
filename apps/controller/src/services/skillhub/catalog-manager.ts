@@ -18,6 +18,7 @@ import {
   copyStaticSkills,
   resolveCuratedSkillsToInstall,
 } from "./curated-skills.js";
+import { ensureNpmAvailable, runNpmInstall } from "./npm-runner.js";
 import type { SkillDb, SkillRecord } from "./skill-db.js";
 import type {
   CatalogMeta,
@@ -678,14 +679,16 @@ export class CatalogManager {
   ): Promise<void> {
     if (!existsSync(resolve(skillDir, "package.json"))) return;
 
+    await ensureNpmAvailable();
+
     this.log("info", `installing npm deps: ${slug}`);
     try {
-      const npmArgs = ["install", "--production", "--no-audit", "--no-fund"];
-      await execFileAsync("npm", npmArgs, { cwd: skillDir });
+      await runNpmInstall(skillDir);
       this.log("info", `npm deps installed: ${slug}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.log("warn", `npm deps failed for ${slug}: ${message}`);
+      this.log("error", `npm deps failed for ${slug}: ${message}`);
+      throw new Error(`DEPS_INSTALL_FAILED: ${slug}: ${message}`);
     }
   }
 

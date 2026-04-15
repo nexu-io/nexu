@@ -10389,6 +10389,8 @@
                             "enum": [
                               "skill_not_found",
                               "rate_limit",
+                              "npm_missing",
+                              "deps_install_failed",
                               "unknown"
                             ]
                           },

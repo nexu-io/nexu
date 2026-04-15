@@ -22,12 +22,16 @@ const MAX_PAUSE_MS = 60000;
 
 const RATE_LIMIT_PREFIX = /Rate limit exceeded/i;
 const SKILL_NOT_FOUND_PREFIX = /Skill not found/i;
+const NPM_MISSING_PREFIX = /^NPM_MISSING:/;
+const DEPS_INSTALL_FAILED_PREFIX = /^DEPS_INSTALL_FAILED:/;
 const RETRY_IN_PATTERN = /retry in (\d+)s/i;
 const RESET_IN_PATTERN = /reset in (\d+)s/i;
 
 function classifyError(message: string): QueueErrorCode {
   if (RATE_LIMIT_PREFIX.test(message)) return "rate_limit";
   if (SKILL_NOT_FOUND_PREFIX.test(message)) return "skill_not_found";
+  if (NPM_MISSING_PREFIX.test(message)) return "npm_missing";
+  if (DEPS_INSTALL_FAILED_PREFIX.test(message)) return "deps_install_failed";
   return "unknown";
 }
 
