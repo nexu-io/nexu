@@ -4,6 +4,7 @@ import {
   buildDeveloperPrPayload,
   checkOrganizationMembership,
   isInternalEquivalentAuthor,
+  parseWebhookUrls,
   runFromEnv,
   sanitizeText,
   validateGithubUrl,
@@ -95,6 +96,45 @@ describe("developer-notify", () => {
         "✅ 最高 2000 积分，可兑换价值 $20 的 nexu 使用额度",
       ),
     });
+  });
+
+  it("parses comma-separated webhook URLs", () => {
+    expect(parseWebhookUrls("https://a.com/hook")).toEqual([
+      "https://a.com/hook",
+    ]);
+    expect(
+      parseWebhookUrls("https://a.com/hook, https://b.com/hook"),
+    ).toEqual(["https://a.com/hook", "https://b.com/hook"]);
+    expect(parseWebhookUrls("  https://a.com/hook ,, ")).toEqual([
+      "https://a.com/hook",
+    ]);
+  });
+
+  it("broadcasts PR notification to multiple webhooks", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ code: 0, msg: "success" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await runFromEnv({
+      WEBHOOK_URL:
+        "https://a.feishu.cn/webhook/1, https://b.feishu.cn/webhook/2",
+      EVENT_KIND: "pr",
+      AUTHOR: "alice",
+      LABELS_OR_CATEGORY: "none",
+      URL: "https://github.com/nexu-io/nexu/pull/1",
+    });
+
+    expect(result).toEqual({ skipped: false, eventKind: "pr" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://a.feishu.cn/webhook/1",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://b.feishu.cn/webhook/2",
+    );
   });
 
   it("treats sentry bot as internal-equivalent", () => {

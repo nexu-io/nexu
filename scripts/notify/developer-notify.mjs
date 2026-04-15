@@ -269,8 +269,32 @@ export async function sendWebhook(webhookUrl, payload) {
   }
 }
 
+export function parseWebhookUrls(raw) {
+  return raw
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+}
+
+async function broadcastWebhook(webhookUrls, payload) {
+  const results = await Promise.allSettled(
+    webhookUrls.map((url) => sendWebhook(url, payload)),
+  );
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length === results.length) {
+    throw failures[0].reason;
+  }
+  if (failures.length > 0) {
+    const msgs = failures.map((f) => f.reason?.message ?? String(f.reason));
+    console.warn(
+      `Warning: ${failures.length}/${results.length} webhook(s) failed: ${msgs.join("; ")}`,
+    );
+  }
+  return { sent: results.length - failures.length, failed: failures.length };
+}
+
 export async function runFromEnv(env = process.env) {
-  const webhookUrl = env.WEBHOOK_URL;
+  const rawWebhookUrl = env.WEBHOOK_URL;
   const eventKind = env.EVENT_KIND ?? "issue";
   const title = env.TITLE ?? "";
   const author = env.AUTHOR ?? "";
@@ -280,7 +304,12 @@ export async function runFromEnv(env = process.env) {
   const githubToken = env.GITHUB_TOKEN;
   const repositoryOwner = env.GITHUB_REPOSITORY_OWNER;
 
-  if (!webhookUrl) {
+  if (!rawWebhookUrl) {
+    throw new Error("WEBHOOK_URL is required");
+  }
+
+  const webhookUrls = parseWebhookUrls(rawWebhookUrl);
+  if (webhookUrls.length === 0) {
     throw new Error("WEBHOOK_URL is required");
   }
 
@@ -320,7 +349,7 @@ export async function runFromEnv(env = process.env) {
       body,
       issueUrl: safeUrl,
     });
-    await sendWebhook(webhookUrl, payload);
+    await broadcastWebhook(webhookUrls, payload);
     return { skipped: false, eventKind };
   }
 
@@ -330,7 +359,7 @@ export async function runFromEnv(env = process.env) {
       labels,
       prUrl: safeUrl,
     });
-    await sendWebhook(webhookUrl, payload);
+    await broadcastWebhook(webhookUrls, payload);
     return { skipped: false, eventKind };
   }
 

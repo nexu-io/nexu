@@ -19,7 +19,7 @@ Runs on `issues: [opened]` via `.github/workflows/developer-issue-notify.yml`.
 2. Runs `scripts/notify/developer-notify.mjs` with `EVENT_KIND=issue`.
 3. Skips notifications for `sentry[bot]`.
 4. Checks whether the issue author is a member of the repository-owner organization; internal authors are skipped.
-5. Sends the developer-community issue card to the shared developer webhook.
+5. Broadcasts the developer-community issue card to all webhook URLs (comma-separated in `NOTIFY_DEVELOPER_FEISHU_WEBHOOK`).
 
 ### Pull request notification
 
@@ -28,12 +28,12 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 1. Job runs only when `github.event.pull_request.head.repo.fork` is true.
 2. Runs `scripts/notify/developer-notify.mjs` with `EVENT_KIND=pr`.
 3. Skips notifications for `sentry[bot]`.
-4. Sends the external-contributor PR card to the shared developer webhook.
+4. Broadcasts the external-contributor PR card to all webhook URLs (comma-separated in `NOTIFY_DEVELOPER_FEISHU_WEBHOOK`).
 
 ## Notification payloads
 
 - `scripts/notify/developer-notify.mjs` is the single payload builder and delivery entrypoint for both developer issue and developer PR notifications.
-- The script selects the payload by `EVENT_KIND` (`issue` or `pr`) and sends a Feishu interactive card to the shared developer webhook.
+- The script selects the payload by `EVENT_KIND` (`issue` or `pr`) and broadcasts a Feishu interactive card to all webhook URLs listed in `WEBHOOK_URL` (comma-separated). Delivery uses `Promise.allSettled` so a single group failure does not block others.
 - Payload layout details are intentionally not documented here; treat the script as the source of truth for message structure.
 
 ## Safety and isolation
@@ -48,7 +48,7 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 
 | Secret | Purpose |
 |--------|---------|
-| `NOTIFY_DEVELOPER_FEISHU_WEBHOOK` | Shared Feishu incoming webhook URL for both developer issue and PR notifications |
+| `NOTIFY_DEVELOPER_FEISHU_WEBHOOK` | Comma-separated Feishu incoming webhook URLs for developer notifications (one per group) |
 | `NEXU_PAL_APP_ID` | GitHub App ID used for issue-author org-membership filtering |
 | `NEXU_PAL_PRIVATE_KEY_PEM` | GitHub App private key used for issue-author org-membership filtering |
 
