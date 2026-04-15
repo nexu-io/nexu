@@ -1,6 +1,6 @@
 # developer-notify
 
-独立于既有 `nexu-pal` 与旧 Feishu 通知链路的开发者社群通知流程。
+Developer community notification flow that is independent from the existing `nexu-pal` and legacy Feishu notification paths.
 
 ## Workflows
 
@@ -38,11 +38,11 @@ Runs on `pull_request_target: [opened]` via `.github/workflows/developer-pr-noti
 
 ## Safety and isolation
 
-- 不修改既有 `nexu-pal` workflow 或旧 Feishu issue/discussion/PR 通知 workflow。
-- 新链路只复用 GitHub App credentials 做组织成员过滤；Feishu webhook 为独立开发者通知用途。
-- PR 流程保持 metadata-only，仍使用 `pull_request_target`，不执行 PR 代码。
-- 所有跳转链接都限制为 `https://github.com/*` 或固定官方文档链接。
-- webhook 发送除了检查 HTTP 状态，还会校验 Feishu JSON 响应里的 `code/msg`，避免 200 但业务失败被误判为成功。
+- Do not modify the existing `nexu-pal` workflow or the legacy Feishu issue/discussion/PR notification workflows.
+- The new path only reuses GitHub App credentials for organization-member filtering; the Feishu webhook is dedicated to developer notifications.
+- The PR flow remains metadata-only, continues to use `pull_request_target`, and does not execute PR code.
+- All outbound links are restricted to `https://github.com/*` or fixed official documentation links.
+- Webhook delivery validates not only the HTTP status but also the Feishu JSON `code/msg` response fields, so an HTTP 200 with a business-level failure is not treated as success.
 
 ## Secrets
 
