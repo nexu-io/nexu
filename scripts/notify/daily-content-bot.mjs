@@ -81,7 +81,7 @@ async function fetchHackerNewsTop(limit = 15) {
       }),
     );
     return stories
-      .filter((s) => s && s.title)
+      .filter((s) => s?.title)
       .map((s) => ({
         title: s.title,
         url: s.url || `https://news.ycombinator.com/item?id=${s.id}`,
@@ -94,7 +94,7 @@ async function fetchHackerNewsTop(limit = 15) {
   }
 }
 
-async function fetchNexuIssues(token, limit = 8) {
+export async function fetchNexuIssues(token, limit = 8) {
   try {
     const res = await fetch(
       `https://api.github.com/repos/nexu-io/nexu/issues?labels=good-first-issue&state=open&per_page=${limit}&sort=created&direction=desc`,
@@ -301,9 +301,7 @@ function buildDiscordEmbed(theme, content, dateStr) {
     .map((section) => {
       const items = section.items
         .map((item) =>
-          item.url
-            ? `• ${item.text} → [Link](${item.url})`
-            : `• ${item.text}`,
+          item.url ? `• ${item.text} → [Link](${item.url})` : `• ${item.text}`,
         )
         .join("\n");
       return `**${section.title}**\n${items}`;
@@ -409,7 +407,9 @@ export async function run(env = process.env) {
   const feishuRaw = env.FEISHU_WEBHOOK_URL;
   const discordRaw = env.DISCORD_WEBHOOK_URL;
   const llmApiBase =
-    env.LLM_API_BASE || env.LITELLM_ENDPOINT || "https://litellm.powerformer.net/v1";
+    env.LLM_API_BASE ||
+    env.LITELLM_ENDPOINT ||
+    "https://litellm.powerformer.net/v1";
   const llmApiKey = env.LLM_API_KEY || env.LITELLM_API_KEY;
   const llmModel = env.LLM_MODEL || "anthropic/claude-sonnet-4";
 
