@@ -137,12 +137,8 @@ describe("developer-notify", () => {
 
     expect(result).toEqual({ skipped: false, eventKind: "pr" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "https://a.feishu.cn/webhook/1",
-    );
-    expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      "https://b.feishu.cn/webhook/2",
-    );
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://a.feishu.cn/webhook/1");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://b.feishu.cn/webhook/2");
   });
 
   it("treats sentry bot as internal-equivalent", () => {
