@@ -1,5 +1,4 @@
 import { ActivityFeed } from "@/components/activity-feed";
-import { BudgetWarningBanner } from "@/components/budget-warning-banner";
 import { ChannelConnectModal } from "@/components/channel-connect-modal";
 import { DingtalkSetupView } from "@/components/channel-setup/dingtalk-setup-view";
 import { QqbotSetupView } from "@/components/channel-setup/qqbot-setup-view";
@@ -22,11 +21,6 @@ import {
   SeedancePromoBanner,
   SeedancePromoModal,
 } from "@/components/seedance-promo";
-import {
-  getBudgetBannerRouteVariant,
-  useDesktopBudgetGuard,
-} from "@/hooks/use-desktop-budget-guard";
-import { useDesktopRewardsStatus } from "@/hooks/use-desktop-rewards";
 import { useGitHubStars } from "@/hooks/use-github-stars";
 import { getChannelChatUrl } from "@/lib/channel-links";
 import {
@@ -631,14 +625,6 @@ export function HomePage() {
       onModeChange={handleBudgetBannerDebugModeChange}
     />
   ) : null;
-  const { status: rewardsStatus } = useDesktopRewardsStatus();
-  const { bannerDismissible, budgetStatus, dismissBanner, shouldShowPrompt } =
-    useDesktopBudgetGuard({
-      pathname: "/workspace/home",
-      cloudConnected: rewardsStatus.viewer.cloudConnected,
-    });
-  const budgetBannerRouteVariant =
-    getBudgetBannerRouteVariant("/workspace/home");
 
   const dismissSeedancePromo = useCallback(() => {
     setShowSeedancePromo(false);
@@ -792,16 +778,6 @@ export function HomePage() {
               </span>
             </div>
           </div>
-
-          {budgetBannerRouteVariant === "inline" &&
-          shouldShowPrompt &&
-          budgetStatus !== "healthy" ? (
-            <BudgetWarningBanner
-              status={budgetStatus}
-              dismissible={bannerDismissible}
-              onDismiss={dismissBanner}
-            />
-          ) : null}
 
           {/* ═══ MIDDLE: Channels — default open, Feishu highlighted ═══ */}
           <div className="card card-static overflow-visible">
@@ -1036,16 +1012,6 @@ export function HomePage() {
             </div>
           </div>
         </div>
-
-        {budgetBannerRouteVariant === "inline" &&
-        shouldShowPrompt &&
-        budgetStatus !== "healthy" ? (
-          <BudgetWarningBanner
-            status={budgetStatus}
-            dismissible={bannerDismissible}
-            onDismiss={dismissBanner}
-          />
-        ) : null}
 
         {showSeedancePromo ? (
           <SeedancePromoBanner
