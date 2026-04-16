@@ -19,7 +19,7 @@ jobs:
 
       - name: Send developer PR notification
         env:
-          WEBHOOK_URL: ${{ secrets.NOTIFY_DEVELOPER_FEISHU_WEBHOOK }}
+          WEBHOOK_URL: ${{ secrets.NOTIFY_DEVELOPER_FEISHU_WEBHOOK }}  # comma-separated for multiple groups
           EVENT_KIND: pr
           TITLE: ${{ github.event.pull_request.title }}
           URL: ${{ github.event.pull_request.html_url }}
