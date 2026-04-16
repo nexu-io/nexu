@@ -104,7 +104,10 @@ describe("developer-notify", () => {
     ]);
     expect(
       parseWebhookUrls("https://a.com/hook, https://b.com/hook"),
-    ).toEqual(["https://a.com/hook", "https://b.com/hook"]);
+    ).toEqual([
+      "https://a.com/hook",
+      "https://b.com/hook",
+    ]);
     expect(parseWebhookUrls("  https://a.com/hook ,, ")).toEqual([
       "https://a.com/hook",
     ]);
