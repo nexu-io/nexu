@@ -31,32 +31,30 @@ When your contribution is merged, it will be shown in these places:
 
 ## Current Points System
 
-The following is the current framework; if the team announces adjustments later, the latest version prevails:
+Points are based on the Issue label, keeping it simple and clear:
 
-| Contribution Type | Points | Description |
+| Issue Label | Points | Equivalent Value |
 | --- | --- | --- |
-| PR merged (starter difficulty) | 10 | Typo fixes, config adjustments |
-| PR merged (easy difficulty) | 25 | Bug fixes, small features |
-| PR merged (medium difficulty) | 50 | Complete feature implementation |
-| PR merged (advanced difficulty) | 100 | Architecture-level changes |
-| Skill published to ClawHub | 80 | Standalone runnable Skill |
-| Bug Report (confirmed) | 10 | Bug report with clear reproduction steps |
-| Documentation | 15-30 | Based on length and depth |
-| Translation | 20 / language | Per language pack |
-| Code Review (adopted) | 15 | Review with substantive suggestions |
-| Discussion quality answer | 10 | Reply marked as Answer |
-| Refer a new contributor | 20 | Given to referrer after referee's first PR merges |
+| `help wanted` | 2,000 | ≈ $20 USD nexu usage credits |
+| `good first issue` | 500 | ≈ $5 USD nexu usage credits |
+| Other (no label above) | 500 | ≈ $5 USD nexu usage credits |
 
-## What These Points Mean
+### How Points Are Awarded
 
-Points aren't for "gamified grinding" — they're for recording every valuable contribution seriously.
+1. **Contributor submits a PR** linked to the corresponding Issue
+2. **The dev team reviews** the PR for code quality and completeness
+3. **After the PR is merged**, the team confirms and awards points to your account
 
-- Small fixes matter too
-- Docs, translations, and reviews are no longer overlooked
-- First-time contributors get clearer positive feedback
+> Points are awarded only after the dev team has reviewed and merged your PR. The team reserves the final right of interpretation on point awards.
+
+## What Can You Do with Points
+
+Points can be directly redeemed for **nexu product usage credits**, and also serve as proof of your community contributions:
+
+- Points = real product usage credits — contribute and get rewarded
+- First-time contributors receive clear positive feedback
 - Long-term contributors build visible identity in the community
-- Points can be redeemed for community badges
-- Points also build your open-source contribution resume
+- Point records become part of your open-source contribution resume
 
 ## Want to Start with the Easiest Tasks?
 

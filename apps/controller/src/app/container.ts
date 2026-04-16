@@ -99,7 +99,7 @@ export async function createContainer(): Promise<ControllerContainer> {
   const openclawProcess = new OpenClawProcessManager(env);
   const watchTrigger = new OpenClawWatchTrigger(env, openclawProcess);
   const wsClient = new OpenClawWsClient(env);
-  const gatewayService = new OpenClawGatewayService(wsClient, runtimeState);
+  const gatewayService = new OpenClawGatewayService(wsClient);
   const controlPlaneHealth = new ControlPlaneHealthService(
     gatewayService,
     wsClient,

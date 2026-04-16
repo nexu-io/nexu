@@ -1,15 +1,17 @@
 import { execFileSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { basename, posix, resolve } from "node:path";
+import { basename, posix, resolve, sep } from "node:path";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{0,127}$/;
 const MAX_ZIP_SIZE = 50 * 1024 * 1024; // 50 MB
+const isWindows = process.platform === "win32";
 
 export type ZipImportResult = {
   readonly ok: boolean;
@@ -58,14 +60,63 @@ function isUnsafeZipEntryPath(entryPath: string): boolean {
   return normalizedPath.length === 0;
 }
 
-function readZipEntries(zipPath: string): string[] {
-  const output = execFileSync("unzip", ["-Z1", zipPath], {
-    encoding: "utf8",
-  });
+function powershellLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function listZipEntriesWindows(zipPath: string): string[] {
+  // Use .NET ZipFile API via PowerShell — available on every Windows since
+  // PowerShell 5.0 (Win 10+), no external dependencies required.
+  const script = [
+    "Add-Type -AssemblyName System.IO.Compression.FileSystem",
+    `$zip = [System.IO.Compression.ZipFile]::OpenRead(${powershellLiteral(zipPath)})`,
+    "try { $zip.Entries | ForEach-Object { $_.FullName } } finally { $zip.Dispose() }",
+  ].join("; ");
+  const output = execFileSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", script],
+    { encoding: "utf8", windowsHide: true },
+  );
   return output
     .split(/\r?\n/u)
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
+}
+
+function listZipEntriesPosix(zipPath: string): string[] {
+  const output = execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8" });
+  return output
+    .split(/\r?\n/u)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function readZipEntries(zipPath: string): string[] {
+  return isWindows
+    ? listZipEntriesWindows(zipPath)
+    : listZipEntriesPosix(zipPath);
+}
+
+function extractZipWindows(zipPath: string, destDir: string): void {
+  // Expand-Archive ships with PowerShell 5.0+ on every supported Windows.
+  const script = `Expand-Archive -LiteralPath ${powershellLiteral(zipPath)} -DestinationPath ${powershellLiteral(destDir)} -Force`;
+  execFileSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", script],
+    { windowsHide: true },
+  );
+}
+
+function extractZipPosix(zipPath: string, destDir: string): void {
+  execFileSync("unzip", ["-o", zipPath, "-d", destDir]);
+}
+
+function extractZipArchive(zipPath: string, destDir: string): void {
+  if (isWindows) {
+    extractZipWindows(zipPath, destDir);
+  } else {
+    extractZipPosix(zipPath, destDir);
+  }
 }
 
 export function importSkillZip(
@@ -94,12 +145,14 @@ export function importSkillZip(
         error: "Zip contains unsafe paths",
       };
     }
-    execFileSync("unzip", ["-o", zipPath, "-d", stagingDir]);
+    extractZipArchive(zipPath, stagingDir);
 
-    // Validate no files escaped staging dir (zip-slip defense)
-    const normalizedStaging = stagingDir.endsWith("/")
+    // Validate no files escaped staging dir (zip-slip defense).
+    // Use the platform separator so the prefix check works on Windows
+    // (resolve() returns backslash-separated paths there).
+    const normalizedStaging = stagingDir.endsWith(sep)
       ? stagingDir
-      : `${stagingDir}/`;
+      : stagingDir + sep;
     for (const entry of readdirSync(stagingDir, {
       withFileTypes: true,
       recursive: true,
@@ -158,7 +211,8 @@ export function importSkillZip(
     }
     mkdirSync(destDir, { recursive: true });
 
-    execFileSync("cp", ["-R", `${skillRoot}/.`, destDir]);
+    // Cross-platform copy: Node's fs.cpSync handles Windows + POSIX uniformly.
+    cpSync(skillRoot, destDir, { recursive: true });
 
     return { ok: true, slug };
   } catch (error: unknown) {

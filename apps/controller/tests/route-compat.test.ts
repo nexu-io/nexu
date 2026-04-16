@@ -113,13 +113,10 @@ async function createTestContainer(
     isConnected: () => false,
     stop: vi.fn(),
   } as unknown as ControllerContainer["wsClient"];
-  const gatewayService = new OpenClawGatewayService(
-    {
-      isConnected: () => false,
-      request: vi.fn(),
-    } as never,
-    runtimeState,
-  );
+  const gatewayService = new OpenClawGatewayService({
+    isConnected: () => false,
+    request: vi.fn(),
+  } as never);
   const controlPlaneHealth = new ControlPlaneHealthService(
     gatewayService,
     wsClient,

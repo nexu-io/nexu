@@ -14,10 +14,6 @@ import type { OpenClawConfig } from "@nexu/shared";
 import { logger } from "../lib/logger.js";
 import { serializeOpenClawConfig } from "../lib/openclaw-config-serialization.js";
 import type { OpenClawWsClient } from "../runtime/openclaw-ws-client.js";
-import {
-  type ControllerRuntimeState,
-  isBootPhasePreReady,
-} from "../runtime/state.js";
 
 // ---------------------------------------------------------------------------
 // Public types — channel status & readiness
@@ -148,10 +144,7 @@ export class OpenClawGatewayService {
   /** SHA-256 hash of the last config we successfully observed. */
   private lastPushedConfigHash: string | null = null;
 
-  constructor(
-    private readonly wsClient: OpenClawWsClient,
-    private readonly runtimeState: ControllerRuntimeState,
-  ) {}
+  constructor(private readonly wsClient: OpenClawWsClient) {}
 
   /** Whether the WS client has completed handshake and is ready for RPC. */
   isConnected(): boolean {
@@ -327,24 +320,22 @@ export class OpenClawGatewayService {
     channels: ChannelLiveStatusEntry[];
   }> {
     if (!this.wsClient.isConnected()) {
-      // During boot or when gateway is still starting, show "connecting"
-      // instead of "disconnected" so the UI doesn't flash a scary red state.
-      const startupStatus: ChannelLiveStatus =
-        isBootPhasePreReady(this.runtimeState.bootPhase) ||
-        this.runtimeState.gatewayStatus === "starting"
-          ? "connecting"
-          : "disconnected";
+      // WS is not connected: we cannot observe live channel status. Report
+      // "connecting" regardless of boot phase so the UI surfaces a neutral
+      // gateway-offline state instead of a per-channel credential failure,
+      // and preserve configured: true for channels with persisted credentials
+      // so the UI does not render the "not configured" reconnect prompt.
       return {
         gatewayConnected: false,
         channels: channels.map((channel) => ({
           channelType: channel.channelType,
           channelId: channel.id,
           accountId: channel.accountId,
-          status: startupStatus,
+          status: "connecting",
           ready: false,
           connected: false,
           running: false,
-          configured: false,
+          configured: true,
           lastError: null,
         })),
       };
@@ -492,17 +483,21 @@ export class OpenClawGatewayService {
         { error: err instanceof Error ? err.message : String(err) },
         "openclaw_channels_live_status_error",
       );
+      // Gateway RPC failed mid-flight — treat as a transient gateway outage.
+      // Report "connecting" + configured: true so the UI shows the
+      // gateway-offline banner instead of prompting users to re-authenticate
+      // channels whose credentials on disk are still valid.
       return {
         gatewayConnected: false,
         channels: channels.map((channel) => ({
           channelType: channel.channelType,
           channelId: channel.id,
           accountId: channel.accountId,
-          status: "disconnected",
+          status: "connecting",
           ready: false,
           connected: false,
           running: false,
-          configured: false,
+          configured: true,
           lastError: null,
         })),
       };
