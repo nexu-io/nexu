@@ -86,7 +86,9 @@ describe("developer-notify", () => {
       issueUrl: "https://github.com/nexu-io/nexu/issues/99",
     });
 
-    expect(payload.card.header.title.content).toContain("刚新增 1 条 issue 等你来领取");
+    expect(payload.card.header.title.content).toContain(
+      "刚新增 1 条 issue 等你来领取",
+    );
     expect(payload.card.body.elements[1]).toMatchObject({ tag: "column_set" });
     expect(
       payload.card.body.elements[1].columns.map(
@@ -111,9 +113,7 @@ describe("developer-notify", () => {
     expect(parseWebhookUrls("https://a.com/hook")).toEqual([
       "https://a.com/hook",
     ]);
-    expect(
-      parseWebhookUrls("https://a.com/hook, https://b.com/hook"),
-    ).toEqual([
+    expect(parseWebhookUrls("https://a.com/hook, https://b.com/hook")).toEqual([
       "https://a.com/hook",
       "https://b.com/hook",
     ]);
