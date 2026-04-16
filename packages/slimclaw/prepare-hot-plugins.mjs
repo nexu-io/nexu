@@ -5,8 +5,8 @@ import ts from "typescript";
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(packageRoot, "..", "..");
-const FEISHU_STARTUP_EXPERIMENT_MODE = process.env
-  .NEXU_SLIMCLAW_FEISHU_STARTUP_EXPERIMENT;
+const FEISHU_STARTUP_EXPERIMENT_MODE =
+  process.env.NEXU_SLIMCLAW_FEISHU_STARTUP_EXPERIMENT;
 
 function buildFeishuMinimalStartupEntrySource() {
   return `import {
