@@ -88,6 +88,9 @@ importers:
       '@nexu/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nexu/slimclaw':
+        specifier: workspace:*
+        version: link:../../packages/slimclaw
       '@sentry/electron':
         specifier: ^7.10.0
         version: 7.10.0
@@ -333,11 +336,20 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  scripts/dev:
+  packages/slimclaw:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  tools/dev:
     devDependencies:
       '@nexu/dev-utils':
         specifier: workspace:*
         version: link:../../packages/dev-utils
+      '@nexu/slimclaw':
+        specifier: workspace:*
+        version: link:../../packages/slimclaw
       cac:
         specifier: ^6.7.14
         version: 6.7.14

@@ -1,7 +1,5 @@
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import {
   type Model,
   type ModelProviderConfig,
@@ -23,6 +21,7 @@ import type { ControllerEnv } from "../app/env.js";
 import { logger } from "../lib/logger.js";
 import { proxyFetch } from "../lib/proxy-fetch.js";
 import type { OpenClawProcessManager } from "../runtime/openclaw-process.js";
+import { getOpenClawCommandSpec } from "../runtime/slimclaw-runtime-resolution.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
 import type { OpenClawAuthService } from "./openclaw-auth-service.js";
 import type { OpenClawSyncService } from "./openclaw-sync-service.js";
@@ -262,120 +261,6 @@ function generatePkce(): {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function findWorkspaceRoot(startDir: string): string | null {
-  let currentDir = path.resolve(startDir);
-
-  for (let index = 0; index < 10; index += 1) {
-    if (existsSync(path.join(currentDir, "pnpm-workspace.yaml"))) {
-      return currentDir;
-    }
-
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-
-  return null;
-}
-
-function resolveOpenclawEntryFromBin(binPath: string): string | null {
-  const resolvedBinPath = path.resolve(binPath.trim());
-  if (resolvedBinPath.endsWith(".mjs") && existsSync(resolvedBinPath)) {
-    return resolvedBinPath;
-  }
-
-  const entry = path.resolve(
-    path.dirname(resolvedBinPath),
-    "..",
-    "node_modules/openclaw/openclaw.mjs",
-  );
-  return existsSync(entry) ? entry : null;
-}
-
-function getOpenClawCommandSpec(env: ControllerEnv): {
-  command: string;
-  argsPrefix: string[];
-  extraEnv: Record<string, string>;
-} {
-  const workspaceRoot =
-    process.env.NEXU_WORKSPACE_ROOT?.trim() || findWorkspaceRoot(process.cwd());
-  const runtimeEntryPath = workspaceRoot
-    ? path.join(
-        workspaceRoot,
-        "openclaw-runtime",
-        "node_modules",
-        "openclaw",
-        "openclaw.mjs",
-      )
-    : null;
-  const electronExec = process.env.OPENCLAW_ELECTRON_EXECUTABLE;
-  if (electronExec) {
-    const openclawEntryFromBin = resolveOpenclawEntryFromBin(env.openclawBin);
-    if (openclawEntryFromBin) {
-      return {
-        command: electronExec,
-        argsPrefix: [openclawEntryFromBin],
-        extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
-      };
-    }
-
-    if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
-      return {
-        command: electronExec,
-        argsPrefix: [runtimeEntryPath],
-        extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
-      };
-    }
-
-    const entry = resolveOpenclawEntryFromBin(env.openclawBin);
-    if (!entry) {
-      throw new Error(
-        "Unable to resolve OpenClaw entry point from OPENCLAW_BIN",
-      );
-    }
-    return {
-      command: electronExec,
-      argsPrefix: [entry],
-      extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
-    };
-  }
-
-  if (path.isAbsolute(env.openclawBin) || env.openclawBin.includes(path.sep)) {
-    return {
-      command: env.openclawBin,
-      argsPrefix: [],
-      extraEnv: {},
-    };
-  }
-
-  if (workspaceRoot) {
-    if (runtimeEntryPath && existsSync(runtimeEntryPath)) {
-      return {
-        command: process.execPath,
-        argsPrefix: [runtimeEntryPath],
-        extraEnv: {},
-      };
-    }
-
-    const wrapperPath = path.join(workspaceRoot, "openclaw-wrapper");
-    if (existsSync(wrapperPath)) {
-      return {
-        command: wrapperPath,
-        argsPrefix: [],
-        extraEnv: {},
-      };
-    }
-  }
-
-  return {
-    command: env.openclawBin,
-    argsPrefix: [],
-    extraEnv: {},
-  };
 }
 
 // Providers that support OAuth login (no API key needed).

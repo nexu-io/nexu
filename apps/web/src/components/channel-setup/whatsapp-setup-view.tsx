@@ -2,6 +2,7 @@ import { identify, track } from "@/lib/tracking";
 import { Loader2, QrCode, RefreshCw, Smartphone } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   postApiV1ChannelsWhatsappConnect,
@@ -25,6 +26,7 @@ export function WhatsappSetupView({
   onConnected,
   disabled,
 }: WhatsappSetupViewProps) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>("idle");
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -53,13 +55,13 @@ export function WhatsappSetupView({
         const message =
           typeof error === "object" && error !== null && "message" in error
             ? String(error.message)
-            : "WhatsApp connect failed";
+            : t("whatsappSetup.connectFailed");
         setErrorMessage(message);
         setPhase("error");
         return;
       }
 
-      toast.success("WhatsApp connected");
+      toast.success(t("whatsappSetup.connectSuccess"));
       track("channel_ready", {
         channel: "whatsapp",
         channel_type: "whatsapp_personal",
@@ -71,7 +73,7 @@ export function WhatsappSetupView({
         setQrUrl(null);
       }
     },
-    [onConnected],
+    [onConnected, t],
   );
 
   const startQrFlow = useCallback(async () => {
@@ -90,7 +92,7 @@ export function WhatsappSetupView({
       const message =
         typeof error === "object" && error !== null && "message" in error
           ? String(error.message)
-          : "Failed to start WhatsApp login";
+          : t("whatsappSetup.startFailed");
       setErrorMessage(message);
       setPhase("error");
       return;
@@ -102,7 +104,7 @@ export function WhatsappSetupView({
     }
 
     if (!data.qrDataUrl) {
-      setErrorMessage(data.message || "Failed to load WhatsApp QR code");
+      setErrorMessage(data.message || t("whatsappSetup.loadQrFailed"));
       setPhase("error");
       return;
     }
@@ -126,7 +128,7 @@ export function WhatsappSetupView({
           waitError !== null &&
           "message" in waitError
             ? String(waitError.message)
-            : "WhatsApp login timed out";
+            : t("whatsappSetup.waitFailed");
         setErrorMessage(message);
         setPhase("error");
         return;
@@ -139,7 +141,7 @@ export function WhatsappSetupView({
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }
-  }, [finalizeConnect]);
+  }, [finalizeConnect, t]);
 
   const isLoading =
     phase === "loading-qr" || phase === "scanning" || phase === "connecting";
@@ -152,12 +154,10 @@ export function WhatsappSetupView({
         </div>
         <div>
           <h3 className="text-[14px] font-semibold text-text-primary">
-            Connect Personal WhatsApp
+            {t("whatsappSetup.personalTitle")}
           </h3>
           <p className="text-[12px] text-text-muted mt-1 leading-relaxed">
-            Scan once with your phone to link WhatsApp Web. Direct messages stay
-            open, and group replies are enabled by default when the account is
-            mentioned.
+            {t("whatsappSetup.desc")}
           </p>
         </div>
       </div>
@@ -169,7 +169,7 @@ export function WhatsappSetupView({
               {isQrImageSource(qrUrl) ? (
                 <img
                   src={qrUrl}
-                  alt="WhatsApp QR code"
+                  alt={t("whatsappSetup.qrAlt")}
                   className="block w-[208px] h-[208px] object-contain"
                 />
               ) : (
@@ -178,25 +178,24 @@ export function WhatsappSetupView({
             </div>
             <div className="flex items-center gap-2 text-[12px] text-text-muted">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />
-              Waiting for WhatsApp scan
+              {t("whatsappSetup.waitingForScan")}
             </div>
             <p className="text-[11px] text-text-muted text-center max-w-xs leading-relaxed">
-              Open WhatsApp on your phone, then go to Linked Devices and scan
-              this QR code.
+              {t("whatsappSetup.scanHint")}
             </p>
           </div>
         ) : phase === "loading-qr" ? (
           <div className="flex flex-col items-center gap-3 py-8">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
             <span className="text-[12px] text-text-muted">
-              Preparing WhatsApp QR code
+              {t("whatsappSetup.preparingQr")}
             </span>
           </div>
         ) : phase === "connecting" ? (
           <div className="flex flex-col items-center gap-3 py-8">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
             <span className="text-[12px] text-text-muted">
-              Finishing WhatsApp connection
+              {t("whatsappSetup.finishingConnection")}
             </span>
           </div>
         ) : phase === "error" ? (
@@ -213,7 +212,7 @@ export function WhatsappSetupView({
               className="flex gap-1.5 items-center px-4 py-2 text-[12px] font-medium text-accent-fg rounded-lg bg-accent hover:bg-accent-hover transition-all"
             >
               <RefreshCw size={13} />
-              Retry
+              {t("whatsappSetup.retry")}
             </button>
           </div>
         ) : (
@@ -228,7 +227,7 @@ export function WhatsappSetupView({
               className="flex gap-1.5 items-center px-5 py-2.5 text-[13px] font-medium text-accent-fg rounded-lg bg-accent hover:bg-accent-hover transition-all disabled:opacity-60"
             >
               <QrCode size={14} />
-              Scan WhatsApp QR
+              {t("whatsappSetup.scanQr")}
             </button>
           </div>
         )}

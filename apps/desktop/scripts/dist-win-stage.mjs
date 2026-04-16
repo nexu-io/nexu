@@ -15,6 +15,10 @@ import {
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  getSlimclawRuntimeRoot,
+  resolveSlimclawRuntimeArtifacts,
+} from "@nexu/slimclaw";
 import { resolvePnpmCommand } from "./platforms/filesystem-compat.mjs";
 import { resolveBuildTargetPlatform } from "./platforms/platform-resolver.mjs";
 import { createPlatformCommandSpec } from "./platforms/process-compat.mjs";
@@ -526,7 +530,7 @@ async function ensureExistingBuildArtifacts() {
 }
 
 async function ensureExistingRuntimeInstall() {
-  const runtimePackageRoot = resolve(repoRoot, "openclaw-runtime");
+  const runtimePackageRoot = getSlimclawRuntimeRoot(repoRoot);
   const runtimeNodeModulesPath = resolve(runtimePackageRoot, "node_modules");
   const runtimePostinstallCachePath = resolve(
     runtimePackageRoot,
@@ -534,13 +538,19 @@ async function ensureExistingRuntimeInstall() {
   );
 
   await Promise.all([
-    ensureExistingPath(runtimeNodeModulesPath, "openclaw-runtime install"),
-    ensureExistingPath(runtimePostinstallCachePath, "openclaw-runtime cache"),
+    ensureExistingPath(runtimeNodeModulesPath, "slimclaw runtime install"),
+    ensureExistingPath(runtimePostinstallCachePath, "slimclaw runtime cache"),
   ]);
 }
 
 async function ensureExistingOpenclawSidecar(runtimeDistRoot, options = {}) {
   const openclawSidecarRoot = resolve(runtimeDistRoot, "openclaw");
+  const openclawArtifacts = resolveSlimclawRuntimeArtifacts(
+    openclawSidecarRoot,
+    {
+      requirePrepared: false,
+    },
+  );
 
   try {
     await ensureExistingPath(
@@ -559,10 +569,7 @@ async function ensureExistingOpenclawSidecar(runtimeDistRoot, options = {}) {
       resolve(openclawSidecarRoot, "package.json"),
       "openclaw sidecar package",
     ),
-    ensureExistingPath(
-      resolve(openclawSidecarRoot, "node_modules", "openclaw", "openclaw.mjs"),
-      "openclaw sidecar entry",
-    ),
+    ensureExistingPath(openclawArtifacts.entryPath, "openclaw sidecar entry"),
   ]);
 }
 
@@ -1107,7 +1114,7 @@ async function main() {
           (args.includes("@nexu/dev-utils") ||
             args.includes("@nexu/shared") ||
             args.includes("@nexu/controller"));
-        const isRuntimeInstallStep = args.includes("openclaw-runtime:install");
+        const isRuntimeInstallStep = args.includes("slimclaw:prepare");
 
         if (isBuildStep && shouldReuseExistingBuildArtifacts) {
           console.log(

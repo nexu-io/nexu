@@ -1,3 +1,4 @@
+import { formatChannelConnectErrorMessage } from "@/lib/channel-connect-errors";
 import { identify, track } from "@/lib/tracking";
 import {
   ExternalLink,
@@ -54,7 +55,12 @@ export function DingtalkSetupView({
       });
 
       if (error || !data) {
-        toast.error(error?.message ?? t("dingtalkSetup.connectFailed"));
+        toast.error(
+          formatChannelConnectErrorMessage(
+            error,
+            t("dingtalkSetup.connectFailed"),
+          ),
+        );
         return;
       }
 

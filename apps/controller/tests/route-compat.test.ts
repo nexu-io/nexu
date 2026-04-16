@@ -5,15 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ControllerContainer } from "../src/app/container.js";
 import { createApp } from "../src/app/create-app.js";
 import type { ControllerEnv } from "../src/app/env.js";
+import { ControlPlaneHealthService } from "../src/runtime/control-plane-health.js";
+import { CreditGuardStateWriter } from "../src/runtime/credit-guard-state-writer.js";
 import { OpenClawAuthProfilesStore } from "../src/runtime/openclaw-auth-profiles-store.js";
 import { OpenClawAuthProfilesWriter } from "../src/runtime/openclaw-auth-profiles-writer.js";
 import { OpenClawConfigWriter } from "../src/runtime/openclaw-config-writer.js";
 import { OpenClawProcessManager } from "../src/runtime/openclaw-process.js";
-import { OpenClawRuntimeModelWriter } from "../src/runtime/openclaw-runtime-model-writer.js";
-import { OpenClawRuntimePluginWriter } from "../src/runtime/openclaw-runtime-plugin-writer.js";
 import { OpenClawWatchTrigger } from "../src/runtime/openclaw-watch-trigger.js";
-import { RuntimeHealth } from "../src/runtime/runtime-health.js";
 import { SessionsRuntime } from "../src/runtime/sessions-runtime.js";
+import { OpenClawRuntimeModelWriter } from "../src/runtime/slimclaw-runtime-model-writer.js";
+import { OpenClawRuntimePluginWriter } from "../src/runtime/slimclaw-runtime-plugin-writer.js";
 import { createRuntimeState } from "../src/runtime/state.js";
 import { WorkspaceTemplateWriter } from "../src/runtime/workspace-template-writer.js";
 import { AgentService } from "../src/services/agent-service.js";
@@ -65,8 +66,14 @@ async function createTestContainer(
       ".openclaw",
       "nexu-runtime-model.json",
     ),
+    creditGuardStatePath: path.join(
+      rootDir,
+      ".openclaw",
+      "nexu-credit-guard-state.json",
+    ),
     skillhubCacheDir: path.join(rootDir, ".nexu", "skillhub-cache"),
     skillDbPath: path.join(rootDir, ".nexu", "skill-ledger.json"),
+    analyticsStatePath: path.join(rootDir, ".nexu", "analytics-state.json"),
     staticSkillsDir: undefined,
     platformTemplatesDir: undefined,
     openclawWorkspaceTemplatesDir: path.join(
@@ -84,6 +91,8 @@ async function createTestContainer(
     runtimeSyncIntervalMs: 2000,
     runtimeHealthIntervalMs: 5000,
     defaultModelId: "anthropic/claude-sonnet-4",
+    posthogApiKey: undefined,
+    posthogHost: undefined,
   };
 
   const configStore = new NexuConfigStore(env);
@@ -94,10 +103,10 @@ async function createTestContainer(
   const authProfilesWriter = new OpenClawAuthProfilesWriter(authProfilesStore);
   const runtimePluginWriter = new OpenClawRuntimePluginWriter(env);
   const runtimeModelWriter = new OpenClawRuntimeModelWriter(env);
+  const creditGuardStateWriter = new CreditGuardStateWriter(env);
   const templateWriter = new WorkspaceTemplateWriter(env);
   const watchTrigger = new OpenClawWatchTrigger(env);
   const sessionsRuntime = new SessionsRuntime(env);
-  const runtimeHealth = new RuntimeHealth(env);
   const openclawProcess = new OpenClawProcessManager(env);
   const runtimeState = createRuntimeState();
   const wsClient = {
@@ -108,6 +117,12 @@ async function createTestContainer(
     isConnected: () => false,
     request: vi.fn(),
   } as never);
+  const controlPlaneHealth = new ControlPlaneHealthService(
+    gatewayService,
+    wsClient,
+    runtimeState,
+    openclawProcess,
+  );
   const openclawSyncService = new OpenClawSyncService(
     env,
     configStore,
@@ -117,6 +132,7 @@ async function createTestContainer(
     authProfilesStore,
     runtimePluginWriter,
     runtimeModelWriter,
+    creditGuardStateWriter,
     templateWriter,
     watchTrigger,
     gatewayService,
@@ -155,7 +171,7 @@ async function createTestContainer(
     gatewayClient: {
       fetchJson: vi.fn(),
     } as unknown as ControllerContainer["gatewayClient"],
-    runtimeHealth,
+    controlPlaneHealth,
     openclawProcess,
     agentService: new AgentService(configStore, openclawSyncService),
     channelService: new ChannelService(
@@ -164,7 +180,7 @@ async function createTestContainer(
       openclawSyncService,
       gatewayService,
       openclawProcess,
-      runtimeHealth,
+      controlPlaneHealth,
       wsClient,
     ),
     channelFallbackService,

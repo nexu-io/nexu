@@ -1,0 +1,30 @@
+name: Developer Pull Request Notification
+
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Notify Developer Feishu
+    if: ${{ github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/notify
+
+      - name: Send developer PR notification
+        env:
+          WEBHOOK_URL: ${{ secrets.NOTIFY_DEVELOPER_FEISHU_WEBHOOK }}
+          EVENT_KIND: pr
+          TITLE: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          LABELS_OR_CATEGORY: ${{ join(github.event.pull_request.labels.*.name, ', ') }}
+          REPO: ${{ github.repository }}
+        run: node scripts/notify/developer-notify.mjs

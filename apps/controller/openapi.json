@@ -1038,23 +1038,49 @@
                     "ready": {
                       "type": "boolean"
                     },
+                    "coreReady": {
+                      "type": "boolean"
+                    },
+                    "degraded": {
+                      "type": "boolean"
+                    },
+                    "bootPhase": {
+                      "type": "string",
+                      "enum": [
+                        "preparing",
+                        "starting-managed-runtime",
+                        "attaching-external-runtime",
+                        "reconciling-runtime",
+                        "stabilizing-runtime",
+                        "ready"
+                      ]
+                    },
                     "workspacePath": {
                       "type": "string"
                     },
-                    "runtime": {
+                    "controlPlane": {
                       "type": "object",
                       "properties": {
                         "ok": {
                           "type": "boolean"
                         },
-                        "status": {
-                          "type": "number",
-                          "nullable": true
+                        "phase": {
+                          "type": "string",
+                          "enum": [
+                            "disconnected",
+                            "connecting",
+                            "ready",
+                            "degraded"
+                          ]
+                        },
+                        "wsConnected": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
                         "ok",
-                        "status"
+                        "phase",
+                        "wsConnected"
                       ]
                     },
                     "status": {
@@ -1069,8 +1095,11 @@
                   },
                   "required": [
                     "ready",
+                    "coreReady",
+                    "degraded",
+                    "bootPhase",
                     "workspacePath",
-                    "runtime",
+                    "controlPlane",
                     "status"
                   ]
                 }
@@ -4962,7 +4991,7 @@
               }
             }
           },
-          "409": {
+          "422": {
             "description": "Invalid credentials",
             "content": {
               "application/json": {
@@ -4971,10 +5000,192 @@
                   "properties": {
                     "message": {
                       "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
                     }
                   },
                   "required": [
-                    "message"
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Local persistence or runtime sync failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Upstream timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "already_connected",
+                        "app_id_mismatch",
+                        "invalid_credentials",
+                        "network_error",
+                        "proxy_error",
+                        "sync_failed",
+                        "timeout",
+                        "upstream_http_error"
+                      ]
+                    },
+                    "requestId": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "phase": {
+                      "type": "string",
+                      "enum": [
+                        "verify_credentials",
+                        "verify_app",
+                        "persist_config",
+                        "sync_runtime"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "code",
+                    "requestId",
+                    "retryable",
+                    "phase"
                   ]
                 }
               }
@@ -10389,6 +10600,8 @@
                             "enum": [
                               "skill_not_found",
                               "rate_limit",
+                              "npm_missing",
+                              "deps_install_failed",
                               "unknown"
                             ]
                           },
@@ -10831,6 +11044,16 @@
                     },
                     "error": {
                       "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "skill_not_found",
+                        "rate_limit",
+                        "npm_missing",
+                        "deps_install_failed",
+                        "unknown"
+                      ]
                     }
                   },
                   "required": [
@@ -10841,25 +11064,34 @@
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Import rejected or failed",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        false
-                      ]
+                      "type": "boolean"
+                    },
+                    "slug": {
+                      "type": "string"
                     },
                     "error": {
                       "type": "string"
+                    },
+                    "errorCode": {
+                      "type": "string",
+                      "enum": [
+                        "skill_not_found",
+                        "rate_limit",
+                        "npm_missing",
+                        "deps_install_failed",
+                        "unknown"
+                      ]
                     }
                   },
                   "required": [
-                    "ok",
-                    "error"
+                    "ok"
                   ]
                 }
               }

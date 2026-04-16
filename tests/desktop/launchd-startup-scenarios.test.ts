@@ -15,6 +15,17 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const mockSlimclawRuntimeRoot =
+  "/repo/packages/slimclaw/.dist-runtime/openclaw";
+
+function buildRuntimeArtifacts(runtimeRoot: string) {
+  return {
+    entryPath: `${runtimeRoot}/node_modules/openclaw/openclaw.mjs`,
+    binPath: `${runtimeRoot}/bin/openclaw`,
+    builtinExtensionsDir: `${runtimeRoot}/node_modules/openclaw/extensions`,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -139,6 +150,30 @@ vi.mock("../../apps/desktop/shared/workspace-paths", () => ({
   getWorkspaceRoot: vi.fn(() => "/repo"),
 }));
 
+vi.mock("@nexu/slimclaw", () => ({
+  getSlimclawRuntimeRoot: vi.fn(() => mockSlimclawRuntimeRoot),
+  resolveSlimclawRuntimePaths: vi.fn(() => ({
+    runtimeRoot: mockSlimclawRuntimeRoot,
+    descriptorPath: "/repo/.tmp/slimclaw/runtime-descriptor.json",
+    descriptor: {
+      version: 1,
+      fingerprint: "test-fingerprint",
+      preparedAt: new Date(0).toISOString(),
+      openclawVersion: "1.0.0",
+      relativeTo: "runtimeRoot",
+      paths: {
+        entryPath: "node_modules/openclaw/openclaw.mjs",
+        binPath: "bin/openclaw",
+        builtinExtensionsDir: "node_modules/openclaw/extensions",
+      },
+    },
+    ...buildRuntimeArtifacts(mockSlimclawRuntimeRoot),
+  })),
+  resolveSlimclawRuntimeArtifacts: vi.fn((runtimeRoot: string) =>
+    buildRuntimeArtifacts(runtimeRoot),
+  ),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -154,19 +189,19 @@ function makeBootstrapEnv(
     webRoot: "/repo/apps/web/dist",
     nodePath: "/usr/local/bin/node",
     controllerEntryPath: "/repo/apps/controller/dist/index.js",
-    openclawPath: "/repo/openclaw-runtime/node_modules/openclaw/openclaw.mjs",
+    openclawPath: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/openclaw.mjs`,
     openclawConfigPath: "/tmp/state/openclaw.json",
     openclawStateDir: "/tmp/state",
     controllerCwd: "/repo/apps/controller",
-    openclawCwd: "/repo",
+    openclawCwd: mockSlimclawRuntimeRoot,
     nexuHome: "/tmp/nexu-home",
     plistDir: "/tmp/test-plist",
     webUrl: "http://127.0.0.1:50810",
     openclawSkillsDir: "/tmp/state/skills",
     skillhubStaticSkillsDir: "/repo/apps/desktop/static/bundled-skills",
     platformTemplatesDir: "/repo/apps/controller/static/platform-templates",
-    openclawBinPath: "/repo/openclaw-runtime/bin/openclaw",
-    openclawExtensionsDir: "/repo/node_modules/openclaw/extensions",
+    openclawBinPath: `${mockSlimclawRuntimeRoot}/bin/openclaw`,
+    openclawExtensionsDir: `${mockSlimclawRuntimeRoot}/node_modules/openclaw/extensions`,
     skillNodePath: "/repo/apps/desktop/node_modules",
     openclawTmpDir: "/tmp/state/tmp",
     proxyEnv: {
@@ -188,6 +223,14 @@ function makeRuntimePorts(overrides?: Record<string, unknown>) {
     isDev: true,
     ...overrides,
   });
+}
+
+function createReadyFetchResponse(ready = true) {
+  return {
+    status: ready ? 200 : 503,
+    ok: ready,
+    json: async () => ({ ready }),
+  };
 }
 
 function mockRunningService(env?: Record<string, string>): {
@@ -253,7 +296,7 @@ describe("Launchd Startup Scenarios", () => {
     // Controller readiness probe succeeds
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 200, ok: true }),
+      vi.fn().mockResolvedValue(createReadyFetchResponse()),
     );
   });
 
@@ -305,7 +348,7 @@ describe("Launchd Startup Scenarios", () => {
     // Health probes: controller HTTP ok, openclaw port listening
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ status: 200, ok: true }),
+      vi.fn().mockResolvedValue(createReadyFetchResponse()),
     );
 
     const { bootstrapWithLaunchd } = await import(
@@ -337,15 +380,17 @@ describe("Launchd Startup Scenarios", () => {
       mockRunningService({ NEXU_HOME: "/tmp/nexu-home", PORT: "50800" }),
     );
 
-    // Controller health probe FAILS
+    // Controller readiness probe fails on attach, then succeeds after recovery
+    let readyAttempt = 0;
     vi.stubGlobal(
       "fetch",
       vi.fn((input: string | URL) => {
         const url = String(input);
-        if (url.includes("/health")) {
-          return Promise.reject(new Error("ECONNREFUSED"));
+        if (url.includes("/api/internal/desktop/ready")) {
+          readyAttempt++;
+          return Promise.resolve(createReadyFetchResponse(readyAttempt >= 2));
         }
-        return Promise.resolve({ status: 200, ok: true });
+        return Promise.resolve(createReadyFetchResponse());
       }),
     );
 
@@ -1203,7 +1248,7 @@ describe("Launchd Startup Scenarios", () => {
         if (cmd === "pgrep" && args[0] === "-f") {
           if (
             args[1]?.includes(
-              "openclaw-runtime/node_modules/openclaw/openclaw\\.mjs",
+              "\\.tmp/slimclaw/dev-runtime/node_modules/openclaw/openclaw\\.mjs",
             )
           ) {
             callback(null, { stdout: "77777\n", stderr: "" });
@@ -1620,10 +1665,23 @@ describe("Launchd Startup Scenarios", () => {
         if (url.includes("/api/internal/desktop/ready")) {
           readyAttempts++;
           if (readyAttempts < 3) {
-            return Promise.resolve({ ok: false, status: 503 });
+            return Promise.resolve({
+              ok: false,
+              status: 503,
+              json: async () => ({ ready: false }),
+            });
           }
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ ready: true }),
+          });
         }
-        return Promise.resolve({ ok: true, status: 200 });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ready: true }),
+        });
       }),
     );
 

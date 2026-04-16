@@ -11,10 +11,12 @@ import type { CreditGuardStateWriter } from "../runtime/credit-guard-state-write
 import type { OpenClawAuthProfilesStore } from "../runtime/openclaw-auth-profiles-store.js";
 import type { OpenClawAuthProfilesWriter } from "../runtime/openclaw-auth-profiles-writer.js";
 import type { OpenClawConfigWriter } from "../runtime/openclaw-config-writer.js";
-import type { OpenClawRuntimeModelWriter } from "../runtime/openclaw-runtime-model-writer.js";
-import { resolveNoModelConfiguredMessage } from "../runtime/openclaw-runtime-model-writer.js";
-import type { OpenClawRuntimePluginWriter } from "../runtime/openclaw-runtime-plugin-writer.js";
 import type { OpenClawWatchTrigger } from "../runtime/openclaw-watch-trigger.js";
+import {
+  type OpenClawRuntimeModelWriter,
+  resolveNoModelConfiguredMessage,
+} from "../runtime/slimclaw-runtime-model-writer.js";
+import type { OpenClawRuntimePluginWriter } from "../runtime/slimclaw-runtime-plugin-writer.js";
 import type { WorkspaceTemplateWriter } from "../runtime/workspace-template-writer.js";
 import type { CompiledOpenClawStore } from "../store/compiled-openclaw-store.js";
 import type { NexuConfigStore } from "../store/nexu-config-store.js";
@@ -106,12 +108,15 @@ function resolveAvailableRuntimeModel(
 }
 
 export class OpenClawSyncService {
-  private pendingSync: Promise<{ configPushed: boolean }> | null = null;
+  private pendingSync: Promise<{
+    configPushed: boolean;
+    configChanged: boolean;
+  }> | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private settling = false;
   private settlingDirty = false;
   private settlingResolvers: Array<{
-    resolve: (v: { configPushed: boolean }) => void;
+    resolve: (v: { configPushed: boolean; configChanged: boolean }) => void;
     reject: (e: unknown) => void;
   }> = [];
   private static readonly DEBOUNCE_MS = 100;
@@ -200,7 +205,9 @@ export class OpenClawSyncService {
       );
     } else {
       logger.info({}, "sync settling ended — no deferred changes");
-      for (const r of resolvers) r.resolve({ configPushed: false });
+      for (const r of resolvers) {
+        r.resolve({ configPushed: false, configChanged: false });
+      }
     }
   }
 
@@ -209,7 +216,7 @@ export class OpenClawSyncService {
    * execution. During settling mode (startup), calls are deferred
    * entirely and flushed once at the end.
    */
-  async syncAll(): Promise<{ configPushed: boolean }> {
+  async syncAll(): Promise<{ configPushed: boolean; configChanged: boolean }> {
     if (this.settling) {
       this.settlingDirty = true;
       logger.debug({}, "syncAll deferred (settling mode)");
@@ -242,7 +249,10 @@ export class OpenClawSyncService {
    * Immediate sync bypassing debounce and settling.
    * Used during bootstrap where we need the config written before OpenClaw starts.
    */
-  async syncAllImmediate(): Promise<{ configPushed: boolean }> {
+  async syncAllImmediate(): Promise<{
+    configPushed: boolean;
+    configChanged: boolean;
+  }> {
     return this.doSync();
   }
 
@@ -265,7 +275,10 @@ export class OpenClawSyncService {
     await this.templateWriter.write([{ id: botId, status: "active" }]);
   }
 
-  private async doSync(): Promise<{ configPushed: boolean }> {
+  private async doSync(): Promise<{
+    configPushed: boolean;
+    configChanged: boolean;
+  }> {
     const seq = ++this.syncCounter;
     const config = await this.configStore.getConfig();
     const oauthState = await this.authProfilesStore.getOAuthConnectionState();
@@ -340,8 +353,7 @@ export class OpenClawSyncService {
     }
 
     // 2. Always write files once (persistence + watcher hot-reload path).
-
-    await this.configWriter.write(compiled);
+    const configChanged = await this.configWriter.write(compiled);
     await this.authProfilesWriter.writeForAgents(
       compiled,
       config.models.providers,
@@ -405,8 +417,8 @@ export class OpenClawSyncService {
     }
     this.lastSkillAllowlist = this.extractSkillAllowlist(compiled);
 
-    logger.info({ seq, configPushed }, "doSync: complete");
-    return { configPushed };
+    logger.info({ seq, configPushed, configChanged }, "doSync: complete");
+    return { configPushed, configChanged };
   }
 
   private extractSkillAllowlist(

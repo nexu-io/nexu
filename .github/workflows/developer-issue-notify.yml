@@ -1,0 +1,39 @@
+name: Developer Issue Notification
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Notify Developer Feishu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.NEXU_PAL_APP_ID }}
+          private-key: ${{ secrets.NEXU_PAL_PRIVATE_KEY_PEM }}
+
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/notify
+
+      - name: Send developer issue notification
+        env:
+          WEBHOOK_URL: ${{ secrets.NOTIFY_DEVELOPER_FEISHU_WEBHOOK }}
+          EVENT_KIND: issue
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          TITLE: ${{ github.event.issue.title }}
+          URL: ${{ github.event.issue.html_url }}
+          NUMBER: ${{ github.event.issue.number }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+          BODY: ${{ github.event.issue.body }}
+          LABELS_OR_CATEGORY: ${{ join(github.event.issue.labels.*.name, ', ') }}
+          REPO: ${{ github.repository }}
+        run: node scripts/notify/developer-notify.mjs

@@ -62,7 +62,7 @@
 `apps/desktop/scripts/dist-mac.mjs` 每次打包都会：
 
 - build shared/controller/web/desktop
-- 执行 `openclaw-runtime:install`
+- 执行 `slimclaw:prepare`
 - 执行 `prepare-runtime-sidecars --release`
 - 清空 `release/` 和 `.dist-runtime/`
 

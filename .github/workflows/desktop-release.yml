@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('openclaw-runtime/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
+          key: desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('packages/slimclaw/runtime-seed/package-lock.json', 'apps/controller/static/runtime-plugins/openclaw-weixin/package-lock.json') }}
           restore-keys: |
             desktop-npm-cache-${{ runner.os }}-${{ matrix.arch }}-
             desktop-npm-cache-${{ runner.os }}-

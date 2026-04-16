@@ -2,10 +2,11 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSlimclawRuntimeRoot } from "@nexu/slimclaw";
 
 const smokeDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(smokeDir, "..");
-const openclawRuntimeRoot = resolve(repoRoot, "openclaw-runtime");
+const openclawRuntimeRoot = getSlimclawRuntimeRoot(repoRoot);
 const desktopConfigPath = resolve(
   repoRoot,
   ".tmp/desktop/electron/user-data/runtime/openclaw/config/openclaw.json",

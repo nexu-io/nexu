@@ -121,8 +121,8 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
-  # ── openclaw-runtime lockfile sync ─────────────────────────────────────────
-  openclaw-runtime-lockfile:
+  # ── slimclaw runtime-seed lockfile sync ────────────────────────────────────
+  slimclaw-runtime-seed-lockfile:
     runs-on: ubuntu-latest
 
     steps:
@@ -134,9 +134,9 @@ jobs:
         with:
           node-version: 24
 
-      - name: Verify openclaw-runtime lockfile is in sync
+      - name: Verify slimclaw runtime-seed lockfile is in sync
         run: corepack npm ci --ignore-scripts --no-audit --no-fund
-        working-directory: openclaw-runtime
+        working-directory: packages/slimclaw/runtime-seed
 
   # ── Build + ESM check ─────────────────────────────────────────────────────
   build:

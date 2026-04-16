@@ -10,8 +10,11 @@ const maxHealthAttemptsByMode = {
   dist: 90,
 };
 const probeTimeoutMs = 5_000;
-const requiredDiagnosticsUnitIds = ["controller", "openclaw"];
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
+function getRequiredDiagnosticsUnitIds(mode) {
+  return mode === "dev" ? ["openclaw"] : ["controller", "openclaw"];
+}
 
 function createCommandSpec(command, args) {
   if (
@@ -731,7 +734,9 @@ function diagnosticsChecksPassed(diagnostics, webOrigin, portConfig) {
   }
 
   const webSurfaceWebview = getLatestWebSurfaceWebview(diagnostics, webOrigin);
-  const requiredUnitsRunning = requiredDiagnosticsUnitIds.every((unitId) => {
+  const requiredUnitsRunning = getRequiredDiagnosticsUnitIds(
+    diagnostics.isPackaged === true ? "dist" : "dev",
+  ).every((unitId) => {
     const unit = getDiagnosticsUnit(diagnostics, unitId);
     if (!unit) {
       return false;
@@ -812,6 +817,10 @@ function collectDiagnosticsFailures(diagnostics, webOrigin, portConfig) {
   }
 
   const failures = [];
+  const requiredDiagnosticsUnitIds = getRequiredDiagnosticsUnitIds(
+    diagnostics.isPackaged === true ? "dist" : "dev",
+  );
+
   if (diagnostics.coldStart?.status !== "succeeded") {
     failures.push(
       `cold start status=${String(diagnostics.coldStart?.status ?? "unknown")}`,

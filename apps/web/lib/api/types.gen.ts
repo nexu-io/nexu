@@ -423,10 +423,14 @@ export type GetApiInternalDesktopReadyResponses = {
      */
     200: {
         ready: boolean;
+        coreReady: boolean;
+        degraded: boolean;
+        bootPhase: 'preparing' | 'starting-managed-runtime' | 'attaching-external-runtime' | 'reconciling-runtime' | 'stabilizing-runtime' | 'ready';
         workspacePath: string;
-        runtime: {
+        controlPlane: {
             ok: boolean;
-            status: number;
+            phase: 'disconnected' | 'connecting' | 'ready' | 'degraded';
+            wsConnected: boolean;
         };
         status: 'active' | 'starting' | 'degraded' | 'unhealthy';
     };
@@ -1617,8 +1621,42 @@ export type PostApiV1ChannelsDingtalkConnectErrors = {
     /**
      * Invalid credentials
      */
-    409: {
+    422: {
         message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Upstream request failed
+     */
+    502: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Local persistence or runtime sync failed
+     */
+    503: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
+    };
+    /**
+     * Upstream timeout
+     */
+    504: {
+        message: string;
+        code: 'already_connected' | 'app_id_mismatch' | 'invalid_credentials' | 'network_error' | 'proxy_error' | 'sync_failed' | 'timeout' | 'upstream_http_error';
+        requestId: string;
+        retryable: boolean;
+        phase: 'verify_credentials' | 'verify_app' | 'persist_config' | 'sync_runtime';
     };
 };
 
@@ -3529,7 +3567,7 @@ export type GetApiV1SkillhubCatalogResponses = {
             status: 'queued' | 'downloading' | 'installing-deps' | 'done' | 'failed';
             position: number;
             error: string;
-            errorCode: 'skill_not_found' | 'rate_limit' | 'unknown';
+            errorCode: 'skill_not_found' | 'rate_limit' | 'npm_missing' | 'deps_install_failed' | 'unknown';
             retries: number;
             enqueuedAt: string;
         }>;
@@ -3687,11 +3725,13 @@ export type PostApiV1SkillhubImportData = {
 
 export type PostApiV1SkillhubImportErrors = {
     /**
-     * Bad request
+     * Import rejected or failed
      */
     400: {
-        ok: false;
-        error: string;
+        ok: boolean;
+        slug?: string;
+        error?: string;
+        errorCode?: 'skill_not_found' | 'rate_limit' | 'npm_missing' | 'deps_install_failed' | 'unknown';
     };
 };
 
@@ -3705,6 +3745,7 @@ export type PostApiV1SkillhubImportResponses = {
         ok: boolean;
         slug?: string;
         error?: string;
+        errorCode?: 'skill_not_found' | 'rate_limit' | 'npm_missing' | 'deps_install_failed' | 'unknown';
     };
 };
 

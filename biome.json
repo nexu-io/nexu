@@ -54,7 +54,7 @@
       "apps/controller/static/runtime-plugins/**",
       "apps/web/public/skill-translations-zh.json",
       "apps/api/migrations/meta/*.json",
-      "openclaw-runtime-patches/**",
+      "packages/slimclaw/runtime-patches/**",
       "*.gen.ts",
       "*.d.ts",
       "openapi.json",

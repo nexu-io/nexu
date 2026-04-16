@@ -146,7 +146,7 @@ function logChannelConnectFailure(
   container: ControllerContainer,
   input: {
     requestId: string;
-    channel: "discord" | "telegram";
+    channel: "discord" | "telegram" | "dingtalk";
     locale: ControllerLocale;
     error: unknown;
   },
@@ -203,16 +203,16 @@ function logChannelConnectFailure(
     "channel_connect_failure",
   );
 
-  void container.runtimeHealth
+  void container.controlPlaneHealth
     .probe({ timeoutMs: 1500 })
-    .then((runtimeHealth) => {
+    .then((controlPlaneHealth) => {
       logger.warn(
         {
           requestId: input.requestId,
           channel: input.channel,
           errorCode: response.body.code,
           errorPhase: response.body.phase,
-          runtimeHealth,
+          controlPlaneHealth,
           process: {
             nodeVersion: process.version,
             platform: process.platform,
@@ -538,9 +538,29 @@ export function registerChannelRoutes(
           content: { "application/json": { schema: channelResponseSchema } },
           description: "Connected dingtalk channel",
         },
-        409: {
-          content: { "application/json": { schema: errorSchema } },
+        422: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
           description: "Invalid credentials",
+        },
+        502: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Upstream request failed",
+        },
+        503: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Local persistence or runtime sync failed",
+        },
+        504: {
+          content: {
+            "application/json": { schema: channelConnectErrorSchema },
+          },
+          description: "Upstream timeout",
         },
       },
     }),
@@ -551,19 +571,15 @@ export function registerChannelRoutes(
           200,
         );
       } catch (error) {
-        logger.error(
-          { error: error instanceof Error ? error.message : String(error) },
-          "channel_connect_error_dingtalk",
-        );
-        return c.json(
-          {
-            message:
-              error instanceof Error
-                ? error.message
-                : "DingTalk connect failed",
-          },
-          409,
-        );
+        const requestId = c.get("requestId");
+        const locale = await getControllerLocale(container);
+        const response = logChannelConnectFailure(container, {
+          requestId,
+          channel: "dingtalk",
+          locale,
+          error,
+        });
+        return c.json(response.body, response.status);
       }
     },
   );

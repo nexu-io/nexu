@@ -28,10 +28,10 @@ playwright-report/
 .worktrees/
 .ralph/
 *.p8
-openclaw-runtime/.postinstall-cache.json
 apps/desktop/release/
 apps/desktop/.dist-runtime/
 apps/controller/.dist-runtime/
+packages/slimclaw/.dist-runtime/
 apps/desktop/.cache/
 apps/desktop/build-config.json
 .claude/settings.local.json

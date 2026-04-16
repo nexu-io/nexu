@@ -33,7 +33,7 @@ Nexu 开源共创招募中，欢迎一起来写代码、拿积分、上榜单。
 - **Git**
 - **Node.js** 24+（推荐 LTS；通过 `package.json` 中 `engines` 强制）
 - **pnpm** 10.26+（仓库通过 `packageManager` 固定为 `pnpm@10.26.0`）
-- **npm** 11+（`openclaw-runtime` 维护流程需要）
+- **npm** 11+（仓库内 OpenClaw runtime 维护流程需要）
 
 ### 克隆与安装
 
