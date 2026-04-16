@@ -64,8 +64,11 @@
 
 작업 선택하기: [Good First Issue 목록](https://github.com/nexu-io/nexu/labels/good-first-issue)
 
-## nexu Discord 기여자 교류 그룹 참여 💬
+## 커뮤니티 참여 💬
 
 혼자 연구하는 것보다 함께 이야기하는 것이 낫습니다. 그룹에는 메인테이너와 경험 많은 기여자가 있습니다. 참여해서 첫 기여에 대해 이야기해 보세요 👇
 
 👉 [nexu Discord 참여](https://discord.gg/vMrySTJW8u)
+👉 [nexu Feishu 그룹 참여](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=bd9j6550-d1ee-41e6-8bbb-7e735ae88ba2)
+
+<img src="/feishu-contributor-qr.png" width="200" alt="nexu Feishu 기여자 그룹" />

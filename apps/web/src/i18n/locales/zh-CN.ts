@@ -678,6 +678,9 @@ const zhCN = {
   "channels.confirmResetBody":
     "这将移除你当前的 {{platform}} Bot 配置。在重新配置之前，nexu 将无法接收来自此平台的消息。",
   "channels.cancel": "取消",
+  "channels.confirmDisconnect": "确认断开",
+  "channels.confirmDisconnectDesc": "{{platform}} 将被断开连接。",
+  "channels.confirmDisconnectBody": "在重新连接之前，你将无法接收或发送消息。",
   "channels.quotaTitle": "当前需求量较大",
   "channels.quotaBody": "新的 Bot 配置将在 {{countdown}} 后可用。请稍后重试。",
 

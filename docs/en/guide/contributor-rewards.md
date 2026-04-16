@@ -64,8 +64,11 @@ These tasks are typically smaller in scope, more focused, and more suitable for 
 
 Go pick one: [Good First Issue List](https://github.com/nexu-io/nexu/labels/good-first-issue)
 
-## Join the nexu Discord Contributor Group 💬
+## Join the Community 💬
 
 It's better to chat with a group than figure things out alone. The group includes maintainers and experienced contributors — join us and talk about your first contribution 👇
 
 👉 [Join nexu Discord](https://discord.gg/vMrySTJW8u)
+👉 [Join nexu Feishu Group](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=bd9j6550-d1ee-41e6-8bbb-7e735ae88ba2)
+
+<img src="/feishu-contributor-qr.png" width="200" alt="nexu Feishu Contributor Group" />

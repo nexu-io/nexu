@@ -1,0 +1,59 @@
+name: Community Content Push
+
+on:
+  schedule:
+    - cron: "0 1 * * 1-5"   # 技术资讯 — 工作日北京 9:00
+    - cron: "0 4 * * 1-5"   # 技术生态 — 工作日北京 12:00
+    - cron: "0 12 * * 1-5"  # AI 产品榜单 — 工作日北京 20:00
+    - cron: "0 10 * * 5"    # 周报 — 周五北京 18:00
+    - cron: "0 2 * * 0,6"   # Weekend Pick — 周末北京 10:00
+  workflow_dispatch:
+    inputs:
+      theme:
+        description: "Content theme to push"
+        required: true
+        type: choice
+        options:
+          - tech-news
+          - tech-eco
+          - ai-products
+          - weekly
+          - weekend
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    name: Generate and Push Content
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/notify
+
+      - name: Resolve content theme
+        id: theme
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "theme=${{ inputs.theme }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              "0 1 * * 1-5")   echo "theme=tech-news" >> "$GITHUB_OUTPUT" ;;
+              "0 4 * * 1-5")   echo "theme=tech-eco" >> "$GITHUB_OUTPUT" ;;
+              "0 12 * * 1-5")  echo "theme=ai-products" >> "$GITHUB_OUTPUT" ;;
+              "0 10 * * 5")    echo "theme=weekly" >> "$GITHUB_OUTPUT" ;;
+              "0 2 * * 0,6")   echo "theme=weekend" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: Generate and send content
+        env:
+          CONTENT_THEME: ${{ steps.theme.outputs.theme }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.COMMUNITY_CONTENT_FEISHU_WEBHOOK }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.COMMUNITY_CONTENT_DISCORD_WEBHOOK }}
+          LLM_API_BASE: ${{ secrets.LITELLM_ENDPOINT }}
+          LLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
+          LLM_MODEL: anthropic/claude-sonnet-4
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/notify/daily-content-bot.mjs

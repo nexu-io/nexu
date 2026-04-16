@@ -27,7 +27,7 @@ const { SkillDb } = await import("../src/services/skillhub/skill-db.js");
 
 function stubExtractTo(
   slug: string,
-  skillsDir: string,
+  _skillsDir: string,
   opts: { withPackageJson?: boolean } = {},
 ) {
   vi.mocked(extractZipMock).mockImplementationOnce(

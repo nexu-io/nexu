@@ -1278,3 +1278,7 @@ const en = {
 } as const;
 
 export default en;
+  "channels.confirmDisconnect": "Confirm disconnect",
+  "channels.confirmDisconnectDesc": "{{platform}} will be disconnected.",
+  "channels.confirmDisconnectBody":
+    "You will not be able to receive or send messages until reconnected.",
