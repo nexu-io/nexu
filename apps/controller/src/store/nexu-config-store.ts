@@ -244,10 +244,15 @@ function readDesktopCloudSessions(
   );
 }
 
-function readDesktopLocale(config: NexuConfig): "en" | "zh-CN" | null {
+function readDesktopLocale(
+  config: NexuConfig,
+): "en" | "zh-CN" | "zh-TW" | null {
   const desktop = config.desktop as Record<string, unknown>;
   if (desktop.locale === "zh-CN") {
     return "zh-CN";
+  }
+  if (desktop.locale === "zh-TW") {
+    return "zh-TW";
   }
   if (desktop.locale === "en") {
     return "en";
@@ -2024,16 +2029,18 @@ export class NexuConfigStore {
     return this.getDesktopRewardsStatus();
   }
 
-  async getStoredDesktopLocale(): Promise<"en" | "zh-CN" | null> {
+  async getStoredDesktopLocale(): Promise<"en" | "zh-CN" | "zh-TW" | null> {
     const config = await this.getConfig();
     return readDesktopLocale(config);
   }
 
-  async getDesktopLocale(): Promise<"en" | "zh-CN"> {
+  async getDesktopLocale(): Promise<"en" | "zh-CN" | "zh-TW"> {
     return (await this.getStoredDesktopLocale()) ?? "en";
   }
 
-  async setDesktopLocale(locale: "en" | "zh-CN"): Promise<"en" | "zh-CN"> {
+  async setDesktopLocale(
+    locale: "en" | "zh-CN" | "zh-TW",
+  ): Promise<"en" | "zh-CN" | "zh-TW"> {
     await this.store.update((config) => ({
       ...config,
       desktop: {

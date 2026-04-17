@@ -11,12 +11,14 @@ export interface OpenClawRuntimeModelState {
 }
 
 const RUNTIME_MODEL_FALLBACK = "anthropic/claude-opus-4-6";
-export type NoModelMessageLocale = "en" | "zh-CN";
+export type NoModelMessageLocale = "en" | "zh-CN" | "zh-TW";
 
 const NO_MODEL_CONFIGURED_MESSAGES: Record<NoModelMessageLocale, string> = {
   en: "No model is available right now. Please sign in to your Nexu Official account, or add your own API key or OAuth provider under Settings → Models to enable a model.",
   "zh-CN":
     "当前没有可用的模型。请登录 Nexu 官方账号，或在 设置 → 模型 中配置您自己的 API Key 或 OAuth 服务商以启用模型。",
+  "zh-TW":
+    "當前沒有可用的模型。請登入 Nexu 官方帳號，或在「設定 → 模型」中設定你自己的 API Key 或 OAuth 服務商以啟用模型。",
 };
 
 export const NO_MODEL_CONFIGURED_MESSAGE = NO_MODEL_CONFIGURED_MESSAGES.en;

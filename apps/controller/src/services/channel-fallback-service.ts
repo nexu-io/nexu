@@ -50,7 +50,7 @@ export interface ChannelFallbackMessageSender {
 }
 
 export interface ChannelFallbackLocaleProvider {
-  getLocale(): Promise<"en" | "zh-CN"> | "en" | "zh-CN";
+  getLocale(): Promise<"en" | "zh-CN" | "zh-TW"> | "en" | "zh-CN" | "zh-TW";
 }
 
 export class ChannelFallbackService {
@@ -203,7 +203,7 @@ export class ChannelFallbackService {
     const template = selectFallbackTemplate(
       adapter.getTemplateMap() as Record<
         FallbackErrorCode,
-        Partial<Record<"en" | "zh-CN", string>>
+        Partial<Record<"en" | "zh-CN" | "zh-TW", string>>
       >,
       normalized.errorCode as FallbackErrorCode,
       lang,

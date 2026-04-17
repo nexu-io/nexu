@@ -13,7 +13,7 @@ import {
   patchApiInternalDesktopPreferences,
 } from "../../lib/api/sdk.gen";
 
-export type Locale = "en" | "zh";
+export type Locale = "en" | "zh-CN" | "zh-TW";
 
 interface LocaleCtx {
   locale: Locale;
@@ -26,12 +26,20 @@ const STORAGE_KEY = "nexu_locale";
 function detectDefault(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "zh") return stored;
+    if (stored === "en" || stored === "zh-CN" || stored === "zh-TW") {
+      return stored;
+    }
+    if (stored === "zh") {
+      return "zh-CN";
+    }
   } catch {
     /* ignore */
   }
   const lang = navigator.language || "";
-  return lang.startsWith("zh") ? "zh" : "en";
+  if (/^zh-(TW|HK|MO)$/i.test(lang) || /Hant/i.test(lang)) {
+    return "zh-TW";
+  }
+  return lang.startsWith("zh") ? "zh-CN" : "en";
 }
 
 const LocaleContext = createContext<LocaleCtx>({
@@ -49,7 +57,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const userInteractedRef = useRef(false);
 
   useEffect(() => {
-    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+    document.documentElement.lang = locale;
   }, [locale]);
 
   useEffect(() => {
@@ -94,7 +102,7 @@ export function useLocale() {
 async function syncDesktopLocale(locale: Locale): Promise<void> {
   await patchApiInternalDesktopPreferences({
     body: {
-      locale: locale === "zh" ? "zh-CN" : "en",
+      locale,
     },
   }).catch(() => {
     // Best-effort sync only; local UI language should still work offline.
@@ -118,8 +126,12 @@ async function bootstrapLocale(
     return;
   }
 
-  if (storedLocale === "en" || storedLocale === "zh-CN") {
-    const nextLocale = storedLocale === "zh-CN" ? "zh" : "en";
+  if (
+    storedLocale === "en" ||
+    storedLocale === "zh-CN" ||
+    storedLocale === "zh-TW"
+  ) {
+    const nextLocale = storedLocale;
     await i18n.changeLanguage(nextLocale);
     setLocaleState(nextLocale);
     try {

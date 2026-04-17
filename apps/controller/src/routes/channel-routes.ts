@@ -35,7 +35,7 @@ import type { ControllerBindings } from "../types.js";
 
 const channelIdParamSchema = z.object({ channelId: z.string() });
 const errorSchema = z.object({ message: z.string() });
-type ControllerLocale = "en" | "zh-CN";
+type ControllerLocale = "en" | "zh-CN" | "zh-TW";
 
 function getOpenclawOrigin(container: ControllerContainer): string | null {
   try {
@@ -60,12 +60,12 @@ function localizeChannelConnectMessage(
   locale: ControllerLocale,
 ): string {
   if (!isChannelConnectError(error)) {
-    return locale === "zh-CN"
+    return locale !== "en"
       ? "连接失败，请稍后重试。"
       : "Connection failed. Please try again.";
   }
 
-  if (locale === "zh-CN") {
+  if (locale !== "en") {
     switch (error.code) {
       case "invalid_credentials":
         return "凭证无效，请检查后重试。";

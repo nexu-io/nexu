@@ -491,7 +491,7 @@ export type GetApiInternalDesktopPreferencesResponses = {
      * Desktop preferences
      */
     200: {
-        locale: 'en' | 'zh-CN';
+        locale: 'en' | 'zh-CN' | 'zh-TW';
         analyticsEnabled: boolean;
     };
 };
@@ -500,7 +500,7 @@ export type GetApiInternalDesktopPreferencesResponse = GetApiInternalDesktopPref
 
 export type PatchApiInternalDesktopPreferencesData = {
     body: {
-        locale?: 'en' | 'zh-CN';
+        locale?: 'en' | 'zh-CN' | 'zh-TW';
         analyticsEnabled?: boolean;
     };
     path?: never;
@@ -513,7 +513,7 @@ export type PatchApiInternalDesktopPreferencesResponses = {
      * Updated desktop preferences
      */
     200: {
-        locale: 'en' | 'zh-CN';
+        locale: 'en' | 'zh-CN' | 'zh-TW';
         analyticsEnabled: boolean;
     };
 };

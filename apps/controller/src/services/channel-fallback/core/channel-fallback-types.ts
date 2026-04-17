@@ -1,6 +1,6 @@
 import type { SendChannelMessageInput } from "../../openclaw-gateway-service.js";
 
-export type FallbackLang = "en" | "zh-CN";
+export type FallbackLang = "en" | "zh-CN" | "zh-TW";
 
 export type FallbackErrorCode =
   | "unknown"

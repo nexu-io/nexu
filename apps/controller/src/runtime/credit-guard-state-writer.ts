@@ -5,7 +5,7 @@ import type { ControllerEnv } from "../app/env.js";
 export class CreditGuardStateWriter {
   constructor(private readonly env: ControllerEnv) {}
 
-  async write(locale: "en" | "zh-CN"): Promise<void> {
+  async write(locale: "en" | "zh-CN" | "zh-TW"): Promise<void> {
     await mkdir(path.dirname(this.env.creditGuardStatePath), {
       recursive: true,
     });
