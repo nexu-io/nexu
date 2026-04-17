@@ -25,7 +25,7 @@ jobs:
 
       - name: Send developer issue notification
         env:
-          WEBHOOK_URL: ${{ secrets.NOTIFY_DEVELOPER_FEISHU_WEBHOOK }}
+          WEBHOOK_URL: ${{ secrets.NOTIFY_DEVELOPER_FEISHU_WEBHOOK }}  # comma-separated for multiple groups
           EVENT_KIND: issue
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
