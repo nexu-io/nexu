@@ -110,6 +110,10 @@ const tagTranslationsZh: Record<string, string> = {
 };
 
 export function getTagLabel(tag: string, locale: string): string {
-  if (locale !== "zh") return tag;
+  if (!isChineseLocale(locale)) return tag;
   return tagTranslationsZh[tag] ?? tag;
+}
+
+function isChineseLocale(locale: string): boolean {
+  return locale === "zh" || locale.startsWith("zh-");
 }
