@@ -11,22 +11,28 @@ const FEISHU_FALLBACK_TEMPLATES: FallbackTemplateMap = {
     en: "🤖 Sorry, I can't handle your request right now. Please try again later, or contact the NexU team for support: https://docs.nexu.io/guide/contact",
     "zh-CN":
       "🤖 抱歉，我暂时无法处理你的请求，请稍后重试，或联系 NexU 工作人员获取支持：https://docs.nexu.io/zh/guide/contact",
+    "zh-TW":
+      "🤖 抱歉，我暫時無法處理你的請求，請稍後再試，或聯絡 NexU 團隊取得支援：https://docs.nexu.io/zh/guide/contact",
   },
   internal_error: {
     en: "Sorry, I hit an internal error while replying. Please try again in a moment.",
     "zh-CN": "抱歉，我刚刚回复时遇到内部错误。请稍后再试。",
+    "zh-TW": "抱歉，我剛剛回覆時遇到內部錯誤。請稍後再試。",
   },
   reply_delivery_failed: {
     en: "Sorry, I couldn't deliver the previous reply successfully. Please try again in a moment.",
     "zh-CN": "抱歉，我刚刚没有成功送达上一条回复。请稍后再试。",
+    "zh-TW": "抱歉，我剛剛沒有成功送達上一條回覆。請稍後再試。",
   },
   no_final_reply: {
     en: "Sorry, I couldn't finish the previous reply. Please try again in a moment.",
     "zh-CN": "抱歉，我刚刚没有完整完成上一条回复。请稍后再试。",
+    "zh-TW": "抱歉，我剛剛沒有完整完成上一條回覆。請稍後再試。",
   },
   synthetic_pre_llm_failure: {
     en: "Sorry, Nexu intentionally interrupted this reply for diagnostics.",
     "zh-CN": "抱歉，这条回复被 Nexu 为诊断目的主动中断。",
+    "zh-TW": "抱歉，這條回覆被 Nexu 為了診斷目的主動中斷。",
   },
 };
 
@@ -94,7 +100,7 @@ export class FeishuFallbackAdapter
 
   toSendInput(input: {
     normalized: NormalizedFallback<FallbackErrorCode>;
-    lang: "en" | "zh-CN";
+    lang: "en" | "zh-CN" | "zh-TW";
     message: string;
   }) {
     const message = appendOptionalDiagnosticHint(
@@ -118,7 +124,7 @@ function appendOptionalDiagnosticHint(
   message: string,
   hint: string | undefined,
   errorCode: FallbackErrorCode,
-  lang: "en" | "zh-CN",
+  lang: "en" | "zh-CN" | "zh-TW",
 ): string {
   if (errorCode !== "unknown") {
     return message;
@@ -132,6 +138,9 @@ function appendOptionalDiagnosticHint(
   switch (lang) {
     case "zh-CN":
       suffix = `诊断提示：${trimmedHint}`;
+      break;
+    case "zh-TW":
+      suffix = `診斷提示：${trimmedHint}`;
       break;
     default:
       suffix = `Diagnostic hint: ${trimmedHint}`;

@@ -985,11 +985,17 @@ function _GeneralSettings() {
             <div className="w-full md:w-[220px] md:shrink-0">
               <Select
                 value={locale}
-                onValueChange={(value) => setLocale(value as "en" | "zh")}
+                onValueChange={(value) =>
+                  setLocale(value as "en" | "zh-CN" | "zh-TW")
+                }
               >
                 <SelectTrigger className="h-11 w-full rounded-xl border-border bg-surface-0 px-4 text-[13px] font-medium text-text-primary shadow-none hover:bg-surface-1">
                   <SelectValue>
-                    {locale === "zh" ? "中文" : "English"}
+                    {locale === "zh-CN"
+                      ? "简体中文"
+                      : locale === "zh-TW"
+                        ? "繁體中文"
+                        : "English"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent
@@ -997,10 +1003,16 @@ function _GeneralSettings() {
                   className="rounded-2xl border-border bg-surface-0 text-text-primary shadow-[0_12px_32px_rgba(0,0,0,0.08)]"
                 >
                   <SelectItem
-                    value="zh"
+                    value="zh-CN"
                     className="rounded-xl px-4 py-2 text-[13px] text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
                   >
-                    中文
+                    简体中文
+                  </SelectItem>
+                  <SelectItem
+                    value="zh-TW"
+                    className="rounded-xl px-4 py-2 text-[13px] text-text-secondary focus:bg-surface-2 focus:text-text-primary data-[state=checked]:bg-surface-2 data-[state=checked]:text-text-primary"
+                  >
+                    繁體中文
                   </SelectItem>
                   <SelectItem
                     value="en"

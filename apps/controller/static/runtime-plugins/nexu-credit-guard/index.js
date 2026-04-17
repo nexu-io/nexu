@@ -58,7 +58,11 @@ function loadState() {
 
 // ── i18n messages ───────────────────────────────────────────────────
 
-const CONTACT_LABEL = { "zh-CN": "联系我们", en: "Contact us" };
+const CONTACT_LABEL = {
+  "zh-CN": "联系我们",
+  "zh-TW": "聯絡我們",
+  en: "Contact us",
+};
 
 function t(locale, zhMsg, enMsg, contactUrl) {
   const msg = locale === "en" ? enMsg : zhMsg;

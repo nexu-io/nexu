@@ -59,13 +59,13 @@ const fallbackEventsQuerySchema = z.object({
 });
 
 const desktopPreferencesResponseSchema = z.object({
-  locale: z.enum(["en", "zh-CN"]).nullable(),
+  locale: z.enum(["en", "zh-CN", "zh-TW"]).nullable(),
   analyticsEnabled: z.boolean(),
 });
 
 const desktopPreferencesUpdateSchema = z
   .object({
-    locale: z.enum(["en", "zh-CN"]).optional(),
+    locale: z.enum(["en", "zh-CN", "zh-TW"]).optional(),
     analyticsEnabled: z.boolean().optional(),
   })
   .refine(
@@ -346,7 +346,9 @@ export function registerDesktopRoutes(
     const message =
       locale === "en"
         ? "⏳ Compacting conversation history, estimated ~30s..."
-        : "⏳ 正在整理对话记录，预计30秒内完成...";
+        : locale === "zh-TW"
+          ? "⏳ 正在整理對話記錄，預計 30 秒內完成..."
+          : "⏳ 正在整理对话记录，预计30秒内完成...";
 
     try {
       await container.gatewayService.sendChannelMessage({

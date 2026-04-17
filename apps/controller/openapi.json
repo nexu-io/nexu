@@ -1259,7 +1259,8 @@
                       "nullable": true,
                       "enum": [
                         "en",
-                        "zh-CN"
+                        "zh-CN",
+                        "zh-TW"
                       ]
                     },
                     "analyticsEnabled": {
@@ -1291,7 +1292,8 @@
                     "type": "string",
                     "enum": [
                       "en",
-                      "zh-CN"
+                      "zh-CN",
+                      "zh-TW"
                     ]
                   },
                   "analyticsEnabled": {
@@ -1315,7 +1317,8 @@
                       "nullable": true,
                       "enum": [
                         "en",
-                        "zh-CN"
+                        "zh-CN",
+                        "zh-TW"
                       ]
                     },
                     "analyticsEnabled": {
