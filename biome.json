@@ -52,6 +52,7 @@
       "specs/**",
       "apps/web/lib/api",
       "apps/controller/static/runtime-plugins/**",
+      "packages/slimclaw/runtime-plugins/**",
       "apps/web/public/skill-translations-zh.json",
       "apps/api/migrations/meta/*.json",
       "packages/slimclaw/runtime-patches/**",

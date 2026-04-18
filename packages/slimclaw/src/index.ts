@@ -4,7 +4,6 @@ export {
   resolveSlimclawRuntimeArtifacts,
   getSlimclawDescriptorPath,
   getSlimclawRuntimeRoot,
-  getSlimclawRuntimePatchesRoot,
   resolveSlimclawRuntimePaths,
   type PrepareSlimclawRuntimeStageOptions,
   type PrepareSlimclawRuntimeStageResult,

@@ -91,12 +91,6 @@ export function getSlimclawDescriptorPath(
   );
 }
 
-export function getSlimclawRuntimePatchesRoot(
-  workspaceRoot = getDefaultWorkspaceRoot(),
-): string {
-  return path.join(workspaceRoot, "packages", "slimclaw", "runtime-patches");
-}
-
 function readJsonFile<T>(filePath: string): T | null {
   try {
     return JSON.parse(readFileSync(filePath, "utf8")) as T;
@@ -260,7 +254,6 @@ export async function prepareSlimclawRuntimeStage(
 
   return prepareSlimclawRuntimeStageInternal({
     sourceOpenclawRoot: path.dirname(runtimePaths.entryPath),
-    patchRoot: getSlimclawRuntimePatchesRoot(workspaceRoot),
     targetStageRoot: options.targetStageRoot,
     log: options.log,
   });
@@ -275,6 +268,5 @@ export async function computeSlimclawRuntimeStageFingerprint(): Promise<string> 
 
   return computeSlimclawRuntimeStageFingerprintInternal({
     sourceOpenclawRoot: path.dirname(runtimePaths.entryPath),
-    patchRoot: getSlimclawRuntimePatchesRoot(workspaceRoot),
   });
 }

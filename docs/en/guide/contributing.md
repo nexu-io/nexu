@@ -22,6 +22,8 @@ If you want to update the English contribution guide itself, edit that file firs
 - Keep pull requests small and focused.
 - Never commit secrets such as API keys or tokens.
 - If you update a guide that exists in multiple languages, keep the localized versions aligned when possible.
+- Treat `AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, and `docs/**` as live docs; treat `specs/**`, `docs/plans/**`, and other dated plan/spec docs as historical snapshots that are frozen by default.
+- `packages/slimclaw` is the single source of truth for Nexu's embedded OpenClaw runtime packaging, prepared artifacts, builtin runtime plugins, and staging contract. Runtime ownership changes should go through slimclaw by default.
 
 ## Local Docs Workflow
 

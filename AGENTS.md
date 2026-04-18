@@ -10,7 +10,7 @@ Nexu is a desktop-first OpenClaw platform. Users create AI bots, connect them to
 - `apps/controller` — Single-user local control plane for Nexu config, OpenClaw sync, and runtime orchestration
 - `apps/desktop` — Electron desktop runtime shell and sidecar orchestrator
 - `apps/web` — React + Ant Design + Vite
-- `packages/slimclaw` — Repo-local Nexu-owned OpenClaw runtime contract, prepared runtime root, and staging/patch ownership for local dev and desktop packaging
+- `packages/slimclaw` — Repo-local Nexu-owned OpenClaw runtime contract and single source of truth for prepared runtime, builtin runtime assets, and staging/patch ownership for local dev and desktop packaging
 - `packages/shared` — Shared Zod schemas
 - `packages/dev-utils` — TS-first reusable utilities for local script tooling
 
@@ -188,6 +188,8 @@ The desktop test suite includes real launchd integration tests that run on macOS
 - Config generator output must match `specs/references/openclaw-config-schema.md`.
 - Do not add dependencies without explicit approval.
 - Do not modify OpenClaw source code.
+- **Historical spec/plan docs are snapshots, not living docs.** Treat `specs/**`, `docs/plans/**`, and other dated plan/spec artifacts as committed historical snapshots. Do not keep mutating them during normal documentation evolution; if the current truth changes, update live docs (`AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/**`) or create a new snapshot artifact instead.
+- **Slimclaw is the single runtime source of truth.** `packages/slimclaw` is the only canonical owner for Nexu's embedded OpenClaw capability packaging, prepared runtime artifacts, builtin runtime plugins, and staging contract. Runtime changes should land through slimclaw by default. Any exception must be justified through a spec/plan PR and explicit team discussion before implementation.
 - Never commit code changes until explicitly told to do so.
 - Desktop packaged app: never use `npx`, `npm`, `pnpm`, or any shell command that relies on the user's PATH. The packaged Electron app has no shell profile — resolve bin paths programmatically via `require.resolve()` and execute with `process.execPath`. The app must be fully self-contained.
 - Windows packaging split: use `pnpm dist:win` for the full installer/release path and keep it close to CI semantics. Use `pnpm dist:win:local` for local Windows validation when you need fast iteration; it is intentionally dir-only and reuse-first, so it is not a substitute for the full release build.
@@ -217,7 +219,7 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 - Monorepo: `apps/controller` (Hono), `apps/web` (React), `apps/desktop` (Electron), `packages/shared` (Zod schemas), `nexu-skills/` (skill repo)
 - Type safety: Zod -> OpenAPI -> generated frontend SDK. Never duplicate types.
 - Config generator: `apps/controller/src/lib/openclaw-config-compiler.ts` builds OpenClaw config from local controller state
-- Local runtime flow: `apps/controller` owns Nexu config/state, writes OpenClaw config/skills/templates, and manages the slimclaw-backed OpenClaw runtime contract directly; desktop wraps that controller-first stack with Electron + web sidecars
+- Local runtime flow: `apps/controller` owns Nexu config/state and writes dynamic OpenClaw config/skills/state, while `packages/slimclaw` remains the sole owner of the prepared embedded OpenClaw runtime and builtin runtime artifacts; desktop wraps that controller-first stack with Electron + web sidecars
 - Key data flows: local config compilation, desktop runtime boot, channel sync, file-based skill catalog
 
 ## Code style (quick reference)
@@ -271,7 +273,13 @@ See `ARCHITECTURE.md` for the full bird's-eye view. Key points:
 
 ## Documentation maintenance
 
-After significant code changes, verify documentation is current.
+After significant code changes, verify the live documentation is current.
+
+### Live docs vs historical snapshots
+
+- Treat `AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, and `docs/**` as the living documentation set.
+- Treat `specs/**`, `docs/plans/**`, and other dated design/plan artifacts as historical snapshots. Once committed, they are frozen by default and should not be used as the target for routine doc drift cleanup.
+- If guidance changes, update the live docs or add a new snapshot doc that supersedes the old one. Do not silently rewrite old snapshots to look current.
 
 ### Diff baseline
 
@@ -283,25 +291,27 @@ git diff --name-only $(git merge-base HEAD origin/main)...HEAD
 
 | Changed area | Affected docs |
 |---|---|
-| `apps/web/src/pages/` or routing | `specs/FRONTEND.md` |
-| `apps/controller/src/routes/` | `specs/references/api-patterns.md`, `specs/product-specs/*.md` |
-| `apps/controller/src/runtime/` | `ARCHITECTURE.md`, `specs/RELIABILITY.md` |
-| `apps/web/src/components/channel-setup/` | `specs/FRONTEND.md` |
+| `apps/web/src/pages/` or routing | `docs/**`, `AGENTS.md` if command/workflow guidance changed |
+| `apps/controller/src/routes/` | `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/**` if contributor-facing behavior changed |
+| `apps/controller/src/runtime/` | `ARCHITECTURE.md`, `AGENTS.md`, `docs/**` if runtime workflow changed |
+| `apps/web/src/components/channel-setup/` | `docs/**` |
 | `nexu-skills/` | `ARCHITECTURE.md` (monorepo layout) |
 | `packages/shared/src/schemas/` | `ARCHITECTURE.md` (type safety) |
+| `packages/slimclaw/**` | `AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `docs/**` when contributor/runtime guidance changed |
 | `package.json` scripts | `AGENTS.md` Commands section |
 | New/moved doc files | `AGENTS.md` Where to look |
 
 ### Cross-reference checklist
 
 1. `AGENTS.md` Where to look table — all paths valid
-2. `specs/DESIGN.md` <-> `specs/design-specs/` + `specs/designs/` (indexed)
-3. `specs/product-specs/index.md` <-> actual spec files
-4. `specs/FRONTEND.md` Pages <-> `apps/web/src/app.tsx` routes
+2. `ARCHITECTURE.md` still reflects the active system shape and ownership boundaries
+3. `CONTRIBUTING.md` and `docs/zh/guide/contributing.md` still reflect the active contributor workflow when changed
+4. `docs/.vitepress/config.ts` still indexes any new or moved live docs pages
 
 ### Rules
 
-- Regenerate `specs/generated/db-schema.md` fully from schema source
+- Only touch snapshot docs under `specs/**` when creating/replacing a snapshot or correcting an objective factual breakage that cannot be left stale
+- Regenerate `specs/generated/db-schema.md` fully from schema source when that generated snapshot itself is intentionally updated
 - Preserve original language (English/Chinese)
 - Do not auto-commit; present changes for review
 

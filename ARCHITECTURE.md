@@ -1,6 +1,6 @@
 # Architecture
 
-Nexu uses a controller-first local runtime model. In desktop/local mode, a single `apps/controller` process owns Nexu config, compiles OpenClaw config, materializes skills/templates, and orchestrates the OpenClaw runtime.
+Nexu uses a controller-first local runtime model. In desktop/local mode, a single `apps/controller` process owns Nexu config, compiles dynamic OpenClaw config, materializes stateful skills/templates, and orchestrates the OpenClaw runtime. The embedded runtime artifact itself is owned by `packages/slimclaw`, which is the single source of truth for prepared OpenClaw runtime assets, builtin runtime plugins, and runtime staging.
 
 ## System diagram
 
@@ -48,14 +48,15 @@ Never hand-write types that duplicate a schema. Use `z.infer<typeof schema>`.
 - **`apps/web/`** — React frontend. Pages in `src/pages/`, generated SDK in `lib/api/`, auth client in `src/lib/auth-client.ts`.
 - **`apps/desktop/`** — Electron desktop runtime shell and sidecar orchestrator. The active local path launches `controller + web + openclaw` sidecars only.
 - **`packages/shared/`** — Shared Zod schemas in `src/schemas/`. Includes bot, channel, gateway, invite, model, skill, and OpenClaw config schemas.
+- **`packages/slimclaw/`** — Nexu-owned embedded OpenClaw runtime contract. Owns prepare/install/prune flows, prepared runtime artifacts, builtin runtime plugin ownership, and staging/patch application.
 - **`nexu-skills/`** — Public skill repository. Each skill is a directory with `SKILL.md` frontmatter. `skills.json` is the built catalog index.
-- **`specs/`** — Design docs, references, product specs, exec plans, generated artifacts.
+- **`specs/`** — Historical design docs, references, product specs, exec plans, and generated snapshots. Useful for context, but not the living source of truth for day-to-day doc maintenance.
 
 ## Key data flows
 
-**Desktop/local config generation:** Controller reads `~/.nexu/config.json` → compiles OpenClaw config JSON (agents, channels, bindings, models) → writes `OPENCLAW_CONFIG_PATH` and managed skills/templates → OpenClaw hot-reloads.
+**Desktop/local config generation:** Controller reads `~/.nexu/config.json` → compiles OpenClaw config JSON (agents, channels, bindings, models) → writes `OPENCLAW_CONFIG_PATH` and managed dynamic skills/templates/state → OpenClaw hot-reloads against the slimclaw-owned prepared runtime.
 
-**Desktop runtime boot:** Electron desktop starts the controller sidecar, waits for controller readiness/auth bootstrap, starts the web sidecar, and delegates OpenClaw process management to `apps/controller`.
+**Desktop runtime boot:** Electron desktop resolves the slimclaw-owned runtime artifact, starts the controller sidecar, waits for controller readiness/auth bootstrap, starts the web sidecar, and delegates OpenClaw process management to `apps/controller`.
 
 **Proxy policy:** Desktop bootstrap computes one normalized proxy policy from `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`, applies it to Electron networking, propagates the normalized uppercase env into controller/web/OpenClaw child processes, and always merges loopback bypass entries (`localhost`, `127.0.0.1`, `::1`).
 

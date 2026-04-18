@@ -4,6 +4,8 @@ This file is the **canonical English** contributing guide. The docs site embeds 
 
 Thank you for helping improve nexu. The sections below cover **code**, **documentation**, and **how we review changes**.
 
+For documentation maintenance, treat `AGENTS.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, and `docs/**` as the live docs. Treat `specs/**`, `docs/plans/**`, and other dated design/plan artifacts as historical snapshots that are frozen by default once committed.
+
 If you want a lower-friction entry point, we are actively looking for **Good First Issue** contributors. Start with the [good-first-issue label](https://github.com/nexu-io/nexu/labels/good-first-issue) or the [Chinese first-PR guide](https://docs.nexu.io/zh/guide/first-pr).
 
 ## Community standards
@@ -54,11 +56,11 @@ nexu/
 │   ├── desktop/          # Electron desktop shell
 │   └── controller/       # Hono backend + OpenClaw orchestration
 ├── packages/shared/      # Shared Zod schemas
-├── packages/slimclaw/    # Repo-local OpenClaw runtime contract + prepared runtime ownership
+├── packages/slimclaw/    # Single source of truth for the embedded OpenClaw runtime contract and prepared runtime artifacts
 ├── scripts/              # Dev/CI scripts (launchd, probes, e2e)
 ├── tests/                # Vitest test suites
 ├── docs/                 # VitePress documentation site
-└── specs/                # Design docs, product specs
+└── specs/                # Historical design docs, product specs, and other snapshots
 ```
 
 ## Common commands
@@ -155,6 +157,12 @@ VitePress prints a local URL; use it to verify headings, links, and images.
 - Chinese pages: `docs/zh/`
 - New sidebar entries: update `docs/.vitepress/config.ts`
 - When you add or substantially change a guide, **keep English and Chinese in sync** when both locales exist.
+- Do not use `specs/**` or dated plan docs as the target for routine doc cleanup. If the current truth changes, update the live docs above or add a new snapshot doc instead of mutating old ones.
+
+### Runtime ownership rule
+
+- `packages/slimclaw` is the single source of truth for Nexu's embedded OpenClaw runtime packaging, prepared artifacts, builtin runtime plugins, and staging contract.
+- If your change affects embedded runtime ownership or packaging behavior, route it through slimclaw by default. Anything that intentionally bypasses slimclaw should be discussed with maintainers before implementation.
 
 ### Paste images into Markdown
 

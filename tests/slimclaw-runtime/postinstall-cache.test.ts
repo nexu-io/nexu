@@ -16,8 +16,11 @@ async function createRuntimeFixture() {
   );
   tempDirs.push(tempRoot);
 
-  const rewrittenCacheInputs = originalCacheInputs.map((inputPath) =>
-    path.join(tempRoot, path.basename(inputPath)),
+  const rewrittenCacheInputs = originalCacheInputs.map((inputPath, index) =>
+    path.join(
+      tempRoot,
+      `${String(index).padStart(3, "0")}-${path.basename(inputPath)}`,
+    ),
   );
   cacheInputs.splice(0, cacheInputs.length, ...rewrittenCacheInputs);
 

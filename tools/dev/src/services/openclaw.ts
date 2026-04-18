@@ -299,7 +299,14 @@ async function waitForOpenclawCurrentLock(options: {
   return null;
 }
 
-async function prepareOpenclawEntryPath(): Promise<string> {
+async function prepareOpenclawEntryPath(): Promise<{
+  entryPath: string;
+  durationMs: number;
+  reused: boolean;
+  patchedFileCount: number;
+  fingerprint: string;
+}> {
+  const startedAt = Date.now();
   logger.info("preparing staged openclaw runtime", {
     targetStageRoot: getOpenclawRuntimeStageRootPath(),
   });
@@ -315,8 +322,21 @@ async function prepareOpenclawEntryPath(): Promise<string> {
     reused: stage.reused,
     patchedFileCount: stage.patchedFileCount,
   });
+  logger.info("openclaw startup timing", {
+    phase: "slimclaw-stage",
+    elapsedMs: Date.now() - startedAt,
+    reused: stage.reused,
+    patchedFileCount: stage.patchedFileCount,
+    fingerprint: stage.fingerprint,
+  });
 
-  return join(stage.stagedOpenclawRoot, "openclaw.mjs");
+  return {
+    entryPath: join(stage.stagedOpenclawRoot, "openclaw.mjs"),
+    durationMs: Date.now() - startedAt,
+    reused: stage.reused,
+    patchedFileCount: stage.patchedFileCount,
+    fingerprint: stage.fingerprint,
+  };
 }
 
 export async function startOpenclawDevProcess(options: {
@@ -345,6 +365,14 @@ export async function startOpenclawDevProcess(options: {
     runId,
     sessionId,
   });
+  const timingStartedAt = Date.now();
+  let stageDurationMs = 0;
+  let spawnDurationMs = 0;
+  let portReadyDurationMs = 0;
+  let healthReadyDurationMs = 0;
+  let stageReused = false;
+  let stagePatchedFileCount = 0;
+  let stageFingerprint = "unknown";
 
   logOpenclawTiming("start:entered", startedAt);
 
@@ -352,7 +380,12 @@ export async function startOpenclawDevProcess(options: {
   await ensureDirectory(runtimeConfig.openclawStateDir);
   await ensureParentDirectory(runtimeConfig.openclawConfigPath);
   await ensureDirectory(runtimeConfig.openclawLogDir);
-  const openclawEntryPath = await prepareOpenclawEntryPath();
+  const stageResult = await prepareOpenclawEntryPath();
+  const openclawEntryPath = stageResult.entryPath;
+  stageDurationMs = stageResult.durationMs;
+  stageReused = stageResult.reused;
+  stagePatchedFileCount = stageResult.patchedFileCount;
+  stageFingerprint = stageResult.fingerprint;
 
   logOpenclawTiming("filesystem-ready", startedAt);
   logger.info("starting openclaw supervisor", {
@@ -360,6 +393,7 @@ export async function startOpenclawDevProcess(options: {
     logFilePath,
   });
 
+  const spawnStartedAt = Date.now();
   const processHandle = await spawnHiddenProcess({
     command: commandSpec.command,
     args: commandSpec.args,
@@ -384,6 +418,7 @@ export async function startOpenclawDevProcess(options: {
   try {
     if (processHandle.child) {
       await waitForProcessStart(processHandle.child, "openclaw dev process");
+      spawnDurationMs = Date.now() - spawnStartedAt;
       logOpenclawTiming("supervisor-process-start-confirmed", startedAt);
     }
   } finally {
@@ -402,8 +437,10 @@ export async function startOpenclawDevProcess(options: {
     port: runtimeConfig.openclawPort,
   });
 
+  const portWaitStartedAt = Date.now();
   try {
     listenerPid = await waitForOpenclawPortPid(supervisorPid, logFilePath);
+    portReadyDurationMs = Date.now() - portWaitStartedAt;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -417,8 +454,10 @@ export async function startOpenclawDevProcess(options: {
     readyUrl: `${runtimeConfig.openclawBaseUrl}/health`,
   });
 
+  const healthWaitStartedAt = Date.now();
   try {
     await waitForOpenclawReady(supervisorPid, logFilePath);
+    healthReadyDurationMs = Date.now() - healthWaitStartedAt;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
@@ -434,6 +473,16 @@ export async function startOpenclawDevProcess(options: {
   });
 
   logOpenclawTiming("lock-written", startedAt);
+  logger.info("[dev:openclaw][timing] summary", {
+    totalMs: Date.now() - timingStartedAt,
+    stageMs: stageDurationMs,
+    spawnMs: spawnDurationMs,
+    portReadyMs: portReadyDurationMs,
+    healthReadyMs: healthReadyDurationMs,
+    reused: stageReused,
+    patchedFileCount: stagePatchedFileCount,
+    fingerprint: stageFingerprint,
+  });
 
   return {
     service: "openclaw",

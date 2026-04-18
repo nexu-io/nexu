@@ -4,6 +4,8 @@
 
 感谢你为 nexu 花时间改进项目。本页说明如何参与 **代码**、**文档** 贡献，以及 **PR 与协作约定**。
 
+文档维护上，`AGENTS.md`、`ARCHITECTURE.md`、`CONTRIBUTING.md` 与 `docs/**` 属于持续演进的 live docs；`specs/**`、`docs/plans/**` 以及其他带日期的设计/计划文档原则上属于历史快照，提交后默认冻结。
+
 Nexu 开源共创招募中，欢迎一起来写代码、拿积分、上榜单。想低门槛开始，可以先看 [第一次提 PR 指南](/zh/guide/first-pr)。
 
 我们长期维护 [Good First Issue 列表](https://github.com/nexu-io/nexu/labels/good-first-issue)，题目边界清晰、方向聚焦，还配有 AI Prompt 模板，方便你更快上手。首次贡献者和 `good-first-issue` 认领者，我们也会尽量提供引导与反馈。更多说明见 [贡献奖励与支持](/zh/guide/contributor-rewards)。
@@ -52,14 +54,14 @@ pnpm install
 ```text
 nexu/
 ├── apps/
-│   ├── api/
-│   ├── web/
-│   ├── desktop/      # Electron 桌面客户端
-│   └── controller/
-├── packages/shared/
-├── docs/             # VitePress 文档站
-├── tests/
-└── specs/
+│   ├── web/              # React + Ant Design dashboard
+│   ├── desktop/          # Electron 桌面运行时外壳
+│   └── controller/       # Hono backend + OpenClaw 编排
+├── packages/shared/      # 共享 Zod schemas
+├── packages/slimclaw/    # 嵌入式 OpenClaw runtime contract 与 prepared artifacts 的唯一真相源
+├── docs/                 # VitePress 文档站
+├── tests/                # Vitest 测试
+└── specs/                # 历史设计文档、产品规格与快照
 ```
 
 ## 常用命令
@@ -68,13 +70,18 @@ nexu/
 
 | 命令 | 作用 |
 | --- | --- |
-| `pnpm dev` | 开发态（controller + web）热更新 |
-| `pnpm dev:desktop` | 桌面客户端开发 |
+| `pnpm dev start` | 本地轻量栈：openclaw -> controller -> web -> desktop |
+| `pnpm dev start <service>` | 单独启动一个本地开发服务 |
+| `pnpm dev stop` | 按逆序停止本地轻量栈 |
+| `pnpm dev restart` | 重启本地轻量栈 |
 | `pnpm dev:controller` | 仅启动 controller |
+| `pnpm start` | 完整桌面运行时（Electron + launchd，macOS） |
+| `pnpm stop` | 停止桌面运行时 |
+| `pnpm status` | 查看桌面运行时状态 |
 | `pnpm build` | 各包生产构建 |
 | `pnpm typecheck` | 全仓库 TypeScript 检查 |
-| `pnpm lint` | Biome 检查 + `typecheck`（与 CI 主流程一致） |
-| `pnpm lint:fix` | 在可行范围内自动修复并 typecheck |
+| `pnpm lint` | Biome 检查 |
+| `pnpm lint:fix` | 在可行范围内自动修复 |
 | `pnpm format` | 使用 Biome 格式化/写入 |
 | `pnpm test` | 根目录 Vitest（`vitest run`） |
 | `pnpm check:esm-imports` | ESM 路径检查（CI 中也会跑） |
@@ -150,6 +157,12 @@ pnpm dev
 - 中文：`docs/zh/`
 - 新增侧边栏条目：修改 `docs/.vitepress/config.ts`
 - 新增或大幅修改指南时，若两种语言都有对应页面，请**尽量保持中英文同步**。
+- 不要把 `specs/**` 或带日期的计划文档当作日常文档清理目标；当前事实变化时，应更新 live docs，或新增快照文档，而不是回写旧快照。
+
+### Runtime ownership 规则
+
+- `packages/slimclaw` 是 Nexu 嵌入式 OpenClaw runtime packaging、prepared artifacts、builtin runtime plugins 与 staging contract 的唯一真相源。
+- 任何会改变嵌入式 runtime 所有权或打包行为的改动，原则上都应通过 slimclaw 落地；若要绕开 slimclaw，先与维护者对齐。
 
 ### 在 Markdown 中贴图
 
