@@ -114,8 +114,22 @@ async function bootstrapLocale(
   // flight, their selection is the source of truth — don't overwrite it.
   // Issue #759: on Windows zh-CN systems, the bootstrap was reverting a
   // user-selected English back to Chinese on the welcome screen.
+  // Issue #448: the welcome page language switcher does not change UI language
+  // because the bootstrap was overwriting the user's selection.
   if (userInteractedRef.current) {
     return;
+  }
+
+  // If the user has manually selected a language via localStorage, use that
+  // as the source of truth and don't overwrite it with the server value.
+  try {
+    const manualSelection = localStorage.getItem(STORAGE_KEY);
+    if (manualSelection === "en" || manualSelection === "zh") {
+      // User has manually selected a language, respect their choice
+      return;
+    }
+  } catch {
+    /* ignore */
   }
 
   if (storedLocale === "en" || storedLocale === "zh-CN") {
