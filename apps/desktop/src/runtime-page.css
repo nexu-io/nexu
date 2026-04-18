@@ -1294,7 +1294,8 @@ body,
 .update-card {
   position: fixed;
   bottom: 80px;
-  left: 12px;
+  right: 12px;
+  left: auto;
   z-index: 9000;
   width: fit-content;
   min-width: 220px;

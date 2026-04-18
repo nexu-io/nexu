@@ -31,6 +31,8 @@
 > 🦞 **最丝滑接入微信 OpenClaw**：扫码即连，开箱即用。
 >
 > 🖥 **已支持平台**：macOS（Apple Silicon）· macOS（Intel）· Windows — [立即下载](https://nexu.io)
+>
+> 🌟 **欢迎贡献**：第一次提交PR？查看我们的[贡献指南](https://docs.nexu.io/zh/guide/first-pr)开始你的开源之旅！
 
 ---
 
