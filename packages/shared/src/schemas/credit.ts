@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const creditSourceTypeSchema = z.enum([
+export const knownCreditSourceTypeSchema = z.enum([
   "signup_bonus",
   "daily_bonus",
   "github_star",
@@ -8,7 +8,10 @@ export const creditSourceTypeSchema = z.enum([
   "test",
 ]);
 
+export const creditSourceTypeSchema = z.string().min(1);
+
 export type CreditSourceType = z.infer<typeof creditSourceTypeSchema>;
+export type KnownCreditSourceType = z.infer<typeof knownCreditSourceTypeSchema>;
 
 export const creditUsageSummarySchema = z.object({
   totalEntries: z.number().int().nonnegative(),
@@ -45,7 +48,7 @@ export const creditRechargeRecordSchema = z.object({
   source: creditSourceTypeSchema,
   sourceId: z.string().nullable(),
   description: z.string().nullable(),
-  expiresAt: z.string(),
+  expiresAt: z.string().nullable(),
   enabled: z.boolean(),
   idempotencyKey: z.string(),
   metadata: z.record(z.unknown()),

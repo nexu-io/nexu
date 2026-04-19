@@ -631,14 +631,27 @@ async function waitForDesktopReady() {
     return r.ok;
   }, "web ready");
 
-  // Discover actual openclaw port from controller readiness payload or
-  // fall back to scanning common ports. The port may differ from 18789
-  // if another service occupied it.
-  const ocPort = readyPayload?.openclawPort ?? 18789;
-  await waitFor(async () => {
-    const r = await fetch(`http://127.0.0.1:${ocPort}/health`);
-    return r.ok;
-  }, `openclaw health (port ${ocPort})`);
+  // Discover actual openclaw port from controller readiness payload,
+  // runtime-ports.json, or by scanning common ports. The port may differ
+  // from 18789 if another service occupied it at launch time.
+  const candidatePorts = [
+    readyPayload?.openclawPort,
+    18789,
+    18790,
+    18791,
+  ].filter(Boolean);
+  await waitFor(
+    async () => {
+      for (const p of candidatePorts) {
+        try {
+          const r = await fetch(`http://127.0.0.1:${p}/health`);
+          if (r.ok) return true;
+        } catch {}
+      }
+      return false;
+    },
+    `openclaw health (ports ${[...new Set(candidatePorts)].join(",")})`,
+  );
 }
 
 // ---------------------------------------------------------------------------

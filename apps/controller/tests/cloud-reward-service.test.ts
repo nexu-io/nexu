@@ -546,6 +546,72 @@ describe("createCloudRewardService", () => {
       expect(result.reason).toBe("parse_error");
     });
 
+    it("accepts future credit source strings without failing the whole response", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                ...mockCreditRecordsResponse,
+                grants: [
+                  {
+                    ...mockCreditRecordsResponse.grants[0],
+                    source: "campaign_gift",
+                  },
+                ],
+              }),
+              {
+                status: 200,
+              },
+            ),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditRecords();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      expect(result.data.grants[0]?.source).toBe("campaign_gift");
+    });
+
+    it("accepts credit records with null expiresAt", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                ...mockCreditRecordsResponse,
+                grants: [
+                  {
+                    ...mockCreditRecordsResponse.grants[0],
+                    expiresAt: null,
+                  },
+                ],
+              }),
+              {
+                status: 200,
+              },
+            ),
+        ),
+      );
+
+      const service = createCloudRewardService({
+        cloudUrl: CLOUD_URL,
+        apiKey: API_KEY,
+      });
+      const result = await service.getCreditRecords();
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("unreachable");
+      expect(result.data.grants[0]?.expiresAt).toBeNull();
+    });
+
     it("uses the credit records endpoint", async () => {
       let capturedUrl = "";
 

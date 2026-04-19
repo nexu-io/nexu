@@ -915,6 +915,191 @@ describe("NexuConfigStore", () => {
     }
   });
 
+  it("classifies future gifted grant sources into gifted balance instead of plan balance", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              tasks: [],
+              progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+              cloudBalance: {
+                totalBalance: 480,
+                totalRecharged: 480,
+                totalConsumed: 0,
+                syncedAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            appUserId: "user-1",
+            grants: [
+              {
+                id: "campaign-grant",
+                appUserId: "user-1",
+                amount: 480,
+                balance: 480,
+                source: "campaign_gift",
+                sourceId: null,
+                description: "trial gift",
+                expiresAt: "2099-04-01T00:00:00.000Z",
+                enabled: true,
+                idempotencyKey: "campaign-gift-1",
+                metadata: {},
+                createdAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            ],
+            usageSummary: {
+              totalEntries: 0,
+              totalDueCredits: 0,
+              totalChargedCredits: 0,
+              totalCostUsd: "0",
+            },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.cloudBalance?.totalBalance).toBe(480);
+      expect(status.cloudBalance?.giftedBalance).toBe(480);
+      expect(status.cloudBalance?.planBalance).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("treats gifted grants with null expiresAt as active balance", async () => {
+    await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
+    await writeFile(
+      path.join(rootDir, ".nexu", "config.json"),
+      JSON.stringify(
+        {
+          version: 1,
+          desktop: {
+            cloud: {
+              connected: true,
+              polling: false,
+              userName: "Cloud User",
+              userEmail: "user@nexu.io",
+              connectedAt: "2026-04-01T00:00:00.000Z",
+              linkUrl: "https://link.nexu.io",
+              apiKey: "valid-key",
+              models: [],
+            },
+          },
+          secrets: {},
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const store = new NexuConfigStore(env);
+
+    let fetchCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        fetchCalls += 1;
+        if (fetchCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              tasks: [],
+              progress: { claimedCount: 0, totalCount: 0, earnedCredits: 0 },
+              cloudBalance: {
+                totalBalance: 300,
+                totalRecharged: 300,
+                totalConsumed: 0,
+                syncedAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            appUserId: "user-1",
+            grants: [
+              {
+                id: "signup-grant",
+                appUserId: "user-1",
+                amount: 300,
+                balance: 300,
+                source: "signup_bonus",
+                sourceId: null,
+                description: null,
+                expiresAt: null,
+                enabled: true,
+                idempotencyKey: "signup-null-expiry",
+                metadata: {},
+                createdAt: "2026-04-01T00:00:00.000Z",
+                updatedAt: "2026-04-01T00:00:00.000Z",
+              },
+            ],
+            usageSummary: {
+              totalEntries: 0,
+              totalDueCredits: 0,
+              totalChargedCredits: 0,
+              totalCostUsd: "0",
+            },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    try {
+      const status = await store.getDesktopRewardsStatus();
+      expect(status.cloudBalance?.giftedBalance).toBe(300);
+      expect(status.cloudBalance?.planBalance).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("falls back to plan-only balance when credit records cannot be loaded", async () => {
     await mkdir(path.join(rootDir, ".nexu"), { recursive: true });
     await writeFile(

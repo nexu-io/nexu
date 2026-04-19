@@ -121,6 +121,15 @@ const GIFTED_CREDIT_SOURCES = new Set<CreditRechargeRecord["source"]>([
   "test",
 ]);
 
+const GIFTED_CREDIT_SOURCE_HINTS = [
+  "gift",
+  "bonus",
+  "trial",
+  "promo",
+  "campaign",
+  "grant",
+];
+
 export type DesktopCloudStateChange = {
   hadCloudInventory: boolean;
   hasCloudInventory: boolean;
@@ -573,6 +582,10 @@ function isActiveCreditGrant(
     return false;
   }
 
+  if (typeof grant.expiresAt !== "string" || grant.expiresAt.length === 0) {
+    return true;
+  }
+
   const expiresAtTimestamp = Date.parse(grant.expiresAt);
   if (!Number.isFinite(expiresAtTimestamp)) {
     return true;
@@ -581,13 +594,32 @@ function isActiveCreditGrant(
   return expiresAtTimestamp > nowTimestamp;
 }
 
+function isGiftedCreditGrant(grant: CreditRechargeRecord): boolean {
+  const source = grant.source.trim().toLowerCase();
+  if (GIFTED_CREDIT_SOURCES.has(source)) {
+    return true;
+  }
+
+  const searchableValues = [
+    source,
+    typeof grant.description === "string"
+      ? grant.description.toLowerCase()
+      : "",
+    JSON.stringify(grant.metadata).toLowerCase(),
+  ];
+
+  return GIFTED_CREDIT_SOURCE_HINTS.some((hint) =>
+    searchableValues.some((value) => value.includes(hint)),
+  );
+}
+
 function deriveDesktopBalanceBreakdown(input: {
   totalBalance: number;
   grants: CreditRechargeRecord[];
 }): DesktopBalanceBreakdown & { giftedBalanceRaw: number } {
   const nowTimestamp = Date.now();
   const giftedBalanceRaw = input.grants.reduce((sum, grant) => {
-    if (!GIFTED_CREDIT_SOURCES.has(grant.source)) {
+    if (!isGiftedCreditGrant(grant)) {
       return sum;
     }
 
